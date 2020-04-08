@@ -1,0 +1,984 @@
+-- *****************************************************************
+-- MY-QOS-MIB.mib:  My QoS MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+MY-QOS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32,
+        Unsigned32
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus,
+        IfIndex
+                FROM MY-TC    
+        EnabledStatus 
+                FROM P-BRIDGE-MIB                            
+        myMgmt
+                FROM MY-SMI;
+
+myQoSMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "D-Link Crop."
+        CONTACT-INFO
+                " 
+                http://support.dlink.com"
+        DESCRIPTION
+                "This module defines my QoS(Policy-Based Quality of Service) mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 18}
+
+-- Priority configure
+
+myQoSPriorityMIBObjects OBJECT IDENTIFIER ::= { myQoSMIB 1 }
+
+myQoSGlobalStatus OBJECT-TYPE
+    SYNTAX  EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+           "QoS function status"
+         ::={ myQoSPriorityMIBObjects 1 }
+                  
+myPriorityTrafficClassNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of the traffic class the priority can mapping to.
+            Traffic class is a  number in the range (1..myPriorityTrafficClassNum)"
+        ::= { myQoSPriorityMIBObjects 2 }
+
+myPriorityClassNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of the priority class.
+             The range of Priority class is (0..(myPriorityClassNum-1))"
+        ::= { myQoSPriorityMIBObjects 3 }
+
+myPriorityDscpMaxValue OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "max value of the dscp in system."
+        ::= { myQoSPriorityMIBObjects 4 }
+    
+myTrafficClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping evaluated User Priority to Traffic
+            Class, for forwarding by the bridge.  Traffic class is a
+            number in the range (1..myPriorityTrafficClassNum)."
+    ::= { myQoSPriorityMIBObjects 5 }
+    
+myTrafficClassEntry OBJECT-TYPE
+        SYNTAX MyTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "User Priority to Traffic Class mapping."
+        INDEX { myTrafficClassPriority }
+    ::= { myTrafficClassTable 1 }
+
+    
+MyTrafficClassEntry ::=
+        SEQUENCE {
+        myTrafficClassPriority
+                INTEGER,
+        myTrafficClass
+                INTEGER,
+        myPriorityToDscp
+                Integer32
+        }
+    
+myTrafficClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The Priority value determined for the received frame.
+            This value is equivalent to the priority indicated in
+            the tagged frame received, or one of the evaluated
+            priorities, determined according to the media-type.
+    
+            For untagged frames received from Ethernet media, this
+            value is equal to the myPortDefaultUserPriority value
+            for the ingress port.
+    
+            For untagged frames received from non-Ethernet media,
+            this value is equal to the myRegenUserPriority value
+            for the ingress port and media-specific user priority.
+            
+            This value is in the range(0..(myPriorityClassNum-1))"
+    ::= { myTrafficClassEntry 1 }
+    
+myTrafficClass OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The Traffic Class the received frame is mapped to, Its value
+            ranges between 0 and the value of the object myPriorityTrafficClass - 1.
+            The priority is higher if this value is bigger."
+    ::= { myTrafficClassEntry 2 }
+    
+myPriorityToDscp OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Dscp value of priority mapping to."
+    ::= { myTrafficClassEntry 3 }
+
+-- mapping of dscp to priority
+myDscpClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyDscpClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping evaluated dscp to priority."
+    ::= { myQoSPriorityMIBObjects 6 }
+    
+myDscpClassEntry OBJECT-TYPE
+        SYNTAX MyDscpClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A entry mapping evaluated dscp to priority."
+        INDEX { myDscpClass }
+    ::= { myDscpClassTable 1 }
+    
+MyDscpClassEntry ::=
+        SEQUENCE {
+        myDscpClass
+                INTEGER,
+        myDscpTrafficClassPriority
+                INTEGER                
+        }
+
+myDscpClass OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Dscp value.This value is even number in 0 between62"
+    ::= { myDscpClassEntry 1 }
+        
+myDscpTrafficClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The priority which dscp value mapped to.            
+            This value is in the range(0..(myPriorityClassNum-1))"
+    ::= { myDscpClassEntry 2 }
+             
+
+myPriorityTrafficClassOperMode OBJECT-TYPE
+        SYNTAX INTEGER{
+                   qos-sp(1),  -- SP arithmetic
+                   qos-wrr(2),  -- WRR arithmetic
+                   qos-drr(3)
+               }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The global arithmetic type which the priority traffic class use."  
+        ::= { myQoSPriorityMIBObjects 7 }
+        
+myPriorityBandWidth OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The global weight setting for every queue  
+             Each octet indicate a traffic class queue in the range(1..255)
+              ,first octet indicate first queue. 
+              The string length equal to myPriorityTrafficClassNum."  
+        ::= { myQoSPriorityMIBObjects 8 }
+        
+        
+myIfPriorityTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyIfPriorityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table that contains information about every interface"
+    ::= { myQoSPriorityMIBObjects 9 }
+
+myIfPriorityEntry OBJECT-TYPE
+        SYNTAX MyIfPriorityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of Default User Priorities for each interface."
+        INDEX { myIfPriorityIfIndex }
+    ::= { myIfPriorityTable 1 }
+    
+MyIfPriorityEntry ::=
+        SEQUENCE {
+            myIfPriorityIfIndex
+                IfIndex,
+            myIfPriority
+                Integer32,
+            myIfPriTrafficClassOperMode
+                INTEGER,
+            myIfPriorityBandwidth
+                OCTET STRING,
+            myIfPriorityQosTrustMode
+                INTEGER
+        }
+myIfPriorityIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            ""
+     ::= { myIfPriorityEntry 1 }
+                
+myIfPriority OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The default ingress User Priority for this interface.
+            This value is in the range (0..(myPriorityClassNum-1))"
+    ::= { myIfPriorityEntry 2 }
+      
+--myIfPriorityDscpMutation OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp Mutation name of this interface match. It indicate that 
+--            this interface doesn't match any dscp mutation which this string is null"
+--        ::= { myIfPriorityEntry  3 }  
+
+myIfPriTrafficClassOperMode OBJECT-TYPE
+        SYNTAX INTEGER{
+                   qos-sp(1),  -- SP arithmetic
+                   qos-wrr(2),  -- WRR arithmetic
+                   qos-drr(3)
+               }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The arithmetic type which the priority traffic class use in this interface."  
+        ::= { myIfPriorityEntry 3 }
+            
+myIfPriorityBandwidth OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The weight of every queue on a interface. 
+             Each octet indicate a traffic class queue in the range(1..255)
+              ,first octet indicate first queue. 
+              The string length equal to myPriorityTrafficClassNum."  
+        ::= { myIfPriorityEntry 4 }
+
+myIfPriorityQosTrustMode OBJECT-TYPE
+        SYNTAX INTEGER{
+               not-trust(1),       
+               trust-cos(2),
+               trust-dscp(3),
+               trust-ip-precedence(4)  
+           } 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "QoS trust mode  for this interface."
+    ::= { myIfPriorityEntry 5 }
+
+-- ippre to dscp table
+myIpPreClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyIpPreClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping ip precedence to dscp value." 
+    ::= { myQoSPriorityMIBObjects 10 }
+    
+myIpPreClassEntry OBJECT-TYPE
+        SYNTAX MyIpPreClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Ip precedence to dscp mapping."
+        INDEX { myIpPreClassPriority }
+    ::= { myIpPreClassTable 1 }
+
+    
+MyIpPreClassEntry ::=
+        SEQUENCE {
+        myIpPreClassPriority
+                INTEGER,
+        myIpPreToDscp
+                Integer32
+        }
+    
+myIpPreClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The Ip precedence value determined for the received frame."
+    ::= { myIpPreClassEntry 1 }
+    
+    
+myIpPreToDscp OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Dscp value of priority mapping to."
+    ::= { myIpPreClassEntry 2 }
+
+-- Rate limit support
+myIfRateLimitTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyIfRateLimitEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of rate limit interface objects."
+        ::= { myQoSPriorityMIBObjects 11 }
+    
+myIfRateLimitEntry OBJECT-TYPE
+        SYNTAX MyIfRateLimitEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entry ACL interface information."
+        INDEX { myIfRateLimitIndex }
+        ::= { myIfRateLimitTable 1 }
+
+MyIfRateLimitEntry ::=
+        SEQUENCE {
+            myIfRateLimitIndex IfIndex,
+            myIfRateLimitInMaxBandWidth Unsigned32,
+            myIfRateLimitInBurstFlowLimit Integer32,
+            myIfRateLimitOutMaxBandWidth Unsigned32,
+            myIfRateLimitOutBurstFlowLimit Integer32
+        }
+
+myIfRateLimitIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            " "
+        ::= { myIfRateLimitEntry 1 }
+
+myIfRateLimitInMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Input maximum bandwidth of in units of kbps.
+             0 indicate that bandwidth will be not limitted."
+        ::= { myIfRateLimitEntry 2 }
+        
+myIfRateLimitInBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Input limit of burst traffic in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { myIfRateLimitEntry 3 }
+
+myIfRateLimitOutMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Ouput maximum bandwidth of in units of kbps.
+             0 indicate that bandwidth will be not limitted."
+        ::= { myIfRateLimitEntry 4 }
+        
+myIfRateLimitOutBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Ouput limit of burst traffic in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { myIfRateLimitEntry 5 }
+
+--------------------------------------------------------------
+-- QoS traffic classification
+---------------------------------------------------------------
+myQoSTrafficClassMIBObjects OBJECT IDENTIFIER ::= { myQoSMIB 2 }
+
+myQoSTrafficClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyQoSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos traffic classification entries."
+        ::= { myQoSTrafficClassMIBObjects 1 }
+    
+myQoSTrafficClassEntry OBJECT-TYPE
+        SYNTAX MyQoSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS traffic classification entry.Every valid QoS traffic 
+                 classification entry need make use of a MyAclEntry which
+                 myAclFlowAction is 'permit'."  
+        INDEX { myQosClassMapName }
+        ::= { myQoSTrafficClassTable 1 }
+        
+MyQoSTrafficClassEntry ::= 
+        SEQUENCE {
+                myQosClassMapName DisplayString,
+                myQosClassAclName DisplayString,
+                myQosClassMapEntryStatus ConfigStatus
+        }
+myQosClassMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS class map.This value is unique for every entry.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { myQoSTrafficClassEntry  1 }
+         
+myQosClassAclName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (0..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Access list name of this class map match.Null indicate that this class 
+            map doesn't match any acl"
+        ::= { myQoSTrafficClassEntry  2 } 
+        
+myQosClassMapEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a class map entry,
+             and set its value to invalid will delete this entry."
+        ::= { myQoSTrafficClassEntry 3 }
+        
+
+myQoSPoliceMapTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyQoSPoliceMapEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos police map entries."
+        ::= { myQoSTrafficClassMIBObjects 2 }
+    
+myQoSPoliceMapEntry OBJECT-TYPE
+        SYNTAX MyQoSPoliceMapEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS police map entry."  
+        INDEX { myQosPoliceMapName}
+        ::= { myQoSPoliceMapTable 1 }
+        
+MyQoSPoliceMapEntry ::= 
+        SEQUENCE {
+                myQosPoliceMapName DisplayString,
+                myQosPoliceMapEntryStatus ConfigStatus
+        }
+myQosPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS police map.
+             When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { myQoSPoliceMapEntry  1 }
+                
+myQosPoliceMapEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+        ::= { myQoSPoliceMapEntry 2 }
+
+myQoSPoliceMapConfTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyQoSPoliceMapConfEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos police map config entries."
+        ::= { myQoSTrafficClassMIBObjects 3 }
+    
+myQoSPoliceMapConfEntry OBJECT-TYPE
+        SYNTAX MyQoSPoliceMapConfEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS police map config entry."  
+        INDEX { myQoSPoliceCfgPoliceMapName,myQoSPoliceCfgClassMapName}
+        ::= { myQoSPoliceMapConfTable 1 }
+        
+MyQoSPoliceMapConfEntry ::= 
+        SEQUENCE {
+                myQoSPoliceCfgPoliceMapName DisplayString,
+                myQoSPoliceCfgClassMapName DisplayString,
+                myQoSPoliceMapConfMaxBandWidth Unsigned32,
+                myQoSPoliceMapConfBurstFlowLimit Integer32,
+                myQoSPoliceMapConfExceedAction INTEGER,
+                myQoSPoliceMapConfExceedDscp Integer32,
+                myQoSPoliceMapConfNewDscp Integer32,
+                myQoSPoliceMapCfgEntryStatus ConfigStatus,
+                myQoSPoliceMapConfMaxHighBandWidth Unsigned32
+        }
+myQoSPoliceCfgPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS police map.
+             When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { myQoSPoliceMapConfEntry  1 }
+         
+myQoSPoliceCfgClassMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "A QoS class map name of this police map match.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { myQoSPoliceMapConfEntry  2 } 
+    
+myQoSPoliceMapConfMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Maximum bandwidth of this traffic classification in units of bps.
+            If the Maximum bandwidth is greater than the maximum value
+            reportable by this object then this object should report its
+            maximum value (4,294,967,295) and myQoSPoliceMapConfMaxBandWidth
+             must be used to set or report the Maximum bandwidth. 
+             0 indicate that bandwidth will be not limitted."
+        ::= { myQoSPoliceMapConfEntry 3 }
+        
+myQoSPoliceMapConfBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Limit of burst traffic of this traffic classification in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { myQoSPoliceMapConfEntry 4 }
+                
+        
+myQoSPoliceMapConfExceedAction OBJECT-TYPE
+        SYNTAX INTEGER{
+               discard(1),     --discard part exceeded bandwidth of traffic
+               modify-dscp(2)  --modify dscp value of packet exceeded bandwidth
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The action deal with the traffic exceeded bandwidth."
+        ::= { myQoSPoliceMapConfEntry 5 }        
+        
+myQoSPoliceMapConfExceedDscp OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The new dscp value will replaces the old dscp value of packet when 
+             traffic of packet has exceeded bandwidth. This value has meaning only
+             when value of myQoSPoliceMapConfExceedAction is 'modify-dscp' ."
+        ::= { myQoSPoliceMapConfEntry 6 }
+        
+myQoSPoliceMapConfNewDscp OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The new dscp value will replaces the old dscp value of packet regardless
+             whether the traffic has exceeded bandwidth. Setting this value to -1 indicate
+             that the dscp value of packet will not be modifed"            
+        ::= { myQoSPoliceMapConfEntry 7 }        
+        
+myQoSPoliceMapCfgEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+        ::= { myQoSPoliceMapConfEntry 8 }
+
+    
+myQoSPoliceMapConfMaxHighBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Maximum bandwidth of this traffic classification in units of kbps.
+            0 indicate that bandwidth will be not limitted.
+            when myQoSPoliceMapConfMaxBandWidth is equal to ,this object display
+            the real  Maximum bandwidth of this traffic classification"
+        ::= { myQoSPoliceMapConfEntry 9 }
+        
+--myQosPoliceIfTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF MyQosPoliceIfEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "list of QoS Police Map interface objects."
+--        ::= { myQoSTrafficClassMIBObjects 4 } this oid is obsolete
+--    
+--myQosPoliceIfEntry OBJECT-TYPE
+--        SYNTAX MyQosPoliceIfEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "Entry ACL interface information."
+--        INDEX { myQosPoliceIfIndex }
+--        ::= { myQosPoliceIfTable 1 }
+--
+--MyQosPoliceIfEntry ::=
+--        SEQUENCE {
+--            myQosPoliceIfIndex IfIndex,
+--            myIfPoliceMapName  DisplayString
+--        }
+--
+--myQosPoliceIfIndex OBJECT-TYPE
+--        SYNTAX IfIndex
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            " "
+--        ::= { myQosPoliceIfEntry 1 }
+--
+--myIfPoliceMapName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Police map name of this interface match. It indicate that 
+--            this interface doesn't match any ACL which this string is null"
+--        ::= { myQosPoliceIfEntry  2 }        
+
+myQosPoliceIfExtTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyQosPoliceIfExtEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of QoS Police Map interface objects."
+        ::= { myQoSTrafficClassMIBObjects 5 }
+    
+myQosPoliceIfExtEntry OBJECT-TYPE
+        SYNTAX MyQosPoliceIfExtEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entry ACL interface information."
+        INDEX { myQosPoliceIfIndex }
+        ::= { myQosPoliceIfExtTable 1 }
+
+MyQosPoliceIfExtEntry ::=
+        SEQUENCE {
+            myQosPoliceIfIndex IfIndex,
+            myIfInPoliceMapName  DisplayString,
+            myIfOutPoliceMapName  DisplayString
+        }
+
+myQosPoliceIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            " "
+        ::= { myQosPoliceIfExtEntry 1 }
+
+myIfInPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Police map name of this interface ingress match. It indicate that 
+            this interface doesn't match any ACL which this string is null"
+        ::= { myQosPoliceIfExtEntry  2 }        
+
+myIfOutPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Police map name of this interface egress match. It indicate that 
+            this interface doesn't match any ACL which this string is null"
+        ::= { myQosPoliceIfExtEntry  3 }        
+
+-- conformance information
+
+myQoSMIBConformance OBJECT IDENTIFIER ::= { myQoSMIB 3 }
+myQoSMIBCompliances OBJECT IDENTIFIER ::= { myQoSMIBConformance 1 }
+myQoSMIBGroups      OBJECT IDENTIFIER ::= { myQoSMIBConformance 2 }
+
+
+-- compliance statements
+
+myQoSMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My QoS MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { 
+                          myQoSPriorityMIBGroup,
+                          myQoSTrafficClassMIBGroup 
+                          }
+        ::= { myQoSMIBCompliances 1 }
+
+-- units of conformance
+
+myQoSPriorityMIBGroup OBJECT-GROUP
+        OBJECTS {
+                myQoSGlobalStatus, 
+                myPriorityTrafficClassNum,
+                myPriorityClassNum,
+                myPriorityDscpMaxValue,
+                
+                myTrafficClassPriority,
+                myTrafficClass,
+                myPriorityToDscp,
+                
+                myDscpClass,
+                myDscpTrafficClassPriority,
+                                                 
+                myPriorityTrafficClassOperMode,
+                myPriorityBandWidth,
+                
+                myIfPriorityIfIndex,
+                myIfPriority,
+                myIfPriTrafficClassOperMode,
+                myIfPriorityBandwidth,
+                myIfPriorityQosTrustMode,
+
+                myIpPreClassPriority,
+                myIpPreToDscp
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qos priority ability to a
+                My agent."
+        ::= { myQoSMIBGroups 1 }        
+        
+myQoSTrafficClassMIBGroup OBJECT-GROUP
+        OBJECTS {
+                myQosClassMapName,
+                myQosClassAclName,
+                myQosClassMapEntryStatus,
+                
+                myQosPoliceMapName,
+--                myQosPoliceClassMapName,
+                myQosPoliceMapEntryStatus,
+                
+                myQoSPoliceCfgPoliceMapName,
+                myQoSPoliceCfgClassMapName,
+                myQoSPoliceMapConfMaxBandWidth,
+                myQoSPoliceMapConfExceedAction,
+                myQoSPoliceMapConfExceedDscp,
+                myQoSPoliceMapConfNewDscp,
+                myQoSPoliceMapCfgEntryStatus, 
+                myQoSPoliceMapConfMaxHighBandWidth,               
+                
+                myQosPoliceIfIndex,
+                myIfInPoliceMapName,
+                myIfOutPoliceMapName
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qos traffic classification ability to a
+                My agent."
+        ::= { myQoSMIBGroups 2 }                
+        
+END
+
+
+-- mapping of ip precedence to dscp
+--myIpPrecToDscpTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF MyIpPrecToDscpEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "A table mapping evaluated ip precedence to dscp."
+--    ::= { myQoSPriorityMIBObjects 6 }
+--    
+--myIpPrecToDscpEntry OBJECT-TYPE
+--        SYNTAX MyIpPrecToDscpEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "A entry mapping evaluated ip precedence to dscp."
+--        INDEX { myDscpIpPrecToDscpIpPrec }
+--    ::= { myIpPrecToDscpTable 1 }
+--    
+--MyIpPrecToDscpEntry ::=
+--        SEQUENCE {
+--        myDscpIpPrecToDscpIpPrec
+--                Integer32,
+--        myIpPrecToDscpDscp
+--                Integer32                
+--        }
+--myDscpIpPrecToDscpIpPrec OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "The ip precedence which dscp value mapped to."
+--    ::= { myIpPrecToDscpEntry 1 }
+--
+--myIpPrecToDscpDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp value."
+--    ::= { myIpPrecToDscpEntry 2 }
+--           
+--
+--myDscpMutationTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF MyDscpMutationEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--               "A table of Dscp Mutation request entries."
+--        ::= { myQoSPriorityMIBObjects 7 }
+--    
+--myDscpMutationEntry OBJECT-TYPE
+--        SYNTAX MyDscpMutationEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--                "Entry contains Dscp Mutation name"  
+--        INDEX { myDscpMutationName }
+--        ::= { myDscpMutationTable 1 }
+--        
+--MyDscpMutationEntry ::= 
+--        SEQUENCE {
+--                myDscpMutationName DisplayString,
+--                myDscpMutationStatus ConfigStatus
+--        } 
+--           
+--myDscpMutationName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp mutation name of this entry.This value is unique for every entry
+--            When this string be used as an index,Value of a sub-identifier equal 
+--            ASCII value of corresponding character(first sub-identifier corresponds
+--            first character of string). The number of sub-identifiers of this string
+--            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+--            will be filled in tail."
+--        ::= { myDscpMutationEntry  1 }
+--                
+--myDscpMutationStatus OBJECT-TYPE
+--        SYNTAX ConfigStatus
+--        MAX-ACCESS read-create
+--        STATUS current
+--        DESCRIPTION
+--            "Status of this entry, set this object to valid will creat a entry,
+--             and set its value to invalid will delete this entry."
+--        ::= { myDscpMutationEntry 2 }    
+--
+--myDscpMutationMapTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF MyDscpMutationMapEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--               "A table of Dscp Mutation mapping input dscp to output dscp entries .
+--                Default mapping is that output dscp value equals input
+--                dscp value.The table doesn't include default mapping."
+--        ::= { myQoSPriorityMIBObjects 8 }
+--    
+--myDscpMutationMapEntry OBJECT-TYPE
+--        SYNTAX MyDscpMutationMapEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--                "Entry of Dscp Mutation mapping."  
+--        INDEX { myDscpMutationMapName }
+--        ::= { myDscpMutationMapTable 1 }
+--        
+--MyDscpMutationMapEntry ::= 
+--        SEQUENCE {
+--                myDscpMutationMapName DisplayString,
+--                myDscpMutationInputDscp Integer32,
+--                myDscpMutationOutputDscp Integer32
+--        } 
+--           
+--myDscpMutationMapName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp mutation name of this entry.This value is unique for every entry
+--            When this string be used as an index,Value of a sub-identifier equal 
+--            ASCII value of corresponding character(first sub-identifier corresponds
+--            first character of string). The number of sub-identifiers of this string
+--            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+--            will be filled in tail."
+--        ::= { myDscpMutationMapEntry  1 }
+--
+--myDscpMutationInputDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Input dscp value."
+--        ::= { myDscpMutationMapEntry 2 }
+--
+--myDscpMutationOutputDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Output dscp value."
+--       ::= { myDscpMutationMapEntry 3 }    
+

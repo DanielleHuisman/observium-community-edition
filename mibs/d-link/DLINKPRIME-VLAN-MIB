@@ -1,0 +1,370 @@
+--  *****************************************************************
+--  DLINKPRIME-VLAN-MIB.mib : VLAN MIB
+-- 
+--  Copyright (c) 2014 D-Link Corporation, all rights reserved.
+--   
+--  *****************************************************************
+DLINKPRIME-VLAN-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY,OBJECT-TYPE,
+        NOTIFICATION-TYPE, Integer32,
+        Unsigned32                  FROM SNMPv2-SMI
+        RowStatus,TruthValue,
+        MacAddress                  FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP                FROM SNMPv2-CONF
+        InetAddress,InetAddressType,
+        InetAddressPrefixLength     FROM INET-ADDRESS-MIB
+        dot1dBasePort               FROM BRIDGE-MIB
+        VlanId,VlanIdOrNone,PortList,
+        dot1vProtocolPortGroupId    FROM Q-BRIDGE-MIB      
+        dlinkPrimeCommon            FROM DLINK-ID-REC-MIB;              
+
+    Dlink2kVlanList ::=
+              OCTET STRING (SIZE (256))
+          -- a string of octets containing one bit per VLAN for VLANs 1 
+          -- to 2048
+
+		  
+    dlinkPrimeVlanMIB MODULE-IDENTITY
+        LAST-UPDATED "201404260000Z"
+        ORGANIZATION "D-Link Corp."
+        CONTACT-INFO
+            "        D-Link Corporation
+
+             Postal: No. 289, Sinhu 3rd Rd., Neihu District,
+                     Taipei City 114, Taiwan, R.O.C
+             Tel:     +886-2-66000123
+             E-mail: tsd@dlink.com.tw
+            "
+        DESCRIPTION
+            "This MIB module defines objects for extending the configuration of 
+            VLAN (Virtual Local Area Network). "
+
+        REVISION "201404260000Z"
+        DESCRIPTION
+            "This is the first version of the MIB file."
+
+        ::= { dlinkPrimeCommon 26 } 
+            
+-- -----------------------------------------------------------------------------
+    dpVlanMIBNotifications   OBJECT IDENTIFIER ::= { dlinkPrimeVlanMIB 0 }
+    dpVlanMIBObjects         OBJECT IDENTIFIER ::= { dlinkPrimeVlanMIB 1 }
+    dpVlanMIBConformance     OBJECT IDENTIFIER ::= { dlinkPrimeVlanMIB 2 }
+ 
+-- -----------------------------------------------------------------------------
+    dpVlanPortIfCtrlTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF DpVlanPortIfCtrlEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table provides mechanism to configure port-specific VLAN
+            function."
+        ::= { dpVlanMIBObjects 1 }
+     
+    dpVlanPortIfCtrlEntry OBJECT-TYPE
+        SYNTAX          DpVlanPortIfCtrlEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "A table entry represents the VLAN configuration on a port.
+            This table is an extension to dot1qPortVlanTable which is defined at 
+            Q-BRIDGE-MIB."            
+        INDEX { 
+            dot1dBasePort 
+        }
+        ::= { dpVlanPortIfCtrlTable 1 }
+                     
+    DpVlanPortIfCtrlEntry ::= SEQUENCE {                                    
+        dpVlanPortIfMode                         INTEGER,
+        dpVlanPortIfTrunkNativeVlanTagged        TruthValue,
+        dpVlanPortIfAcceptableFrameTypes         INTEGER,        
+        dpVlanPortIfTagAllowVlanLstFirst2K       Dlink2kVlanList,
+        dpVlanPortIfTagAllowVlanLstSecond2K      Dlink2kVlanList,
+        dpVlanPortIfUntagAllowVlanLstFirst2K     Dlink2kVlanList,
+        dpVlanPortIfUntagAllowVlanLstSecond2K    Dlink2kVlanList
+    }
+              
+    dpVlanPortIfMode OBJECT-TYPE
+        SYNTAX          INTEGER {
+            access(1),
+            hybrid(2),
+            trunk(3),
+            dot1qTunnel(4),
+            privateVlanHost(5),
+            privateVlanPromiscuous(6),
+            privateVlanTrunkPromiscuous(7),
+            privateVlanTrunkSecondary(8)
+        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object indicates VLAN mode for the port. 
+            access - this port will be untagged member of the access VLAN
+                     configured for the port.
+            hybrid - the port can be untagged or tagged member of all VLANs
+                     configured by the user. The purpose of this VLAN mode is
+                     to support protocol VLAN, MAC-based VLAN, voice VLAN and
+                     dot1q VLAN tunnel application in access side.
+            trunk -  this port is either tagged or untagged member port of its
+                     native VLAN and can be tagged member of other VLANs
+                     configured by the user. The purpose of a trunk port is to
+                     support the switch-to-switch connection. 
+            dot1qTunnel - the port behaves as an UNI port of a service VLAN.
+            privateVlanHost - the port behaves as private VLAN host port.
+            privateVlanPromiscuous - the port behaves as private VLAN promiscuous
+                     port.
+            privateVlanTrunkPromiscuous - the port behaves as private VLAN trunk 
+            		 promiscuous port.
+            privateVlanTrunkSecondary - the port behaves as private VLAN trunk 
+            		 secondary port.
+
+            When VLAN mode is changed, the VLAN related setting associated
+            with previous mode will be lost."
+        ::= { dpVlanPortIfCtrlEntry 1 } 
+       
+    dpVlanPortIfTrunkNativeVlanTagged OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current  
+        DESCRIPTION
+            "This object indicates whether enable the tagging mode of the native
+            VLAN on the interface.
+            
+            Note: This value is meaningful only when the VLAN mode of the port
+                  is one of the 'trunk', 'privateVlanTrunkPromiscuous' or 
+                  'privateVlanTrunkSecondary'."
+        ::= { dpVlanPortIfCtrlEntry 2 }
+      
+    dpVlanPortIfAcceptableFrameTypes OBJECT-TYPE
+        SYNTAX          INTEGER {
+            admitAll(1),
+            admitUntaggedAndPriority(2),
+            admitTagged(3)            
+        }
+        MAX-ACCESS      read-write
+        STATUS          current  
+        DESCRIPTION
+            "This object indicates the acceptable frame types on the interface.     
+            
+            'admitAll' - Permits both tagged and untagged packet.
+            'admitUntaggedAndPriority' - Only untagged or Priority-Tagged packets 
+                        received on this interface will be accepted and tagged packets are 
+                        dropped. 
+            'admitTagged' - Only tagged incoming packets are permitted and untagged packets
+                        are dropped."
+        ::= { dpVlanPortIfCtrlEntry 3 }  
+
+
+    dpVlanPortIfTagAllowVlanLstFirst2K  OBJECT-TYPE
+        SYNTAX          Dlink2kVlanList
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object specifies the VLANs in a string of octets containing
+            one bit per VLAN for VLANs 1 to 2048.
+             
+            If the bit is set to '1', then the interface is allowed to be the
+            VLAN's tagged member.
+            
+            Note: This value is meaningful only when the VLAN mode of the port
+                  is one of the 'hybrid', 'trunk', 'privateVlanTrunkPromiscuous' 
+                  or 'privateVlanTrunkSecondary'"         
+        ::= { dpVlanPortIfCtrlEntry 4 }
+    
+    dpVlanPortIfTagAllowVlanLstSecond2K OBJECT-TYPE
+        SYNTAX          Dlink2kVlanList
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object specifies the VLANs in a string of octets containing
+            one bit per VLAN for VLANs 2049 to 4094.
+            
+            If the bit is set to '1', then the interface is allowed to be the
+            VLAN's tagged member.
+            
+            Note: This value is meaningful only when the VLAN mode of the port
+                  is one of the 'hybrid', 'trunk', 'privateVlanTrunkPromiscuous' 
+                  or 'privateVlanTrunkSecondary'"    
+        ::= { dpVlanPortIfCtrlEntry 5 }         
+        
+    dpVlanPortIfUntagAllowVlanLstFirst2K  OBJECT-TYPE
+        SYNTAX          Dlink2kVlanList
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object specifies the VLANs in a string of octets containing
+            one bit per VLAN for VLANs 1 to 2048. 
+                                   
+            If the bit is set to '1', then the interface is allowed to be the
+            VLAN's untagged member.  
+            
+            Note: This value is meaningful only when the VLAN mode of the port
+                  is 'hybrid' or 'dot1qTunnel'."         
+        ::= { dpVlanPortIfCtrlEntry 6 }
+    
+    dpVlanPortIfUntagAllowVlanLstSecond2K OBJECT-TYPE
+        SYNTAX          Dlink2kVlanList
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object specifies the VLANs in a string of octets containing
+            one bit per VLAN for VLANs 2049 to 4094.                       
+             
+            If the bit is set to '1', then the interface is allowed to be the
+            VLAN's untagged member.                         
+            
+            Note: This value is meaningful only when the VLAN mode of the port
+                  is 'hybrid' or 'dot1qTunnel'."      
+        ::= { dpVlanPortIfCtrlEntry 7 } 
+        
+
+-- -----------------------------------------------------------------------------
+ dpVlanAsymVlanStateEnabled OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object enables or disables asymmetric VLAN feature."
+        ::= { dpVlanMIBObjects 2 }
+
+---------------------------------------------------------------------------------
+ dpVlanManagementVlanGlobal OBJECT IDENTIFIER ::= { dpVlanMIBObjects 3 }
+
+	dpVlanManagementVlanEnabled OBJECT-TYPE
+	SYNTAX          TruthValue
+	MAX-ACCESS      read-write
+	STATUS          current
+	DESCRIPTION
+		"This object enables or disables management VLAN feature."
+	::= { dpVlanManagementVlanGlobal 1 }
+		
+    dpVlanManagementVlanId OBJECT-TYPE
+        SYNTAX          VlanIdOrNone
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "The object specifies the management VLAN on a switch.
+            A value of zero indicates that no management VLAN has been
+            configured.
+            It is required to configure the global dpVlanManagementVlanId and enable
+            dpsvEnabled to start the management VLAN function."
+        DEFVAL  { 0 }
+        ::= { dpVlanManagementVlanGlobal 2 }	
+
+---------------------------------------------------------------------------------
+ dpVlanPortBasedVlan OBJECT IDENTIFIER ::= { dpVlanMIBObjects 4 }
+
+	dpVlanPortBasedVlanEnabled OBJECT-TYPE
+	SYNTAX          TruthValue
+	MAX-ACCESS      read-write
+	STATUS          current
+	DESCRIPTION
+		"This object enables or disables Port-based VLAN feature."
+	::= { dpVlanPortBasedVlan 1 }
+		
+    
+ dpPortBasedVlanTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF  DpPortBasedVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing static configuration information for
+        each VLAN configured into the device by (local or
+        network) management.  All entries are permanent and will
+        be restored after the device is reset."
+    ::= { dpVlanPortBasedVlan 2 }
+
+ dpPortBasedVlanEntry OBJECT-TYPE
+    SYNTAX      DpPortBasedVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Static information for a Port-based VLAN configured into the
+        device by (local or network) management."
+    INDEX   { dpPortBasedVlanIndex }
+    ::= { dpPortBasedVlanTable 1 }
+
+ DpPortBasedVlanEntry ::=
+    SEQUENCE {
+        dpPortBasedVlanIndex            Integer32,
+        dpPortBasedVlanEgressPorts      PortList,
+        dpPortBasedVlanRowStatus        RowStatus
+    }
+
+ dpPortBasedVlanIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Port-based VLAN index."
+    ::= { dpPortBasedVlanEntry 1 }
+
+ dpPortBasedVlanEgressPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The set of ports that are permanently assigned to the
+        egress list for this VLAN by management. "
+    ::= { dpPortBasedVlanEntry 2 }
+
+ dpPortBasedVlanRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry."
+    ::= { dpPortBasedVlanEntry 3 }
+	
+		
+--  *************************************************************************** 
+--  Conformance
+--  ***************************************************************************                 
+    dpVlanCompliances OBJECT IDENTIFIER ::= { dpVlanMIBConformance 1 }
+        
+    dpVlanCompliance MODULE-COMPLIANCE
+        STATUS current
+        DESCRIPTION 
+            "The compliance statement for entities which implement the 
+            DLINKPRIME-VLAN-MIB."
+        MODULE -- this module
+        MANDATORY-GROUPS { 
+            dpVlanIfCfgGroup
+        }
+        GROUP           dpVlanAsymmetricVlanCfgGroup
+        DESCRIPTION
+            "Implementation of this group is optional."  
+        ::= { dpVlanCompliances 1 }
+        
+    dpVlanGroups OBJECT IDENTIFIER ::= { dpVlanMIBConformance 2 }
+        
+    dpVlanIfCfgGroup OBJECT-GROUP
+        OBJECTS { 
+            dpVlanPortIfMode,
+            dpVlanPortIfTrunkNativeVlanTagged,            
+            dpVlanPortIfAcceptableFrameTypes,
+            dpVlanPortIfTagAllowVlanLstFirst2K,
+            dpVlanPortIfTagAllowVlanLstSecond2K,
+            dpVlanPortIfUntagAllowVlanLstFirst2K,
+            dpVlanPortIfUntagAllowVlanLstSecond2K
+        }           
+        STATUS current
+        DESCRIPTION 
+            "A collection of objects providing the information 
+            and control for configuring port-specific VLAN feature."
+        ::= { dpVlanGroups 1 }
+        
+     
+    dpVlanAsymmetricVlanCfgGroup OBJECT-GROUP
+        OBJECTS { 
+            dpVlanAsymVlanStateEnabled
+        }
+        STATUS current
+        DESCRIPTION 
+            "A collection of objects provides the management of
+            asymmetric VLAN feature."
+            ::= { dpVlanGroups 2 }
+END
+

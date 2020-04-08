@@ -1,0 +1,698 @@
+-- ===========================================================================================================
+-- Copyright (c) 2004-2018 Hangzhou H3C Tech. Co., Ltd.  All rights reserved.
+--
+-- Description: ISSU MIB
+-- Reference:
+-- Version: V1.2
+-- History:
+--  Revision 1.0 2012-12-20 created by Wang Feng
+--               2013-4-20 modified by Zhu Liuxing
+--  Revision 1.1 2014-01-10 change h3cIssuUpgradeImageIndex and
+--               h3cIssuUpgradeImageURL range by z03030
+--  Revision 1.2 2018-04-08 change h3cIssuUpgradeImageType by l07660
+-- ============================================================================================================
+
+H3C-ISSU-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    h3cCommon
+        FROM HUAWEI-3COM-OID-MIB
+    Integer32, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE
+        FROM SNMPv2-SMI
+    DisplayString, RowStatus, TruthValue
+        FROM SNMPv2-TC;
+
+h3cIssuUpgrade MODULE-IDENTITY
+    LAST-UPDATED "201301151536Z"        -- January 15, 2013 at 15:36 GMT
+    ORGANIZATION
+        "Hangzhou H3C Tech. Co., Ltd."
+    CONTACT-INFO
+        "Platform Team Hangzhou H3C Tech. Co., Ltd.
+        Haidian District Beijing P.R. China
+        http://www.h3c.com
+        Zip:_100085"
+    DESCRIPTION
+        "This MIB provides objects for upgrading images on modules in the
+        system, objects for showing the result of an upgrade operation,
+        and objects for showing the result of a test operation.
+
+        To perform an upgrade operation, a management application
+        must first read the h3cIssuUpgradeImageTable table and use the
+        information in other tables, as explained below.  You can
+        configure a new image name for each image type as listed in
+        h3cIssuUpgradeImageTable.  The system will use this image on the
+        particular module at the next reboot.
+
+        The management application used to perform an upgrade
+        operation must first check if an upgrade operation is already
+        in progress in the system.  This is done by reading the
+        h3cIssuOpType ('none' indicates that
+        no other upgrade operation is in progress.  Any other value
+        indicates that an upgrade is already in progress and a new upgrade
+        operation is not allowed.  To start an 'install' operation,
+        the user must first perform a 'test' operation to examine the
+        version compatibility between the given set of images
+        and the running images.  Only if the result of the 'test'
+        operation is 'success' can the user proceed to do an install
+        operation.  The table h3cIssuTestResultTable
+        provides the result of the 'test' operation performed by using h3cIssuOpType.
+        The table h3cIssuUpgradeResultTable provides the result of the 'install' operation
+        performed by using h3cIssuOpType.
+        "
+    REVISION "201301151536Z"        -- January 15, 2013 at 15:36 GMT
+    DESCRIPTION
+        "Initial version of this MIB module.
+        Added h3cIssuUpgradeImageTable h3cIssuOp h3cIssuCompatibleResult
+        h3cIssuTestResultTable h3cIssuUpgradeResultTable"
+    ::= { h3cCommon 133 }
+
+--
+-- Node definitions
+--
+
+h3cIssuUpgradeMibObjects OBJECT IDENTIFIER ::= { h3cIssuUpgrade 1 }
+
+
+h3cIssuUpgradeGroup OBJECT IDENTIFIER ::= { h3cIssuUpgradeMibObjects 1 }
+
+
+h3cIssuUpgradeImageTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cIssuUpgradeImageEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "A table listing the image variable types that
+        exist in the device."
+    ::= { h3cIssuUpgradeGroup 1 }
+
+
+h3cIssuUpgradeImageEntry OBJECT-TYPE
+    SYNTAX H3cIssuUpgradeImageEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An h3cIssuUpgradeImageEntry entry.  Each entry provides an
+        image variable type that exists in the device."
+    INDEX { h3cIssuUpgradeImageIndex }
+    ::= { h3cIssuUpgradeImageTable 1 }
+
+
+H3cIssuUpgradeImageEntry ::=
+    SEQUENCE {
+        h3cIssuUpgradeImageIndex
+            Integer32,
+        h3cIssuUpgradeImageType
+            INTEGER,
+        h3cIssuUpgradeImageURL
+            DisplayString,
+        h3cIssuUpgradeImageRowStatus
+            RowStatus
+     }
+
+h3cIssuUpgradeImageIndex OBJECT-TYPE
+    SYNTAX Integer32 (1..2147483647)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Index of each image."
+    ::= { h3cIssuUpgradeImageEntry 1 }
+
+
+h3cIssuUpgradeImageType OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        boot(1),
+        system(2),
+        feature(3),
+        ipe(4),
+        patch(5)
+        }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Types of images that the system can run.  The value of
+        this object has five image variable names:
+        'boot', 'system', 'feature', 'ipe' and 'patch'.  This table will then
+        list these five strings as follows:
+
+              h3cIssuUpgradeImageType
+                  boot
+                  system
+                  feature
+                  IPE
+                  patch
+
+              The user can assign images (using h3cIssuUpgradeImageURL)
+              to these variables and the system will use the assigned
+              images to boot."
+    ::= { h3cIssuUpgradeImageEntry 2 }
+
+
+h3cIssuUpgradeImageURL OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (1..127))
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This object contains the path of the image
+        of this entity."
+    ::= { h3cIssuUpgradeImageEntry 3 }
+
+
+h3cIssuUpgradeImageRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "Row-status of image table."
+    ::= { h3cIssuUpgradeImageEntry 4 }
+
+
+h3cIssuOp OBJECT IDENTIFIER ::= { h3cIssuUpgradeGroup 2 }
+
+
+h3cIssuOpType OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        none(1),
+        done(2),
+        test(3),
+        install(4),
+        rollback(5)
+        }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Command to be executed.
+        The 'test' command must be performed before the 'install'
+        command can be executed.  The 'install'
+        command is allowed only if a read of
+        this object returns 'test' and the value of object
+        h3cIssuOpStatus is 'success'.
+
+        Command                 Remarks
+
+        none      If the user sets this object to 'none', the agent will return a success
+                  without performing an upgrade operation.
+        done      If this object returns any value other than
+                  'none', setting this to 'done' will do
+                  the required cleanup of the previous upgrade
+                  operation and get the system ready for a new
+                  upgrade operation.
+        test      Check the version compatibility and upgrade method
+                  for the given set of image files.
+        install   For all the image entities listed in the
+                  h3cIssuUpgradeImageTable, perform the required
+                  upgrade operation listed in that table.
+        rollback  Abort the current 'install' operation and roll back
+                  to the previous version.
+          "
+    DEFVAL { none }
+    ::= { h3cIssuOp 1 }
+
+
+h3cIssuImageFileOverwrite OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "If you want to overwrite the existing file, set the value of
+        this object to enable.  Otherwise, set the value of this
+        object to disable."
+    DEFVAL { true }
+    ::= { h3cIssuOp 2 }
+
+
+h3cIssuOpTrapEnable OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "If you want to enable the trap, set the value of
+        this object to enable.  Otherwise, set the value of this
+        object to disable."
+    DEFVAL { true }
+    ::= { h3cIssuOp 3 }
+
+
+h3cIssuOpStatus OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        none(1),
+        failure(2),
+        inProgress(3),
+        success(4),
+        rollbackInProgress(5),
+        rollbackSuccess(6)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Status of the specified operation.
+        none                - No operation was performed.
+        failure             - Specified operation has failed.
+        inProgress          - Specified operation is in progress.
+        success             - Specified operation completed successfully.
+        rollbackInProgress     - Rollback operation is in progress.
+        rollbackSuccess        - Rollback operation completed successfully.
+          "
+    DEFVAL { none }
+    ::= { h3cIssuOp 4 }
+
+
+h3cIssuFailedReason OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Indicates the the cause of 'failure' state
+        of the object 'h3cIssuOpStatus'.
+        This object would be a null string if the value of
+        'h3cIssuOpStatus' is not 'failure'."
+    ::= { h3cIssuOp 5 }
+
+
+h3cIssuOpTimeCompleted OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Indicates the time when the upgrade operation was completed.
+        This object would be a null string if h3cIssuOpType is
+        'none'. "
+    ::= { h3cIssuOp 6 }
+
+
+h3cIssuLastOpType OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        none(1),
+        done(2),
+        test(3),
+        install(4),
+        rollback(5)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This object indicates the previous h3cIssuOp value.
+        It will be updated after a new h3cIssuOp is set and delivered
+        to the upgrade process.
+
+        Command                 Remarks
+
+        none      If the user sets this object to 'none', agent will return a success
+                  without performing an upgrade operation.
+        done      If this object returns any value other than
+                  'none', setting this to 'done' will do
+                  the required cleanup of the previous upgrade
+                  operation and get the system ready for a new
+                  upgrade operation.
+        test      Check the version compatibility and upgrade method
+                  for the given set of image files.
+        install   For all the image entities listed in the
+                  h3cIssuUpgradeImageTable, perform the required
+                  upgrade operation listed in that table.
+        rollback  Abort the current install operation and roll back
+                  to the previous version.
+        "
+    DEFVAL { none }
+    ::= { h3cIssuOp 7 }
+
+
+h3cIssuLastOpStatus OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        none(1),
+        failure(2),
+        inProgress(3),
+        success(4),
+        rollbackInProgress(5),
+        rollbackSuccess(6)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This object indicates previous h3cIssuOpStatus value.
+        It will be updated after new h3cIssuOp is set and delivered
+        to upgrade process.
+        none                - No operation was performed.
+        failure             - Specified operation has failed.
+        inProgress          - Specified operation is active.
+        success             - Specified operation completed successfully.
+        rollbackInProgress     - Rollback operation is in progress.
+        rollbackSuccess        - Rollback operation completed successfully.
+        "
+    DEFVAL { none }
+    ::= { h3cIssuOp 8 }
+
+
+h3cIssuLastOpFailedReason OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Indicates the cause of 'failure' state
+        of the object 'h3cIssuOpStatus'.
+        This object would be a null string if the value of
+        'h3cIssuOpStatus' is not 'failure'.
+        The value will be updated when new h3cIssuOp is set
+        and delivered to the upgrade process."
+    ::= { h3cIssuOp 9 }
+
+
+h3cIssuLastOpTimeCompleted OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Indicates the previous h3cIssuOpTimeCompleted value.
+        The value will be updated when new h3cIssuOp is set
+        and delivered to the upgrade process."
+    ::= { h3cIssuOp 10 }
+
+
+h3cIssuUpgradeResultGroup OBJECT IDENTIFIER ::= { h3cIssuUpgradeMibObjects 2 }
+
+
+h3cIssuCompatibleResult OBJECT IDENTIFIER ::= { h3cIssuUpgradeResultGroup 1 }
+
+
+h3cIssuCompatibleResultStatus OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        none(1),
+        inCompatible(2),
+        compatible(3),
+        failure(4)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Specifies whether the images provided in
+        h3cIssuUpgradeImageTable are compatible with each other as
+        far as this module is concerned.
+        none            - No operation was performed.
+        inCompatible    - The images provided are compatible
+                          and can be run on this module.
+        compatible      - The images provided are incompatible
+                          and can be run on this module.
+        failure         - Failed to get the compatibility.
+        "
+    DEFVAL { none }
+    ::= { h3cIssuCompatibleResult 1 }
+
+
+h3cIssuCompatibleResultFailedReason OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Indicates the cause of 'failure' state
+        of the object 'h3cIssuCompatibleResultStatus'.
+        This object would be a null string if the value of
+        'h3cIssuCompatibleResultStatus' is not 'failure'."
+    ::= { h3cIssuCompatibleResult 2 }
+
+
+h3cIssuTestResultTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cIssuTestResultEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Shows the result of the test operation, from which you can
+        see the upgrade method."
+    ::= { h3cIssuUpgradeResultGroup 2 }
+
+
+h3cIssuTestResultEntry OBJECT-TYPE
+    SYNTAX H3cIssuTestResultEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An h3cIssuTestResultEntry entry.  Each entry provides the
+        test result of a card in the device."
+    INDEX { h3cIssuTestResultIndex }
+    ::= { h3cIssuTestResultTable 1 }
+
+
+H3cIssuTestResultEntry ::=
+    SEQUENCE {
+        h3cIssuTestResultIndex
+            Integer32,
+        h3cIssuTestDeviceChassisID
+            Integer32,
+        h3cIssuTestDeviceSlotID
+            Integer32,
+        h3cIssuTestDeviceCpuID
+            Integer32,
+        h3cIssuTestDeviceUpgradeWay
+            INTEGER
+     }
+
+h3cIssuTestResultIndex OBJECT-TYPE
+    SYNTAX Integer32 (1..65535)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Internal index, not accessible."
+    ::= { h3cIssuTestResultEntry 1 }
+
+
+h3cIssuTestDeviceChassisID OBJECT-TYPE
+    SYNTAX Integer32 (0..255)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Chassis ID of the card."
+    ::= { h3cIssuTestResultEntry 2 }
+
+
+h3cIssuTestDeviceSlotID OBJECT-TYPE
+    SYNTAX Integer32 (0..255)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Slot ID of the card."
+    ::= { h3cIssuTestResultEntry 3 }
+
+
+h3cIssuTestDeviceCpuID OBJECT-TYPE
+    SYNTAX Integer32 (0..7)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "CPU ID of the card."
+    ::= { h3cIssuTestResultEntry 4 }
+
+
+h3cIssuTestDeviceUpgradeWay OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        none(1),
+        reboot(2),
+        sequenceReboot(3),
+        issuReboot(4),
+        serviceUpgrade(5),
+        fileUpgrade(6),
+        incompatibleUpgrade(7)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Upgrade method of the device.
+        none                   - No operation was performed.
+        reboot                 - The upgrade method of this device is Reboot.
+        sequenceReboot         - The upgrade method of this device is SequenceReboot.
+        issuReboot             - The upgrade method of this device is IssuReboot.
+        serviceUpgrade         - The upgrade method of this device is ServiceReboot.
+        fileUpgrade            - The upgrade method of this device is FileReboot.
+        incompatibleUpgrade    - The upgrade method of this device is IncompatibleUpgrade.
+        "
+    DEFVAL { none }
+    ::= { h3cIssuTestResultEntry 5 }
+
+
+h3cIssuUpgradeResultTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cIssuUpgradeResultEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Shows the result of the install operation."
+    ::= { h3cIssuUpgradeResultGroup 3 }
+
+
+h3cIssuUpgradeResultEntry OBJECT-TYPE
+    SYNTAX H3cIssuUpgradeResultEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An h3cIssuUpgradeResultEntry entry.  Each entry provides the
+        upgrade result of a card in the device."
+    INDEX { h3cIssuUpgradeResultIndex }
+    ::= { h3cIssuUpgradeResultTable 1 }
+
+
+H3cIssuUpgradeResultEntry ::=
+    SEQUENCE {
+        h3cIssuUpgradeResultIndex
+            Integer32,
+        h3cIssuUpgradeDeviceChassisID
+            Integer32,
+        h3cIssuUpgradeDeviceSlotID
+            Integer32,
+        h3cIssuUpgradeDeviceCpuID
+            Integer32,
+        h3cIssuUpgradeState
+            INTEGER,
+        h3cIssuDeviceUpgradeWay
+            INTEGER,
+        h3cIssuUpgradeDeviceStatus
+            INTEGER,
+        h3cIssuUpgradeFailedReason
+            DisplayString
+     }
+
+h3cIssuUpgradeResultIndex OBJECT-TYPE
+    SYNTAX Integer32 (1..65535)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Internal Index, not accessible."
+    ::= { h3cIssuUpgradeResultEntry 1 }
+
+
+h3cIssuUpgradeDeviceChassisID OBJECT-TYPE
+    SYNTAX Integer32 (0..255)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Chassis ID of the card."
+    ::= { h3cIssuUpgradeResultEntry 2 }
+
+
+h3cIssuUpgradeDeviceSlotID OBJECT-TYPE
+    SYNTAX Integer32 (0..255)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Slot ID of the card."
+    ::= { h3cIssuUpgradeResultEntry 3 }
+
+
+h3cIssuUpgradeDeviceCpuID OBJECT-TYPE
+    SYNTAX Integer32 (0..7)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "CPU ID of the card."
+    ::= { h3cIssuUpgradeResultEntry 4 }
+
+
+h3cIssuUpgradeState OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        init(1),
+        loading(2),
+        loaded(3),
+        switching(4),
+        switchover(5),
+        committing(6),
+        committed(7),
+        rollbacking(8),
+        rollbacked(9)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Upgrade status of the device.
+        init           -The current status of the device is Init.
+        loading        -The current status of the device is Loading.
+        loaded         -The current status of the device is Loaded.
+        switching      -The current status of the device is Switching.
+        switchover     -The current status of the device is Switchover.
+        committing     -The current status of the device is Committing.
+        committed      -The current status of the device is Committed.
+        rollbacking    -The current status of the device is Rollbacking.
+        rollbacked     -The current status of the device is Rollbacked.
+        "
+    ::= { h3cIssuUpgradeResultEntry 5 }
+
+
+h3cIssuDeviceUpgradeWay OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        none(1),
+        reboot(2),
+        sequenceReboot(3),
+        issuReboot(4),
+        serviceUpgrade(5),
+        fileUpgrade(6),
+        incompatibleUpgrade(7)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Upgrade method of the card.
+        none                   - No operation was performed.
+        reboot                 - The upgrade method of this device is Reboot.
+        sequenceReboot         - The upgrade method of this device is SequenceReboot.
+        issuReboot             - The upgrade method of this device is IssuReboot.
+        serviceUpgrade         - The upgrade method of this device is ServiceReboot.
+        fileUpgrade            - The upgrade method of this device is FileReboot.
+        incompatibleUpgrade    - The upgrade method of this device is IncompatibleUpgrade.
+        "
+    ::= { h3cIssuUpgradeResultEntry 6 }
+
+
+h3cIssuUpgradeDeviceStatus OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+        waitingUpgrade(1),
+        inProcess(2),
+        success(3),
+        failure(4)
+        }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Upgrade status of the device."
+    ::= { h3cIssuUpgradeResultEntry 7 }
+
+
+h3cIssuUpgradeFailedReason OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..255))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Indicates the cause of 'failure' state
+        of the object 'h3cIssuUpgradeDeviceStatus'.
+        This object would be a null string if the value of
+        'h3cIssuCompatibleResultStatus' is not 'failure'."
+    ::= { h3cIssuUpgradeResultEntry 8 }
+
+
+h3cIssuUpgradeNotify OBJECT IDENTIFIER ::= { h3cIssuUpgrade 2 }
+
+
+h3cIssuUpgradeTrapPrefix OBJECT IDENTIFIER ::= { h3cIssuUpgradeNotify 0 }
+
+
+h3cIssuUpgradeOpCompletionNotify NOTIFICATION-TYPE
+    OBJECTS { h3cIssuOpType, h3cIssuOpStatus, h3cIssuFailedReason, h3cIssuOpTimeCompleted }
+    STATUS current
+    DESCRIPTION
+        "An h3cIssuUpgradeOpCompletionNotify is sent at the
+        completion of upgrade operation denoted by
+        h3cIssuOp object, if such a notification
+        was requested when the operation was initiated.
+        h3cIssuOpType indicates the type of the
+        operation.  h3cIssuOpStatus indicates the
+        result of the operation.  h3cIssuFailedReason
+        indicates the operation failure reason.
+        h3cIssuOpTimeCompleted indicates the time
+        when the operation was completed."
+    ::= { h3cIssuUpgradeTrapPrefix 1 }
+
+
+
+END

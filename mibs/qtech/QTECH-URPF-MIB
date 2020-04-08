@@ -1,0 +1,583 @@
+-- ******************************************************************
+-- QTECH-URPF-MIB.mib
+--
+-- This module is used for monitoring the state of Unicast Reverse
+-- Path Forwarding (URPF) checking.
+--
+-- April 2009, huangcb
+--
+-- Copyright (c) 2009 by Qtech Networks Co.,Ltd.
+-- All rights reserved.
+-- ******************************************************************
+--
+
+QTECH-URPF-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS 
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Gauge32,
+    Integer32,
+    Counter32,
+    Unsigned32,
+    NOTIFICATION-TYPE      
+        FROM SNMPv2-SMI
+    MODULE-COMPLIANCE, 
+    NOTIFICATION-GROUP,
+    OBJECT-GROUP           
+        FROM SNMPv2-CONF
+    TruthValue             
+        FROM SNMPv2-TC
+    SnmpAdminString        
+        FROM SNMP-FRAMEWORK-MIB
+    ifIndex                
+        FROM IF-MIB
+    qtechMgmt             
+        FROM QTECH-SMI;
+
+qtechUrpfMIB MODULE-IDENTITY
+    LAST-UPDATED "200904090000z"
+    ORGANIZATION "Qtech Networks Co.,Ltd."
+    CONTACT-INFO
+        " 
+        Tel: 4008-111-000 
+
+        E-mail: service@qtech.com.cn"
+    DESCRIPTION
+        "Unicast Reverse Path Forwarding (URPF) is a function 
+         that checks the validity of the source address of IP 
+         packets received on an interface. This in an attempt 
+         to prevent Denial of Service attacks based on IP address 
+         spoofing.
+
+        URPF checks validity of a source address by determining
+        whether the packet would be successfully routed as a
+        destination address.
+
+        Based on configuration, the check made can be for existence
+        of any route for the address, or more strictly for a route
+        out the interface on which the packet was received by the 
+        device. When a violating packet is detected, it can be dropped.
+
+        This MIB allows detection of spoofing events."
+    REVISION        "200904090000z" 
+    DESCRIPTION
+        "Initial version of this MIB module."    
+    ::= { qtechMgmt 46 }
+
+--
+-- URPF MIB
+--
+
+qtechUrpfMIBObjects     OBJECT IDENTIFIER ::= { qtechUrpfMIB 0 }
+qtechUrpfMIBNotifs      OBJECT IDENTIFIER ::= { qtechUrpfMIB 1 }
+qtechUrpfMIBConformance OBJECT IDENTIFIER ::= { qtechUrpfMIB 2 }
+
+--
+-- URPF MIB Objects
+--
+qtechUrpfScalar          OBJECT IDENTIFIER ::= { qtechUrpfMIBObjects 1 }
+qtechUrpfStatistics      OBJECT IDENTIFIER ::= { qtechUrpfMIBObjects 2 }
+qtechUrpfInterfaceConfig OBJECT IDENTIFIER ::= { qtechUrpfMIBObjects 3 }
+--
+-- qtechUrpfScalar
+--
+qtechUrpfComputeInterval OBJECT-TYPE
+    SYNTAX     Integer32 (30..300)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The time between rate computations. This global value 
+         applies for the computation of all URPF rates, global
+         and per-interface.
+
+         When the value of qtechUrpfComputeInterval is changed,
+         the interval in-progress proceeds as though the value
+         had not changed. The change will apply to the length
+         of subsequent intervals.
+
+         The qtechUrpfComputeInterval must be less than or equal 
+         to the qtechUrpfDropRateWindow.
+         
+         Relation CLI: ip verify urpf drop-rate compute interval seconds."
+    DEFVAL { 30 }
+    ::= { qtechUrpfScalar 1 }
+    
+qtechUrpfDropRateWindow OBJECT-TYPE
+    SYNTAX     Integer32 (150..1500)
+    UNITS      "seconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The window of time in the recent past over which the drop
+         count used in the drop rate computation is collected. 
+         This global value applies for the computation of all URPF 
+         rates, global and per-interface. 
+
+         Once the period over which computations have been 
+         performed exceeds qtechUrpfDropRateWindow, every time a 
+         computation is performed, the window slides up to end 
+         at the current time and start at qtechUrpfDropRateWindow 
+         seconds before. 
+         
+         Since the agent must save the drop count values
+         for each compute interval in order to slide the window,
+         the number of counts saved is the quotient of
+         qtechUrpfDropRateWindow divided by qtechUrpfComputeInterval."
+    DEFVAL { 150 }
+    ::= { qtechUrpfScalar 2 }
+
+
+qtechUrpfDropNotifyHoldDownTime OBJECT-TYPE
+    SYNTAX     Integer32(30..300)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The minimum time between issuance of 
+         qtechUrpfIfDropRateNotify notifications for a 
+         particular interface and packet forwarding type.
+
+         Notifications are generated for each interface and
+         packet forwarding type that exceeds the drop-rate. 
+         When a Notify is sent because the drop-rate is 
+         exceeded for a particular interface and forwarding
+         type, the time specified by this object is used to 
+         specify the minimum time that must elapse before 
+         another Notify can be sent for that interface and
+         forwarding type. The time is specified globally but 
+         used individually.
+         
+         Relation CLI: ip verify urpf drop-rate notify hold-down seconds."
+    DEFVAL { 300 }
+    ::= { qtechUrpfScalar 3 }
+
+--
+-- qtechUrpfStatistics
+--
+
+qtechUrpfTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF QtechUrpfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains summary information for the
+         managed device on URPF dropping."
+    ::= { qtechUrpfStatistics 1 }
+
+qtechUrpfEntry OBJECT-TYPE
+    SYNTAX     QtechUrpfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "If the managed device supports URPF dropping,
+         a row exists for each IP version type (v4 and v6).
+         A row contains summary information on URPF
+         dropping over the entire managed device." 
+    INDEX  { qtechUrpfIpVersion }
+    ::= { qtechUrpfTable 1 }
+
+QtechUrpfEntry ::= SEQUENCE {
+        qtechUrpfIpVersion               INTEGER,
+        qtechUrpfDrops                   Counter32,
+        qtechUrpfDropRate                Gauge32
+    }
+
+qtechUrpfIpVersion OBJECT-TYPE
+    SYNTAX     INTEGER {ipv4(1), ipv6(2)}
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Specifies the version of IP forwarding on an interface
+        to which the table row URPF counts, rates, and
+        configuration apply."
+    ::= { qtechUrpfEntry 1 }
+
+qtechUrpfDrops OBJECT-TYPE
+    SYNTAX     Counter32
+    UNITS      "packets"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Sum of dropped IP version qtechUrpfIpVersion packets failing 
+         a URPF check. This value is the sum of drops of packets 
+         received on all interfaces of the managed device."
+    ::= { qtechUrpfEntry 2 }
+
+qtechUrpfDropRate OBJECT-TYPE
+    SYNTAX     Gauge32
+    UNITS      "packets per second"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The rate of packet drops of IP version qtechUrpfIpVersion 
+         packets due to URPF for the managed device. The 
+         per-interface drop rate notification is issued on rates 
+         exceeding a limit (rising rate). This dropping may 
+         indicate an security attack on the network. To determine 
+         whether the attack/event is over, the NMS must 
+         consult the managed device. This object can be polled to 
+         determine the recent drop rate for the managed device
+         as a whole, in addition to querying particular interface 
+         objects.
+
+         This object is the average rate of dropping over the most 
+         recent window of time. The rate is computed by dividing 
+         the number of packets dropped over a window by the window 
+         time in seconds. The window time is specified by 
+         qtechUrpfDropRateWindow. Each time the drop rate is computed, 
+         and at system startup, a snapshot is taken of the latest 
+         value of qtechUrpfDrops. Subtracting from this the snapshot 
+         of qtechUrpfDrops at the start of the current window of time 
+         gives the number of packets dropped.  
+         
+         The drop rate is 
+         computed every qtechUrpfComputeInterval seconds. As an 
+         example, let qtechUrpfDropRateWindow be 300 seconds,
+         and qtechUrpfComputeInterval 30 seconds. Every 30 seconds,
+         the drop count five minutes previous is subtracted
+         from the current drop count, and the result is divided
+         by 300 to arrive at the drop rate.
+         
+         At device start-up, until the device has been up more than
+         qtechUrpfDropRateWindow, when drop rate is computed,
+         the value of qtechUrpfDrops is divided by the time the
+         device has been up.
+         After the device has been up for qtechUrpfDropRateWindow,
+         when drop rate is computed, the number of packet drops counted 
+         from interval start time to the computation time is divided 
+         by qtechUrpfDropRateWindow.
+         
+         Changes to qtechUrpfDropRateWindow are not reflected in this
+         object until the next computation time.
+
+         The rate from the  most recent computation is the value 
+         fetched until the subsequent computation is performed."
+    ::= { qtechUrpfEntry 3 }
+
+qtechUrpfIfMonTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF QtechUrpfIfMonEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains information on URPF dropping on
+         an interface."
+    ::= { qtechUrpfStatistics 2 }
+                
+qtechUrpfIfMonEntry OBJECT-TYPE
+    SYNTAX     QtechUrpfIfMonEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "If IPv4 packet forwarding is configured on an interface,
+         and is configured to perform URPF checking, a row appears
+         in this table with indices [ifIndex][ipv4]. If IPv4
+         packet forwarding is deconfigured, or URPF checking
+         is deconfigured, the row disappears.
+
+         If IPv6 packet forwarding is configured on an interface,
+         and is configured to perform URPF checking, a row appears
+         in the table with indices [ifIndex][ipv6].  If IPv6
+         packet forwarding is deconfigured, or URPF checking
+         is deconfigured, the row disappears."
+    INDEX  { ifIndex, qtechUrpfIfIpVersion }
+    ::= { qtechUrpfIfMonTable 1 }
+
+QtechUrpfIfMonEntry ::= SEQUENCE { 
+        qtechUrpfIfIpVersion             INTEGER,
+        qtechUrpfIfDrops                 Counter32,
+        qtechUrpfIfDropRate              Gauge32
+    }
+
+qtechUrpfIfIpVersion OBJECT-TYPE
+    SYNTAX     INTEGER {ipv4(1), ipv6(2)}
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+       "Specifies the version of IP forwarding on an interface 
+        to which the table row URPF counts, rates, and 
+        configuration apply."
+    ::= { qtechUrpfIfMonEntry 1}
+
+qtechUrpfIfDrops OBJECT-TYPE
+    SYNTAX     Counter32
+    UNITS      "packets"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The number of IP packets of version qtechUrpfIfIpVersion
+         failing the URPF check and dropped by the managed device
+         on a particular interface."
+    ::= { qtechUrpfIfMonEntry 2 }
+
+qtechUrpfIfDropRate OBJECT-TYPE
+    SYNTAX     Gauge32
+    UNITS      "packets/second"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The rate of packet drops of IP version qtechUrpfIfIpVersion
+         packets due to URPF on the interface.
+
+         This object is the average rate of dropping over the most 
+         recent interval of time.The rate is computed by dividing
+         the number of packets dropped over an interval by the 
+         interval time in seconds. Each time the drop rate
+         is computed, and at system startup, a snapshot is taken
+         of the latest value of qtechUrpfIfDrops. Subtracting from this
+         the snapshot of qtechUrpfIfDrops at the start of the current
+         interval of time gives the number of packets dropped.
+         The drop rate is computed every qtechUrpfComputeInterval
+         seconds.
+
+         When drop rate is computed, if time since the creation of 
+         a row in qtechUrpfIfMonTable is less than 
+         qtechUrpfDropRateWindow, the value of qtechUrpfIfDrops is 
+         divided by the time since row was created.
+
+         After the row has been in existence for 
+         qtechUrpfDropRateWindow, when drop rate is computed, the 
+         number of packet drops counted on the interface from 
+         interval start time to the computation time is divided 
+         by qtechUrpfDropRateWindow.
+
+         Changes to qtechUrpfDropRateWindow are not reflected in this
+         object until the next computation time.
+
+         The rate from the  most recent computation is the value 
+         fetched until the subsequent computation is performed."
+    ::= { qtechUrpfIfMonEntry 3 }
+
+--
+-- qtechUrpfInterfaceConfig
+--
+
+qtechUrpfIfConfTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF QtechUrpfIfConfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains statistics information on URPF on
+         an interface."
+    ::= { qtechUrpfInterfaceConfig 1 }
+
+qtechUrpfIfConfEntry OBJECT-TYPE
+    SYNTAX     QtechUrpfIfConfEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A row exists in this table if a row exists
+         in qtechUrpfIfMonTable."
+    AUGMENTS { qtechUrpfIfMonEntry }
+    ::= { qtechUrpfIfConfTable 1 }
+
+QtechUrpfIfConfEntry ::= SEQUENCE {
+        qtechUrpfIfCheckStrict             INTEGER,
+        qtechUrpfIfDropRateNotifyEnable    TruthValue,
+        qtechUrpfIfNotifyDropRateThreshold Unsigned32,
+        qtechUrpfIfNotifyDrHoldDownReset   TruthValue,
+        qtechUrpfIfWhichRouteTableID       INTEGER,
+        qtechUrpfIfVrfName                 SnmpAdminString
+    }
+
+qtechUrpfIfCheckStrict OBJECT-TYPE
+    SYNTAX INTEGER {
+              none(0),
+              strict(1),
+              loose(2)
+            }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Interface configuration indicating the strictness of 
+         the reachability check performed 
+         on the interface.
+         - none: not enable urpf check in this interface.
+         - strict: check that source addr is reachable via 
+                   the interface it came in on.
+         - loose : check that source addr is reachable via 
+		   some interface on the device."
+    ::= { qtechUrpfIfConfEntry 1 }
+
+qtechUrpfIfDropRateNotifyEnable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "This object specifies whether the system produces the 
+         qtechUrpfIfDropRateNotify notification as a result of URPF 
+         dropping of version qtechUrpfIfIpVersion IP packets on this 
+         interface. A false value prevents such notifications from 
+         being generated by this system.
+         
+         Relation CLI: ip verify urpf drop-rate notify."
+    DEFVAL { false }
+    ::= { qtechUrpfIfConfEntry 2 }
+
+qtechUrpfIfNotifyDropRateThreshold OBJECT-TYPE
+    SYNTAX     Unsigned32
+    UNITS      "packets/second"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "When the calculated rate of URPF packet drops 
+         (qtechUrpfIfDropRate) meets or exceeds the value 
+         specified by this object, a qtechUrpfIfDropRateNotify 
+         notification is sent if qtechUrpfIfDropRateNotifyEnable 
+         is set to true, and no such notification for the
+         IP version has been sent for this interface for the 
+         hold-down period.
+
+         Note that due to the calculation used for drop rate, 
+         if there are less than n drop events in an n-second
+         period the notification will not be generated. To allow
+         for the detection of a small number of drop events, the
+         value 0 (zero) is used to indicate that if any drop events
+         occur during the interval, a notification is generated.
+         
+         Relation CLI: ip verify urpf drop-rate notify hold-down seconds."
+    DEFVAL { 1000 }
+    ::= { qtechUrpfIfConfEntry 3 }
+
+qtechUrpfIfNotifyDrHoldDownReset OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "Setting this object to true causes the five-minute 
+         hold-down timer for emitting URPF drop rate 
+         notifications for IP version qtechUrpfIfIpVersion on 
+         the interface to be short-circuited.  If a notification 
+         is due and would be emitted for the interface if the 
+         five-minutes elapsed, setting this object will cause 
+         the notification to be sent.
+
+         This is a trigger, and doesn't hold information. It is
+         set and an action is performed. Therefore a get for 
+         this object always returns false.
+         
+         Relation CLI: clear ip urpf interface."
+    DEFVAL { false }
+    ::= { qtechUrpfIfConfEntry 4 }
+
+qtechUrpfIfWhichRouteTableID OBJECT-TYPE
+    SYNTAX INTEGER {
+              default(1),
+              vrf(2)
+            }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Interface configuration indicating the routing table 
+         consulted for the reachability check:
+         - default: the non-private routing table for of the 
+                    managed system.
+         - vrf   : a particular VPN routing table."
+    ::= { qtechUrpfIfConfEntry 5 }
+
+qtechUrpfIfVrfName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "If the value of qtechUrpfIfWhichRouteTableID is 'vrf',
+         the name of the VRF Table. Otherwise a zero-length
+         string."
+    ::= { qtechUrpfIfConfEntry 6 }
+
+--
+-- URPF MIB Notifications
+--
+
+qtechUrpfIfDropRateNotify NOTIFICATION-TYPE
+    OBJECTS     {
+                qtechUrpfIfDropRate
+                }
+    STATUS      current
+    DESCRIPTION
+        "This notification is generated when 
+         qtechUrpfIfDropRateNotifyEnable is set to true and
+         the calculated URPF drop rate (qtechUrpfIfDropRate) 
+         exceeds the notification threshold drop rate 
+         (qtechUrpfIfNotifyDropRateThreshold). Note the 
+         exceptional value of 0 for threshold allows notification 
+         generation if any drop events occur in an interval.
+ 
+         After generating this notification, another such
+         notification will not be sent out for a minimum of five 
+         minutes (note the exception to this provided by 
+         qtechUrpfIfNotifyDrHoldDownReset).
+
+         The object value present in the notification is the 
+         the drop rate that exceeded the threshold."
+    ::= { qtechUrpfMIBNotifs 1 }
+
+--
+-- URPF MIB Conformance
+--
+qtechUrpfMIBCompliances OBJECT IDENTIFIER ::= 
+                                   { qtechUrpfMIBConformance 1 }
+qtechUrpfMIBGroups  OBJECT IDENTIFIER ::= 
+                                   { qtechUrpfMIBConformance 2 }
+                
+
+qtechUrpfMIBCompliance MODULE-COMPLIANCE
+    STATUS     current
+    DESCRIPTION
+        "An SNMP entity can implement this module to
+        provide URPF problem diagnosis information."
+
+    MODULE  -- this module
+
+    MANDATORY-GROUPS { qtechUrpfMIBMainObjectGroup,
+                       qtechUrpfMIBNotifyGroup }
+
+    GROUP           qtechUrpfMIBVrfObjectGroup 
+    DESCRIPTION
+        "This group is mandatory for all implementations
+         that need to index URPF statistics by VRF interfaces."
+
+    ::= { qtechUrpfMIBCompliances 1 }
+                
+qtechUrpfMIBMainObjectGroup OBJECT-GROUP
+    OBJECTS  {
+        qtechUrpfComputeInterval,
+        qtechUrpfDropRateWindow,
+        qtechUrpfDropNotifyHoldDownTime,
+        qtechUrpfDrops,
+        qtechUrpfDropRate,
+        qtechUrpfIfDrops,
+        qtechUrpfIfDropRate,
+        qtechUrpfIfCheckStrict,
+        qtechUrpfIfDropRateNotifyEnable,
+        qtechUrpfIfNotifyDropRateThreshold,
+        qtechUrpfIfNotifyDrHoldDownReset
+    }
+    STATUS     current
+    DESCRIPTION
+        "The collection of common counter objects, those 
+         needed by other objects, and the common interface 
+         table."
+    ::= { qtechUrpfMIBGroups 1 }
+
+qtechUrpfMIBVrfObjectGroup OBJECT-GROUP
+    OBJECTS  {
+        qtechUrpfIfWhichRouteTableID,
+        qtechUrpfIfVrfName
+    }
+    STATUS     current
+    DESCRIPTION
+        "The collection of objects needed to index by  
+         VRF."
+    ::= { qtechUrpfMIBGroups 2 }
+
+qtechUrpfMIBNotifyGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { qtechUrpfIfDropRateNotify }
+    STATUS     current
+    DESCRIPTION
+        "The collection of objects which are used to specify 
+         notifications for URPF."
+    ::= { qtechUrpfMIBGroups 3 }
+
+END

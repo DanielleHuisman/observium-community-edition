@@ -1,0 +1,1652 @@
+AVAYA-RTP-MIB DEFINITIONS ::= BEGIN
+   IMPORTS
+     OBJECT-GROUP, NOTIFICATION-GROUP, MODULE-COMPLIANCE
+         FROM SNMPv2-CONF
+     Integer32, Unsigned32, enterprises, Gauge32, Counter32, OBJECT-TYPE, 
+      MODULE-IDENTITY, NOTIFICATION-TYPE
+         FROM SNMPv2-SMI
+      RowStatus, TEXTUAL-CONVENTION, TruthValue, DateAndTime, TimeInterval, DisplayString
+         FROM SNMPv2-TC      
+       InetAddressType, InetAddress, InetPortNumber, InetAddressIPv6
+         FROM INET-ADDRESS-MIB
+       IpAddress
+         FROM RFC1155-SMI;
+      
+
+
+     avRtpMib MODULE-IDENTITY
+       LAST-UPDATED "201501091031Z"   
+     ORGANIZATION
+                       "Avaya"
+     CONTACT-INFO
+     "
+       Avaya Customer Services
+       Postal: Avaya, Inc.
+       211 Mt Airy Rd.
+       Basking Ridge, NJ 07920
+       USA
+       Tel:	+1 908 953 6000
+       WWW: 	http://www.avaya.com
+     "
+     DESCRIPTION
+     "              
+     This module defines an interface to RTP sessions QoS statistic gathering capabilities 
+     in Avaya's VoIP enabled devices. The MIB, designed for Avaya Services, allows operators
+      to perform the following tasks:
+        1.	View the statistics of recently terminated RTP session. 
+        2.	Define QoS related thresholds that define bad-QoS conditions.
+        3.	View the statistics of last session, which experienced bad QoS.
+        4.	Enable a special QoS trap that is sent upon termination of RTP session with bad QoS. 
+        5.	Enable a special QoS fault trap that is sent when more than N streams suffer from bad QoS. And a QoS clear trap that is sent when this fault conditions ends.
+        6.	Configure the above traps rate limiting mechanism.
+
+     Copyright notice:
+     
+     This AVAYA SNMP Management Information Base Specification (Specification) embodies
+     AVAYA confidential and Proprietary intellectual property.  AVAYA retains all Title
+     and ownership in the Specification, including any revisionsIt is AVAYA's intent to
+     encourage the widespread use of this Specification in connection with the management
+     of AVAYA products. AVAYA grants vendors, end-users, and other interested parties a
+     non-exclusive license to use this Specification in connection with the management 
+     of AVAYA products.This Specification is supplied 'as is', and AVAYA makes no warranty,
+     either express or implied, as to the use, operation, condition, or performance of the
+      Specification.     
+     "
+--Warning! do not change the token below. Required for parsing.
+--ChkTk001 Parsing token 001
+
+           ::= { mibs 7  }  
+
+-- Version 201501091031Z
+-- 1. Add Opus to avRtpSessionType
+-- 2. Add AES256 to avRtpSessionTxEncryp
+           
+-- Version 201006081712Z
+-- 1. Add avRtpQoSInetTrap.
+           
+-- Version 200912231042Z
+-- 1. Add avRtpSessionTxFlowLabel and avRtpSessionRxFlowLabel
+--
+-- Version 200612241255Z
+--  add "generic" srtp enum to AvRtpSessionTxEncryp 
+-- Version 200510061516Z
+--  1. Add new enums to avRtpSessionType 
+--
+-- Version 200505191225Z
+--  1. Add enums to AvRtpSessionTxEncryp for SRTP
+--
+-- Version 200410271525Z
+--  1.  Change the avRtpSessionEcReturnLoss range
+--  2.  Update description: avRtpSessionCname, avRtpSessionPhone 
+--  3.  avRtpSessionTxEncryp  change AEA enum to encryptionAEAv2 
+--
+-- Version 200410211225Z
+--     Update some of the threshold ranges
+--
+-- Version 200410201417Z
+--  1. Add avRtpSessionSeverity to the traps
+--  2. Change configuration items to INTEGER with ranges
+--  3. Change    avRtpFaultMask SYNTAX to OCTET STRING
+--
+-- Version 200402080725Z
+--   Fix the lookup table: include the sessionID in the index
+--
+--
+-- Version 200401081250Z
+--   Simplify the trap rate limiter replace old items with AvrtpQoSTrapTokenInterval
+--        and AvrtpQoSTrapBucketSize
+--
+-- Version 200406221435Z
+--   1. Add avRtpFaultMask
+--   2. avRtpDateAndTime access changed to read-only
+--   3. avRtpSumTable index should be avRtpSumEngineID
+--   4. Rename:
+--        avRtpSessionTableSize   to avRtpMaxSessionTableSize
+--        avRtpSessionTableReservedRows  to avRtpReservedSessionTableRows
+--        avRtpSessionClear to 
+
+--
+-- Version 200406221507Z
+--  avRtpThresholdRxAvgCodecLoss item added
+--
+-- Version 200404260701Z
+--    avRtpSessionPhone syntax changed to DisplayString
+--    avRtpavRtpQoSTrapShapeMaxDelay changed to avRtpQoSTrapShapeMaxDelay
+--	  avRtpSessionStatInerval changed to avRtpSessionStatInterval 
+--
+-- Version 200404210955Z
+--  change avRtpQoSClearTh syntax to integer32 (typo)
+--
+-- Version 200403300000Z
+--   Modification to allow the MIB to compile with the embedded firmware.
+--
+-- Version 200403290000Z
+--   Update the Session Table to support IPv6, Codec RTT and Codec Loss.
+--
+-- Version 200402210000Z
+--   Initial Version
+
+  AvRtpItuPerceivedSeverity ::= TEXTUAL-CONVENTION
+       STATUS current
+       DESCRIPTION
+               "ITU perceived severity values"
+       REFERENCE
+              "ITU Recommendation M.3100, 'Generic Network Information
+               Model', 1995
+               ITU Recommendation X.733, 'Information Technology - Open
+               Systems Interconnection - System Management: Alarm
+               Reporting Function', 1992"
+       SYNTAX         INTEGER
+              {
+              cleared (1),
+              indeterminate (2),
+              critical (3),
+              major (4),
+              minor (5),
+              warning (6)
+              }     
+              
+    AvRtpLoss ::= TEXTUAL-CONVENTION          
+       DISPLAY-HINT "d-1%"
+       STATUS current
+       DESCRIPTION
+               "Loss in 1/10 precent accuracy"       
+       SYNTAX INTEGER (-1..1000)
+   
+    AvRtpSilenceSupp   ::= TEXTUAL-CONVENTION          
+       STATUS current
+       DESCRIPTION
+               "Silence Suppression modes where:
+                noRtp(2)  No RTP packets during silence periods
+                SilenceFrames(3)  The codec sends special silence frames during silence periods
+                Complex(4)  A combination of the above"       
+       SYNTAX INTEGER {
+           notSupported (0),
+           disabled (1),
+           noRtp (2),
+           silenceFrames (3),
+           complex (4)  }
+
+
+avaya OBJECT IDENTIFIER ::= { enterprises 6889 }
+       
+mibs OBJECT IDENTIFIER ::= { avaya 2 }
+
+--Warning! do not change the token below. Required for parsing.
+--ChkTk002 Parsing token 002
+              
+avRtpNotification OBJECT IDENTIFIER ::= { avRtpMib 0 }
+
+	avRtpQoSTrap NOTIFICATION-TYPE
+            OBJECTS { avRtpSessionLocAddrV4, avRtpSessionRemAddrV4, avRtpSessionDuration,
+                    avRtpSessionCname, avRtpSessionPhone, 
+                    avRtpSessionSeverity, avRtpSessionDebugStr }
+            STATUS current
+            DESCRIPTION
+                "The trap contains QoS statistics for a single RTP session.
+                 The device can send this trap when an RTP session that experienced bad 
+                 QoS terminates"
+            ::= { avRtpNotification 1 }
+
+	avRtpQoSFault NOTIFICATION-TYPE
+            OBJECTS { avRtpQoSFaultTh, avRtpQoSClearTh, avRtpSessionSeverity }
+            STATUS current
+            DESCRIPTION
+                "The trap indicates that more than XXX RTP sessions currently suffers 
+                from bad QoS." 
+            ::= { avRtpNotification 2 }
+            
+	avRtpQoSClear NOTIFICATION-TYPE
+            OBJECTS { avRtpQoSFaultTh, avRtpQoSClearTh, avRtpSessionSeverity }
+            STATUS current
+            DESCRIPTION
+                "This trap indicates that a QoS fault, previously indicated by an
+                 avRtpQoSFault has cleared. "
+            ::= { avRtpNotification 3 }    
+            
+    avRtpQoSInetTrap NOTIFICATION-TYPE
+            OBJECTS { avRtpSessionLocInetAddrType, avRtpSessionLocInetAddr, 
+            avRtpSessionRemInetAddrType, avRtpSessionRemInetAddr,
+            avRtpSessionDuration, avRtpSessionCname, avRtpSessionPhone, 
+                    avRtpSessionSeverity, avRtpSessionDebugStr }
+            STATUS current
+            DESCRIPTION
+                "The trap contains QoS statistics for a single RTP session over IPv4/IPv6.
+                 The device can send this trap when an RTP session that experienced bad 
+                 QoS terminates"
+            ::= { avRtpNotification 4 }
+     
+            
+avRtpConfig OBJECT IDENTIFIER ::= { avRtpMib 1 }
+      
+
+avRtpThresholdTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF AvRtpThresholdEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Thresholds configuration table"
+	::= { avRtpConfig 1 }
+	
+	avRtpThresholdEntry OBJECT-TYPE
+	SYNTAX	   AvRtpThresholdEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Each entry contains one set of thresholds. In this version only one entry is
+	     supported (1). "
+	INDEX {
+	     avRtpThresholdSet
+	}
+	::= { avRtpThresholdTable 1 }
+
+
+
+    AvRtpThresholdEntry ::= SEQUENCE {
+      avRtpThresholdSet Integer32,
+      avRtpThresholdMinStatWin INTEGER, 
+      avRtpThresholdRxCodecLoss AvRtpLoss, 
+      avRtpThresholdRxAvgCodecLoss AvRtpLoss, 
+      avRtpThresholdRxCodecLossEv INTEGER,
+      avRtpThresholdCodecRtt INTEGER,
+      avRtpThresholdCodecRttEv INTEGER,
+      avRtpThresholdEcReturnLoss INTEGER,
+      avRtpThresholdEcReturnLossEv INTEGER,
+      avRtpThresholdRxLoss AvRtpLoss,
+      avRtpThresholdRxLossEv INTEGER,
+      avRtpThresholdRemLoss AvRtpLoss,
+      avRtpThresholdRemLossEv INTEGER,
+      avRtpThresholdAvgRxLoss AvRtpLoss,
+      avRtpThresholdAvgRemLoss AvRtpLoss,
+      avRtpThresholdRxJitter INTEGER,
+      avRtpThresholdRxJitterEv INTEGER,
+      avRtpThresholdRemJitter INTEGER,
+      avRtpThresholdRemJitterEv INTEGER,
+      avRtpThresholdRtt INTEGER,
+      avRtpThresholdRttEv INTEGER,
+      avRtpThresholdRxSsrcChangeEv INTEGER
+    }
+
+    avRtpThresholdSet OBJECT-TYPE
+            SYNTAX Integer32
+            MAX-ACCESS read-only
+            STATUS current
+            DESCRIPTION
+              "The threshold set"    
+            ::= { avRtpThresholdEntry 1 }
+	
+     avRtpThresholdMinStatWin OBJECT-TYPE
+            SYNTAX INTEGER (1..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The minimum number of observed RTP sequence numbers advance needed for the 
+                evaluation of packet loss. "
+            ::= { avRtpThresholdEntry 2 }
+
+     avRtpThresholdRxCodecLoss OBJECT-TYPE
+            SYNTAX AvRtpLoss
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Codec packet loss i.e. the loss at the codec decoder. This threshold is 
+                evaluated once for each statistical interval (6-12 seconds)"
+            ::= { avRtpThresholdEntry 3 }
+
+	 avRtpThresholdRxAvgCodecLoss  OBJECT-TYPE
+            SYNTAX AvRtpLoss
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Threshold on the avarage codec loss"
+            ::= { avRtpThresholdEntry 4 }
+	 
+     avRtpThresholdRxCodecLossEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The device generates a QoS traps if avRtpThresholdRxCodecLoss was crossed
+                 avRtpThresholdRxCodecLossEv times during the session (0 means that no traps 
+                 are sent for this threshold)."
+            ::= { avRtpThresholdEntry 5}  
+
+     avRtpThresholdCodecRtt OBJECT-TYPE
+            SYNTAX INTEGER (0..5000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Codec round trip time threshold (an estimate for the overall RTT, including 
+                 the internal delays). This threshold is evaluated each time an RTCP message 
+                 is received (usually every 6-12 seconds)"
+            ::= { avRtpThresholdEntry 6}
+
+     avRtpThresholdCodecRttEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The device generates a QoS traps if avRtpThresholdCodecRtt was crossed
+                 avRtpThresholdCodecRttEv times during the session (0 means that no traps 
+                 are sent for this threshold)."
+            ::= { avRtpThresholdEntry 7}  
+
+     avRtpThresholdEcReturnLoss OBJECT-TYPE
+            SYNTAX INTEGER (0..100)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Echo Cancellation return loss in -dBm. High value (low absolute)
+                 means that a lot of energy is returned which can result in auditable echos.
+                 This threshold is evaluated once for each statistical interval (6-12 seconds) "
+            ::= { avRtpThresholdEntry 8}
+
+     avRtpThresholdEcReturnLossEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                ""
+            ::= { avRtpThresholdEntry 9 }             
+
+
+     avRtpThresholdRxLoss OBJECT-TYPE
+            SYNTAX AvRtpLoss
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The received packet loss.
+                 This threshold is evaluated once for each statistical interval (6-12 seconds) "
+            ::= { avRtpThresholdEntry 10  }
+
+     avRtpThresholdRxLossEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The device generates a QoS traps if avRtpThresholdRxCodecLoss was crossed
+                 avRtpThresholdRxCodecLossEv times during the session (0 means that no traps 
+                 are sent for this threshold)."
+            ::= { avRtpThresholdEntry 11 } 
+
+     avRtpThresholdRemLoss OBJECT-TYPE
+            SYNTAX AvRtpLoss
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Remote peer packet loss threshold learnt from received RTCP reports.
+                 This threshold is evaluated once for each statistical interval (6-12 seconds) "
+            ::= { avRtpThresholdEntry 12 }
+
+     avRtpThresholdRemLossEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                ""
+            ::= { avRtpThresholdEntry 13 } 
+
+     avRtpThresholdAvgRxLoss OBJECT-TYPE
+            SYNTAX AvRtpLoss
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The received average packet loss. This threshold is evaluated at the end
+                 of the session."
+            ::= { avRtpThresholdEntry 14 }
+
+     avRtpThresholdAvgRemLoss OBJECT-TYPE
+            SYNTAX AvRtpLoss
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Threshold on the  average remote packet loss, learnt from RTCP reports.
+                 This threshold is evaluated at the end of the session."
+            ::= { avRtpThresholdEntry 15 }
+
+       avRtpThresholdRxJitter OBJECT-TYPE
+            SYNTAX INTEGER (0..5000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "A threshold on the received inter-arrival jitter, measured in milliseconds.
+                This threshold is evaluated once for each statistical interval (6-12 seconds)"
+            ::= { avRtpThresholdEntry 16 }
+
+     avRtpThresholdRxJitterEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                ""
+            ::= { avRtpThresholdEntry 17 }
+
+     avRtpThresholdRemJitter OBJECT-TYPE
+            SYNTAX INTEGER (0..5000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "A threshold on the remote inter-arrival jitter, learnt from RTCP reports.
+                 This item is measured in milliseconds and is evaluated upon reception
+                  of an RTCP message."
+            ::= { avRtpThresholdEntry 18 }
+
+     avRtpThresholdRemJitterEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                ""
+            ::= { avRtpThresholdEntry 19 }
+
+     avRtpThresholdRtt OBJECT-TYPE
+            SYNTAX INTEGER (0..5000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "A threshold on the network round-trip-time, measured in milliseconds. 
+                  This item is evaluated upon reception of RTCP messages."
+            ::= { avRtpThresholdEntry 20 }
+
+     avRtpThresholdRttEv OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                ""
+            ::= { avRtpThresholdEntry 21 }
+
+	avRtpThresholdRxSsrcChangeEv    OBJECT-TYPE
+            SYNTAX INTEGER (0..1000)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The device would generate an end-of-session QoS trap if the number of observed 
+                SSRC changes was over this treshold."
+            ::= { avRtpThresholdEntry 22 }        
+            
+     
+
+
+      avRtpEnable OBJECT-TYPE
+            SYNTAX TruthValue
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Enable RTP statistic collection by the device.
+                 Note that statistic collection may cause minor performance hit."
+            ::= { avRtpConfig 2 }
+
+      avRtpQoSTrapEnable OBJECT-TYPE
+            SYNTAX TruthValue
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "EEnable the QoS-Trap generation."
+            ::= { avRtpConfig 3 }            
+            
+      avRtpQoSFaultTrapEnable OBJECT-TYPE
+            SYNTAX TruthValue
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "Enable the QoS-Trap generation."
+            ::= { avRtpConfig 4 }            
+            
+      avRtpQoSFaultTh OBJECT-TYPE
+            SYNTAX INTEGER (1..100)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The number of concurrent active RTP sessions that suffers from bad QoS
+                 (according to avRtpThresholds) that cause the device to enter a 
+                 'QoS fault' state. Note, upon entering this fault state, the device sends
+                  a avRtpQoSFault trap."
+            ::= { avRtpConfig 5 }     
+            
+	  avRtpQoSClearTh OBJECT-TYPE            
+            SYNTAX INTEGER (0..99)
+            MAX-ACCESS read-write
+            STATUS current
+            DESCRIPTION
+                "The number of concurrent active RTP sessions that suffers from bad QoS 
+                (according to avRtpThresholds) that clears the 'QoS fault' state.
+                 Note, when the QoS fault clears, the device send a avRtpQoSClear trap."
+            ::= { avRtpConfig 6 }     
+            
+      avRtpTxQoSTraps OBJECT-TYPE            
+            SYNTAX Counter32
+            MAX-ACCESS read-only
+            STATUS current            
+            DESCRIPTION
+                "The number of  avRtpQoSTrap  sent so far."
+            ::= { avRtpConfig  7}     
+            
+      avRtpQoSTrapsDrop OBJECT-TYPE            
+            SYNTAX Counter32
+            MAX-ACCESS read-only
+            STATUS current            
+            DESCRIPTION
+                "The number of avRtpQoSTraps that were dropped by the rate limiter"
+            ::= { avRtpConfig  8}     
+            
+            avRtpQoSTrapTokenInterval OBJECT-TYPE            
+            SYNTAX TimeInterval (10..1000000)
+            MAX-ACCESS read-write
+            STATUS current            
+            DESCRIPTION
+                "Configure the QoS trap token-bucket rate limiter. This item sets
+                 the token interval in hundredth of seconds."
+            DEFVAL { 1000 }                
+            ::= { avRtpConfig  9}     
+            
+            avRtpQoSTrapBucketSize OBJECT-TYPE            
+            SYNTAX  INTEGER (1..1000)
+            MAX-ACCESS read-write
+            STATUS current            
+            DESCRIPTION
+                "Configure the QoS trap token-bucket rate limiter. This item
+                 configures the bucket-size."
+            DEFVAL { 5 }                 
+            ::= { avRtpConfig  10}                 
+
+            
+            avRtpDateAndTime OBJECT-TYPE            
+            SYNTAX   DateAndTime
+            MAX-ACCESS read-only
+            STATUS current            
+            DESCRIPTION
+                "The current RTC date and Time"
+            ::= { avRtpConfig 11 }                          
+
+            avRtpMaxSessionTableSize OBJECT-TYPE            
+            SYNTAX   Integer32
+            MAX-ACCESS read-only
+            STATUS current            
+            DESCRIPTION
+                "The maximum number of rows of the session table"
+            ::= { avRtpConfig 12 }        
+
+          avRtpReservedSessionTableRows OBJECT-TYPE            
+            SYNTAX   Integer32
+            MAX-ACCESS read-only
+            STATUS current            
+            DESCRIPTION
+                "The number of rows in session table reserved for terminated
+                 sessions that had QoS events "
+            ::= { avRtpConfig 13 }    
+           
+           avRtpClear OBJECT-TYPE            
+            SYNTAX   TruthValue
+            MAX-ACCESS read-write
+            STATUS current            
+            DESCRIPTION
+                "Clear the Session table"
+            ::= { avRtpConfig 14 } 
+            
+            avRtpFaultMask OBJECT-TYPE            
+            SYNTAX   OCTET STRING (SIZE (0..1))
+            MAX-ACCESS read-only
+            STATUS current            
+            DESCRIPTION
+                "Fault mask enables Avaya Fault-Mon to poll the device status
+                  Bit 0 - Set if there is a fault condition according to
+                          avRtpQoSFaultTh/avRtpQoSClearTh"                          
+            ::= { avRtpConfig 15 } 
+
+  avRtpSessionTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF AvRtpSessionEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+                "This table contains statistics for recently terminated RTP flows."
+      ::= { avRtpMib 2 }
+
+      avRtpSessionEntry OBJECT-TYPE
+            SYNTAX AvRtpSessionEntry
+            MAX-ACCESS not-accessible
+            STATUS current
+            DESCRIPTION
+                "Each row contains information from a single RTP session. 
+                 Rows are removed when the space limits are reached (avRtpSessionTableSize).
+                 There are avRtpSessionTableReservedRows reserved rows for terminated
+                 sessions that had QoS events. Sessions that had QoS events 
+                 might appear twice in the table, e.g. once with
+                 AvRtpSessionState = terminated and once with 
+                 terminatedWithEvent. 
+                "
+            INDEX { avRtpSessionState, avRtpSessionID }
+            ::= { avRtpSessionTable 1 }
+        
+        AvRtpSessionEntry ::=
+            SEQUENCE { 
+				avRtpSessionState INTEGER,
+				avRtpSessionID Integer32,
+				avRtpSessionEngineID Integer32,   
+				avRtpSessionLocAddrType InetAddressType,
+				avRtpSessionLocAddr InetAddress,   
+				avRtpSessionLocAddrV4 IpAddress,
+				avRtpSessionLocAddrV6 InetAddressIPv6,
+				avRtpSessionRemAddrType InetAddressType,
+				avRtpSessionRemAddr InetAddress,     			
+				avRtpSessionRemAddrV4 IpAddress,
+				avRtpSessionRemAddrV6 InetAddressIPv6,
+				avRtpSessionLocPort	InetPortNumber,
+				avRtpSessionRemPort	InetPortNumber, 
+				avRtpSessionStartTime	DateAndTime,
+				avRtpSessionEndTime	DateAndTime,
+				avRtpSessionDuration	TimeInterval,				
+                avRtpSessionCname  DisplayString,
+                avRtpSessionPhone  DisplayString,
+                avRtpSessionSeverity INTEGER,
+                avRtpSessionTxLen Integer32,
+                avRtpSessionType INTEGER,
+                avRtpSessionTxInterval Integer32,
+                avRtpSessionTxEncryp INTEGER,
+                avRtpSessionTxDscp	INTEGER,
+                avRtpSessionTxVlan INTEGER,
+                avRtpSessionTxL2Pri INTEGER,
+                avRtpSessionTxSilenceSupp	AvRtpSilenceSupp,
+                avRtpSessionTxSsrc	Unsigned32,
+                avRtpSessionTxRsvp INTEGER,
+                avRtpSessionTxResvFail	Gauge32,
+                avRtpSessionStatInterval	TimeInterval,
+                avRtpSessionRxCodecPlayTime Counter32,
+                avRtpSessionRxCodecLossCount Counter32,
+                avRtpSessionRxCodecLoss AvRtpLoss,
+                avRtpSessionRxAvgCodecLoss AvRtpLoss,
+                avRtpSessionRxCodecLossEv Counter32, 
+                avRtpSessionRxLoss    AvRtpLoss,
+                avRtpSessionRxAvgLoss AvRtpLoss,
+                avRtpSessionRxLossEv  Counter32,                
+				avRtpSessionRx 	Counter32,
+				avRtpSessionRxLossCount	Counter32,
+				avRtpSessionRxSeqFall	Counter32,
+				avRtpSessionRxDup	Counter32,
+				avRtpSessionRxJBufUnderruns	Gauge32,
+				avRtpSessionRxJBufOverruns	Gauge32,
+				avRtpSessionRxJBufDelay	Integer32,
+				avRtpSessionRxMaxJBufDelay Integer32,
+				avRtpSessionRxJitter Integer32,
+				avRtpSessionRxAvgJitter Integer32,
+				avRtpSessionRxJitterEv Counter32,			
+				avRtpSessionRxTtl	INTEGER,
+				avRtpSessionRxMinTtl	INTEGER,
+				avRtpSessionRxMaxTtl	INTEGER, 
+				avRtpSessionRxDscp	INTEGER,
+				avRtpSessionRxL2Pri	INTEGER,
+				avRtpSessionRxSilenceSupp	AvRtpSilenceSupp,
+				avRtpSessionRxSsrc	Unsigned32,
+				avRtpSessionRxSsrcChange Counter32,			
+   				avRtpSessionTxRtcp	Counter32,
+				avRtpSessionRxRtcp	Counter32,     
+				avRtpSessionCodecRtt	Integer32,
+				avRtpSessionAvgCodecRtt	Integer32,
+				avRtpSessionCodecRttEv	Counter32,				
+				avRtpSessionRtt	Integer32,
+				avRtpSessionAvgRtt	Integer32,
+				avRtpSessionRttEv	Counter32,
+				avRtpSessionRemLoss AvRtpLoss,
+				avRtpSessionRemAvgLoss  AvRtpLoss,
+				avRtpSessionRemLossEv Counter32,
+				avRtpSessionRemJitter	Integer32,
+				avRtpSessionRemAvgJitter Integer32,
+				avRtpSessionRemJitterEv	Counter32,				
+				avRtpSessionEcTailLen	Integer32,
+				avRtpSessionEcReturnLoss	INTEGER,
+				avRtpSessionEcReturnLossEv	Counter32,
+				avRtpSessionAEC INTEGER,
+				avRtpSessionDebugStr DisplayString,
+				avRtpSessionTxFlowLabel	INTEGER,
+                avRtpSessionRxFlowLabel	INTEGER
+				}
+
+        avRtpSessionState OBJECT-TYPE            
+        SYNTAX  INTEGER {active(1), activeWithEvent(2), terminated(3),terminatedWithEvent(4)}
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "An arbitrary RTP-flow sequence number, serves as the MIB tables index"
+        ::= { avRtpSessionEntry 1} 
+
+        avRtpSessionID OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "An arbitrary RTP-flow sequence number, serves as the MIB tables index"
+        ::= { avRtpSessionEntry 2}                 
+        
+        avRtpSessionEngineID OBJECT-TYPE            
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of the VoIP engine responsible for the RTP stream.
+          More information about the specific VoIP engine can be found in
+           avRtpSumTable"
+        ::= { avRtpSessionEntry 3}           
+
+  		avRtpSessionLocAddrType OBJECT-TYPE            
+         SYNTAX  InetAddressType
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "This item specifies whether the IP addresses in this row are in IPv6
+          or in IPv4 format (See RFC3291)"
+        ::= { avRtpSessionEntry 4}                  
+
+  		avRtpSessionLocAddr OBJECT-TYPE           
+        SYNTAX InetAddress     
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream local RTP address."
+        ::= { avRtpSessionEntry 5}        
+        
+    	avRtpSessionLocAddrV4 OBJECT-TYPE           
+        SYNTAX IpAddress     
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream local RTP address (IPv4)."
+        ::= { avRtpSessionEntry 6} 
+
+    	avRtpSessionLocAddrV6 OBJECT-TYPE           
+        SYNTAX InetAddressIPv6     
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream local RTP address (IPv6)."
+        ::= { avRtpSessionEntry 7} 
+       
+
+		avRtpSessionRemAddrType OBJECT-TYPE            
+        SYNTAX  InetAddressType
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "This item specifies whether the remote IP addresses in this row is in IPv6
+          or in IPv4 format (See RFC3291)"
+        ::= { avRtpSessionEntry 8}          
+        
+  		avRtpSessionRemAddr OBJECT-TYPE            
+        SYNTAX  InetAddress
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream remote peer address"
+        ::= { avRtpSessionEntry 9}                  
+
+    	avRtpSessionRemAddrV4 OBJECT-TYPE           
+        SYNTAX IpAddress     
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream Remote RTP address (IPv4)."
+        ::= { avRtpSessionEntry 10} 
+
+    	avRtpSessionRemAddrV6 OBJECT-TYPE           
+        SYNTAX InetAddressIPv6     
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream Remote RTP address (IPv6)."
+        ::= { avRtpSessionEntry 11} 
+
+
+  		avRtpSessionLocPort OBJECT-TYPE            
+        SYNTAX InetPortNumber
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream local UDP port"
+        ::= { avRtpSessionEntry 12}             
+        
+       avRtpSessionRemPort OBJECT-TYPE            
+        SYNTAX InetPortNumber
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP stream remote UDP port"
+        ::= { avRtpSessionEntry 13}                 
+
+  		avRtpSessionStartTime OBJECT-TYPE            
+        SYNTAX DateAndTime
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The stream start time"
+        ::= { avRtpSessionEntry 14}                 
+
+  		avRtpSessionEndTime OBJECT-TYPE            
+        SYNTAX DateAndTime
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The stream end time"
+        ::= { avRtpSessionEntry 15}
+
+       avRtpSessionDuration OBJECT-TYPE            
+        SYNTAX  TimeInterval
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The duration of the stream in hundredth of seconds"
+        ::= { avRtpSessionEntry 16}                 
+            
+
+  		avRtpSessionCname OBJECT-TYPE            
+        SYNTAX  DisplayString (SIZE (0..100))
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RTP canonical name of the gateway"
+        ::= { avRtpSessionEntry 17} 
+
+        avRtpSessionPhone OBJECT-TYPE            
+        SYNTAX DisplayString (SIZE (0..22))
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "A string containing the phone extensions (received for CM), in the format of
+          <conferenceID>:<extension #1>...<extension #N>"
+        ::= { avRtpSessionEntry 18}                 
+
+
+  		avRtpSessionSeverity OBJECT-TYPE            
+-- Note, the syntax should match up exactly with AvRtpItuPerceivedSeverity.
+-- The CGTrap.sh tool does not expect another redirection so hard code
+-- the enuerated types to the same as the values in AvRtpItuPerceivedSeverity
+		SYNTAX	INTEGER
+              {
+              cleared (1),
+              indeterminate (2),
+              critical (3),
+              major (4),
+              minor (5),
+              warning (6)
+              }     
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The QoS problem severity for the stream. This item equals to 
+          'warning' if a trap was suppose to be sent. and 'cleared' otherwise. "
+        ::= { avRtpSessionEntry 19} 
+
+ 		avRtpSessionTxLen OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The transmitted RTP packet size"
+        ::= { avRtpSessionEntry 20}                
+        
+ 		avRtpSessionType OBJECT-TYPE            
+        SYNTAX INTEGER {
+        	g711u(0),
+        	g723(4),
+        	g711a(8),
+        	g722(9),
+        	g728(15),
+        	g729(18),
+        	avayaFaxRelay(128),
+        	t38fax(129),
+        	faxPassThru(130),
+        	ttyRelay(131),
+        	ttyPassThru(132),
+        	modemRelay(133),
+        	modemPassThru(134),
+        	clearChannel(135),        
+        	g729a(136),
+        	g729ab(137),  
+        	g729b(138),
+        	g726a32(139),
+        	opus(140),
+        	unspecified(255)
+        }
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "This value describes the session type. It holds the RTP type for RTP streams and 
+          unique items (above 127) for non-RTP or dynamically allocated types"
+        ::= { avRtpSessionEntry 21} 
+        
+        avRtpSessionTxInterval OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The interval (in milliseconds) between RTP packets."
+        ::= { avRtpSessionEntry 22}     
+
+ 		avRtpSessionTxEncryp OBJECT-TYPE            
+        SYNTAX INTEGER     { 
+          unknown(-1), 
+          encryptionOff(0),
+          encryptionAEAv2(1),
+          encryptionAES(2),
+          srtpAesCm128(4),
+          srtpAesCm128HmacSha180(5),
+          srtpAesCm128HmacSha132(6),
+          srtpF8128HmacSha180(7),
+          srtpHmacSha180(8),
+          srtpHmacSha132(9),
+          srtp(10),
+          srtpAesCm256(11),
+          srtpAesCm256HmacSha180(12),
+          srtpAesCm256HmacSha132(13)
+		}
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The Media Encryption metric indicates what kind media encryption is 
+          ,if any, is used for the RTP session. This information is valuable because:
+          1)	media-encryption consumes more VoIP resources
+          2)	Encryption key infrastructure may cause problems 
+
+          encryptionOff(0) - Encryption is off
+          encryptionAEAv2(1) - Avaya Proprietary AEAv2 encryption
+          encryptionAES(2)  - Avaya Proprietary AES encryption
+
+             Standard Encryption (Secure RTP):
+          srtpAesCm128(4) - Counter Mode 128 AES encryption, no authentication
+          srtpAesCm128HmacSha180(5) - AES encryption, 80bit SHA1 authentication
+          srtpAesCm128HmacSha132(6) - AES encryption, 32bit SHA1 authentication
+          srtpF8128HmacSha180(7) - F8 encryption, 80bit SHA1 authentication
+          srtpHmacSha180(8) - No encryption, 80bit SHA1 authentication
+          srtpHmacSha132(9) - No encryption, 32bit SHA1 authentication
+		"
+        ::= { avRtpSessionEntry 23}          
+
+  		avRtpSessionTxDscp OBJECT-TYPE            
+        SYNTAX INTEGER (0..63)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last transmitted IP DSCP. This value may change during the call according
+          to the RSVP status.This information is valuable because routers may give 
+          different priority to packets according to their DSCP value"
+        ::= { avRtpSessionEntry 24} 
+
+ 		avRtpSessionTxVlan OBJECT-TYPE            
+        SYNTAX INTEGER (-1..4095)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The VLAN on which the RTP packets are transmitted. Minus one means 'unknown'"
+        ::= { avRtpSessionEntry 25}                
+        
+ 		avRtpSessionTxL2Pri OBJECT-TYPE            
+        SYNTAX INTEGER (-1..7)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The Layer 2 (e.g. IEEE 802.1p) priority of the sent Ethernet frames. Minus 1 
+         means unknown. This information is valuable because Ethernet switches can give
+          frames  different priority according to their 802.1p value"
+        ::= { avRtpSessionEntry 26} 
+
+ 		avRtpSessionTxSilenceSupp OBJECT-TYPE            
+        SYNTAX AvRtpSilenceSupp 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "Silence suppression state.noRtp means that a simple silence suppression scheme 
+         was used i.e. without RTP packets on silence. Complex means that a combination of 
+         silence packets and 'no RTP on Silence' is usedThis information is valuable because:
+          1)	silence suppression can save upto %60 bandwidth
+          2)	Silence suppression influences user experience (especially if the terminals
+            does not generate confort-noise)"
+        ::= { avRtpSessionEntry 27}  
+
+ 		avRtpSessionTxSsrc OBJECT-TYPE            
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The transmitted RTP stream SSRC.This value can be used to locate a stream in a packet capture."
+        ::= { avRtpSessionEntry 28} 
+
+
+  		avRtpSessionTxRsvp OBJECT-TYPE            
+        SYNTAX INTEGER {unused(0), disabled(1), pending(2), failed(3), reserved(4)}
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The RSVP status for the stream. This information is valuable because:
+         1)	Routers may reserve bandwidth to for the stream.
+         2)	Avaya VoIP endpoints changes the transmitted DSCP according to 
+         the RSVP status. "
+        ::= { avRtpSessionEntry 29} 
+
+ 		avRtpSessionTxResvFail OBJECT-TYPE            
+        SYNTAX Gauge32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of times the RSVP reservation has failed.
+          This item is init to one if RSVP is in-use."
+        ::= { avRtpSessionEntry 30}                
+        
+ 		avRtpSessionStatInterval OBJECT-TYPE            
+        SYNTAX TimeInterval
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The thresholds are evaluated periodically, usually 
+         each time an RTCP message is being sent."
+        ::= { avRtpSessionEntry 31} 
+        
+        avRtpSessionRxCodecPlayTime  OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The time the codec has played frames (not including silence suppression or fill frames)"
+        ::= { avRtpSessionEntry 32} 
+
+        avRtpSessionRxCodecLossCount  OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total codec loss time in milliseconds "
+        ::= { avRtpSessionEntry 33} 
+        
+        avRtpSessionRxCodecLoss  OBJECT-TYPE        
+        SYNTAX AvRtpLoss
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The codec loss during the last Statistical interval, in 1/1000 units. 
+          The codec loss is the number of fill period divided by the statistical interval.
+          The fill period is  the duration of time that the codec had to send data to the digital
+          to analog converter, but no codec frames  were available in the jitter buffer. 
+          This is a measure for the overall packet loss after the jitter and resequencing re
+          sequencing buffers."
+         ::= { avRtpSessionEntry 34} 
+         
+        avRtpSessionRxAvgCodecLoss OBJECT-TYPE            
+        SYNTAX AvRtpLoss
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total codec loss during the session."
+        ::= { avRtpSessionEntry 35} 
+ 
+        avRtpSessionRxCodecLossEv  OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of times codec loss was sampled over the threshold"
+        ::= { avRtpSessionEntry 36}
+        
+        avRtpSessionRxLoss   OBJECT-TYPE            
+        SYNTAX AvRtpLoss
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The received network loss in the last statistical interval (in 1/1000 units)."
+        ::= { avRtpSessionEntry 37}
+        
+        avRtpSessionRxAvgLoss   OBJECT-TYPE            
+        SYNTAX AvRtpLoss
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total network loss during the session (in 1/1000 units)."
+        ::= { avRtpSessionEntry 38}
+        
+        avRtpSessionRxLossEv   OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of times network loss was sampled over the threshold"
+        ::= { avRtpSessionEntry 39}
+      
+        
+ 		avRtpSessionRx OBJECT-TYPE            
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of received RTP packets"
+        ::= { avRtpSessionEntry 40}  
+        
+  		avRtpSessionRxLossCount OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of lost packets"
+        ::= { avRtpSessionEntry 41} 
+
+ 		avRtpSessionRxSeqFall OBJECT-TYPE            
+        SYNTAX Counter32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of sequence fall events"
+        ::= { avRtpSessionEntry 42}                    
+        
+   		avRtpSessionRxDup OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of received duplicate packets.
+          This item may indicate transient routing loop"
+        ::= { avRtpSessionEntry 43} 
+
+        
+		avRtpSessionRxJBufUnderruns OBJECT-TYPE            
+        SYNTAX Gauge32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The duration of jitter buffer under runs during the call in milliseconds (i.e.
+          buffer empty when a frame is needed by the codec)."
+        ::= { avRtpSessionEntry 44} 
+
+ 		avRtpSessionRxJBufOverruns OBJECT-TYPE            
+        SYNTAX  Gauge32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The duration of time in codec frames that were dropped due to jitter buffer overruns 
+         in milliseconds (i.e. jitter buffer is full)"
+        ::= { avRtpSessionEntry 45} 
+
+		avRtpSessionRxJBufDelay OBJECT-TYPE            
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last jitter buffer delay in milliseconds."
+        ::= { avRtpSessionEntry 46}    
+        
+		avRtpSessionRxMaxJBufDelay OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The maximum jitter buffer delay during the call (in milliseconds)"
+        ::= { avRtpSessionEntry 47}    
+                                                            
+                                                            
+	    avRtpSessionRxJitter  OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last/current  received RTP jitter"
+        ::= { avRtpSessionEntry 48}    
+
+
+		avRtpSessionRxAvgJitter   OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The average received RTP jitter"
+        ::= { avRtpSessionEntry 49}    
+				
+				                                                            
+		avRtpSessionRxJitterEv OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of times, jitter was sampled over the threshold."
+        ::= { avRtpSessionEntry 50}   
+
+ 		avRtpSessionRxTtl OBJECT-TYPE            
+        SYNTAX INTEGER (0..255)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The current/last received TTL value (IP Time To Live)"
+        ::= { avRtpSessionEntry 51} 
+
+		avRtpSessionRxMinTtl OBJECT-TYPE            
+        SYNTAX  INTEGER (0..255)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The minimum received TTL value. The technician can use this value as a 
+         hint to what was the IP route during the session. "
+        ::= { avRtpSessionEntry 52}    
+        
+		avRtpSessionRxMaxTtl OBJECT-TYPE            
+        SYNTAX   INTEGER (0..255)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The maximum received TTL value. Difference between this value and 
+         avRtpSessionRxMinTtl may indicate route changes during the call."
+        ::= { avRtpSessionEntry 53}    
+
+        
+		avRtpSessionRxDscp OBJECT-TYPE            
+        SYNTAX INTEGER (0..63)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last received DSCP value."
+        ::= { avRtpSessionEntry 54}                                                                                                               
+
+		avRtpSessionRxL2Pri OBJECT-TYPE            
+        SYNTAX  INTEGER (-1..7)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last received L2 priority  (IEEE 802.1p, Ethernet priority)"
+        ::= { avRtpSessionEntry 55}    
+
+		avRtpSessionRxSilenceSupp OBJECT-TYPE            
+        SYNTAX  AvRtpSilenceSupp
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The observed (received) silence suppression technique."
+        ::= { avRtpSessionEntry 56}    
+
+		avRtpSessionRxSsrc OBJECT-TYPE            
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last received RTP SSRC value"
+        ::= { avRtpSessionEntry 57}    
+
+		avRtpSessionRxSsrcChange OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "Counts the number of observed SSRC changes during the call. This may indicate 
+           a remote VoIP engine fail-over event."
+        ::= { avRtpSessionEntry 58}    
+        
+		avRtpSessionTxRtcp OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of transmitted RTCP reports"
+        ::= { avRtpSessionEntry 59}    
+
+
+		avRtpSessionRxRtcp OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of received RTCP reports"
+        ::= { avRtpSessionEntry 60}    
+
+		avRtpSessionCodecRtt OBJECT-TYPE            
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The Estimated analog overall round-trip time calculated from the last received
+          RTCP packet. The estimate value include the network delay plus the internal delays
+           plus an estimate for the remote internal delay. This value is measured in
+            milliseconds."
+        ::= { avRtpSessionEntry 61}    
+
+		avRtpSessionAvgCodecRtt OBJECT-TYPE            
+        SYNTAX   Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The Avarage Estimated analog overall  RTT (including internal delays) 
+          during the session."
+        ::= { avRtpSessionEntry 62}    
+
+		avRtpSessionCodecRttEv OBJECT-TYPE            
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of times the Estimated analog codec  RTT was over the threshold"
+         ::= { avRtpSessionEntry 63}    
+
+
+		avRtpSessionRtt OBJECT-TYPE            
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last RTT value in milliseconds. RTT is learnt from RTCP reports"
+        ::= { avRtpSessionEntry 64}    
+
+		avRtpSessionAvgRtt OBJECT-TYPE            
+        SYNTAX   Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The average RTT during the RTP sessions"
+        ::= { avRtpSessionEntry 65}    
+
+		avRtpSessionRttEv OBJECT-TYPE            
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of received RTCP packets which has indicated that RTT was 
+         over the threshold."
+        ::= { avRtpSessionEntry 66}    
+                                  
+                                  
+                                  
+		avRtpSessionRemLoss OBJECT-TYPE            
+        SYNTAX AvRtpLoss
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last known remote loss (learnt from received RTCP message)"
+        ::= { avRtpSessionEntry 67}    
+
+		avRtpSessionRemAvgLoss OBJECT-TYPE            
+        SYNTAX AvRtpLoss
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last known remote loss (learnt from received RTCP message)"
+        ::= { avRtpSessionEntry 68}    
+
+		avRtpSessionRemLossEv OBJECT-TYPE            
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of received RTCP packets which has indicated that loss, at the remote
+          peer,  was over the threshold.."
+        ::= { avRtpSessionEntry 69}    
+        
+        
+		avRtpSessionRemJitter OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last known remote jitter, learnt from RTCP."
+        ::= { avRtpSessionEntry 70}    
+
+		avRtpSessionRemAvgJitter OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The average remote jitter, learnt from RTCP."
+        ::= { avRtpSessionEntry 71}    
+
+
+		avRtpSessionRemJitterEv OBJECT-TYPE            
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of received RTCP messages, which have indicated that loss was over 
+         the threshold."
+        ::= { avRtpSessionEntry 72}    
+
+		avRtpSessionEcTailLen OBJECT-TYPE            
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The current/last echo cancellation tail length."
+        ::= { avRtpSessionEntry 73}    
+
+		avRtpSessionEcReturnLoss OBJECT-TYPE            
+        SYNTAX  INTEGER (0..100)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The last sampled Echo Cancellation return loss. "
+        ::= { avRtpSessionEntry 74}        
+                                           
+		avRtpSessionEcReturnLossEv OBJECT-TYPE            
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of time the echo cancellation return loss was sampled over the 
+         threshold. This value is sampled every avRtpSessionStatInerval"
+        ::= { avRtpSessionEntry 75}                                                   
+
+        avRtpSessionAEC OBJECT-TYPE            
+        SYNTAX  INTEGER {
+                 notSupported(0),
+                 none(1),
+                 halfDuplex(2),
+                 fullDuplex(3),
+                 aec(4)}
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "Acoustic echo cancellation state, relevant for speaker phones"
+        ::= { avRtpSessionEntry 76} 
+        
+        avRtpSessionDebugStr OBJECT-TYPE            
+        SYNTAX  DisplayString (SIZE (0..255))
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "This string contains the major metrics in human readable form. It is used by
+          the QoS trap."
+        ::= { avRtpSessionEntry 77}     
+        
+  		avRtpSessionTxFlowLabel OBJECT-TYPE            
+        SYNTAX INTEGER (0..1048575)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+		 "The last transmitted IPv6 Flow Label. This metric represents the most recently 
+		 transmitted IPv6 Flow Label field in the IPv6 RTP stream. The value fits in a
+		 20-bit integer and is reset to zero et the start of each new RTP session."
+        ::= { avRtpSessionEntry 78} 
+
+  		avRtpSessionRxFlowLabel OBJECT-TYPE            
+        SYNTAX INTEGER (0..1048575)
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+		 "The last Received IPv6 Flow Label. This metric represents the value of the IPv6 
+		 Flow Label field of the incoming RTP packets. The Received IPv6 Flow Label metric 
+		 is a 20-bit integer. The metric is set with the first IPv6 RTP packet received,
+		 and updated when the value has changed from the previously reported value."
+        ::= { avRtpSessionEntry 79} 
+        
+        
+avRtpSumTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AvRtpSumEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+      "This table contains summary of sessions and QoS events for each VoIP engine."
+    ::= { avRtpMib 3 }
+
+      avRtpSumEntry OBJECT-TYPE
+            SYNTAX AvRtpSumEntry
+            MAX-ACCESS not-accessible
+            STATUS current
+            DESCRIPTION 
+              " "
+            INDEX { avRtpSumEngineID}
+            ::= { avRtpSumTable 1 }
+        
+        AvRtpSumEntry ::=
+            SEQUENCE {  
+            	avRtpSumEngineID	Integer32,
+				avRtpSumEngineDescr	DisplayString,
+				avRtpSumPeriod	TimeInterval,
+				avRtpSumActiveFlows	Integer32,
+				avRtpSumActiveQosEvents	Integer32,
+				avRtpSumTotalFlows	Counter32,
+				avRtpSumTotalFlowsQoSEvents	Counter32,
+				avRtpSumTxTTL	INTEGER,  
+				avRtpSumSessionDuration Counter32,
+				avRtpSumClear	TruthValue          
+				}
+                           
+                           
+
+		avRtpSumEngineID OBJECT-TYPE            
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "VoIP engine identifier. Usually, the VoIP engine slot number."
+        ::= { avRtpSumEntry 1 }                               
+
+		avRtpSumEngineDescr OBJECT-TYPE            
+        SYNTAX DisplayString (SIZE (0..32))
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "A string describing the VoIP engine. 
+         Equals to entPhysicalDescr or cmgModuleDescription "
+        ::= { avRtpSumEntry 2}                               
+
+		avRtpSumPeriod OBJECT-TYPE            
+        SYNTAX TimeInterval 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The time since the summary counters were cleared."
+        ::= { avRtpSumEntry 3}                               
+
+		avRtpSumActiveFlows OBJECT-TYPE            
+        SYNTAX Integer32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of active flows"
+        ::= { avRtpSumEntry 4}                               
+
+		avRtpSumActiveQosEvents OBJECT-TYPE            
+        SYNTAX Integer32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The number of flows that currently suffers from QoS problems."
+        ::= { avRtpSumEntry 5}                               
+
+		avRtpSumTotalFlows OBJECT-TYPE            
+        SYNTAX Counter32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of flows"
+        ::= { avRtpSumEntry 6}                               
+
+		avRtpSumTotalFlowsQoSEvents OBJECT-TYPE            
+        SYNTAX Counter32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The total number of flows that had QoS events"
+        ::= { avRtpSumEntry 7}                               
+
+		avRtpSumTxTTL OBJECT-TYPE            
+        SYNTAX INTEGER (0..255) 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "TTL of transmitted RTP packets."
+        ::= { avRtpSumEntry 8}                               
+      
+        avRtpSumSessionDuration  OBJECT-TYPE            
+        SYNTAX Counter32 
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "Total duration of the sessions in seconds"
+        ::= { avRtpSumEntry 9}                               
+        
+      	avRtpSumClear OBJECT-TYPE            
+        SYNTAX TruthValue 
+        MAX-ACCESS read-write
+        STATUS current            
+        DESCRIPTION
+         "Clear the summary counters"
+        ::= { avRtpSumEntry 10}       
+        
+        
+
+avRtpLookupTable OBJECT-TYPE
+   SYNTAX SEQUENCE OF AvRtpLookupEntry
+   MAX-ACCESS not-accessible
+   STATUS current
+   DESCRIPTION
+      "This virtual table is used for finding a specific SessionIDs based
+        on the remote address and call state."
+   ::= { avRtpMib 4 }
+
+      avRtpLookupEntry OBJECT-TYPE
+            SYNTAX AvRtpLookupEntry
+            MAX-ACCESS not-accessible
+            STATUS current
+            DESCRIPTION ""
+             INDEX { avRtpSessionRemAddrType, avRtpSessionRemAddr, avRtpSessionState, avRtpSessionID }
+            ::= { avRtpLookupTable 1 }
+ 
+         AvRtpLookupEntry ::=
+            SEQUENCE { avRtpLookupStartTime	DateAndTime } 
+            	
+       
+  		avRtpLookupStartTime OBJECT-TYPE            
+        SYNTAX DateAndTime
+        MAX-ACCESS read-only
+        STATUS current            
+        DESCRIPTION
+         "The stream start time"
+        ::= { avRtpLookupEntry 1}                       
+        
+       
+avRtpNotificationVarbinds OBJECT-IDENTITY
+       	STATUS current
+        DESCRIPTION
+        "Notify only varbinds used for
+        notifications in avRtpNotification group"
+        ::= { avRtpMib 5 }
+
+avRtpSessionLocInetAddrType OBJECT-TYPE
+        SYNTAX InetAddressType
+        MAX-ACCESS accessible-for-notify
+        STATUS current
+        DESCRIPTION
+        "The RTP stream local RTP address Type (IPv4/IPv6)."
+        ::= { avRtpNotificationVarbinds 1 }
+                
+avRtpSessionLocInetAddr OBJECT-TYPE
+      	SYNTAX InetAddress
+     	MAX-ACCESS accessible-for-notify
+     	STATUS current
+     	DESCRIPTION
+     	"The RTP stream local RTP address (IPv4/IPv6)."
+     	::= { avRtpNotificationVarbinds 2 }
+
+avRtpSessionRemInetAddrType OBJECT-TYPE
+        SYNTAX InetAddressType
+        MAX-ACCESS accessible-for-notify
+        STATUS current
+        DESCRIPTION
+        "The RTP stream remote RTP address Type (IPv4/IPv6)."
+        ::= { avRtpNotificationVarbinds 3 }
+                
+avRtpSessionRemInetAddr OBJECT-TYPE
+      	SYNTAX InetAddress
+     	MAX-ACCESS accessible-for-notify
+     	STATUS current
+     	DESCRIPTION
+     	"The RTP stream remote RTP address (IPv4/IPv6)."
+     	::= { avRtpNotificationVarbinds 4 }     
+END

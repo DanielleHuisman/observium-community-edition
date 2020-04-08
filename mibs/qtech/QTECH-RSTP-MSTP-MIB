@@ -1,0 +1,1241 @@
+-- *****************************************************************
+-- QTECH-RSTP-MIB.mib:  Qtech RSTP MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by Qtech Networks Co.,Ltd.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+QTECH-RSTP-MSTP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        TimeTicks,
+        Integer32,
+        Counter32
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        IfIndex,
+        ConfigStatus
+                FROM QTECH-TC 
+        BridgeId 
+                FROM BRIDGE-MIB
+        EnabledStatus
+                FROM P-BRIDGE-MIB
+        qtechMgmt
+                FROM QTECH-SMI;
+
+qtechStpMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "Qtech Networks Co.,Ltd."
+        CONTACT-INFO
+                " 
+                Tel: 4008-111-000 
+
+                E-mail: service@qtech.com.cn"
+        DESCRIPTION
+                "This module defines qtech stp mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { qtechMgmt 16}
+
+qtechStpMIBObjects OBJECT IDENTIFIER ::=  { qtechStpMIB 1 }
+qtechRstpMIBObjects OBJECT IDENTIFIER ::= { qtechStpMIB 2 }
+qtechMstpMIBObjects OBJECT IDENTIFIER ::= { qtechStpMIB 3 }
+
+-- -------------------------------------------------------------
+-- extend of stp
+-- -------------------------------------------------------------
+qtechSysStpStatus OBJECT-TYPE
+        SYNTAX EnabledStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This object allow of enabling or disabling the Spanning
+            Tree Protocol in the system, this will avoid the circle
+            exist in the net environment, then avoid the broad cast
+            storm. and when set its value to enable(1) will cause a
+            short time that the station can not connect the agent,
+            waitting for the topology become stable."
+        DEFVAL { disabled }
+        ::= { qtechStpMIBObjects 1 }
+    
+qtechSysStpReset OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This object allow of resetting all Spanning Tree Protocol
+            parameter reset to default settings. set its value to any
+            but 0, will cause agent reset the parameters, set it to 0
+            will cause no action. this operation may cause some interval
+            the station can not connect the agent depending on the
+            parameters previous set."
+        ::= { qtechStpMIBObjects 2 }
+
+qtechStpExtPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF QtechStpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains port-specific Spanning Tree
+         extend information."
+    ::= { qtechStpMIBObjects 3 }
+
+qtechStpExtPortEntry OBJECT-TYPE
+    SYNTAX      QtechStpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of Spanning Tree extend information maintained by
+         each port."
+    INDEX    { qtechStpPortIfIndex }
+    ::= { qtechStpExtPortTable 1 }
+
+QtechStpExtPortEntry ::=
+    SEQUENCE {
+        qtechStpPortIfIndex
+            IfIndex,
+        qtechStpPortAdminPathCost
+            INTEGER,
+        qtechStpPortOperPathCost
+            INTEGER,
+        qtechStpPortRole
+            INTEGER
+--        qtechStpPortIfRunSTP
+--            TruthValue    
+    }
+qtechStpPortIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "include only physical port and trunk port "
+        ::= { qtechStpExtPortEntry 1 }
+            
+qtechStpPortAdminPathCost OBJECT-TYPE
+        SYNTAX  INTEGER (0..200000000)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+              "The contribution of this port to the path cost of
+              paths towards the spanning tree root which include
+              this port.  802.1D-1990 recommends that the
+              default value of this parameter be in inverse
+              proportion to the speed of the attached LAN.
+              Setting this value to 0 indicates that port's real
+              path cost will be automaticly assigned by system
+              according to duplex and speed of the port.Setting 
+              this value to other value and system will assigned this 
+              value to the port."
+        DEFVAL{0}
+        ::= { qtechStpExtPortEntry  2 }
+
+qtechStpPortOperPathCost OBJECT-TYPE
+        SYNTAX  INTEGER (1..200000000)
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              " Actual oper value of port cost."
+        ::= { qtechStpExtPortEntry  3 }
+
+qtechStpPortRole OBJECT-TYPE
+        SYNTAX  INTEGER {
+               disabledPort(1),
+               alternatePort(2),
+               backupPort(3),
+               rootPort(4),
+               designatedPort(5),
+               masterPort(6)
+        }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              " Actual role of port in stp."
+        ::= { qtechStpExtPortEntry  4 }
+
+--qtechStpPortIfRunSTP OBJECT-TYPE
+--        SYNTAX TruthValue
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "When the value is true the port will take part in the spanning tree algorithm,
+--             that is, if the topology of a port is changed will this be sensed by the algorithm
+--             or not."
+--        ::= { qtechStpExtPortEntry 5 }
+
+-- -------------------------------------------------------------
+-- RSTP / CIST ieee 802.1s-d14-1 12.8.1
+-- -------------------------------------------------------------
+-- Addition to the dot1dStp group
+qtechStpVersion OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    stpCompatible(0),
+                    rstp(2),
+                    mstp(3)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The version of Spanning Tree Protocol the bridge is
+         currently running.  The value 'stpCompatible(0)'
+         indicates the Spanning Tree Protocol specified in
+         IEEE 802.1D , 'rstp(2)' indicates the Rapid Spanning
+         Tree Protocol specified in IEEE 802.1w mstp(3) indicates 
+         the Multiple spanning tree protocol specified in 
+         IEEE 802.1s.  New value may be defined as future versions 
+         of the protocol become available."
+    REFERENCE
+        "IEEE 802.1w clause 14.8.1, 17.12, 17.16.1"
+    DEFVAL      { mstp }
+    ::= { qtechRstpMIBObjects 1 }
+
+qtechStpTxHoldCount OBJECT-TYPE
+    SYNTAX      Integer32 (1..10)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value used by the Port Transmit state machine to limit
+         the maximum transmission rate."
+    REFERENCE
+        "IEEE 802.1w clause 17.16.6"
+    DEFVAL      { 3 }
+    ::= { qtechRstpMIBObjects 2 }
+
+qtechStpPathCostDefault OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    stp8021d1998(1),
+                    stp8021t2001(2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The version of the Spanning Tree default Path Costs that
+         are to be used by this Bridge.  A value of 8021d1998(1)
+         uses the 16-bit default Path Costs from IEEE Std. 802.1D-1998.
+         A value of stp8021t2001(2) uses the 32-bit default Path
+         Costs from IEEE Std. 802.1t."
+    REFERENCE
+        "IEEE 802.1D & 802.1t Table 8-5"
+    ::= { qtechRstpMIBObjects 3 }
+
+qtechRstpExtPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF QtechRstpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains port-specific Rapid Spanning Tree
+         information."
+    ::= { qtechRstpMIBObjects 4 }
+
+qtechRstpExtPortEntry OBJECT-TYPE
+    SYNTAX      QtechRstpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of Rapid Spanning Tree information maintained by
+         each port."
+    INDEX    { qtechRstpExtPortIfIndex }
+    ::= { qtechRstpExtPortTable 1 }
+
+QtechRstpExtPortEntry ::=
+    SEQUENCE {
+        qtechRstpExtPortIfIndex    
+            IfIndex,
+        qtechStpPortProtocolMigration
+            TruthValue,
+        qtechStpPortAdminEdgePort
+            TruthValue,
+        qtechStpPortOperEdgePort
+            TruthValue,
+        qtechStpPortAdminPointToPoint
+            INTEGER,
+        qtechStpPortOperPointToPoint
+            TruthValue,
+	qtechStpPortBpduGuard
+	    EnabledStatus,
+	qtechStpPortBpduFilter	    
+	    EnabledStatus		    
+    }
+qtechRstpExtPortIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "include only physical port and trunk port "
+        ::= { qtechRstpExtPortEntry 1 }
+        
+qtechStpPortProtocolMigration OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "When operating in RSTP (version 2) mode, writing TRUE(1)
+         to this object forces this port to transmit RSTP BPDUs.
+         Any other operation on this object has no effect and
+         it always returns FALSE(2) when read."
+    REFERENCE
+        "IEEE 802.1w clause 14.8.2.4, 17.18.10, 17.26"
+    ::= { qtechRstpExtPortEntry 2 }
+
+qtechStpPortAdminEdgePort OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative value of the Edge Port parameter.  A
+         value of TRUE(1) indicates that this port should be
+         assumed as an edge-port and a value of FALSE(2) indicates
+         that this port should be assumed as a non-edge-port."
+    REFERENCE
+        "IEEE 802.1t clause 14.8.2, 18.3.3"
+    ::= { qtechRstpExtPortEntry 3 }
+
+qtechStpPortOperEdgePort OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational value of the Edge Port parameter.  The
+         object is initialized to the value of
+         qtechStpPortAdminEdgePort and is set FALSE on reception of
+         a BPDU."
+    REFERENCE
+        "IEEE 802.1t clause 14.8.2, 18.3.4"
+    ::= { qtechRstpExtPortEntry 4 }
+
+qtechStpPortAdminPointToPoint OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    forceTrue(0),
+                    forceFalse(1),
+                    auto(2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative point-to-point status of the LAN segment
+         attached to this port.  A value of forceTrue(0) indicates that
+         this port should always be treated as if it is connected to
+         a point-to-point link.  A value of forceFalse(1) indicates
+         that this port should be treated as having a shared media
+         connection.  A value of auto(2) indicates that this port is
+         considered to have a point-to-point link if it is an Aggregator
+         and all of its members are aggregatable, or if the MAC entity
+         is configured for full duplex operation, either through
+         auto-negotiation or by management means."
+   REFERENCE
+       "IEEE 802.1w clause 6.4.3, 6.5, 14.8.2"
+   ::= { qtechRstpExtPortEntry 5 }
+
+qtechStpPortOperPointToPoint OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational point-to-point status of the LAN segment
+         attached to this port.  It indicates whether a port is
+         considered to have a point-to-point connection or not.
+         The value is determined by management or by auto-detection,
+         as described in the qtechStpPortAdminPointToPoint object."
+    REFERENCE
+        "IEEE 802.1w clause 6.4.3, 6.5, 14.8.2"
+    ::= { qtechRstpExtPortEntry 6 }
+    
+qtechStpPortBpduGuard  OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "
+         The BPDU guard feature provides a secure response to invalid configurations because
+         you must manually put the port back in service. Use the BPDU guard feature in a 
+         service-provider network to  prevent an access port from participating in the 
+         spanning tree.
+                 
+         When the port receives a BPDU, it is put in the error-disabled state if you enable
+         BPDU guard feature of this port.
+        "
+   ::= { qtechRstpExtPortEntry 7 }
+   
+qtechStpPortBpduFilter  OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "It will prevent the port from sending or receiving BPDUs if you enable
+         BPDU filter feature of this port. "
+   ::= { qtechRstpExtPortEntry 8 }   
+
+qtechStpBpduGuard OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If you enable Global BPDU guard feature ,ports which is EdgePort will
+         is put in the error-disabled state When thest ports receives a BPDU."
+    ::= { qtechRstpMIBObjects 5 }
+    
+qtechStpBpduFilter OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If you enable Global BPDU filter feature ,ports which is EdgePort will
+        be prevented the port from sending or receiving BPDUs."
+    ::= { qtechRstpMIBObjects 6 }    
+ 
+--MSTP addition
+qtechStpCistRegionRoot OBJECT-TYPE
+    SYNTAX  BridgeId
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The Bridge Identifier of the current CIST Regional Root."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.1.3"        
+    ::= { qtechRstpMIBObjects 7 }
+
+qtechStpCistPathCost OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The CIST path cost from the transmitting Bridge to the CIST Regional Root.."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.1.3"        
+    ::= { qtechRstpMIBObjects 8 }
+    
+    
+--qtechStpPortCistTable OBJECT-TYPE
+--      SYNTAX      SEQUENCE OF QtechStpPortCistEntry
+--      MAX-ACCESS  not-accessible
+--      STATUS      current
+--      DESCRIPTION
+--        "A table containing the spanning tree port path cost
+--        configuration when stpxSpanningTreePathCostMode is
+--        long(2),
+
+--        If the value of stpxSpanningTreePathCostMode is short(1),
+--        this table is not instantiated."
+--    ::= { qtechRstpMIBObjects 9 }
+
+--qtechStpPortCistEntry OBJECT-TYPE
+--    SYNTAX      QtechStpPortCistEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--        "A conceptual row containing the spanning tree port path cost
+--         configuration."
+--     AUGMENTS   { qtechRstpExtPortEntry }
+--    ::= { qtechStpPortCistTable 1 }
+
+--QtechStpPortCistEntry ::= SEQUENCE {
+--        qtechStpPortCistRegionRoot BridgeId,
+--        qtechStpPortCistPathCost Counter32
+--        qtechStpPortHelloTime Integer32
+--}
+
+--qtechStpPortCistRegionRoot OBJECT-TYPE
+--    SYNTAX      BridgeId
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--         "The Bridge Identifier of the current CIST Regional Root."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.1.3"           
+--    ::= { qtechStpPortCistEntry 1}   
+
+
+--qtechStpPortCistPathCost OBJECT-TYPE
+--    SYNTAX      Counter32
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--         "The CIST path cost from the transmitting Bridge to the CIST Regional Root."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.1.3"           
+--    ::= { qtechStpPortCistEntry 2}   
+
+
+--qtechStpPortHelloTime OBJECT-TYPE
+--    SYNTAX      Integer32
+--    MAX-ACCESS  read-write
+--    STATUS      current
+--    DESCRIPTION
+--         "The administrative value of Hello Time for the Port."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.1.3"           
+--    ::= { qtechStpPortCistEntry 3}   
+
+-- -------------------------------------------------------------
+-- MSTP / MSTI 802.1s-d14-1 12.8.1
+-- -------------------------------------------------------------
+qtechStpMstiMaxInstanceNumber  OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum MST (Multiple Spanning Tree) instance id, 
+       that are supported by the device for the MST Protocol." 
+    ::= { qtechMstpMIBObjects 1}
+
+qtechStpMstiRegionName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))  
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The operational MST region name."  
+    ::= { qtechMstpMIBObjects 2}
+
+qtechStpMstiRegionRevision OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The operational MST region version."  
+    ::= { qtechMstpMIBObjects 3 } 
+
+qtechStpMstiMaxHopNumber OBJECT-TYPE
+    SYNTAX      Integer32 (1..40) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The operational MST region max hop number."  
+    DEFVAL { 20 }       
+    ::= { qtechMstpMIBObjects 4 } 
+
+
+qtechStpMstiInstanceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF QtechStpMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains MST instance information with 
+       one entry for each MST instance numbered from 0 
+       to qtechStpxMSTMaxInstanceNumber." 
+    ::= {qtechMstpMIBObjects 5 }
+
+qtechStpMstiInstanceEntry OBJECT-TYPE
+    SYNTAX      QtechStpMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "A conceptual row containing the MST instance 
+       information."
+    INDEX  { qtechStpMstiInstanceIndex }
+    ::= { qtechStpMstiInstanceTable 1 }
+
+QtechStpMstiInstanceEntry ::= SEQUENCE {
+    qtechStpMstiInstanceIndex Integer32,
+    qtechStpMstiInstanceVlansAddMapped OCTET STRING,
+    qtechStpMstiInstanceVlansDeleteMapped OCTET STRING,
+    qtechStpMstiInstanceVlansGetMapped OCTET STRING,
+    qtechStpMstiInstanceRemainingHopCount Integer32,
+    qtechStpMstiPriority Integer32,
+--    qtechStpMstiBridgeId Integer32,
+    qtechStpMstiTimeSinceTopologyChange TimeTicks,
+    qtechStpMstiTopChanges Integer32,
+--    qtechStpMstiTopChanged TruthValue,
+    qtechStpMstiDesignatedRoot BridgeId,
+    qtechStpMstiRootCost Integer32,
+    qtechStpMstiRootPort Integer32,
+    qtechStpMstiInstanceEntryStatus ConfigStatus
+
+}
+
+qtechStpMstiInstanceIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..64) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "An integer that uniquely identifies an MST instance 
+       from 0 to the object value of qtechStpMstiMaxInstanceNumber."  
+    ::= {qtechStpMstiInstanceEntry 1 }
+
+qtechStpMstiInstanceVlansAddMapped OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (512))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= {qtechStpMstiInstanceEntry 2 }
+
+qtechStpMstiInstanceVlansDeleteMapped OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (512))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= {qtechStpMstiInstanceEntry 3 }
+    
+qtechStpMstiInstanceVlansGetMapped OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (512))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= {qtechStpMstiInstanceEntry 4 }
+
+qtechStpMstiInstanceRemainingHopCount OBJECT-TYPE
+    SYNTAX     Integer32 (0..40)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The remaining hop count for this MST instance."
+    ::= {qtechStpMstiInstanceEntry 5 }
+    
+qtechStpMstiPriority  OBJECT-TYPE
+    SYNTAX     Integer32 (0..65535)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "The Bridge priority for the spanning tree instance identified
+	by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    DEFVAL { 32768 }	
+    ::= {qtechStpMstiInstanceEntry 6 }  
+    
+--qtechStpMstiBridgeId  OBJECT-TYPE
+--    SYNTAX     BridgeId
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "The Bridge Identifier for the spanning tree instance identified
+--	by the MSTID."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+--    ::= {qtechStpMstiInstanceEntry 5 }      
+    
+qtechStpMstiTimeSinceTopologyChange  OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Ccount in (in hundredths of a second) of the time elapsed since tcWhile (13.21) was last
+         non-zero for any Port for the given MSTI."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {qtechStpMstiInstanceEntry 7 }          
+    
+qtechStpMstiTopChanges  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Count of the times tcWhile (13.21) has been non-zero for any Port for the
+	given MSTI since the Bridge was powered on or initialized."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {qtechStpMstiInstanceEntry 8 }          
+
+--qtechStpMstiTopChanged  OBJECT-TYPE
+--    SYNTAX     TruthValue
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "True if tcWhile is non-zero for any Port for the given MST."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+--    ::= {qtechStpMstiInstanceEntry 8 }          
+ 
+qtechStpMstiDesignatedRoot  OBJECT-TYPE
+    SYNTAX     BridgeId
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Bridge Identifier of the Root Bridge for the spanning tree instance
+	identified by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {qtechStpMstiInstanceEntry 9 }         
+    
+qtechStpMstiRootCost  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The path cost from the transmitting Bridge to the Root Bridge for the
+	spanning tree instance identified by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {qtechStpMstiInstanceEntry 10 }         
+    
+qtechStpMstiRootPort  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Root Port for the spanning tree instance identified by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {qtechStpMstiInstanceEntry 11 }         
+
+qtechStpMstiInstanceEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+    ::= { qtechStpMstiInstanceEntry 12 }
+        
+qtechStpPortMstiInstanceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF QtechStpPortMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains MST instance information with 
+       one entry for each MST instance numbered from 0 
+       to qtechStpxMSTMaxInstanceNumber." 
+    ::= {qtechMstpMIBObjects 6 }
+
+qtechStpPortMstiInstanceEntry OBJECT-TYPE
+    SYNTAX      QtechStpPortMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "A conceptual row containing pthe MST instance 
+       information of a bridge port."
+    INDEX  { qtechStpMstiInstanceIndex, qtechStpPortMstiIndex}
+    ::= { qtechStpPortMstiInstanceTable 1 }
+
+QtechStpPortMstiInstanceEntry ::= SEQUENCE {
+    qtechStpPortMstiIndex Integer32,
+--    qtechStpPortMstiUpTime TimeTicks,
+    qtechStpPortMstiState INTEGER,
+--    qtechStpPortMstiEnable INTEGER,
+--    qtechStpPortMstiPortId OCTET STRING,
+    qtechStpPortMstiAdminPathCost Integer32,
+    qtechStpPortMstiOperPathCost Counter32,
+    qtechStpPortMstiPriority Integer32,
+    qtechStpPortMstiDesignatedRoot BridgeId,
+    qtechStpPortMstiDesignatedCost Integer32,
+    qtechStpPortMstiDesignatedBridge BridgeId,
+    qtechStpPortMstiDesignatedPort OCTET STRING,
+    qtechStpPortMstiPortRole INTEGER,
+    qtechStpPortMstiPortForwardTransitions Integer32
+    
+}
+
+qtechStpPortMstiIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The value of dot1dBasePort (i.e. dot1dBridge.1.4)
+                 for the bridge port."  
+    REFERENCE
+               "dot1dBasePort is defined in RFC1493."
+                 
+    ::= {qtechStpPortMstiInstanceEntry 1 }
+
+--qtechStpPortMstiUpTime  OBJECT-TYPE
+--    SYNTAX     TimeTicks
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "Count in seconds of the time elapsed since the Port was last reset or initialized."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+--    ::= {qtechStpPortMstiInstanceEntry 2 }           
+
+qtechStpPortMstiState  OBJECT-TYPE
+     SYNTAX      INTEGER {
+   	        	disabled(1),
+        	        blocking(2),
+                        listening(3),
+                        learning(4),
+                        forwarding(5),
+                        broken(6),
+                        discard(7)
+                    }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The current state of the Port."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {qtechStpPortMstiInstanceEntry 2 }        
+
+--qtechStpPortMstiEnable  OBJECT-TYPE
+--     SYNTAX      INTEGER {
+--   	        	enabled(1),
+--        	        disabled(2)
+--                    }
+--    MAX-ACCESS read-write
+--    STATUS     current
+--    DESCRIPTION
+--        "The enabled/disabled status of the port."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+--    ::= {qtechStpPortMstiInstanceEntry 3 }        
+
+--qtechStpPortMstiPortId  OBJECT-TYPE
+--    SYNTAX     OCTET STRING (SIZE (2))
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "The Port Identifier of the port on the Designated
+--        Bridge for this port's segment."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+--    ::= {qtechStpPortMstiInstanceEntry 4 }       
+
+qtechStpPortMstiAdminPathCost  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+              "The contribution of this port to the path cost of
+              paths towards the spanning tree root which include
+              this port.  802.1D-1990 recommends that the
+              default value of this parameter be in inverse
+              proportion to the speed of the attached LAN.
+              Setting this value to 0 indicates that port's real
+              path cost will be automaticly assigned by system
+              according to duplex and speed of the port.Setting 
+              this value to other value and system will assigned this 
+              value to the port."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {qtechStpPortMstiInstanceEntry 3 }      
+
+qtechStpPortMstiOperPathCost  OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        " Actual oper value of port cost of msti."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {qtechStpPortMstiInstanceEntry 4 }      
+
+qtechStpPortMstiPriority  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The value of the priority field which is contained in
+        the first (in network byte order) octet of the (2 octet
+        long) Port ID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    DEFVAL { 128 }    	
+    ::= {qtechStpPortMstiInstanceEntry 5 }      
+
+qtechStpPortMstiDesignatedRoot  OBJECT-TYPE
+    SYNTAX     BridgeId
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The unique Bridge Identifier of the Bridge
+        recorded as the Root."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {qtechStpPortMstiInstanceEntry 6 }      
+
+qtechStpPortMstiDesignatedCost  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The path cost of the Designated Port of the segment
+        connected to this port."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {qtechStpPortMstiInstanceEntry 7 }        
+
+qtechStpPortMstiDesignatedBridge  OBJECT-TYPE
+    SYNTAX     BridgeId
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Bridge Identifier of the bridge which this
+        port considers to be the Designated Bridge for
+        this port's segment."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {qtechStpPortMstiInstanceEntry 8 }    
+
+qtechStpPortMstiDesignatedPort  OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (2))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Port Identifier of the port on the Designated
+         Bridge for this port's segment."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {qtechStpPortMstiInstanceEntry 9 }    
+
+qtechStpPortMstiPortRole  OBJECT-TYPE
+    SYNTAX  INTEGER {
+               disabledPort(1),
+               alternatePort(2),
+               backupPort(3),
+               rootPort(4),
+               designatedPort(5),
+               masterPort(6)
+        }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        " Actual role of port in msti."
+    ::= {qtechStpPortMstiInstanceEntry 10 }    
+    
+qtechStpPortMstiPortForwardTransitions  OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The number of times this port has transitioned
+         from the Learning state to the Forwarding state in msti."
+    ::= {qtechStpPortMstiInstanceEntry 11 }    
+
+    
+    
+qtechStpMstiReset  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+            "This object allow of resetting  MST configuration
+            parameter reset to default settings. set its value to any
+            but 0, will cause agent reset the parameters, set it to 0
+            will cause no action. this operation may cause some interval
+            the station can not connect the agent depending on the
+            parameters previous set."
+    ::= { qtechMstpMIBObjects 7}
+    
+qtechStpCistVlansAddMapped OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= { qtechMstpMIBObjects 8 }
+
+qtechStpCistVlansGetMapped OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= { qtechMstpMIBObjects 9 }
+    
+
+qtechStpCistRemainingHopCount OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The remaining hop count for CIST."
+    ::= { qtechMstpMIBObjects 10 }
+
+
+-- -------------------------------------------------------------
+-- rstpMIB - Conformance Information
+-- -------------------------------------------------------------
+
+
+stpExternConformance OBJECT IDENTIFIER ::= { qtechStpMIB 4 }
+
+stpExternGroups OBJECT IDENTIFIER ::= { stpExternConformance 1 }
+
+-- stpExternCompliances OBJECT IDENTIFIER ::= { stpExternConformance 2 }
+
+-- -------------------------------------------------------------
+-- Units of conformance
+-- -------------------------------------------------------------
+
+stpExternGroup OBJECT-GROUP
+    OBJECTS {
+        qtechSysStpStatus,
+        qtechSysStpReset,
+        qtechStpPortIfIndex,
+        qtechStpPortAdminPathCost,
+        qtechStpPortOperPathCost,
+        qtechStpPortRole
+--        qtechStpPortIfRunSTP
+    }
+    STATUS      current
+    DESCRIPTION
+        "Spanning Tree extern information for the bridge."
+    ::= { stpExternGroups 1 }
+
+-- -------------------------------------------------------------
+-- Compliance statements
+-- -------------------------------------------------------------
+--stpExternCompliance MODULE-COMPLIANCE
+--    STATUS      current
+--    DESCRIPTION
+--        "The compliance statement for device support of bridging
+--         services."
+--         
+--    MODULE
+--        MANDATORY-GROUPS {
+--            stpExternGroup
+--            }
+--        OBJECT           dot1dStpPortPathCost
+--        MIN-ACCESS       read-only
+--        DESCRIPTION     "Write access is not required."
+--        
+--        OBJECT           dot1dStpPortEnable
+--        MIN-ACCESS       read-only
+--        DESCRIPTION     "Write access is not required."
+--          
+--        OBJECT           dot1dStpHoldTime
+--        MIN-ACCESS       not-accessible
+--        DESCRIPTION     "Access is not required."  
+--            
+--        OBJECT           dot1dStpPortState
+--        SYNTAX           INTEGER {
+--                          disabled(1),
+--                          blocking(2),
+--                          listening(3),
+--                          learning(4),
+--                          forwarding(5),
+--                          broken(6),
+--                          discard(7)
+--                      }
+--        DESCRIPTION     "Add a new syntax."
+--            
+--    ::= { stpExternCompliances 1 }
+
+
+
+
+-- -------------------------------------------------------------
+-- rstpMIB - Conformance Information
+-- -------------------------------------------------------------
+
+rstpConformance OBJECT IDENTIFIER ::= { qtechStpMIB 5 }
+
+rstpGroups OBJECT IDENTIFIER ::= { rstpConformance 1 }
+
+rstpCompliances OBJECT IDENTIFIER ::= { rstpConformance 2 }
+
+-- -------------------------------------------------------------
+-- Units of conformance
+-- -------------------------------------------------------------
+
+rstpBridgeGroup OBJECT-GROUP
+    OBJECTS {
+        qtechStpVersion,
+        qtechStpTxHoldCount,
+        qtechStpBpduGuard,
+        qtechStpBpduFilter
+    }
+    STATUS      current
+    DESCRIPTION
+        "Rapid Spanning Tree information for the bridge."
+    ::= { rstpGroups 1 }
+
+rstpDefaultPathCostGroup OBJECT-GROUP
+    OBJECTS {
+        qtechStpPathCostDefault
+
+    }
+    STATUS      current
+    DESCRIPTION
+        "Default Spanning Tree path cost information."
+    ::= { rstpGroups 2 }
+
+rstpPortGroup OBJECT-GROUP
+    OBJECTS {
+        qtechRstpExtPortIfIndex,
+        qtechStpPortProtocolMigration,
+        qtechStpPortAdminEdgePort,
+        qtechStpPortOperEdgePort,
+        qtechStpPortAdminPointToPoint,
+        qtechStpPortOperPointToPoint,
+        qtechStpPortBpduGuard,
+        qtechStpPortBpduFilter,
+--        qtechStpPortCistRegionRoot,
+--        qtechStpPortCistPathCost,
+--        qtechStpPortHelloTime,
+        qtechStpCistRegionRoot,
+        qtechStpCistPathCost
+        
+    }
+    STATUS      current
+    DESCRIPTION
+        "Rapid Spanning Tree information for individual ports."
+    ::= { rstpGroups 3 }
+
+-- -------------------------------------------------------------
+-- Compliance statements
+-- -------------------------------------------------------------
+
+rstpCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for device support of bridging
+         services."
+
+    MODULE
+        MANDATORY-GROUPS {
+            rstpBridgeGroup,
+            rstpDefaultPathCostGroup,
+            rstpPortGroup
+        }
+
+        GROUP rstpDefaultPathCostGroup
+            DESCRIPTION
+                "Support for this group is mandatory only if
+                 both 16-bit and 32-bit Path Costs are supported."
+    ::= { rstpCompliances 1 }
+    
+
+-- -------------------------------------------------------------
+-- mstpMIB - Conformance Information
+-- -------------------------------------------------------------
+
+mstpConformance OBJECT IDENTIFIER ::= { qtechStpMIB 6 }
+
+mstpGroups OBJECT IDENTIFIER ::= { mstpConformance 1 }
+
+mstpCompliances OBJECT IDENTIFIER ::= { mstpConformance 2 }
+
+-- -------------------------------------------------------------
+-- Units of conformance
+-- -------------------------------------------------------------
+
+mstpBridgeRegionGroup OBJECT-GROUP
+    OBJECTS {
+    	qtechStpMstiMaxInstanceNumber,
+    	qtechStpMstiRegionName,
+    	qtechStpMstiRegionRevision,
+    	qtechStpMstiMaxHopNumber
+    	
+    }
+    STATUS      current
+    DESCRIPTION
+        "Msti information for the bridge."
+    ::= { mstpGroups 1 }
+
+mstpMstiBridgeGroup OBJECT-GROUP
+    OBJECTS {
+	qtechStpMstiInstanceIndex,
+    qtechStpMstiInstanceVlansAddMapped,
+    qtechStpMstiInstanceVlansDeleteMapped,
+    qtechStpMstiInstanceVlansGetMapped,
+    	qtechStpMstiInstanceRemainingHopCount,
+    	qtechStpMstiPriority,
+--    	qtechStpMstiBridgeId,
+    	qtechStpMstiTimeSinceTopologyChange,
+    	qtechStpMstiTopChanges,
+--    	qtechStpMstiTopChanged,
+    	qtechStpMstiDesignatedRoot,
+    	qtechStpMstiRootCost,
+    	qtechStpMstiRootPort,
+	qtechStpMstiInstanceEntryStatus    	
+    }
+    STATUS      current
+    DESCRIPTION
+        "Default Spanning Tree path cost information."
+    ::= { mstpGroups 2 }
+
+mstpMstiPortGroup OBJECT-GROUP
+    OBJECTS {
+--    	qtechStpPortMstiUpTime,
+    	qtechStpPortMstiState,
+--    	qtechStpPortMstiEnable,
+--    	qtechStpPortMstiPortId,
+    	qtechStpPortMstiAdminPathCost,
+    	qtechStpPortMstiOperPathCost,
+    	qtechStpPortMstiPriority,
+    	qtechStpPortMstiDesignatedRoot,
+    	qtechStpPortMstiDesignatedCost,
+    	qtechStpPortMstiDesignatedBridge,
+    	qtechStpPortMstiDesignatedPort,
+    	qtechStpPortMstiPortRole,
+	qtechStpPortMstiPortForwardTransitions    	
+    }
+    STATUS      current
+    DESCRIPTION
+        "Rapid Spanning Tree information for individual ports."
+    ::= { mstpGroups 3 }
+
+-- -------------------------------------------------------------
+-- Compliance statements
+-- -------------------------------------------------------------
+
+mstpCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for device support of bridging
+         services."
+
+    MODULE
+        MANDATORY-GROUPS {
+            mstpBridgeRegionGroup,
+            mstpMstiBridgeGroup,
+            mstpMstiPortGroup
+        }
+
+    ::= { mstpCompliances 1 }
+END

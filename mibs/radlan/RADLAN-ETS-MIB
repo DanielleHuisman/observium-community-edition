@@ -1,0 +1,169 @@
+RADLAN-ETS-MIB DEFINITIONS ::= BEGIN
+
+-- Version:    7.50
+-- Date:       21 Mar 2010
+-- 21 Mar 2010 Initial release
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,Counter32,
+    Gauge32, Unsigned32, IpAddress, TimeTicks   FROM SNMPv2-SMI
+    InterfaceIndexOrZero, InterfaceIndex        FROM IF-MIB
+    TruthValue, RowStatus, RowPointer,
+    TEXTUAL-CONVENTION,DisplayString            FROM SNMPv2-TC
+    Counter64, OBJECT-TYPE                      FROM SNMPv2-SMI
+    PortList                                    FROM Q-BRIDGE-MIB
+    Percents,rnd                                FROM RADLAN-MIB;
+
+
+rlEtsMib MODULE-IDENTITY
+        LAST-UPDATED "201003210000A"
+        ORGANIZATION "Marvell Computer Communications Ltd."
+        CONTACT-INFO
+                "marvell.com"
+        DESCRIPTION
+                "Added:
+                     EtsPriorityGroupType
+                     rlEtsFeatureStatus
+                     rlEtsPriorityGroupMappingTable
+                     rlEtsPriorityGroupBwAllocTable."
+
+        ::= { rnd 201 }
+
+
+EtsPriorityGroupType  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "Priority group enumerator."
+   SYNTAX INTEGER {
+      priorityGroup0(0),
+      priorityGroup1(1),
+      priorityGroup2(2),
+      priorityGroup3(3),
+      priorityGroup4(4),
+      priorityGroup5(5),
+      priorityGroup6(6),
+      priorityGroup7(7),
+      priorityGroup15(15)
+}
+
+EtsAdminStatusReasonType  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "Administarative reason enumerator."
+   SYNTAX INTEGER {
+    ok(1),
+    too-many-groups(2),    -- priorities from same queue is not mapped to same PG
+    too-many-queues(3),    -- priorities from same PG is not mapped to same queue
+    not-highest-queue(4)   -- priorities from PG 15 is not mapped to highest queues
+}
+
+-- ETS global enable status
+
+rlEtsFeatureStatus OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "This scalar indicates ETS enable status."
+    DEFVAL { false }
+    ::= { rlEtsMib 1 }
+
+
+
+-- ETS Priority to Priority Group Mapping Table
+
+rlEtsPriorityGroupMappingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF RlEtsPriorityGroupMappingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table describes Enhanced Transmission Selection Priority to Priority Group Mapping."
+    ::= { rlEtsMib 2 }
+
+rlEtsPriorityGroupMappingEntry OBJECT-TYPE
+    SYNTAX RlEtsPriorityGroupMappingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Each entry in this table describes The
+         priority to priority group mapping.
+         The index is represented by rlEtsPriorityGroupMapping8021QPrio."
+    INDEX { rlEtsPriorityGroupMapping8021QPrio }
+    ::= { rlEtsPriorityGroupMappingTable 1 }
+
+RlEtsPriorityGroupMappingEntry ::= SEQUENCE {
+        rlEtsPriorityGroupMapping8021QPrio  INTEGER,
+        rlEtsPriorityGroupMappingAdminPG    EtsPriorityGroupType,
+        rlEtsPriorityGroupMappingOperPG     EtsPriorityGroupType,
+        rlEtsPriorityGroupMappingStatus     RowStatus
+    }
+
+rlEtsPriorityGroupMapping8021QPrio OBJECT-TYPE
+    SYNTAX INTEGER (0..7)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "802.1Q Priority."
+    ::= { rlEtsPriorityGroupMappingEntry 1 }
+
+rlEtsPriorityGroupMappingAdminPG OBJECT-TYPE
+    SYNTAX EtsPriorityGroupType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Administrative (desired) Priority group of this priority."
+    DEFVAL   { priorityGroup15 }
+    ::= { rlEtsPriorityGroupMappingEntry 2 }
+
+rlEtsPriorityGroupMappingOperPG OBJECT-TYPE
+    SYNTAX EtsPriorityGroupType
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Operational (current) priority group of this priority."
+    DEFVAL   { priorityGroup15 }
+    ::= { rlEtsPriorityGroupMappingEntry 3 }
+
+rlEtsPriorityGroupMappingStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The status of a table entry.
+        It is used to add/delete an entry from this table."
+    ::= { rlEtsPriorityGroupMappingEntry 4 }
+
+
+-- ETS Admin mapping not equal to oper mapping reason
+
+rlEtsPriorityGroupMappingProblemReason OBJECT-TYPE
+    SYNTAX EtsAdminStatusReasonType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Reason if priority to priority group, admin status is not equal to operational status."
+    DEFVAL { ok }
+    ::= { rlEtsMib 3 }
+
+-- ETS Admin mapping not equal to oper, mapping index
+
+rlEtsPriorityGroupMappingProblemIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Index of problematic PG if rlEtsPriorityGroupMappingProblemReason = too-many-queues(2) or
+         index of problematic queue if rlEtsPriorityGroupMappingProblemReason = too-many-groups(1)."
+    DEFVAL { 0 }
+    ::= { rlEtsMib 4 }
+
+-- ETS Priority Group Bandwidth Allocation
+
+rlEtsPriorityGroupBwAlloc OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE(16))
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "Enhanced Transmission Selection Priority Group Bandwidth Allocation identifier.
+         Each pair of octets represent priority group with corresponding bandwidth"
+    ::= { rlEtsMib 5 }
+
+
+END

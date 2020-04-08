@@ -1,0 +1,923 @@
+ELTEX-MES-BRIDGE-SECURITY DEFINITIONS ::= BEGIN
+
+-- Version:    7.43
+-- Date:       02-Apr-2006
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Unsigned32, IpAddress, Counter32,
+    TimeTicks, NOTIFICATION-TYPE                    FROM SNMPv2-SMI
+    InterfaceIndex, ifIndex                         FROM IF-MIB
+    RowStatus, TEXTUAL-CONVENTION, MacAddress,
+    DisplayString, TruthValue                       FROM SNMPv2-TC
+    VlanId, PortList                                FROM Q-BRIDGE-MIB
+    eltMes, eltMesBridgeSecurity                    FROM ELTEX-MES
+    rlIpArpInspectEnableVlanEntry                   FROM RADLAN-BRIDGE-SECURITY;
+
+eltMesIpDhcpSnoop OBJECT IDENTIFIER   ::= { eltMesBridgeSecurity  1}
+
+eltMesPppoeIa OBJECT IDENTIFIER       ::= { eltMesBridgeSecurity  6}
+
+eltMesIpv6DhcpGuard OBJECT IDENTIFIER ::= { eltMesBridgeSecurity  2}
+
+eltMesIpv6RaGuard OBJECT IDENTIFIER ::= { eltMesBridgeSecurity  3}
+
+eltMesIpDhcpSnoopNotif OBJECT IDENTIFIER ::= { eltMesIpDhcpSnoop 0}
+
+eltMesIpArpInspect OBJECT IDENTIFIER ::= { eltMesBridgeSecurity 7 }
+
+--
+-- Common types
+--
+
+EltCircuitIdType  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "PPPoE Intermediate Agent curcuit ID type."
+   SYNTAX DisplayString(SIZE(1..63))
+
+EltRemoteIdType  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "PPPoE Intermediate Agent remote ID type."
+   SYNTAX DisplayString(SIZE(1..63))
+
+EltOpt82CombinationType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION    "Specifies circuit id suboptions that will be inserted to a option 82."
+    SYNTAX INTEGER{
+       sp(1),
+       sv(2),
+       pv(3),
+       spv(4),
+       bin(5)
+    }
+
+EltOpt82DelimiterType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION    "Specifies circuit id suboptions that will be inserted to a option 82."
+    SYNTAX INTEGER{
+       tr101(1),
+       dot(2),
+       comma(3),
+       semicolon(4),
+       hash(5),
+       slash(6),
+       space(7)
+    }
+
+EltOpt82SuboptionType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION    "Specifies global format of option 82 suboptions."
+    SYNTAX INTEGER{
+       tr101(1),
+       custom(2)
+    }
+
+EltDHCPSnoopRateLimitType  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "DHCP Snooping limit rate type. 0 means rate limit is disabled."
+   SYNTAX INTEGER(0..2048)
+--
+-- DHCP Option 82
+--
+
+eltIpDhcpOpt82AccessNodeIdentifier OBJECT-TYPE
+    SYNTAX DisplayString(SIZE(1..48))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Specifies an access node identifier used by PPPoE IA."
+    ::= { eltMesIpDhcpSnoop 14 }
+
+eltIpDhcpOpt82CircuitIdSuboptionsCombination OBJECT-TYPE
+    SYNTAX EltOpt82CombinationType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Specifies circuit id suboptions that will be inserted to a PPPoED client packet."
+    ::= { eltMesIpDhcpSnoop 15 }
+
+eltIpDhcpOpt82CircuitIdSuboptionsDelimeter OBJECT-TYPE
+    SYNTAX EltOpt82DelimiterType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Specifies a char symbol that will delimit circuit id suboptions."
+    ::= { eltMesIpDhcpSnoop 16 }
+
+eltIpDhcpOpt82PortTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltIpDhcpOpt82PortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION      "A DHCP interface configuration table."
+    ::= { eltMesIpDhcpSnoop 17 }
+
+eltIpDhcpOpt82SuboptionType OBJECT-TYPE
+    SYNTAX EltOpt82SuboptionType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Specifies global format of option 82 suboptions."
+    ::= { eltMesIpDhcpSnoop 18 }
+
+eltIpDhcpOpt82PortEntry OBJECT-TYPE
+   SYNTAX      EltIpDhcpOpt82PortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "A DHCP interface configuration entry."
+   INDEX {ifIndex}
+::= { eltIpDhcpOpt82PortTable 1 }
+
+EltIpDhcpOpt82PortEntry ::= SEQUENCE {
+   eltIpDhcpOpt82PortCircuitId                          EltCircuitIdType,
+   eltIpDhcpOpt82PortRemoteId                           EltRemoteIdType,
+   eltIpDhcpOpt82PortRowStatus                          RowStatus
+}
+
+eltIpDhcpOpt82PortCircuitId OBJECT-TYPE
+    SYNTAX      EltCircuitIdType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A DHCP interface entry curcuit id"
+    ::= { eltIpDhcpOpt82PortEntry 2 }
+
+eltIpDhcpOpt82PortRemoteId OBJECT-TYPE
+    SYNTAX      EltRemoteIdType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A DHCP interface entry remote id"
+    ::= { eltIpDhcpOpt82PortEntry 3 }
+
+eltIpDhcpOpt82PortRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session row status."
+    ::= { eltIpDhcpOpt82PortEntry 4 }
+
+eltIpDhcpOpt82RemoteIdentifier OBJECT-TYPE
+    SYNTAX DisplayString(SIZE(1..63))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Specifies global Remote Identifier suboption for Option 82."
+    ::= { eltMesIpDhcpSnoop 19 }
+
+--
+-- DHCP Snooping limit rate
+--
+
+eltIpDhcpSnoopPortTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltIpDhcpSnoopPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION      "A DHCP Snooping Rate Limiting configuration table on L2 interfaces."
+    ::= { eltMesIpDhcpSnoop 20 }
+
+eltIpDhcpSnoopPortEntry OBJECT-TYPE
+   SYNTAX      EltIpDhcpSnoopPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "A DHCP interface configuration entry."
+   INDEX {ifIndex}
+::= { eltIpDhcpSnoopPortTable 1 }
+
+EltIpDhcpSnoopPortEntry ::= SEQUENCE {
+   eltIpDhcpSnoopPortRateLimit                          EltDHCPSnoopRateLimitType,
+   eltIpDhcpSnoopPortRowStatus                          RowStatus
+}
+
+eltIpDhcpSnoopPortRateLimit OBJECT-TYPE
+    SYNTAX      EltDHCPSnoopRateLimitType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A DHCP Snooping Limit Rate."
+    DEFVAL{ 0 }
+    ::= { eltIpDhcpSnoopPortEntry 2 }
+
+eltIpDhcpSnoopPortRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session row status."
+    ::= { eltIpDhcpSnoopPortEntry 3 }
+
+eltIpDhcpSnoopRateLimitTrap NOTIFICATION-TYPE
+	OBJECTS {
+    	ifIndex,
+		eltIpDhcpSnoopPortRateLimit
+    }
+    STATUS current
+    DESCRIPTION
+		"A eltIpDhcpSnoopRateLimitTrap is generated when interface
+         reached the rate limit."
+    ::= { eltMesIpDhcpSnoopNotif 1 }
+
+--
+-- PPPoE Intermediate Agent
+--
+
+eltPppoeIaEnable OBJECT-TYPE
+    SYNTAX INTEGER{
+       enable(1),
+       disable(2)
+    }
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Specifies a system PPPoE Intermediate Agent enable state."
+   ::= { eltMesPppoeIa 1 }
+
+eltPppoeIaAccessNodeIdentifier OBJECT-TYPE
+   SYNTAX DisplayString(SIZE(1..48))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Specifies an access node identifier used by PPPoE IA."
+   ::= { eltMesPppoeIa 2 }
+
+eltPppoeIaCircuitIdSuboptionsCombination OBJECT-TYPE
+    SYNTAX EltOpt82CombinationType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Specifies circuit id suboptions that will be inserted to a PPPoED client packet."
+    ::= { eltMesPppoeIa 3 }
+
+eltPppoeIaCircuitIdSuboptionsDelimeter OBJECT-TYPE
+    SYNTAX EltOpt82DelimiterType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Specifies a char symbol that will delimit circuit id suboptions."
+    ::= { eltMesPppoeIa 4 }
+
+eltPppoeIaGenericErrorMessage OBJECT-TYPE
+   SYNTAX DisplayString(SIZE(1..128))
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Specifies a generic error message sent to client if packet is too large."
+   ::= { eltMesPppoeIa 5 }
+
+--
+-- PPPoE Intermediate Agent configuration interface table
+--
+eltPppoeIaPortTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltPppoeIaPortEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      "A PPPoE Intermediate Agent interface table."
+  ::= { eltMesPppoeIa 6 }
+
+eltPppoeIaPortEntry OBJECT-TYPE
+   SYNTAX      EltPppoeIaPortEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "A PPPoE Intermediate Agent interface entry."
+   INDEX {ifIndex}
+::= { eltPppoeIaPortTable 1 }
+
+EltPppoeIaPortEntry ::= SEQUENCE {
+   eltPppoeIaPortEnabled                            TruthValue,
+   eltPppoeIaPortTrusted                            TruthValue,
+   eltPppoeIaPortCircuitId                          EltCircuitIdType,
+   eltPppoeIaPortRemoteId                           EltRemoteIdType,
+   eltPppoeIaPortStripVendorTag                     TruthValue,
+   eltPppoeIaPortStatsRxPADI                        Counter32,
+   eltPppoeIaPortStatsRxPADO                        Counter32,
+   eltPppoeIaPortStatsRxPADR                        Counter32,
+   eltPppoeIaPortStatsRxPADS                        Counter32,
+   eltPppoeIaPortStatsRxPADT                        Counter32,
+   eltPppoeIaPortStatsTxGenError                    Counter32,
+   eltPppoeIaPortStatsDroppedResponseFromUntrusted  Counter32,
+   eltPppoeIaPortStatsDroppedRequestToUntrusted     Counter32,
+   eltPppoeIaPortStatsDroppedMalformed              Counter32,
+   eltPppoeIaPortStatsClearCountersAction           TruthValue,
+   eltPppoeIaPortRowStatus                          RowStatus
+}
+
+eltPppoeIaPortEnabled OBJECT-TYPE
+  SYNTAX        TruthValue
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION
+    "A PPPoE Intermediate Agent interface entry enabled state."
+  ::= { eltPppoeIaPortEntry 2 }
+
+eltPppoeIaPortTrusted OBJECT-TYPE
+  SYNTAX        TruthValue
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION
+    "A PPPoE Intermediate Agent interface entry trusted state."
+  ::= { eltPppoeIaPortEntry 3 }
+
+eltPppoeIaPortCircuitId OBJECT-TYPE
+    SYNTAX      EltCircuitIdType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+      "A PPPoE Intermediate Agent interface entry curcuit id."
+    ::= { eltPppoeIaPortEntry 4 }
+
+eltPppoeIaPortRemoteId OBJECT-TYPE
+  SYNTAX        EltRemoteIdType
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION
+    "A PPPoE Intermediate Agent interface entry remote id."
+  ::= { eltPppoeIaPortEntry 5 }
+
+eltPppoeIaPortStripVendorTag OBJECT-TYPE
+  SYNTAX        TruthValue
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION
+    "A PPPoE Intermediate Agent interface entry enable stripping vendor tag."
+  ::= { eltPppoeIaPortEntry 6 }
+
+eltPppoeIaPortStatsRxPADI OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of received PADI packets."
+    ::= { eltPppoeIaPortEntry 7 }
+
+eltPppoeIaPortStatsRxPADO OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of received PADO packets."
+    ::= { eltPppoeIaPortEntry 8 }
+
+eltPppoeIaPortStatsRxPADR OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of received PADR packets."
+    ::= { eltPppoeIaPortEntry 9 }
+
+eltPppoeIaPortStatsRxPADS OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of received PADS packets."
+    ::= { eltPppoeIaPortEntry 10 }
+
+eltPppoeIaPortStatsRxPADT OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of received PADT packets."
+    ::= { eltPppoeIaPortEntry 11 }
+
+eltPppoeIaPortStatsTxGenError OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of transmitted PPPoED generic error messages."
+    ::= { eltPppoeIaPortEntry 12 }
+
+eltPppoeIaPortStatsDroppedResponseFromUntrusted OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of dropped server PPPoED packets from untrusted ports."
+    ::= { eltPppoeIaPortEntry 13 }
+
+eltPppoeIaPortStatsDroppedRequestToUntrusted OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of dropped client PPPoED packets from trusted ports."
+    ::= { eltPppoeIaPortEntry 14 }
+
+eltPppoeIaPortStatsDroppedMalformed OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of dropped malformed PPPoED packets."
+    ::= { eltPppoeIaPortEntry 15 }
+
+eltPppoeIaPortStatsClearCountersAction OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If true, clear (set to zero) all PPPoE Intermediate Agent interface counters."
+    DEFVAL{ false }
+    ::= { eltPppoeIaPortEntry 16 }
+
+eltPppoeIaPortRowStatus OBJECT-TYPE
+  SYNTAX        RowStatus
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION
+    "A PPPoE Intermediate Agent interface entry row status."
+  ::= { eltPppoeIaPortEntry 17 }
+
+--
+-- PPPoE Intermediate Agent clear all statistics
+--
+eltPppoeIaClearCountersAction OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If true, clear (set to zero) counters on all ports."
+    DEFVAL{ false }
+    ::= { eltMesPppoeIa 7 }
+
+--
+-- PPPoE Intermediate Agent sessions table
+--
+
+EltPppoeIaSessionIDType  ::= TEXTUAL-CONVENTION
+   STATUS current
+   DESCRIPTION    "PPPoE Intermediate Agent session ID type."
+   SYNTAX INTEGER(0..65535)
+
+eltPppoeIaSessionTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltPppoeIaSessionEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      "A PPPoE Intermediate Agent sessions table."
+  ::= { eltMesPppoeIa 8 }
+
+eltPppoeIaSessionEntry OBJECT-TYPE
+   SYNTAX      EltPppoeIaSessionEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "A PPPoE Intermediate Agent session entry."
+   INDEX { eltPppoeIaSessionVLANTag, eltPppoeIaSessionMACAddress }
+::= { eltPppoeIaSessionTable 1 }
+
+EltPppoeIaSessionEntry ::= SEQUENCE {
+   eltPppoeIaSessionVLANTag          VlanId,
+   eltPppoeIaSessionMACAddress       MacAddress,
+   eltPppoeIaSessionPort             InterfaceIndex,
+   eltPppoeIaSessionID               EltPppoeIaSessionIDType,
+   eltPppoeIaSessionTimer            Unsigned32,
+   eltPppoeIaSessionRowStatus        RowStatus
+}
+
+eltPppoeIaSessionVLANTag OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session VLAN ID."
+    ::= { eltPppoeIaSessionEntry 1 }
+
+eltPppoeIaSessionMACAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session MAC address."
+    ::= { eltPppoeIaSessionEntry 2 }
+
+eltPppoeIaSessionPort OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session interface index."
+    ::= { eltPppoeIaSessionEntry 3 }
+
+eltPppoeIaSessionID OBJECT-TYPE
+    SYNTAX      EltPppoeIaSessionIDType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session ID."
+    ::= { eltPppoeIaSessionEntry 4 }
+
+eltPppoeIaSessionTimer OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session timer."
+    ::= { eltPppoeIaSessionEntry 5 }
+
+eltPppoeIaSessionRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Session row status."
+    ::= { eltPppoeIaSessionEntry 6 }
+
+eltIpv6DhcpGuardEnable OBJECT-TYPE
+    SYNTAX INTEGER{
+       enable(1),
+       disable(2)
+    }
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Specifies a system DHCPv6 Guard enable state."
+   ::= { eltMesIpv6DhcpGuard 1 }
+
+eltIpv6DhcpGuardEnableTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltIpv6DhcpGuardEnableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      "An Ip DHCPv6 Guard enabled VLAN table."
+  ::= { eltMesIpv6DhcpGuard 2 }
+
+eltIpv6DhcpGuardEnableEntry OBJECT-TYPE
+   SYNTAX      EltIpv6DhcpGuardEnableEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "An Ip Dhcp Snooping enabled VLAN entry."
+   INDEX {eltIpv6DhcpGuardEnableVlanTag}
+::= { eltIpv6DhcpGuardEnableTable 1 }
+
+EltIpv6DhcpGuardEnableEntry ::= SEQUENCE {
+   eltIpv6DhcpGuardEnableVlanTag         VlanId,
+   eltIpv6DhcpGuardEnableVlanRowStatus   RowStatus
+}
+eltIpv6DhcpGuardEnableVlanTag OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "A DHCP Snoop entry vlan tag."
+    ::= { eltIpv6DhcpGuardEnableEntry 1 }
+
+eltIpv6DhcpGuardEnableVlanRowStatus OBJECT-TYPE
+   SYNTAX       RowStatus
+   MAX-ACCESS   read-write
+   STATUS current
+   DESCRIPTION
+       "Entry status. A valid status is CreateandGo and Delete."
+  ::= { eltIpv6DhcpGuardEnableEntry  2 }
+
+
+EltIpv6DhcpGuardRoleType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION    "Specifies circuit id suboptions that will be inserted to a option 82."
+    SYNTAX INTEGER{
+       client(1),
+       server(2)
+    }
+
+eltIpv6DhcpGuardTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltIpv6DhcpGuardEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      "An Ip DHCPv6 Guard enabled VLAN table."
+  ::= { eltMesIpv6DhcpGuard 3 }
+
+eltIpv6DhcpGuardEntry OBJECT-TYPE
+   SYNTAX      EltIpv6DhcpGuardEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "An Ip Dhcp Snooping enabled VLAN entry."
+   INDEX {eltIpv6DhcpGuardIfIndex}
+::= { eltIpv6DhcpGuardTable 1 }
+
+EltIpv6DhcpGuardEntry ::= SEQUENCE {
+    eltIpv6DhcpGuardIfIndex              INTEGER,
+    eltIpv6DhcpGuardRole                 EltIpv6DhcpGuardRoleType,
+    eltIpv6DhcpGuardAcl                  INTEGER,
+    eltIpv6DhcpGuardPrefList             DisplayString,
+    eltIpv6DhcpGuardTrusted              INTEGER,
+    eltIpv6DhcpGuardRowStatus            RowStatus
+}
+
+eltIpv6DhcpGuardIfIndex OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Interface index."
+    ::= { eltIpv6DhcpGuardEntry 1 }
+
+eltIpv6DhcpGuardRole OBJECT-TYPE
+    SYNTAX      EltIpv6DhcpGuardRoleType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Set port role of client/server."
+    ::= { eltIpv6DhcpGuardEntry 2 }
+
+eltIpv6DhcpGuardAcl OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Set ipv6 ACL index."
+    ::= { eltIpv6DhcpGuardEntry 3 }
+
+eltIpv6DhcpGuardPrefList OBJECT-TYPE
+    SYNTAX DisplayString(SIZE(0..32))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Set ipv6 prefix list name."
+    ::= { eltIpv6DhcpGuardEntry 4 }
+
+eltIpv6DhcpGuardTrusted OBJECT-TYPE
+    SYNTAX INTEGER{
+       enable(1),
+       disable(2)
+    }
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Port is trusted."
+   ::= { eltIpv6DhcpGuardEntry 5 }
+
+eltIpv6DhcpGuardRowStatus OBJECT-TYPE
+   SYNTAX       RowStatus
+   MAX-ACCESS   read-write
+   STATUS current
+   DESCRIPTION
+       "Entry status. A valid status is CreateandGo and Delete."
+  ::= { eltIpv6DhcpGuardEntry  6 }
+
+
+eltIpv6RaGuardEnable OBJECT-TYPE
+    SYNTAX INTEGER{
+       enable(1),
+       disable(2)
+    }
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Specifies a system IPv RA Guard enable state."
+   ::= { eltMesIpv6RaGuard 1 }
+
+eltIpv6RaGuardEnableTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltIpv6RaGuardEnableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      "An Ip DHCPv6 Guard enabled VLAN table."
+  ::= { eltMesIpv6RaGuard 2 }
+
+eltIpv6RaGuardEnableEntry OBJECT-TYPE
+   SYNTAX      EltIpv6RaGuardEnableEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "An Ip Dhcp Snooping enabled VLAN entry."
+   INDEX {eltIpv6RaGuardEnableVlanTag}
+::= { eltIpv6RaGuardEnableTable 1 }
+
+EltIpv6RaGuardEnableEntry ::= SEQUENCE {
+   eltIpv6RaGuardEnableVlanTag         VlanId,
+   eltIpv6RaGuardEnableVlanRowStatus   RowStatus
+}
+eltIpv6RaGuardEnableVlanTag OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "A DHCP Snoop entry vlan tag."
+    ::= { eltIpv6RaGuardEnableEntry 1 }
+
+eltIpv6RaGuardEnableVlanRowStatus OBJECT-TYPE
+   SYNTAX       RowStatus
+   MAX-ACCESS   read-write
+   STATUS current
+   DESCRIPTION
+       "Entry status. A valid status is CreateandGo and Delete."
+  ::= { eltIpv6RaGuardEnableEntry  2 }
+
+
+EltIpv6RaGuardRoleType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION    "Type router/host"
+    SYNTAX INTEGER{
+       router(1),
+       host(2)
+    }
+
+eltIpv6RaGuardTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltIpv6RaGuardEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      "An Ip ND RA Guard table."
+  ::= { eltMesIpv6RaGuard 3 }
+
+eltIpv6RaGuardEntry OBJECT-TYPE
+   SYNTAX      EltIpv6RaGuardEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "An Ip ND RA Guard table entry."
+   INDEX {eltIpv6RaGuardIfIndex}
+::= { eltIpv6RaGuardTable 1 }
+
+EltIpv6RaGuardEntry ::= SEQUENCE {
+    eltIpv6RaGuardIfIndex              INTEGER,
+    eltIpv6RaGuardRole                 EltIpv6RaGuardRoleType,
+    eltIpv6RaGuardAcl                  INTEGER,
+    eltIpv6RaGuardPrefList             DisplayString,
+    eltIpv6RaGuardTrusted              INTEGER,
+    eltIpv6RaGuardRowStatus            RowStatus
+}
+
+eltIpv6RaGuardIfIndex OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Interface index."
+    ::= { eltIpv6RaGuardEntry 1 }
+
+eltIpv6RaGuardRole OBJECT-TYPE
+    SYNTAX      EltIpv6RaGuardRoleType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Set port role of router/host."
+    ::= { eltIpv6RaGuardEntry 2 }
+
+eltIpv6RaGuardAcl OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Set ipv6 ACL index."
+    ::= { eltIpv6RaGuardEntry 3 }
+
+eltIpv6RaGuardPrefList OBJECT-TYPE
+    SYNTAX DisplayString(SIZE(0..32))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION       "Set ipv6 prefix list name."
+    ::= { eltIpv6RaGuardEntry 4 }
+
+eltIpv6RaGuardTrusted OBJECT-TYPE
+    SYNTAX INTEGER{
+       enable(1),
+       disable(2)
+    }
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Port is trusted."
+   ::= { eltIpv6RaGuardEntry 5 }
+
+eltIpv6RaGuardRowStatus OBJECT-TYPE
+   SYNTAX       RowStatus
+   MAX-ACCESS   read-write
+   STATUS current
+   DESCRIPTION
+       "Entry status. A valid status is CreateandGo and Delete."
+  ::= { eltIpv6RaGuardEntry  6 }
+
+
+eltIpv6RelayAgentEnable OBJECT-TYPE
+    SYNTAX INTEGER{
+       enable(1),
+       disable(2)
+    }
+   MAX-ACCESS read-write
+   STATUS current
+   DESCRIPTION       "Lightweight DHCPv6 Relay Agent (rfc 6221)"
+   ::= { eltMesBridgeSecurity  4 }
+
+--
+-- ARP Inspection statistic port table
+--
+
+eltIpArpInspectPortStatTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltIpArpInspectPortStatEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      "An Ip Arp Inspection port table."
+  ::= { eltMesIpArpInspect 1 }
+
+eltIpArpInspectPortStatEntry OBJECT-TYPE
+   SYNTAX      EltIpArpInspectPortStatEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "An Ip Arp Inspection port entry."
+   INDEX {eltIpArpInspectPortIndex}
+::= { eltIpArpInspectPortStatTable 1 }
+
+EltIpArpInspectPortStatEntry ::= SEQUENCE {
+   eltIpArpInspectPortIndex                  INTEGER,
+   eltIpArpInspectPortNumOfArpForwarded      Counter32,
+   eltIpArpInspectPortNumOfArpDropped        Counter32,
+   eltIpArpInspectPortNumOfArpMismatched     Counter32,
+   eltIpArpInspectLastDropIP                 IpAddress,
+   eltIpArpInspectLastDropMac                MacAddress,
+   eltIpArpInspectLastDropTime               TimeTicks
+}
+
+eltIpArpInspectPortIndex OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "An Ip ARP Inspection entry interface index."
+    ::= { eltIpArpInspectPortStatEntry 1 }
+
+eltIpArpInspectPortNumOfArpForwarded OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of forwarded ARP packets that were validated by ARP inspection"
+    ::= { eltIpArpInspectPortStatEntry 2 }
+
+eltIpArpInspectPortNumOfArpDropped OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of dropped ARP packets that were not validated by ARP inspection
+        (mismatch , not-found and dropped for any reason)"
+    ::= { eltIpArpInspectPortStatEntry 3 }
+
+eltIpArpInspectPortNumOfArpMismatched OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of dropped ARP packets that were not validated by ARP inspection
+        and inconsistency was found for IP and MAC (mismatch)"
+    ::= { eltIpArpInspectPortStatEntry 4 }
+
+eltIpArpInspectLastDropIP OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sender IP Address of last dropped ARP packet."
+    ::= { eltIpArpInspectPortStatEntry 5 }
+
+eltIpArpInspectLastDropMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sender MAC Address of last dropped ARP packet."
+    ::= { eltIpArpInspectPortStatEntry 6 }
+
+eltIpArpInspectLastDropTime OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Time of last dropped ARP packet (system uptime in seconds)."
+    ::= { eltIpArpInspectPortStatEntry 7 }
+
+eltIpArpInspectEnableVlanTable  OBJECT-TYPE
+  SYNTAX  SEQUENCE OF EltIpArpInspectEnableVlanEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      " Augment for Ip ARP Inspection enabled VLAN table."
+  ::= { eltMesIpArpInspect 2 }
+
+eltIpArpInspectEnableVlanEntry  OBJECT-TYPE
+  SYNTAX      EltIpArpInspectEnableVlanEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION      " Augment for Ip ARP Inspection enabled VLAN entry."
+  AUGMENTS { rlIpArpInspectEnableVlanEntry }
+  ::= { eltIpArpInspectEnableVlanTable 1 }
+
+EltIpArpInspectEnableVlanEntry ::= SEQUENCE {
+   eltIpArpInspectVlanLastDropIP                 IpAddress,
+   eltIpArpInspectVlanLastDropMac                MacAddress,
+   eltIpArpInspectVlanLastDropTime               TimeTicks
+}
+
+eltIpArpInspectVlanLastDropIP OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sender IP Address of last dropped ARP packet."
+    ::= { eltIpArpInspectEnableVlanEntry 1 }
+
+eltIpArpInspectVlanLastDropMac OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sender MAC Address of last dropped ARP packet."
+    ::= { eltIpArpInspectEnableVlanEntry 2 }
+
+eltIpArpInspectVlanLastDropTime OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Time of last dropped ARP packet (system uptime in seconds)."
+    ::= { eltIpArpInspectEnableVlanEntry 3 }
+
+eltIpArpInspectPortClearCountersAction OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Clear for ports in PortSet (set to zero) Arp Inspection counters: eltIpArpInspectPortNumOfArpForwarded ,
+        eltIpArpInspectPortNumOfArpDropped and eltIpArpInspectPortNumOfArpMismatched"
+    ::= { eltMesIpArpInspect 3 }
+
+END

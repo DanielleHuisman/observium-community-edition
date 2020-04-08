@@ -1,0 +1,1 @@
+ALTER TABLE `bgpPeers` CHANGE `local_as` `local_as` INT UNSIGNED NULL DEFAULT NULL;

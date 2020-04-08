@@ -1,0 +1,636 @@
+-- $Id: RBN-SSE-MIB.my,v 1.1.4.3.26.1 2012/08/04 00:07:22 chiachun Exp $
+-- $Source: /cvsroot/pkt/sw/se/xc/bsd/config/snmp/mibs/Attic/RBN-SSE-MIB.my,v $
+-- *****************************************************************
+-- RBN-SSE-MIB
+--
+-- Copyright (c) 2008, 2009 RedBack Networks, Inc.
+-- All rights reserved.
+--
+-- *****************************************************************
+RBN-SSE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, NOTIFICATION-TYPE, OBJECT-TYPE,
+        Unsigned32
+                FROM SNMPv2-SMI
+
+        TruthValue,
+        DateAndTime
+                FROM SNMPv2-TC
+
+        SnmpAdminString
+                FROM SNMP-FRAMEWORK-MIB
+
+        RbnSlot, RbnPercentage
+                FROM RBN-TC
+
+        IANAItuEventType, 
+        IANAItuProbableCause
+                FROM IANA-ITU-ALARM-TC-MIB
+
+        ItuPerceivedSeverity
+                FROM ITU-ALARM-TC-MIB
+
+        MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+
+        rbnMgmt
+                FROM RBN-SMI;
+
+rbnSseMIB MODULE-IDENTITY
+     LAST-UPDATED    "200909010000Z" -- Sept 1, 2009
+     ORGANIZATION    "RedBack Networks, Inc."
+     CONTACT-INFO
+             "       RedBack Networks, Inc.
+
+          Postal:    300 Holger Way
+                     San Jose, CA  95134-1362
+                     USA
+
+             Phone:  +1 408 750-5000
+             Fax:    +1 408 750-5599
+
+          E-mail:    mib-info@redback.com"
+     DESCRIPTION
+          "This management information module defines the
+          objects necessary to support the management of
+          SmartEdge Server Engine(SSE) file server groups, partitions 
+          and corresponding alarms"
+
+     REVISION        "200909010000Z" -- Sept 1, 2009
+     DESCRIPTION
+             "Initial version."
+     ::= { rbnMgmt 48 }
+
+rbnSseMIBNotifications OBJECT IDENTIFIER
+        ::= { rbnSseMIB 0 }
+
+rbnSseMIBObjects OBJECT IDENTIFIER
+        ::= { rbnSseMIB 1 }
+
+rbnSseMIBConformance OBJECT IDENTIFIER
+        ::= { rbnSseMIB 2 }
+
+-- rbnFSGroup Table
+rbnFSGroupTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnFSGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "File-Server Group is a logical abstraction of a physical file server. 
+        This table lists the File Server Groups  that have been
+        configured on the system."
+    ::= { rbnSseMIBObjects 1 }
+
+rbnFSGroupEntry OBJECT-TYPE
+    SYNTAX      RbnFSGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the rbnFSGroupTable."
+    INDEX { rbnFSGroupName }
+    ::= { rbnFSGroupTable 1 }
+
+RbnFSGroupEntry ::= SEQUENCE {
+    rbnFSGroupName            SnmpAdminString,
+    rbnFSGroupState           INTEGER,
+    rbnFSGroupMode            INTEGER,
+    rbnFSGroupRaidMode        INTEGER,
+    rbnFSGroupRevert          TruthValue,
+    rbnFSPrimarySlot          RbnSlot,
+    rbnFSSecondarySlot        RbnSlot,
+    rbnFSActiveSlot           RbnSlot
+}
+
+rbnFSGroupName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A textual name for the File Server Group."
+    ::= { rbnFSGroupEntry 1 }
+
+rbnFSGroupState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        unknown(0),
+                        up(1),
+                        down(2),
+                        partial(3),
+                        stale(4),
+                        noCard(5),
+                        unassigned(6)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Service state of the File Server Group."
+    ::= { rbnFSGroupEntry 2 }
+
+rbnFSGroupMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        diskRedundancy(1),
+                        networkRedundancy(2),
+                        nonRedundant(3)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Operational mode.
+        diskRedundancy 
+            Each hard disk on a single file-server card will mirror each other, 
+            and when one fails, the other will take over automatically. 
+        networkRedundancy
+            One file-server is mirroring the other in the same chassis.
+            One of the file-servers will be in active state while the other is 
+            standby or backup. 
+        nonRedundant
+            One or two hard disks serving as generic disk."
+    ::= { rbnFSGroupEntry 3 }
+
+rbnFSGroupRaidMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        unknown(0),
+                        raid0(1),
+                        raid1(2),
+                        independent(3)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Operational mode of the disks.
+        RAID0 : must use 2 disks.
+        Non-RAID0:
+          RAID1: imply using 2 disks, although 1 could be un-plugged.
+          Independent (standalone): either 1 or 2 disks."
+    ::= { rbnFSGroupEntry 4 }
+
+rbnFSGroupRevert OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The reverting mode of the File Server Group.
+       Revert back to original primary/secondary relationship if in reverted 
+       mode (that is this object has the value true(1))."
+    DEFVAL{2}   
+    ::= { rbnFSGroupEntry 5 }
+
+rbnFSPrimarySlot OBJECT-TYPE
+    SYNTAX      RbnSlot
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The chassis slot number in which the primary SSE 
+             card is present."
+    ::= { rbnFSGroupEntry 6 }
+
+rbnFSSecondarySlot OBJECT-TYPE
+    SYNTAX      RbnSlot
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The chassis slot number in which the secondary SSE 
+            card is present."
+    ::= { rbnFSGroupEntry 7 }
+
+rbnFSActiveSlot OBJECT-TYPE
+    SYNTAX      RbnSlot
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The slot number in which the active SSE
+            card is present."
+    ::= { rbnFSGroupEntry 8 }
+
+-- rbnFSPartition Table
+rbnFSPartitionTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnFSPartitionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the Partitions that have been
+         configured on the system."
+    ::= { rbnSseMIBObjects 2 }
+
+rbnFSPartitionEntry OBJECT-TYPE
+    SYNTAX      RbnFSPartitionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the PartitionTable."
+    INDEX { rbnFSGroupName, rbnFSPartitionName }
+    ::= { rbnFSPartitionTable 1 }
+
+RbnFSPartitionEntry ::= SEQUENCE {
+    rbnFSPartitionName                   SnmpAdminString,
+    rbnFSPartitionState                  INTEGER,
+    rbnFSPartitionSize                   Unsigned32,
+    rbnFSPartitionDisk                   Unsigned32,
+    rbnFSPartitionMirrored               INTEGER,
+    rbnFSPartitionRaiseTriggerPercentage RbnPercentage,
+    rbnFSPartitionClearTriggerPercentage RbnPercentage 
+}
+
+rbnFSPartitionName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A textual name for the Partition."
+    ::= { rbnFSPartitionEntry 1 }
+
+rbnFSPartitionState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        up(1),
+                        down(2),
+                        stale(3)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Operational status of the partition."
+    ::= {rbnFSPartitionEntry 2 }
+
+rbnFSPartitionSize OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    UNITS       "GBytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of the partition in GBytes."
+    ::= { rbnFSPartitionEntry 3 }
+
+rbnFSPartitionDisk OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..10)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "DiskId of the disk(disk num) where the partition is located.
+         For SSE, 0 for DISK_1, 1 for DISK_2 and 2 for DISK_ALL will be used."
+    ::= { rbnFSPartitionEntry 4 }
+
+rbnFSPartitionMirrored OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        enabled(1),
+                        disabled(2),
+                        notApplicable(3)
+                        } 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Mirror data to standby disk, if network redundancy
+         is configured."
+    ::= { rbnFSPartitionEntry 5 }
+
+rbnFSPartitionRaiseTriggerPercentage OBJECT-TYPE
+    SYNTAX      RbnPercentage(50..100)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Partition capacity used in percentage to trigger alarm. Raise 
+         percentage of 100 indicates alarm is triggered when the partition 
+         is completeley full."
+    DEFVAL { 80 }
+    ::= { rbnFSPartitionEntry 6 }
+
+rbnFSPartitionClearTriggerPercentage OBJECT-TYPE
+    SYNTAX      RbnPercentage(10..100)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Specifies the capacity percentage for when the alarm is cleared. 
+         Clear percentage of 10 indicates alarm is triggered when parition 
+         is at 10% below raise percentage."
+    DEFVAL { 70 }
+    ::= { rbnFSPartitionEntry 7 }
+
+ -- Notification Definition section
+rbnSseAlarmDateAndTime OBJECT-TYPE
+        SYNTAX      DateAndTime
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION
+                "The local date and time when the alarm was raised"
+        ::= { rbnSseMIBObjects 3 }
+
+rbnSseAlarmSeverity OBJECT-TYPE
+        SYNTAX      ItuPerceivedSeverity
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION
+                "The perceived severity of the alarm."
+        ::= { rbnSseMIBObjects 4 }
+
+rbnSseAlarmProbableCause OBJECT-TYPE
+        SYNTAX      IANAItuProbableCause
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION
+                "The probable cause for this alarm."
+        ::= { rbnSseMIBObjects 5 }
+
+rbnSseEventType OBJECT-TYPE
+        SYNTAX      IANAItuEventType
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION
+                 "The type of the alarm." 
+        ::= { rbnSseMIBObjects 6 }
+
+rbnSseAlarmDescription OBJECT-TYPE
+        SYNTAX      SnmpAdminString (SIZE(0..64))
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION 
+                "A text string which conveys additional information
+                about the alarm." 
+        ::= { rbnSseMIBObjects 7 }
+
+ -- Notifications
+
+rbnSseFsgSwitchManual NOTIFICATION-TYPE
+    OBJECTS     { 
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSGroupState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgSwitchManual notification signifies that the
+        FS group manual switch in progress."
+    ::= { rbnSseMIBNotifications 1 } 
+
+rbnSseFsgSwitchAuto NOTIFICATION-TYPE
+    OBJECTS     {  
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSGroupState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgSwitchAuto notification signifies that the
+        FS group auto switch in progress."
+    ::= { rbnSseMIBNotifications 2 }
+
+rbnSseFsgSwitchCompleted NOTIFICATION-TYPE
+    OBJECTS     {  
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSGroupState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgSwitchCompleted notification signifies that the
+        FS group switch completed."
+    ::= { rbnSseMIBNotifications 3 }
+
+rbnSseFsgSwitchFail NOTIFICATION-TYPE
+    OBJECTS     {  
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSGroupState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgSwitchFail notification signifies that the
+         FS group switch failed."
+    ::= { rbnSseMIBNotifications 4 }
+
+rbnSseFsgSwitchWtr NOTIFICATION-TYPE
+    OBJECTS     {  
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSGroupState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgSwitchWtr notification signifies that the
+        FS group auto switch is waiting to restored."
+    ::= { rbnSseMIBNotifications 5 }
+
+rbnSseFsgNotOperational NOTIFICATION-TYPE
+    OBJECTS     { 
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSGroupState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgNotOperational notification signifies that the
+         FS group is not operational."
+    ::= { rbnSseMIBNotifications 6 }
+
+rbnSseFsgBlockDeviceFail NOTIFICATION-TYPE
+    OBJECTS     {
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSGroupState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgBlockDeviceFail notification signifies that the
+        FS group block device (DRBD) failed." 
+    ::= { rbnSseMIBNotifications 7 }
+
+rbnSseFsgPartitionNotOperational NOTIFICATION-TYPE
+    OBJECTS     { 
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSPartitionState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgPartitionNotOperational notification signifies that the
+        FS group partition not operational."
+    ::= { rbnSseMIBNotifications 8 }
+
+rbnSseFsgParitionDataSyncing NOTIFICATION-TYPE
+    OBJECTS     {  
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSPartitionState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgParitionDataSyncing notification signifies that the
+        FS group partition data sync failed."
+    ::= { rbnSseMIBNotifications 9 }
+
+rbnSseFsgParitionDataSyncFail NOTIFICATION-TYPE
+    OBJECTS     {  
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSPartitionState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgParitionDataSyncFail notification signifies that the
+        FS group partition data sync failed."
+    ::= { rbnSseMIBNotifications 10 }
+
+rbnSseFsgPartitionFull NOTIFICATION-TYPE
+    OBJECTS     {  
+         rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSPartitionState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgPartitionFull notification signifies that the
+        FS group partition is full"
+    ::= { rbnSseMIBNotifications 11 }
+
+rbnSseFsgPartitionLow NOTIFICATION-TYPE
+    OBJECTS     {
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSPartitionState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgPartitionLow notification signifies that the
+        FS group partition is low in space."
+    ::= { rbnSseMIBNotifications 12 }
+
+rbnSseFsgPartitionNotOperStandby NOTIFICATION-TYPE
+    OBJECTS     { 
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmSeverity,
+        rbnSseAlarmProbableCause,
+        rbnSseEventType,
+        rbnSseAlarmDescription,
+        rbnFSPartitionState
+    }
+    STATUS      current
+    DESCRIPTION
+        "A rbnSseFsgPartitionNotOperStandby notification signifies that the
+        FS group partition is not ready at standby"
+    ::= { rbnSseMIBNotifications 13 }
+
+ -- Conformance information
+
+ -- Compliance statements
+
+rbnSseGroups      OBJECT IDENTIFIER ::= { rbnSseMIBConformance 1 }
+rbnSseCompliances OBJECT IDENTIFIER ::= { rbnSseMIBConformance 2 }
+
+  -- Compliance statements
+rbnSseMIBCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+        "The compliance statement for Redback SmartEdge Server Engine(SSE) MIB."
+    MODULE  -- this module
+    MANDATORY-GROUPS {
+           rbnSseFileServerGroup,
+           rbnSsePartitionGroup,
+           rbnSseEventObjectGroup,
+           rbnSseEventGroup
+    }
+  ::= { rbnSseCompliances 1 }
+-- units of conformance
+
+rbnSseFileServerGroup OBJECT-GROUP
+    OBJECTS
+    {
+        rbnFSGroupMode,            
+        rbnFSGroupState,         
+        rbnFSGroupRaidMode,       
+        rbnFSGroupRevert,
+        rbnFSPrimarySlot,            
+        rbnFSSecondarySlot,
+        rbnFSActiveSlot        
+    }
+    STATUS  current
+    DESCRIPTION
+        "A collection of rbnFSGroupTable objects providing 
+         information applicable to all file server groups."
+    ::= { rbnSseGroups 1 }
+
+rbnSsePartitionGroup OBJECT-GROUP
+    OBJECTS 
+    {
+        rbnFSPartitionSize,            
+        rbnFSPartitionState,           
+        rbnFSPartitionDisk,            
+        rbnFSPartitionMirrored,          
+        rbnFSPartitionRaiseTriggerPercentage,
+        rbnFSPartitionClearTriggerPercentage
+    }
+    STATUS  current
+    DESCRIPTION
+        "A collection of rbnFSPartitionTable objects providing 
+         information applicable to all file server group partitions."
+    ::= { rbnSseGroups 2 }
+
+rbnSseEventObjectGroup OBJECT-GROUP
+    OBJECTS 
+    {   
+        rbnSseEventType,
+        rbnSseAlarmDateAndTime,
+        rbnSseAlarmDescription,
+        rbnSseAlarmProbableCause,
+        rbnSseAlarmSeverity
+    }
+    STATUS    current
+    DESCRIPTION
+        "A collection of rbnSse notification objects."
+    ::= { rbnSseGroups 3 }
+
+rbnSseEventGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { 
+        rbnSseFsgSwitchManual,
+        rbnSseFsgSwitchAuto,
+        rbnSseFsgSwitchCompleted,
+        rbnSseFsgSwitchFail,
+        rbnSseFsgSwitchWtr,
+        rbnSseFsgNotOperational,
+        rbnSseFsgBlockDeviceFail,
+        rbnSseFsgPartitionNotOperational,
+        rbnSseFsgParitionDataSyncing,
+        rbnSseFsgParitionDataSyncFail,
+        rbnSseFsgPartitionFull,
+        rbnSseFsgPartitionLow,
+        rbnSseFsgPartitionNotOperStandby
+    }
+    STATUS    current
+    DESCRIPTION
+        "A collection of rbnSse notifications."
+    ::= { rbnSseGroups 4 }
+
+END

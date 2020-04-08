@@ -1,0 +1,1 @@
+ALTER TABLE `ports` CHANGE `port_label_base` `port_label_base` VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL, CHANGE `port_label_num` `port_label_num` VARCHAR(64) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL;

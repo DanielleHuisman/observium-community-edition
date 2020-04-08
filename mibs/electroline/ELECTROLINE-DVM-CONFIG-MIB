@@ -1,0 +1,316 @@
+--*****************************************************************************
+--                                                                          
+--    Copyright 2010 Electroline Equipment Inc                                   
+--    All Rights Reserved       
+--                                                                          
+--                                                                          
+--                                                                          
+--*****************************************************************************
+--    Filename: ELECTROLINE-DVM-CONFIG.mib
+--    Author:   Alain Leclerc
+--    Creation Date: 2010.05.18
+--*****************************************************************************
+--    Description:
+--
+--	This file contains the SNMPv2 MIB definition of the Configuration branch 
+--      for the DVM products.
+--		
+--*****************************************************************************
+--   Revision History:
+--   2010.05.18	Alain Leclerc			First Draft
+--   2011.02.09	Alain Leclerc			Added mib to disable channel bonding  
+--   2011.04.27	Alain Leclerc			Added mibs for the FPGA image Download
+--   2011.05.19	Alain Leclerc			Modify the EMS table to support IPv6 and HTTP Post
+
+--*****************************************************************************
+
+ELECTROLINE-DVM-CONFIG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32
+        FROM SNMPv2-SMI
+    RowStatus, TruthValue
+        FROM SNMPv2-TC        
+    dvmConfiguration
+        FROM ELECTROLINE-DVM-ROOT-MIB
+    DisplayString
+    	FROM RFC1213-MIB
+    NetworkAddress
+    	FROM RFC1155-SMI
+    SnmpAdminString
+        FROM SNMP-FRAMEWORK-MIB   -- RFC 3411
+	InetAddress,
+	InetAddressType
+    	FROM INET-ADDRESS-MIB     -- RFC 4001
+    TenthdB,
+    TenthdBmV,
+        FROM DOCS-IF-MIB;
+
+-- ****************************************************************************
+-- * Definition of Configuration Sub-groups
+-- ****************************************************************************
+dvmCfgGlobal OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Group of configuration objects related to all DVM models"
+	::= { dvmConfiguration 1 }
+
+-- ****************************************************************************
+-- * EMS CONFIGURATION DATA
+-- *
+-- * The following MIB objects control communication (Traps) with external Element 
+-- * / Network Management Systems.  It includes the EMS Address Table that is used to
+-- * indicate to the DVM the IP addresses of the EMS / NMS and related parameters.
+-- ****************************************************************************
+dvmCfgEms OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This sub-tree contains configuration information for trap management."
+	::= { dvmCfgGlobal 1 }
+
+cfgEmsAddressTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgEmsAddressEntry
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This is the list of ip addresses of the Element Management System(s)
+        to which the DVM will send its AlarmEvent traps.
+
+	   The entries in this table are stored in non-volatile memory.
+	   A maximum of 10 entries is supported.
+        " 
+    ::= { dvmCfgEms 1 }
+
+cfgEmsAddressEntry OBJECT-TYPE
+     SYNTAX CfgEmsAddressEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"EMS entry definition"     
+     INDEX { cfgEmsAddressIndex }
+     ::= { cfgEmsAddressTable 1 }
+
+CfgEmsAddressEntry ::=
+     SEQUENCE
+     {
+          cfgEmsAddressIndex					INTEGER,
+          cfgEmsAddressIP						IpAddress,
+          cfgEmsAddressTrapPortNumber			INTEGER,
+          cfgEmsAddressType						InetAddressType,
+          cfgEmsAddress							InetAddress,
+          cfgEmsAddressProtocol                 INTEGER
+     }
+
+cfgEmsAddressIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the EMS address table"
+     ::= { cfgEmsAddressEntry 1 }                                      
+
+cfgEmsAddressIP OBJECT-TYPE
+     SYNTAX IpAddress
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "IP address of the EMS server that will receive traps.
+          If the EMS server is unknown or is a
+          non-IPv4 address, return 0.0.0.0. This object is used
+          only to have a more human readable ipv4 address.
+
+          See also cfgEmsAddress. This object will have its value
+          modified, given a valid SET to cfgEmsAddress."
+     ::= { cfgEmsAddressEntry 2 }
+
+cfgEmsAddressTrapPortNumber OBJECT-TYPE
+     SYNTAX INTEGER (0..65535)
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "This represents the Ems's port number to which the trap will be sent to.
+           The default value is the common SNMP trap port (162)."
+     ::= { cfgEmsAddressEntry 3 }
+     
+cfgEmsAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The address type of the EMS server.
+             Values: unknown(0), ipv4(1), ipv6(2), ipv4z(3), ipv6z(4), dns(16)"
+        ::= { cfgEmsAddressEntry 4 }
+
+cfgEmsAddress OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "IP address of the destination EMS that will receive traps.
+             If the message server is unknown, return the zero-
+             length address string."
+        ::= { cfgEmsAddressEntry 5}
+
+cfgEmsAddressProtocol OBJECT-TYPE
+	SYNTAX INTEGER {snmp(1), http_post(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB can be used to remotely restore the factory default values, thus overwriting
+		any other setup values that were stored 
+          in the DVM's non-volatile memory. The DVM must be reset following this 
+         command (commonReset or other reset function)."
+		::= { cfgEmsAddressEntry 6 }
+
+-- ****************************************************************************
+-- * GLOBAL CONFIGURATION DATA
+-- * 
+-- * These MIB objects control some functions of the DVM that cannot be set 
+-- * DOCSIS MIBs.
+-- ****************************************************************************
+dvmCfgResetToFactory OBJECT-TYPE
+	SYNTAX INTEGER {reset(1)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB can be used to remotely restore the factory default values, thus overwriting
+		any other setup values that were stored 
+          in the DVM's non-volatile memory. The DVM must be reset following this 
+         command (commonReset or other reset function)."
+		
+	::= { dvmCfgGlobal 2 }
+
+dvmCfgUsbMode OBJECT-TYPE
+	SYNTAX INTEGER {cpe(1), craft(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB controls the behavior of the USB port.  In craft mode, the USB port
+		 has a default MAC address which enables a PC to be connected locally to 
+		 any DVM with the same driver and network adapter settings.  
+		 In craft mode, read access to the DOCSIS MIBS and read/write access to the HMS is allowed. 
+		 In CPE mode, the USB port behaves like a normal cable modem USB port, 
+		 allowing access to the network if this access has been provisioned by the CMTS. 
+		 In CPE mode, access to the MIBs is as per DOCSIS specifications. As well, read-write 
+         access to the Electroline MIBs is permitted.
+         The DVM must be reset following this command (commonReset or other 
+         reset function) in order for the change to take effect.
+		 The value of this MIB is stored in non-volatile memory."		
+	::= { dvmCfgGlobal 3 } 
+	
+dvmChannelBondingEnable  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enables or disables the support of channel bonding.
+         The value of this MIB is stored in non-volatile memory."
+    ::= { dvmCfgGlobal 4 }
+
+-- ****************************************************************************
+-- * FPGA Configuration 
+-- *
+-- * The following MIB objects are dedicated to the FPGA chipset on  the DVM
+-- ****************************************************************************
+dvmCfgFpga OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This sub-tree contains configuration information For the FPGA chipset."
+	::= { dvmCfgGlobal 5 }
+
+dvmCfgFpgaSoftware OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This sub-tree contains control to perform a software update on the FPGA chipset."
+	::= { dvmCfgFpga 1 }
+
+dvmCfgFpgaSwServerAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The type of address of the TFTP server used for
+             software upgrades.
+             Values: unknown(0), ipv4(1), ipv6(2), ipv4z(3), ipv6z(4), dns(16)"
+        ::= { dvmCfgFpgaSoftware 1 }
+        
+dvmCfgFpgaSwServer OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The address of the TFTP server used for software
+             upgrades.  If the TFTP server is unknown or is a
+             non-IPv4 address, return 0.0.0.0. This object is used
+             only to have a more human readable ipv4 address.
+
+             See also dvmCfgFpgaSwServerAddress. This object will have its value
+             modified, given a valid SET to dvmCfgFpgaSwServerAddress."
+        ::= { dvmCfgFpgaSoftware 2 }
+
+dvmCfgFpgaSwServerAddress OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The address of the TFTP server used for software
+             upgrades.
+
+             If the TFTP server is unknown, return the zero-
+             length address string."
+        ::= { dvmCfgFpgaSoftware 3}
+        
+dvmCfgFpgaSwFilename OBJECT-TYPE
+        SYNTAX      SnmpAdminString (SIZE (0..64))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The filename of the software image to be downloaded via
+             TFTP for the FPGA.
+             If unknown, the value of this object is the zero-length
+             string."
+             ::= { dvmCfgFpgaSoftware 4 }
+
+dvmCfgFpgaSwDloadNow OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If set to true, a TFTP download will begin which will load the FPGA image
+         from the TFTP server specified in dvmCfgFpgaSwServerAddress using the file
+         specified in dvmCfgFpgaSwFilename.  When read, always returns false(2)."
+    ::= { dvmCfgFpgaSoftware 5 }
+
+
+dvmCfgFpgaSwDloadStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            failure(0),
+            success(1),
+            inProgress(2),
+            other(3)
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the status of the last (or current) FPGA firmware image download attempt."
+        ::= { dvmCfgFpgaSoftware 6 }
+
+dvmCfgFpgaSwCurrentVers OBJECT-TYPE
+        SYNTAX      SnmpAdminString
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The software version currently operating in the FPGA device."
+        ::= { dvmCfgFpgaSoftware 7 }
+     
+dvmCfgSystemTrapEnginFilter  OBJECT-TYPE
+      SYNTAX DisplayString (SIZE(1..255))
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "OID use for comparaison with each OID parameter filter from NMS address list - TLV38"
+      ::={dvmCfgGlobal 6  }
+
+END
+

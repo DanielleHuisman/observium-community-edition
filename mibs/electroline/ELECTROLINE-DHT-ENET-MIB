@@ -1,0 +1,1066 @@
+--*****************************************************************************
+--                                                                          
+--    Copyright 2006 Electroline Equipment Inc                                   
+--    All Rights Reserved                                                                          
+--                                                                          
+--    Filename: ELECTROLINE-DHT-ENET.mib
+--    Author:   Eric Alarie
+--    Creation Date: 2006.07.20
+--
+--*****************************************************************************
+--  Description:
+--
+--	This MIB, located under the DHT-EXTENSION branch
+--  contains the interface for the ENET module.
+--  Enet is a Network Monitoring Package that allows the DHT to test
+--  the network's performance at the DOCSIS, IP & VoIP levels
+--     
+--*****************************************************************************
+--    Revision History:
+--	  2006.07.20   	Eric Alarie		First Draft
+--    2006.07.27    Eric Alarie     Corrections after review:  
+--									- replaced enetTestMaxDuration by enetTestNumOfPackets						 
+--									- added comments to explain expected behaviors
+--									- added enetTestCodecType & enetResultsStatus
+--	  					            - changed enetOneWayDelayEstimate to
+--                                    enetRoundTripTimeEstimate
+--									- changed enetResultsGoodPacketCount for
+--									  enetResultsTotalPacketCount
+--    2006.08.01   Eric Alarie      - Moved RoundTripTime in TestControl table
+--									- Added ToSByte control 
+--                                  - Changed CodecType from string to enumeration
+--*****************************************************************************
+ELECTROLINE-DHT-ENET-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32, Counter32, Unsigned32, IpAddress, Gauge32
+        FROM SNMPv2-SMI
+    Gauge
+    	FROM RFC1155-SMI
+    TruthValue, DateAndTime
+        FROM SNMPv2-TC          
+    dhtExtensionsMibObjects       
+        FROM ELECTROLINE-DHT-EXTENSIONS-MIB;
+                    
+dhtEnetMib MODULE-IDENTITY
+    LAST-UPDATED "200607200000Z"
+    ORGANIZATION "Electroline Equipment Inc"
+    CONTACT-INFO
+        "Electroline Equipment Inc.
+         E-mail: support@electroline.com
+         Telephone:
+         	(514) 374-6335 
+         	(800)-461-3344 (Toll-free - North America)
+        "
+    DESCRIPTION
+        "
+		This MIB, located under the DHT-EXTENSION branch
+		contains the interface for the ENET module.
+		Enet is a Network Monitoring Package that allows the DHT to test
+		the network's performance at the DOCSIS, IP & VoIP levels
+		
+		Theory Of operation:
+		The DHT controlled by this MIB sends or receives a test stream to/from
+		another test endpoint.  A measurement application is responsible to control
+		both endpoints to setup compatible test streams and to gather results
+		from both endpoints.  The measurement application can implement the other 
+		endpoint as well such as in the case of the EnetToolbox Server.
+		
+		The Enet Module is a licensed feature.  The dhtEnetCapabilities branch is 
+		used by the DHT to advertised its capabilities in terms of available & 
+		licensed features. enetLicenseKey MIB is used by the server to send the 
+		license key that will activate the selected feature set.
+ 
+		The DHT can implement enetMaxTestInstance simultaneous test streams.  Each 
+		test stream is controlled by a separate entry in the enetTestControlTable.
+		This table contains a series of controls that enable the server to set two 
+		basic types of tests:  raw UDP packets test & RTP tests.  Raw UDP tests can
+		be used to test packet loss and throughput while RTP tests can be used to 
+		simultate a VoIP connection and estimate the equivalent call quality.  Some
+		controls are used only for VoIP tests, see comments in each MIB description
+		for details.
+		
+		From the DHT's point of view, each test stream has three possible directions:
+		transmission, reception or loopback.  The direction is inferred from the 
+		enetTestSenderIP & enetTestReceiverIP MIBs, the DHT will detect its address 
+		in one of the two MIB and set itself up accordingly.  When none of the two 
+		MIB contains the DHT's address a mirror (loopback) mode is used.
+
+		The enetCurrentResultsTable displays the test results for each test 
+		instance.  The results are refreshed periodically during the test at 
+		enetPollingInterval value.  The results are cumulative from the start of the
+		test.  enetResultsStatus, shows if the test is in-progress or completed.
+		The measuring application is responsible to verify the integrity of the test 
+		results, No mechanism is provided to avoid a third application from changing
+		the test parameters.  However if the results shown in enetCurrentResultsTable
+		are not corresponding to the current setup found in enetTestControlTable the 
+		enetResultsStatus MIB will indicate that the results are inconsistent.
+        "
+    REVISION      "200607200000Z"
+    DESCRIPTION
+            "Initial version of this MIB module."
+            
+    REVISION      "200607270000Z"
+    DESCRIPTION
+            "Revision after first review."
+
+	REVISION 	  "200608010000Z"
+    DESCRIPTION
+			"- Moved RoundTripTime in TestControl table.
+			 - Added ToSByte control. 
+			 - Changed CodecType from string to enumeration.            
+			"
+			
+    ::= { dhtExtensionsMibObjects 12 }
+
+--
+-- TEXTUAL CONVENTIONS used by this MIB
+--
+Rfactor ::= TEXTUAL-CONVENTION
+DISPLAY-HINT "d"
+STATUS      current
+DESCRIPTION
+      "Call or transmission quality expressed as an 
+       R factor in the range 0 to 120. A value of
+       127 shall be interpreted as NULL or unsupported."
+REFERENCE
+       "ITU-T G.107"
+SYNTAX      Unsigned32 (0..120|127)
+
+
+ScaledMOSscore ::= TEXTUAL-CONVENTION
+DISPLAY-HINT "d"
+STATUS      current
+DESCRIPTION
+       "Call or transmission quality expressed as a 
+       MOS score scaled by 10.  MOS is typically represented
+       as a 1.0 to 5.0 score with a single decimal place and
+       hence in this representation as 10 to 50. A value of
+       127 shall be interpreted as NULL or unsupported."
+REFERENCE
+       "ITU-T P.800"
+SYNTAX      Integer32 (10..50|127)
+ 
+ 
+ScaledPercentage ::= TEXTUAL-CONVENTION
+DISPLAY-HINT "d"
+STATUS       current
+DESCRIPTION
+       "Percentage scaled by 10 expressed as a rounded integer.
+       A value of 500 represents 50.0%"
+SYNTAX      Unsigned32 (0..1000)
+
+--                
+-- dhtEnet MIb Branch root
+--
+dhtEnetMibObjects 		OBJECT IDENTIFIER ::= { dhtEnetMib 1 } 
+
+
+--
+-- Enet Support Advertizing Group
+--
+dhtEnetCapabilities OBJECT IDENTIFIER ::= { dhtEnetMibObjects 1 }
+
+enetSupport OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current    
+    DESCRIPTION
+		"Defines if this device contains the ENET module.
+	
+			True(1) = ENET Module present.
+			False(2) = ENET Module not present.
+		" 		   
+    ::= { dhtEnetCapabilities 1 }
+
+
+enetModuleVersion OBJECT-TYPE
+    SYNTAX OCTET STRING
+    MAX-ACCESS read-only
+    STATUS current    
+    DESCRIPTION
+		"Tells the version of the ENET module running on this device
+		" 		   
+    ::= { dhtEnetCapabilities 2 }
+
+enetMaxTestInstance OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current    
+    DESCRIPTION
+		"The number of concurrent tests supported by this device.
+		" 		   
+    ::= { dhtEnetCapabilities 3 }
+
+
+
+enetPerFeatureSupport OBJECT IDENTIFIER ::= { dhtEnetCapabilities 11 }
+
+enetConstellationDisplaySupport OBJECT-TYPE
+    SYNTAX INTEGER {notSupported(0), notLicensed(1), active(2)}
+    MAX-ACCESS read-only
+    STATUS current    
+    DESCRIPTION
+		"Defines if this DHT's ENET module supports the Constellation 
+		 Display feature.
+		 	Not Supported(0): the DHT does not support this feature
+			Not Licensed(1): this feature is supported but has not been licensed
+			Active(2):  A valid license was entered, this feature is useable.
+		" 		  
+    ::= { enetPerFeatureSupport 1 }
+
+enetUDPTestSupport OBJECT-TYPE
+    SYNTAX INTEGER {notSupported(0), notLicensed(1), active(2)}
+    MAX-ACCESS read-only
+    STATUS current    
+    DESCRIPTION
+		"Defines if this DHT's ENET module supports the UDP test feature.
+		 	Not Supported(0): the DHT does not support this feature
+			Not Licensed(1): this feature is supported but has not been licensed
+			Active(2):  A valid license was entered, this feature is useable.
+		" 		  
+    ::= { enetPerFeatureSupport 2 }
+
+
+enetVOIPTestSupport OBJECT-TYPE
+    SYNTAX INTEGER {notSupported(0), notLicensed(1), active(2)}
+    MAX-ACCESS read-only
+    STATUS current    
+    DESCRIPTION
+		"Defines if this DHT's ENET module supports the VoIP tests feature.
+		 	Not Supported(0): the DHT does not support this feature
+			Not Licensed(1): this feature is supported but has not been licensed
+			Active(2):  A valid license was entered, this feature is useable.
+		" 		   
+    ::= { enetPerFeatureSupport 3 }
+
+enetSMRPTestSupport OBJECT-TYPE
+    SYNTAX INTEGER {notSupported(0), notLicensed(1), active(2)}
+    MAX-ACCESS read-only
+    STATUS current    
+    DESCRIPTION
+		"Defines if this DHT's ENET module supports the Minacom SMRP test 
+		 control protocol for VoIP tests.
+		 	Not Supported(0): the DHT does not support this feature
+			Not Licensed(1): this feature is supported but has not been licensed
+			Active(2):  A valid license was entered, this feature is useable.
+		" 		   
+    ::= { enetPerFeatureSupport 4 }
+
+--
+-- Global control Group
+--
+dhtEnetGlobalControls OBJECT IDENTIFIER ::= { dhtEnetMibObjects 2 }
+
+enetLicenseKey OBJECT-TYPE
+    SYNTAX OCTET STRING
+    MAX-ACCESS read-write
+    STATUS current    
+    DESCRIPTION
+		"Used to enter the activation Key for the Enet Module. 
+		 Expected format is a string of hexadecimal characters.
+		 Upon reception of this activation key, the device will update
+		 the Mibs in the enetPerFeatureSupport group.
+		 
+		 A read of this object will not return the previously entered key."		   
+    ::= { dhtEnetGlobalControls 1 }
+    
+enetPollingInterval OBJECT-TYPE
+    SYNTAX INTEGER (1000..10000)
+    MAX-ACCESS read-write
+    STATUS current    
+    DESCRIPTION
+		"Time in millisecond between each poll of the test results
+		 and MIB update.
+		 Default value is 5000 (5 seconds).
+		 The value of this MIB is stored in non-volatile memory." 		   
+    ::= { dhtEnetGlobalControls 2 }
+
+dhtEnetPacketTests OBJECT IDENTIFIER ::= {dhtEnetMibObjects 3}
+--
+-- Test Control Mibs
+--
+dhtEnetPktTestControls OBJECT IDENTIFIER ::= { dhtEnetPacketTests 1 }
+
+
+enetTestControlTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EnetTestControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current    
+    DESCRIPTION
+		"Table of Test Controls
+		 Each entry is used to control a test instance.  Tests parameters
+		 shall be inputed to the device first, then the enetTestControl
+		 MIB must be set the setupTest value and Ready status verified before
+		 starting a test.
+		" 		   
+   	::= { dhtEnetPktTestControls 1 }
+
+
+enetTestControlEntry OBJECT-TYPE
+	SYNTAX EnetTestControlEntry
+    MAX-ACCESS not-accessible
+    STATUS current    
+    DESCRIPTION
+		"An entry in the Table of Test Control.  The will be one entry 
+		 per supported simultaneous tests.
+		"
+	INDEX {enetTestIndex}
+    ::= { enetTestControlTable 1 }
+
+
+EnetTestControlEntry ::= SEQUENCE {
+	enetTestIndex				INTEGER,
+	enetTestIdString			OCTET STRING,
+	enetTestControl				INTEGER,
+	enetTestSenderIP			IpAddress,
+	enetTestSenderUDPPort		Gauge,
+	enetTestReceiverIP			IpAddress,
+	enetTestReceiverUDPPort		Gauge,	
+	enetTestType				INTEGER,
+	enetTestPacketSize 			INTEGER,
+	enetTestPacketInterval 		INTEGER,
+	enetTestPacketRate			INTEGER,
+	enetTestNumOfPackets		Unsigned32,
+	enetTestJitterBufferSize   	INTEGER,
+	enetTestQosControl		   	INTEGER,
+	enetTestCodecType			INTEGER,
+	enetTestRoundTripTimeEstimate INTEGER,
+	enetTestTosByte             INTEGER,
+	enetTestStatus				INTEGER,
+	enetTestStatusString        OCTET STRING
+	}
+	
+enetTestIndex OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Index for this set of test controls.  One set controls one instance
+		 of the test engine.
+		"
+	::= {enetTestControlEntry 1}				
+
+enetTestIdString OBJECT-TYPE
+	SYNTAX OCTET STRING
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This String can be used by the management entity as a unique test 
+		 identifier string.  The Enet module will simply copy this string
+		 in the result table.
+		"
+	::= {enetTestControlEntry 2}	
+	
+enetTestControl OBJECT-TYPE
+	SYNTAX INTEGER {stopTest(1), setupTest(2), startTest(3)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Used to control the test engine.  Once the control parameter for the 
+		 test are set, the management entity must set this to setupTest(2) & 
+		 verify that the test control status returns ready before starting the
+		 test with startTest(2). This is necessary to reserve the ressources
+		 required for the tests such as service flows, etc.
+		 
+		 The test will run a maximum number of packets (enetTestNumOfPackets),
+		 or it can be stopped at any time by setting this MIB to stopTest(1).
+		"
+	::= {enetTestControlEntry 3}
+	
+enetTestSenderIP OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This is the address of the sender entity for the test stream.
+		 To set this device as the transmitter for the test, set this MIB to
+		 its IP address.
+		"
+	::= {enetTestControlEntry 4}
+	
+enetTestSenderUDPPort OBJECT-TYPE
+	SYNTAX Gauge (0..65535)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		" Port Number that the sender will use.
+		"
+	::= {enetTestControlEntry 5}
+	
+enetTestReceiverIP OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This is the address of the receiving entity for this test stream.
+		 To set this device as the receiver for the test, set this MIB to
+		 its IP address.
+		 
+		 If both enetTestReceiverIP & enetTestSenderIP do not match the device's
+		 own address, it will start a loopback mode test.		
+		"
+	::= {enetTestControlEntry 6}
+	
+enetTestReceiverUDPPort OBJECT-TYPE
+	SYNTAX Gauge (0..65535)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		" UDP port number to be used by the receiving entity.
+		
+		  In loopback mode the receiver Port number is also used as both the reception
+		  and source port of the loopbacking entity.
+		"
+	::= {enetTestControlEntry 7}
+	
+enetTestType OBJECT-TYPE
+	SYNTAX INTEGER {voip(1), packetLoss(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Sets the type of test to be ran.  Selection is made between the following two:
+		voip(1): A VoIP simulation RTP test will be ran, sender will transmit packets
+				simulating a voice codec and the VoIP  metrics will be computer by the 
+				receiver.
+		packetLoss(2): 	In a Packet Loss test the sender simply sends a specified 
+						packet rate (enetTestPacketRate) and the receiver counts the 
+						number of packets received.
+		"
+	::= {enetTestControlEntry 8 }
+	
+enetTestPacketSize OBJECT-TYPE
+	SYNTAX INTEGER (64..1514)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		" Size of the Ethernet packet (Including headers) to be used by this 
+		  test.
+		  
+		  Note that the packet size for rtp test is computed from the packet 
+		  interval and the codec type.  This MIB is used for packetLoss tests
+		  only.		  
+		"
+	::= {enetTestControlEntry 9}
+	
+enetTestPacketInterval OBJECT-TYPE
+	SYNTAX INTEGER (10 | 20 | 30)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Interval in milliseconds between each packets.
+		
+		 This parameter is used only for the RTP test type. 
+		"
+	::= {enetTestControlEntry 10 }
+	
+	
+enetTestPacketRate OBJECT-TYPE
+	SYNTAX INTEGER (0..255000)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Number of packets per seconds to be transmitted.
+		
+		 This parameter is used only for packetLoss test type.
+		"
+	::= {enetTestControlEntry 11}				
+
+
+	
+enetTestNumOfPackets OBJECT-TYPE
+	SYNTAX Unsigned32 (0..4294967295)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Maximum duration of the test expressed in number of packets.
+		
+		 A sender will stop the transmitting when it reaches this amount. 		 
+		 A receiver can use this parameter to know how many packets to expect.
+		 The test can be stopped by the management entity before that number
+		 is reached.
+		 
+		 A value of zero means that the test such run until stopped.
+		"
+	::= {enetTestControlEntry 12}				
+
+
+	
+enetTestJitterBufferSize OBJECT-TYPE
+	SYNTAX INTEGER (0..200)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Jitter buffer size in millisecond to be implemented by the receiving
+		 entity.  This will impact the total delay and the discarded packet count.
+		 
+		 The value set in this MIB must be a multiple of 20 milliseconds.
+		 
+		 This parameter is used only for the rtp test type. 
+		"
+	::= {enetTestControlEntry 13}				
+
+
+	
+enetTestQosControl OBJECT-TYPE
+	SYNTAX INTEGER {none(1), preestablished(2), dsa(3)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This parameter tells the DHT is a specific service flow must be used
+		 for the test.
+		 
+		 none(1): Means that the test will run in a best effort mode.
+		 
+		 preestablished(2): tells the DHT that a high priority service flow has
+		 					been established by an external mean.
+		 
+		 dsa(3):  	Request that the DHT takes care of establishing a high 
+		 			priority service flow usign Dynamic Service Add messages to
+		 			the CMTS.
+		"
+	::= {enetTestControlEntry 14}				
+
+	
+enetTestCodecType OBJECT-TYPE
+	SYNTAX INTEGER {na(0), g711(1)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"                                                                       		
+		 The Codec type to be used for the rtp test. 
+		  
+		 It is used by sender to set the appropriate value in the
+		 rtp header. The receiver can use this parameter in the computation
+		 of the R-Factor.
+		 
+		 This parameter is used only for the rtp test type.
+		 
+		 Note that the list of supported codecs is device specific.
+		"
+	::= {enetTestControlEntry 15 }
+
+enetTestTosByte OBJECT-TYPE
+	SYNTAX INTEGER (0..255)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"                                                                       		
+		 Type of Service Byte to be used in the transmitted packets.
+		 
+		 This parameter is used only for the rtp test type.
+		"
+	::= {enetTestControlEntry 16 }
+	
+enetTestRoundTripTimeEstimate OBJECT-TYPE
+	SYNTAX INTEGER (0..60000)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The round trip time (in milliseconds) is used by the DHT in the computation of the CQE 
+		 R-Factor. It must be estimated by the management entity and supplied 
+		 to the DHT via	the use of this MIB for the RCQE result to be accurate.
+		 Note that the one way delay used by the device in its computation will
+		 be RoundTripTime / 2."
+	::= {enetTestControlEntry 17}
+
+	
+enetTestStatus OBJECT-TYPE
+	SYNTAX INTEGER {na(0), running(1), completed(2), 
+	                   ressourceUnavailable(3), invalidParameter(4), ready(5)}
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"
+		 This MIB indicates the test status.  A value of  N/A(0) is returned
+		 before the test is ran. A value of Running (1) is returned while the 
+		 test is in progress. A value of Completed (2) is returned when the test
+		 is stopped by the TestControl MIB or by the end-point when the 
+		 enetTestNumOfPackets is reached. A value of  RessourceUnavailable (3) 
+		 is returned when the end-point is not able to start the test due to 
+		 internal or network limitations. A value of InvalidParameters(4) is 
+		 returned if the test parameters cannot be accepted by the end-point.  
+		 A value of Ready(5) is reported if the SetUpTest command succeeded.		
+		"
+	::= {enetTestControlEntry 18}				
+
+
+	
+enetTestStatusString OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..128))
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" This field is used by the device to further explain the Status of 
+		  the test. and its content is device specific.
+		"
+	::= {enetTestControlEntry 19}				
+		
+
+	
+--
+-- Enet Test Results Group
+--
+
+dhtEnetPktTestResults OBJECT IDENTIFIER ::= { dhtEnetPacketTests 3 }
+
+enetCurrentResultsTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EnetCurrentResultsEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+     "Table that contains the current cummulative test results. 
+      This table is used for both packetLoss and RTP test types
+      but some values are valid only for the RTP tests.  
+      The result values are reset each time the test is started.
+      
+      Note that all the results for one entry are updated at once 
+      when a get on the enetResultsStatus is performed.  This ensures
+      that all displayed results where taken in the same period and
+      are coherent with each other.
+      "
+    ::= { dhtEnetPktTestResults 1 }
+
+enetCurrentResultsEntry OBJECT-TYPE
+    SYNTAX EnetCurrentResultsEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An entry in the result table.  Each simultaneous test has its own
+         entry.  The index of the enetResultsEntry will match that of the
+         EnetTestControlEntry.
+        "
+    INDEX { enetResultsIndex }
+    ::= { enetCurrentResultsTable 1 }
+
+EnetCurrentResultsEntry ::= SEQUENCE {
+    enetResultsIndex                 	Unsigned32,
+    enetResultsIdString               	OCTET STRING,
+    enetResultsStatus                   INTEGER,
+    enetResultsDuration					Unsigned32,
+    enetResultsStartTime                DateAndTime,
+    enetResultsStopTime                 DateAndTime,
+    enetResultsProcessedPacketCount		Gauge32,
+    enetResultsLossPacketCount			Gauge32,
+    enetResultsDiscardedPacketCount 	Gauge32,  
+    enetResultsPacketLossRate           ScaledPercentage,
+    enetResultsPacketDiscardRate        ScaledPercentage,
+    enetResultsMinInstantJitter    		Gauge32,
+    enetResultsMaxInstantJitter    		Gauge32,
+    enetResultsAvgInstantJitter		    Gauge32,
+    enetResultsMinRfcJitterLevel        Gauge32,
+    enetResultsMaxRfcJitterLevel        Gauge32,
+    enetResultsAvgRfcJitterLevel        Gauge32,
+    enetResultsRCQ                      Rfactor,
+    enetResultsRLQ                      Rfactor,    
+    enetResultsMOSCQ                    ScaledMOSscore,
+    enetResultsMOSLQ                    ScaledMOSscore
+}
+
+
+
+
+enetResultsIndex OBJECT-TYPE
+    SYNTAX Unsigned32 (0..4294967295)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Index for this set of data."
+    ::= { enetCurrentResultsEntry 1 }
+
+enetResultsIdString OBJECT-TYPE
+    SYNTAX OCTET STRING
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A copy of the corresponding enetTestIdString string."
+    ::= { enetCurrentResultsEntry 2 }
+
+enetResultsStatus OBJECT-TYPE
+	SYNTAX INTEGER {inconsistent(0), partial(1), complete(2)}
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"
+		This MIB shows the result status.  A value of partial(1) is returned
+		while the test is running.  A value of complete(2) is returned if the
+		test is stopped.                             
+		
+		The inconsistent(0) value is returned if the test controls parameters
+		have been altered since the test results were conputed.  This indicates
+		that the test results are not related to the test control parameters.
+		
+		Note that all the results for one entry are updated at once 
+      	when a get on the enetResultsStatus is performed.  This ensures
+      	that all displayed results where taken in the same period and
+      	are coherent with each other.
+		"
+	::= {enetCurrentResultsEntry 3}	
+	
+enetResultsDuration OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Total Duration of the test in milliseconds.
+        "
+    ::= { enetCurrentResultsEntry 4 }
+
+enetResultsStartTime OBJECT-TYPE
+    SYNTAX DateAndTime
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "System time at the beginning of the test.
+        "
+    ::= { enetCurrentResultsEntry 5 }
+    
+enetResultsStopTime OBJECT-TYPE
+    SYNTAX DateAndTime
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "System time at the end of the test.  
+         The value of this MIB is valid only if the enetResultsStatus is 
+         complete(2)
+        "
+    ::= { enetCurrentResultsEntry 6 }
+
+enetResultsProcessedPacketCount OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Total number of packets that have been processed by the device.
+         In transmission this indicates the number of packets sent
+         In reception this is the sum of the good packets and the discarded
+         packets."
+    ::= { enetCurrentResultsEntry 7 }
+
+enetResultsLossPacketCount OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Number of packets lost in the network before their arrival to this 
+         device.
+         The value reported by this MIB is valid only in the receiving end-point.
+        "
+    ::= { enetCurrentResultsEntry 8 }
+
+enetResultsDiscardedPacketCount OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Number of packets discarded by this device because they arrived too
+         late to be played out by the codec.
+         The value reported by this MIB is valid only in the receiving end-point.
+        "
+    ::= { enetCurrentResultsEntry 9 }
+
+enetResultsPacketLossRate OBJECT-TYPE
+    SYNTAX ScaledPercentage
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Lost packets over total number of expected packets expressed in percent.
+ 
+         The value reported by this MIB is valid only in the receiving end-point.
+        "        
+    ::= { enetCurrentResultsEntry 10 }
+    
+enetResultsPacketDiscardRate OBJECT-TYPE
+    SYNTAX ScaledPercentage
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Discarded packets over total number of expected packets expressed in percent.
+ 
+         The value reported by this MIB is valid only in the receiving end-point.
+        "        
+        
+    ::= { enetCurrentResultsEntry 11 }
+                
+enetResultsMinInstantJitter OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Minimum value of the Inter packet delay variation.
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+        
+    ::= { enetCurrentResultsEntry 12 }
+
+enetResultsMaxInstantJitter OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Maximum value of the Inter packet delay variation.
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 13 }
+
+enetResultsAvgInstantJitter OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Average value of the Inter packet delay variation.
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 14 }
+
+enetResultsMinRfcJitterLevel OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Mimimum of the smoothed Jitter level computed as per rfc3550.
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 15 }
+
+enetResultsMaxRfcJitterLevel OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Maximum of the smoothed Jitter level computed as per rfc3550.
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 16 }
+
+enetResultsAvgRfcJitterLevel OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Average of the smoothed Jitter level computed as per rfc3550.
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 17 }
+    
+enetResultsRCQ OBJECT-TYPE
+    SYNTAX Rfactor
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Computed R-Factor - Conversationnal Quality Equivalent as per ITU G.107
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 18 }
+    
+enetResultsRLQ OBJECT-TYPE
+    SYNTAX Rfactor
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Computed R-Factor - Listening Quality Equivalent as per ITU G.107
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 19 }
+    
+enetResultsMOSCQ OBJECT-TYPE
+    SYNTAX ScaledMOSscore
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Computed MOS - Conversationnal Quality Equivalent as per ITU G.107
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 20 }
+    
+enetResultsMOSLQ OBJECT-TYPE
+    SYNTAX ScaledMOSscore
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Computed MOS - Listenning Quality Equivalent as per ITU G.107
+         
+         The value reported by this MIB is valid only in the receiving end-point.   
+         of an RTP test.
+        "        
+    ::= { enetCurrentResultsEntry 21 }        
+
+
+--
+-- DOCSIS Section
+--
+dhtEnetDOCSISMonitoring OBJECT IDENTIFIER ::= {dhtEnetMibObjects 4}
+
+enetDocsisMonResetCounters OBJECT-TYPE
+    SYNTAX INTEGER {reset(1)}
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Write (1) to this MIB to clear the DOCSIS Monitoring counters.
+        "        
+    ::= { dhtEnetDOCSISMonitoring 1 }
+    
+enetDocsisMonPreFECErrorRate OBJECT-TYPE
+    SYNTAX OCTET STRING
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This is the Pre-FEC DOCSIS Codeword Error Rate computed by the DHT from
+        the FEC counters.
+        
+        It counts the number of corrected and uncorrectable codewords over the 
+        total received.
+        
+        This reported value is an string formated scientific number in the form of
+        D.DDDDDEsDD where s is the sign (+ or -) and D are digits
+        Examples: 3.17234E+00 and 5.00234E-12.
+        "        
+    ::= { dhtEnetDOCSISMonitoring 2 }
+
+enetDocsisMonPostFECErrorRate OBJECT-TYPE
+    SYNTAX OCTET STRING
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This is the Post-FEC DOCSIS Codeword Error Rate computed by the DHT from
+        the FEC counters.
+        
+        It counts the number uncorrectable codewords over the total received.
+        
+        This reported value is an string formated scientific number in the form of
+        D.DDDDDEsDD where s is the sign (+ or -) and D are digits
+        Examples: 3.17234E+00 and 5.00234E-12.
+        "         
+    ::= { dhtEnetDOCSISMonitoring 3 }
+
+    
+enetDocsisMonErroredSeconds OBJECT-TYPE
+    SYNTAX Gauge
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The Errored Second (ES) counter aggregates the information of the DOCSIS engine
+         into a single error counter. 
+         
+         An errored second is a second during which an event occured that caused the service
+         to be degraded but not interrupted.
+        "        
+    ::= { dhtEnetDOCSISMonitoring 4 }    
+
+    
+enetDocsisMonSeverelyErroredSeconds OBJECT-TYPE
+    SYNTAX Gauge
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The Severely Errored Second (ES) counter aggregates the information of the DOCSIS
+         engine into a single error counter.
+         
+         A Severely errored second is a second during an event occured that caused the service
+         to be interrupted.
+        "        
+    ::= { dhtEnetDOCSISMonitoring 5 } 
+    
+enetDocsisMonTimeElapsed OBJECT-TYPE
+    SYNTAX Gauge
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The Docsis monitoring time elapsed is the number of seconds elapsed since the last 
+         occurrence of the counters reset."        
+         
+    ::= { dhtEnetDOCSISMonitoring 6 } 
+
+END  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

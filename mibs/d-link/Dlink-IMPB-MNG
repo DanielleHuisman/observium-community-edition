@@ -1,0 +1,309 @@
+Dlink-IMPB-MNG DEFINITIONS ::= BEGIN
+
+-- Title:      Dlink IMPB Management
+-- Version:    7.47.00.00
+-- Date:       07-Jan-2009
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Unsigned32, IpAddress, Counter32                FROM SNMPv2-SMI
+    RowStatus, MacAddress, TruthValue               FROM SNMPv2-TC
+    InterfaceIndex, ifIndex                         FROM IF-MIB
+    rnd                                             FROM DLINK-3100-MIB
+    PortList                                        FROM Q-BRIDGE-MIB
+    EnabledStatus                                   FROM P-BRIDGE-MIB
+    rlImpbManagment                                 FROM Dlink-IMPB-FEATURES;
+
+--- Declerations
+
+IMPBPacketType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies one of 2 Packet Types:
+         1- IP.
+         2- ARP.
+         3- IP+ARP"
+    SYNTAX  INTEGER {
+        ip(1),
+        arp(2),
+        iparp(3)
+        }
+
+IMPBLockMode ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies lock/unlock for an entry:
+         1- Unlocked.
+         2- Locked."
+    SYNTAX  INTEGER {
+        unlocked(1),
+        locked(2)
+        }
+
+IMPBDeviceType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies one of 3 Devices Types:
+         1- HOST.
+         2- DHCP Server.
+         3- Router.
+         4- Router with DHCP."
+    SYNTAX  INTEGER {
+        host(1),
+        dhcpSrv(2),
+        router(3),
+        routerDhcp(4)
+        }
+
+--- Management Main Table
+
+rlIMPBMngTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlIMPBMngEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+        "The table specifies all IMPB station.
+         The entry contains IP address and MAC of the station and
+         also list of ports, packet type and Device type of this station."
+    ::= { rlImpbManagment 1 }
+
+rlIMPBMngEntry OBJECT-TYPE
+    SYNTAX  RlIMPBMngEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+        "The row definition for this table."
+    INDEX { rlIMPBMngIPAddress }
+        ::= { rlIMPBMngTable 1 }
+
+RlIMPBMngEntry  ::= SEQUENCE {
+  rlIMPBMngIPAddress        IpAddress,
+  rlIMPBMngPacketType       IMPBPacketType,
+  rlIMPBMngPMACAddress      MacAddress,
+  rlIMPBMngDeviceType       IMPBDeviceType,
+  rlIMPBMngPortlist         PortList,
+  rlIMPBMngMode             IMPBLockMode,
+  rlIMPBMngRouterBandwidth  Unsigned32(0|100..1000000),
+  rlIMPBMngRowStatus        RowStatus
+  }
+
+rlIMPBMngIPAddress OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "IP address of station."
+    ::= { rlIMPBMngEntry  1 }
+
+rlIMPBMngPacketType OBJECT-TYPE
+    SYNTAX      IMPBPacketType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Packet type of IMPB."
+    DEFVAL{ ip }
+    ::= { rlIMPBMngEntry  2 }
+
+rlIMPBMngPMACAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Station mac address"
+    ::= { rlIMPBMngEntry 3 }
+
+rlIMPBMngDeviceType OBJECT-TYPE
+    SYNTAX      IMPBDeviceType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "Station type"
+    DEFVAL{ host }
+    ::= { rlIMPBMngEntry 4 }
+
+rlIMPBMngPortlist OBJECT-TYPE
+    SYNTAX       PortList
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "List of ports that the station is configured on."
+    ::= { rlIMPBMngEntry  5 }
+
+rlIMPBMngMode OBJECT-TYPE
+    SYNTAX             IMPBLockMode
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+             "Is this station locked or not."
+    DEFVAL{ locked }
+    ::= { rlIMPBMngEntry  6 }
+
+rlIMPBMngRouterBandwidth OBJECT-TYPE
+    SYNTAX             Unsigned32 (0|100..1000000)
+    MAX-ACCESS         read-write
+    STATUS             current
+    DESCRIPTION
+             "Specifies, for Router entry, , egress Bandwidth on the associated ports. Zero means disabled."
+    DEFVAL{ 0 }
+    ::= { rlIMPBMngEntry  7 }
+
+rlIMPBMngRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A status can be destroy, active or createAndGo"
+    ::= { rlIMPBMngEntry  8 }
+
+--- Action Table
+
+rlIMPBMngAction OBJECT-TYPE
+    SYNTAX  INTEGER {
+        noAction(1), -- for get only
+        lockAll(2),
+        unlockAll(3),
+        deleteUnlock(4),
+        deleteAll(5)
+        }
+    MAX-ACCESS  read-write
+    STATUS current
+    DESCRIPTION
+        "An action scalar which specifies the global action to take on the management DB."
+    ::= { rlImpbManagment 2 }
+
+--- Router Shaper Table
+
+rlIMPBMngPortBandwidthTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlIMPBMngPortBandwidthEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+        "The table specifies the Bandwidth value for each Port that at least one Router
+         station is configured on it."
+    ::= { rlImpbManagment 3 }
+
+rlIMPBMngPortBandwidthEntry OBJECT-TYPE
+    SYNTAX      RlIMPBMngPortBandwidthEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The row definition for this table."
+    INDEX { ifIndex }
+    ::= { rlIMPBMngPortBandwidthTable 1 }
+
+RlIMPBMngPortBandwidthEntry ::= SEQUENCE {
+  rlIMPBMngBandwidth           Unsigned32
+  }
+
+rlIMPBMngBandwidth OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This variable specifies what is the Bandwidth value on the specific ifIndex. Zero means disabled."
+        DEFVAL{ 0 }
+    ::= { rlIMPBMngPortBandwidthEntry 1 }
+
+rlIMPBMngRouterBandwidthTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlIMPBMngRouterBandwidthEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+        "The table shows the Bandwidth information per configured router"
+    ::= { rlImpbManagment 4 }
+
+rlIMPBMngRouterBandwidthEntry OBJECT-TYPE
+    SYNTAX      RlIMPBMngRouterBandwidthEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The row definition for this table."
+    INDEX { rlIMPBRouterIPAddress }
+    ::= { rlIMPBMngRouterBandwidthTable 1 }
+
+RlIMPBMngRouterBandwidthEntry ::= SEQUENCE {
+  rlIMPBRouterIPAddress  IpAddress,
+  rlIMPBRouterPortlist   PortList,
+  rlIMPBRouterBandwidth  Unsigned32
+  }
+
+rlIMPBRouterIPAddress OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "IP address of station."
+    ::= { rlIMPBMngRouterBandwidthEntry 1 }
+
+rlIMPBRouterPortlist OBJECT-TYPE
+    SYNTAX       PortList
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "List of ports that the router is configured on."
+    ::= { rlIMPBMngRouterBandwidthEntry 2 }
+
+rlIMPBRouterBandwidth  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This variable specifies the Bandwidth value for a specific router, Zero means disabled."
+        DEFVAL{ 0 }
+    ::= { rlIMPBMngRouterBandwidthEntry 3 }
+
+
+--- Discovery Status
+rlIMPBMngDiscoveryLearningStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                                        learning(1),
+                                        noLearning(2)
+                                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This variable specifies the discovery is NOW learning or stopped.
+        Setting an entry in rlIMPBMngDiscoverytTable is conditioned with
+        a value of this scalar to be set to noLearning."
+    ::= { rlImpbManagment 5 }
+
+--- Uncheck Ports
+
+rlIMPBMngUncheckPorts  OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "Action scalar that defines which ports the system should be deleted from all
+                         entries in the management MIB. If an entry is remained with empty portlist
+                         the entry will be deleted also"
+    ::= { rlImpbManagment 6 }
+
+-- Locked stations count
+rlIMPBMngLockedStations  OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Read-only scalar to count how much locked stations there are in the system"
+    ::= { rlImpbManagment 7 }
+
+-- Grat ARP interval
+rlIMPBMngGratARPPeriodTimeout OBJECT-TYPE
+    SYNTAX     Unsigned32 (0|30..300)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The interval at which ARP Requests are transmitted on
+            behalf of configured stations.
+
+            The default value for rlIMPBGratARPPeriodTimeout object is
+            Zero, which means don't send ARP Request.
+
+            The value of this object must be restored from non-volatile
+            storage after a re-initialization of the management system."
+    ::= { rlImpbManagment 8 }
+
+END
+

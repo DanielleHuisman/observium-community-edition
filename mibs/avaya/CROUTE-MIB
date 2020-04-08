@@ -1,0 +1,6351 @@
+--========================================================
+--
+-- MIB      : Common Routing  Avaya Inc.
+--
+-- Version  : 2.7.13           25 May 2005
+--
+-- ========================================================
+-- Source Safe data:
+-- $Revision: 19 $
+-- Check In: $Date: 3/12/06 10:59a $
+-- $Author: Sbiton $
+-- $Archive: /MIBs/Version 1.0/Source/Lannet/CROUTE-MIB.MY $
+-- ========================================================
+--
+-- Copyright 1997, 1998, 1999, 2000, 2001  Avaya Inc.  
+-- All Rights Reserved.  
+--
+-- Reproduction of this document is authorized on condition 
+-- that the foregoing copyright notice is included.
+--
+-- This Avaya SNMP Management Information Base Specification
+-- (Specification) embodies Avaya confidential and
+-- Proprietary intellectual property.  Avaya retains all
+-- Title and ownership in the Specification, including any revisions
+--
+-- It is Avaya's intent to encourage the widespread use of this
+-- Specification in connection with the management of Avaya products.
+-- Avaya grants vendors, end-users, and other interested parties
+-- a non-exclusive license to use this Specification in connection
+-- with the management of Avaya products.
+--
+-- This Specification is supplied "as is," and Avaya makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+--
+--========================================================
+--
+-- RCS                         
+--   
+-- Version 2.7.14 - Shlomi Biton
+-- 1. Adding NAT pool list tables. 
+--
+-- Version 2.7.13 - Shlomi Biton
+-- 1. Adding comment to ipCidrRouteStaticUsedNextHop.
+--
+-- Version 2.7.12 - Shlomi Biton
+-- 1. Add Track (nextHopTrackId) to NH list entry (NextHopEntry). The track will be used
+--  	to monitor the state of the next hop.
+-- 2. Adding the iphcControlTcpCompressionRatio and iphcControlTotalCompressionRatio for
+--    TCP header compression and total header compression.
+--
+-- Version 2.7.11 - Shlomi Biton
+-- 1. Updating the ipCidrRouteStaticTable table.
+--    a. Cancel the ipCidrRouteStaticOperStatus. 
+--    b. Cancel the ipCidrRouteStaticTos that is used as key to the table.
+--    c. The keys to the table are: ipCidrRouteStaticDest, ipCidrRouteStaticMask, 
+--       ipCidrRouteStaticIfIndex, ipCidrRouteStaticNextHop and ipCidrRouteStaticPreference. 
+--       This is instead of the 4 keys used for ipCidrRouteTable.
+--    d. The following fields will be canceled: ipCidrRouteStaticProto, ipCidrRouteStaticInfo, 
+--       ipCidrRouteStaticNextHopAS, ipCidrRouteStaticMetric2, ipCidrRouteStaticSubType. 
+--    e. The following fields will be renamed: ipCidrRouteStaticMetric1 to ipCidrRouteStaticCost.
+--    f. ipCidrRouteStaticType will be R/O and will include the following values:regular, discard , 
+--       dhcp and via.
+--    g. There will be two new leafs: ipCidrRouteStaticUsedIfIndex and ipCidrRouteStaticUsedNextHop 
+--       and their location will be after the 5 indexes.	
+--    h. The ipCidrRouteStaticAge will be removed as well. 
+--    i. ipCidrRouteStaticTrackId will be before ipCidrRouteStaticActive.
+--    j. ipCidrRouteStaticRowStatus will support create-and-wait and create-and-go.
+--	  h. Adding note to ipCidrRouteStaticTrackId that Discard routes and Permanent Routes have 
+--       ipCidrRouteStaticTrackId equal to 0xffffffff. Permanent Routes that were changed to 
+--	     Non-Permanent Routes will have ipCidrRouteStaticTrackId equal to 0x0 
+-- 		(The value changed from 0xffffffff to 0x0).
+--
+--
+-- Version 2.7.10 - Shlomi Biton
+-- 1. Adding ipCidrRouteStaticTrackId to the ipCidrRouteStaticTable. This mib item will allow
+-- setting track to specific route. Adding new enumeration of keepAliveDown(3)
+-- to the ipCidrRouteStaticOperStatus for representation of route which its track connected to it
+-- is in down state.
+--
+-- Version 2.7.9 - Shlomi Biton
+-- 07-April-2005
+-- 1. Renaming the ipCidrRouteCompleteTable to ipCidrRouteStaticTable. The reason for renaming is 
+-- that ipCidrRouteStaticTable will include only static routes and NOT RIP, OSPF routes as
+-- the standard MIB table shows. The reason is that if there is OSPF route learn to the same 
+-- destination, next-hop etc than it will mask static low routes. Therefore this table shows
+-- only static routes so management applications will be able to configure ALWAYS the static routes.
+-- 
+-- 2. Adding ipCidrRouteStaticActive to the ipCidrRouteStaticTable. This MIB item will show whether 
+-- the static route is active or not. It depends whether its operation status is up and whether
+-- it is the highest preference route among other static route/dynamic (OSPF/RIP) routes to the 
+-- same destination/mask.    
+-- 
+-- Version 2.7.8 - Shlomi Biton
+-- 21-Mar-2005
+-- Fixing the description of ipCidrRouteCompletePreference. 
+--
+-- Version 2.7.7 - Shlomi Biton
+-- 13-Mar-2005
+-- Adding the ipCidrRouteCompleteTable to show/configure static routes that their operation status
+-- is down.This table will include all the routes no matter what is their status.
+--
+-- Version 2.7.6 - Shlomi Biton
+-- 1. The IP unnumbered interfaces will be shown only in the IpInterfaceEntry and not in the 
+-- ipAddrEntry (RFC1213-MIB). The reason is that some management application 
+-- are confused when IP unnumbered interfaces are declared with the same IP on different devices.
+-- The ipAddrEntry index by ipAdEntAddr contains 4 R/O items as:
+-- ipAdEntIfIndex, ipAdEntNetMask, ipAdEntBcastAddr, ipAdEntReasmMaxSize.
+-- The IpInterfaceEntry index by ipInterfaceAddr contains only 3 items as R/W:
+-- ipInterfaceLowerIfAlias (R/W) as String instead of ifIndex
+-- ipInterfaceNetMask (R/W), 
+-- ipInterfaceBroadcastAddr (R/W) 
+-- Therefore ipAdEntReasmMaxSize is added as R/O to IpInterfaceEntry.
+-- The IpInterfaceEntry will include ip unnumbered interfaces and other IP interfaces.
+-- 
+-- 2. OSPF
+-- a. Adding Standard OSPF table (OspfIfEntry) for IP unnumbered configurations. 
+-- This table will include the IP unnumbered and other IP interface addresses. 
+-- 
+-- b. Adding Standard OSPF Metric table (ospfIfMetricTable) for IP Unnumbered configurations.
+-- This table will include the IP unnumbered and other IP interface addresses. 
+-- Note: Cost parameter??? 
+-- 
+-- 3. RIP - Adding the table rip2IfConfEntry and rip2IfStatTable from RIPv2-MIB. 
+-- Those tables will show all IP interfaces including IP unnumbered. 
+-- The standard rip2IfConfEntry and rip2IfStatTable will not show the IP unnumbered interfaces.     
+--
+-- Version 2.7.5 - Shlomi Biton
+-- 1. Fixing Compiler issues: 
+--  	a. Exchanging ipTunnelIfEncapsMethod 3 to gre keyword as default.
+-- 		b. Exchanging ipTunnelIfSecurity 1 to none keyword as default.
+-- 2. Adding IP unnumbered items.   
+--	a. Adding to ipInterfaceAddrType the value unnumbered(4) for unnumbered IP interfaces. 
+--  b. Adding ipInterfaceUnnumberedLowerIfAlias and ipInterfaceAddrUnnumbered for the interface
+--     from which the IP address is borrowed and the IP address that is borrowed.
+--                             
+-- Version 2.7.4 - Shlomi Biton
+-- 1. Add ipDynamic for Dynamic IP address. 
+-- The ipInterface table will present static and dynamic IPs, where the dynamic
+-- IPs are R/O only. 
+-- 2. Adding ipInterfaceAddrType to the ipInterface table for distinguishing between
+-- Dynmaic IP addresses as DHCP / PPP-IPCP and static IP addresses.
+-- 3. Adding ipNegotiated table for PPP-IPCP IP negotiation.
+--                                        
+-- Version 2.7.3 - Shlomi Biton
+-- 1. Add ipTunnel section for GRE Tunnel extended parameters.
+-- 2. Add next hop Table.
+--
+-- Version 2.7.2 - Dan Gluskin
+-- 1. Add ipGlobalsNextPrimaryManagementIPAddress
+--
+-- Version 2.7.1 - ItaiZ
+-- 1. Added ospfXtndIfTable, a table extending the standard OSPF interface
+--    table ospfIfTable. 
+-- 2. Added ospfXtndIfPassiveMode to control  Passive/active OSPF 
+--    interface mode.
+--
+-- Version 2.7.0 - ItaiZ
+-- 1. Added ipInterfaceDhcpRelay, drIpInterfaceDhcpRelay to control
+--    DHCP/BOOTP Relay per IP Interface.
+--
+-- Version 2.6.13 - ItaiZ
+--  1. Added SourceSafe documentation macros
+--  2. Changed default values of iphcTcpSessions, iphcRtpSessions to 16.
+--  3. Changed dexcription of iphcTcpSessions to mean "non tcp, non rtp"
+--  4. Removed default values for read-only mib items in IphcControlEntry
+-- 
+-- Version 2.6.12 - ItaiZ
+-- 07 Mar. 2002
+-- 1. Removed default value from index terms in distributionListTable
+-- 2. drStaticCidrTos - range modified to start from 0.
+-- 3. Fixed format of all descriptions to fit 80 col.
+--
+-- Version 2.6.11
+-- 07 Mar. 2002
+-- 1. Merge with version 2.6.9 (RTP Compression).
+-- 2. Add iphcControlNonTcpMode. - Niv Hanigal
+--
+-- Version 2.6.10
+-- 06 Mar. 2002
+-- 1. Add ospfGlobalsDefaultExportMetric for.
+-- 2. Add ripGlobalsDefaultExportMetric.
+-- 3. Version 2.6.9 which consists of the CRTP is not included in 
+--    this copy - Dror Zebaida
+--
+-- Version 2.6.9
+-- 12 Feb. 2002
+-- 1. Add iphcObjects (RTP Compression) - Michael Weksler
+--
+-- Version 2.6.8
+-- 31 Jan. 2002
+-- 1. Add ipInterfaceOperStatus, drIpInterfaceOperStatus.
+-- 2. Add ipGlobalsPrimaryManagementIPAddress. - Niv Hanigal
+--
+-- Version 2.6.7
+-- 28 Jan. 2002
+-- 1. Change ipInterfaceLowerIfAlias,drIpInterfaceLowerIfAlias size to 32. - 
+--    Eran Lefler
+--
+-- Version 2.6.6
+-- 27 Jan. 2002
+-- 1. Add distributionListTable. - Dror Zebaida
+--
+-- Version 2.6.5
+-- 19 Dec. 2001
+-- 1. Add ripGlobalsPeriodicUpdateTimer and ripGlobalsPeriodicInvalidRouteTimer
+--  - Dror Zebaida
+--
+-- Version 2.6.4
+-- 13 Feb. 2001
+-- 1. drStaticCidr is directly under croute.
+-- 2. Some fields in drStaticCidrEntry removed - Shili Ben-Dori 
+--
+-- Version 2.6.3
+-- 28 Jan. 2001
+-- 1. Added Static routes table, for FWLB routes and more - itaiz
+-- 2. Copyright changed from Lucent/Lannet to Avaya
+--
+-- Version 2.6.2
+-- 31 Oct. 2000
+-- 1. routeGroupRouteMode modified to include routeAndWebSwitch(21) Value. 
+--  - Itai Z.
+--
+-- Version 2.6.1
+-- 04 July 2000
+-- 1. Change the order of ipEZ2RcontrolBoostedRoutersTimeout &
+--     ipEZ2RcontrolHostsTimeout and ipEZ2RcontrolAutoLearnMode in ipEZ2R 
+--     control table - Shili B.
+--
+-- Version 2.6.0
+-- 16 May 2000
+-- 1. Add 2 mib items ipEZ2RcontrolBoostedRoutersTimeout &
+--     ipEZ2RcontrolHostsTimeout to ipEZ2R control table - Shili B.
+--
+-- Version 2.5.0
+-- 5 Apr. 2000
+-- 1. Remove the ipPolicyMgmt subtree under ipRoute - Same subtree  in policy 
+-- mib. - Niv H.
+-- 2. Add new item ipInterfaceIcmpRedirects to ipInterface table - Eyal A.
+-- 3. Add new item drIpInterfaceIcmpRedirects to drIpInterface table - Eyal A.
+--
+-- Version 2.4.0
+-- 11 Jan. 2000
+-- 1. Add new item ipInterfaceNetbiosRebroadcast to the ipInterface table. 
+--  - Yigal N.
+-- 2. Add new sub-tree to enable distribution of layer2 and ip interface 
+--    tables - Eyal A.
+--
+-- Version 2.3.0
+-- 03 Nov. 1999
+-- 1. Add new item ipVRRPAdminStatus as a global switch for VRRP - Yigal N.
+-- 2. Add new item ipInterfaceName to the ipInterface table. - Yigal N.
+--
+-- Version 2.2.1
+-- 06 Sep. 1998
+-- 1. Change the access of routeGroupRouteMode item to read-write - Yigal N.
+--
+-- Version 2.2.0
+-- 06 Sep. 1998
+-- 1. Add new item ipPolicyControlActiveEZ2routeList to ipPolicyControl table 
+--  - Yigal N.
+-- 2. Remove do-not-route enum from ipPolicyList table - Yigal N.
+--
+-- Version 2.1.0
+-- 01 Sep. 1998
+-- 1. Add new table routeGroupTable for router module management. - Yigal N.
+-- 2. Change access of ipPolicyListType to read-write. - Yigal N.
+-- 3. Add new item ipPolicyListChecksum to ipPolicyList table - Yigal N.
+-- 4. Add new item ipPolicyControlChecksum to ipPolicyControl table - Yigal N.
+--
+-- Version 2.0.0
+-- 17 Aug. 1998
+-- 1. Add 3 new tables ipPolicyXX for policy management. - Yigal N.
+-- 2. Add 2 new table to control the EZ2route mode - Yigal N.
+-- 3. Add new enumeration (sna & ipx) to vlBridgeProtocol - Yigal N.
+--
+-- Version 1.9.2
+-- 11 Mar. 1998
+-- 1. Add new enumeration to layer2GlobalsBridgeEnable for redundancy support.
+--   - Yigal N.
+--
+-- Version 1.9.1
+-- 1. Add new item relayVlRelayAddr to relay table. - Yigal N.
+--
+-- Version 1.9.0
+-- 14 Dec. 1998
+-- 1. Change names of ipxCircRIPState & ipxCircSAPState to ipxCircRIPStatus &.
+--     ipxCircSAPStatus respectively. - Yigal N.
+-- 2. Add new items ipxCircRipState & ipxCircSapState to the interface table. 
+--  -Yigal N.
+-- 3. Add ipxDestAgingTime mib to ipxDest table & ipxServAgingTime mib to 
+--  ipxServ table - Yigal N.
+--
+-- Version 1.8.0
+-- 23 Nov. 1998
+-- 1. Delete decLAT from the enumeration of the vlBridgeProtocol, and change 
+--  the order - Yigal N.
+-- 2. Add IP Multicast table to support IP Multicast. - Yigal N.
+--
+-- Version 1.7.0
+-- 19 Nov. 1998
+-- 1. Add 2 new mibs items, ripInterfaceSendMode & ripInterfaceVersion
+--     for RIP, to support RIP-2  - Yigal N.
+-- 2. Change the mib name of ripInterfacePoisonReverse  to
+--   ripInterfaceSplitHorizon
+--     and it's enumeration. - Yigal N.
+-- 3. Change the Index order of vlBridge table vlBridgeProtocol befor 
+--  vlBridgeGroupIndex -Yigal N.
+--
+-- Version 1.6.0
+-- 15 Feb. 1998
+-- 1. Replace standard name NetNumber to NetNum due to browser load problem
+--   - Yigal N.
+--
+-- Version 1.5.0
+-- 18 Jan. 1998
+-- 1. Add ipxSapFilterGlobals sub-tree to ipxRoute sub-tree - Yigal N.
+-- 2. Change ACCESS of ipxSapFilterCircIndex from RO to RW - Yigal N.
+--
+-- Version 1.4.0
+-- 11 Jan. 1998
+-- 1. Add new mib ripInterfaceState to ripInterfaceTable. - Yigal N.
+--
+-- Version 1.3.0
+-- 15 Dec. 1997
+-- 1. Add mibs to support ARP Server feature. IpInterfaceARPServerStatus to ip 
+--  interface table
+--     and global parameter ipShortcutARPServerStatus. - Yigal N. (Eyal A.)
+-- 
+-- Version 1.2.0
+-- 07 Dec. 1997
+-- 1. Replace definition of NetNumber from INTEGER(1.. 4294967295) to INTEGER -
+--     Yigal N. (Eyal A.).
+-- 2. Delete ipxSapFilterServiceNetMask mib item from ipxSap table and change 
+--    the numbering of the other mibs in the table - Yigal N. (Eyal A.)
+-- 3. Add mibs to support IP Redundancy. IpInterfaceMainRouterAddr to ip 
+--   interface table
+--     and 3 global parameters: ipRedundancyStatus, ipRedundancyTimeout and
+--     ipRedundancyPollingInterval. - Yigal N. (Eyal A.)
+-- 4. Change the suffix name of ipGlobalsBOOTPRelayStatus from Enable to 
+--    Status, and add more enumeration to the list backup and active Backup 
+--   - Yigal N. (Eyal A.)
+--
+-- Version 1.1.0
+-- 23 Nov. 1997
+-- 1. Change the ACCESS of ipAccessControlSrcAddr, ipAccessControlSrcMask,
+--     ipAccessControlDstAddr, ipAccessControlDstMask and 
+--   ipxAccessControlSrcAddr,
+--     ipxAccessControlDstAddr mib items from read-only to read-write.
+-- 2. Add SAP filter table for IPX.
+--
+-- Version 1.0.4
+-- 10 Nov. 1997
+-- 1. Add IP Access Control Table & IPX Access Control Table.
+--
+-- Version 1.0.3
+-- 29 Sep. 1997
+-- 1. Move mib item BridgeEnable from ipRoute group to layer2 group.
+-- 2. Change bcast address from enum to values 0 or 1.
+-- 3. Change SYNTAX of ipxServType from OCTET-STRING to INTEGER.
+-- 4. Change SYNTýAX of ipxServName from OCTET-STRING to DisplayString.
+-- 5. Change SYNTAX of ipxServSocket from OCTET-STRING to INTEGER.
+--
+-- Version 1.0.2
+-- 23 Sep. 1997
+-- 1. Add Row Status to Relay Table. This item used for deleting entry.
+--
+-- Version 1.0.1
+-- 23 Sep. 1997
+-- 1. Change order of the ipRoute sub-tree
+-- 2. Move Relay from layer2 to ipRoute sub-tree..
+--
+-- Version 1.0.0
+-- 18 Sep. 1997
+-- 1. Initial version.
+--========================================================
+
+	CROUTE-MIB DEFINITIONS ::= BEGIN
+ 
+		IMPORTS
+			lannet			
+				FROM GEN-MIB			
+			OBJECT-TYPE			
+				FROM RFC-1212			
+			IpAddress			
+				FROM RFC1155-SMI			
+			DisplayString, PhysAddress			
+				FROM RFC1213-MIB			
+			OwnerString			
+				FROM RMON-MIB
+			Integer32, Counter32, Unsigned32
+                FROM SNMPv2-SMI
+            AreaID, Status, DesignatedRouterPriority, UpToMaxAge, HelloRange, 
+            PositiveInteger, TOSType, Metric 
+            	FROM OSPF-MIB
+            TruthValue
+                FROM SNMPv2-TC
+            RouteTag
+            	FROM RIPv2-MIB;
+	
+	
+--
+-- Type definitions
+--
+	
+		RowStatus ::= INTEGER
+			{
+			active(1),
+			notInService(2),
+			notReady(3),
+			createAndGo(4),
+			createAndWait(5),
+			destroy(6)
+			}
+		
+		NetNum ::= INTEGER
+		
+	
+--
+-- Node definitions
+--
+	
+		-- 1.3.6.1.4.1.81.31
+		croute OBJECT IDENTIFIER ::= { lannet 31 }
+		
+		-- 1.3.6.1.4.1.81.31.1
+		ipRoute OBJECT IDENTIFIER ::= { croute 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.1
+		ipGlobals OBJECT IDENTIFIER ::= { ipRoute 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.1.1
+		ipGlobalsBOOTPRelayStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2),
+				backup(3),
+				activeBackup(4)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whenever to activate the BOOTP Relay
+				protocol on the device. 
+
+				enable - set by the user, means
+				  activate the BOOTP Relay protocol
+				  over the defined VLANs.
+				
+				disable - set by the user, means don't
+				  active the BOOTP Relay protocol.
+				
+				backup - set by the user, means the
+				  BOOTP Relay protocol is in stand-by.
+				  It will enter to activeBackup mode
+				  after IP REDUNDANCY mechanism will
+				  enter to active mode.
+
+				activeBackup - set by the device
+				  (status), means the backup BOOTP
+				  Relay is working (after time-out of
+				  IP REDUNDANCY)."
+			DEFVAL { disable }
+			::= { ipGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.1.2
+		ipGlobalsICMPErrMsgEnable OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whenever to send ICMP messages such
+				as Destination Unreachable, etc. "
+			DEFVAL { enable }
+			::= { ipGlobals 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.1.3
+		ipGlobalsARPInactiveTimeout OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Time-out required to remove inactive
+				ARP entries. The value is in seconds.
+				The default value is 4 hours "
+			DEFVAL { 14400 }
+			::= { ipGlobals 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.1.4
+		ipGlobalsPrimaryManagementIPAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The Primary Management IP address.
+				One of the device's IP interfaces that
+				is used for some applications."
+			DEFVAL { 0 }
+			::= { ipGlobals 4 }
+
+		-- 1.3.6.1.4.1.81.31.1.1.5
+		ipGlobalsNextPrimaryManagementIPAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The Primary Management Interface IP address for the next boot.
+				 The PMI address is used as source address for 
+				 some applications (tftp/ftp/telnet clients, Media Gateway, trap sending etc).				 
+				 "
+			DEFVAL { 0 }
+			::= { ipGlobals 5 }
+
+		
+		-- 1.3.6.1.4.1.81.31.1.2
+		ipInterfaceTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is an extention of MIB II
+				IpAddrTable, and is used to add/delete
+				entries to/from that table. In
+				addition it contains private objects."
+			::= { ipRoute 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1
+		ipInterfaceEntry OBJECT-TYPE
+			SYNTAX IpInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's IP interfaces. An IP
+				interface is a logical connection to a
+				certain IP net/subnet."
+			INDEX { ipInterfaceAddr }
+			::= { ipInterfaceTable 1 }
+		
+		IpInterfaceEntry ::=
+			SEQUENCE { 
+				ipInterfaceAddr
+					IpAddress,
+				ipInterfaceNetMask
+					IpAddress,
+				ipInterfaceLowerIfAlias
+					DisplayString,
+				ipInterfaceType
+					INTEGER,
+				ipInterfaceForwardIpBroadcast
+					INTEGER,
+				ipInterfaceBroadcastAddr
+					INTEGER,
+				ipInterfaceProxyArp
+					INTEGER,
+				ipInterfaceStatus
+					RowStatus,
+				ipInterfaceMainRouterAddr
+					IpAddress,
+				ipInterfaceARPServerStatus
+					INTEGER,
+				ipInterfaceName
+					DisplayString,
+				ipInterfaceNetbiosRebroadcast
+					INTEGER,
+				ipInterfaceIcmpRedirects
+					INTEGER,
+				ipInterfaceOperStatus
+					INTEGER,
+				ipInterfaceDhcpRelay
+				    INTEGER,
+				ipInterfaceAddrType
+				    INTEGER,        
+				ipInterfaceAddrUnnumbered
+				    IpAddress,
+				ipInterfaceUnnumberedLowerIfAlias
+				    DisplayString,
+				ipInterfaceReasmMaxSize
+                      INTEGER (0..65535)
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.2.1.1
+		ipInterfaceAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address to which this entry's
+				addressing information pertains."
+			::= { ipInterfaceEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.2
+		ipInterfaceNetMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The subnet mask associated with the
+				IP address of this entry. The value of
+				the mask is an IP address with all the
+				network bits set to 1 and all the
+				hosts bits set to 0."
+			::= { ipInterfaceEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.3
+		ipInterfaceLowerIfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for
+				the lower-layer interface on top of
+				which this IP interface is defined.
+				The alias is specified by the network
+				manager, and provides a non-volatile
+				'handle' for the lower-layer
+				interface. The semantics of the object
+				are similar to the semantics of the
+				ifAlias object, defined by the
+				Interfaces MIB. At the time when this
+				Madge MIB object was defined, the
+				latest release of the Interfaces MIB
+				was draft-ietf-ifmib-mib-05.txt. The
+				purpose is to support all methods
+				(static or dynamic) for creation of
+				interfaces and to allow creation of IP
+				table entries without the need of the
+				layer 2 interface to be present on the
+				device at the time of the creation. It
+				is assumed that some implementation
+				dependent mechanisms allow the IP
+				application to be informed about the
+				creation of new lower layer
+				interfaces."
+			::= { ipInterfaceEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.4
+		ipInterfaceType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				broadcast(1),
+				nBMA(2),
+				ptp(4),   		-- old value 3
+				loopback(8),    -- new value
+				tunnel(16)      -- new value
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The logical type of the interface.
+				The default depends on the physical
+				type. For example Ethernet and
+				Token-Ring LANs are of type broadcast"
+			DEFVAL { broadcast }
+			::= { ipInterfaceEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.5
+		ipInterfaceForwardIpBroadcast OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whether the router forwards IP
+				directed broadcasts that are to be
+				transmitted as link-layer broadcast to
+				an attached net or subnet. "
+			DEFVAL { enable }
+			::= { ipInterfaceEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.6
+		ipInterfaceBroadcastAddr OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The value of the least-significant
+				bit in the IP broadcast address used
+				for sending datagrams on the (logical)
+				interface associated with the IP
+				address of this entry. For example,
+				when the Internet standard all-ones
+				broadcast address is used, the value
+				will be 1. This value applies to both
+				the subnet and network broadcasts
+				addresses used by the entity on this
+				(logical) interface."
+			DEFVAL { 1 }
+			::= { ipInterfaceEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.7
+		ipInterfaceProxyArp OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" When proxy ARP is enabled, the
+				router responds to ARP requests
+				received on one link-layer interface
+				for an IP-address that is reachable
+				via another link-layer interface. The
+				response provides the router's own MAC
+				address. "
+			DEFVAL { disable }
+			::= { ipInterfaceEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.8
+		ipInterfaceStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting IP
+				interfaces. Deleting this row means
+				deleting the corresponding entry in
+				IpAddrTable (MIB II). Deleting an IP
+				interface also causes deletion of all
+				static routes defined on this IP
+				interface, as well as protocol
+				interfaces (e.g. RIP and OSPF) defined
+				on this IP interface."
+			::= { ipInterfaceEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.9
+		ipInterfaceMainRouterAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address of the main router
+				backed up on this interface."
+			::= { ipInterfaceEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.10
+		ipInterfaceARPServerStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to activate the ARP Server
+				mechanism on this interface. 
+				enable - set by the user, means
+				  activate the ARP Server mechanism
+				  over this IP interface.
+
+				disable - set by the user, means don't
+				  active the ARP Server mechanism over
+				  this IP interface."
+			DEFVAL { disable }
+			::= { ipInterfaceEntry 10 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.11
+		ipInterfaceName OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The name of this interface for
+				compatibility with cli."
+			::= { ipInterfaceEntry 11 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.12
+		ipInterfaceNetbiosRebroadcast OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				inbound(1),
+				outbound(2),
+				both(3),
+				disable(4)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"inbound - netbios received from the
+				   interface are rebarodcasted,
+				 
+				outbound - netbios are rebraodcasted
+				  to this interface,
+ 
+				both - netbios are rebroadacsted both
+				   from and to this interface,
+
+				disable - netbios is not rebraodcasted
+				  neither from nor to this interface.
+				  mandatoryly only both and disable are
+				  supported"
+			DEFVAL { disable }
+			::= { ipInterfaceEntry 12 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.13
+		ipInterfaceIcmpRedirects OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"enable - enable the sending of
+				   redirect messages if the router is
+				   forced to re-send a packet through
+				   the same interface on which it was
+				   received.
+
+				disable - disable the sending of
+				  redirect messages on this
+				  interface."
+			DEFVAL { enable }
+			::= { ipInterfaceEntry 13 }
+		
+		-- 1.3.6.1.4.1.81.31.1.2.1.14
+		ipInterfaceOperStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				up(1),
+				down(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The operational status of this interface.
+				up - the interface is active.
+				down - the interface is inactive.
+				"
+			::= { ipInterfaceEntry 14 }
+
+		-- 1.3.6.1.4.1.81.31.1.2.1.15
+		ipInterfaceDhcpRelay OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+			"enable - enable the DHCP/BOOTP Relay
+				     agent for the subnet associated
+				     with this IP Interface. Requires that
+				     a relayEntry for the L2 interface over
+				     which this IP interface is defined will
+				     be defined.
+			  disable - disablesenable the DHCP/BOOTP Relay
+				     agent for the subnet associated
+				     with this IP Interface."
+			DEFVAL { disable }
+			::= { ipInterfaceEntry 15 }
+
+		ipInterfaceAddrType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				static(1),
+				pppIpcp(2),
+				dhcp(3),
+				unnumbered(4)         
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+			"This Mib item presents the type of the the ip address whether is static, 
+			unnumbered or dynamic using two of the following methods: 
+			pppipcp (negotiated) or dhcp."
+			DEFVAL { static }
+			::= { ipInterfaceEntry 16 }       
+
+		ipInterfaceAddrUnnumbered OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address that is borrowed for the unnumbered interface. 
+				In case this IP address is not valid then 0.0.0.0. 
+				If the current IP interface borrow the IP address from dynamic IP interface 
+				where the IP address is not allocated yet, then the value will be 0.0.0.0 as well. 
+				The user will be able to recognize that this IP interface is unnumbered according to
+				ipInterfaceAddrType field."
+			::= { ipInterfaceEntry 17 }
+			
+		ipInterfaceUnnumberedLowerIfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for 
+				the lower-layer interface used to borrow the IP unnumbered. 
+				In case the IP interface is not unnumbered then this value is null - not exists interface."
+				
+			::= { ipInterfaceEntry 18 }
+			
+        ipInterfaceReasmMaxSize OBJECT-TYPE
+              SYNTAX  INTEGER (0..65535)
+              ACCESS  read-only
+              STATUS  mandatory
+              DESCRIPTION
+                      "The size of the largest IP datagram which this
+                      entity can re-assemble from incoming IP fragmented
+                      datagrams received on this interface."
+            ::= { ipInterfaceEntry 19 }
+
+		-- 1.3.6.1.4.1.81.31.1.3
+		ripGlobals OBJECT IDENTIFIER ::= { ipRoute 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.3.1
+		ripGlobalsRIPEnable OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whenever to activate the RIP
+				protocol on the device. 
+
+				disable - don't activate RIP over all
+				  the IP interfaces
+
+				enable - the status of each interface
+				  is relevant "
+			DEFVAL { enable }
+			::= { ripGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.3.2
+		ripGlobalsLeakOSPFIntoRIP OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to leak (redistribute)
+				routes learned from OSPF protocol into
+				the domain of the RIP protocol."
+			DEFVAL { disable }
+			::= { ripGlobals 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.3.3
+		ripGlobalsLeakStaticIntoRIP OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to leak (redistribute)
+				routes learned from Static Route into
+				the domain of the RIP protocol."
+			DEFVAL { enable }
+			::= { ripGlobals 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.3.4
+		ripGlobalsPeriodicUpdateTimer OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The time in seconds between periodic
+				RIP updates. The default value is 30
+				seconds "
+			DEFVAL { 30 }
+			::= { ripGlobals 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.3.5
+		ripGlobalsPeriodicInvalidRouteTimer OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The interval in seconds after which a
+				route is declared invalid. The default
+				value is 180 seconds "
+			DEFVAL { 180 }
+			::= { ripGlobals 5 }
+
+		-- 1.3.6.1.4.1.81.31.1.3.6
+		ripGlobalsDefaultExportMetric OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS  read-write 
+			STATUS  mandatory
+			DESCRIPTION
+				"The default metric for redistributed
+				routes. The default value is 1"
+			DEFVAL  { 1 }
+			::=   { ripGlobals 6 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4
+		ripInterfaceTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF RipInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is an extention of
+				rip2IfConfTable, and is used to
+				add/delete objects entries to/from
+				that table."
+			::= { ipRoute 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1
+		ripInterfaceEntry OBJECT-TYPE
+			SYNTAX RipInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's IP interfaces. An IP
+				interface is a logical connection to a
+				certain IP net/subnet."
+			INDEX { ripInterfaceAddr }
+			::= { ripInterfaceTable 1 }
+		
+		RipInterfaceEntry ::=
+			SEQUENCE { 
+				ripInterfaceAddr
+					IpAddress,
+				ripInterfaceMetric
+					INTEGER,
+				ripInterfaceSplitHorizon
+					INTEGER,
+				ripInterfaceAcceptDefaultRoute
+					INTEGER,
+				ripInterfaceSendDefaultRoute
+					INTEGER,
+				ripInterfaceState
+					INTEGER,
+				ripInterfaceSendMode
+					INTEGER,
+				ripInterfaceVersion
+					INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.4.1.1
+		ripInterfaceAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address to which this entry's
+				addressing information pertains."
+			::= { ripInterfaceEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1.2
+		ripInterfaceMetric OBJECT-TYPE
+			SYNTAX INTEGER (0..15)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" This variable indicates the number
+				of hops that is to be assign to that
+				interface. "
+			DEFVAL { 1 }
+			::= { ripInterfaceEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1.3
+		ripInterfaceSplitHorizon OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				poisonReverse(1),
+				splitHorizon(2),
+				none(3)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whether to activate Poison Reverse
+				algorithm, Split Horizon or none of
+				them, on this interface "
+			DEFVAL { splitHorizon }
+			::= { ripInterfaceEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1.4
+		ripInterfaceAcceptDefaultRoute OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whether to accept the default route
+				from receive RIP message. "
+			DEFVAL { enable }
+			::= { ripInterfaceEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1.5
+		ripInterfaceSendDefaultRoute OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whether to send the default route in
+				RIP message. "
+			DEFVAL { disable }
+			::= { ripInterfaceEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1.6
+		ripInterfaceState OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				active(1),
+				inactive(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The operational (mandatory state) of
+				the IP interface from RIP point of
+				view. It depends on Global RIP status,
+				IP interface status and rip interface
+				STATUS. 
+				
+				inactive - set by the device (status),
+				  the rip is not active on this
+				  interface.
+
+				active - set by the device (status),
+				  rip is active on this interface."
+			::= { ripInterfaceEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1.7
+		ripInterfaceSendMode OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				all(1),
+				defaultOnly(2),
+				doNotSend(3)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" What the router sends on this
+				interface. 
+				All - send the whole routing table
+				  according to the RIP version.
+
+				DefaultOnly - send default route only.
+				
+				DoNotDend - don't send any RIP
+				  information on this interface."
+			::= { ripInterfaceEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.1.4.1.8
+		ripInterfaceVersion OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				rip1(1),
+				rip2(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" What RIP information the router
+				sends on this interface."
+			::= { ripInterfaceEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.1.5
+		ospfGlobals OBJECT IDENTIFIER ::= { ipRoute 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.5.1
+		ospfGlobalsLeakRIPIntoOSPF OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to leak (redistribute)
+				routes learned from RIP protocol into
+				the domain of the OSPF protocol."
+			DEFVAL { disable }
+			::= { ospfGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.5.2
+		ospfGlobalsLeakStaticIntoOSPF OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to leak (redistribute)
+				routes learned from Static Route into
+				the domain of the OSPF protocol."
+			DEFVAL { enable }
+			::= { ospfGlobals 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.5.3
+		ospfGlobalsLeakDirectIntoOSPF OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to leak (redistribute)
+				routes learned from Direct into the
+				domain of the OSPF protocol."
+			DEFVAL { enable }
+			::= { ospfGlobals 3 }
+
+		-- 1.3.6.1.4.1.81.31.1.5.4
+		ospfGlobalsDefaultExportMetric OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS  read-write 
+			STATUS  mandatory
+			DESCRIPTION
+				"The default metric for redistributed
+				routes. The default value is 20"
+			DEFVAL  { 20 }
+			::=   { ospfGlobals 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.6
+		relayTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF RelayEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is an extention of
+				vlConfTable, and is used to add/delete
+				DHCP Servers to/from that table."
+			::= { ipRoute 6 }
+		
+		-- 1.3.6.1.4.1.81.31.1.6.1
+		relayEntry OBJECT-TYPE
+			SYNTAX RelayEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's VLAN interfaces. An VLAN
+				interface is a virtual connection to a
+				switch."
+			INDEX { relayVlIndex }
+			::= { relayTable 1 }
+		
+		RelayEntry ::=
+			SEQUENCE { 
+				relayVlIndex
+					INTEGER,
+				relayVlPrimaryServerAddr
+					IpAddress,
+				relayVlSeconderyServerAddr
+					IpAddress,
+				relayVlStatus
+					RowStatus,
+				relayVlRelayAddr
+					IpAddress
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.6.1.1
+		relayVlIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A unique value for each interface.
+				Its value ranges between 1 and the
+				value of ifNumber. The value for each
+				interface must remain constant at
+				least from one re-initialization of
+				the entity's network management system
+				to the next re-initialization."
+			::= { relayEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.6.1.2
+		relayVlPrimaryServerAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address of the primary server,
+				to which the BOOTP/DHCP requests to be
+				sent."
+			::= { relayEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.6.1.3
+		relayVlSeconderyServerAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address of the secondary
+				server, to which the BOOTP/DHCP
+				requests to be sent."
+			::= { relayEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.6.1.4
+		relayVlStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For deleting an DHCP/BOOTP servers
+				entry. The entry will be deleted upon
+				deleting the corresponding VLAN"
+			::= { relayEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.6.1.5
+		relayVlRelayAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address of the Relay, i.e. the
+				router's IP address to write in the
+				relayed request (giaddr field in the
+				Bootp packet). When there are multiple
+				IP interfaces on the same VLAN such
+				that the router has multiple IP
+				addresses on the VLAN, the user can
+				configure which of these addresses to
+				use when relaying requests arriving on
+				this VLAN. This relay address is used
+				by the server to determines the subnet
+				from which the address shall be
+				allocated. The special value
+				255.255.255.255 means DUPLICATE. In
+				this case the Relay will duplicate
+				each request arriving on this VLAN and
+				send to the server multiple copies of
+				the request, a copy for each of the
+				router's IP addresses on that VLAN.
+				The relay address in each copy of the
+				request shall be the router's IP
+				address (NOT 255.255.255.255). The
+				special value 0.0.0.0 means that the
+				router shall use the Default value
+				(lowest IP address on the VLAN) for
+				the relay address"
+			::= { relayEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.7
+		ipAccessGlobals OBJECT IDENTIFIER ::= { ipRoute 7 }
+		
+		-- 1.3.6.1.4.1.81.31.1.7.1
+		ipAccessControlEnable OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whenever to activate the IP ACCESS
+				CONTROL statements on the device.
+				
+				disable - don't activate IP ACCESS
+				  CONTROL over all the IP statements
+				enable - activate IP ACCESS CONTROL
+				  over all the IP statements "
+			DEFVAL { disable }
+			::= { ipAccessGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8
+		ipAccessControlTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpAccessControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is used to add/delete
+				access control statement to/from that
+				table."
+			::= { ipRoute 8 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1
+		ipAccessControlEntry OBJECT-TYPE
+			SYNTAX IpAccessControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's IP interfaces. An IP
+				interface is a logical connection to a
+				certain IP net/subnet."
+			INDEX { ipAccessControlIndex }
+			::= { ipAccessControlTable 1 }
+		
+		IpAccessControlEntry ::=
+			SEQUENCE { 
+				ipAccessControlIndex
+					INTEGER,
+				ipAccessControlSrcAddr
+					IpAddress,
+				ipAccessControlSrcMask
+					IpAddress,
+				ipAccessControlDstAddr
+					IpAddress,
+				ipAccessControlDstMask
+					IpAddress,
+				ipAccessControlOperation
+					INTEGER,
+				ipAccessControlActivation
+					INTEGER,
+				ipAccessControlProtocol
+					INTEGER,
+				ipAccessControlApplication
+					INTEGER,
+				ipAccessControlStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.8.1.1
+		ipAccessControlIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Entry index."
+			::= { ipAccessControlEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.2
+		ipAccessControlSrcAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address of the source address."
+			::= { ipAccessControlEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.3
+		ipAccessControlSrcMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The MASK address of the source address."
+			::= { ipAccessControlEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.4
+		ipAccessControlDstAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address of the destination address."
+			::= { ipAccessControlEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.5
+		ipAccessControlDstMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The MASK address of the destination address."
+			::= { ipAccessControlEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.6
+		ipAccessControlOperation OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				forward(1),
+				block(2),
+				blockAndReport(3)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"How to operate the IP ACCESS CONTROL
+				statement, on the receiving packet.
+				Forwards the packet, Block (Discard)
+				the packet or block (Discard) the
+				packet and report to the user by
+				sending trap."
+			::= { ipAccessControlEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.7
+		ipAccessControlActivation OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				wire-speed(1),
+				regular(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Does the IP ACCESS CONTROL statement
+				done by HW or SW(CPU). 
+				HW - wire-speed,
+			        SW - regular."
+			::= { ipAccessControlEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.8
+		ipAccessControlProtocol OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				icmp(1),
+				tcp(6),
+				udp(17),
+				none(256)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Over which protocol does the IP
+				ACCESS CONTROL statement activate.
+				Icmp, Tcp, Udp. None - means IP
+				addresses only"
+			::= { ipAccessControlEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.9
+		ipAccessControlApplication OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				ftp(21),
+				telnet(23),
+				smtp(25),
+				http(80),
+				pop3(110),
+				snmp(161),
+				snmpTrap(162),
+				above1023(65536),
+				none(65537)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Over which application does the IP
+				ACCESS CONTROL statement activate. The
+				exception are: above1023 can work over
+				TCP or UDP, none can't work over TCP
+				or UDP or ICMP only none is excepted"
+			::= { ipAccessControlEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.1.8.1.10
+		ipAccessControlStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"For create/delete of a IP ACCESS
+				CONTROL statement."
+			::= { ipAccessControlEntry 10 }
+		
+		-- 1.3.6.1.4.1.81.31.1.9
+		ipRedundancyGlobals OBJECT IDENTIFIER ::= { ipRoute 9 }
+		
+		-- 1.3.6.1.4.1.81.31.1.9.1
+		ipRedundancyStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2),
+				inactive(3),
+				active(4)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to activate the IP
+				REDUNDANCY mechanism on the device.
+
+				enable - set by the user, means
+				  activate the IP REDUNDANCY mechanism
+				  over the defined IP interfaces.
+
+				disable - set by the user, means don't
+				  activate the IP REDUNDANCY mechanism
+				  over the defined IP interfaces.
+
+				inactive - set by the device (status),
+				  means the backup interface is in
+				  stand-by (after enable operation).
+
+				active - set by the device (status),
+				  means the backup interface is
+				  working (after time-out)."
+			DEFVAL { disable }
+			::= { ipRedundancyGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.9.2
+		ipRedundancyTimeout OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Time-out required to activate the
+				backup process of IP REDUNDANCY. After
+				Time-out the Redundant router assumes
+				that the main (Backuped) router is not
+				operational, and takes control over
+				all defined IP interfaces of the main.
+				The value is in seconds. The default
+				value is 12"
+			DEFVAL { 12 }
+			::= { ipRedundancyGlobals 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.9.3
+		ipRedundancyPollingInterval OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The polling interval used to poll the
+				Main (Backed up) router. The value is
+				multiply of ipRedundancyTimeout. The
+				value is in seconds. The default value
+				is 3"
+			DEFVAL { 3 }
+			::= { ipRedundancyGlobals 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.10
+		ipShortcutGlobals OBJECT IDENTIFIER ::= { ipRoute 10 }
+		
+		-- 1.3.6.1.4.1.81.31.1.10.1
+		ipShortcutARPServerStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to activate the ARP Server
+				mechanism on the device. 
+				
+				enable - set by the user, means
+				  activate the ARP Server mechanism
+				  over the defined IP interfaces.
+
+				disable - set by the user, means don't
+				  active the ARP Server mechanism over
+				  the defined IP interfaces."
+			DEFVAL { disable }
+			::= { ipShortcutGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.11
+		ipMulticastInterfaceTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpMulticastInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is used to update
+				multicast parameters over interfaces
+				already define"
+			::= { ipRoute 11 }
+		
+		-- 1.3.6.1.4.1.81.31.1.11.1
+		ipMulticastInterfaceEntry OBJECT-TYPE
+			SYNTAX IpMulticastInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's interfaces."
+			INDEX { ipMulticastInterfaceIfIndex }
+			::= { ipMulticastInterfaceTable 1 }
+		
+		IpMulticastInterfaceEntry ::=
+			SEQUENCE { 
+				ipMulticastInterfaceIfIndex
+					INTEGER,
+				ipMulticastInterfaceSendAll
+					INTEGER,
+				ipMulticastInterfaceState
+					INTEGER,
+				ipMulticastInterfaceStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.11.1.1
+		ipMulticastInterfaceIfIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A unique value for each interface.
+				Its value ranges between 1 and the
+				value of ifNumber. The value for each
+				interface must remain constant at
+				least from one re-initialization of
+				the entity's network management system
+				to the next re-initialization."
+			::= { ipMulticastInterfaceEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.11.1.2
+		ipMulticastInterfaceSendAll OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The user will be able to configure
+				whenever to send the all Multicast
+				packets to this interface. 
+
+				Enable - Enable the user to define
+				   this interface, over all the
+				   existing groups
+
+				Disable - Will acts according to the
+				  other parameters."
+			DEFVAL { disable }
+			::= { ipMulticastInterfaceEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.11.1.3
+		ipMulticastInterfaceState OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				active(1),
+				inactive(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The mandatory state (operational) of
+				the IP Multicast from IP Multicast
+				point of view. It depends on global
+				ipMRouteEnable status and Multicast
+				interface status. 
+				
+				Inactive - set by the device (status),
+				   Global IP multicast is disabled or
+				   Multicast is disable on this
+				   interface.
+
+				Active -set by the device (status),
+				   Global IP multicast is enable and
+				   Multicast is active on this
+				   interface."
+
+			::= { ipMulticastInterfaceEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.11.1.4
+		ipMulticastInterfaceStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"For enable/disable of a IP multicast
+				over an interface."
+			DEFVAL { active }
+			::= { ipMulticastInterfaceEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12
+		distributionListTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF DistributionListEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is used to create distribution 
+				list for import and exporting route updates"
+			::= { ipRoute 12 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1
+		distributionListEntry OBJECT-TYPE
+			SYNTAX DistributionListEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning each entry in the
+				distribution list"
+			INDEX { distributionListRoutingProtocol,
+			distributionListDirection, distributionListIfIndex,
+			distributionListRouteProtocol, 
+			distributionListProtocolSpecific1,
+			distributionListProtocolSpecific2, 
+			distributionListProtocolSpecific3, 
+			distributionListProtocolSpecific4, 
+			distributionListProtocolSpecific5 }
+			::= { distributionListTable 1 }
+		
+		DistributionListEntry ::=
+			SEQUENCE { 
+				distributionListRoutingProtocol
+					INTEGER,
+				distributionListDirection
+					INTEGER,
+				distributionListIfIndex
+					INTEGER,
+				distributionListRouteProtocol
+					INTEGER,
+				distributionListProtocolSpecific1
+					INTEGER,
+				distributionListProtocolSpecific2
+					INTEGER,
+				distributionListProtocolSpecific3
+					INTEGER,
+				distributionListProtocolSpecific4
+					IpAddress,
+				distributionListProtocolSpecific5
+					IpAddress,
+				distributionListAccessListNumber
+					INTEGER,
+				distributionListEntryStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.12.1.1
+		distributionListRoutingProtocol OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				rip(1),
+				ospf(2),
+				bgp4(3)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies which routing protocol we are 
+				configuring this distribution list for"
+			::= { distributionListEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.2
+		distributionListDirection OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				import(1),
+				export(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies whether this distribution list
+				entry applies to import or export route 
+				updates"
+			::= { distributionListEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.3
+		distributionListIfIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies the interface for incoming and
+				outgoing updates on which to apply this 
+				distribution list.
+				Relevant for RIP import/export and OSPF 
+				import policies, otherwise zero for if index."
+			::= { distributionListEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.4
+		distributionListRouteProtocol OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				all(1),
+				static(2),
+				rip(3),
+				ospf(4),
+				connected(5),
+				bgp4(6)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies to which routing protocols 
+				to apply this distribution list on outgoing
+				updates"
+			::= { distributionListEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.5
+		distributionListProtocolSpecific1 OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies a routing protocol specific
+				parameter"
+			::= { distributionListEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.6
+		distributionListProtocolSpecific2 OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies a routing protocol specific 
+				parameter"
+			::= { distributionListEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.7
+		distributionListProtocolSpecific3 OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies a routing protocol specific
+				parameter"
+			::= { distributionListEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.8
+		distributionListProtocolSpecific4 OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies a routing protocol specific 
+				parameter"
+			::= { distributionListEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.9
+		distributionListProtocolSpecific5 OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies a routing protocol specific
+				parameter"
+			::= { distributionListEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.10
+		distributionListAccessListNumber OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Specifies the access list number 
+				attached to this distribution list"
+			::= { distributionListEntry 10 }
+		
+		-- 1.3.6.1.4.1.81.31.1.12.1.11
+		distributionListEntryStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting distribution 
+				list entries"
+			::= { distributionListEntry 11 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13
+		ipEZ2RouteMgmt OBJECT IDENTIFIER ::= { ipRoute 13 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.1
+		ipEZ2BoostRouterTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpEZ2BoostRouterEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			::= { ipEZ2RouteMgmt 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.1.1
+		ipEZ2BoostRouterEntry OBJECT-TYPE
+			SYNTAX IpEZ2BoostRouterEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			INDEX { ipEZ2BoostRouterSlot, 
+			ipEZ2BoostRouterBRAddress }
+			::= { ipEZ2BoostRouterTable 1 }
+		
+		IpEZ2BoostRouterEntry ::=
+			SEQUENCE { 
+				ipEZ2BoostRouterSlot
+					INTEGER,
+				ipEZ2BoostRouterBRAddress
+					IpAddress,
+				ipEZ2BoostRouterType
+					INTEGER,
+				ipEZ2BoostRouterStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.13.1.1.1
+		ipEZ2BoostRouterSlot OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			::= { ipEZ2BoostRouterEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.1.1.2
+		ipEZ2BoostRouterBRAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			::= { ipEZ2BoostRouterEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.1.1.3
+		ipEZ2BoostRouterType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				dynamic(1),
+				static(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			::= { ipEZ2BoostRouterEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.1.1.4
+		ipEZ2BoostRouterStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			::= { ipEZ2BoostRouterEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.2
+		ipEZ2RControlTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpEZ2RControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			::= { ipEZ2RouteMgmt 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.2.1
+		ipEZ2RControlEntry OBJECT-TYPE
+			SYNTAX IpEZ2RControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			INDEX { ipEZ2RControlSlot }
+			::= { ipEZ2RControlTable 1 }
+		
+		IpEZ2RControlEntry ::=
+			SEQUENCE { 
+				ipEZ2RControlSlot
+					INTEGER,
+				ipEZ2RControlBoostedRoutersTimeout
+					INTEGER,
+				ipEZ2RControlHostsTimeout
+					INTEGER,
+				ipEZ2RControlAutoLearnMode
+					INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.13.2.1.1
+		ipEZ2RControlSlot OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			::= { ipEZ2RControlEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.2.1.2
+		ipEZ2RControlBoostedRoutersTimeout OBJECT-TYPE
+			SYNTAX INTEGER (5..9999999)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Set the timeout of EZ2route routers"
+			DEFVAL { 900 }
+			::= { ipEZ2RControlEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.2.1.3
+		ipEZ2RControlHostsTimeout OBJECT-TYPE
+			SYNTAX INTEGER (300..9999999)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Set the timeout of EZ2route hosts"
+			DEFVAL { 14400 }
+			::= { ipEZ2RControlEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.13.2.1.5
+		ipEZ2RControlAutoLearnMode OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DEFVAL { enable }
+			::= { ipEZ2RControlEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.14
+		ipVRRP OBJECT IDENTIFIER ::= { ipRoute 14 }
+		
+		-- 1.3.6.1.4.1.81.31.1.14.1
+		ipVRRPAdminStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Global switch to enable/disable VRRP"
+			DEFVAL { disable }
+			::= { ipVRRP 1 }
+		
+-- ************************************************
+-- * IP Header Compression (IPHC) control mib     *
+-- * This manages IP, TCP, RTP header compression,*
+-- * according to RFCs 1144, 2507 & 2508.         *
+-- ************************************************
+		-- 1.3.6.1.4.1.81.31.1.15
+		iphcObjects OBJECT IDENTIFIER ::= { ipRoute 15 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1
+		iphcControlTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IphcControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"IPHC table"
+			::= { iphcObjects 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1
+		iphcControlEntry OBJECT-TYPE
+			SYNTAX IphcControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"An list of iphc configuration parameters"
+			INDEX { iphcIfIndex }
+			::= { iphcControlTable 1 }
+		
+		IphcControlEntry ::=
+			SEQUENCE { 
+				iphcIfIndex
+					INTEGER,
+				iphcControlTcpAdminStatus
+					INTEGER,
+				iphcTcpSessions
+					INTEGER,
+				iphcNegotiatedTcpSessions
+					INTEGER,
+				iphcControlRtpAdminStatus
+					INTEGER,
+				iphcRtpSessions
+					INTEGER,
+				iphcNegotiatedRtpSessions
+					INTEGER,
+				iphcControlNonTcpAdminStatus
+					INTEGER,
+				iphcNonTcpSessions
+					INTEGER,
+				iphcNegotiatedNonTcpSessions
+					INTEGER,
+				iphcMaxPeriod
+					INTEGER,
+				iphcMaxTime
+					INTEGER,
+				iphcControRtpMinPortNumber
+					INTEGER,
+				iphcControRtpMaxPortNumber
+					INTEGER,
+				iphcControlRtpCompressionRatio
+					INTEGER,
+				iphcControlNonTcpMode
+					INTEGER,
+				iphcControlTcpCompressionRatio
+					INTEGER,  
+				iphcControlTotalCompressionRatio
+					INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.1
+		iphcIfIndex OBJECT-TYPE
+			SYNTAX INTEGER (1..2147483647)
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"This object represents the interface index
+				of the interface for which iphc parameters
+				are configured.
+				"
+			::= { iphcControlEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.2
+		iphcControlTcpAdminStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object determines whether tcp
+				header compression is enabled on this
+				interface."
+			DEFVAL { disable }
+			::= { iphcControlEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.3
+		iphcTcpSessions OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The maximum number of context identifiers 
+				for TCP connections on this interface."
+			DEFVAL { 16 }
+			::= { iphcControlEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.4
+		iphcNegotiatedTcpSessions OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The negotiated number of context
+				identifiers for TCP connections on
+				this interface. "
+			::= { iphcControlEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.5
+		iphcControlRtpAdminStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object determines whether rtp
+				header compression is enabled on this
+				interface."
+			DEFVAL { disable }
+			::= { iphcControlEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.6
+		iphcRtpSessions OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The maximum number of context
+				identifiers for RTP connections on
+				this interface. 0 means that no RTP
+				headers will be compressed."
+			DEFVAL { 16 }
+			::= { iphcControlEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.7
+		iphcNegotiatedRtpSessions OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The negotiated number of context identifiers 
+				for Rtp connections on this interface.
+				
+				"
+			::= { iphcControlEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.8
+		iphcControlNonTcpAdminStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object determines whether non
+				tcp header compression is enabled on
+				this interface."
+			DEFVAL { disable }
+			::= { iphcControlEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.9
+		iphcNonTcpSessions OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The maximum number of context
+				identifiers for non-TCP, non RTP connections on
+				this interface. 0 means that no
+				non-tcp, non-rtp  headers will be compressed."
+			DEFVAL { 0 }
+			::= { iphcControlEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.10
+		iphcNegotiatedNonTcpSessions OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The negotiated number of context identifiers 
+				for non-TCP, non-RTP
+				connections on this interface."
+			::= { iphcControlEntry 10 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.11
+		iphcMaxPeriod OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The maximum number of compressed packets
+				that can be sent between full headers."
+			DEFVAL { 256 }
+			::= { iphcControlEntry 11 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.12
+		iphcMaxTime OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The maximum number of seconds between 
+				full headers. "
+			DEFVAL { 5 }
+			::= { iphcControlEntry 12 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.13
+		iphcControRtpMinPortNumber OBJECT-TYPE
+			SYNTAX INTEGER (1..65535)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The minimal UDP destination port number to
+				be considered as RTP traffic."
+			::= { iphcControlEntry 13 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.14
+		iphcControRtpMaxPortNumber OBJECT-TYPE
+			SYNTAX INTEGER (1..65535)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The maximal UDP destination port number to
+				be considered as RTP traffic."
+			::= { iphcControlEntry 14 }
+		
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.15
+		iphcControlRtpCompressionRatio OBJECT-TYPE
+			SYNTAX INTEGER (0..100)
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The average ratio between the
+				compressed header size and the
+				original header size on this
+				interface. The value is expressed as a
+				percentage value.
+				Used for RTP header compression."
+			::= { iphcControlEntry 15 }
+
+		-- 1.3.6.1.4.1.81.31.1.15.1.1.16
+		iphcControlNonTcpMode OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				ietf(1),
+				other(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The non-TCP compression mode. 
+				ietf -	standard according to RFC 2507. 
+				other - D-bit is set, but the order of the
+				random fields is inverted"
+			DEFVAL { other }
+			::= { iphcControlEntry 16 }
+        
+        iphcControlTcpCompressionRatio OBJECT-TYPE
+			SYNTAX INTEGER (0..100)
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The average ratio between the
+				compressed header size and the
+				original header size on this
+				interface. The value is expressed as a
+				percentage value.
+				Used for TCP header compression."
+			::= { iphcControlEntry 17 }
+			
+		iphcControlTotalCompressionRatio OBJECT-TYPE
+			SYNTAX INTEGER (0..100)
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The average ratio between the
+				compressed header size and the
+				original header size on this
+				interface. The value is expressed as a
+				percentage value.
+				Used for the total TCP/RTP/UDP Header compression."
+			::= { iphcControlEntry 18 }
+        
+        
+        
+		-- 1.3.6.1.4.1.81.31.1.16
+		ospfXtndIfTable OBJECT-TYPE
+			SYNTAX  SEQUENCE OF OspfXtndIfEntry
+			ACCESS  not-accessible
+			STATUS  mandatory
+			DESCRIPTION
+			    "This table provides an extension to
+			    the standard OSPF Interface Table, ospfIfTable,
+			    as defined in RFC 1253, RFC1850."
+			::= { ipRoute 16 }
+
+		-- 1.3.6.1.4.1.81.31.1.16.1
+		ospfXtndIfEntry OBJECT-TYPE
+			SYNTAX  OspfXtndIfEntry
+			ACCESS  not-accessible
+			STATUS  mandatory
+			DESCRIPTION
+			    "An entry describes one interface from the view 
+			    point of OSPF."
+			INDEX   { ospfXtndIfIpAddress, ospfXtndIfAddressLessIf }
+			::= {ospfXtndIfTable 1 }
+
+		OspfXtndIfEntry ::= SEQUENCE {
+		      ospfXtndIfIpAddress IpAddress, 
+		      ospfXtndIfAddressLessIf INTEGER,
+		      ospfXtndIfPassiveMode  INTEGER
+		    }
+
+		-- 1.3.6.1.4.1.81.31.1.16.1.1
+		ospfXtndIfIpAddress OBJECT-TYPE
+			SYNTAX   IpAddress
+			ACCESS   read-only
+			STATUS   mandatory
+			DESCRIPTION
+			    "Equivalent to ospfIfIpAddress in the 
+			    standard ospfIfTable. 
+
+			    The IP address of this OSPF interface."
+			::= { ospfXtndIfEntry 1 }
+
+		-- 1.3.6.1.4.1.81.31.1.16.1.2
+	        ospfXtndIfAddressLessIf OBJECT-TYPE
+			SYNTAX   INTEGER
+			ACCESS   read-only
+			STATUS   mandatory
+			DESCRIPTION
+			    "Equivalent to ospfAddressLessIf in the 
+			    standard ospfIfTable.
+
+			    For the purpose of easing the instancing of
+			    addressed and addressless interfaces; This 
+			    variable takes the value 0 on interfaces with
+			    IP Addresses, and the corresponding value of 
+			    ifIndex for interfaces having no IP Address."
+			::= { ospfXtndIfEntry 2 }
+
+		-- 1.3.6.1.4.1.81.31.1.16.1.3
+    	        ospfXtndIfPassiveMode OBJECT-TYPE
+			SYNTAX  INTEGER {
+			        active(1),
+				passive(2)
+				}
+			ACCESS  read-write
+			STATUS  mandatory
+			DESCRIPTION
+			    "determines  whether this OSPF interface is in
+			    active or passive mode."
+			DEFVAL { active }
+			::= { ospfXtndIfEntry 3 }     
+			
+
+--   Next Hop section.
+-- Used in conjuction with the Policy based Routing
+-- application. 
+-- The user may configure next Hop IP or interface 
+-- in each next hop list.
+-- 
+-- 
+		nextHop OBJECT IDENTIFIER ::= { ipRoute 17 }
+		
+		nextHopListTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF NextHopListEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table configures the next hop lists parameters."
+			::= { nextHop 1 }
+		
+		nextHopListEntry OBJECT-TYPE
+			SYNTAX NextHopListEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"next Hop list parameters."
+			INDEX { nextHopListIndex }
+			::= { nextHopListTable 1 }
+		
+		NextHopListEntry ::=
+			SEQUENCE { 
+				nextHopListIndex
+					INTEGER,
+				nextHopListName
+					DisplayString,
+				nextHopListRowStatus
+					RowStatus,
+				nextHopListActive
+					INTEGER
+			 }
+
+		nextHopListIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"next Hop List Index."
+			::= { nextHopListEntry 1 }
+		
+		nextHopListName OBJECT-TYPE
+			SYNTAX DisplayString
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"next Hop list name."
+			::= { nextHopListEntry 2 }
+		
+		nextHopListRowStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Used for creation/deletion of a list and for 
+				monitoring list status.
+				Use createAndGo (4) to create a list. 
+				Destroy (6) to destroy a list.
+				active(1),
+				notInService(2),
+				notReady(3),
+				createAndGo(4),
+				createAndWait(5),
+				destroy(6)"
+			::= { nextHopListEntry 3 }
+		
+		nextHopListActive OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				active(1),
+				nonActive(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"State whether the next hop list is active or not.
+				"
+			DEFVAL { nonActive }
+			::= { nextHopListEntry 4 }
+		
+		nextHopTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF NextHopEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"Next Hop IP/Interface table. 
+				Each next hop List may contain several next hops."
+			::= { nextHop 2 }
+		
+		nextHopEntry OBJECT-TYPE
+			SYNTAX NextHopEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"next hop parameters."
+			INDEX { nextHopListIndex, nextHopIndex  }
+			::= { nextHopTable 1 }
+		
+		NextHopEntry ::=
+			SEQUENCE { 
+				nextHopIndex
+					INTEGER,
+				nextHopType
+					INTEGER,
+				nextHopIP
+					IpAddress,
+				nextHopInterface
+					DisplayString,
+				nextHopStatus
+					INTEGER,
+				nextHopRowStatus
+					INTEGER,
+				nextHopTrackId
+					Unsigned32
+			 }
+
+		nextHopIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"next hop index in the next hop list."
+			::= { nextHopEntry 1 }
+		
+		nextHopType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				iPAddress(1),
+				interface(2),
+				null0(3)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Type of the next hop.
+				1 - IP address - next jop IP address.
+				2 - Interface - next hop interface.
+				3 - Null0 - Interface Null0 for dropping packets."
+			::= { nextHopEntry 2 }
+		
+		nextHopIP OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"next hop IP address"
+			::= { nextHopEntry 3 }
+		
+		nextHopInterface OBJECT-TYPE
+			SYNTAX DisplayString
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"next hop interface - null0, GRE Tunnel, Serial."
+			::= { nextHopEntry 4 }
+		
+		nextHopStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				up(1),
+				down(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Presents whether this next hop is available or not.
+				1 - UP
+				2 - Down
+				The status is used to for choosing the first 
+				IP/Interface UP/Valid in the next hop list."
+			DEFVAL { down }
+			::= { nextHopEntry 5 }
+		
+		nextHopRowStatus OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Used for creation/deletion of a next hop entry 
+				and for monitoring entry status.
+				1) create the next-hop entry by setting nextHopRowStatus==CreateAndWait
+					At this stage the entry is NotReady
+				2) set either the nextHopIP or nextHopInterface to change the entry to Active
+				3) If nextHop is IP Address then nextHopInterface=L3 interface name
+				4) if nextHop is interface then nextHopIP=0.0.0.0.
+				5) if nextHop is null0 then nextHopIp=0.0.0.0 and.
+					nextHopInterface=null0
+				6) to change an entry from IP to INTERFACE to NULL0:
+					ip->interface/null0 : set the nextHopInterface 
+					interface->null0	: set the nextHopInterface 
+					interface->ip		: set the nextHopIP 
+				7) nextHopType is READ-ONLY
+				active(1),
+				notInService(2),
+				notReady(3),
+				createAndGo(4),
+				createAndWait(5),
+				destroy(6)"
+			::= { nextHopEntry 6 }
+
+		nextHopTrackId OBJECT-TYPE
+            SYNTAX Unsigned32
+            ACCESS read-write
+            STATUS mandatory
+            DESCRIPTION
+       		"Bind the status of this next hop to an object-tracker by specifying
+ 			the ID of the object-tracker (avstrTrackerId in 
+			AVAYA-SAA-TRACK-MIB).
+			A value of 0 means that the next hop is not bound to any 
+			object-tracker.
+			A value of 0xffffffff is notSupported feature for the relevant next hop.
+			"
+            DEFVAL { 'ffffffff'h}
+            ::= { nextHopEntry 7 }
+
+
+--  OSPF Interface Table
+
+-- This table is copied from standard OSPF-MIB. However unlike the standard MIB
+-- this table will show all the IP addresses including those that are IP unnumbered (0.0.0.N).
+-- We duplicate this table becuase some managmenet applications does not know to handle IP
+-- unnumbered. Therefore all the stanrdard MIBs as IP interfaces (RFC1213-MIB), OSPF interfaces
+-- (OSPF-MIB) and RIP tables(RIPv2-MIB) are duplicated. The standard tables will not show the IP
+-- unnumbered addresses but the new table will show all IP addresses.
+
+--      The OSPF Interface Table augments the ipAddrTable
+--             with OSPF specific information.
+
+    ospfCompleteIfTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF OspfCompleteIfEntry
+        ACCESS   not-accessible
+        STATUS   mandatory
+        DESCRIPTION
+           "The OSPF Interface Table describes the  inter-
+           faces from the viewpoint of OSPF."
+       REFERENCE
+          "OSPF Version 2, Appendix C.3  Router  interface
+          parameters"
+      ::= { ipRoute 18 }
+
+
+    ospfCompleteIfEntry OBJECT-TYPE
+        SYNTAX   OspfCompleteIfEntry
+        ACCESS   not-accessible
+        STATUS   mandatory
+        DESCRIPTION
+           "The OSPF Interface Entry describes one  inter-
+           face from the viewpoint of OSPF."
+       INDEX { ospfCompleteIfIpAddress, ospfCompleteAddressLessIf }
+       ::= { ospfCompleteIfTable 1 }
+
+OspfCompleteIfEntry ::=
+    SEQUENCE {
+        ospfCompleteIfIpAddress
+            IpAddress,
+        ospfCompleteAddressLessIf
+            Integer32,
+        ospfCompleteIfAreaId
+            AreaID,
+        ospfCompleteIfType
+            INTEGER,
+        ospfCompleteIfAdminStat
+            Status,
+        ospfCompleteIfRtrPriority
+            DesignatedRouterPriority,
+        ospfCompleteIfTransitDelay
+            UpToMaxAge,
+        ospfCompleteIfRetransInterval
+            UpToMaxAge,
+        ospfCompleteIfHelloInterval
+            HelloRange,
+        ospfCompleteIfRtrDeadInterval
+            PositiveInteger,
+        ospfCompleteIfPollInterval
+            PositiveInteger,
+        ospfCompleteIfState
+            INTEGER,
+        ospfCompleteIfDesignatedRouter
+            IpAddress,
+        ospfCompleteIfBackupDesignatedRouter
+            IpAddress,
+        ospfCompleteIfEvents
+            Counter32,
+        ospfCompleteIfAuthType
+            INTEGER,
+        ospfCompleteIfAuthKey
+            OCTET STRING,
+        ospfCompleteIfStatus
+            RowStatus,
+        ospfCompleteIfMulticastForwarding
+            INTEGER,
+        ospfCompleteIfDemand
+            TruthValue
+              }
+
+    ospfCompleteIfIpAddress OBJECT-TYPE
+        SYNTAX   IpAddress
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The IP address of this OSPF interface."
+       ::= { ospfCompleteIfEntry 1 }
+
+    ospfCompleteAddressLessIf OBJECT-TYPE
+        SYNTAX   Integer32
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "For the purpose of easing  the  instancing  of
+           addressed   and  addressless  interfaces;  This
+           variable takes the value 0 on  interfaces  with
+           IP  Addresses,  and  the corresponding value of
+           ifIndex for interfaces having no IP Address."
+       ::= { ospfCompleteIfEntry 2 }
+
+    ospfCompleteIfAreaId OBJECT-TYPE
+        SYNTAX   AreaID
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "A 32-bit integer uniquely identifying the area
+           to  which  the  interface  connects.   Area  ID
+           0.0.0.0 is used for the OSPF backbone."
+       DEFVAL   { '00000000'H }    -- 0.0.0.0
+       ::= { ospfCompleteIfEntry 3 }
+
+    ospfCompleteIfType OBJECT-TYPE
+        SYNTAX   INTEGER    {
+                    broadcast (1),
+                    nbma (2),
+                    pointToPoint (3),
+                    pointToMultipoint (5)
+                  }
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The OSPF interface type.
+
+           By way of a default, this field may be intuited
+           from the corresponding value of ifType.  Broad-
+           cast LANs, such as  Ethernet  and  IEEE  802.5,
+           take  the  value  'broadcast', X.25 and similar
+           technologies take the value 'nbma',  and  links
+           that  are  definitively point to point take the
+           value 'pointToPoint'."
+       ::= { ospfCompleteIfEntry 4 }
+
+
+    ospfCompleteIfAdminStat OBJECT-TYPE
+        SYNTAX   Status
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The OSPF  interface's  administrative  status.
+           The  value formed on the interface, and the in-
+           terface will be advertised as an internal route
+           to  some  area.   The  value 'disabled' denotes
+           that the interface is external to OSPF."
+       DEFVAL { enabled }
+       ::= { ospfCompleteIfEntry 5 }
+
+    ospfCompleteIfRtrPriority OBJECT-TYPE
+        SYNTAX   DesignatedRouterPriority
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The  priority  of  this  interface.   Used  in
+           multi-access  networks,  this  field is used in
+           the designated router election algorithm.   The
+           value 0 signifies that the router is not eligi-
+           ble to become the  designated  router  on  this
+           particular  network.   In the event of a tie in
+           this value, routers will use their Router ID as
+           a tie breaker."
+       DEFVAL { 1 }
+       ::= { ospfCompleteIfEntry 6 }
+
+
+    ospfCompleteIfTransitDelay OBJECT-TYPE
+        SYNTAX   UpToMaxAge
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The estimated number of seconds  it  takes  to
+           transmit  a  link state update packet over this
+           interface."
+       DEFVAL { 1 }
+       ::= { ospfCompleteIfEntry 7 }
+
+
+    ospfCompleteIfRetransInterval OBJECT-TYPE
+        SYNTAX   UpToMaxAge
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The number of seconds between  link-state  ad-
+           vertisement  retransmissions,  for  adjacencies
+           belonging to this  interface.   This  value  is
+           also used when retransmitting database descrip-
+           tion and link-state request packets."
+       DEFVAL { 5 }
+       ::= { ospfCompleteIfEntry 8 }
+
+
+    ospfCompleteIfHelloInterval OBJECT-TYPE
+        SYNTAX   HelloRange
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The length of time, in  seconds,  between  the
+           Hello  packets that the router sends on the in-
+           terface.  This value must be the same  for  all
+           routers attached to a common network."
+       DEFVAL { 10 }
+       ::= { ospfCompleteIfEntry 9 }
+
+
+    ospfCompleteIfRtrDeadInterval OBJECT-TYPE
+        SYNTAX   PositiveInteger
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The number of seconds that  a  router's  Hello
+           packets  have  not been seen before it's neigh-
+           bors declare the router down.  This  should  be
+           some  multiple  of  the  Hello  interval.  This
+           value must be the same for all routers attached
+           to a common network."
+       DEFVAL { 40 }
+       ::= { ospfCompleteIfEntry 10 }
+
+
+    ospfCompleteIfPollInterval OBJECT-TYPE
+        SYNTAX   PositiveInteger
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The larger time interval, in seconds,  between
+           the  Hello  packets  sent  to  an inactive non-
+           broadcast multi- access neighbor."
+       DEFVAL { 120 }
+       ::= { ospfCompleteIfEntry 11 }
+
+
+    ospfCompleteIfState OBJECT-TYPE
+        SYNTAX   INTEGER    {
+                    down (1),
+                    loopback (2),
+                    waiting (3),
+                    pointToPoint (4),
+                    designatedRouter (5),
+                    backupDesignatedRouter (6),
+                    otherDesignatedRouter (7)
+                  }
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The OSPF Interface State."
+       DEFVAL { down }
+       ::= { ospfCompleteIfEntry 12 }
+
+
+    ospfCompleteIfDesignatedRouter OBJECT-TYPE
+        SYNTAX   IpAddress
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The IP Address of the Designated Router."
+       DEFVAL   { '00000000'H }    -- 0.0.0.0
+       ::= { ospfCompleteIfEntry 13 }
+
+
+    ospfCompleteIfBackupDesignatedRouter OBJECT-TYPE
+        SYNTAX   IpAddress
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The  IP  Address  of  the  Backup   Designated
+           Router."
+       DEFVAL   { '00000000'H }    -- 0.0.0.0
+       ::= { ospfCompleteIfEntry 14 }
+
+    ospfCompleteIfEvents OBJECT-TYPE
+        SYNTAX   Counter32
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The number of times this  OSPF  interface  has
+           changed its state, or an error has occurred."
+       ::= { ospfCompleteIfEntry 15 }
+
+
+    ospfCompleteIfAuthKey OBJECT-TYPE
+        SYNTAX   OCTET STRING (SIZE (0..256))
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The Authentication Key.  If the Area's Author-
+           ization  Type  is  simplePassword,  and the key
+           length is shorter than 8 octets, the agent will
+           left adjust and zero fill to 8 octets.
+
+           Note that unauthenticated  interfaces  need  no
+           authentication key, and simple password authen-
+           tication cannot use a key of more  than  8  oc-
+           tets.  Larger keys are useful only with authen-
+           tication mechanisms not specified in this docu-
+           ment.
+
+           When read, ospfCompleteIfAuthKey always returns an  Oc-
+           tet String of length zero."
+       REFERENCE
+          "OSPF Version 2, Section 9  The  Interface  Data
+          Structure"
+      DEFVAL   { '0000000000000000'H }    -- 0.0.0.0.0.0.0.0
+      ::= { ospfCompleteIfEntry 16 }
+
+    ospfCompleteIfStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "This variable displays the status of  the  en-
+           try.  Setting it to 'invalid' has the effect of
+           rendering it inoperative.  The internal  effect
+           (row removal) is implementation dependent."
+       ::= { ospfCompleteIfEntry 17 }
+
+
+    ospfCompleteIfMulticastForwarding OBJECT-TYPE
+        SYNTAX   INTEGER    {
+                            blocked (1),        -- no multicast forwarding
+                            multicast (2),        -- using multicast address
+                            unicast (3)        -- to each OSPF neighbor
+                  }
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The way multicasts should  forwarded  on  this
+           interface;  not  forwarded,  forwarded  as data
+           link multicasts, or forwarded as data link uni-
+           casts.   Data link multicasting is not meaning-
+           ful on point to point and NBMA interfaces,  and
+           setting ospfMulticastForwarding to 0 effective-
+           ly disables all multicast forwarding."
+       DEFVAL { blocked }
+       ::= { ospfCompleteIfEntry 18 }
+
+
+    ospfCompleteIfDemand OBJECT-TYPE
+        SYNTAX   TruthValue
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "Indicates whether Demand OSPF procedures (hel-
+           lo supression to FULL neighbors and setting the
+           DoNotAge flag on proogated LSAs) should be per-
+           formed on this interface."
+       DEFVAL { false }
+       ::= { ospfCompleteIfEntry 19 }
+
+
+    ospfCompleteIfAuthType OBJECT-TYPE
+        SYNTAX   INTEGER (0..255)
+                    -- none (0),
+                    -- simplePassword (1)
+                    -- md5 (2)
+                    -- reserved for specification by IANA (> 2)
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The authentication type specified for  an  in-
+           terface.   Additional  authentication types may
+           be assigned locally."
+       REFERENCE
+          "OSPF Version 2, Appendix E Authentication"
+      DEFVAL { 0 }        -- no authentication, by default
+      ::= { ospfCompleteIfEntry 20 }
+
+--  OSPF Interface Metric Table
+
+-- This table is copied from standard OSPF-MIB. However unlike the standard MIB
+-- this table will show all the IP addresses including those that are IP unnumbered (0.0.0.N).
+-- We duplicate this table becuase some managmenet applications does not know to handle IP
+-- unnumbered. Therefore all the stanrdard MIBs as IP interfaces (RFC1213-MIB), OSPF interfaces
+-- (OSPF-MIB) and RIP tables(RIPv2-MIB) are duplicated. The standard tables will not show the IP
+-- unnumbered addresses but the new table will show all IP addresses.
+
+--      The Metric Table describes the metrics to be advertised
+--      for a specified interface at the various types of service.
+--      As such, this table is an adjunct of the OSPF Interface
+--      Table.
+
+-- Types of service, as defined by RFC 791, have the ability
+-- to request low delay, high bandwidth, or reliable linkage.
+
+-- For the purposes of this specification, the measure of
+-- bandwidth
+
+--      Metric = 10^8 / ifSpeed
+
+-- is the default value.  For multiple link interfaces, note
+-- that ifSpeed is the sum of the individual link speeds.
+-- This yields a number having the following typical values:
+
+--      Network Type/bit rate   Metric
+
+--      >= 100 MBPS                 1
+--      Ethernet/802.3             10
+--      E1                         48
+--      T1 (ESF)                   65
+--       64 KBPS                 1562
+--       56 KBPS                 1785
+--       19.2 KBPS               5208
+--        9.6 KBPS              10416
+
+-- Routes that are not specified use the default (TOS 0) metric
+
+    ospfCompleteIfMetricTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF OspfCompleteIfMetricEntry
+        ACCESS   not-accessible
+        STATUS   mandatory
+        DESCRIPTION
+           "The TOS metrics for  a  non-virtual  interface
+           identified by the interface index."
+       REFERENCE
+          "OSPF Version 2, Appendix C.3  Router  interface
+          parameters"
+     ::= { ipRoute 19 }
+
+
+    ospfCompleteIfMetricEntry OBJECT-TYPE
+        SYNTAX   OspfCompleteIfMetricEntry
+        ACCESS   not-accessible
+        STATUS   mandatory
+        DESCRIPTION
+           "A particular TOS metric for a non-virtual  in-
+           terface identified by the interface index."
+       REFERENCE
+          "OSPF Version 2, Appendix C.3  Router  interface
+          parameters"
+      INDEX { ospfCompleteIfMetricIpAddress,
+  ospfCompleteIfMetricAddressLessIf,
+  ospfCompleteIfMetricTOS }
+      ::= { ospfCompleteIfMetricTable 1 }
+
+OspfCompleteIfMetricEntry ::=
+    SEQUENCE {
+        ospfCompleteIfMetricIpAddress
+            IpAddress,
+        ospfCompleteIfMetricAddressLessIf
+            Integer32,
+        ospfCompleteIfMetricTOS
+            TOSType,
+        ospfCompleteIfMetricValue
+            Metric,
+        ospfCompleteIfMetricStatus
+            RowStatus
+              }
+
+    ospfCompleteIfMetricIpAddress OBJECT-TYPE
+        SYNTAX   IpAddress
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The IP address of this OSPF interface.  On row
+           creation,  this  can  be  derived  from the in-
+           stance."
+       ::= { ospfCompleteIfMetricEntry 1 }
+
+    ospfCompleteIfMetricAddressLessIf OBJECT-TYPE
+        SYNTAX   Integer32
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "For the purpose of easing  the  instancing  of
+           addressed   and  addressless  interfaces;  This
+           variable takes the value 0 on  interfaces  with
+           IP  Addresses, and the value of ifIndex for in-
+           terfaces having no IP Address.   On  row  crea-
+           tion, this can be derived from the instance."
+       ::= { ospfCompleteIfMetricEntry 2 }
+
+
+    ospfCompleteIfMetricTOS OBJECT-TYPE
+        SYNTAX   TOSType
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The type of service metric  being  referenced.
+           On  row  creation, this can be derived from the
+           instance."
+       ::= { ospfCompleteIfMetricEntry 3 }
+
+
+    ospfCompleteIfMetricValue OBJECT-TYPE
+        SYNTAX   Metric
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The metric of using this type  of  service  on
+           this interface.  The default value of the TOS 0
+           Metric is 10^8 / ifSpeed."
+       ::= { ospfCompleteIfMetricEntry 4 }
+
+    ospfCompleteIfMetricStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "This variable displays the status of  the  en-
+           try.  Setting it to 'invalid' has the effect of
+           rendering it inoperative.  The internal  effect
+           (row removal) is implementation dependent."
+       ::= { ospfCompleteIfMetricEntry 5 }
+
+--4.2 RIP Interface Tables
+
+-- The RIP Interface Configuration Table.
+-- This table is copied from standard RIPv2-MIB. However unlike the standard MIB
+-- this table will show all the IP addresses including those that are IP unnumbered (0.0.0.N).
+-- We duplicate this table because some managmenet applications does not know to handle IP
+-- unnumbered. Therefore all the stanrdard MIBs as IP interfaces (RFC1213-MIB), OSPF interfaces
+-- (OSPF-MIB) and RIP tables(RIPv2-MIB) are duplicated. The standard tables will not show the IP
+-- unnumbered addresses but the new table will show all IP addresses.
+
+--  RIP Interfaces Groups
+--  Implementation of these Groups is mandatory for systems
+--  which implement RIP-2.
+
+-- The RIP Interface Status Table.
+
+    rip2CompleteIfStatTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF Rip2CompleteIfStatEntry
+        ACCESS   not-accessible
+        STATUS   mandatory
+        DESCRIPTION
+           "A list of subnets which require separate
+           status monitoring in RIP."
+       ::= { ipRoute 20 }
+
+   rip2CompleteIfStatEntry OBJECT-TYPE
+       SYNTAX   Rip2CompleteIfStatEntry
+       ACCESS   not-accessible
+       STATUS   mandatory
+       DESCRIPTION
+          "A Single Routing Domain in a single Subnet."
+      INDEX { rip2CompleteIfStatAddress }
+      ::= { rip2CompleteIfStatTable 1 }
+
+    Rip2CompleteIfStatEntry ::=
+        SEQUENCE {
+            rip2CompleteIfStatAddress
+                IpAddress,
+            rip2CompleteIfStatRcvBadPackets
+                Counter32,
+            rip2CompleteIfStatRcvBadRoutes
+                Counter32,
+            rip2CompleteIfStatSentUpdates
+                Counter32,
+            rip2CompleteIfStatStatus
+                RowStatus
+    }
+
+    rip2CompleteIfStatAddress OBJECT-TYPE
+        SYNTAX   IpAddress
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The IP Address of this system on the indicated
+           subnet. For unnumbered interfaces, the value 0.0.0.N,
+           where the least significant 24 bits (N) is the ifIndex
+           for the IP Interface in network byte order."
+       ::= { rip2CompleteIfStatEntry 1 }
+
+    rip2CompleteIfStatRcvBadPackets OBJECT-TYPE
+        SYNTAX   Counter32
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The number of RIP response packets received by
+           the RIP process which were subsequently discarded
+           for any reason (e.g. a version 0 packet, or an
+           unknown command type)."
+       ::= { rip2CompleteIfStatEntry 2 }
+
+    rip2CompleteIfStatRcvBadRoutes OBJECT-TYPE
+        SYNTAX   Counter32
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The number of routes, in valid RIP packets,
+           which were ignored for any reason (e.g. unknown
+           address family, or invalid metric)."
+       ::= { rip2CompleteIfStatEntry 3 }
+
+    rip2CompleteIfStatSentUpdates OBJECT-TYPE
+        SYNTAX   Counter32
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The number of triggered RIP updates actually
+           sent on this interface.  This explicitly does
+           NOT include full updates sent containing new
+           information."
+       ::= { rip2CompleteIfStatEntry 4 }
+
+    rip2CompleteIfStatStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "Writing invalid has the effect of deleting
+           this interface."
+       ::= { rip2CompleteIfStatEntry 5 }
+
+
+
+-- The RIP Interface Configuration Table.
+-- This table is copied from standard RIPv2-MIB. However unlike the standard MIB
+-- this table will show all the IP addresses including those that are IP unnumbered (0.0.0.N).
+-- We duplicate this table becuase some managmenet applications does not know to handle IP
+-- unnumbered. Therefore all the stanrdard MIBs as IP interfaces (RFC1213-MIB), OSPF interfaces
+-- (OSPF-MIB) and RIP tables(RIPv2-MIB) are duplicated. The standard tables will not show the IP
+-- unnumbered addresses but the new table will show all IP addresses.
+
+    rip2CompleteIfConfTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF Rip2CompleteIfConfEntry
+        ACCESS   not-accessible
+        STATUS   mandatory
+        DESCRIPTION
+           "A list of subnets which require separate
+           configuration in RIP."
+       ::= { ipRoute 21 }
+
+   rip2CompleteIfConfEntry OBJECT-TYPE
+       SYNTAX   Rip2CompleteIfConfEntry
+       ACCESS   not-accessible
+       STATUS   mandatory
+       DESCRIPTION
+          "A Single Routing Domain in a single Subnet."
+      INDEX { rip2CompleteIfConfAddress }
+      ::= { rip2CompleteIfConfTable 1 }
+
+    Rip2CompleteIfConfEntry ::=
+        SEQUENCE {
+            rip2CompleteIfConfAddress
+                IpAddress,
+            rip2CompleteIfConfDomain
+                RouteTag,
+            rip2CompleteIfConfAuthType
+                INTEGER,
+            rip2CompleteIfConfAuthKey
+                OCTET STRING (SIZE(0..16)),
+            rip2CompleteIfConfSend
+                INTEGER,
+            rip2CompleteIfConfReceive
+                INTEGER,
+            rip2CompleteIfConfDefaultMetric
+                INTEGER,
+            rip2CompleteIfConfStatus
+                RowStatus,
+            rip2CompleteIfConfSrcAddress
+                IpAddress
+    }
+
+    rip2CompleteIfConfAddress OBJECT-TYPE
+        SYNTAX   IpAddress
+        ACCESS   read-only
+        STATUS   mandatory
+        DESCRIPTION
+           "The IP Address of this system on the indicated
+           subnet.  For unnumbered interfaces, the value 0.0.0.N,
+           where the least significant 24 bits (N) is the ifIndex
+           for the IP Interface in network byte order."
+       ::= { rip2CompleteIfConfEntry 1 }
+
+    rip2CompleteIfConfDomain OBJECT-TYPE
+        SYNTAX   RouteTag
+        ACCESS   read-write
+        STATUS   obsolete
+        DESCRIPTION
+           "Value inserted into the Routing Domain field
+           of all RIP packets sent on this interface."
+       DEFVAL { '0000'h }
+       ::= { rip2CompleteIfConfEntry 2 }
+
+    rip2CompleteIfConfAuthType OBJECT-TYPE
+        SYNTAX   INTEGER {
+                    noAuthentication (1),
+                    simplePassword (2),
+                    md5 (3)
+                 }
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The type of Authentication used on this
+           interface."
+       DEFVAL { noAuthentication }
+       ::= { rip2CompleteIfConfEntry 3 }
+
+    rip2CompleteIfConfAuthKey OBJECT-TYPE
+        SYNTAX   OCTET STRING (SIZE(0..16))
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The value to be used as the Authentication Key
+           whenever the corresponding instance of
+           rip2CompleteIfConfAuthType has a value other than
+           noAuthentication.  A modification of the corresponding
+           instance of rip2CompleteIfConfAuthType does not modify
+           the rip2CompleteIfConfAuthKey value.  If a string shorter
+           than 16 octets is supplied, it will be left-
+           justified and padded to 16 octets, on the right,
+           with nulls (0x00).
+
+           Reading this object always results in an  OCTET
+           STRING of length zero; authentication may not
+           be bypassed by reading the MIB object."
+       DEFVAL { ''h }
+       ::= { rip2CompleteIfConfEntry 4 }
+
+    rip2CompleteIfConfSend OBJECT-TYPE
+        SYNTAX   INTEGER {
+                    doNotSend (1),
+                    ripVersion1 (2),
+                    rip1Compatible (3),
+                    ripVersion2 (4),
+                    ripV1Demand (5),
+                    ripV2Demand (6)
+                 }
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "What the router sends on this interface.
+           ripVersion1 implies sending RIP updates compliant
+           with  RFC  1058.   rip1Compatible implies
+           broadcasting RIP-2 updates using RFC 1058 route
+           subsumption rules.  ripVersion2 implies
+           multicasting RIP-2 updates.  ripV1Demand indicates
+           the use of Demand RIP on a WAN interface under RIP
+           Version 1 rules.  ripV2Demand indicates the use of
+           Demand RIP on a WAN interface under Version 2 rules."
+       DEFVAL { rip1Compatible }
+       ::= { rip2CompleteIfConfEntry 5 }
+
+    rip2CompleteIfConfReceive OBJECT-TYPE
+        SYNTAX   INTEGER {
+                    rip1 (1),
+                    rip2 (2),
+                    rip1OrRip2 (3),
+                    doNotRecieve (4)
+                 }
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "This indicates which version of RIP updates
+           are to be accepted.  Note that rip2 and
+           rip1OrRip2 implies reception of multicast
+           packets."
+       DEFVAL { rip1OrRip2 }
+       ::= { rip2CompleteIfConfEntry 6 }
+
+    rip2CompleteIfConfDefaultMetric OBJECT-TYPE
+        SYNTAX   INTEGER ( 0..15 )
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "This variable indicates the metric that is to
+           be used for the default route entry in RIP updates
+           originated on this interface.  A value of zero
+           indicates that no default route should be
+           originated; in this case, a default route via
+           another router may be propagated."
+       ::= { rip2CompleteIfConfEntry 7 }
+
+    rip2CompleteIfConfStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "Writing invalid has  the  effect  of  deleting
+           this interface."
+       ::= { rip2CompleteIfConfEntry 8 }
+
+    rip2CompleteIfConfSrcAddress OBJECT-TYPE
+        SYNTAX   IpAddress
+        ACCESS   read-write
+        STATUS   mandatory
+        DESCRIPTION
+           "The IP Address this system will use as a source
+            address on this interface.  If it is a numbered
+            interface, this MUST be the same value as
+            rip2CompleteIfConfAddress.  On unnumbered interfaces,
+            it must be the value of rip2CompleteIfConfAddress for
+            some interface on the system."
+       ::= { rip2CompleteIfConfEntry 9 }        
+       
+       
+--  The  IpCidrRouteTable is a standard table in IP-FORWARDING-MIB that used to show/configure 
+--  routes of the device. This table shows only active (status up) routes. Thus, causing to a 
+--  problem when user configure static route that its state is down and are not shown in the table. 
+--  Only permanent static-routes are shown. Non-permanent routes with status down are not shown. 
+--  The proprietary IpCidrRouteStaticEntry table will be used to show/configure all the static 
+--  routes as IpCidrRouteTable and also those that their status is down. 
+--  The IpCidrRouteStaticEntry allows in different way to create static routes over VIA interface
+--  or using dhcp next hops. Part of the index is the ifindex which allows creating Via/DHCP static
+--  routes. Therefore, the current mechanism of declaring static routes over VIA interfaces using 
+--  temporarily next-hop 127.50.0.0 or of declaring static routes over Interfaces running DHCP 
+--  client using temporarily next-hop 127.60.0.0 IS REMOVED.
+--  Both tables (IpCidrRouteTable and ipCidrRouteStaticTable) will be used to create/show/configure
+--  the routes at the same time.
+--  Note that ipCidrRouteStaticTable will include only static routes and NOT RIP, OSPF routes as
+--  the standard MIB table shows. 
+--  In addition part of the indexes is the ipCidrRouteStaticPreference which can allows definition 
+--  of the same static routes but with different preferences (high/low).
+--  Configuration of Static routes shall be as follows:
+--  ipCidrRouteStaticIfIndex	ipCidrRouteStaticNextHop 	Static route type
+--  ------------------------    ------------------------ 	-----------------
+--     0            			0           				Discard route / Null route. Static 
+--															Route used for dropping packets.
+--     0         				Valid      					Regular Static Route
+-- 
+--   Valid						0 							VIA interface static route or route 
+-- 															using DHCP default router
+--   Valid       				Valid          				Invalid Route - Illegal Configuration.
+
+ipCidrRouteStaticTable OBJECT-TYPE
+    SYNTAX   SEQUENCE OF IpCidrRouteStaticEntry
+    ACCESS not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+       "Static Route Table"
+    ::= { ipRoute 22 }
+
+ipCidrRouteStaticEntry OBJECT-TYPE
+    SYNTAX   IpCidrRouteStaticEntry
+    ACCESS not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+       "A particular route to  a  particular  destina-
+       tion"
+    INDEX {
+        ipCidrRouteStaticDest,
+        ipCidrRouteStaticMask,   
+        ipCidrRouteStaticIfIndex,
+        ipCidrRouteStaticNextHop,  
+        ipCidrRouteStaticPreference
+        }
+    ::= { ipCidrRouteStaticTable 1 }
+
+IpCidrRouteStaticEntry ::=
+    SEQUENCE {
+        ipCidrRouteStaticDest
+            IpAddress,
+        ipCidrRouteStaticMask
+            IpAddress,
+        ipCidrRouteStaticIfIndex
+            Integer32,
+        ipCidrRouteStaticNextHop
+            IpAddress,
+        ipCidrRouteStaticPreference
+            Integer32,
+        ipCidrRouteStaticUsedIfIndex
+            Integer32,
+        ipCidrRouteStaticUsedNextHop
+            IpAddress,
+        ipCidrRouteStaticType
+            INTEGER,
+        ipCidrRouteStaticCost
+            Integer32,
+        ipCidrRouteStaticPermanent
+            Integer32,
+        ipCidrRouteStaticTrackId
+            Unsigned32,
+        ipCidrRouteStaticActive
+            INTEGER,
+        ipCidrRouteStaticRowStatus
+            RowStatus
+    }
+
+ipCidrRouteStaticDest OBJECT-TYPE
+    SYNTAX   IpAddress
+    ACCESS not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+       "The destination IP address of this route.
+
+       This object may not take a Multicast (Class  D)
+       address value.
+
+       Any assignment (implicit or  otherwise)  of  an
+       instance  of  this  object to a value x must be
+       rejected if the bitwise logical-AND of  x  with
+       the  value of the corresponding instance of the
+       ipCidrRouteStaticMask object is not equal to x."
+    ::= { ipCidrRouteStaticEntry 1 }
+
+ipCidrRouteStaticMask OBJECT-TYPE
+    SYNTAX   IpAddress
+    ACCESS not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+       "Indicate the mask to be logical-ANDed with the
+       destination  address  before  being compared to
+       the value  in  the  ipCidrRouteStaticDest  field.   For
+       those  systems  that  do  not support arbitrary
+       subnet masks, an agent constructs the value  of
+       the  ipCidrRouteStaticMask  by  reference to the IP Ad-
+       dress Class.
+
+       Any assignment (implicit or  otherwise)  of  an
+       instance  of  this  object to a value x must be
+       rejected if the bitwise logical-AND of  x  with
+       the  value of the corresponding instance of the
+       ipCidrRouteStaticDest object is not equal to ipCidrRouteStatic-
+       Dest."
+    ::= { ipCidrRouteStaticEntry 2 }
+
+ipCidrRouteStaticIfIndex OBJECT-TYPE
+    SYNTAX   Integer32
+    ACCESS not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+       "The ifIndex value which identifies  the  local
+       interface  through  which  the next hop of this
+       route should be reached.
+       Note that for regular static routes and for discard routes the ifindex is 0.
+       "
+    DEFVAL { 0 }
+    ::= { ipCidrRouteStaticEntry 3 }
+    
+ipCidrRouteStaticNextHop OBJECT-TYPE
+    SYNTAX   IpAddress
+    ACCESS not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+       "On remote routes, the address of the next sys-
+       tem en route; Otherwise, 0.0.0.0.
+       Note that for Via interface/DHCP static routes the next-hop is 0.0.0.0."
+    ::= { ipCidrRouteStaticEntry 4 }
+
+ipCidrRouteStaticPreference OBJECT-TYPE
+    SYNTAX   Integer32
+    ACCESS not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+       "Preference of the static route.
+       high(0) - High priority route.
+       low(250) - low priority route.
+       In case of Discard route the preference is high(0)."
+    DEFVAL { 0 }
+    ::= { ipCidrRouteStaticEntry 5 }
+
+ipCidrRouteStaticUsedIfIndex OBJECT-TYPE
+    SYNTAX   Integer32
+    ACCESS read-only
+    STATUS   mandatory
+    DESCRIPTION
+       "The ifIndex value which identifies  the  local
+       interface  through  which  the next hop of this
+       route should be reached.
+       When creating regular static route then there is no information to management application
+       on the ifindex. After creating this route this information is presented by the device on this
+       MIB. There is no option to present it on the ipCidrRouteStaticIfIndex because the row
+       index will then be changed."
+    DEFVAL { 0 }
+    ::= { ipCidrRouteStaticEntry 6 }
+    
+ipCidrRouteStaticUsedNextHop OBJECT-TYPE
+    SYNTAX   IpAddress
+    ACCESS read-only
+    STATUS   mandatory
+    DESCRIPTION
+       "On remote routes, the address of the next sys-
+       tem en route; Otherwise, 0.0.0.0.
+       When creating DHCP static route using the default router as next hop then when creating
+       this route the next-hop IP address is not known by the management application.  
+       After creating this route this information is presented by the device on this
+       MIB. Note that if no default router/IP address was gathered by the DHCP client from the DHCP
+       server then 0.0.0.0 will be presented else the default-router will be presented. 
+       There is no option to present it on the ipCidrRouteStaticNextHop because the row
+       index will then be changed.
+       Note that usedNextHop can be different than 0.0.0.0 only in DHCP and regular routes. 
+       In via route/discard, it remains 0.0.0.0."
+    ::= { ipCidrRouteStaticEntry 7 }
+
+ipCidrRouteStaticType OBJECT-TYPE
+    SYNTAX   INTEGER {
+                via      (1), -- Via interface static route
+                discard  (2), -- route which discards traffic
+                dhcp     (3), -- Static route using DHCP client next hop.
+                regular  (4)  -- Regular Static route
+             }
+    ACCESS read-only
+    STATUS   mandatory
+    DESCRIPTION
+       "Type of the static route. 
+        via      (1), -- Via interface static route
+        discard  (2), -- route which discards traffic
+        dhcp     (3), -- Static route using DHCP client next hop.
+        regular  (4)  -- Regular Static route
+       "
+    ::= { ipCidrRouteStaticEntry 8 }
+
+ipCidrRouteStaticCost OBJECT-TYPE
+    SYNTAX   Integer32
+    ACCESS read-write
+    STATUS   mandatory
+    DESCRIPTION
+       "The static route cost."
+    DEFVAL { 1 }
+    ::= { ipCidrRouteStaticEntry 9 }
+
+ipCidrRouteStaticPermanent OBJECT-TYPE
+    SYNTAX   Integer32
+    ACCESS read-write
+    STATUS   mandatory
+    DESCRIPTION
+       "This MIB item conveys additional information about the route.
+       Permanent(1) - Permanent Static route which is still active even if the next hop is down.
+       Non-Permanent(2) -  Non-Permanent Static routes which is non-active when the next hop is down and
+       up when the next-hop is up."
+    DEFVAL { 2 }
+    ::= { ipCidrRouteStaticEntry 10 }
+
+ipCidrRouteStaticTrackId OBJECT-TYPE
+            SYNTAX Unsigned32
+            ACCESS read-write
+            STATUS mandatory
+            DESCRIPTION
+       		"Bind the status of this static route to an object-tracker by specifying
+ 			the ID of the object-tracker (avstrTrackerId in 
+			AVAYA-SAA-TRACK-MIB).
+			A value of 0 means that the static route is not bound to any 
+			object-tracker.
+			A value of 0xffffffff is notSupported feature for the relevant static route.
+			
+			Note that Discard routes and Permanent Routes have ipCidrRouteStaticTrackId 
+			equal to 0xffffffff.
+			Permanent Routes that were changed to Non-Permanent Routes will have       
+			ipCidrRouteStaticTrackId equal to 0x0 (The value changed from 0xffffffff to 0x0).
+			"
+            DEFVAL { 'ffffffff'h}
+            ::= { ipCidrRouteStaticEntry 11 }
+
+ipCidrRouteStaticActive OBJECT-TYPE
+    SYNTAX   INTEGER {
+                yes(1),    -- Active Route
+                no(2)  -- Non-Active Route
+                }
+    ACCESS read-only
+    STATUS   mandatory
+    DESCRIPTION
+       "The status of the route. If it is active then it is found on the routing database and
+       affect traffic else it is no found on the routing database and does not affect traffic.
+       "
+    ::= { ipCidrRouteStaticEntry 12 }        
+
+ipCidrRouteStaticRowStatus OBJECT-TYPE
+    SYNTAX   RowStatus
+    ACCESS read-write
+    STATUS   mandatory
+    DESCRIPTION
+       "The row status variable, used according to
+       row installation and removal conventions.
+       The values that are supported are destroy, create-and-wait,create-and-go, active."
+    ::= { ipCidrRouteStaticEntry 13 }
+
+
+
+		-- 1.3.6.1.4.1.81.31.2
+		ipxRoute OBJECT IDENTIFIER ::= { croute 2 }
+
+		-- 1.3.6.1.4.1.81.31.2.1
+		ipxCircTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpxCircEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is an extention of Novell
+				mib IpxCircTable, and is used to
+				add/delete entries to/from that table.
+				In addition it contains private
+				objects."
+			::= { ipxRoute 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1
+		ipxCircEntry OBJECT-TYPE
+			SYNTAX IpxCircEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's IPX circuits. An IPX
+				circuit is a logical connection to a
+				certain IPX netNumber."
+			INDEX { ipxCircIndex }
+			::= { ipxCircTable 1 }
+		
+		IpxCircEntry ::=
+			SEQUENCE { 
+				ipxCircIndex
+					INTEGER,
+				ipxCircNetNumber
+					NetNum,
+				ipxCircLowerIfAlias
+					DisplayString,
+				ipxCircEncapsulation
+					INTEGER,
+				ipxCircNetbios
+					INTEGER,
+				ipxCircStatus
+					RowStatus,
+				ipxCircRipUpdate
+					INTEGER,
+				ipxCircRipAgeMultiplier
+					INTEGER,
+				ipxCircRipStatus
+					INTEGER,
+				ipxCircSapUpdate
+					INTEGER,
+				ipxCircSapAgeMultiplier
+					INTEGER,
+				ipxCircGetNearestServerReply
+					INTEGER,
+				ipxCircSapStatus
+					INTEGER,
+				ipxCircRipState
+					INTEGER,
+				ipxCircSapState
+					INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.2.1.1.1
+		ipxCircIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The identifier of this circuit,
+				unique within the instance of IPX.
+				This value may be written only when
+				creating a new entry in the table."
+			::= { ipxCircEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.2
+		ipxCircNetNumber OBJECT-TYPE
+			SYNTAX NetNum
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IPX network number of this circuit."
+			::= { ipxCircEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.3
+		ipxCircLowerIfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..16))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for
+				the lower-layer interface on top of
+				which this IP interface is defined.
+				The alias is specified by the network
+				manager, and provides a non-volatile
+				'handle' for the lower-layer
+				interface. The semantics of the object
+				are similar to the semantics of the
+				ifAlias object, defined by the
+				Interfaces MIB. At the time when this
+				Madge MIB object was defined, the
+				latest release of the Interfaces MIB
+				was draft-ietf-ifmib-mib-05.txt. The
+				purpose is to support all methods
+				(static or dynamic) for creation of
+				interfaces and to allow creation of
+				IPX table entries without the need of
+				the layer 2 interface to be present on
+				the device at the time of the
+				creation. It is assumed that some
+				implementation dependent mechanisms
+				allow the IPX application to be
+				informed about the creation of new
+				lower layer interfaces."
+			::= { ipxCircEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.4
+		ipxCircEncapsulation OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				other(1),
+				novell(2),
+				ethernet(3),
+				llc(4),
+				snap(5)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The media type (encapsulation of
+				layer2) of this circuit."
+			::= { ipxCircEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.5
+		ipxCircNetbios OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The type of the circuit."
+			DEFVAL { enable }
+			::= { ipxCircEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.6
+		ipxCircStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting Circuits.
+				Deleting this row means deleting the
+				corresponding entry in ipxCircTable.
+				Deleting a Circuit also causes
+				deletion of all static routes defined
+				on this Circuit, as well as protocol
+				Circuit (e.g. RIP and SAP) defined on
+				this Circuit."
+			::= { ipxCircEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.7
+		ipxCircRipUpdate OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The RIP periodic update interval, in seconds."
+			DEFVAL { 60 }
+			::= { ipxCircEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.8
+		ipxCircRipAgeMultiplier OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The holding multiplier for
+				information received in RIP periodic
+				updates."
+			DEFVAL { 4 }
+			::= { ipxCircEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.9
+		ipxCircRipStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Indicates whether RIP information may
+				be sent/received over this circuit.
+				Set by the user"
+			DEFVAL { enable }
+			::= { ipxCircEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.10
+		ipxCircSapUpdate OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The SAP periodic update interval, in seconds."
+			DEFVAL { 60 }
+			::= { ipxCircEntry 10 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.11
+		ipxCircSapAgeMultiplier OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The holding multiplier for
+				information received in SAP periodic
+				updates."
+			DEFVAL { 4 }
+			::= { ipxCircEntry 11 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.12
+		ipxCircGetNearestServerReply OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Indicates whether to respond to SAP
+				get nearest server requests received
+				on this circuit."
+			DEFVAL { enable }
+			::= { ipxCircEntry 12 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.13
+		ipxCircSapStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Indicates whether SAP information may
+				be sent/received over this circuit."
+			DEFVAL { enable }
+			::= { ipxCircEntry 13 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.14
+		ipxCircRipState OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				active(1),
+				inactive(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Indicates whether RIP information may
+				be sent/received over this circuit.
+				Set by the device to reflect the RIP
+				status and the interface status"
+			DEFVAL { active }
+			::= { ipxCircEntry 14 }
+		
+		-- 1.3.6.1.4.1.81.31.2.1.1.15
+		ipxCircSapState OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				active(1),
+				inactive(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Indicates whether SAP information may
+				be sent/received over this circuit.
+				Set by the device to reflect the SAP
+				status and the interface status"
+			DEFVAL { active }
+			::= { ipxCircEntry 15 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2
+		ipxDestTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpxDestEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table replace the Novell mib
+				IpxDestTable, and is used to
+				add/delete entries to/from that
+				table."
+			::= { ipxRoute 2 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1
+		ipxDestEntry OBJECT-TYPE
+			SYNTAX IpxDestEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's IPX Routes. An IPX
+				service is a logical connection to a
+				certain IPX Server."
+			INDEX { ipxDestNetNum }
+			::= { ipxDestTable 1 }
+		
+		IpxDestEntry ::=
+			SEQUENCE { 
+				ipxDestNetNum
+					NetNum,
+				ipxDestProtocol
+					INTEGER,
+				ipxDestTicks
+					INTEGER,
+				ipxDestHopCount
+					INTEGER,
+				ipxDestNextHopCircIndex
+					INTEGER,
+				ipxDestNextHopNICAddress
+					PhysAddress,
+				ipxDestNextHopNetNum
+					NetNum,
+				ipxDestStatus
+					RowStatus,
+				ipxDestAge
+					INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.2.2.1.1
+		ipxDestNetNum OBJECT-TYPE
+			SYNTAX NetNum
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The IPX network number portion of the
+				IPX address of the destination."
+			::= { ipxDestEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.2
+		ipxDestProtocol OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				other(1),
+				local(2),
+				rip(3),
+				nlsp(4),
+				static(5)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The routing protocol from which
+				knowledge of this destination was
+				obtained."
+			::= { ipxDestEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.3
+		ipxDestTicks OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The delay in ticks to reach this destination."
+			::= { ipxDestEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.4
+		ipxDestHopCount OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The number of hops necessary to reach
+				the destination."
+			::= { ipxDestEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.5
+		ipxDestNextHopCircIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The unique identifier of the circuit,
+				used to reach the next hop."
+			::= { ipxDestEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.6
+		ipxDestNextHopNICAddress OBJECT-TYPE
+			SYNTAX PhysAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The NIC address of the next hop."
+			::= { ipxDestEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.7
+		ipxDestNextHopNetNum OBJECT-TYPE
+			SYNTAX NetNum
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IPX network number of the next hop."
+			::= { ipxDestEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.8
+		ipxDestStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			::= { ipxDestEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.2.2.1.9
+		ipxDestAge OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The age of the Routing table entry."
+			::= { ipxDestEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3
+		ipxServTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpxServEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table replace the Novell mib
+				IpxServTable, and is used to
+				add/delete entries to/from that
+				table."
+			::= { ipxRoute 3 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1
+		ipxServEntry OBJECT-TYPE
+			SYNTAX IpxServEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's IPX Services. An IPX
+				service is a logical connection to a
+				certain IPX Server."
+			INDEX { ipxServType, ipxServName }
+			::= { ipxServTable 1 }
+		
+		IpxServEntry ::=
+			SEQUENCE { 
+				ipxServType
+					INTEGER,
+				ipxServName
+					DisplayString,
+				ipxServProtocol
+					INTEGER,
+				ipxServNetNum
+					NetNum,
+				ipxServNode
+					OCTET STRING,
+				ipxServSocket
+					INTEGER,
+				ipxServHopCount
+					INTEGER,
+				ipxServStatus
+					RowStatus,
+				ipxServAge
+					INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.2.3.1.1
+		ipxServType OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The service type."
+			::= { ipxServEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.2
+		ipxServName OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (1..48))
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The server name."
+			::= { ipxServEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.3
+		ipxServProtocol OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				other(1),
+				local(2),
+				nlsp(4),
+				static(5),
+				sap(6)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The protocol from which knowledge of
+				this service was obtained."
+			::= { ipxServEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.4
+		ipxServNetNum OBJECT-TYPE
+			SYNTAX NetNum
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IPX network number portion of the
+				IPX address of the service."
+			::= { ipxServEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.5
+		ipxServNode OBJECT-TYPE
+			SYNTAX OCTET STRING (SIZE (6))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The node portion of the IPX address
+				of the service."
+			::= { ipxServEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.6
+		ipxServSocket OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The socket portion of the IPX address
+				of the service."
+			::= { ipxServEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.7
+		ipxServHopCount OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The number of hops to the service."
+			::= { ipxServEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.8
+		ipxServStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			::= { ipxServEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.2.3.1.9
+		ipxServAge OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The age of the SAP entry."
+			::= { ipxServEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.2.4
+		ipxAccessGlobals OBJECT IDENTIFIER ::= { ipxRoute 4 }
+		
+		-- 1.3.6.1.4.1.81.31.2.4.1
+		ipxAccessControlEnable OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to activate the IPX ACCESS
+				CONTROL statements on the device.
+				disable means don't activate IPX
+				ACCESS CONTROL over all the IPX
+				statements enable means activate IPX
+				ACCESS CONTROL over all the IPX
+				statements "
+			DEFVAL { disable }
+			::= { ipxAccessGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.5
+		ipxAccessControlTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpxAccessControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is used to add/delete IPX
+				access control statement to/from that
+				table."
+			::= { ipxRoute 5 }
+		
+		-- 1.3.6.1.4.1.81.31.2.5.1
+		ipxAccessControlEntry OBJECT-TYPE
+			SYNTAX IpxAccessControlEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's IPX access control
+				statements."
+			INDEX { ipxAccessControlIndex }
+			::= { ipxAccessControlTable 1 }
+		
+		IpxAccessControlEntry ::=
+			SEQUENCE { 
+				ipxAccessControlIndex
+					INTEGER,
+				ipxAccessControlSrcAddr
+					NetNum,
+				ipxAccessControlDstAddr
+					NetNum,
+				ipxAccessControlOperation
+					INTEGER,
+				ipxAccessControlActivation
+					INTEGER,
+				ipxAccessControlStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.2.5.1.1
+		ipxAccessControlIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Entry index."
+			::= { ipxAccessControlEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.5.1.2
+		ipxAccessControlSrcAddr OBJECT-TYPE
+			SYNTAX NetNum
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IPX network of the source address."
+			::= { ipxAccessControlEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.2.5.1.3
+		ipxAccessControlDstAddr OBJECT-TYPE
+			SYNTAX NetNum
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IPX network of the destination address."
+			::= { ipxAccessControlEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.2.5.1.4
+		ipxAccessControlOperation OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				forward(1),
+				block(2),
+				blockAndReport(3)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"How to operate the IPX ACCESS CONTROL
+				statement, on the receiving packet.
+				Forwards the packet, Block (Discard)
+				the packet or block (Discard) the
+				packet and report to the user by
+				sending trap."
+			::= { ipxAccessControlEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.2.5.1.5
+		ipxAccessControlActivation OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				wire-speed(1),
+				regular(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Does the IPX ACCESS CONTROL statement
+				done by HW or SW(CPU).
+				HW - wire-speed, 
+				SW - regular."
+			::= { ipxAccessControlEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.2.5.1.6
+		ipxAccessControlStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"For create/delete of an IPX ACCESS
+				CONTROL statement."
+			::= { ipxAccessControlEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.2.6
+		ipxSapFilterGlobals OBJECT IDENTIFIER ::= { ipxRoute 6 }
+		
+		-- 1.3.6.1.4.1.81.31.2.6.1
+		ipxSapFilterEnable OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to activate the IPX SAP
+				Filters statements on the device.
+				disable means don't activate IPX SAP
+				Filters over all the IPX SAP
+				statements enable means activate IPX
+				SAP Filter over all the IPX SAP
+				statements "
+			DEFVAL { disable }
+			::= { ipxSapFilterGlobals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7
+		ipxSapFilterTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpxSapFilterEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"Table of input/output SAP filter
+				according to IPX circuit number."
+			::= { ipxRoute 7 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1
+		ipxSapFilterEntry OBJECT-TYPE
+			SYNTAX IpxSapFilterEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"An entry in the SAP filter table"
+			INDEX { ipxSapFilterID }
+			::= { ipxSapFilterTable 1 }
+		
+		IpxSapFilterEntry ::=
+			SEQUENCE { 
+				ipxSapFilterID
+					INTEGER,
+				ipxSapFilterCircIndex
+					INTEGER,
+				ipxSapFilterServiceNetNumber
+					NetNum,
+				ipxSapFilterServiceType
+					INTEGER,
+				ipxSapFilterServerName
+					DisplayString,
+				ipxSapFilterDirection
+					INTEGER,
+				ipxSapFilterAction
+					INTEGER,
+				ipxSapFilterStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.2.7.1.1
+		ipxSapFilterID OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"ID of SAP filter. "
+			::= { ipxSapFilterEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1.2
+		ipxSapFilterCircIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				".... 
+				-- 0xffff means this is a global SAP filter "
+			::= { ipxSapFilterEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1.3
+		ipxSapFilterServiceNetNumber OBJECT-TYPE
+			SYNTAX NetNum
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Number network of the filtered service. Value
+				0xFFFFFFFF  applies for any network.
+				DEFVAL {0xFFFFFFFF}"
+			::= { ipxSapFilterEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1.4
+		ipxSapFilterServiceType OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The type of the service which may be
+				filtered; value 0xFFFF applies for all
+				types of service and it's default
+				DEFVAL {0xFFFF}"
+			::= { ipxSapFilterEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1.5
+		ipxSapFilterServerName OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (1..48))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The name of the service which may be
+				filtered; wildcards (*) may be used in
+				the end of the name. DEFVAL {*}"
+			::= { ipxSapFilterEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1.6
+		ipxSapFilterDirection OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				input(1),
+				output(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Type of filter-input or output"
+			::= { ipxSapFilterEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1.7
+		ipxSapFilterAction OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				permit(1),
+				deny(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Permit/deny receiving/transmitting of
+				SAP entry"
+			DEFVAL { permit }
+			::= { ipxSapFilterEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.2.7.1.8
+		ipxSapFilterStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"...."
+			::= { ipxSapFilterEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.3
+		layer2 OBJECT IDENTIFIER ::= { croute 3 }
+		
+		-- 1.3.6.1.4.1.81.31.3.1
+		vlConfTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF VlConfEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is an extention of MIB II
+				ifTable, and is used to add/delete
+				entries to/from that table. In
+				addition it contains private objects."
+			::= { layer2 1 }
+		
+		-- 1.3.6.1.4.1.81.31.3.1.1
+		vlConfEntry OBJECT-TYPE
+			SYNTAX VlConfEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's VLAN interfaces. An VLAN
+				interface is a virtual connection to a
+				switch."
+			INDEX { vlConfIndex }
+			::= { vlConfTable 1 }
+		
+		VlConfEntry ::=
+			SEQUENCE { 
+				vlConfIndex
+					INTEGER,
+				vlConfAlias
+					DisplayString,
+				vlConfStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.3.1.1.1
+		vlConfIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A unique value for each interface.
+				Its value ranges between 1 and the
+				value of ifNumber. The value for each
+				interface must remain constant at
+				least from one re-initialization of
+				the entity's network management system
+				to the next re-initialization."
+			::= { vlConfEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.3.1.1.2
+		vlConfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..16))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for
+				the lower-layer interface on top of
+				which this IP interface is defined.
+				The alias is specified by the network
+				manager, and provides a non-volatile
+				'handle' for the lower-layer
+				interface. The semantics of the object
+				are similar to the semantics of the
+				ifAlias object, defined by the
+				Interfaces MIB. At the time when this
+				Madge MIB object was defined, the
+				latest release of the Interfaces MIB
+				was draft-ietf-ifmib-mib-05.txt. The
+				purpose is to support all methods
+				(static or dynamic) for creation of
+				interfaces and to allow creation of IP
+				table entries without the need of the
+				layer 2 interface to be present on the
+				device at the time of the creation. It
+				is assumed that some implementation
+				dependent mechanisms allow the IP
+				application to be informed about the
+				creation of new lower layer
+				interfaces."
+			::= { vlConfEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.3.1.1.3
+		vlConfStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting VLAN
+				interfaces. Deleting this row means
+				deleting the corresponding entry in
+				ifTable (MIB II). Deleting a VLAN
+				interface is allowed only if IP
+				interface is not defined on this
+				VLAN."
+			::= { vlConfEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.3.2
+		vlBridgeTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF VlBridgeEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"For each Bridge segment an entry of
+				this table specifies a set of VLANs,
+				which it contains."
+			::= { layer2 2 }
+		
+		-- 1.3.6.1.4.1.81.31.3.2.1
+		vlBridgeEntry OBJECT-TYPE
+			SYNTAX VlBridgeEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"A entry of this table specifies a
+				Group of VLANs and VLANs belonging to
+				it"
+			INDEX { vlBridgeProtocol, vlBridgeGroupIndex,
+			vlBridgeIndex }
+			::= { vlBridgeTable 1 }
+		
+		VlBridgeEntry ::=
+			SEQUENCE { 
+				vlBridgeProtocol
+					INTEGER,
+				vlBridgeGroupIndex
+					INTEGER,
+				vlBridgeIndex
+					INTEGER,
+				vlBridgeStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.3.2.1.1
+		vlBridgeProtocol OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				other(1),
+				dec(2),
+				netBios(3),
+				appleTalk(4),
+				sna(5),
+				ipx(6)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The protocol, supported by this VLAN.
+				The meanings of the values are:
+				
+				other: none of the following. This
+				      VLAN includes any protocol
+				      except the following protocols.
+				      It is a bridging VLAN. L2 relies
+				      on a third-party router to
+				      exchange traffic between nodes
+				      on different VLANs of this type.
+				
+				dec : This is a bridging VLAN, L2
+				      relies on a third-party router
+				      to exchange traffic between
+				      nodes on different DEC VALNs of
+				      this type.
+				
+				netBios: This is a Bridging VLAN, L2
+				        relies on a third-party router
+				        to exchange traffic between
+				        nodes on different NetBIOS
+				        VLAN of this type.
+				
+				appleTalk: This is a Bridging VLAN, L2
+    				        relies on a third-party router
+    				        to exchange traffic between
+    				        nodes on different appleTalk
+    				        VLAN of this type. value of
+    				        other(1) always exist"
+			::= { vlBridgeEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.3.2.1.2
+		vlBridgeGroupIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A logical number, corresponded this group of
+				VLANs"
+			::= { vlBridgeEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.3.2.1.3
+		vlBridgeIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A logical number, corresponded this VLAN. 
+				Each VLAN is allowed to participate in
+				ONE group only"
+			::= { vlBridgeEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.3.2.1.4
+		vlBridgeStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"It is used to create or delete an entry"
+			::= { vlBridgeEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.3.3
+		layer2Globals OBJECT IDENTIFIER ::= { layer2 3 }
+		
+		-- 1.3.6.1.4.1.81.31.3.3.1
+		layer2GlobalsBridgeEnable OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2),
+				backup(3),
+				activeBackup(4)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" Whenever to activate the Bridge
+				capability on the device. 
+				enable - set by the user, means
+				   activate the Bridge capability over
+				   the defined VLANs.
+				
+				disable - set by the user, means don't
+				    active the Bridge capability. 
+
+				backup - set by the user, means the
+				    Bridge capability is in stand-by.
+				    It will enter to activeBackup mode
+				    after IP REDUNDANCY mechanism will
+				    enter to active mode.
+
+				activeBackup - set by the device
+				     (status), means the backup Bridge
+				     is working (after time-out of IP
+				     REDUNDANCY)."
+			DEFVAL { disable }
+			::= { layer2Globals 1 }
+		
+		-- 1.3.6.1.4.1.81.31.4
+		routeGroupMgmt OBJECT IDENTIFIER ::= { croute 4 }
+		
+		-- 1.3.6.1.4.1.81.31.4.1
+		routeGroupTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF RouteGroupEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			::= { routeGroupMgmt 1 }
+		
+		-- 1.3.6.1.4.1.81.31.4.1.1
+		routeGroupEntry OBJECT-TYPE
+			SYNTAX RouteGroupEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			INDEX { routeGroupId }
+			::= { routeGroupTable 1 }
+		
+		RouteGroupEntry ::=
+			SEQUENCE { 
+				routeGroupId
+					INTEGER,
+				routeGroupRouteMode
+					INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.4.1.1.1
+		routeGroupId OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			::= { routeGroupEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.4.1.1.2
+		routeGroupRouteMode OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				secondLayer(1),
+				ez2route(3),
+				router(5),
+				routerAndWebSwitch(21),
+				notSupported(255)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"A bit mask representing the routing
+				mode of the module:
+
+				bit 0 - L2 switching
+				bit 1 - EZ2Route
+				bit 2 - Router
+				bit 3 - Rich L2
+				bit 4 - WebSwitch (Load balance,
+				        application redirection).
+				mandatoryly, the following values for
+				this bit mask are defined:
+				secondLayer(1) - no routing. Behaves like 
+				                 P333T.
+				ez2route (3) - no configuration is
+				               needed. Boosts external routers.
+				router (5) - Behaves like third layer switch.
+				routerAndWebSwitch(21) - Perform
+				           routing and Load-Balancing or
+				           application redirection"
+
+			::= { routeGroupEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.5
+		drLayer2 OBJECT IDENTIFIER ::= { croute 5 }
+		
+		-- 1.3.6.1.4.1.81.31.5.1
+		drVlConfTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF DrVlConfEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is an extention of MIB II
+				ifTable, and is used to add/delete
+				entries to/from that table. In
+				addition it contains private objects."
+
+			::= { drLayer2 1 }
+		
+		-- 1.3.6.1.4.1.81.31.5.1.1
+		drVlConfEntry OBJECT-TYPE
+			SYNTAX DrVlConfEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of
+				this entity's VLAN interfaces. An VLAN
+				interface is a virtual connection to a
+				switch."
+
+			INDEX { drVlConfSlot, drVlConfIndex }
+			::= { drVlConfTable 1 }
+		
+		DrVlConfEntry ::=
+			SEQUENCE { 
+				drVlConfSlot
+					INTEGER,
+				drVlConfIndex
+					INTEGER,
+				drVlConfAlias
+					DisplayString,
+				drVlConfStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.5.1.1.1
+		drVlConfSlot OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The slot number of the module"
+			::= { drVlConfEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.5.1.1.2
+		drVlConfIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A unique value for each interface.
+				Its value ranges between 1 and the
+				value of ifNumber. The value for each
+				interface must remain constant at
+				least from one re-initialization of
+				the entity's network management system
+				to the next re-initialization."
+
+			::= { drVlConfEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.5.1.1.3
+		drVlConfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..16))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for the 
+				lower-layer interface on top of which this IP 
+				interface is defined. The alias is specified 
+				by the network manager, and provides a 
+				non-volatile 'handle' for the lower-layer 
+				interface.
+				The semantics of the object are similar to 
+				the semantics of the ifAlias object, defined
+				by the Interfaces MIB. At the time when this 
+				Madge MIB object was defined, the latest
+				release	of the Interfaces MIB was 
+				draft-ietf-ifmib-mib-05.txt. The purpose is to
+				support all methods (static or dynamic) for 
+				creation of interfaces and to allow creation 
+				of IP table entries without the need 
+				of the layer 2 interface to be present on the 
+				device at the time of the creation. It is
+				assumed that some implementation dependent
+				mechanisms allow the IP application to be 
+				informed about the creation of new lower
+				layer interfaces."
+			::= { drVlConfEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.5.1.1.4
+		drVlConfStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting VLAN interfaces. 
+				Deleting this row means deleting the 
+				corresponding entry in ifTable (MIB II). 
+				Deleting a VLAN	interface is allowed only if IP
+				interface is not defined on this VLAN."
+			::= { drVlConfEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.6
+		drIpRoute OBJECT IDENTIFIER ::= { croute 6 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1
+		drIpInterfaceTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF DrIpInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"This table is an extention of MIB II 
+				IpAddrTable, and is used to add/delete entries 
+				to/from that table. In addition it contains
+				private objects."
+			::= { drIpRoute 1 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1
+		drIpInterfaceEntry OBJECT-TYPE
+			SYNTAX DrIpInterfaceEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The information concerning one of this 
+				entity's IP interfaces.
+				An IP interface is a logical connection to a
+				certain IP net/subnet."
+			INDEX { drIpInterfaceSlot, drIpInterfaceAddr }
+			::= { drIpInterfaceTable 1 }
+		
+		DrIpInterfaceEntry ::=
+			SEQUENCE { 
+				drIpInterfaceSlot
+					INTEGER,
+				drIpInterfaceAddr
+					IpAddress,
+				drIpInterfaceNetMask
+					IpAddress,
+				drIpInterfaceLowerIfAlias
+					DisplayString,
+				drIpInterfaceType
+					INTEGER,
+				drIpInterfaceForwardIpBroadcast
+					INTEGER,
+				drIpInterfaceBroadcastAddr
+					INTEGER,
+				drIpInterfaceProxyArp
+					INTEGER,
+				drIpInterfaceStatus
+					RowStatus,
+				drIpInterfaceMainRouterAddr
+					IpAddress,
+				drIpInterfaceARPServerStatus
+					INTEGER,
+				drIpInterfaceName
+					DisplayString,
+				drIpInterfaceNetbiosRebroadcast
+					INTEGER,
+				drIpInterfaceIcmpRedirects
+					INTEGER,
+				drIpInterfaceOperStatus
+					INTEGER,
+				drIpInterfaceDhcpRelay
+				        INTEGER
+			 }
+
+		-- 1.3.6.1.4.1.81.31.6.1.1.1
+		drIpInterfaceSlot OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The slot number of the module"
+			::= { drIpInterfaceEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.2
+		drIpInterfaceAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address to which this entry's 
+				addressing information pertains."
+			::= { drIpInterfaceEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.3
+		drIpInterfaceNetMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The subnet mask associated with the IP 
+				address of this entry.
+				The value of the mask is an IP address with 
+				all the network bits
+				set to 1 and all the hosts bits set to 0."
+			::= { drIpInterfaceEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.4
+		drIpInterfaceLowerIfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for the 
+				lower-layer interface on top
+				of which this IP interface is defined. The 
+				alias is specified by the network manager, and
+				provides a non-volatile 'handle'
+				for the lower-layer interface.
+				The semantics of the object are similar to the 
+				semantics of the ifAlias object, defined by 
+				the Interfaces MIB. At the time when this
+				Madge MIB object was defined, the latest
+				release of the Interfaces MIB was 
+				draft-ietf-ifmib-mib-05.txt. The purpose is to 
+				support all methods (static or dynamic) for 
+				creation of interfaces and to allow creation 
+				of IP table entries without the need of the 
+				layer 2 interface to be present on the device 
+				at the time of the creation. It is assumed 
+				that some implementation dependent mechanisms
+				allow the IP application to be informed about
+				the creation of new lower layer interfaces."
+			::= { drIpInterfaceEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.5
+		drIpInterfaceType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				broadcast(1),
+				nBMA(2),
+				ptp(3)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The logical type of the interface. The default
+				depends on the physical type.
+				For example Ethernet and Token-Ring LANs are
+				of type broadcast"
+			DEFVAL { broadcast }
+			::= { drIpInterfaceEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.6
+		drIpInterfaceForwardIpBroadcast OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whether the router forwards IP directed 
+				broadcasts that are to be transmitted as 
+				link-layer broadcast to an attached net 
+				or subnet. "
+			DEFVAL { enable }
+			::= { drIpInterfaceEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.7
+		drIpInterfaceBroadcastAddr OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The value of the least-significant bit in 
+				the IP broadcast address used
+				for sending datagrams on the (logical) 
+				interface associated with the IP address of
+				this entry.
+				For example, when the Internet standard 
+				all-ones broadcast address is
+				used, the value will be 1. This value
+				applies to both the subnet and network
+				broadcasts addresses used by the entity on
+				this (logical) interface."
+			DEFVAL { 1 }
+			::= { drIpInterfaceEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.8
+		drIpInterfaceProxyArp OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" When proxy ARP is enabled, the router 
+				responds to ARP requests received on one 
+				link-layer interface for an IP-address 
+				that is reachable via another link-layer 
+				interface. 
+				The response provides the router's own MAC 
+				address. "
+			DEFVAL { disable }
+			::= { drIpInterfaceEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.9
+		drIpInterfaceStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting IP interfaces. 
+				Deleting this row means deleting the 
+				corresponding entry in IpAddrTable (MIB II). 
+				Deleting an IP interface also causes deletion
+				of all static routes defined on this IP 
+				interface, as well as protocol interfaces
+				(e.g. RIP and OSPF) defined on 
+				this IP interface."
+			::= { drIpInterfaceEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.10
+		drIpInterfaceMainRouterAddr OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address of the main router backed up
+				on this interface."
+			::= { drIpInterfaceEntry 10 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.11
+		drIpInterfaceARPServerStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Whenever to activate the ARP Server
+				mechanism on this interface.
+				enable  -	set by the user,
+					means activate the ARP Server
+					mechanism over this IP interface.
+				disable -	set by the user,
+					means don't active the ARP Server 
+					mechanism over this IP interface."
+			DEFVAL { disable }
+			::= { drIpInterfaceEntry 11 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.12
+		drIpInterfaceName OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The name of this interface for compatibility
+				with cli."
+			::= { drIpInterfaceEntry 12 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.13
+		drIpInterfaceNetbiosRebroadcast OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				inbound(1),
+				outbound(2),
+				both(3),
+				disable(4)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+			    "How to deal with NETBIOS Broadcasts.
+			     inbound - netbios broadcasts received from the
+			             interface are rebarodcasted
+			     outbound - netbios broadcastrs are rebraodcasted 
+			             to this interface.
+			     both - netbios are rebroadacsted both from
+				       and to this interface,
+			     disable - netbios is not rebraodcasted 
+				          neither from nor to this interface.
+			    mandatoryly only both and disable are supported"
+			DEFVAL { disable }
+			::= { drIpInterfaceEntry 13 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.14
+		drIpInterfaceIcmpRedirects OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"enable - enable the sending of redirect 
+				        messages if the router is forced to 
+					re-send a packet through the same
+					interface on which it was received.
+				disable - disable the sending of redirect					 messages on this interface."
+			DEFVAL { enable }
+			::= { drIpInterfaceEntry 14 }
+		
+		-- 1.3.6.1.4.1.81.31.6.1.1.15
+		drIpInterfaceOperStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				up(1),
+				down(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The operational status of this interface.
+				up - the interface is active.
+				down - the interface is inactive.
+				"
+			::= { drIpInterfaceEntry 15 }
+
+		-- 1.3.6.1.4.1.81.31.6.1.1.16
+		drIpInterfaceDhcpRelay OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+			"enable - enable the DHCP/BOOTP Relay
+				     agent for the subnet associated
+				     with this IP Interface. Requires that
+				     a relayEntry for the L2 interface over
+				     which this IP interface is defined will
+				     be defined.
+			  disable - disablesenable the DHCP/BOOTP Relay
+				     agent for the subnet associated
+				     with this IP Interface."
+			DEFVAL { disable }
+			::= { drIpInterfaceEntry 16 }
+
+		
+		-- 1.3.6.1.4.1.81.31.7
+		drStaticCidr OBJECT IDENTIFIER ::= { croute 7 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1
+		drStaticCidrTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF DrStaticCidrEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"The static route table for this entity. 
+				The table includes all static routes, both 
+				active and inactive.
+				Note that inactive static routes are deleted 
+				from RFC2096 ipCidrRouteTable; Hence the need
+				for this private table to maintain user 
+				configuration about disabled routes.
+				The table also includes the EntID index, to 
+				allow for use in a distributed environment."
+			REFERENCE
+				"RFC 2096, ipCidrRouteTable"
+			::= { drStaticCidr 1 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1
+		drStaticCidrEntry OBJECT-TYPE
+			SYNTAX DrStaticCidrEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"A particular route to  a  particular  
+				destination, under a particular policy."
+			INDEX { 
+			  drStaticCidrEntID, 
+			  drStaticCidrDest,
+			  drStaticCidrMask,
+			  drStaticCidrTos, 
+			  drStaticCidrNextHop
+				 }
+			::= { drStaticCidrTable 1 }
+		
+		DrStaticCidrEntry ::=
+			SEQUENCE { 
+				drStaticCidrEntID
+					INTEGER,
+				drStaticCidrDest
+					IpAddress,
+				drStaticCidrMask
+					IpAddress,
+				drStaticCidrTos
+					INTEGER,
+				drStaticCidrNextHop
+					IpAddress,
+				drStaticCidrIfIndex
+					INTEGER,
+				drStaticCidrType
+					INTEGER,
+				drStaticCidrMetric1
+					INTEGER,
+				drStaticCidrPrecedence
+					INTEGER,
+				drStaticCidrCRPType
+					INTEGER,
+				drStaticCidrOperStatus
+					INTEGER,
+				drStaticCidrName
+					DisplayString,
+				drStaticOwner
+					OwnerString,
+				drStaticCidrStatus
+					RowStatus
+			 }
+
+		-- 1.3.6.1.4.1.81.31.7.1.1.1
+		drStaticCidrEntID OBJECT-TYPE
+			SYNTAX INTEGER (1..65535)
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The Id of the entity for which a set of rows 
+				applies. This index is provided as a mean  of
+				distributing non-related information on 
+				different entities such as physical modules. 
+				The value: The module ID (slot number). "
+			::= { drStaticCidrEntry 1 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.2
+		drStaticCidrDest OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Equivalent  to ipCidrRouteDest.
+				The destination IP address of this route.
+				This object may not take a Multicast (Class  D)
+				address value.
+				Any assignment (implicit or  otherwise)  of  an
+				instance  of  this  object to a value x must be
+				rejected if the bitwise logical-AND of  x  with
+				the  value of the corresponding instance of the
+				drStaticCidrMask object is not equal to x."
+			::= { drStaticCidrEntry 2 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.3
+		drStaticCidrMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Equivalent  to ipCidrRouteMask.
+				Indicate the mask to be logical-ANDed with the
+				destination  address  before  being compared to
+				the value  in  the  drStaticCidrDest  field.   
+				For those  systems that do not support 
+				arbitrary subnet masks, an agent constructs 
+				the value  of the  drStaticCidrMask by 
+				reference to the IP Address Class.
+				Any assignment (implicit or  otherwise)  of  an
+				instance  of  this  object to a value x must be
+				rejected if the bitwise logical-AND of  x  with
+				the  value of the corresponding instance of the
+				drStaticCidrDest object is not equal to
+				drStaticCidrDest."
+			::= { drStaticCidrEntry 3 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.4
+		drStaticCidrTos OBJECT-TYPE
+			SYNTAX INTEGER (0..2147483647)
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+ 				"Equivalent  to ipCidrRouteTos.
+				The policy specifier is the IP TOS Field. 
+				The encoding of IP TOS is as specified  by 
+				the  following convention. Zero indicates the
+				default path if no more  specific policy 
+				applies.
+				
+			+-----+-----+-----+-----+-----+-----+-----+-----+
+			|                 |                       |     |
+			|   PRECEDENCE    |    TYPE OF SERVICE    |  0  |
+			|                 |                       |     |
+			+-----+-----+-----+-----+-----+-----+-----+-----+
+				
+				
+				         IP TOS                IP TOS
+				    Field     Policy      Field     Policy
+				    Contents    Code      Contents    Code
+				    0 0 0 0  ==>   0      0 0 0 1  ==>   2
+				    0 0 1 0  ==>   4      0 0 1 1  ==>   6
+				    0 1 0 0  ==>   8      0 1 0 1  ==>  10
+				    0 1 1 0  ==>  12      0 1 1 1  ==>  14
+				    1 0 0 0  ==>  16      1 0 0 1  ==>  18
+				    1 0 1 0  ==>  20      1 0 1 1  ==>  22
+				    1 1 0 0  ==>  24      1 1 0 1  ==>  26
+				    1 1 1 0  ==>  28      1 1 1 1  ==>  30"
+			::= { drStaticCidrEntry 4 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.5
+		drStaticCidrNextHop OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"Equivalent  to ipCidrRouteNextHop.
+				On remote routes, the address of the next 
+				system en route; Otherwise, 0.0.0.0."
+			::= { drStaticCidrEntry 5 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.6
+		drStaticCidrIfIndex OBJECT-TYPE
+			SYNTAX INTEGER (-2147483648..2147483647)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Equivalent  to ipCidrRouteIfIndex.
+				The ifIndex value which identifies  the  local
+				interface  through  which  the next hop of this
+				route should be reached."
+			DEFVAL { 0 }
+			::= { drStaticCidrEntry 6 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.7
+		drStaticCidrType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				other(1),
+				reject(2),
+				local(3),
+				remote(4)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Equivalent  to ipCidrRouteType.
+				The type of route.  Note that local(3)  refers
+				to  a route for which the next hop is the final
+				destination; remote(4) refers to  a  route  for
+				which  the  next  hop is not the final destina-
+				tion.
+				reject (2) refers to a route which, 
+				if matched, discards the message as 
+				unreachable. This is used in some protocols as
+				a means of correctly aggregating routes."
+			::= { drStaticCidrEntry 7 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.8
+		drStaticCidrMetric1 OBJECT-TYPE
+			SYNTAX INTEGER (-2147483648..2147483647)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Equivalent  to ipCidrRouteMetric1.
+				The primary routing  metric  for  this  route.
+				The  semantics of this metric are determined by
+				the routing-protocol specified in  the  route's
+				drStaticCidrProto  value.
+				If  this metric is not used, its value should 
+				be set to -1."
+			DEFVAL { -1 }
+			::= { drStaticCidrEntry 8 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.9
+		drStaticCidrPrecedence OBJECT-TYPE
+			SYNTAX INTEGER (0..255)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Equivalent  to ipCidrRouteMetric5 
+				(Avaya use of it).
+				The precedence of this routing rule, 
+				compared to other routes which may have been 
+				learned vie other methods. Translates into 
+				ipCidrRouteMetric5 in ipCidrRouteTable
+				(RFC2096).
+				Higher values mean lower precedence.
+				The Agent initialize this value as follows:
+				0 -  drStaticCidrCRPType of bridgingFWLB 
+				     or routingFWLB
+				250 - drStaticCidrCRPType of regularStatic
+				"
+			::= { drStaticCidrEntry 9 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.10
+		drStaticCidrCRPType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				routingFWLB(1),
+				bridgingFWLB(2),
+				regularStatic(3)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The internal type of this static routing 
+				entry.
+				routingFWLB - Route to a group of routing
+				    Firewalls 
+				bridgingFWLB - Route through a group of 
+				   bridging Firewalls
+				regularStatic - Regular static routes
+				"
+			::= { drStaticCidrEntry 10 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.11
+		drStaticCidrOperStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				up(1),
+				down(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The operational status of this route.
+				up - the route is active, and is present in ipCidrRouteTable.
+				down - the route is inactive; it is not present in 
+				ipCidrRouteTable.
+				"
+			::= { drStaticCidrEntry 11 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.12
+		drStaticCidrName OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"A label given to this route by the user.
+				Has no equivalent in ipCidrRouteTable.
+				"
+			::= { drStaticCidrEntry 12 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.13
+		drStaticOwner OBJECT-TYPE
+			SYNTAX OwnerString (SIZE (0..80))
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The user who is responsible for the entry.
+				Management Apps should 	write: 'user on host'
+				CLI should write:CLI_User on local device"
+			::= { drStaticCidrEntry 13 }
+		
+		-- 1.3.6.1.4.1.81.31.7.1.1.14
+		drStaticCidrStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Creation, activation, de-activation and 
+				deletion of a static route, using the 
+				RowStatus convention:
+				active(1), notInService(2) ,
+				notReady(3), createAndGo(4), 
+				createAndWait(5), destroy(6).
+				when an entry is placed in the notInService 
+				state, the corresponding route is disabled 
+				(removed from ipCidrRouteTable)"
+			::= { drStaticCidrEntry 14 }
+		
+-- IP tunnel MiB items
+		ipTunnel OBJECT IDENTIFIER ::= { croute 8 }
+		
+		ipTunnelTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpTunnelEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"ipTunnelTable parameters."
+			::= { ipTunnel 1 }
+		
+		ipTunnelEntry OBJECT-TYPE
+			SYNTAX IpTunnelEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"ipTunnel Entry Parameters."
+			INDEX { ipTunnelIfIndex }
+			::= { ipTunnelTable 1 }
+		
+		IpTunnelEntry ::=
+			SEQUENCE { 
+				ipTunnelIfIndex
+					INTEGER,
+				ipTunnelIfStatus
+					RowStatus,
+				ipTunnelIfLocalAddress
+					IpAddress,
+				ipTunnelIfRemoteAddress
+					IpAddress,
+				ipTunnelIfEncapsMethod
+					INTEGER,
+				ipTunnelIfConfigID
+					INTEGER,
+				ipTunnelIfHopLimit
+					INTEGER,
+				ipTunnelIfSecurity
+					INTEGER,
+				ipTunnelIfDSCP
+					INTEGER,
+				ipTunnelIfChecksum
+					INTEGER,
+				ipTunnelIfKey
+					INTEGER,
+				ipTunnelIfKeyMode
+					INTEGER,
+				ipTunnelIfOutOfOrderDrop
+					INTEGER,
+				ipTunnelIfAgingTimer
+					INTEGER,
+				ipTunnelIfMTUDiscovery
+					INTEGER,
+				ipTunnelIfMTU
+					INTEGER,
+				ipTunnelIfKeepAliveRetries
+					INTEGER,
+				ipTunnelIfKeepAliveRate
+					INTEGER
+			 }
+
+		ipTunnelIfIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A unique value for each interface.
+				Its value ranges between 1 and the
+				value of ifNumber. The value for each
+				interface must remain constant at
+				least from one re-initialization of
+				the entity's network management system
+				to the next re-initialization."
+			::= { ipTunnelEntry 1 }
+		
+		ipTunnelIfStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting IP Tunnel
+				interfaces. Deleting this row means
+				deleting the corresponding entry in
+				ifTable (MIB II). "
+			::= { ipTunnelEntry 2 }
+		
+		ipTunnelIfLocalAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The address of the local endpoint of the tunnel, 
+				or 0.0.0.0 if the device is free to choose any 
+				of its addresses at tunnel establishment time."       
+			DEFVAL { '00000000'h }
+			::= { ipTunnelEntry 3 }
+		
+		ipTunnelIfRemoteAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The address of the remote endpoint of the tunnel."
+			DEFVAL { '00000000'h }
+			::= { ipTunnelEntry 4 }
+		
+		ipTunnelIfEncapsMethod OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				other(1),
+				direct(2),
+				gre(3),
+				minimal(4),
+				l2tp(5),
+				pptp(6),
+				l2f(7),
+				udp(8),
+				atmp(9)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The encapsulation method used by the tunnel."        
+			DEFVAL { gre }
+			::= { ipTunnelEntry 5 }
+		
+		ipTunnelIfConfigID OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"An identifier used to distinguish between multiple 
+				tunnels of the same encapsulation method, with the 
+				same endpoints. If the encapsulation protocol only 
+				allows one tunnel per set of endpoint addresses 
+				(such as for GRE or IP-in-IP), the value of this 
+				object is 1.  For encapsulation methods (such as 
+				L2F) which allow multiple parallel tunnels, the 
+				manager is responsible for choosing any ID which 
+				does not conflict with an existing row, such as 
+				choosing a random number.
+				"       
+			DEFVAL { 1 }
+			::= { ipTunnelEntry 6 }
+		
+		ipTunnelIfHopLimit OBJECT-TYPE
+			SYNTAX INTEGER (1..255)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The TTL to use in the outer IP header."     
+			DEFVAL { 255 }
+		::= { ipTunnelEntry 7 }
+		
+		ipTunnelIfSecurity OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				none(1),
+				ipsec(2),
+				other(3)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The method used by the tunnel to secure the outer IP
+				header.  The value ipsec indicates that IPsec is used
+				between the tunnel endpoints for authentication or
+				encryption or both.  More specific security-related
+				information may be available in a MIB for the security
+				protocol in use."
+			DEFVAL { none }
+			::= { ipTunnelEntry 8 }
+		
+		ipTunnelIfDSCP OBJECT-TYPE
+			SYNTAX INTEGER (-1..63)
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The method used to set the high 6 bits of the 
+				TOS in the outer IP header.  A value of -1 
+				indicates that the bits are copied from the payload's
+				header. A value	between 0 and 63 inclusive indicates that the bit 
+				field is set to the indicated value."      
+			DEFVAL { -1 }
+			::= { ipTunnelEntry 9 }
+		
+		ipTunnelIfChecksum OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Verifying checksum of the GRE header. 
+				1 - Check the checksum.
+				2 - Do not check the checksum.
+				In case of checksum calaculation does not match to the
+				packet checksum the packet is dropped."
+			DEFVAL { disable }
+			::= { ipTunnelEntry 10 }
+		
+		ipTunnelIfKey OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The Shared Key for the GRE Tunnel.
+				"
+			::= { ipTunnelEntry 11 }
+		
+		ipTunnelIfKeyMode OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The mode according which the Key field is checked or not.
+				1 - Enable  Key
+				2 - Disable Key"
+			DEFVAL { disable }
+			::= { ipTunnelEntry 12 }
+		
+		ipTunnelIfOutOfOrderDrop OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"1 - Drop the packets in case of out  of order packets.
+				2 - Do not Drop the packets in case of out of order packets."
+			DEFVAL { disable }
+			::= { ipTunnelEntry 13 }
+		
+		ipTunnelIfAgingTimer OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The timer (minutes) for aging of path MTU discovery.
+				0 - Disable aging is done.
+				"
+			DEFVAL { 10 }
+			::= { ipTunnelEntry 14 }
+		
+		ipTunnelIfMTUDiscovery OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Path MTU discovery.
+				1 - Enable Path MTU discovery.
+				2 - Disable Path MTU discovery."
+			DEFVAL { disable }
+			::= { ipTunnelEntry 15 }
+		
+		ipTunnelIfMTU OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"mandatory GRE Tunnel MTU Value (Bytes)"
+			::= { ipTunnelEntry 16 }
+		
+		ipTunnelIfKeepAliveRetries OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The number of times that a device will keep sending
+				keepalive packets without a response before the
+				interface becomes inactive. This item is changeable only when 
+				ipTunnelIfKeepAliveRate > 0. Possible values are: 1-255."
+			DEFVAL { 3 }
+			::= { ipTunnelEntry 17 }
+		
+		ipTunnelIfKeepAliveRate OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"The rate at which the keepalive packets are sent in
+				seconds. I.e. One keepalive packet will be send in ipTunnelIfKeepAliveRate seconds.
+				If ipTunnelIfKeepAliveRate=0 Then Keepalive is Disable and
+				therefore ipTunnelIfKeepAliveRetries is not changeable. Possible Values: 
+				0-32767."
+			DEFVAL { 10 }
+			::= { ipTunnelEntry 18 }
+
+-- Dynamic IP 
+		ipDynamic OBJECT IDENTIFIER ::= { croute 9 }
+		
+		ipDynamicTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpDynamicEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"ipDynamicTable parameters. Used for PPP-IPCP/DHCP connections 
+				which gathered dynamic IP addresses."
+			::= { ipDynamic 1 }
+		
+		ipDynamicEntry OBJECT-TYPE
+			SYNTAX IpDynamicEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"ipDynamic Entry Parameters. This entry is created when the user activates a row 
+				in the ipNegotiated table or in the cigDhcpClientsTable in CIG-CLIENTS for specific
+				interface."
+			INDEX { ipDynamicIfIndex }
+			::= { ipDynamicTable 1 }
+		
+		IpDynamicEntry ::=
+			SEQUENCE { 
+				ipDynamicIfIndex
+					INTEGER,
+				ipDynamicIfAlias
+					DisplayString,
+				ipDynamicAddrType
+					INTEGER, 
+				ipDynamicIPAddress
+				    IpAddress,    
+				ipDynamicNetMask   
+					IpAddress,    
+				ipDynamicInterfaceName
+				    DisplayString,   
+				ipDynamicOperStatus
+				    INTEGER,
+				ipDynamicIcmpRedirects
+					INTEGER
+				 }
+
+		ipDynamicIfIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A unique value for each interface."
+			::= { ipDynamicEntry 1 }
+		
+		ipDynamicIfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for
+				the lower-layer interface on top of
+				which this IP interface is defined.
+				It is the same as the ifAlias from the standard interface table."
+			::= { ipDynamicEntry 2 }
+
+		ipDynamicAddrType OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				pppIpcp(2),
+				dhcp(3)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+			"This Mib item presents the type of the the ip address whether is ppp ipcp (negotiated) 
+			or dhcp."
+			DEFVAL { pppIpcp }
+			::= { ipDynamicEntry 3 }
+
+		ipDynamicIPAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address received from remote peer during the PPP-IPCP session or from 
+				DHCP server using DHCP client."
+			DEFVAL { '00000000'h }
+			::= { ipDynamicEntry 4 }
+
+		ipDynamicNetMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The subnet mask associated with the
+				IP address of this entry. The value of
+				the mask is an IP address with all the
+				network bits set to 1 and all the
+				hosts bits set to 0."
+			::= { ipDynamicEntry 5 }
+
+		ipDynamicInterfaceName OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The name of the IP dynamic interface."
+			::= { ipDynamicEntry 6 }
+
+		ipDynamicOperStatus OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				up(1),
+				down(2)
+				}
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The operational status of this IP dynamic interface.
+				up - the interface is active.
+				down - the interface is inactive.
+				"
+			::= { ipDynamicEntry 7 }
+
+		ipDynamicIcmpRedirects OBJECT-TYPE
+			SYNTAX INTEGER
+				{
+				enable(1),
+				disable(2)
+				}
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"enable - enable the sending of
+				   redirect messages if the router is
+				   forced to re-send a packet through
+				   the same interface on which it was
+				   received.
+
+				disable - disable the sending of
+				  redirect messages on this
+				  interface."
+			DEFVAL { enable }
+			::= { ipDynamicEntry 8 }
+		
+		ipNegotiated OBJECT IDENTIFIER ::= { croute 10 }
+		
+		ipNegotiatedTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpNegotiatedEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"ipNegotiatedTable parameters. Used for PPP-IPCP connections 
+				which gathered dynamic IP addresses."
+			::= { ipNegotiated 1 }
+		
+		ipNegotiatedEntry OBJECT-TYPE
+			SYNTAX IpNegotiatedEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"ipNegotiated Entry Parameters."
+			INDEX { ipNegotiatedIfIndex }
+			::= { ipNegotiatedTable 1 }
+		
+		IpNegotiatedEntry ::=
+			SEQUENCE { 
+				ipNegotiatedIfIndex
+					INTEGER,
+				ipNegotiatedRowStatus
+					RowStatus,   
+				ipNegotiatedIfAlias
+				    DisplayString,
+				ipNegotiatedIPAddress
+				    IpAddress    
+					 }
+
+		ipNegotiatedIfIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"A unique value for each interface."
+			::= { ipNegotiatedEntry 1 }
+		
+		ipNegotiatedRowStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				" For adding and deleting IP Negotiated PPP-IPCP
+				interfaces.
+				For configuring only Negotiated parameters use create and wait for specific interface.
+				When activating negotiation, activate the row. Activating the row will create a new row
+				in the ipDynamic Table that presents dynamic ipInterface.
+				Deactivating the negotiation will cause to erasing the row in the ipDynamic Mib table 
+				and deactivating the ipNegotiated row in order to keep the specific parameters which 
+				already were configured."
+			::= { ipNegotiatedEntry 2 }       
+			
+		ipNegotiatedIfAlias OBJECT-TYPE
+			SYNTAX DisplayString (SIZE (0..32))
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"This object is an 'alias' name for
+				the lower-layer interface on top of
+				which this IP interface is defined.
+				It is the same as the ifAlias from the standard interface table."
+			::= { ipNegotiatedEntry 3 }
+
+		ipNegotiatedIPAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"The IP address received from remote peer during the PPP-IPCP session."
+			DEFVAL { '00000000'h }
+			::= { ipNegotiatedEntry 4 }
+
+
+		ipNAT OBJECT IDENTIFIER ::= { croute 11 }
+		
+		ipNATPoolListTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpNATPoolListEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"NAT pool list Table."
+			::= { ipNAT 1 }
+		
+		ipNATPoolListEntry OBJECT-TYPE
+			SYNTAX IpNATPoolListEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"NAT pool list parameters."
+			INDEX { ipNATPoolListIndex }
+			::= { ipNATPoolListTable 1 }
+		
+		IpNATPoolListEntry ::=
+			SEQUENCE { 
+				ipNATPoolListIndex
+					INTEGER,
+				ipNATPoolListName
+					DisplayString,
+				ipNATPoolListRowStatus
+					RowStatus
+			 }
+
+		ipNATPoolListIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool List Index."
+			::= { ipNATPoolListEntry 1 }
+		
+		ipNATPoolListName OBJECT-TYPE
+			SYNTAX DisplayString
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool list name."
+			::= { ipNATPoolListEntry 2 }
+		
+		ipNATPoolListRowStatus OBJECT-TYPE
+			SYNTAX RowStatus
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Used for creation/deletion of a list and for 
+				monitoring list status.
+				Use createAndGo (4) to create a list. 
+				Destroy (6) to destroy a list.
+				active(1),
+				notInService(2),
+				notReady(3),
+				createAndGo(4),
+				createAndWait(5),
+				destroy(6)"
+			::= { ipNATPoolListEntry 3 }
+		
+		ipNATPoolTable OBJECT-TYPE
+			SYNTAX SEQUENCE OF IpNATPoolEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool entry parameters."
+			::= { ipNAT 2 }
+		
+		ipNATPoolEntry OBJECT-TYPE
+			SYNTAX IpNATPoolEntry
+			ACCESS not-accessible
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool parameters."
+			INDEX { ipNATPoolListIndex, ipNATPoolIndex  }
+			::= { ipNATPoolTable 1 }
+		
+		IpNATPoolEntry ::=
+			SEQUENCE { 
+				ipNATPoolIndex
+					INTEGER,
+				ipNATPoolIPAddress
+					IpAddress,    
+				ipNATPoolIPMask
+					IpAddress,
+				ipNATPoolMapIPAddress
+					IpAddress,    
+				ipNATPoolMapIPMask
+					IpAddress,
+				ipNATPoolRowStatus
+					INTEGER
+			 }
+
+		ipNATPoolIndex OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-only
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool index in the NAT Pool list."
+			::= { ipNATPoolEntry 1 }
+		
+		ipNATPoolIPAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool Source IP Address to be NAT'ed."
+			::= { ipNATPoolEntry 2 }
+		
+	    ipNATPoolIPMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool Source IP Network Mask to be NAT'ed."
+			::= { ipNATPoolEntry 3 }
+					
+		ipNATPoolMapIPAddress OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool Mapping to IP Address."
+			::= { ipNATPoolEntry 4 }
+		
+	    ipNATPoolMapIPMask OBJECT-TYPE
+			SYNTAX IpAddress
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"NAT Pool Mapping to Network Mask."
+			::= { ipNATPoolEntry 5 }
+	    
+		ipNATPoolRowStatus OBJECT-TYPE
+			SYNTAX INTEGER
+			ACCESS read-write
+			STATUS mandatory
+			DESCRIPTION
+				"Used for creation/deletion of a NAT pool entry 
+				and for monitoring entry status.
+				active(1),
+				notInService(2),
+				notReady(3),
+				createAndGo(4),
+				createAndWait(5),
+				destroy(6)"
+			::= { ipNATPoolEntry 6 }
+
+	END
+
+--
+-- iphc_CROUTE-MIB.mib
+--

@@ -1,0 +1,511 @@
+-- ==========================================================================
+-- Copyright (c) 2004-2015 Hangzhou H3C Tech. Co., Ltd. All rights reserved.
+--
+-- Description: Infomation center MIB
+-- Reference: RFC5424
+-- Version: V1.1
+-- History:
+--   V1.0 Initial version 2012-03-07 by shuaixiaojuan
+--        2012-11-03
+--        add h3cICLogbufferContTable, h3cICLogbufferContEntry,
+--        h3cICLogbufferContIndex, h3cICLogbufferContDescription by chenkaiping
+--   V1.1 2014-09-05 by SongHao
+--        Added isoWithTimezone(5) to ICTimeStampType.
+--        Modified description of h3cICLogTimestampType.
+-- ==========================================================================
+H3C-INFOCENTER-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    h3cCommon
+        FROM HUAWEI-3COM-OID-MIB
+    DisplayString, TruthValue, RowStatus, TAddress, TEXTUAL-CONVENTION
+        FROM SNMPv2-TC
+    Counter32, Unsigned32, Integer32, OBJECT-TYPE, MODULE-IDENTITY
+        FROM SNMPv2-SMI
+    InetAddressType, InetAddress
+        FROM INET-ADDRESS-MIB
+    InterfaceIndexOrZero
+        FROM IF-MIB;
+
+h3cInfoCenter MODULE-IDENTITY
+    LAST-UPDATED "201409050325Z"
+    ORGANIZATION
+        "Hangzhou H3C Tech. Co., Ltd."
+    CONTACT-INFO
+        "Platform Team Hangzhou H3C Tech. Co., Ltd.
+         Hai-Dian District Beijing P.R. China
+         http://www.h3c.com
+         Zip:100085"
+    DESCRIPTION
+        "All the configuration of the info center can be managed
+        by info center MIB."
+    REVISION "201409050325Z"
+    DESCRIPTION
+        "Added isoWithTimezone(5) to ICTimeStampType.
+        Modified description of h3cICLogTimestampType."
+    REVISION "201211031900Z"
+    DESCRIPTION
+        "Add h3cICLogbufferContTable, h3cICLogbufferContEntry,
+        h3cICLogbufferContIndex, h3cICLogbufferContDescription."
+    REVISION "201203071900Z"        -- Mar 07, 2012 at 19:00 GMT
+    DESCRIPTION
+        "The initial version of this MIB module."
+     ::= { h3cCommon 119 }
+
+--
+-- Textual conventions
+--
+
+ICMessageLevelType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Specify severity level of message."
+    SYNTAX INTEGER
+        {
+            emergency(0),
+            alert(1),
+            critical(2),
+            error(3),
+            warning(4),
+            notice(5),
+            informational(6),
+            debug(7),
+            invalid(8)
+        }
+
+ICFacilityType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Specify loghost facility which generates messages."
+    SYNTAX INTEGER
+        {
+            kernel(0),
+            userLevel(1),
+            mailSystem(2),
+            systemDaemons(3),
+            securityAuthorization(4),
+            internallyMessages(5),
+            linePrinter(6),
+            networkNews(7),
+            uucp(8),
+            clockDaemon(9),
+            securityAuthorization2(10),
+            ftpDaemon(11),
+            ntp(12),
+            logAudit(13),
+            logAlert(14),
+            clockDaemon2(15),
+            local0(16),
+            local1(17),
+            local2(18),
+            local3(19),
+            local4(20),
+            local5(21),
+            local6(22),
+            local7(23)
+        }
+
+ICTimeStampType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Specify operation types on time stamp of message.
+        date: the time stamp type of message is date.
+        boot: the time stamp type of message is the time from
+              uptime of system.
+        iso: the time stamp type of message is ISO date with
+             format YYYY-MM-ddThh:mm:ss.
+        dateWithoutYear: the time stamp type of message is date
+                         without year information.
+        none: no time stamp information in message.
+        isoWithTimezone: the time stamp type of message is ISO date
+                         with timezone offset.
+                         Example YYYY-MM-ddThh:mm:ss-04:00
+                                 or
+                                 YYYY-MM-ddThh:mm:ssZ
+        "
+    SYNTAX INTEGER
+        {
+            date(0),
+            boot(1),
+            iso(2),
+            dateWithoutYear(3),
+            none(4),
+            isoWithTimezone(5)
+        }
+
+--
+-- Node definitions
+--
+
+h3cICLogbuffer OBJECT IDENTIFIER ::= { h3cInfoCenter 1 }
+
+h3cICLogbufferObjects OBJECT IDENTIFIER ::= { h3cICLogbuffer 1 }
+
+h3cICMaxLogbufferSize OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The maximum number of messages that can be stored
+         in logbuffer."
+    ::= { h3cICLogbufferObjects 1 }
+
+h3cICLogbufferSize OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The capacity of logbuffer which can be customized by users.
+         The valid range is from 0 to h3cICMaxLogbufferSize."
+    DEFVAL { 512 }
+    ::= { h3cICLogbufferObjects 2 }
+
+h3cICLogbufferCurrentMessages OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The number of log messages stored in logbuffer."
+    ::= { h3cICLogbufferObjects 3 }
+
+h3cICLogbufferOverwrittenMessages OBJECT-TYPE
+    SYNTAX Counter32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The number of log messages overwritten in logbuffer."
+    ::= { h3cICLogbufferObjects 4 }
+
+h3cICLogbufferDroppedMessages OBJECT-TYPE
+    SYNTAX Counter32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The number of log messages dropped in logbuffer."
+    ::= { h3cICLogbufferObjects 5 }
+
+h3cICLogbufferContTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cICLogbufferContEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The table of logbuffer contents."
+    ::= { h3cICLogbuffer 2 }
+
+h3cICLogbufferContEntry OBJECT-TYPE
+    SYNTAX H3cICLogbufferContEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The contents entry of logbuffer."
+    INDEX { h3cICLogbufferContIndex }
+    ::= { h3cICLogbufferContTable 1 }
+
+H3cICLogbufferContEntry ::=
+    SEQUENCE {
+        h3cICLogbufferContIndex            Integer32,
+        h3cICLogbufferContDescription      DisplayString
+        }
+
+h3cICLogbufferContIndex OBJECT-TYPE
+    SYNTAX Integer32 (1..2147483647)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The index of this table."
+    ::= { h3cICLogbufferContEntry 1 }
+
+h3cICLogbufferContDescription OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..1600))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The contents of logbuffer."
+    ::= { h3cICLogbufferContEntry 2 }
+
+h3cICLoghost OBJECT IDENTIFIER ::= { h3cInfoCenter 2 }
+
+h3cICLoghostObjects OBJECT IDENTIFIER ::= { h3cICLoghost 1 }
+
+h3cICMaxLoghost OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The object shows the maximum number of rows in
+         h3cLoghostTable."
+    ::= { h3cICLoghostObjects 1 }
+
+h3cICLoghostSourceInterface OBJECT-TYPE
+    SYNTAX InterfaceIndexOrZero
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The source interface which sends message to loghost.
+         All loghosts use the same source interface.
+         Zero is invalid."
+    ::= { h3cICLoghostObjects 2 }
+
+h3cICLoghostTimestampType OBJECT-TYPE
+    SYNTAX ICTimeStampType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Time stamp type of message sent to loghost."
+    DEFVAL { date }
+    ::= { h3cICLoghostObjects 3 }
+
+h3cICLoghostTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cICLoghostEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The table of loghost."
+    ::= { h3cICLoghost 2 }
+
+h3cICLoghostEntry OBJECT-TYPE
+    SYNTAX H3cICLoghostEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The loghost entry of syslog."
+    INDEX { h3cICLoghostIndex }
+    ::= { h3cICLoghostTable 1 }
+
+H3cICLoghostEntry ::=
+    SEQUENCE {
+        h3cICLoghostIndex                   Unsigned32,
+        h3cICLoghostIpaddressType           InetAddressType,
+        h3cICLoghostIpaddress               InetAddress,
+        h3cICLoghostVPNName                 DisplayString,
+        h3cICLoghostFacility                ICFacilityType,
+        h3cICLoghostOperateRowStatus        RowStatus,
+        h3cICLoghostIpaddressPort           Unsigned32,
+        h3cICLoghostTAddress                TAddress
+    }
+
+h3cICLoghostIndex OBJECT-TYPE
+    SYNTAX Unsigned32(1..64)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The index of this table."
+    ::= { h3cICLoghostEntry 1 }
+
+h3cICLoghostIpaddressType OBJECT-TYPE
+    SYNTAX InetAddressType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The address type of loghost."
+    DEFVAL { ipv4 }
+    ::= { h3cICLoghostEntry 2 }
+
+h3cICLoghostIpaddress OBJECT-TYPE
+    SYNTAX InetAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The address of loghost."
+    ::= { h3cICLoghostEntry 3 }
+
+h3cICLoghostVPNName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The VPN instance of loghost."
+    DEFVAL { "" }
+    ::= { h3cICLoghostEntry 4 }
+
+h3cICLoghostFacility OBJECT-TYPE
+    SYNTAX ICFacilityType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The operations staff can selectively filter the messages
+         with priority which consists of facility that generates
+         the message and severity of the message.
+         "
+    DEFVAL { local7 }
+    ::= { h3cICLoghostEntry 5 }
+
+h3cICLoghostOperateRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The status of this table entry."
+    ::= { h3cICLoghostEntry 6 }
+
+h3cICLoghostIpaddressPort OBJECT-TYPE
+    SYNTAX Unsigned32(1..65535)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The loghost server port."
+    DEFVAL { 514 }
+    ::= { h3cICLoghostEntry 7 }
+
+h3cICLoghostTAddress OBJECT-TYPE
+    SYNTAX TAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The loghost server transport address.
+         Consist of h3cICLoghostIpaddress(ipv4) and h3cICLoghostIpaddressPort.
+         This node can't be bound with h3cICLoghostIpaddress, h3cICLoghostIpaddressPort
+         and h3cICLoghostIpaddressType at the same time."
+    ::= { h3cICLoghostEntry 8 }
+
+h3cICDirection OBJECT IDENTIFIER ::= { h3cInfoCenter 3 }
+
+h3cICDirectionTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cICDirectionEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "A table of syslog output direction."
+    ::= { h3cICDirection 1 }
+
+h3cICDirectionEntry OBJECT-TYPE
+    SYNTAX H3cICDirectionEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The output direction entry of syslog."
+    INDEX { h3cICDirectionIndex }
+    ::= { h3cICDirectionTable 1 }
+
+H3cICDirectionEntry ::=
+    SEQUENCE {
+        h3cICDirectionIndex       Unsigned32,
+        h3cICDirectionName        DisplayString,
+        h3cICDirectionState       TruthValue
+        }
+
+h3cICDirectionIndex OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The index of this table."
+    ::= { h3cICDirectionEntry 1 }
+
+h3cICDirectionName OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (1..30))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The name of output direction."
+    ::= { h3cICDirectionEntry 2 }
+
+h3cICDirectionState OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The state of syslog: true(1):enable.
+                              false(2):disable."
+    ::= { h3cICDirectionEntry 3 }
+
+
+h3cICModule OBJECT IDENTIFIER ::= { h3cInfoCenter 4 }
+
+h3cICModuleTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cICModuleEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "A table of syslog module."
+    ::= { h3cICModule 1 }
+
+h3cICModuleEntry OBJECT-TYPE
+    SYNTAX H3cICModuleEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The module entry of syslog."
+    INDEX { IMPLIED h3cICModuleName }
+    ::= { h3cICModuleTable 1 }
+
+H3cICModuleEntry ::=
+    SEQUENCE {
+        h3cICModuleName         DisplayString
+        }
+
+h3cICModuleName OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (1..8))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "The name of module."
+    ::= { h3cICModuleEntry 1 }
+
+h3cICLog OBJECT IDENTIFIER ::= { h3cInfoCenter 5 }
+
+h3cICLogObjects OBJECT IDENTIFIER ::= { h3cICLog 1 }
+
+h3cICLogGlobalState OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The global state of syslog: true(1):enable.
+                              false(2):disable."
+    DEFVAL { true }
+    ::= { h3cICLogObjects 1 }
+
+h3cICLogTimestampType OBJECT-TYPE
+    SYNTAX ICTimeStampType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Time stamp type of log message.
+        Note that isoWithTimezone is not supported."
+    DEFVAL { date }
+    ::= { h3cICLogObjects 2 }
+
+h3cICLogTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF H3cICLogEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "A table of syslog module."
+    ::= { h3cICLog 2 }
+
+h3cICLogEntry OBJECT-TYPE
+    SYNTAX H3cICLogEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "The log entry of syslog."
+    INDEX { h3cICDirectionIndex,
+            IMPLIED h3cICModuleName
+          }
+    ::= { h3cICLogTable 1 }
+
+H3cICLogEntry ::=
+    SEQUENCE {
+        h3cICLogLevel           ICMessageLevelType,
+        h3cICLogRowStatus       RowStatus
+        }
+
+
+h3cICLogLevel OBJECT-TYPE
+    SYNTAX ICMessageLevelType
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The level of log message, invalid is for deny any log."
+    ::= { h3cICLogEntry 1 }
+
+h3cICLogRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The status of this table entry."
+    ::= { h3cICLogEntry 2 }
+
+END

@@ -1,0 +1,588 @@
+-- This file is corresponding to Release 9.1.10.101 from 2014/08/11 00:00:00
+
+
+-- (C)opyright 2004-2014 bintec elmeg GmbH, All Rights Reserved
+-- $RCSfile: mibapdisc,v $
+-- $Revision: 1.14 $
+
+APDISC-MIB DEFINITIONS ::= BEGIN
+
+
+          IMPORTS
+                 NetworkAddress, IpAddress, TimeTicks, enterprises
+                     FROM RFC1155-SMI
+
+		DisplayString
+		    FROM RFC1158-MIB
+
+		Date
+		    FROM BINTEC-MIB
+                OBJECT-TYPE
+                         FROM RFC-1212
+                MacAddress
+                         FROM SNMPv2-TC;
+
+	bintec 		OBJECT IDENTIFIER ::= { enterprises 272 }
+	bibo		OBJECT IDENTIFIER ::= { bintec 4 }
+	admin		OBJECT IDENTIFIER ::= { bibo 1 }
+	apdisc		OBJECT IDENTIFIER
+          ::= { bibo 49 }
+      
+      -- Apdisc Group
+
+--	  ApDiscProto ::= INTEGER { artem(1) }
+	  -- The protocol for access point discovery
+
+	  
+	  apDiscCtrlTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF ApDiscCtrlEntry
+              ACCESS  not-accessible
+              STATUS  mandatory
+              DESCRIPTION
+		  "This table holds the interfaces configured for access point disovery.
+		  An entry in this table is identified by the interface index and the
+		  protocol to be used for the discovery.
+
+		  A successfull discovery creates related entries in apDiscTable and
+		  apDiscSetTable for each discovered access point. Deleting an entry in
+		  this table removes also the related entries in apDiscTable and
+		  apDiscSetTable.
+		  
+		  All variables in this table are volatile and not stored permanently."
+	      
+	      ::= { apdisc 1 }
+
+	  apDiscCtrlEntry OBJECT-TYPE
+              SYNTAX  ApDiscCtrlEntry
+              ACCESS  not-accessible
+              STATUS  mandatory
+              DESCRIPTION
+                      "The access point discovery control information."
+              INDEX   { apDiscCtrlIfIndex, apDiscCtrlProto }
+              ::= { apDiscCtrlTable 1 }
+
+          ApDiscCtrlEntry ::=
+	      SEQUENCE {
+		apDiscCtrlIfIndex
+		    INTEGER,
+		apDiscCtrlProto
+		    INTEGER,
+		apDiscCtrlOperation
+		    INTEGER,
+		apDiscCtrlResult
+		    INTEGER,
+		apDiscCtrlLastRun
+		    Date,
+		apDiscCtrlLimit
+		    INTEGER
+	      }
+
+	      
+	      apDiscCtrlIfIndex OBJECT-TYPE
+		  SYNTAX INTEGER
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This variable identifies on which interface the access point
+		      discovery is to be performed. The interface is identified by its
+		      index in the ifTable."
+
+		  ::= { apDiscCtrlEntry 1 }
+
+
+	      apDiscCtrlProto OBJECT-TYPE
+		  SYNTAX INTEGER { artem(1) }
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This indicates which access point discovery is to be performed.
+		      Currently only ARtem access points can be discovered. This is a
+		      proprietary discovery protocol, which uses IP multicast protocol
+		      with group address 239.239.239.239 and UPD port 1111."
+		  DEFVAL { artem }
+
+		  ::= { apDiscCtrlEntry 2 }
+
+	      apDiscCtrlOperation OBJECT-TYPE
+		  SYNTAX INTEGER {
+			none(1),
+			discovery(2),
+			delete(3)
+		    }
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "Setting this variable to 'discovery' initiates the discovery. After the
+		      discovery it is autonomously changed to 'none'. Setting this variable
+		      to 'delete' deletes the entry and all related entries in apDiscTable
+		      and apDiscSetTable."
+		  DEFVAL { none }
+
+		  ::= { apDiscCtrlEntry 3 }
+
+	      apDiscCtrlResult OBJECT-TYPE
+		  SYNTAX INTEGER {
+			noError(1),
+			destUnreachable(2),
+			internalError(3)
+		    }
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This variable indicates the result of the discovery operation after
+		      the operation has finished.
+
+		      'noError': no discovery has been initiated or discovery was a success.
+		      
+		      'destUnreachable': the interface is currently not usable.
+		      Interface is not operational, has no IP address assigned or
+		      has no associated direct route. The request could not be sent.
+		      
+		      'internalError': an internal error was detected, discovery not
+		      initiated. Enabling logging and debugging might reveal more
+		      information in this case."
+		      
+		  DEFVAL { noError }
+
+		  ::= { apDiscCtrlEntry 4 }
+
+	      
+	      apDiscCtrlLastRun OBJECT-TYPE
+		  SYNTAX Date
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The time (GMT) of the last successful access point discovery
+		      given in seconds since 01/01/1970 00:00:00. A value of 0 indicates
+		      that no successful discovery had been run yet."
+
+		  ::= { apDiscCtrlEntry 5 }
+
+
+	      apDiscCtrlLimit OBJECT-TYPE
+		  SYNTAX INTEGER
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This variable limits how many replies from APs are to be stored.
+		       The replies exceeding this value are discarded. This avoids a
+		       DOS vulnerability where one may flood us with wrong answers. If
+		       this limit is reached a syslog message is generated."
+		  DEFVAL { 100 }
+
+		  ::= { apDiscCtrlEntry 6 }
+
+	  
+	  apDiscTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF ApDiscEntry
+              ACCESS  not-accessible
+              STATUS  mandatory
+              DESCRIPTION
+		  "In this table the discovered access points are listed with the
+		  retrieved information like node name, IP address, netmask and
+		  gateway address. An entry in this table is identified by the
+		  interface on which the access point was found, by the utilized
+		  discovery protocol and the MAC address of the access point.
+		  
+		  Entries in this table are created autonomously by the system for
+		  each discovered access point, and are autonomously deleted if the
+		  access point is not found anymore at the next discovery. All
+		  entries in this table belonging to an interface are deleted, if
+		  the corresponding entry is deleted from the apDiscCtrlTable.
+
+		  All variables in this table are volatile and not stored permanently."
+	      
+	      ::= { apdisc 2 }
+
+	  
+	  apDiscEntry OBJECT-TYPE
+              SYNTAX  ApDiscEntry
+              ACCESS  not-accessible
+              STATUS  mandatory
+              DESCRIPTION
+		  "An entry for a discovered access point."
+              INDEX   { apDiscIfIndex, apDiscProto, apDiscMacAddress }
+              ::= { apDiscTable 1 }
+
+          ApDiscEntry ::=
+	      SEQUENCE {
+		apDiscIfIndex			INTEGER,
+		apDiscProto				INTEGER,
+		apDiscMacAddress		MacAddress,
+		apDiscNodeName			DisplayString,
+		apDiscIpStatus			INTEGER,
+		apDiscIpAddress			IpAddress,
+		apDiscNetMask			IpAddress,
+		apDiscGwAddress			IpAddress,
+		apDiscLastChange		Date,
+		apDiscSerialNumber		DisplayString,
+		apDiscSysDescription		DisplayString,
+		apDiscVersionString		DisplayString
+	      }
+
+	      
+	      apDiscIfIndex OBJECT-TYPE
+		  SYNTAX INTEGER
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The interface on which the access point was detected. The
+		      interface is identified by its interface index in the
+		      ifTable."
+
+		  ::= { apDiscEntry 1 }
+
+
+	      apDiscProto OBJECT-TYPE
+		  SYNTAX INTEGER { artem(1) }
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This indicates via which discovery protocol the access
+		      point was found. Currently only the protocol to discover
+		      ARtem access points is supported. This is protocol uses
+		      IP multicast protocol with group address 239.239.239.239
+		      and UPD port 1111."
+
+		  ::= { apDiscEntry 2 }
+
+	      apDiscMacAddress OBJECT-TYPE
+		  SYNTAX MacAddress
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The MAC address of the found access point. The ARtem
+		      access points report via the discovery protocol the MAC
+		      address of their first ethernet-like interface."
+
+		  ::= { apDiscEntry 3 }
+
+	      apDiscNodeName OBJECT-TYPE
+		  SYNTAX DisplayString (SIZE (0..32))
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The node name of the access point."
+		  DEFVAL { "" }
+		  
+		  ::= { apDiscEntry 4 }
+
+	      
+	      apDiscIpStatus OBJECT-TYPE
+		  SYNTAX INTEGER { unknown(1), static(2), dhcpLease(3),
+		                   dhcpFailed(4) }
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This indicates how the access point got its IP address,
+		      netmask and gateway address. 'unknown' means that the
+		      access point does not give an indication how these values
+		      have been set, 'static' indicates that the values have been
+		      set statically or manually, 'dhcpLease' means that the
+		      values have been set via DHCP, 'dhcpFailed' means that DCHP
+		      request failed."
+		  DEFVAL { unknown }
+		  
+		  ::= { apDiscEntry 5 }
+
+
+	      apDiscIpAddress OBJECT-TYPE
+		  SYNTAX IpAddress
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The IP address of the access point."
+
+		  ::= { apDiscEntry 6 }
+
+
+	      apDiscNetMask OBJECT-TYPE
+		  SYNTAX IpAddress
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The netmask of the access point."
+
+		  ::= { apDiscEntry 7 }
+
+
+	      apDiscGwAddress OBJECT-TYPE
+		  SYNTAX IpAddress
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The gateway address of the access point."
+		  
+		  ::= { apDiscEntry 8 }
+
+
+	      apDiscLastChange OBJECT-TYPE
+		  SYNTAX Date
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The time (GMT) when the access point was initially
+		      discovered or has changed its networking configuration
+		      given in seconds since 01/01/1970 00:00:00."
+
+		  ::= { apDiscEntry 9 }
+
+	  
+	      apDiscSerialNumber OBJECT-TYPE
+		  SYNTAX DisplayString (SIZE (0..32))
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The serial number of the access point."
+		  
+		  ::= { apDiscEntry 10 }
+
+
+	      apDiscSysDescription OBJECT-TYPE
+		  SYNTAX DisplayString (SIZE (0..64))
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The system description of the access point."
+		  
+		  ::= { apDiscEntry 11 }
+
+
+	      apDiscVersionString OBJECT-TYPE
+		  SYNTAX DisplayString (SIZE (0..64))
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The version string of the access point."
+		  
+		  ::= { apDiscEntry 12 }
+
+
+	  apDiscSetTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF ApDiscSetEntry
+              ACCESS  not-accessible
+              STATUS  mandatory
+              DESCRIPTION
+		  "This table holds one entry for each discovered access point
+		  allowing to configure the access point's network parameters
+		  like node name, IP address, netmask and gateway address.
+		  Whether the change was successful or not is indicated via
+		  apDiscSetResult. Each access point is identified in this
+		  table by the interface on which it was detected and its MAC
+		  address.
+		  An entry in this table is created autonomously by the system
+		  for each discovered access point. An entry is autonomously
+		  deleted if the access point does not reply at the next
+		  discovery. All entries in this table belonging to an interface
+		  are deleted if the corresponding entry is deleted from the
+		  apDiscCtrlTable.
+		  
+		  All variables in this table are volatile and not stored
+		  permanently. However the networking parameters are sent to
+		  the access point and stored in its configuration."
+
+	      
+	      ::= { apdisc 3 }
+
+	  
+	  apDiscSetEntry OBJECT-TYPE
+              SYNTAX  ApDiscSetEntry
+              ACCESS  not-accessible
+              STATUS  mandatory
+              DESCRIPTION
+                      "An entry fo an discovered access point allowing to set
+		      network parameters."
+              INDEX   { apDiscSetIfIndex, apDiscSetProto, apDiscSetMacAddress }
+              ::= { apDiscSetTable 1 }
+
+          ApDiscSetEntry ::=
+	      SEQUENCE {
+		apDiscSetIfIndex
+		    INTEGER,
+		apDiscSetProto
+		    INTEGER,
+		apDiscSetMacAddress
+		    MacAddress,
+		apDiscSetNodeName
+		    DisplayString,
+		apDiscSetIpAddress
+		    IpAddress,
+		apDiscSetNetMask
+		    IpAddress,
+		apDiscSetGwAddress
+		    IpAddress,
+		apDiscSetAdminPassword
+		    DisplayString,
+		apDiscSetOperation
+		    INTEGER,
+		apDiscSetResult
+		    INTEGER
+	      }
+
+	      
+	      apDiscSetIfIndex OBJECT-TYPE
+		  SYNTAX INTEGER
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The interface on which the access point was detected.
+		      The interface is identified by its interface index in
+		      the ifTable."
+
+		  ::= { apDiscSetEntry 1 }
+
+
+	      apDiscSetProto OBJECT-TYPE
+		  SYNTAX INTEGER { artem(1) }
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This indicates via which protocol the access point is
+		      addressed. Currently only the protocol to discover
+		      ARtem access points is supported. This is protocol uses
+		      IP multicast protocol with group address 239.239.239.239
+		      and UPD port 1111."
+		  ::= { apDiscSetEntry 2 }
+
+	      apDiscSetMacAddress OBJECT-TYPE
+		  SYNTAX MacAddress
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The MAC address of the access point. The ARtem
+		      access points report via the discovery protocol the MAC
+		      address of their first ethernet-like interface."
+
+		  ::= { apDiscSetEntry 3 }
+
+	      apDiscSetNodeName OBJECT-TYPE
+		  SYNTAX DisplayString (SIZE (0..32))
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The new node name of the access point to be used in
+		      the next set request."
+		  DEFVAL { "" }
+		  
+		  ::= { apDiscSetEntry 4 }
+
+	      apDiscSetIpAddress OBJECT-TYPE
+		  SYNTAX IpAddress
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The new IP address of the access point to be used in
+		      the next set request. The access point uses DHCP if
+		      apDiscSetIpAddress, apDiscSetNetmask and apDiscSetGwAddress
+		      are all set to '0.0.0.0'."
+
+		  ::= { apDiscSetEntry 5 }
+
+
+	      apDiscSetNetMask OBJECT-TYPE
+		  SYNTAX IpAddress
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The new netmask of the access point to be used in the
+		      next set request. The access point uses DHCP if
+		      apDiscSetIpAddress, apDiscSetNetmask and apDiscSetGwAddress
+		      are all set to '0.0.0.0'."
+
+		  ::= { apDiscSetEntry 6 }
+
+
+	      apDiscSetGwAddress OBJECT-TYPE
+		  SYNTAX IpAddress
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The new gateway address of the access point to be used
+		      in the next set request. The gateway address must be in
+		      the network defined by apDiscSetIpAddress and the
+		      apDiscSetNetmask. The access point uses DHCP if
+		      apDiscSetIpAddress, apDiscSetNetmask and apDiscSetGwAddress
+		      are all set to '0.0.0.0'."
+
+		  ::= { apDiscSetEntry 7 }
+
+
+	      apDiscSetAdminPassword OBJECT-TYPE
+		  SYNTAX DisplayString (SIZE(0..64))
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "The access point's password of the administrative user
+		      account to authorize the set request."
+
+		  ::= { apDiscSetEntry 8 }
+	      
+	      apDiscSetOperation OBJECT-TYPE
+		  SYNTAX INTEGER {  none(1), set(2) }
+		  ACCESS read-write
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This variable allows to initiate a set operation. After
+		      the set operation is performed the variable apDiscSetResult
+		      is updated autonomously to reflect the result of the operation.
+		      
+		      'none': no set operation is performed or set operation has
+		      finished.
+
+		      'set': initiate the set request."
+		  
+		  DEFVAL { none }
+		  ::= { apDiscSetEntry 9 }
+		  
+	      apDiscSetResult OBJECT-TYPE
+		  SYNTAX INTEGER {  noError(1), invalidIpParam(2),
+		  		    accessDenied(3), otherError(4),
+				    destUnreachable(5), timeout(6),
+				    internalError(7) }
+		  ACCESS read-only
+		  STATUS mandatory
+		  DESCRIPTION
+		      "This variable indicates the result of the set operation
+		      after the operation has finished.
+		      
+		      'noError': no set operation performed or operation was a
+		      success.
+
+		      'invalidIpParam':  either no proper netmask was specified,
+		      or the gateway address does not fit to the IP address and
+		      netmask.
+
+		      'accessDenied': authorization for set operation failed.
+
+		      'otherError': access point replied with an unexpected error.
+		      Logging and debugging might reveal more information in this
+		      case.
+		      
+		      'destUnreachable': the interface is currently not usable.
+		      Interface is not operational or has no IP address assigned.
+		      The request could not be sent.
+
+		      'timeout': no response to set request.
+
+		      'internalError': an internal problem detected. The request
+		      could not be sent. Enabling log and debug messages might
+		      reveal more information in this case."
+
+		  DEFVAL { noError }
+		  
+		  ::= { apDiscSetEntry 10 }
+
+	  apDiscControl	OBJECT IDENTIFIER
+	  ::= { apdisc 4 }
+	  
+	    apDiscServerEnable OBJECT-TYPE
+		SYNTAX  INTEGER { enable(1), disable(2)}
+		ACCESS  read-write
+		STATUS  mandatory
+		DESCRIPTION
+			"Enable/disable the discovery server."
+		DEFVAL { disable }
+		::= { apDiscControl 1 }
+
+
+END

@@ -1,0 +1,1 @@
+/usr/bin/glue-sprite html/img/svg_png --css=html/css --img=html/img --namespace= --sprite-namespace=sprite --global-template='[class^="sprite-"], [class*=" sprite-"] { display: inline-block; background-image: url("../img/svg_png.png");  background-position: 18px 18px;  background-repeat: no-repeat; }' --optipng

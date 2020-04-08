@@ -1,0 +1,2689 @@
+--               GE Management Information Base   VERSION 2.00
+--
+--  Date: 11/10/2004
+--  Changes: remove of "_" in snmp identifiers, remove of duplicate comment characters         
+--  Author : MHCL
+--
+--  Date 02/14/2005
+--  Changes: remove additional size definition for DisplayString
+--  Changes: remove additional range definition of PositiveInteger32
+--  Changes: change of range definition for Integer32 entries
+--  Changes: change names of managed UPSs so that tablenames end with 'table'
+--           without changes of other structures
+--  Changes: change some Capital-/Lowercase issues            
+
+--  Author : MHCL
+--  Date:  15/11/2006
+--  Changes: added BatterRipple
+--  Changes: added OutputPowerFactor; OutputPeakCurrent; OutputShareCurrent
+--  Changes: added alarm HighpeedBusfailure; HighpeedBusCRCfailure; ConnectivityBusfailure
+--  Changes: added traps HighpeedBusfailure; HighpeedBusCRCfailure; ConnectivityBusfailure
+--  Changes: added traps HighpeedBusrestore; HighpeedBusCRCrestore; ConnectivityBusrestore
+--  Changes: added group Diagnostic
+--  Changes: added BatteryLifetime; FansLifetime; DCcapacitorsLifetime; ACcapacitorsLifetime
+--           GlobalServiceCheck
+--  Changes: added Status ServiceCheck
+--  Deleted: geEnvironmental tree
+--  Deleted: geModem tree 
+--  Deleted: geDevices tree
+--  Deleted: geSoftware tree
+--
+-- Author:  GE, Stefan Kuhn
+-- Date: 25/11/2006
+-- Changes: upsDiagnosticGlobalServiceChecke Syntax from DisplayString to Integer32
+-- Changes: upsDiagnosticGlobalServiceChecke into upsDiagnosticGlobalServiceCheck
+--
+-- Author: GE, Stefan Kuhn
+-- Date: 27/11/2006
+-- added: upsDiagnosticBusJACommunicationStatus
+-- added: upsDiagnosticBusJBCommunicationStatus
+-- Moved: BatteryLifetime; FansLifetime; DCcapacitorsLifetime; ACcapacitorsLifetime
+--        GlobalServiceCheck
+-- Author: GE, Stefan Kuhn
+--
+-- Date: 10/12/2006
+-- modified: upsSecondsOnBattery from NonNegativeInteger32 back to Integer32
+--           for the backard compatibility      
+-- added:    upsAlarmHighSpeedBusJACRCFailure,upsAlarmHighSpeedBusJBCRCFailure,upsAlarmShareCurrent,
+--           upsAlarmDCRipple and there relative traps
+-- Author: GE, Stefan Kuhn
+--
+-- Date: 22/Oct/2007
+-- added:    geDevices group
+-- Author: GE, L. Giuntini
+--
+-- Date: Jan 8th, 2008
+-- Author: GE, L. Giuntini
+-- Created version 2.00 for SMIv2 compliance
+-- Changes include the following:
+-- * MODULE-IDENTITY clause introduced right after the IMPORT statement
+-- * Compliance to RFC2578, section 7.1.1, second paragraph 
+--   in case of enumerations, use INTEGER rather than Integer32
+-- * Replace MAX-ACCESS read-only with MAX-ACCESS read-write
+--   (access `write-only' is no longer allowed in SMIv2)
+-- * Use NOTIFICATION-TYPE instead of TRAP-TYPE for Traps
+--   Remove ENTERPRISE clause
+--   Rename VARIABLES clause as OBJECTS clause
+--   Add STATUS current clause
+--   Incorporate traps in the Object tree
+-- * Finally, corrected some errors (undefined/re-defined identifiers) 
+--   Added 'Trap' to the trap name in order to prevent redefinition errors
+--
+-- Date: Jul 5th, 2010
+-- Author: GE, L. Giuntini
+-- Created version 2.40 for IEMi / eBoost introduction
+-- Modified: 
+-- * Description (Properties) for the upsStatus, upsUPSMode OIDs
+-- * Various changes to ensure full SNMP v2 compliance
+--
+-- GE-MIB
+-- { iso org(3) dod(6) internet(1) private(4) enterprises(1) imv(818) }
+--
+-- Title:       GE-MIB
+-- By:          Theo Versteeg & Fontana Gianluca
+--
+-- 11-5-00 Theo Versteeg
+--         Removed the complete Victron-MIB to create a new IMV-mib to cover Comprot4, 
+--         IM and IMV1 protocol.
+--         incl. external devices and object for the agents and protection software.
+--
+--   Entries marked with (*) are part of the RFC1628 definition
+--   Although we integrated the RFC1628 in our own OID range,
+--   all RCF1628 OIDs should also be accessable on their own OID defined in RFC1628.
+
+
+GESINGLEUPS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        
+       MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+       OBJECT-IDENTITY, Counter32, Gauge32, Integer32, Unsigned32, enterprises
+       FROM SNMPv2-SMI
+       DisplayString, TimeStamp, TimeInterval, TestAndIncr,
+         AutonomousType, TEXTUAL-CONVENTION
+           FROM SNMPv2-TC;
+
+imv MODULE-IDENTITY
+       LAST-UPDATED "201007050000Z"
+       ORGANIZATION "GE Digital Energy"
+       CONTACT-INFO
+              "GE Digital Energy
+               Via Cantonale, 50
+               CH-6595 Riazzino
+               Switzerland"
+       DESCRIPTION
+               "The MIB module to describe GE Digital Energy
+               Uninterruptible Power Supplies."
+       REVISION "201007050000Z"
+       DESCRIPTION
+               "Updated following IEMi & eBoost introduction."
+       REVISION "200801080000Z"
+       DESCRIPTION
+               "SNMPv2 compliant MIB released."
+       ::= { enterprises 818 }   
+       
+PositiveInteger32 ::= TEXTUAL-CONVENTION
+       DISPLAY-HINT "d"
+       STATUS       current
+       DESCRIPTION
+               "This data type is a non-zero and non-negative value."
+       SYNTAX       Integer32 (1..2147483647)
+
+              
+NonNegativeInteger32 ::= TEXTUAL-CONVENTION
+       DISPLAY-HINT "d"
+       STATUS       current
+       DESCRIPTION
+               "This data type is a non-negative value."
+       SYNTAX       Integer32 (0..2147483647)
+
+geHardware             OBJECT IDENTIFIER ::=  { imv 1 }
+
+geUPS                  OBJECT IDENTIFIER ::=  { geHardware 1 }
+         
+
+-- The following list is not really a table, but can be implemented as one in the software.
+-- The complete UPS section is simply too large to fit in a pre-defined table.
+-- The solution: 
+-- * All objects are defined for geGenericUPS
+-- * All individual UPSs of parallel systems can be reached by their respective sequence
+--   number as reflected in below list in stead of the geGenericUPS objects.
+
+geGenericUPS           OBJECT IDENTIFIER ::=  { geUPS 10 }
+                                              
+-- Generic UPS
+                                              
+upsIdentgen                OBJECT IDENTIFIER ::=  { geGenericUPS 1 }
+upsBatterygen              OBJECT IDENTIFIER ::=  { geGenericUPS 2 }
+upsInputgen                OBJECT IDENTIFIER ::=  { geGenericUPS 3 }
+upsOutputgen               OBJECT IDENTIFIER ::=  { geGenericUPS 4 }
+upsBypassgen               OBJECT IDENTIFIER ::=  { geGenericUPS 5 }
+upsAlarmgen                OBJECT IDENTIFIER ::=  { geGenericUPS 6 }
+upsWellKnownAlarmsgen      OBJECT IDENTIFIER ::=  { upsAlarmgen 3 }
+upsTestgen                 OBJECT IDENTIFIER ::=  { geGenericUPS 7 }
+upsWellKnownTestsgen       OBJECT IDENTIFIER ::=  { upsTestgen 7 }
+upsControlgen              OBJECT IDENTIFIER ::=  { geGenericUPS 8 }
+upsConfiggen               OBJECT IDENTIFIER ::=  { geGenericUPS 9 }
+upsGetSetgen               OBJECT IDENTIFIER ::=  { geGenericUPS 10 }
+geUPSTrapsgen              OBJECT IDENTIFIER ::=  { geGenericUPS 11 }
+upsDiagnosticgen           OBJECT IDENTIFIER ::=  { geGenericUPS 12 }
+
+-- Device 
+
+geDevices              OBJECT IDENTIFIER ::=  { geHardware 100 }
+geDevicesDescriptions  OBJECT IDENTIFIER ::=  { geDevices 1 }
+
+advSNMPWebIntCard       OBJECT IDENTIFIER ::=  { geDevicesDescriptions 1 }
+snmpWebIntCard          OBJECT IDENTIFIER ::=  { geDevicesDescriptions 2 }
+snmpWebIntBox           OBJECT IDENTIFIER ::=  { geDevicesDescriptions 3 } 
+
+--
+-- The GE UPS group           
+--
+
+geDiscoveredUPSsMask OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Reading this variable returns bit mask indicating which 
+            UPSs in a parallel system are alive. Management 
+            software should poll only these UPSs on their snmp
+            branches 11-18 as follows:
+
+              1  FirstUPS alive
+              2  SecondUPS alive
+              4  ThirdUPS alive
+              8  FourthUPS alive
+             16  FifthUPS alive
+             32  SixthUPS alive
+             64  SeventhUPS alive
+            128  EigthUPS alive
+
+            Since the management software should always monitor
+            the GenericUPS branch (10), this value has no meaning 
+            for single upses (which provide values on that snmp 
+            branch), and should be set to zero in that case."
+    ::= { geUPS 1 }
+
+geRequestPacket OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-write 
+    STATUS     current
+    DESCRIPTION
+            "Put the string, formatted as a IMV/CP4 packet, directly to internally RS485 bus. 
+	This OID could be used for accede directly to the internally RS485 bus from a remote place."
+    ::= { geUPS 2 }
+
+geReplyPacket OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Contain the reply of the IMV/CP4 request packet sent using the OID geRequestPacket. 
+	Every time that a write command has be made at the OID ge RequestPacket, the value of this OID is erased."
+    ::= { geUPS 3 }
+
+
+
+--
+-- The Device Identification group. Generic
+--      All objects in this group except for upsIdentName and
+--      upsIdentAttachedDevices are set at device initialization
+--      and remain static.
+--
+
+upsIdentManufacturergen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The name of the UPS manufacturer.(*)"
+    ::= { upsIdentgen 1 }
+
+upsIdentModelgen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The UPS Model designation.(*)"
+    ::= { upsIdentgen 2 }
+
+upsIdentUPSSoftwareVersiongen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The UPS firmware/software version(s).  This variable
+            may or may not have the same value as
+            upsIdentAgentSoftwareVersion in some implementations.(*)"
+    ::= { upsIdentgen 3 }
+
+upsIdentAgentSoftwareVersiongen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The UPS agent software version.  This variable may or
+            may not have the same value as
+            upsIdentUPSSoftwareVersion in some implementations.(*)"
+    ::= { upsIdentgen 4 }
+
+upsIdentNamegen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "A string identifying the UPS.  This object should be
+            set by the administrator.(*)"
+    ::= { upsIdentgen 5 }
+
+upsIdentAttachedDevicesgen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "A string identifying the devices attached to the
+            output(s) of the UPS.  This object should be set by
+            the administrator.(*)"
+    ::= { upsIdentgen 6 }
+
+upsIdentUPSSerialNumbergen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The UPS serial number"
+    ::= { upsIdentgen 7 }
+				
+upsIdentComProtVersiongen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The IMV communication protocol version"
+    ::= { upsIdentgen 8 }	
+		
+upsIdentOperatingTimegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "seconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present value of the operating time.
+             total 'on' time since UPS manufactured"
+    ::= { upsIdentgen 9 }	
+				
+--
+-- Battery Group Generic
+--
+
+upsBatteryStatusgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        unknown(1),
+        batteryNormal(2),
+        batteryLow(3),
+        batteryDepleted(4)
+    }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The indication of the capacity remaining in the UPS
+            system's batteries.   A value of batteryNormal
+            indicates that the remaining run-time is greater than
+            upsConfigLowBattTime.  A value of batteryLow indicates
+            that the remaining battery run-time is less than or
+            equal to upsConfigLowBattTime.  A value of
+            batteryDepleted indicates that the UPS will be unable
+            to sustain the present load when and if the utility
+            power is lost (including the possibility that the
+            utility power is currently absent and the UPS is
+            unable to sustain the output).(*)"
+    ::= { upsBatterygen 1 }
+
+upsSecondsOnBatterygen OBJECT-TYPE
+    SYNTAX     Integer32
+    UNITS      "seconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If the unit is on battery power, the elapsed time
+            since the UPS last switched to battery power, or the
+            time since the network management subsystem was last
+            restarted, whichever is less.  Zero shall be returned
+            if the unit is not on battery power.(*)"
+    ::= { upsBatterygen 2 }
+
+upsEstimatedMinutesRemaininggen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    UNITS      "minutes"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "An estimate of the time to battery charge depletion
+            under the present load conditions if the utility power
+            is off and remains off, or if it were to be lost and
+            remain off.(*)"
+    ::= { upsBatterygen 3 }
+
+upsEstimatedChargeRemaininggen OBJECT-TYPE
+    SYNTAX     Integer32 (0..100)
+    UNITS      "percent"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "An estimate of the battery charge remaining expressed
+            as a percent of full charge.(*)"
+    ::= { upsBatterygen 4 }
+
+upsBatteryVoltagegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 Volt DC"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the present battery voltage.(*)"
+    ::= { upsBatterygen 5 }
+
+upsBatteryCurrentgen OBJECT-TYPE
+    SYNTAX     Integer32
+    UNITS      "0.1 Amp DC"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present battery current.(*)"
+    ::= { upsBatterygen 6 }
+
+upsBatteryTemperaturegen OBJECT-TYPE
+    SYNTAX     Integer32
+    UNITS      "degrees Centigrade"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The ambient temperature at or near the UPS Battery
+            casing.(*)"
+    ::= { upsBatterygen 7 }
+
+upsBatteryRipplegen OBJECT-TYPE
+    SYNTAX     Integer32
+    UNITS      "0.1 Volt RMS"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present DC link RMS voltage ripple.(*)"
+    ::= { upsBatterygen 8 }
+
+
+--
+-- Input Group
+--
+
+upsInputLineBadsgen OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "A count of the number of times the input entered an
+            out-of-tolerance condition as defined by the
+            manufacturer.  This count is incremented by one each
+            time the input transitions from zero out-of-tolerance
+            lines to one or more input lines out-of-tolerance.(*)"
+    ::= { upsInputgen 1 }
+
+upsInputNumLinesgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of input lines utilized in this device.
+            This variable indicates the number of rows in the
+            input table.(*)"
+    ::= { upsInputgen 2 }
+
+upsInputGenTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF UpsInputGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A list of input table entries.  The number of entries
+            is given by the value of upsInputNumLines.(*)"
+    ::= { upsInputgen 3 }
+
+upsInputGenEntry OBJECT-TYPE
+    SYNTAX     UpsInputGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry containing information applicable to a
+            particular input line.(*)"
+    INDEX { upsInputLineIndexgen }
+    ::= { upsInputGenTable 1 }
+
+UpsInputGenEntry ::= SEQUENCE {
+    upsInputLineIndexgen   PositiveInteger32,
+    upsInputFrequencygen   NonNegativeInteger32,
+    upsInputVoltagegen     NonNegativeInteger32,
+    upsInputCurrentgen     NonNegativeInteger32,
+    upsInputTruePowergen   NonNegativeInteger32,
+    upsInputVoltageMingen  NonNegativeInteger32,
+    upsInputVoltageMaxgen  NonNegativeInteger32
+}
+
+upsInputLineIndexgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The input line identifier.(*)"
+    ::= { upsInputGenEntry 1 }
+
+upsInputFrequencygen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 Hertz"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present input frequency.(*)"
+    ::= { upsInputGenEntry 2 }
+
+upsInputVoltagegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the present input voltage.(*)"
+    ::= { upsInputGenEntry 3 }
+
+upsInputCurrentgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 RMS Amp"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the present input current.(*)"
+    ::= { upsInputGenEntry 4 }
+
+upsInputTruePowergen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the present input true power.(*)"
+    ::= { upsInputGenEntry 5 }
+
+upsInputVoltageMingen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The lowest magnitude of the input voltage since last read out."
+    ::= { upsInputGenEntry 6 }
+
+upsInputVoltageMaxgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The highest magnitude of the input voltage since last read out."
+    ::= { upsInputGenEntry 7 }
+
+--
+-- The Output group.
+--
+
+upsOutputSourcegen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        other(1),
+        none(2),
+        normal(3),
+        bypass(4),
+        battery(5),
+        booster(6),
+        reducer(7)
+    }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present source of output power.  The enumeration
+            none(2) indicates that there is no source of output
+            power (and therefore no output power), for example,
+            the system has opened the output breaker.(*)"
+    ::= { upsOutputgen 1 }
+
+upsOutputFrequencygen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 Hertz"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present output frequency.(*)"
+    ::= { upsOutputgen 2 }
+
+upsOutputNumLinesgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of output lines utilized in this device.
+            This variable indicates the number of rows in the
+            output table.(*)"
+    ::= { upsOutputgen 3 }
+
+upsOutputGenTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF UpsOutputGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A list of output table entries.  The number of
+            entries is given by the value of upsOutputNumLines.(*)"
+    ::= { upsOutputgen 4 }
+
+upsOutputGenEntry OBJECT-TYPE
+    SYNTAX     UpsOutputGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry containing information applicable to a
+            particular output line.(*)"
+    INDEX { upsOutputLineIndexgen }
+    ::= { upsOutputGenTable 1 }
+
+UpsOutputGenEntry ::= SEQUENCE {
+    upsOutputLineIndexgen   PositiveInteger32,
+    upsOutputVoltagegen     NonNegativeInteger32,
+    upsOutputCurrentgen     NonNegativeInteger32,
+    upsOutputPowergen       NonNegativeInteger32,
+    upsOutputPercentLoadgen Integer32,
+    upsOutputPowerFactorgen	Integer32,
+    upsOutputPeakCurrentgen	Integer32,
+    upsOutputShareCurrentgen Integer32
+}
+
+upsOutputLineIndexgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The output line identifier.(*)"
+    ::= { upsOutputGenEntry 1 }
+
+upsOutputVoltagegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present output voltage.(*)"
+    ::= { upsOutputGenEntry 2 }
+
+upsOutputCurrentgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 RMS Amp"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present output current.(*)"
+    ::= { upsOutputGenEntry 3 }
+
+upsOutputPowergen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present output true power.(*)"
+    ::= { upsOutputGenEntry 4 }
+
+upsOutputPercentLoadgen OBJECT-TYPE
+    SYNTAX     Integer32 (0..200)
+    UNITS      "percent"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The percentage of the UPS power capacity presently
+            being used on this output line, i.e., the greater of
+            the percent load of true power capacity and the
+            percent load of VA.(*)"
+    ::= { upsOutputGenEntry 5 }
+
+upsOutputPowerFactorgen OBJECT-TYPE
+    SYNTAX     Integer32 (-99..100)
+    UNITS      "0.01 cos phi"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present output power factor. 
+             The returned value correspond to the cosf of the load.
+             A positive value indicate an inductive load; 
+             a negative value indicate a capacitive load; 
+             value 1 indicate a resistive load. 
+             If the measure is not available due to a small load for 
+             a consistent calculation, the NA value is then returned.(*)"
+    ::= { upsOutputGenEntry 6 }
+    
+upsOutputPeakCurrentgen OBJECT-TYPE
+    SYNTAX     Integer32 
+    UNITS      "Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present output peak current.(*)"
+    ::= { upsOutputGenEntry 7 }
+
+upsOutputShareCurrentgen OBJECT-TYPE
+    SYNTAX     Integer32 
+    UNITS      "Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "In a parallel system ideally all the UPS are requested to 
+            contribute to the load with the same amount of current, 
+            i.e. with no current share. The current share occurs when an
+            UPS exchanges some current with another UPS, so that this 
+            current component doesn't feed the load. 
+            The share part of the UPS current represents an undesired UPS
+            loading, and therefore it should be minimized. If the share 
+            current is too high, the UPS results overloaded and in some 
+            conditions (i.e. very high load) the system could turn on 
+            bypass reducing dramatically the global system reliability.
+			PMAD detects the amount of share currents in a parallel system,
+			generating an alarm if this value is above a parameter-based threshold.
+			Single UPS systems don't have this feature, NA will be provided.(*)"
+    ::= { upsOutputGenEntry 8 }
+
+--
+-- The Bypass group generic.
+--
+
+upsBypassFrequencygen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 Hertz"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present bypass frequency.(*)"
+    ::= { upsBypassgen 1 }
+
+upsBypassNumLinesgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of bypass lines utilized in this device.
+            This entry indicates the number of rows in the bypass
+            table.(*)"
+    ::= { upsBypassgen 2 }
+
+upsBypassGenTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF UpsBypassGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A list of bypass table entries.  The number of
+            entries is given by the value of upsBypassNumLines.(*)"
+    ::= { upsBypassgen 3 }
+
+upsBypassGenEntry OBJECT-TYPE
+    SYNTAX     UpsBypassGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry containing information applicable to a
+            particular bypass input.(*)"
+    INDEX { upsBypassLineIndexgen }
+    ::= { upsBypassGenTable 1 }
+
+UpsBypassGenEntry ::= SEQUENCE {
+    upsBypassLineIndexgen  PositiveInteger32,
+    upsBypassVoltagegen    NonNegativeInteger32,
+    upsBypassCurrentgen    NonNegativeInteger32,
+    upsBypassPowergen      NonNegativeInteger32
+}
+
+upsBypassLineIndexgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The bypass line identifier.(*)"
+    ::= { upsBypassGenEntry 1 }
+
+upsBypassVoltagegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present bypass voltage.(*)"
+    ::= { upsBypassGenEntry 2 }
+
+upsBypassCurrentgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 RMS Amp"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present bypass current.(*)"
+    ::= { upsBypassGenEntry 3 }
+
+upsBypassPowergen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present true power conveyed by the bypass.(*)"
+    ::= { upsBypassGenEntry 4 }
+
+--
+-- The Alarm group generic.
+--
+
+upsAlarmsPresentgen OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The present number of active alarm conditions.(*)"
+    ::= { upsAlarmgen 1 }
+
+upsAlarmGenTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF UpsAlarmGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A list of alarm table entries.  The table contains
+            zero, one, or many rows at any moment, depending upon
+            the number of alarm conditions in effect.  The table
+            is initially empty at agent startup.  The agent
+            creates a row in the table each time a condition is
+            detected and deletes that row when that condition no
+            longer pertains.  The agent creates the first row with
+            upsAlarmId equal to 1, and increments the value of
+            upsAlarmId each time a new row is created, wrapping to
+            the first free value greater than or equal to 1 when
+            the maximum value of upsAlarmId would otherwise be
+            exceeded.  Consequently, after multiple operations,
+            the table may become sparse, e.g., containing entries
+            for rows 95, 100, 101, and 203 and the entries should
+            not be assumed to be in chronological order because
+            upsAlarmId might have wrapped.
+
+            Alarms are named by an AutonomousType (OBJECT
+            IDENTIFIER), upsAlarmDescr, to allow a single table to
+            reflect well known alarms plus alarms defined by a
+            particular implementation, i.e., as documented in the
+            private enterprise MIB definition for the device.  No
+            two rows will have the same value of upsAlarmDescr,
+            since alarms define conditions.  In order to meet this
+            requirement, care should be taken in the definition of
+            alarm conditions to insure that a system cannot enter
+            the same condition multiple times simultaneously.
+
+            The number of rows in the table at any given time is
+            reflected by the value of upsAlarmsPresent.(*)"
+    ::= { upsAlarmgen 2 }
+
+upsAlarmGenEntry OBJECT-TYPE
+    SYNTAX     UpsAlarmGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry containing information applicable to a
+            particular alarm.(*)"
+    INDEX { upsAlarmIdgen }
+    ::= { upsAlarmGenTable 1 }
+
+UpsAlarmGenEntry ::= SEQUENCE {
+    upsAlarmIdgen          PositiveInteger32,
+    upsAlarmDescrgen       AutonomousType,
+    upsAlarmTimegen       TimeStamp
+}
+
+upsAlarmIdgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A unique identifier for an alarm condition.  This
+            value must remain constant.(*)"
+    ::= { upsAlarmGenEntry 1 }
+
+upsAlarmDescrgen OBJECT-TYPE
+    SYNTAX     AutonomousType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "A reference to an alarm description object.  The
+            object referenced should not be accessible, but rather
+            be used to provide a unique description of the alarm
+            condition.(*)"
+    ::= { upsAlarmGenEntry 2 }
+
+upsAlarmTimegen OBJECT-TYPE
+    SYNTAX     TimeStamp
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of sysUpTime when the alarm condition was
+            detected.  If the alarm condition was detected at the
+            time of agent startup and presumably existed before
+            agent startup, the value of upsAlarmTime shall equal
+            0.(*)"
+    ::= { upsAlarmGenEntry 3 }
+
+--
+-- Well known alarm conditions generic.
+--
+
+upsAlarmBatteryBadgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "One or more batteries have been determined to require
+            replacement.(*)"
+    ::= { upsWellKnownAlarmsgen  1 }
+
+upsAlarmOnBatterygen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS is drawing power from the batteries.(*)"
+    ::= { upsWellKnownAlarmsgen  2 }
+
+upsAlarmLowBatterygen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The remaining battery run-time is less than or equal
+            to upsConfigLowBattTime.(*)"
+    ::= { upsWellKnownAlarmsgen  3 }
+
+upsAlarmDepletedBatterygen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS will be unable to sustain the present load
+            when and if the utility power is lost.(*)"
+    ::= { upsWellKnownAlarmsgen  4 }
+
+upsAlarmTempBadgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A temperature is out of tolerance.(*)"
+    ::= { upsWellKnownAlarmsgen  5 }
+
+upsAlarmInputBadgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "An input condition is out of tolerance.(*)"
+    ::= { upsWellKnownAlarmsgen  6 }
+
+upsAlarmOutputBadgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "An output condition (other than OutputOverload) is
+            out of tolerance.(*)"
+    ::= { upsWellKnownAlarmsgen  7 }
+
+upsAlarmOutputOverloadgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The output load exceeds the UPS output capacity.(*)"
+    ::= { upsWellKnownAlarmsgen  8 }
+
+upsAlarmOnBypassgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The Bypass is presently engaged on the UPS.(*)"
+    ::= { upsWellKnownAlarmsgen  9 }
+
+upsAlarmBypassBadgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The Bypass is out of tolerance.(*)"
+    ::= { upsWellKnownAlarmsgen 10 }
+
+upsAlarmOutputOffAsRequestedgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS has shutdown as requested, i.e., the output
+            is off.(*)"
+    ::= { upsWellKnownAlarmsgen 11 }
+
+upsAlarmUpsOffAsRequestedgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The entire UPS has shutdown as commanded.(*)"
+    ::= { upsWellKnownAlarmsgen 12 }
+
+upsAlarmChargerFailedgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "An uncorrected problem has been detected within the
+            UPS charger subsystem.(*)"
+    ::= { upsWellKnownAlarmsgen 13 }
+
+upsAlarmUpsOutputOffgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The output of the UPS is in the off state.(*)"
+    ::= { upsWellKnownAlarmsgen 14 }
+
+upsAlarmUpsSystemOffgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS system is in the off state.(*)"
+    ::= { upsWellKnownAlarmsgen 15 }
+
+upsAlarmFanFailuregen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The failure of one or more fans in the UPS has been
+            detected.(*)"
+    ::= { upsWellKnownAlarmsgen 16 }
+
+upsAlarmFuseFailuregen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The failure of one or more fuses has been detected.(*)"
+    ::= { upsWellKnownAlarmsgen 17 }
+
+upsAlarmGeneralFaultgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A general fault in the UPS has been detected.(*)"
+    ::= { upsWellKnownAlarmsgen 18 }
+
+upsAlarmDiagnosticTestFailedgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The result of the last diagnostic test indicates a
+            failure.(*)"
+    ::= { upsWellKnownAlarmsgen 19 }
+
+upsAlarmCommunicationsLostgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A problem has been encountered in the communications
+            between the agent and the UPS.(*)"
+    ::= { upsWellKnownAlarmsgen 20 }
+
+upsAlarmAwaitingPowergen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS output is off and the UPS is awaiting the
+            return of input power.(*)"
+    ::= { upsWellKnownAlarmsgen 21 }
+
+upsAlarmShutdownPendinggen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A upsShutdownAfterDelay countdown is underway.(*)"
+    ::= { upsWellKnownAlarmsgen 22 }
+
+upsAlarmShutdownImminentgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS will turn off power to the load in less than
+            5 seconds; this may be either a timed shutdown or a
+            low battery shutdown.(*)"
+    ::= { upsWellKnownAlarmsgen 23 }
+
+upsAlarmTestInProgressgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A test is in progress, as initiated and indicated by
+            the Test Group.  Tests initiated via other
+            implementation-specific mechanisms can indicate the
+            presence of the testing in the alarm table, if
+            desired, via a OBJECT-IDENTITY macro in the MIB
+            document specific to that implementation and are
+            outside the scope of this OBJECT-IDENTITY.(*)"
+    ::= { upsWellKnownAlarmsgen 24 }
+
+upsAlarmReceptacleOffgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The receptacle are switch off    "
+    ::= { upsWellKnownAlarmsgen 25 }
+
+upsAlarmHighSpeedBusFailuregen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A problem on the High Speed Bus communication is detected"
+    ::= { upsWellKnownAlarmsgen 26 }
+    
+upsAlarmHighSpeedBusJACRCFailuregen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A High Speed Bus CRC failure on Bus JA is detected"
+    ::= { upsWellKnownAlarmsgen 27 }
+    
+upsAlarmConnectivityBusFailuregen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A problem on the Connectivity Bus communication is detected"
+    ::= { upsWellKnownAlarmsgen 28 }
+
+upsAlarmHighSpeedBusJBCRCFailuregen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A High Speed Bus CRC failure on Bus JB is detected"
+    ::= { upsWellKnownAlarmsgen 29 }
+
+upsAlarmCurrentSharinggen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS detects an high current sharing on the parallel system"
+    ::= { upsWellKnownAlarmsgen 30 }
+        
+upsAlarmDCRipplegen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The UPS detects an high ripple voltage on his DC link"
+    ::= { upsWellKnownAlarmsgen 31 }
+    
+upsAlarmMaskAgen OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Specifies which alarm can be handled by the UPS.
+            The 'Mask' parameter is a Long Integer32. The meaning
+            of every bit is the same as for the 'upsAlarmGroupA'
+            command. A bit having value=1 indicates that the
+            corresponding alarm is handled by the UPS."
+    ::= { upsAlarmgen 4 }
+
+--
+-- The Test Group generic
+--
+
+upsTestIdgen OBJECT-TYPE
+    SYNTAX     OBJECT IDENTIFIER
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The test is named by an OBJECT IDENTIFIER which
+            allows a standard mechanism for the initiation of
+            tests, including the well known tests identified in
+            this document as well as those introduced by a
+            particular implementation, i.e., as documented in the
+            private enterprise MIB definition for the device.
+
+            Setting this variable initiates the named test. Sets
+            to this variable require the presence of
+            upsTestSpinLock in the same SNMP message.
+
+            The set request will be rejected with an appropriate
+            error message if the requested test cannot be
+            performed, including attempts to start a test when
+            another test is already in progress.  The status of
+            the current or last test is maintained in
+            upsTestResultsSummary. Tests in progress may be
+            aborted by setting the upsTestId variable to
+            upsTestAbortTestInProgress.
+
+            Read operations return the value of the name of the
+            test in progress if a test is in progress or the name
+            of the last test performed if no test is in progress,
+            unless no test has been run, in which case the well
+            known value upsTestNoTestsInitiated is returned.(*)"
+    ::= { upsTestgen 1 }
+
+-- see [6] for more information on the semantics of objects with
+-- syntax of TestAndIncr
+
+upsTestSpinLockgen OBJECT-TYPE
+    SYNTAX     TestAndIncr
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "A spin lock on the test subsystem.  The spinlock is
+            used as follows.
+
+            Before starting a test, a manager-station should make
+            sure that a test is not in progress as follows:
+
+                tryagain:
+                  get (upsTestSpinLock)
+                  while (upsTestResultsSummary == inProgress) {
+                    /* loop while a test is running for another
+            manager */
+                    short delay
+                    get (upsTestSpinLock)
+                  }
+                  lockvalue = upsTestSpinLock
+                  /* no test in progress, start the test */
+                  set (upsTestSpinLock = lockvalue, upsTestId =
+            requestedtest)
+                  if (errorindex == 1) { /* (upsTestSpinLock
+            failed) */
+                    /* if problem is not access control, then
+                        some other manager slipped in ahead of us
+            */
+                    goto tryagain
+                  }
+                  if (errorindex == 2) { /* (upsTestId) */
+                    /* cannot perform the test */
+                    give up
+                  }
+                  /* test started ok */
+                  /* wait for test completion by polling
+            upsTestResultsSummary */
+                  get (upsTestSpinLock, upsTestResultsSummary,
+            upsTestResultsDetail)
+                  while (upsTestResultsSummary == inProgress) {
+                    short delay
+                    get (upsTestSpinLock, upsTestResultsSummary,
+            upsTestResultsDetail)
+                  }
+                  /* when test completes, retrieve any additional
+            test results */
+                  /* if upsTestSpinLock == lockvalue + 1, then
+            these are our test */
+                  /* results (as opposed to another manager's */
+                  The initial value of upsTestSpinLock at agent
+            initialization shall
+                  be 1.(*)"
+    ::= { upsTestgen 2 }
+
+upsTestResultsSummarygen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        donePass(1),
+        doneWarning(2),
+        doneError(3),
+        aborted(4),
+        inProgress(5),
+        noTestsInitiated(6)
+    }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The results of the current or last UPS diagnostics
+            test performed.  The values for donePass(1),
+            doneWarning(2), and doneError(3) indicate that the
+            test completed either successfully, with a warning, or
+            with an error, respectively.  The value aborted(4) is
+            returned for tests which are aborted by setting the
+            value of upsTestId to upsTestAbortTestInProgress.
+            Tests which have not yet concluded are indicated by
+            inProgress(5).  The value noTestsInitiated(6)
+            indicates that no previous test results are available,
+            such as is the case when no tests have been run since
+            the last reinitialization of the network management
+            subsystem and the system has no provision for non-
+            volatile storage of test results.(*)"
+    ::= { upsTestgen 3 }
+
+upsTestResultsDetailgen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Additional information about upsTestResultsSummary.
+            If no additional information available, a zero length
+            string is returned.(*)"
+    ::= { upsTestgen 4 }
+
+upsTestStartTimegen OBJECT-TYPE
+    SYNTAX     TimeStamp
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of sysUpTime at the time the test in
+            progress was initiated, or, if no test is in progress,
+            the time the previous test was initiated.  If the
+            value of upsTestResultsSummary is noTestsInitiated(6),
+            upsTestStartTime has the value 0.(*)"
+    ::= { upsTestgen 5 }
+
+upsTestElapsedTimegen OBJECT-TYPE
+    SYNTAX     TimeInterval
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The amount of time, in TimeTicks, since the test in
+            progress was initiated, or, if no test is in progress,
+            the previous test took to complete.  If the value of
+            upsTestResultsSummary is noTestsInitiated(6),
+            upsTestElapsedTime has the value 0.(*)"
+    ::= { upsTestgen 6 }
+
+--
+-- Well known tests generic.
+--
+
+upsTestNoTestsInitiatedgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "No tests have been initiated and no test is in
+            progress.(*)"
+    ::= { upsWellKnownTestsgen  1 }
+
+upsTestAbortTestInProgressgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The test in progress is to be aborted / the test in
+            progress was aborted.(*)"
+    ::= { upsWellKnownTestsgen  2 }
+
+upsTestGeneralSystemsTestgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The manufacturer's standard test of UPS device
+            systems.(*)"
+    ::= { upsWellKnownTestsgen  3 }
+
+upsTestQuickBatteryTestgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "A test that is sufficient to determine if the battery
+            needs replacement.(*)"
+    ::= { upsWellKnownTestsgen  4 }
+
+upsTestDeepBatteryCalibrationgen OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+            "The system is placed on battery to a discharge level,
+            set by the manufacturer, sufficient to determine
+            battery replacement and battery run-time with a high
+            degree of confidence.  WARNING:  this test will leave
+            the battery in a low charge state and will require
+            time for recharging to a level sufficient to provide
+            normal battery duration for the protected load.(*)"
+    ::= { upsWellKnownTestsgen  5 }
+
+--
+-- The Control group generic.
+--
+
+upsShutdownTypegen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        output(1),
+        system(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "This object determines the nature of the action to be
+            taken at the time when the countdown of the
+            upsShutdownAfterDelay and upsRebootWithDuration
+            objects reaches zero.
+
+            Setting this object to output(1) indicates that
+            shutdown requests should cause only the output of the
+            UPS to turn off.  Setting this object to system(2)
+            indicates that shutdown requests will cause the entire
+            UPS system to turn off.(*)"
+    ::= { upsControlgen 1 }
+
+upsShutdownAfterDelaygen OBJECT-TYPE
+    SYNTAX     Integer32 (-1..2147483647)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "Setting this object will shutdown (i.e., turn off)
+            either the UPS output or the UPS system (as determined
+            by the value of upsShutdownType at the time of
+            shutdown) after the indicated number of seconds, or
+            less if the UPS batteries become depleted. Setting
+            this object to 0 will cause the shutdown to occur
+            immediately.  Setting this object to -1 will abort the
+            countdown.  If the system is already in the desired
+            state at the time the countdown reaches 0, then
+            nothing will happen.  That is, there is no additional
+            action at that time if upsShutdownType = system and
+            the system is already off.  Similarly, there is no
+            additional action at that time if upsShutdownType =
+            output and the output is already off.  When read,
+            upsShutdownAfterDelay will return the number of
+            seconds remaining until shutdown, or -1 if no shutdown
+            countdown is in effect.  On some systems, if the agent
+            is restarted while a shutdown countdown is in effect,
+            the countdown may be aborted.  Sets to this object
+            override any upsShutdownAfterDelay already in effect.(*)"
+    ::= { upsControlgen 2 }
+
+upsStartupAfterDelaygen OBJECT-TYPE
+    SYNTAX     Integer32 (-1..2147483647)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "Setting this object will start the output after the
+            indicated number of seconds, including starting the
+            UPS, if necessary.  Setting this object to 0 will
+            cause the startup to occur immediately.  Setting this
+            object to -1 will abort the countdown.  If the output
+            is already on at the time the countdown reaches 0,
+            then nothing will happen.  Sets to this object
+            override the effect of any upsStartupAfterDelay
+            countdown or upsRebootWithDuration countdown in
+            progress.  When read, upsStartupAfterDelay will return
+            the number of seconds until startup, or -1 if no
+            startup countdown is in effect.  If the countdown
+            expires during a utility failure, the startup shall
+            not occur until the utility power is restored.  On
+            some systems, if the agent is restarted while a
+            startup countdown is in effect, the countdown is
+            aborted.(*)"
+    ::= { upsControlgen 3 }
+
+upsRebootWithDurationgen OBJECT-TYPE
+    SYNTAX     Integer32 (-1..300)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "Setting this object will immediately shutdown (i.e.,
+            turn off) either the UPS output or the UPS system (as
+            determined by the value of upsShutdownType at the time
+            of shutdown) for a period equal to the indicated
+            number of seconds, after which time the output will be
+            started, including starting the UPS, if necessary.  If
+            the number of seconds required to perform the request
+            is greater than the requested duration, then the
+            requested shutdown and startup cycle shall be
+            performed in the minimum time possible, but in no case
+            shall this require more than the requested duration
+            plus 60 seconds.  When read, upsRebootWithDuration
+            shall return the number of seconds remaining in the
+            countdown, or -1 if no countdown is in progress.  If
+            the startup should occur during a utility failure, the
+            startup shall not occur until the utility power is
+            restored.(*)"
+    ::= { upsControlgen 4 }
+
+upsAutoRestartgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        on(1),
+        off(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "Setting this object to 'on' will cause the UPS system
+            to restart after a shutdown if the shutdown occurred
+            during a power loss as a result of either a
+            upsShutdownAfterDelay or an internal battery depleted
+            condition.  Setting this object to 'off' will prevent
+            the UPS system from restarting after a shutdown until
+            an operator manually or remotely explicitly restarts
+            it.  If the UPS is in a startup or reboot countdown,
+            then the UPS will not restart until that delay has
+            been satisfied.(*)"
+    ::= { upsControlgen 5 }
+
+upsReceptaclesNumgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of receptacles utilized in this device.
+            This entry indicates the number of rows in the receptacle
+            table."
+    ::= { upsControlgen 6 }
+
+upsReceptacleGenTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF UpsReceptacleGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A list of receptacle table entries.  The number of
+            entries is given by the value of upsReceptacleNum."
+    ::= { upsControlgen 7 }
+
+upsReceptacleGenEntry OBJECT-TYPE
+    SYNTAX     UpsReceptacleGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry containing information applicable to a
+            particular receptacle."
+    INDEX { upsReceptacleLineIndexgen }
+    ::= { upsReceptacleGenTable 1 }
+
+UpsReceptacleGenEntry ::= SEQUENCE {
+    upsReceptacleLineIndexgen  PositiveInteger32,
+    upsReceptacleOnOffgen      INTEGER    
+}
+
+upsReceptacleLineIndexgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The receptacle line identifier."
+    ::= { upsReceptacleGenEntry 1 }
+
+upsReceptacleOnOffgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        on(1),
+        off(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The present state of the receptacle. Setting this 
+             object to 'on' will cause the receptacle to be turned
+             on. Setting this object to 'off' will turn the
+             receptacle off. If the receptacle is already in the
+             desired state nothing will happen. After an
+             autorestart (see upsAutoRestart) the receptacle will
+             be on."
+    ::= { upsReceptacleGenEntry 2 }
+
+upsUPSModegen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        offLine(1),
+        onLine(2),
+        ecomode(3),
+	iem(4)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The operation mode off the UPS. Off-line indicates a
+            mode in which the input power is transferred to the
+            output directly or via a step-up or step-down
+            transformer. On-line mode indicates a mode in which 
+            the output power is regenerated through some convertor.
+            the operating mode of the UPS may be fixed, or may be
+            selectable (e.g. an on-line UPS with ecomode)"
+    ::= { upsControlgen 8 }
+
+upsRectifierOnOffgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        on(1),
+        off(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The present state of the rectifier. Setting this 
+             object to 'on' will cause the rectifier to be turned
+             on. Setting this object to 'off' will turn the
+             rectifier off. If the rectifier is already in the
+             desired state nothing will happen. "
+    ::= { upsControlgen 9 }
+
+upsBatteryChargeMethodgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        normalcharge(1),
+        boostcharge(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The present state of the charge method. Setting this 
+             object to 'Normal charge' will cause the battery to be 
+             charged using the normal method. Setting this object to 
+             'Boost charge' will charge the battery in boost mode. 
+             If the charge method is already in the desired state 
+             nothing will happen. "
+    ::= { upsControlgen 10 }
+
+upsInverterOnOffgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        on(1),
+        off(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The present state of the inverter. Setting this 
+             object to 'on' will cause the inverter to be turned
+             on. Setting this object to 'off' will turn the
+             inverter off. If the inverter is already in the
+             desired state nothing will happen. "
+    ::= { upsControlgen 11 }
+
+upsBypassOnOffgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        on(1),
+        off(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The present state of the bypass. Setting this 
+             object to 'on' will cause the bypass to be activated.
+             Setting this object to 'off' will deactivate the
+             bypass. If the UPS is already in the
+             desired state nothing will happen. "
+    ::= { upsControlgen 12 }
+
+upsLoadSourcegen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        onbypass(1),
+        onInverter(2),
+        onDetour(3),
+        loadOff(4),
+        other (5)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The present source of the load. Setting this 
+             object to 'On bypass' will cause the load to be 
+             supplied by the bypass.
+             Setting this object to 'On inverter' will cause the 
+             load to be supplied by the inverter.
+             If the load is already supplied by the desired 
+             source nothing will happen. "
+    ::= { upsControlgen 13 }
+	
+--
+-- The Configuration group generic.
+--
+
+upsConfigInputVoltagegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the nominal input voltage.  On those
+            systems which support read-write access to this
+            object, if there is an attempt to set this variable to
+            a value that is not supported, the request must be
+            rejected and the agent shall respond with an
+            appropriate error message, i.e., badValue for SNMPv1,
+            or inconsistentValue for SNMPv2.(*)"
+    ::= { upsConfiggen 1 }
+
+upsConfigInputFreqgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 Hertz"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The nominal input frequency.  On those systems which
+            support read-write access to this object, if there is
+            an attempt to set this variable to a value that is not
+            supported, the request must be rejected and the agent
+            shall respond with an appropriate error message, i.e.,
+            badValue for SNMPv1, or inconsistentValue for SNMPv2.(*)"
+    ::= { upsConfiggen 2 }
+
+upsConfigOutputVoltagegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the nominal output voltage.  On
+            those systems which support read-write access to this
+            object, if there is an attempt to set this variable to
+            a value that is not supported, the request must be
+            rejected and the agent shall respond with an
+            appropriate error message, i.e., badValue for SNMPv1,
+            or inconsistentValue for SNMPv2.(*)"
+    ::= { upsConfiggen 3 }
+
+upsConfigOutputFreqgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 Hertz"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The nominal output frequency.  On those systems which
+            support read-write access to this object, if there is
+            an attempt to set this variable to a value that is not
+            supported, the request must be rejected and the agent
+            shall respond with an appropriate error message, i.e.,
+            badValue for SNMPv1, or inconsistentValue for SNMPv2.(*)"
+    ::= { upsConfiggen 4 }
+
+upsConfigOutputVAgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "Volt-Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the nominal Volt-Amp rating.(*)"
+    ::= { upsConfiggen 5 }
+
+upsConfigOutputPowergen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The magnitude of the nominal true power rating.(*)"
+    ::= { upsConfiggen 6 }
+
+upsConfigLowBattTimegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "minutes"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The value of upsEstimatedMinutesRemaining at which a
+            lowBattery condition is declared.  For agents which
+            support only discrete (discontinuous) values, then the
+            agent shall round up to the next supported value.  If
+            the requested value is larger than the largest
+            supported value, then the largest supported value
+            shall be selected.(*)"
+    ::= { upsConfiggen 7 }
+
+upsConfigAudibleStatusgen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        disabled(1),
+        enabled(2),
+        muted(3)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The requested state of the audible alarm.  When in
+            the disabled state, the audible alarm should never
+            sound.  The enabled state is self-describing.  Setting
+            this object to muted(3) when the audible alarm is
+            sounding shall temporarily silence the alarm.  It will
+            remain muted until it would normally stop sounding and
+            the value returned for read operations during this
+            period shall equal muted(3).  At the end of this
+            period, the value shall revert to enabled(2).  Writes
+            of the value muted(3) when the audible alarm is not
+            sounding shall be accepted but otherwise shall have no
+            effect.(*)"
+    ::= { upsConfiggen 8 }
+
+upsConfigLowVoltageTransferPointgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The minimum input line voltage allowed before the UPS
+            system transfers to battery backup.(*)"
+    ::= { upsConfiggen 9 }
+
+upsConfigHighVoltageTransferPointgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The maximum line voltage allowed before the UPS
+            system transfers to battery backup.(*)"
+    ::= { upsConfiggen 10 }
+
+upsConfigBatteryCapacitygen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "Amps Hours"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The installed battery capacity. This value is the 'factory'-value,
+             not the value after calibration."
+    ::= { upsConfiggen 11 }
+
+upsConfigBatteryChargeCurrentgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    UNITS      "0.1 Amp DC"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The maximum battery charge current, including external chargers."
+    ::= { upsConfiggen 12 }						
+
+upsConfigNoLoadShutdowngen OBJECT-TYPE
+    SYNTAX     INTEGER {
+        disabled(1),
+        enabled(2)
+    }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "Dis- or enable 'no load' shutdown from the contact interface."
+    ::= { upsConfiggen 13 }
+	
+upsConfigStartDelaygen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    UNITS      "minutes"				
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "Minimum required autonomy time before the UPS may perform an
+             autorestart."
+    ::= { upsConfiggen 14 }
+
+--
+-- The GetSet group generic.
+--
+
+upsEventGetNextgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The number of events to retreive from the UPS event buffer.
+            When this object is set the EventTable will be filled with the
+            requested number of entries. The value upsEventSetStartingTimeStamp
+            will be used as the start value of the table with the lowest index number."
+    ::= { upsGetSetgen 1 }
+
+upsEventGetPreviousgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The number of events to retreive from the UPS event buffer.
+            When this object is set the EventTable will be filled with the
+            requested number of entries. The value upsEventLastTime will
+            be used as the last value of the table with the highest index number.
+
+            Returns SNMPNOSUCHNAME for UPSs that don't support this command."
+    ::= { upsGetSetgen 2 }
+				
+upsEventSetStartingTimeStampgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The timestamp which is used as starting point for downloading
+             events from the UPS event buffer"
+    ::= { upsGetSetgen 3 }				
+
+upsEventRetreiveCurrentTimeStampgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The current timestamp is retreived from the UPS"
+    ::= { upsGetSetgen 4 }				
+
+upsEventTableSizegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the event table.
+            This object indicates the number of rows in the event table."
+    ::= { upsGetSetgen 5 }
+
+upsEventGenTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF UpsEventGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A list of event table entries.  The number of entries is always
+            10, and the value of upsEventTableSize gives the number of valid
+            entries from the begging of the table.  Invalid entries return 0.
+
+            To prevent problems with simultaneous queries from several agents,
+            these values MUST be accessed using several PDUs in the
+            same SNMP message (<number> is (1..10)):
+
+            PDU-SET upsSetStartingTimeStamp <time> 
+            PDU-SET upsEventGetNext <number>
+            PDU-GET upsEventTableSize
+            PDU-GET upsEventCode,upsEventStatus,upsEventTime 1
+            PDU-GET upsEventCode,upsEventStatus,upsEventTime 2
+            ..
+            PDU-GET upsEventCode,upsEventStatus,upsEventTime <number>
+
+            The table is read up to requested number of events and the
+            management software afterwards decides which entries are
+            valid, as indicated by the upsEventTableSize.
+            "
+    ::= { upsGetSetgen 6 }
+
+upsEventGenEntry OBJECT-TYPE
+    SYNTAX     UpsEventGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry containing information applicable to a
+            particular event."
+    INDEX { upsEventLineIndexgen }
+    ::= { upsEventGenTable 1 }
+
+UpsEventGenEntry ::= SEQUENCE {
+    upsEventLineIndexgen PositiveInteger32,
+    upsEventCodegen      Integer32,
+    upsEventStatusgen    NonNegativeInteger32,
+    upsEventTimegen      NonNegativeInteger32
+}
+
+upsEventLineIndexgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The event line identifier."
+    ::= { upsEventGenEntry 1 }
+
+upsEventCodegen OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The event code in numerical format."
+    ::= { upsEventGenEntry 2 }
+
+upsEventStatusgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The status of the UPS at the moment that the event was generated.
+             The format is specified at the 'upsStatus' command.
+             If the UPS is not able to deliver status information, then
+             SNMPNOSUCHNAME is returned."
+    ::= { upsEventGenEntry 3 }
+
+upsEventTimegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The timestamp of the moment the event was generated."
+    ::= { upsEventGenEntry 4 }
+
+upsParametersReadgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The number of parameters to retreive from the UPS.
+            When this object is set the ParameterTable will be filled with the
+            requested number of entries. The value upsParametersStartAddress
+            will be used as the start value of the table with the lowest index 
+            number."
+    ::= { upsGetSetgen 7 }
+
+upsParametersWritegen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The number of parameters to write to the UPS.
+            When this object is set the ParameterTable will be send to the ups. 
+            The value upsParametersStartAddress will be used for the first value 
+            of the table with the lowest index number."
+    ::= { upsGetSetgen 8 }
+
+upsParametersStartAddressgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The address which is used as starting point for downloading
+             parameters from the UPS"
+    ::= { upsGetSetgen 9 }				
+
+upsParameterTableSizegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the parameter table.
+            This object indicates the number of rows in the parameter table."
+    ::= { upsGetSetgen 10 }
+
+upsParameterGenTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF UpsParameterGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "A list of parameter entries. The number of entries is always
+            16, and the value of upsParameterTableSize gives the number of valid
+            entries from the begging of the table. Invalid entries return 0.
+
+            To prevent problems with simultaneous queries from several agents,
+            these values MUST be accessed using several PDUs in the
+            same SNMP message (<number> is (1..16)):
+
+            Read sequence:
+
+            PDU-SET upsSetStartingAddress <addr>
+            PDU-SET upsParametersRead <number>
+            PDU-GET upsParameterTableSize
+            PDU-GET upsParameterValue 1
+            PDU-GET upsParameterValue 2
+            ..
+            PDU-GET upsParameterValue <number>
+
+            The table is read up to requested number of events and the
+            management software afterwards decides which entries are
+            valid, as indicated by the upsParameterTableSize.
+
+            Write sequence:
+
+            PDU-SET upsSetStartingAddress <addr>
+            PDU-SET upsParameterValue 1
+            PDU-SET upsParameterValue 2
+            ..
+            PDU-SET upsParameterValue <number>
+            PDU-SET upsParametersWrite <number>
+            "
+    ::= { upsGetSetgen 11 }
+
+upsParameterGenEntry OBJECT-TYPE
+    SYNTAX     UpsParameterGenEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry containing information applicable to a
+            particular parameter."
+    INDEX { upsParameterLineIndexgen }
+    ::= { upsParameterGenTable 1 }
+
+UpsParameterGenEntry ::= SEQUENCE {
+    upsParameterLineIndexgen PositiveInteger32,
+    upsParameterValuegen     Integer32   
+}
+
+upsParameterLineIndexgen OBJECT-TYPE
+    SYNTAX     PositiveInteger32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The parameter line identifier."
+    ::= { upsParameterGenEntry 1 }
+
+upsParameterValuegen OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The parameter value in numerical format."
+    ::= { upsParameterGenEntry 2 }
+
+upsStatusgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The global UPS status is returned. Every bit reflects a specific 
+             status condition. Unused bits returns as 0. The status value can 
+             also be found on other commands. The value SNMPNOSUCHNAME means 
+             'invalid status' or 'status value non available'.
+
+             Status
+                     1  0000 0001h	upsStatusEcomodeIsOn
+                     2  0000 0002h	upsStatusBatteryIsCharging
+                     4  0000 0004h	upsStatusBatteryIsDischarging
+                     8  0000 0008h	upsStatusAlarmIsActive
+                    16  0000 0010h	upsStatusRectifierIsOn
+                    32  0000 0020h	upsStatusLowBattery
+                    64  0000 0040h	upsStatusOnBypass
+                   128  0000 0080h	upsStatusMainsBypassOK
+                   256  0000 0100h	upsStatusMainsRectifierOK
+                   512  0000 0200h	upsStatusDetourIsOn
+                  1024  0000 0400h	upsStatusAcousticAlarmIsOn
+                  2048  0000 0800h	upsStatusGlobalServiceCheck
+                  4096  0000 1000h	upsStatusInverterIsOn
+                  8192  0000 2000h	upsStatusNotInParallel (Q1 open)
+                 16384  0000 4000h	upsStatusResetLoadOff
+                 32768  0000 8000h	upsStatusLoadOff 
+                 65536  0001 0000h	upsStatusBoostMode 
+                131072  0002 0000h	upsStatusBuckMode 
+                262144  0004 0000h	upsStatusIemModeIsOn 
+                524288  0008 0000h	upsStatus5thFilterIsOn 
+               1048576  0010 0000h	upsStatus11thFilterIsOn
+               2097152  0020 0000h	upsStatus2ndRectifierBridgeIsOn
+               4194304  0040 0000h	- reserved -
+               8388608  0080 0000h	- reserved -
+              16777216  0100 0000h	- reserved -
+              33554432  0200 0000h	- reserved -
+              67108864  0400 0000h	- reserved -
+             134217728  0800 0000h	- reserved -
+             268435456  1000 0000h	upsGlobalParallelValues "
+    ::= { upsGetSetgen 12 }
+
+upsMainsStatisticsMBfailgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Count of main bypass failures (>200 ms), since UPS installation."
+    ::= { upsGetSetgen 13 }
+
+upsMainsStatisticsMRfailgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Count of mains rectifier failures (>200 ms), since UPS installation."
+    ::= { upsGetSetgen 14 }
+		
+upsMainsStatisticsB2gen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Count of transients on the mains bypass (0..2 ms), during the last 7 days."
+    ::= { upsGetSetgen 15 }
+
+upsMainsStatisticsB5gen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Count of transients on the mains bypass (2..5 ms), during the last 7 days."
+    ::= { upsGetSetgen 16 }
+
+upsMainsStatisticsB10gen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Count of transients on the mains bypass (5..10 ms), during the last 7 days."
+    ::= { upsGetSetgen 17 }
+
+upsMainsStatisticsB200gen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Count of transients on the mains bypass (10..200 ms), during the last 7 days."
+    ::= { upsGetSetgen 18 }
+
+upsMainsStatisticsBypRelgen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Bypass reliability degree [0..100%;255]. The value NOSUCHNAME means 'not available'."
+    ::= { upsGetSetgen 19 }
+
+upsTimegen OBJECT-TYPE
+    SYNTAX     NonNegativeInteger32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The current timestamp (or real-time) of the UPS. For the format, 
+             see 'Timestamp' specifications. The write-command has to comply with the 
+             correct timestamp format expected by the UPS (counter value or real-time-clock 
+             value). Missing to doing so will result in a SNMPgenERROR, 
+             meaning 'command not supported'. It is possible to know which is the timestamp 
+             format supported by the UPS, by issuing a read-command or by reading events, 
+             which includes timestamps."
+    ::= { upsGetSetgen 20 }
+
+upsRequestPermissiongen OBJECT-TYPE
+    SYNTAX     DisplayString 
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "An encrypted code is send to enable use of restricted write objects during
+             a limited period of time."
+    ::= { upsGetSetgen 21 }
+    
+upsEventGetCodegen OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The code which is used as starting point to downloading the events from the 
+            UPS event buffer."
+    ::= { upsGetSetgen 22 }    
+    
+upsEventSpinLockgen OBJECT-TYPE
+    SYNTAX     TestAndIncr
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "A spin lock on the event subsystem. "
+
+    ::= { upsGetSetgen 23 }
+    
+upsParameterSpinLockgen OBJECT-TYPE
+    SYNTAX     TestAndIncr
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "A spin lock on the parameters subsystem. "
+
+    ::= { upsGetSetgen 24 }
+
+
+---
+--- GE Trap group generic
+---
+
+upsTrapAlarmBatteryBadgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "One or more batteries have been determined to require
+            replacement."
+    ::= { geUPSTrapsgen 1 }
+
+upsTrapAlarmOnBatterygen NOTIFICATION-TYPE
+    OBJECTS  { upsSecondsOnBatterygen  }
+    STATUS   current
+    DESCRIPTION
+            "The UPS is drawing power from the batteries."
+    ::= { geUPSTrapsgen 2 }
+
+upsTrapAlarmLowBatterygen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The remaining battery run-time is less than or equal
+            to upsConfigLowBattTime."
+    ::= { geUPSTrapsgen 3 }
+
+upsTrapAlarmDepletedBatterygen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The UPS will be unable to sustain the present load
+            when and if the utility power is lost)"
+    ::= { geUPSTrapsgen 4 }
+
+upsTrapAlarmTempBadgen NOTIFICATION-TYPE
+    OBJECTS  { upsBatteryTemperaturegen }
+    STATUS   current
+    DESCRIPTION
+            "A temperature is out of tolerance."
+    ::= { geUPSTrapsgen 5 }
+
+upsTrapAlarmInputBadgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An input condition is out of tolerance."
+    ::= { geUPSTrapsgen 6 }
+
+upsTrapAlarmOutputBadgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An output condition (other than OutputOverload) is
+            out of tolerance."
+    ::= { geUPSTrapsgen 7 }
+
+upsTrapAlarmOutputOverloadgen NOTIFICATION-TYPE
+    OBJECTS  { upsOutputNumLinesgen, upsOutputPercentLoadgen }
+    STATUS   current
+    DESCRIPTION
+            "The output load exceeds the UPS output capacity."
+    ::= { geUPSTrapsgen 8 }
+
+upsTrapAlarmOnBypassgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The Bypass is presently engaged on the UPS."
+    ::= { geUPSTrapsgen 9 }
+
+upsTrapAlarmBypassBadgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The Bypass is out of tolerance."
+    ::= { geUPSTrapsgen 10 }
+
+upsTrapAlarmOutputOffAsRequestedgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The UPS has shutdown as requested, i.e., the output
+            is off."
+    ::= { geUPSTrapsgen 11 }
+
+upsTrapAlarmUpsOffAsRequestedgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The entire UPS has shutdown as commanded."
+    ::= { geUPSTrapsgen 12 }
+
+upsTrapAlarmChargerFailedgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An uncorrected problem has been detected within the
+            UPS charger subsystem."
+    ::= { geUPSTrapsgen 13 }
+
+upsTrapAlarmUpsOutputOffgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The output of the UPS is in the off state."
+    ::= { geUPSTrapsgen 14 }
+
+upsTrapAlarmUpsSystemOffgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The UPS system is in the off state."
+    ::= { geUPSTrapsgen 15 }
+
+upsTrapAlarmFanFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The failure of one or more fans in the UPS has been
+            detected."
+    ::= { geUPSTrapsgen 16 }
+
+upsTrapAlarmFuseFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The failure of one or more fuses has been detected."
+    ::= { geUPSTrapsgen 17 }
+
+upsTrapAlarmGeneralFaultgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A general fault in the UPS has been detected."
+    ::= { geUPSTrapsgen 18 }
+
+upsTrapAlarmDiagnosticTestFailedgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The result of the last diagnostic test indicates a
+            failure."
+    ::= { geUPSTrapsgen 19 }
+
+upsTrapAlarmCommunicationsLostgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A problem has been encountered in the communication
+            between the agent and the UPS."
+    ::= { geUPSTrapsgen 20 }
+    
+upsTrapAlarmAwaitingPowergen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The UPS output is off and the UPS is awaiting the
+            return of the input power (*)."
+    ::= { geUPSTrapsgen 21 }    
+
+upsTrapAlarmShutdownPendinggen NOTIFICATION-TYPE
+    OBJECTS  { upsShutdownAfterDelaygen }
+    STATUS   current
+    DESCRIPTION
+            "A upsShutdownAfterDelay countdown is underway."
+    ::= { geUPSTrapsgen 22 }
+
+upsTrapAlarmShutdownImminentgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The UPS will turn off power to the load in less than
+            5 seconds; this may be either a timed shutdown or a
+            low battery shutdown."
+    ::= { geUPSTrapsgen 23 }
+
+upsTrapAlarmTestInProgressgen NOTIFICATION-TYPE
+    OBJECTS  { upsTestIdgen }
+    STATUS   current
+    DESCRIPTION
+            "A test is in progress, as initiated and indicated by
+            the Test Group.  Tests initiated via other
+            implementation-specific mechanisms can indicate the
+            presence of the testing in the alarm table, if
+            desired, via a OBJECT-IDENTITY macro in the MIB
+            document specific to that implementation and are
+            outside the scope of this OBJECT-IDENTITY."
+    ::= { geUPSTrapsgen 24 }
+    
+upsTrapAlarmReceptacleOffgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A receptacle has been switched off."
+    ::= { geUPSTrapsgen 25 }
+
+upsTrapAlarmHighspeedBusFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A problem on the Highspeed Bus communication is detected."
+    ::= { geUPSTrapsgen 26 }
+
+upsTrapAlarmHighspeedBusJACRCFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A CRC failure on the Highspeed Bus JA is detected."
+    ::= { geUPSTrapsgen 27 }
+     
+upsTrapAlarmConnectivityBusFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Connectivity Bus failure is detected"
+    ::= { geUPSTrapsgen 28 }
+
+upsTrapAlarmHighspeedBusJBCRCFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A CRC failure on the Highspeed Bus JB is detected."
+     ::= { geUPSTrapsgen 29 }
+
+upsTrapAlarmCurrentSharingFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An high current sharing on the parallel system is detected."
+     ::= { geUPSTrapsgen 30 }
+     
+upsTrapAlarmDCRippleFailuregen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An high ripple voltage on his DC link is detected."
+     ::= { geUPSTrapsgen 31 }
+          
+upsTrapAlarmBatteryBadRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Battery bad condition is restored."
+    ::= { geUPSTrapsgen 33 }
+
+upsTrapAlarmOnBatteryRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The UPS is drawing power from mains again."
+    ::= { geUPSTrapsgen 34 }
+
+upsTrapAlarmLowBatteryRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Low Battery condition is restored."
+    ::= { geUPSTrapsgen 35 }
+
+upsTrapAlarmDepletedBatteryRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Depleted Battery condition is restored."
+    ::= { geUPSTrapsgen 36 }
+
+upsTrapAlarmTempBadRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A bad temperature condition is restored."
+    ::= { geUPSTrapsgen 37 }
+
+upsTrapAlarmInputBadRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An input bad condition is restored."
+    ::= { geUPSTrapsgen 38 }
+
+upsTrapAlarmOutputBadRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An output bad condition is restored."
+    ::= { geUPSTrapsgen 39 }
+
+upsTrapAlarmOutputOverloadRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An output overload condition is restored."
+    ::= { geUPSTrapsgen 40 }
+
+upsTrapAlarmOnBypassRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An On Bypass condition is restored."
+    ::= { geUPSTrapsgen 41 }
+
+upsTrapAlarmBypassBadRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Bypass bad condition is restored."
+    ::= { geUPSTrapsgen 42 }
+
+upsTrapAlarmOutputOffAsRequestedRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A request shutdown has been restored."
+    ::= { geUPSTrapsgen 43 }
+
+upsTrapAlarmUpsOffAsRequestedRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A entire UPS command has been restored."
+    ::= { geUPSTrapsgen 44 }
+
+upsTrapAlarmChargerFailedRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Charger Failer condition is restored."
+    ::= { geUPSTrapsgen 45 }
+
+upsTrapAlarmUpsOutputOngen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The output of the UPS switched in the on state."
+    ::= { geUPSTrapsgen 46 }
+
+upsTrapAlarmUpsSystemOngen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "The UPS system is switched in the on state."
+    ::= { geUPSTrapsgen 47 }
+
+upsTrapAlarmFanFailureRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Fan failure condition is restored."
+    ::= { geUPSTrapsgen 48 }
+
+upsTrapAlarmFuseFailureRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A Fuse failure condition is restored."
+    ::= { geUPSTrapsgen 49 }
+
+upsTrapAlarmGeneralFaultRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A general fault is restored."
+    ::= { geUPSTrapsgen 50 }
+
+upsTrapAlarmDiagnosticTestFailedRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A last diagnostic test indicates a failure is 
+            restored."
+    ::= { geUPSTrapsgen 51 }
+
+upsTrapAlarmCommunicationsLostRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A problem in the communication between the agent 
+            and the UPS is restored."
+    ::= { geUPSTrapsgen 52 }
+    
+upsTrapAlarmAwaitingPowerRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A awaiting power condition is restored (*)."
+    ::= { geUPSTrapsgen 53 }
+
+upsTrapAlarmShutdownPendingRestoredgen NOTIFICATION-TYPE
+    OBJECTS  { upsShutdownAfterDelaygen }
+    STATUS   current
+    DESCRIPTION
+            "A upsShutdownAfterDelay countdown is restored."
+    ::= { geUPSTrapsgen 54 }
+
+upsTrapAlarmShutdownImminentRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A shutdown imminent condition is restored."
+    ::= { geUPSTrapsgen 55 }
+
+upsTrapAlarmTestInProgressRestoredgen NOTIFICATION-TYPE
+    OBJECTS  { upsTestIdgen }
+    STATUS   current
+    DESCRIPTION
+            "The test is in progress is terminated."
+    ::= { geUPSTrapsgen 56 }
+
+upsTrapAlarmReceptacleOn NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A receptacle has been switched on."
+    ::= { geUPSTrapsgen 57 }
+
+upsTrapAlarmHighspeedBusRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A problem on the Highspeed Bus communication is restored."
+    ::= { geUPSTrapsgen 58 }
+
+upsTrapAlarmHighspeedBusJACRCRestoredAgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A CRC failure on the Highspeed Bus JA is restored."
+    ::= { geUPSTrapsgen 59 }
+     
+upsTrapAlarmConnectivityBusRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A problem on the Connectivity Bus communication is restored."
+    ::= { geUPSTrapsgen 60 }
+
+upsTrapAlarmHighspeedBusJBCRCRestoredBgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A CRC failure on the Highspeed Bus JB is restored."
+     ::= { geUPSTrapsgen 61 }
+
+upsTrapAlarmCurrentSharingRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An high current sharing on the parallel system is restored."
+     ::= { geUPSTrapsgen 62 }
+     
+upsTrapAlarmDCRippleRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "An high ripple voltage on his DC link is restored."
+     ::= { geUPSTrapsgen 63 }
+
+upsTrapAlarmValueLowgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A measurement value reached a value below its low-level threshold."
+    ::= { geUPSTrapsgen 129 }
+
+upsTrapAlarmValueHighgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A measurement value reached a value higher than its high-level threshold."
+    ::= { geUPSTrapsgen 130 }
+
+upsTrapAlarmValueLowRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A ValueLow alarm condition is restored."
+    ::= { geUPSTrapsgen 133 }
+
+upsTrapAlarmValueHighRestoredgen NOTIFICATION-TYPE
+    STATUS   current
+    DESCRIPTION
+            "A ValueHigh alarm condition is restored."
+    ::= { geUPSTrapsgen 134 }
+
+--
+-- Diagnostic Group Generic
+--
+
+upsDiagnosticBusJACommunicationStatusgen OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Bit oriented values associated to the ID of the UPS
+            (bit0 = UPS1 ... bit7 = UPS8). 
+            The correspondent UPS is not present on the high speed 
+            bus communication JA if bit=0.(*)"
+    ::= { upsDiagnosticgen 1 }
+    
+upsDiagnosticBusJBCommunicationStatusgen OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Bit oriented values associated to the ID of the UPS
+            (bit0 = UPS1 ... bit7 = UPS8). 
+            The correspondent UPS is not present on the high speed 
+            bus communication JA if bit=0.(*)"
+    ::= { upsDiagnosticgen 2 }
+  
+upsDiagnosticBatteryLifetimegen OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The critical components are associated to Service 
+            parameters indicating the remaining lifetime. 
+            They are initially set to default values depending 
+            to the data given by the component supplier. 
+            The parameter values decrease over time and when one 
+            of them reaches zero (lifetime expiration) a service 
+            check warning is generated, indicating that a check or 
+            a replacement is suggested for that component.
+            The service technician is then required to re-set the 
+            default value after the replacing of the component.(*)"
+    ::= { upsDiagnosticgen 3 }
+
+upsDiagnosticFansLifetimegen OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The critical components are associated to Service 
+            parameters indicating the remaining lifetime. 
+            They are initially set to default values depending 
+            to the data given by the component supplier. 
+            The parameter values decrease over time and when one 
+            of them reaches zero (lifetime expiration) a service 
+            check warning is generated, indicating that a check or 
+            a replacement is suggested for that component.
+            The service technician is then required to re-set the 
+            default value after the replacing of the component.(*)"
+    ::= { upsDiagnosticgen 4 } 
+    
+upsDiagnosticDCcapacitorsLifetimegen OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The critical components are associated to Service 
+            parameters indicating the remaining lifetime. 
+            They are initially set to default values depending 
+            to the data given by the component supplier. 
+            The parameter values decrease over time and when one 
+            of them reaches zero (lifetime expiration) a service 
+            check warning is generated, indicating that a check or 
+            a replacement is suggested for that component.
+            The service technician is then required to re-set the 
+            default value after the replacing of the component.(*)"
+    ::= { upsDiagnosticgen 5 }  
+    
+upsDiagnosticACcapacitorsLifetimegen OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The critical components are associated to Service 
+            parameters indicating the remaining lifetime. 
+            They are initially set to default values depending 
+            to the data given by the component supplier. 
+            The parameter values decrease over time and when one 
+            of them reaches zero (lifetime expiration) a service 
+            check warning is generated, indicating that a check or 
+            a replacement is suggested for that component.
+            The service technician is then required to re-set the 
+            default value after the replacing of the component.(*)"
+    ::= { upsDiagnosticgen 6 }
+    
+upsDiagnosticGlobalServiceCheckgen OBJECT-TYPE
+    SYNTAX     Integer32 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The critical components are associated to Service 
+            parameters indicating the remaining lifetime. 
+            They are initially set to default values depending 
+            to the data given by the component supplier. 
+            The parameter values decrease over time and when one 
+            of them reaches zero (lifetime expiration) a service 
+            check warning is generated, indicating that a check or 
+            a replacement is suggested for that component.
+            The service technician is then required to re-set the 
+            default value after the replacing of the component.(*)"
+    ::= { upsDiagnosticgen 7 }
+
+END
+
+

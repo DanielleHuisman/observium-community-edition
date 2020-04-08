@@ -1,0 +1,543 @@
+--MibName=raisecomSynce
+-- *****************************************************************
+-- Version 1.0 Created 2010.10.09 by zengliang
+-- This version of MIB is created just for the Management of SYNCE .
+--
+-- Copyright(c) 2002-2012 by RAISECOM TECH, Ltd. 
+-- All rights reserved.
+--
+-- modify history 
+--
+-- *****************************************************************
+SWITCH-SYNCE-MIB  DEFINITIONS ::= BEGIN
+
+IMPORTS
+        raisecomAgent
+            FROM RAISECOM-BASE-MIB     
+        TruthValue
+            FROM SNMPv2-TC
+        EnableVar                
+            FROM SWITCH-TC
+        NTPTimeStamp
+        	FROM RAISECOM-NTP-MIB
+        Integer32,Unsigned32,Counter32                         
+        	FROM SNMPv2-SMI;
+--        SnmpAdminString                   FROM SNMP-FRAMEWORK-MIB;
+--        rcPortIndex                                         
+--            FROM SWITCH-SYSTEM-MIB
+
+
+	raisecomSynce MODULE-IDENTITY
+        LAST-UPDATED    "201010090000Z"
+        ORGANIZATION    "Raisecom, Inc."
+        CONTACT-INFO
+                "       Raise Systems
+
+                Postal: Beijing,
+                        China
+
+                   Tel: 86-010-82884499
+
+                E-mail: support@raisecom.com"
+        DESCRIPTION
+                "Configuration of synce object." 
+-- -------------------------------------------------------------
+-- modify history
+-- -------------------------------------------------------------       
+        REVISION    "201010090000Z"
+        DESCRIPTION "The initial revision of this MIB."
+                ::= { raisecomAgent 20}         
+
+-- -------------------------------------------------------------
+-- groups in the SWITCH-SYNCECFG MIB
+-- -------------------------------------------------------------
+raisecomSynceNotification  OBJECT IDENTIFIER ::= { raisecomSynce 1 }  
+raisecomSynceMibObjects    OBJECT IDENTIFIER ::= { raisecomSynce 2 }  
+
+-- -------------------------------------------------------------
+-- raisecomSynceNotification
+-- -------------------------------------------------------------    
+    raisecomSynceSourceSwitch NOTIFICATION-TYPE
+        OBJECTS { raisecomSynceLatestSwitchTime,
+                  raisecomSynceCurrentSourceIndex,
+                  raisecomSynceCurrentSourceQl,
+                  raisecomSyncePreviousSourceIndex,
+                  raisecomSyncePreviousSourceQl
+                }
+        STATUS current
+        DESCRIPTION
+                "Synce source is switched; Or source-selected process is failed, go to holdover state."            
+        ::= { raisecomSynceNotification 1 }  
+        
+	raisecomSynceSourceSignalStateChange NOTIFICATION-TYPE
+        OBJECTS { raisecomSynceSourceSignalFail }
+        STATUS current
+        DESCRIPTION
+                "Synce source signal state is changed from failed to normal or from 
+                 normal to failed."
+        ::= { raisecomSynceNotification 2 }    
+        
+    raisecomSynceStateChange NOTIFICATION-TYPE
+        OBJECTS { raisecomSynceCurrentState }
+        STATUS current
+        DESCRIPTION
+                "Synce state is changed."
+        ::= { raisecomSynceNotification 3 } 
+
+-- -------------------------------------------------------------
+-- raisecomSynceMibObjects
+-- -------------------------------------------------------------  
+raisecomSynceGlobalGroup   OBJECT IDENTIFIER ::= { raisecomSynceMibObjects 1 }   
+
+-- -------------------------------------------------------------
+-- raisecomSynceGlobalGroup
+-- -------------------------------------------------------------          
+    raisecomSynceEnable OBJECT-TYPE
+        SYNTAX	EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           	"Indicates whether the syncE feature is enabled on the device.
+             Enable(1) means that the syncE feature is enabled on this device.
+             Disable(2) means that the syncE feature is disabled."
+        ::= { raisecomSynceGlobalGroup 1 } 
+        
+	raisecomSynceQlEnable OBJECT-TYPE
+        SYNTAX	INTEGER
+        {
+        	Enable(1),
+    		 Disable(2),
+    		  Extend(3)    	
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           	"Indicates whether the syncE ssm feature is enabled on the device.
+             Enable(1) means that the syncE quality level mode is standard on this device.
+             Disable(2) means that the syncE quality level mode is disabled.
+             Extend(3) means that the syncE quality level mode is extend.
+             If enabled, clock source quality level will be a source-selected parameter, 
+             or neglect it when selecting clock source."  
+        REFERENCE
+            "Check ITU-T G.781 chapter 5 for more details."
+        ::= { raisecomSynceGlobalGroup 2 }
+      
+    raisecomSynceRevertiveMode OBJECT-TYPE
+        SYNTAX	EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           	"Indicates whether the syncE is working at revertive mode.
+			 Enable(1) means that the syncE is working at revertive mode.
+			 Disable(2) means that the syncE is working at non-revertive mode." 
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.10 for more details."
+        ::= { raisecomSynceGlobalGroup 3 }
+        
+    raisecomSynceTrapEnable OBJECT-TYPE
+        SYNTAX	EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           	"Indicates whether the syncE trap should be generated.
+             Enable(1) means that the syncE trap should be generated.
+             Disable(2) means that the syncE trap should not be generated."
+        ::= { raisecomSynceGlobalGroup 4 }
+    
+    raisecomSynceCurrentState OBJECT-TYPE
+        SYNTAX	INTEGER
+        {
+        	freerunning(1),
+    		holdover(2),
+    		locked(3),
+    		lossoflock(4)       	
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+           	"Synce current state, including:
+           	 freerunning--initial state, select local oscillator as clock source
+           	 holdover--current clock source is failed and no other source is available, keep current source
+           	 locked--select clock source successful, lock the source
+           	 lossoflock--loss of phase lock."
+        ::= { raisecomSynceGlobalGroup 5 } 
+        
+    raisecomSynceLatestSwitchTime OBJECT-TYPE
+        SYNTAX  NTPTimeStamp
+    	MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+           	"The latest clock source switched time."
+        ::= { raisecomSynceGlobalGroup 6 }   
+        
+    raisecomSynceWaitToRestore OBJECT-TYPE
+        SYNTAX  Unsigned32(0..12)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Synce source wait-to-restore time."  
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.9 for more details."
+        ::= { raisecomSynceGlobalGroup 7 }
+        
+	raisecomSynceCurrentSourceIndex OBJECT-TYPE
+        SYNTAX	Unsigned32 
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Synce current source index(32 bits, unit/slot/porttype/portnum):
+			0-10:port number index based 1
+			11-15:port type
+			The value of 00000 indicates this is a Local source
+			The value of 00001 indicates this is a ethernet source
+			The value of 00010 indicates this is a external source
+			The value of 00100 indicates system is in holdover state
+			16-23: slot index based 0
+			24-31: unit index based 1." 
+        ::= { raisecomSynceGlobalGroup 8 }
+
+	raisecomSynceCurrentSourceQl OBJECT-TYPE
+        SYNTAX	Integer32(-1..15)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+           	"Synce current source quality level, including(EEC-OPTION 1):
+           	 0x0010--primary reference clock defined in ITU-T G.811
+           	 0x0100--type 1 or 5 SSU clock defined in ITU-T G.812
+           	 0x1000--type 6 SSU clock defined in ITU-T G.812
+           	 0x1011--synchronous ethernet clock defined in ITU-T G.8262
+           	 0x1111--means that the signal shall not be used for synchronization
+           	 The value is smaller while the priority is higher." 
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.4 for more details."
+        ::= { raisecomSynceGlobalGroup 9 } 
+        
+	raisecomSyncePreviousSourceIndex OBJECT-TYPE
+        SYNTAX	Unsigned32 
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+           	"Synce current source index
+			(32 bits, unit/slot/porttype/portnum):
+			0-10:port number index based 1
+			11-15:port type
+			The value of 00000 indicates this is a Local source
+			The value of 00001 indicates this is a ethernet source
+			The value of 00010 indicates this is a external source
+			The value of 00011 indicates this is a ptp source
+			The value of 00100 indicates system is in holdover state
+			16-23:slot index based 0
+			24-31:unit index based 1." 
+        ::= { raisecomSynceGlobalGroup 10 }
+
+	raisecomSyncePreviousSourceQl OBJECT-TYPE
+        SYNTAX	Integer32(-1..15)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+           	"Synce previous source quality level, including(EEC-OPTION 1):
+           	 0x0010--primary reference clock defined in ITU-T G.811
+           	 0x0100--type 1 or 5 SSU clock defined in ITU-T G.812
+           	 0x1000--type 6 SSU clock defined in ITU-T G.812
+           	 0x1011--synchronous ethernet clock defined in ITU-T G.8262
+           	 0x1111--means that the signal shall not be used for synchronization
+           	 The value is smaller while the priority is higher."
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.4 for more details."
+        ::= { raisecomSynceGlobalGroup 11 }
+
+	raisecomSynceStatisticClear OBJECT-TYPE
+        SYNTAX  TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           	"Clear synce current statistic result if true."
+        ::= { raisecomSynceGlobalGroup 12 }  
+        
+    raisecomSynceClearBothSwitch OBJECT-TYPE
+        SYNTAX  TruthValue
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+           	"Clear synce manual and forced switch if true."
+        ::= { raisecomSynceGlobalGroup 13 }    
+        
+   raisecomSynceHoldOffTime OBJECT-TYPE
+        SYNTAX  Unsigned32(3..8)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Synce source hold off time."  
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.9 for more details."
+        ::= { raisecomSynceGlobalGroup 14 }    
+        
+  raisecomSynceEEC1Mode OBJECT-TYPE
+        SYNTAX	INTEGER
+        {
+        	holdover(1),
+    		  lock(2)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Quality level degradation to eec1 mode selection."  
+        ::= { raisecomSynceGlobalGroup 15 }                        
+-- -------------------------------------------------------------
+-- raisecomSynceSourceTable
+-- -------------------------------------------------------------
+    raisecomSynceSourceTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RaisecomSynceSourceEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce source table."
+        ::= { raisecomSynceMibObjects 2 }
+
+    raisecomSynceSourceEntry OBJECT-TYPE
+        SYNTAX RaisecomSynceSourceEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce source table entry."
+        INDEX { raisecomSynceSourceIndex }
+        ::= { raisecomSynceSourceTable 1 }
+
+    RaisecomSynceSourceEntry ::= SEQUENCE {
+        raisecomSynceSourceIndex               Unsigned32,
+        raisecomSynceSourceSignalFail          TruthValue,
+        raisecomSynceSourcePriority            Integer32
+    }
+    
+    raisecomSynceSourceIndex OBJECT-TYPE
+        SYNTAX  Unsigned32  
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce current source index
+			(32 bits, unit/slot/porttype/portnum):
+			0-10:port number index based 1
+			11-15:port type
+			The value of 00000 indicates this is a Local source
+			The value of 00001 indicates this is a ethernet source
+			The value of 00010 indicates this is a external source
+			The value of 00011 indicates this is a ptp source
+			16-23:slot index based 0
+			24-31:unit index based 1."
+        ::= { raisecomSynceSourceEntry 1 } 
+        
+    raisecomSynceSourceSignalFail OBJECT-TYPE
+        SYNTAX  TruthValue
+	    MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Indicates whether the syncE source signal is failed.
+             True(1) means that the syncE source signal is failed.
+             False(2) means that the syncE source signal is not failed."
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.7 for more details."
+        ::= { raisecomSynceSourceEntry 2 }
+    
+    raisecomSynceSourcePriority OBJECT-TYPE
+        SYNTAX  Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Synce source priority, The value is smaller while the priority is higher."
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.10 for more details."
+        ::= { raisecomSynceSourceEntry 3 }    
+        
+-- -------------------------------------------------------------
+-- raisecomSynceQlTable
+-- -------------------------------------------------------------
+    raisecomSynceQlTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RaisecomSynceQlEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce source quality level table."
+        ::= { raisecomSynceMibObjects 3 }
+
+    raisecomSynceQlEntry OBJECT-TYPE
+        SYNTAX RaisecomSynceQlEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce source quality level table entry."
+        INDEX { raisecomSynceSourceIndex }
+        ::= { raisecomSynceQlTable 1 }
+
+    RaisecomSynceQlEntry ::= SEQUENCE { 
+        raisecomSynceSourceAdminQl              Integer32,
+        raisecomSynceSourceRecvQl               Integer32
+    }
+        
+    raisecomSynceSourceAdminQl OBJECT-TYPE
+        SYNTAX  Integer32(-1..15)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Synce source administrator quality level, range -1-15.
+             The value is smaller while the priority is higher."  
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.4 for more details."
+        ::= { raisecomSynceQlEntry 1 }    
+    
+    raisecomSynceSourceRecvQl OBJECT-TYPE
+        SYNTAX  Integer32(-1..15)  
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Synce source received quality level, including(EEC-OPTION 1):
+           	 0x0010--primary reference clock defined in ITU-T G.811
+           	 0x0100--type 1 or 5 SSU clock defined in ITU-T G.812
+           	 0x1000--type 6 SSU clock defined in ITU-T G.812
+           	 0x1011--synchronous ethernet clock defined in ITU-T G.8262
+           	 0x1111--means that the signal shall not be used for synchronization.
+           	 The value is smaller while the priority is higher." 
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.4 for more details."
+        ::= { raisecomSynceQlEntry 2 }   
+        
+-- -------------------------------------------------------------
+-- raisecomSynceExternalCommandsTable
+-- -------------------------------------------------------------
+    raisecomSynceExternalCommandsTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RaisecomSynceExternalCommandsEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce external commands table."
+        ::= { raisecomSynceMibObjects 4 }
+
+    raisecomSynceExternalCommandsEntry OBJECT-TYPE
+        SYNTAX RaisecomSynceExternalCommandsEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce external commands table entry."
+        INDEX { raisecomSynceSourceIndex }
+        ::= { raisecomSynceExternalCommandsTable 1 }
+
+    RaisecomSynceExternalCommandsEntry ::= SEQUENCE {
+        raisecomSynceExternalCommand              INTEGER
+    }
+    raisecomSynceExternalCommand OBJECT-TYPE
+        SYNTAX  INTEGER
+        {
+        	noExternalCommand(1),
+        	lockOut(2),
+        	clearLockOut(3),
+        	manualSwitch(4),
+        	forcedSwitch(5)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Synce external commands, including:
+             noExternalCommand--initialization, no external command
+             lockOut--temporary lock a source out, don't allow it to join source selection
+             clearLockOut--clear a source lock-out status, allow it to join source selection
+             manualSwitch--manually switch a source to current selective source
+             forcedSwitch--forced switch a source to current selective source."   
+        REFERENCE
+            "Check ITU-T G.781 chapter 5.11 for more details."
+        ::= { raisecomSynceExternalCommandsEntry 1 }         
+        
+-- -------------------------------------------------------------
+-- raisecomSynceEsmcStatisticTable
+-- -------------------------------------------------------------   
+	raisecomSynceEsmcStatisticTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RaisecomSynceEsmcStatisticEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce esmc packets statistic table."
+        ::= { raisecomSynceMibObjects 5 }
+
+    raisecomSynceEsmcStatisticEntry OBJECT-TYPE
+        SYNTAX RaisecomSynceEsmcStatisticEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce esmc packets statistic table entry."
+        INDEX { raisecomSynceSourceIndex }
+        ::= { raisecomSynceEsmcStatisticTable 1 }
+
+    RaisecomSynceEsmcStatisticEntry ::= SEQUENCE {
+        raisecomSynceEsmcPktsRx              Counter32,
+        raisecomSynceEsmcPktsTx              Counter32,
+        raisecomSynceEventEsmcPktsTx         Counter32  
+    }
+              
+    raisecomSynceEsmcPktsRx OBJECT-TYPE
+        SYNTAX  Counter32   
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The number of received esmc packets."
+        ::= { raisecomSynceEsmcStatisticEntry 1 }
+        
+	raisecomSynceEsmcPktsTx OBJECT-TYPE
+        SYNTAX  Counter32 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The number of transmitted esmc packets."
+        ::= { raisecomSynceEsmcStatisticEntry 2 }  
+        
+    raisecomSynceEventEsmcPktsTx OBJECT-TYPE
+        SYNTAX  Counter32 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The number of transmitted event esmc packets."
+        ::= { raisecomSynceEsmcStatisticEntry 3 }
+
+-- -------------------------------------------------------------
+-- raisecomSynceControlTable
+-- -------------------------------------------------------------   
+	raisecomSynceControlTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF raisecomSynceControlEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce control statistic table."
+        ::= { raisecomSynceMibObjects 6 }
+
+    raisecomSynceControlEntry OBJECT-TYPE
+        SYNTAX raisecomSynceControlEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Synce esmc control statistic table entry."
+        INDEX { raisecomSynceControlPortIndex }
+        ::= { raisecomSynceControlTable 1 }
+
+    raisecomSynceControlEntry ::= SEQUENCE {
+        raisecomSynceControlPortIndex           Counter32,
+        raisecomSynceControlEnable              INTEGER,
+    }
+              
+    raisecomSynceControlPortIndex OBJECT-TYPE
+        SYNTAX  Counter32   
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Index of synce control statistic table."
+        ::= { raisecomSynceControlEntry 1 }
+        
+	  raisecomSynceControlEnable OBJECT-TYPE
+        SYNTAX	INTEGER
+        {
+        	Enable(1),
+        	Disable(2)     	
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Enable/Disable synce function."
+        ::= { raisecomSynceControlEntry 2 }  
+        
+END

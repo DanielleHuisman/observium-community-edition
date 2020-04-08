@@ -1,0 +1,242 @@
+-- *****************************************************************
+-- RBN-ATM-PVC-OAM-MIB	
+--
+-- Copyright (c) 2002 RedBack Networks, Inc.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+
+RBN-ATM-PVC-OAM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    Integer32,
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE
+            FROM SNMPv2-SMI
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP
+            FROM SNMPv2-CONF
+
+    rbnMgmt
+            FROM RBN-SMI
+
+    RbnSlot, RbnPort
+            FROM RBN-TC;
+
+rbnAtmPvcOamMib MODULE-IDENTITY
+    LAST-UPDATED "200211130000Z" -- November 13, 2002
+    ORGANIZATION "Redback Networks, Inc."
+    CONTACT-INFO
+        "               RedBack Networks, Inc.
+
+                Postal: 300 Holger Way
+                    San Jose, CA  95134
+                    USA
+
+             Phone: +1 408 750 5000
+               Fax: +1 408 750 5599
+
+                E-mail: mib-info@redback.com
+            "
+    DESCRIPTION
+        "Defines the objects required to monitor the ATM PVC OAM
+	(Operation, Administration, and Maintenance) function.
+
+	The OAM functionality may be enabled on one or more ATM PVCs
+	in a system.  When this functionality is enabled on a given
+	PVC, the system	will periodically generate OAM F5 end-to-end
+	loopback cells on the PVC.  The primary goal of this function
+	is to insure that an ATM PVC is brought down if the loss of
+	network connectivity to the remote end is detected by the
+	failure of the F5 OAM heartbeat cell.  In addition, when this
+	function is enabled on a PVC, receipt of an incoming F5 OAM
+	VC-AIS (Virtual Circuit - Alarm Indication Signal) cell or
+	F5 OAM VC-RDI (Virtual Circuit - Remote Detection Indicator)
+	cell will also cause the associated PVC to be brought down.
+        "
+
+    REVISION      "200211130000Z" -- November 13, 2002
+    DESCRIPTION
+	"Replaced the SYNTAX of rbnAtmPvcOamStatusSlot and 
+	rbnAtmPvcOamStatusPort by the textual conventions RbnSlot
+	and RbnPort, respectively.  Updated CONTACT-INFO."
+
+    REVISION      "200202050000Z" -- February 5, 2002
+    DESCRIPTION
+        "Initial version."
+    ::= { rbnMgmt 19 }
+
+rbnAtmPvcOamMibNotifications
+        OBJECT IDENTIFIER ::= { rbnAtmPvcOamMib 0 }
+
+rbnAtmPvcOamMibObjects
+        OBJECT IDENTIFIER ::= { rbnAtmPvcOamMib 1 }
+
+rbnAtmPvcOamMibConformance
+        OBJECT IDENTIFIER ::= { rbnAtmPvcOamMib 2 }
+
+rbnAtmPvcOamStatusTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnAtmPvcOamStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table which contains the status of the ATM PVC OAM
+	function for every ATM PVC in the managed system.  There
+	will be one entry in this table for each ATM PVC active
+	in the system, whether the PVC is statically configured
+	or was created on-demand.
+        "
+    ::= { rbnAtmPvcOamMibObjects 1 }
+
+rbnAtmPvcOamStatusEntry OBJECT-TYPE
+    SYNTAX      RbnAtmPvcOamStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry which contains the status of the ATM PVC OAM
+	function for a given ATM PVC.  
+        "
+    INDEX {
+	rbnAtmPvcOamStatusSlot,
+	rbnAtmPvcOamStatusPort,
+	rbnAtmPvcOamStatusVpi,
+	rbnAtmPvcOamStatusVci
+	}
+    ::= { rbnAtmPvcOamStatusTable 1 }
+    
+RbnAtmPvcOamStatusEntry ::= SEQUENCE {
+    rbnAtmPvcOamStatusSlot	RbnSlot,
+    rbnAtmPvcOamStatusPort	RbnPort,
+    rbnAtmPvcOamStatusVpi	Integer32,
+    rbnAtmPvcOamStatusVci	Integer32,
+    rbnAtmPvcOamStatusState	INTEGER
+}
+
+rbnAtmPvcOamStatusSlot OBJECT-TYPE
+    SYNTAX      RbnSlot
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The slot containing the given ATM PVC."
+    ::= { rbnAtmPvcOamStatusEntry 1 }
+
+rbnAtmPvcOamStatusPort OBJECT-TYPE
+    SYNTAX      RbnPort
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The port containing the given ATM PVC."
+    ::= { rbnAtmPvcOamStatusEntry 2 }
+
+rbnAtmPvcOamStatusVpi OBJECT-TYPE
+    SYNTAX      Integer32 (0..4095)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The VPI value of the given ATM PVC."
+    ::= { rbnAtmPvcOamStatusEntry 3 }
+
+rbnAtmPvcOamStatusVci OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The VCI value of the given ATM PVC."
+    ::= { rbnAtmPvcOamStatusEntry 4 }
+
+rbnAtmPvcOamStatusState OBJECT-TYPE
+    SYNTAX      INTEGER {
+		    noOam (1),
+		    oamUp (2),
+		    oamDownLoopback (3),
+		    oamDownAis (4),
+		    oamDownRdi (5)
+		}
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The state of the ATM PVC OAM function on a given ATM PVC.
+
+	A value of noOam indicates the ATM PVC OAM function is not
+	active on the given ATM PVC
+
+	A value of oamUp indicates the ATM PVC OAM function is
+	active on the given ATM PVC and no failure condition is
+	currently being detected on the circuit
+
+	A value of oamDownLoopback indicates the ATM PVC OAM function is
+	active on the given ATM PVC and F5 OAM loopback cell management
+	has detected a fault on the circuit
+
+	A value of oamDownAis indicates the ATM PVC OAM function is
+	active on the given ATM PVC and a VC-AIS cell was recently
+	received which indicates a fault on the circuit
+
+	A value of oamDownRdi indicates the ATM PVC OAM function is
+	active on the given ATM PVC and a VC-RDI cell was recently
+	received which indicates a fault on the circuit
+        "
+    ::= { rbnAtmPvcOamStatusEntry 5 }
+
+--
+-- notifications
+--
+
+rbnAtmPvcOamStatusStateChange NOTIFICATION-TYPE
+    OBJECTS {
+	rbnAtmPvcOamStatusState
+    }
+    STATUS      current
+    DESCRIPTION
+	"A notification indicating that the state of an ATM PVC has
+	transitioned as a result of the ATM PVC OAM function.  This
+	notification will be sent if the value of rbnAtmPvcOamStatusState
+	transitions from oamUp to any of the three oamDown values, or if
+	it transitions from any of the three oamDown values to oamUp.
+	"
+        ::= { rbnAtmPvcOamMibNotifications 1 }
+
+--
+-- compliance statements
+--
+rbnAtmPvcOamCompliances 
+        OBJECT IDENTIFIER ::= { rbnAtmPvcOamMibConformance 1 }
+rbnAtmPvcOamGroups
+        OBJECT IDENTIFIER ::= { rbnAtmPvcOamMibConformance 2 }
+
+rbnAtmPvcOamCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+        "The compliance statement for SNMP entities which implement
+         the Redback ATM PVC OAM MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS {
+            rbnAtmPvcOamGroup,
+            rbnAtmPvcOamNotifyGroup
+        }
+    ::= { rbnAtmPvcOamCompliances  1 }
+
+rbnAtmPvcOamGroup OBJECT-GROUP
+    OBJECTS {
+	rbnAtmPvcOamStatusState
+    }
+    STATUS    current
+    DESCRIPTION
+        "The collection of objects which allow monitoring of the
+	ATM PVC OAM function."
+    ::= { rbnAtmPvcOamGroups 1 }
+
+rbnAtmPvcOamNotifyGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+	rbnAtmPvcOamStatusStateChange
+    }
+    STATUS    current
+    DESCRIPTION
+        "The collection of notifications which allow monitoring of the
+	ATM PVC OAM function."
+    ::= { rbnAtmPvcOamGroups 2 }
+
+END

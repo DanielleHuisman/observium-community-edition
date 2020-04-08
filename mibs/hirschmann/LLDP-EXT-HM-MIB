@@ -1,0 +1,1278 @@
+LLDP-EXT-HM-MIB DEFINITIONS ::= BEGIN
+
+-- 
+-- ***********************************************************
+-- Hirschmann LLDP extension MIB
+-- ***********************************************************
+--
+
+IMPORTS
+    MODULE-IDENTITY, 
+	OBJECT-TYPE, Integer32
+        					FROM SNMPv2-SMI
+    TruthValue, 
+	TEXTUAL-CONVENTION
+        					FROM SNMPv2-TC
+    lldpExtensions,
+    lldpLocPortNum, 
+    lldpRemTimeMark,
+    lldpRemLocalPortNum,
+    lldpRemIndex, 
+    lldpPortConfigEntry
+					        FROM LLDP-MIB;
+        
+lldpXHmMIB MODULE-IDENTITY
+    LAST-UPDATED "200809121200Z" -- September 12, 2008
+    ORGANIZATION "Hirschmann Automation & Control"
+    CONTACT-INFO
+        "Postal:     Stuttgarter Str. 45-51
+                     72654 Neckartenzlingen
+                     Germany
+         Phone:      +49 7127 140
+         E-mail:     hac.support@belden.com"
+    DESCRIPTION
+    "The LLDP Management Information Base extension module for
+     Hirschmann organizationally defined discovery information.
+     In order to assure the uniqueness of the LLDP-MIB,
+     lldpXHmMIB is branched from lldpExtensions using the Hirschmann
+     OUI value as the node.
+	 Copyright (C) 2008. All Rights Reserved."
+    REVISION        "200809121200Z" -- September 12, 2008
+    DESCRIPTION
+            "Part of Hirschmann LLDP device information extension"
+-- OUI for Hirschmann Automation & Control is 32867 (00-80-63) 
+   ::= { lldpExtensions 32867 }
+
+--------------------------------------------
+--------------------------------------------
+--
+-- Organizationally Defined Information Extension - Hirschmann Automation & Control
+--
+--------------------------------------------
+--------------------------------------------
+
+lldpXHmObjects    OBJECT IDENTIFIER ::= { lldpXHmMIB 1 }
+
+-- LLDP Hirschmann extension MIB groups
+lldpXHmConfig     OBJECT IDENTIFIER ::= { lldpXHmObjects 1 }
+lldpXHmLocalData  OBJECT IDENTIFIER ::= { lldpXHmObjects 2 }
+lldpXHmRemoteData OBJECT IDENTIFIER ::= { lldpXHmObjects 3 }
+
+--------------------------------------------
+--Textual Conventions
+--------------------------------------------
+
+LldpXHmLocGMRPServiceReqSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "(1) corresponds to forward All Multicast Groups requirement
+     (2) corresponds to forward Unregistered Multicast Groups requirement
+     (3) not applicable
+     If GMRP is not configured on the interface, the value should be set to
+     3 and the field should not be evaluated."
+    SYNTAX  INTEGER {
+            forwardAll(1),
+            forwardUnregistered(2),
+            notApplicable(3)
+    }
+
+LldpXHmLocIGMPVersionSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This bitmap shows which IGMP version is configured on the local device:
+    Bit(0): a 1 indicates IGMPv1 configured.
+    Bit(1): a 1 indicates IGMPv2 configured.
+    Bit(2): a 1 indicates IGMPv2 configured.
+    
+    All IGMP Versions are mutually exclusive, so only one bit should be set
+    at any given time. If all bits are set to 0, IGMP is not configured on the
+    device."
+    SYNTAX  BITS {
+            iGMPv1(0),
+            iGMPv2(1),
+            iGMPv3(2)
+}
+
+LldpXHmLocPortSecModeSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This Integer Value Shows the 802.1X Port Security configuration for a local port:
+            (1) not applicable, no 802.1X support or not configured
+            (2) force Authorized, general port access without authorization
+            (3) force Unauthorized, no general port access, even with autorization
+            (4) automatic, access based on successful authorization
+            (5) mac Based, access based on successful authorization for each client (MAC)
+            "
+    SYNTAX  INTEGER {
+            notApplicable(1),
+            forceAuthorized(2),
+            forceUnauthorized(3),
+            automatic(4),
+            multiClient(5)
+}
+
+
+LldpXHmLocPTPSupportSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This bitmap shows which PTP versions are supported by the local system, based on installed hardware:
+        Bit(0): a 1 indicates that PTP is supported in software only
+        Bit(1): a 1 indicates that PTPv1 is supported
+        Bit(2): a 1 indicates that PTPv2 is supported
+        Bit(3): a 1 indicates that PTPTC is supported
+    PTPTC indicates the capability to act as a PTP transparent clock.
+    If no bits are set, the device does not support any PTP standard and all
+    following fields should be set to (0) or (not applicable)."
+    SYNTAX  BITS {
+            swsupport(0),
+            ptpv1capable(1),
+            ptpv2capable(2),
+            ptptccapable(3)
+}
+
+
+LldpXHmLocPTPStatusSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This bitmap shows which PTP versions are enabled on the local system:
+        Bit(0): a 1 indicates that PTPv1 is enabled
+        Bit(1): a 1 indicates that PTPv2 is enabled
+    Both bits should not be set simultaneously, as either only PTPv1 or PTPv2
+    can be enabled on a device.
+    If no bits are set, no PTP standard is enabled on the port/device and all
+    following fields should be set to (0) or similar (e.g. not applicable)."
+    SYNTAX  BITS {
+            ptpv1enabled(0),
+            ptpv2enabled(1)
+}
+
+LldpXHmLocPTPv2DataTransferSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This Integer is only viable if PTPv2 is enabled. It shows the data transfer
+    type configured on the local port and device.
+    If only PTPv1 is enabled or no PTP available, this should be set to 4 and not
+    evaluated."
+    SYNTAX  INTEGER {
+            ptp2Ieee8023(1),
+            ptp2UdpIpv4(2),
+            ptp2UdpIpv6(3),
+            notApplicable(4)
+}
+
+LldpXHmLocPTPv2DelayMechanismSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This Integer is only viable if PTPv2 is enabled. It shows the delay
+    mechanism configured on the local port and device.
+    If only PTPv1 is enabled or no PTP available, this should be set to 4 and not
+    evaluated."
+    SYNTAX  INTEGER {
+            p2p(1),
+            e2e(2),
+            disabled(3),
+            notApplicable(4)
+}
+
+LldpXHmRemGMRPServiceReqSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "(1) corresponds to forward All Multicast Groups requirement
+     (2) corresponds to forward Unregistered Multicast Groups requirement
+    If GMRP is not configured on the interface, the value should be set to
+     3 and the field should not be evaluated."
+    SYNTAX  INTEGER {
+            forwardAll(1),
+            forwardUnregistered(2),
+            notApplicable(3)
+}
+
+
+LldpXHmRemPTPv2DataTransferSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This field is only viable if PTPv2 is enabled. It shows the data transfer
+    type configured on the remote port and device.
+    If only PTPv1 is enabled or no PTP available, this should be set to 4 and not
+    evaluated."
+    SYNTAX  INTEGER {
+            ptp2Ieee8023(1),
+            ptp2UdpIpv4(2),
+            ptp2UdpIpv6(3),
+            notApplicable(4)
+}
+
+LldpXHmRemPTPv2DelayMechanismSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This field is only viable if PTPv2 is enabled. It shows the delay
+    mechanism configured on the remote port and device.
+    If only PTPv1 is enabled or no PTP available, this should be set to 4 and not
+    evaluated."
+    SYNTAX  INTEGER {
+            p2p(1),
+            e2e(2),
+            disabled(3),
+            notApplicable(4)
+}
+
+LldpXHmRemPTPSupportSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This bitmap shows which PTP versions are supported by the remote system, based on installed hardware:
+        Bit(0): a 1 indicates that PTP is supported in software only
+        Bit(1): a 1 indicates that PTPv1 is supported
+        Bit(2): a 1 indicates that PTPv2 is supported
+        Bit(3): a 1 indicates that PTPTC is supported
+    PTPTC indicates the capability to act as a PTP transparent clock.
+    If no bits are set, the device does not support any PTP standard and all
+    following fields should be set to (0) or (not applicable)."
+    SYNTAX  BITS {
+            swsupport(0),
+            ptpv1capable(1),
+            ptpv2capable(2),
+            ptptccapable(3)
+}
+
+LldpXHmRemPTPStatusSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This Bitmap shows which PTP versions are enabled on the remote system:
+        Bit(0): a 1 indicates that PTPv1 is enabled
+        Bit(1): a 1 indicates that PTPv2 is enabled
+    Both bits should not be set simultaneously, as either only PTPv1 or PTPv2
+    can be enabled on a device.
+    If no bits are set, no PTP standard is enabled on the port/device and all
+    following fields should be set to (0) or similar (e.g. not applicable).
+    "
+
+    SYNTAX  BITS {
+            ptpv1enabled(0),
+            ptpv2enabled(1)
+}
+
+LldpXHmRemPortSecModeSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "This Integer Value Shows the 802.1X Port Security configuration for a remote port:
+            (1) not applicable, no 802.1X support or not configured
+            (2) force Authorized, general port access without authorization
+            (3) force Unauthorized, no general port access, even with autorization
+            (4) automatic, access based on successful authorization
+            "
+
+    SYNTAX  INTEGER {
+            notApplicable(1),
+            forceAuthorized(2),
+            forceUnauthorized(3),
+            automatic(4)
+}
+
+LldpXHmRemIGMPVersionSyntax ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "Shows which IGMP version is configured on the remote device:
+    Bit(0): a 1 indicates IGMPv1 configured.
+    Bit(1): a 1 indicates IGMPv2 configured.
+    Bit(2): a 1 indicates IGMPv2 configured.
+    
+    All IGMP Versions are mutually exclusive, so only one bit should be set
+    to 1 at any given time. If all bits are set to 0, IGMP is not configured
+    on the device."
+    SYNTAX  BITS {
+            iGMPv1(0),
+            iGMPv2(1),
+            iGMPv3(2)
+}
+
+
+--------------------------------------------
+--------------------------------------------
+-- Hirschmann - Configuration
+--------------------------------------------
+--------------------------------------------
+
+--------------------------------------------
+-- GMRP Config Entry
+--------------------------------------------
+lldpXHmConfigGMRPTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmConfigGMRPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table that controls GMRP LLDP TLV Information
+            to be transmitted on individual ports."
+    ::= { lldpXHmConfig 1 }
+
+lldpXHmConfigGMRPEntry  OBJECT-TYPE
+    SYNTAX      LldpXHmConfigGMRPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "LLDP configuration information that controls the
+    transmission of Hirschmann GMRP organizationally defined Configuration
+    TLV on LLDP transmission capable ports.
+
+    This configuration object augments the lldpPortConfigEntry of
+    the LLDP-MIB, therefore it is only present along with the port
+    configuration defined by the associated lldpPortConfigEntry
+    entry.
+
+    Each active lldpConfigEntry must be restored from non-volatile
+    storage (along with the corresponding lldpPortConfigEntry)
+    after a re-initialization of the management system."
+    AUGMENTS { lldpPortConfigEntry }
+    ::= { lldpXHmConfigGMRPTable 1 }
+
+LldpXHmConfigGMRPEntry ::= SEQUENCE {
+      lldpXHmConfigGMRPTxEnable  TruthValue
+}
+
+lldpXHmConfigGMRPTxEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "The lldpXHmConfigGMRPTxEnable, which is defined as
+            a truth value and configured by the network management,
+            determines whether the Hirschmann GMRP organizationally defined
+            port TLV transmission is allowed on a given LLDP
+            transmission capable port.
+
+            The value of this object must be restored from non-volatile
+            storage after a re-initialization of the management system."
+    REFERENCE 
+            "internal"
+    DEFVAL  { false }
+    ::= { lldpXHmConfigGMRPEntry 1 }
+
+--------------------------------------------
+-- IGMP Config Entry
+--------------------------------------------
+lldpXHmConfigIGMPTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmConfigIGMPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table that controls IGMP LLDP TLV Information
+            to be transmitted on individual ports."
+    ::= { lldpXHmConfig 2 }
+
+lldpXHmConfigIGMPEntry  OBJECT-TYPE
+    SYNTAX      LldpXHmConfigIGMPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "LLDP configuration information that controls the
+            transmission of Hirschmann IGMP organizationally defined Configuration
+            TLV on LLDP transmission capable ports.
+
+            This configuration object augments the lldpPortConfigEntry of
+            the LLDP-MIB, therefore it is only present along with the port
+            configuration defined by the associated lldpPortConfigEntry
+            entry.
+
+            Each active lldpConfigEntry must be restored from non-volatile
+            storage (along with the corresponding lldpPortConfigEntry)
+            after a re-initialization of the management system."
+    AUGMENTS { lldpPortConfigEntry }
+    ::= { lldpXHmConfigIGMPTable 1 }
+
+LldpXHmConfigIGMPEntry ::= SEQUENCE {
+      lldpXHmConfigIGMPTxEnable  TruthValue
+}
+
+lldpXHmConfigIGMPTxEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "The lldpXHmConfigIGMPTxEnable, which is defined as
+            a truth value and configured by the network management,
+            determines whether the Hirschmann IGMP organizationally defined
+            port TLV transmission is allowed on a given LLDP
+            transmission capable port.
+
+            The value of this object must be restored from non-volatile
+            storage after a re-initialization of the management system."
+    REFERENCE 
+            "internal"
+    DEFVAL  { false }
+    ::= { lldpXHmConfigIGMPEntry 1 }
+
+--------------------------------------------
+--802.1X Port Security Config Entry
+--------------------------------------------
+lldpXHmConfigPortSecTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmConfigPortSecEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table that controls 802.1X Port Security LLDP TLV Information
+            to be transmitted on individual ports."
+    ::= { lldpXHmConfig 3 }
+
+lldpXHmConfigPortSecEntry  OBJECT-TYPE
+    SYNTAX      LldpXHmConfigPortSecEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "LLDP configuration information that controls the
+            transmission of Hirschmann 802.1X Port Security organizationally
+            defined Configuration TLV on LLDP transmission capable ports.
+
+            This configuration object augments the lldpPortConfigEntry of
+            the LLDP-MIB, therefore it is only present along with the port
+            configuration defined by the associated lldpPortConfigEntry
+            entry.
+
+            Each active lldpConfigEntry must be restored from non-volatile
+            storage (along with the corresponding lldpPortConfigEntry)
+            after a re-initialization of the management system."
+    AUGMENTS { lldpPortConfigEntry }
+    ::= { lldpXHmConfigPortSecTable 1 }
+
+LldpXHmConfigPortSecEntry ::= SEQUENCE {
+      lldpXHmConfigPortSecTxEnable  TruthValue
+}
+
+lldpXHmConfigPortSecTxEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "The lldpXHmConfigPortSecTxEnable, which is defined as
+            a truth value and configured by the network management,
+            determines whether the Hirschmann 802.1X Port Security 
+            organizationally defined port TLV transmission is allowed 
+            on a given LLDP transmission capable port.
+
+            The value of this object must be restored from non-volatile
+            storage after a re-initialization of the management system."
+    REFERENCE 
+            "internal"
+    DEFVAL  { false }
+    ::= { lldpXHmConfigPortSecEntry 1 }
+
+--------------------------------------------
+-- PTP Config Entry
+--------------------------------------------
+lldpXHmConfigPTPTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmConfigPTPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table that controls PTP LLDP TLV Information
+            to be transmitted on individual ports."
+    ::= { lldpXHmConfig 4 }
+
+lldpXHmConfigPTPEntry  OBJECT-TYPE
+    SYNTAX      LldpXHmConfigPTPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "LLDP configuration information that controls the
+            transmission of Hirschmann PTP organizationally defined Configuration
+            TLV on LLDP transmission capable ports.
+
+            This configuration object augments the lldpPortConfigEntry of
+            the LLDP-MIB, therefore it is only present along with the port
+            configuration defined by the associated lldpPortConfigEntry
+            entry.
+
+            Each active lldpConfigEntry must be restored from non-volatile
+            storage (along with the corresponding lldpPortConfigEntry)
+            after a re-initialization of the management system."
+    AUGMENTS { lldpPortConfigEntry }
+    ::= { lldpXHmConfigPTPTable 1 }
+
+LldpXHmConfigPTPEntry ::= SEQUENCE {
+      lldpXHmConfigPTPTxEnable  TruthValue
+}
+
+lldpXHmConfigPTPTxEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "The lldpXHmConfigPTPTxEnable, which is defined as
+            a truth value and configured by the network management,
+            determines whether the Hirschmann PTP organizationally defined
+            port TLV transmission is allowed on a given LLDP
+            transmission capable port.
+
+            The value of this object must be restored from non-volatile
+            storage after a re-initialization of the management system."
+    REFERENCE 
+            "internal"
+    DEFVAL  { false }
+    ::= { lldpXHmConfigPTPEntry 1 }
+
+
+--------------------------------------------
+--------------------------------------------
+-- Hirschmann - Local System Information
+--------------------------------------------
+--------------------------------------------
+
+
+--------------------------------------------
+-- lldpXHmLocGMRPTable: GMRP information 
+--------------------------------------------
+
+lldpXHmLocGMRPTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmLocGMRPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one or more rows per Port and GMRP
+             information about each port of the local system.
+             
+             GMRP is a protocol used for constraining IP Multicast traffic
+             defined by the IEEE in standard 802.1p, published in standard 802.1D"
+    REFERENCE
+            "IEEE 802.1D-2004, Section 10"
+    ::= { lldpXHmLocalData 1 }
+
+lldpXHmLocGMRPEntry OBJECT-TYPE
+    SYNTAX      LldpXHmLocGMRPEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "GMRP Information about a particular
+            port component."
+    INDEX   { lldpLocPortNum }
+    ::= { lldpXHmLocGMRPTable 1 }
+
+LldpXHmLocGMRPEntry ::= SEQUENCE {
+      lldpXHmLocGMRPSupport TruthValue,
+      lldpXHmLocGMRPStatus TruthValue,
+      lldpXHmLocGMRPServiceReq LldpXHmLocGMRPServiceReqSyntax
+}
+
+lldpXHmLocGMRPSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether the given port
+            (associated with the local system) supports GMRP.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocGMRPEntry 1 }
+
+lldpXHmLocGMRPStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether GMRP
+            is enabled on the the given port associated with the local system.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocGMRPEntry 2 }
+
+lldpXHmLocGMRPServiceReq OBJECT-TYPE
+    SYNTAX      LldpXHmLocGMRPServiceReqSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Integer value, used to indicate which GMRP service requirement
+            is enabled on the the given port associated with the local system.
+            "
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocGMRPEntry 3 }
+    
+--------------------------------------------
+-- lldpXHmLocIGMPTable: IGMP information 
+--------------------------------------------
+
+lldpXHmLocIGMPTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmLocIGMPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one or more rows per Port and IGMP
+             information about each port of the local system.
+             
+             IGMP is a protocol used for constraining IP multicast traffic
+             specified in IETF RFCs 1112, 2236(IGMPv2) and 3376(IGMPv3)"
+    REFERENCE
+            "RFCs 1112, 2236, 3376 e.g. at www.rfc.net"
+    ::= { lldpXHmLocalData 2 }
+
+lldpXHmLocIGMPEntry OBJECT-TYPE
+    SYNTAX      LldpXHmLocIGMPEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "IGMP Information about a particular
+            port component."
+    INDEX   { lldpLocPortNum }
+    ::= { lldpXHmLocIGMPTable 1 }
+
+LldpXHmLocIGMPEntry ::= SEQUENCE {
+      lldpXHmLocIGMPSupport 	TruthValue,
+      lldpXHmLocIGMPStatus 		TruthValue,
+      lldpXHmLocIGMPVersion 	LldpXHmLocIGMPVersionSyntax
+}
+
+lldpXHmLocIGMPSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether the given port
+            (associated with the local system) supports IGMP.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocIGMPEntry 1 }
+
+lldpXHmLocIGMPStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether IGMP is enabled
+            on the the given port associated with the local system.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocIGMPEntry 2 }
+    
+lldpXHmLocIGMPVersion OBJECT-TYPE
+    SYNTAX      LldpXHmLocIGMPVersionSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+          "This bitmap shows which IGMP version is configured on the local device."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocIGMPEntry 3 }
+
+--------------------------------------------
+-- lldpXHmLocPortSecTable: Port Security information 
+--------------------------------------------
+
+
+lldpXHmLocPortSecTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmLocPortSecEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one or more rows per Port and 
+            802.1X Port Security information about each port of
+            the local system.
+            
+            IEEE 802.1X Port Security is a standard, defining rules for
+            a port based network access control with a client/supplicant
+            requesting access to the network from an authenticator/RADIUS server"
+    REFERENCE
+              "IEEE Standard 802.1X - 2004"
+    ::= { lldpXHmLocalData 3 }
+
+lldpXHmLocPortSecEntry OBJECT-TYPE
+    SYNTAX      LldpXHmLocPortSecEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "802.1X Port Security Information about a particular
+            port component."
+    INDEX   { lldpLocPortNum }
+    ::= { lldpXHmLocPortSecTable 1 }
+
+LldpXHmLocPortSecEntry ::= SEQUENCE {
+      lldpXHmLocPortSecSupport TruthValue,
+      lldpXHmLocPortSecStatus TruthValue,
+      lldpXHmLocPortSecMode LldpXHmLocPortSecModeSyntax
+}
+
+lldpXHmLocPortSecSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether the given port
+            (associated with the local system) supports 802.1X Port Security.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPortSecEntry 1 }
+
+lldpXHmLocPortSecStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether 802.1X Port Security
+            is enabled on the the given port associated with the local system.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPortSecEntry 2 }
+
+lldpXHmLocPortSecMode OBJECT-TYPE
+    SYNTAX      LldpXHmLocPortSecModeSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Integer value contains informations about a local ports 802.1X
+            configuration."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPortSecEntry 3 }
+
+--------------------------------------------
+-- lldpXHmLocPTPTable: PTP information 
+--------------------------------------------
+
+
+lldpXHmLocPTPTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmLocPTPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one or more rows per Port and PTP
+             information about the local system.
+             
+             The Precision Time Protocol (PTP) is defined in IEEE Standard 1588
+             and describes a protocol for network (system) clock synchronization
+             with very high precision."
+    REFERENCE
+              "IEEE 1588 - 2002 Precision Time Protocol"
+    ::= { lldpXHmLocalData 4 }
+
+lldpXHmLocPTPEntry OBJECT-TYPE
+    SYNTAX      LldpXHmLocPTPEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Port and PTP Information about a particular
+            port component"
+    INDEX   { lldpLocPortNum }
+    ::= { lldpXHmLocPTPTable 1 }
+
+LldpXHmLocPTPEntry ::= SEQUENCE {
+      lldpXHmLocPTPSupport 				LldpXHmLocPTPSupportSyntax,
+      lldpXHmLocPTPStatus 				LldpXHmLocPTPStatusSyntax,
+      lldpXHmLocPTPSyncInterval 		Integer32,
+      lldpXHmLocPTPv2AnnounceInterval  	Integer32,
+      lldpXHmLocPTPv2DataTransfer  		LldpXHmLocPTPv2DataTransferSyntax,
+      lldpXHmLocPTPv2DelayMechanism  	LldpXHmLocPTPv2DelayMechanismSyntax,
+      lldpXHmLocPTPClockValues  		BITS,
+      lldpXHmLocPTPv2SubdomainNumber 	Integer32,
+      lldpXHmLocPTPv1SubdomainName 		OCTET STRING
+}
+
+lldpXHmLocPTPSupport  OBJECT-TYPE
+    SYNTAX      LldpXHmLocPTPSupportSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This bitmap shows which PTP versions are supported by the local system, based on installed hardware"
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPTPEntry 1 }
+
+lldpXHmLocPTPStatus  OBJECT-TYPE
+    SYNTAX      LldpXHmLocPTPStatusSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This bitmap shows which PTP versions are enabled on the local system"
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPTPEntry 2 }
+
+lldpXHmLocPTPSyncInterval  OBJECT-TYPE
+    SYNTAX      Integer32(-128..127)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Integer shows the PTPv1 and PTPv2 Synchronization Interval.
+            If no PTP is available or configured, this value should be set to -128."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPTPEntry 3 }
+
+lldpXHmLocPTPv2AnnounceInterval  OBJECT-TYPE
+    SYNTAX      Integer32(-128..127)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Integer shows the PTPv2 Announce Interval. If PTPv2 is not
+            configured or available, this should be set to -128."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPTPEntry 4 }
+
+lldpXHmLocPTPv2DataTransfer  OBJECT-TYPE
+    SYNTAX      LldpXHmLocPTPv2DataTransferSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Integer shows the enabled PTPv2 data transfer method.
+            "
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPTPEntry 5 }
+
+lldpXHmLocPTPv2DelayMechanism  OBJECT-TYPE
+    SYNTAX      LldpXHmLocPTPv2DelayMechanismSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Integer shows the enabled PTPv2 delay mechanism"
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPTPEntry 6 }
+
+lldpXHmLocPTPClockValues  OBJECT-TYPE
+    SYNTAX      BITS {
+            slave(0),
+            master(1),
+            transparent(2),
+            boundary(3),
+            grandmaster(4),
+            multidomain(5),
+            simplemode(6)
+            }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This bitmap shows, which clock type(s) are configured
+            on a specific port and/or device:
+            Bit (0) set to 1 indicates a slave clock
+            Bit (1) set to 1 indicates a master clock
+            Bit (2) set to 1 indicates a transparent clock
+            Bit (3) set to 1 indicates a boundary clock
+            Bit (4) set to 1 indicates a grandmaster clock
+            Bit (5) set to 1 indicates a clock in multi domain mode
+            Bit (6) set to 1 indicates a clock in simple mode
+            
+            If no PTP is configured, all bits should be set to 0."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmLocPTPEntry 7 }
+    
+    
+lldpXHmLocPTPv2SubdomainNumber  OBJECT-TYPE
+    SYNTAX      Integer32(0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Integer shows the PTPv2 subdomain number configured on the local device.
+            In case PTPv1 is configured, this value is of no relevance and will not be evaluated."
+    ::= { lldpXHmLocPTPEntry 8 }
+    
+
+lldpXHmLocPTPv1SubdomainName  OBJECT-TYPE
+    SYNTAX      OCTET STRING(SIZE (0..16))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Octet String contains the PTPv1 subdomain name, an ASCII String
+            with a maximum of 16 characters length, configured on the local
+            device.
+            If PTPv2 or no PTP is configured, this should be set to 0."
+    ::= { lldpXHmLocPTPEntry 9 }
+--------------------------------------------
+--------------------------------------------
+-- Hirschmann - Remote System Information
+--------------------------------------------
+--------------------------------------------
+
+--------------------------------------------
+-- lldpXHmRemGMRPTable: GMRP information 
+--------------------------------------------
+
+
+lldpXHmRemGMRPTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmRemGMRPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one or more rows per Port and GMRP
+             information about the remote system.
+             
+             GMRP is a protocol used for constraining IP Multicast traffic
+             defined by the IEEE in standard 802.1p, published in standard 802.1D"
+    REFERENCE
+            "IEEE 802.1D-2004, Section 10"
+    ::= { lldpXHmRemoteData 1 }
+
+lldpXHmRemGMRPEntry OBJECT-TYPE
+    SYNTAX      LldpXHmRemGMRPEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "GMRP Information about a particular
+            port component."
+    INDEX   { lldpRemTimeMark,
+              lldpRemLocalPortNum,
+              lldpRemIndex }
+    ::= { lldpXHmRemGMRPTable 1 }
+
+LldpXHmRemGMRPEntry ::= SEQUENCE {
+      lldpXHmRemGMRPSupport TruthValue,
+      lldpXHmRemGMRPStatus TruthValue,
+      lldpXHmRemGMRPServiceReq LldpXHmRemGMRPServiceReqSyntax
+}
+
+
+lldpXHmRemGMRPSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether the given port
+            (associated with the remote system) supports GMRP.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemGMRPEntry 1 }
+
+lldpXHmRemGMRPStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether GMRP is enabled on the
+            the given port associated with the remote system.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemGMRPEntry 2 }
+
+lldpXHmRemGMRPServiceReq OBJECT-TYPE
+    SYNTAX      LldpXHmRemGMRPServiceReqSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Integer value, used to indicate which GMRP service requirement
+            is enabled on the the given port associated with the remote system.
+            "
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemGMRPEntry 3 }
+    
+--------------------------------------------
+-- lldpXHmRemIGMPTable: IGMP information 
+--------------------------------------------
+
+
+
+lldpXHmRemIGMPTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmRemIGMPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+             "This table contains one or more rows per Port and IGMP
+             information about each port of the remote system.
+             
+             IGMP is a protocol used for constraining IP multicast traffic
+             specified in IETF RFCs 1112, 2236(IGMPv2) and 3376(IGMPv3)"
+    REFERENCE
+            "RFCs 1112, 2236, 3376 at www.rfc.net"
+    ::= { lldpXHmRemoteData 2 }
+
+lldpXHmRemIGMPEntry OBJECT-TYPE
+    SYNTAX      LldpXHmRemIGMPEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "IGMP Information about a particular
+            port component."
+    INDEX   { lldpRemTimeMark,
+              lldpRemLocalPortNum,
+              lldpRemIndex }
+    ::= { lldpXHmRemIGMPTable 1 }
+
+LldpXHmRemIGMPEntry ::= SEQUENCE {
+      lldpXHmRemIGMPSupport 	TruthValue,
+      lldpXHmRemIGMPStatus 		TruthValue,
+      lldpXHmRemIGMPVersion 	LldpXHmRemIGMPVersionSyntax
+}
+
+lldpXHmRemIGMPSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether the given port
+            (associated with the remote system) supports IGMP.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemIGMPEntry 1 }
+
+lldpXHmRemIGMPStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether IGMP is enabled on
+            the the given port associated with the remote system.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemIGMPEntry 2 }
+    
+lldpXHmRemIGMPVersion OBJECT-TYPE
+    SYNTAX      LldpXHmRemIGMPVersionSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This bitmap shows which IGMP version is configured on the remote device."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemIGMPEntry 3 }
+
+--------------------------------------------
+-- lldpXHmRemPortSecTable: Port Security information 
+--------------------------------------------
+
+
+lldpXHmRemPortSecTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmRemPortSecEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one or more rows per Port and 
+            802.1X Port Security information about each port of
+            the remote system.
+            IEEE 802.1X Port Security is a standard, defining rules for
+            a port based network access control with a client/supplicant
+            requesting access to the network from an authenticator/RADIUS server"
+    REFERENCE
+              "IEEE Standard 802.1X - 2004"
+    ::= { lldpXHmRemoteData 3 }
+
+lldpXHmRemPortSecEntry OBJECT-TYPE
+    SYNTAX      LldpXHmRemPortSecEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "802.1X Port Security Information about a particular
+            port component."
+    INDEX   { lldpRemTimeMark,
+              lldpRemLocalPortNum,
+              lldpRemIndex }
+    ::= { lldpXHmRemPortSecTable 1 }
+
+LldpXHmRemPortSecEntry ::= SEQUENCE {
+      lldpXHmRemPortSecSupport TruthValue,
+      lldpXHmRemPortSecStatus TruthValue,
+      lldpXHmRemPortSecMode LldpXHmRemPortSecModeSyntax
+}
+
+lldpXHmRemPortSecSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether the given port
+            (associated with the remote system) supports 802.1X Port Security.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPortSecEntry 1 }
+
+lldpXHmRemPortSecStatus OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The truth value used to indicate whether 802.1X Port Security
+            is enabled on the the given port associated with the remote system.
+            If this is set to (false), all following fields should be
+            set to not applicable and should not be evaluated."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPortSecEntry 2 }
+
+lldpXHmRemPortSecMode OBJECT-TYPE
+    SYNTAX      LldpXHmRemPortSecModeSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+           "This Integer value contains informations about a remote ports 802.1X
+            configuration."
+
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPortSecEntry 3 }
+
+--------------------------------------------
+-- lldpXHmRemPTPTable: PTP information 
+--------------------------------------------
+
+
+
+lldpXHmRemPTPTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF LldpXHmRemPTPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one or more rows per Port and PTP
+             information about the remote system.
+             
+             The Precision Time Protocol (PTP) is defined in IEEE Standard 1588
+             and describes a protocol for network (system) clock synchronization
+             with very high precision."
+    REFERENCE
+              "IEEE 1588 - 2002 Precision Time Protocol"
+    ::= { lldpXHmRemoteData 4 }
+
+lldpXHmRemPTPEntry OBJECT-TYPE
+    SYNTAX      LldpXHmRemPTPEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Port and PTP Information about a particular
+            port component"
+    INDEX   { lldpRemTimeMark,
+              lldpRemLocalPortNum,
+              lldpRemIndex }
+    ::= { lldpXHmRemPTPTable 1 }
+
+LldpXHmRemPTPEntry ::= SEQUENCE {
+      lldpXHmRemPTPSupport 				LldpXHmRemPTPSupportSyntax,
+      lldpXHmRemPTPStatus 				LldpXHmRemPTPStatusSyntax,
+      lldpXHmRemPTPSyncInterval 		Integer32,
+      lldpXHmRemPTPv2AnnounceInterval  	Integer32,
+      lldpXHmRemPTPv2DataTransfer  		LldpXHmRemPTPv2DataTransferSyntax,
+      lldpXHmRemPTPv2DelayMechanism  	LldpXHmRemPTPv2DelayMechanismSyntax,
+      lldpXHmRemPTPClockValues  		BITS,
+      lldpXHmRemPTPv2SubdomainNumber 	Integer32,
+      lldpXHmRemPTPv1SubdomainName 		OCTET STRING
+}
+
+lldpXHmRemPTPSupport  OBJECT-TYPE
+    SYNTAX      LldpXHmRemPTPSupportSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Shows which PTP versions are supported by the remote system, based on installed hardware"
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPTPEntry 1 }
+
+lldpXHmRemPTPStatus  OBJECT-TYPE
+    SYNTAX      LldpXHmRemPTPStatusSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Shows which PTP versions are enabled on the remote system"
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPTPEntry 2 }
+
+lldpXHmRemPTPSyncInterval  OBJECT-TYPE
+    SYNTAX      Integer32(-128..127)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Shows the PTPv1 and PTPv2 Synchronization Interval.
+            If no PTP is available or configured, this value should be set to -128."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPTPEntry 3 }
+
+lldpXHmRemPTPv2AnnounceInterval  OBJECT-TYPE
+    SYNTAX      Integer32(-128..127)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Shows the PTPv2 Announce Interval. If PTPv2 is not
+            configured or available, this should be set to -128."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPTPEntry 4 }
+
+lldpXHmRemPTPv2DataTransfer  OBJECT-TYPE
+    SYNTAX      LldpXHmRemPTPv2DataTransferSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This field is only viable if PTPv2 is enabled. It shows the data transfer
+            type configured on the remote port and device."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPTPEntry 5 }
+
+lldpXHmRemPTPv2DelayMechanism  OBJECT-TYPE
+    SYNTAX      LldpXHmRemPTPv2DelayMechanismSyntax
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Shows the enabled PTPv2 delay mechanism"
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPTPEntry 6 }
+
+
+lldpXHmRemPTPClockValues  OBJECT-TYPE
+    SYNTAX      BITS {
+            slave(0),
+            master(1),
+            transparent(2),
+            boundary(3),
+            grandmaster(4),
+            multidomain(5),
+            simplemode(6)
+            }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Shows, which clock type(s) are configured on a specific remote port
+            and/or device:
+            Bit (0) set to 1 indicates a slave clock
+            Bit (1) set to 1 indicates a master clock
+            Bit (2) set to 1 indicates a transparent clock
+            Bit (3) set to 1 indicates a boundary clock
+            Bit (4) set to 1 indicates a grandmaster clock
+            Bit (5) set to 1 indicates a clock in multi domain mode
+            Bit (6) set to 1 indicates a clock in simple mode
+            
+            If no PTP is configured, all bits should be set to 0."
+    REFERENCE 
+            "internal"
+    ::= { lldpXHmRemPTPEntry 7 }
+    
+    
+lldpXHmRemPTPv2SubdomainNumber  OBJECT-TYPE
+    SYNTAX      Integer32(0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Shows the PTPv2 subdomain number configured on the remote device.
+            In case PTPv1 is configured, this value is of no relevance and will not be evaluated."
+    ::= { lldpXHmRemPTPEntry 8 }
+    
+
+lldpXHmRemPTPv1SubdomainName  OBJECT-TYPE
+    SYNTAX      OCTET STRING(SIZE (0..16))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This Octet String contains the PTPv1 subdomain name, an ASCII String
+            with a maximum of 16 characters length, configured on the remote device.
+            If PTPv2 is configured, this field should be set to 0."
+    ::= { lldpXHmRemPTPEntry 9 }
+END

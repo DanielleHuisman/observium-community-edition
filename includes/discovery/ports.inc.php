@@ -1,0 +1,204 @@
+<?php
+
+/**
+ * Observium
+ *
+ *   This file is part of Observium.
+ *
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ *
+ */
+
+// Build SNMP Cache Array
+
+$port_stats = array();
+$port_oids  = array("ifDescr", "ifAlias", "ifName", "ifType", "ifOperStatus");
+
+print_cli_data_field("Caching OIDs", 3);
+if (is_device_mib($device, "IF-MIB"))
+{
+  foreach ($port_oids as $oid)
+{
+  print_cli($oid." ");
+  $port_stats = snmpwalk_cache_oid($device, $oid, $port_stats, "IF-MIB");
+}
+} else { // End IF-MIB permitted
+  // This part for devices who not have IF-MIB stats, but have own vendor tree with ports
+}
+print_cli(PHP_EOL); // END CACHING OIDS
+
+
+foreach(get_device_mibs_permitted($device) as $mib)
+{
+  merge_private_mib($device, 'ports', $mib, $port_stats, $port_oids);
+}
+
+// Additionally include per MIB functions and snmpwalks (uses include_once)
+$include_lib = TRUE;
+$include_dir = "includes/discovery/ports/";
+include("includes/include-dir-mib.inc.php");
+
+// End Building SNMP Cache Array
+
+print_debug_vars($port_stats, 1);
+
+// Build array of ports in the database
+
+// FIXME -- this stuff is a little messy, looping the array to make an array just seems wrong. :>
+//       -- i can make it a function, so that you don't know what it's doing.
+//       -- $ports_db = adamasMagicFunction($ports_db); ?
+
+print_cli_data_field("Caching DB", 3);
+
+$ports_db = [];
+$ports_ids = [];
+$ports_duplicates_ids = [];
+foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ?", array($device['device_id'])) as $port)
+{
+  // Note, deleted / disabled and up ports can have same indexes!
+  $key = $port['ifIndex']; // Possible to use other key in future
+
+  // Mark for clean deleted/disabled duplicates
+  if (isset($ports_db[$key]))
+  {
+    $old_port = $ports_db[$key];
+    if ($old_port['deleted'] || $old_port['disabled'])
+    {
+      // Rewrite old cached entry
+      $ports_duplicates_ids[$old_port['port_id']] = $old_port['port_id'];
+      unset($ports_ids[$old_port['port_id']]);
+    } else {
+      // Just skip duplicate entry
+      $ports_duplicates_ids[$port['port_id']] = $port['port_id'];
+      continue;
+    }
+  }
+
+  $ports_db[$key] = $port;
+  $ports_ids[$port['port_id']] = $port;
+}
+
+print_cli(count($ports_db)." ports".PHP_EOL);
+
+print_cli_data_field("Discovering ports", 3);
+
+$table_rows = array();
+$ports_insert = array();
+
+// New interface detection
+foreach ($port_stats as $ifIndex => $port)
+{
+  $port['ifIndex'] = $ifIndex;
+  $key = $ifIndex; // Possible to use other key in future
+
+  // Fix ord (UTF-8) chars, ie:
+  // ifAlias.3 = Conexi<F3>n de <E1>rea local* 3
+  foreach (array('ifAlias', 'ifDescr', 'ifName') as $oid_fix)
+  {
+    if (isset($port[$oid_fix])) { $port[$oid_fix] = snmp_fix_string($port[$oid_fix]); }
+  }
+
+  $table_row = array($ifIndex, truncate($port['ifDescr'], 30), $port['ifName'], truncate($port['ifAlias'], 20), $port['ifType'], $port['ifOperStatus']);
+  // Check the port against our filters.
+  if (is_port_valid($port, $device))
+  {
+    // Not ignored ports
+
+    $table_row[]  = '%gno%n';
+
+    if (!isset($ports_db[$key]))
+    {
+      // New port
+      process_port_label($port, $device); // Process ifDescr if needed
+      $table_row[1] = truncate($port['ifDescr'], 30);
+
+      $ports_insert[] = array('device_id' => $device['device_id'],
+                              'ifIndex'  => $ifIndex,
+                              'ifAlias'  => $port['ifAlias'],
+                              'ifDescr'  => $port['ifDescr'],
+                              'ifName'   => $port['ifName'],
+                              'ifType'   => $port['ifType'],
+                              'ignore'   => isset($port['ignore']) ? $port['ignore'] : '0',
+                              'disabled' => isset($port['disabled']) ? $port['disabled'] : '0',
+      );
+      //$port_id = dbInsert(array('device_id' => $device['device_id'], 'ifIndex' => $ifIndex, 'ifAlias' => $port['ifAlias'], 'ifDescr' => $port['ifDescr'], 'ifName' => $port['ifName'], 'ifType' => $port['ifType']), 'ports');
+      //$ports_db[$ifIndex] = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?", array($device['device_id'], $ifIndex));
+      echo(" ".$port['port_label']."(".$ifIndex.")");
+    }
+    elseif ($ports_db[$key]['deleted'] == "1")
+    {
+      // Undeleted port
+      dbUpdate(array('deleted' => '0'), 'ports', '`port_id` = ?', array($ports_db[$key]['port_id']));
+      log_event("Interface DELETED mark removed", $device, 'port', $ports_db[$key]);
+      $ports_db[$key]['deleted'] = "0";
+      echo("U");
+
+      // We've seen it. Remove it from the cache.
+      $port_id = $ports_db[$key]['port_id'];
+      unset($ports_ids[$port_id]);
+    } else {
+      echo(".");
+
+      // We've seen it. Remove it from the cache.
+      $port_id = $ports_db[$key]['port_id'];
+      unset($ports_ids[$port_id]);
+    }
+
+  } else {
+    // Port incorrect/ignored
+
+    $table_row[] = '%ryes%n';
+    if (isset($ports_db[$key]))
+    {
+      if ($ports_db[$key]['deleted'] != "1")
+      {
+        dbUpdate(array('deleted' => '1', 'ifLastChange' => date('Y-m-d H:i:s', time())), 'ports', '`port_id` = ?', array($ports_db[$key]['port_id']));
+        log_event("Interface was marked as DELETED", $device, 'port', $ports_db[$key]);
+        $ports_db[$key]['deleted'] = "1";
+        echo("-");
+      }
+
+      // We've seen it. Remove it from the cache.
+      $port_id = $ports_db[$key]['port_id'];
+      unset($ports_ids[$port_id]);
+    }
+    echo("X");
+  }
+  $table_rows[] = $table_row;
+}
+
+if (count($ports_insert))
+{
+  dbInsertMulti($ports_insert, 'ports');
+}
+// End New interface detection
+
+// Interfaces Clean
+// If it's in our $ports_ids list, that means it's not been seen. Mark it deleted.
+foreach ($ports_ids as $port_id => $port)
+{
+  if ($port['deleted'] == "0")
+  {
+    dbUpdate(array('deleted' => '1', 'ifLastChange' => date('Y-m-d H:i:s', time())), 'ports', '`port_id` = ?', array($port_id));
+    log_event("Interface was marked as DELETED", $device, 'port', $port_id);
+    echo("-");
+  }
+}
+
+// Complete remove duplicates
+if (count($ports_duplicates_ids))
+{
+  dbDelete('ports', generate_query_values($ports_duplicates_ids, 'port_id', NULL, FALSE));
+}
+// End interfaces clean
+echo(PHP_EOL);
+
+$table_headers = array('%WifIndex%n', '%WifDescr%n', '%WifName%n', '%WifAlias%n', '%WifType%n', '%WOper Status%n', '%WIgnored%n');
+print_cli_table($table_rows, $table_headers);
+
+// Clear Variables Here
+unset($port_stats, $ports_db, $ports_ids, $ports_duplicates_ids, $ports_insert, $port, $table_rows, $table_headers);
+
+// EOF

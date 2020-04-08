@@ -1,0 +1,503 @@
+PEPWAVE-MAX-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+	MODULE-IDENTITY, OBJECT-TYPE, Integer32, 
+	Counter32, Counter64, TimeTicks,
+	IpAddress, enterprises						FROM SNMPv2-SMI
+	TEXTUAL-CONVENTION							FROM SNMPv2-TC
+	MODULE-COMPLIANCE, OBJECT-GROUP				FROM SNMPv2-CONF;
+
+
+pepwaveMAX MODULE-IDENTITY
+    LAST-UPDATED "201206060000Z"
+    ORGANIZATION "Pepwave"
+    CONTACT-INFO
+		"Pepwave
+		http://www.pepwave.com
+		Support: http://www.pepwave.com/contact/support/
+		Email: info@pepwave.com		
+		"
+    DESCRIPTION
+            "MIB module for Pepwave MAX."
+    REVISION     "201206060000Z"
+    DESCRIPTION
+		"Initial release."
+    ::= { enterprises pepwave(27662) 1 }
+
+-- Local type define ----------------------------------------------------------
+
+TableIndex ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+            "A unique value, greater than zero, for each interface or
+            interface sub-layer in the managed system.  It is
+            recommended that values are assigned contiguously starting
+            from 1.  The value for each interface sub-layer must remain
+            constant at least from one re-initialization of the entity's
+            network management system to the next re-initialization."
+    SYNTAX       Integer32 (1..2147483647)
+
+ConnectionNum ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+            "A unique value, greater than zero, for each WAN connection
+			number."
+    SYNTAX       Integer32 (1..2147483647)
+
+NameString ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "80a"
+    STATUS       current
+    DESCRIPTION
+            "MAX name string."
+    SYNTAX       OCTET STRING (SIZE (0..80))
+
+PortSpeedType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+            "Describe the port speed and type."
+    SYNTAX       INTEGER {
+                     unknown(0),
+                     auto(1),
+                     fullDulplex10(2),
+                     halfDulplex10(3),
+                     fullDulplex100(4),
+                     halfDulplex100(5),
+                     fullDulplex1000(6),
+                     halfDulplex1000(7)
+                 }
+
+-- System status --------------------------------------------------------------
+
+maxStatus OBJECT IDENTIFIER ::= { pepwaveMAX 1 }
+
+-- System information
+
+maxSystem OBJECT IDENTIFIER ::= { maxStatus 1 }
+
+maxFirmware OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"MAX firmware version."
+    ::= { maxSystem 1 }
+
+maxSerialNumber OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"MAX serial number."
+    ::= { maxSystem 2 }
+
+maxTime OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"MAX system time."
+    ::= { maxSystem 3 }
+
+maxUpTime OBJECT-TYPE
+    SYNTAX		TimeTicks
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"MAX up time (in hundredths of a second) since the 
+				system was last re-initialized."
+    ::= { maxSystem 4 }
+
+maxLan OBJECT IDENTIFIER ::= { maxSystem 6 }
+
+maxLanStatus OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"MAX LAN status (up/down)."
+    ::= { maxLan 1 }
+
+maxLanIp OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"MAX LAN IP address."
+    ::= { maxLan 2 }
+
+maxLanSubnetMask OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"MAX LAN sub-net mask."
+    ::= { maxLan 3 }
+
+-- Link status of virtual WAN
+
+maxLinkStatus OBJECT IDENTIFIER ::= { maxStatus 2 }
+
+maxLinkNumber OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION	"The number of network interfaces (regardless of their
+				current state) present on this system."
+    ::= { maxLinkStatus 1 }
+
+linkTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF LinkStatusEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of link status."
+	::= { maxLinkStatus 2 }
+
+linkEntry OBJECT-TYPE
+	SYNTAX		LinkStatusEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { linkConnNum }
+	::= { linkTable 1 }
+
+LinkStatusEntry ::=
+	SEQUENCE {
+		linkConnNum					ConnectionNum,
+		linkName					NameString,
+		linkStatus					NameString,
+		linkThroughputIn			Counter32,
+		linkThroughputOut			Counter32,
+		linkDataTransferred			Counter64
+	}
+
+linkConnNum OBJECT-TYPE
+	SYNTAX		ConnectionNum
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Virtual WAN index number (1-based, unique)."
+	::= { linkEntry 1 }
+
+linkName OBJECT-TYPE
+	SYNTAX		NameString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"MAX link status (connecting/connected/link down)."
+	::= { linkEntry 2 }
+
+linkStatus OBJECT-TYPE
+	SYNTAX		NameString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"MAX link status (connecting/connected/link down)."
+	::= { linkEntry 3 }
+
+linkThroughputIn OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of inbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being deliverable to a higher-layer protocol.  One
+				possible reason for discarding such a packet could be to
+				free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				maxWanCounterDiscontinuityTime."
+	::= { linkEntry 4 }
+
+linkThroughputOut OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of outbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being transmitted.  One possible reason for discarding
+				such a packet could be to free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				maxWanCounterDiscontinuityTime."
+	::= { linkEntry 5 }
+
+linkDataTransferred OBJECT-TYPE
+	SYNTAX		Counter64
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The numbe of bytes transferred through."
+	::= { linkEntry 6 }
+
+-- Link IP address of virtual WAN
+
+linkIpTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF LinkIpEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of link status."
+	::= { maxLinkStatus 3 }
+
+linkIpEntry OBJECT-TYPE
+	SYNTAX		LinkIpEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { linkIpConnNum, linkIpIndex }
+	::= { linkIpTable 1 }
+
+LinkIpEntry ::=
+	SEQUENCE {
+		linkIpConnNum				ConnectionNum,
+		linkIpIndex					TableIndex,
+		linkIp						IpAddress
+	}
+
+linkIpConnNum OBJECT-TYPE
+	SYNTAX		ConnectionNum
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Virtual WAN index number."
+	::= { linkIpEntry 1 }
+
+linkIpIndex OBJECT-TYPE
+	SYNTAX		TableIndex
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Virtual WAN index number."
+	::= { linkIpEntry 2 }
+
+linkIp OBJECT-TYPE
+	SYNTAX		IpAddress
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"MAX link IP address list."
+	::= { linkIpEntry 3 }
+
+-- Physical WAN port usage
+
+wanUsageTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF WanUsageEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of interface entries."
+	::= { maxStatus 3 }
+
+wanUsageEntry OBJECT-TYPE
+	SYNTAX		WanUsageEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { wanUsageIndex }
+	::= { wanUsageTable 1 }
+
+WanUsageEntry ::=
+	SEQUENCE {
+		wanUsageIndex				TableIndex,
+		wanUsageThroughputIn		Counter32,
+		wanUsageThroughputOut		Counter32,
+		wanUsageDataTransferred		Counter64
+	}
+
+wanUsageIndex OBJECT-TYPE
+	SYNTAX		TableIndex
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Physical WAN index number."
+	::= { wanUsageEntry 1 }
+
+wanUsageThroughputIn OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of inbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being deliverable to a higher-layer protocol.  One
+				possible reason for discarding such a packet could be to
+				free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				maxWanCounterDiscontinuityTime."
+	::= { wanUsageEntry 2 }
+
+wanUsageThroughputOut OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of outbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being transmitted.  One possible reason for discarding
+				such a packet could be to free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				maxWanCounterDiscontinuityTime."
+	::= { wanUsageEntry 3 }
+
+wanUsageDataTransferred OBJECT-TYPE
+	SYNTAX		Counter64
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The numbe of bytes transferred through."
+	::= { wanUsageEntry 4 }
+
+-- Maintenance ----------------------------------------------------------------
+maxMaintenance OBJECT IDENTIFIER ::= { pepwaveMAX 2 }
+
+maxReboot OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION	"Reboot the device. Write 'enable' to take effect."
+    ::= { maxMaintenance 1 }
+
+-- LAN config -----------------------------------------------------------------
+maxLanConfig OBJECT IDENTIFIER ::= { pepwaveMAX 3 }
+
+portLanSpeedConfig OBJECT-TYPE
+	SYNTAX		PortSpeedType
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION	"Set device's LAN port speed (Auto/10baseT-FD/
+				10baseT-HD/100baseTx-FD/100baseTx-HD/1000baseTx-FD/
+				1000baseTx-HD."
+	::= { maxLanConfig 1 }
+
+portWanSpeedConfigTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF PortSpeedConfigEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of interface entries."
+	::= { maxLanConfig 2 }
+
+portWanSpeedConfigEntry OBJECT-TYPE
+	SYNTAX		PortSpeedConfigEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { portWanSpeedConfigIndex }
+	::= { portWanSpeedConfigTable 1 }
+
+PortSpeedConfigEntry ::=
+	SEQUENCE {
+		portWanSpeedConfigIndex			TableIndex,
+		portWanSpeedConfig				PortSpeedType
+	}
+
+portWanSpeedConfigIndex OBJECT-TYPE
+	SYNTAX		TableIndex
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Physical LAN/WAN port name."
+	::= { portWanSpeedConfigEntry 1 }
+
+portWanSpeedConfig OBJECT-TYPE
+	SYNTAX		PortSpeedType
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION	"Set device's WAN port speed (Auto/10baseT-FD/
+				10baseT-HD/100baseTx-FD/100baseTx-HD/1000baseTx-FD/
+				1000baseTx-HD."
+	::= { portWanSpeedConfigEntry 2 }
+
+lanConfigIp OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION	"Set device's LAN IP address."
+    ::= { maxLanConfig 3 }
+
+lanConfigSubnetMask OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION	"Set device's LAN sub-net mask."
+    ::= { maxLanConfig 4 }
+
+-- Compliance Statements ------------------------------------------------------
+
+maxConformance OBJECT IDENTIFIER ::= { pepwaveMAX 50 }
+
+maxCompliances OBJECT IDENTIFIER ::= { maxConformance 1 }
+maxGroups      OBJECT IDENTIFIER ::= { maxConformance 2 }
+
+maxCompliance MODULE-COMPLIANCE
+	STATUS		current
+	DESCRIPTION	"MAX compliance groups."
+	MODULE		-- compliance to the containing MIB module
+
+	GROUP maxSystemGroup
+		DESCRIPTION
+			"MAX system group."
+
+	GROUP maxLinkGroup
+		DESCRIPTION
+			"MAX link group."
+
+	GROUP maxWanGroup
+		DESCRIPTION
+			"MAX WAN group."
+
+	GROUP maxSetGroup
+		DESCRIPTION
+			"MAX set group."
+	::= { maxCompliances 1 }
+
+	maxSystemGroup OBJECT-GROUP
+		OBJECTS {
+			maxFirmware,
+			maxSerialNumber,
+			maxTime,
+			maxUpTime,
+			maxLanStatus,
+			maxLanIp,
+			maxLanSubnetMask
+		}
+		STATUS current
+		DESCRIPTION
+			"MAX's system status group."
+		::= { maxGroups 1 }
+
+	maxLinkGroup OBJECT-GROUP
+		OBJECTS {
+			maxLinkNumber,
+			linkName,
+			linkStatus,
+			linkIp,
+			linkThroughputIn,
+			linkThroughputOut,
+			linkDataTransferred
+		}
+		STATUS current
+		DESCRIPTION
+			"MAX's system status group."
+		::= { maxGroups 2 }
+
+	maxWanGroup OBJECT-GROUP
+		OBJECTS {
+			wanUsageThroughputIn,
+			wanUsageThroughputOut,
+			wanUsageDataTransferred
+		}
+		STATUS current
+		DESCRIPTION
+			"MAX's system status group."
+		::= { maxGroups 3 }
+
+	maxSetGroup OBJECT-GROUP
+		OBJECTS {
+			maxReboot,
+			portWanSpeedConfig,
+			portLanSpeedConfig,
+			lanConfigIp,
+			lanConfigSubnetMask
+		}
+		STATUS current
+		DESCRIPTION
+			"MAX's system status group."
+		::= { maxGroups 4 }
+
+
+END

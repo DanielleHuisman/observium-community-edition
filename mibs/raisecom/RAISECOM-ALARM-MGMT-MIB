@@ -1,0 +1,220 @@
+-- MibName=raisecomAlarm
+-- *****************************************************************
+-- RAISECOM-ALARM-MGMT-MIB.mib:  RAISECOM ALARM MIB
+--
+-- April 2011, yangguodong
+--
+-- Copyright (c) 1996-2011 by Raisecom Technology Co., Ltd. 
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+  RAISECOM-ALARM-MGMT-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+     Integer32, Unsigned32, Gauge32,
+     TimeTicks, Counter32, Counter64,
+     IpAddress, Opaque, mib-2,
+     zeroDotZero
+        FROM SNMPv2-SMI                 -- [RFC2578]
+     TEXTUAL-CONVENTION,TruthValue, RowStatus
+        FROM SNMPv2-TC                     -- [RFC2579]   
+  
+     SnmpAdminString
+       FROM SNMP-FRAMEWORK-MIB         -- [RFC3411]       
+     ifIndex, InterfaceIndex             FROM IF-MIB   
+     raisecomAgent
+				FROM RAISECOM-BASE-MIB
+     ;
+ 
+  raisecomAlarmMgmt MODULE-IDENTITY
+     LAST-UPDATED "201103120000Z"  -- 12 March 2011 00:00:00 GMT
+     ORGANIZATION "Raisecom Technology Co., Ltd."
+     CONTACT-INFO
+        "Raisecom Science & Technology Co., ltd.
+        E-mail: support@raisecom.com ."
+     DESCRIPTION
+        "This MIB module contains managed object definitions for
+         MPLS. "
+        ::= { raisecomAgent 34 }
+
+	raisecomAlarmMgmtObejcts OBJECT IDENTIFIER ::= { raisecomAlarmMgmt 1 } 
+
+    -- User-defined types  
+	AlarmStorageMode ::= TEXTUAL-CONVENTION
+	   STATUS       current
+	   DESCRIPTION
+	            "Describes how to store alarm active table when the alarm
+	            table was full.When the storage mode is stop,the new raised
+	            alarm will be discarded.It will not insert to alarm active table.
+	            If the storage mode is loop,the oldest row in alarm active table
+	            will be deleted and the the newly raiseco alarm will be inserted 
+	            to the alarm active table."
+	            
+	   SYNTAX       INTEGER {
+	                     stop(1),       -- eh?
+	                     loop(2)    -- e.g., in RAM
+	                   } 
+
+	AlarmInverseMode ::= TEXTUAL-CONVENTION
+	   STATUS       current
+	   DESCRIPTION
+	            "Describes the mode of alarm inverse "
+	            
+	   SYNTAX       INTEGER {
+	                     none(1),       -- inverse mode is non
+	                     auto(2),       -- inverse mode is auto
+	                     manual(3)      -- inverse mode is manual 
+	                   }  	                     
+	-- end user defined type                   
+
+	-- start of alarm config   	
+	raisecomAlarmMgmtRaiseDelay OBJECT-TYPE
+	SYNTAX            INTEGER (0..600) 
+    UNITS             "seconds"	
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "The approximate period from the time a alarm was 
+	   raised to a time this alarm was reported."   
+	DEFVAL { 0 }
+	::= { raisecomAlarmMgmtObejcts 1}  
+	
+	raisecomAlarmMgmtClearDelay OBJECT-TYPE
+	SYNTAX            INTEGER (0..600) 
+    UNITS             "seconds"	
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "The approximate period from the time a alarm was 
+	   cleared to a time this alarm report."   
+	DEFVAL { 0 }
+	::= { raisecomAlarmMgmtObejcts 2 }    
+	
+	raisecomAlarmMgmtActiveStoreMode OBJECT-TYPE
+	SYNTAX            AlarmStorageMode 
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "The storage mode of the alarm active table"   
+	::= { raisecomAlarmMgmtObejcts 3 }   
+	
+	raisecomAlarmMgmtInhibitEnable OBJECT-TYPE
+	SYNTAX            TruthValue 
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "Enable or Disable Alarm Inhibit"   
+	DEFVAL { true }   
+	::= { raisecomAlarmMgmtObejcts 4 }    
+	
+	raisecomAlarmMgmtSyslogEnable OBJECT-TYPE
+	SYNTAX            TruthValue 
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "Enable or Disable write syslog when an alarm raise"   
+	DEFVAL { true }   
+	::= { raisecomAlarmMgmtObejcts 5 }  
+	
+	raisecomAlarmMgmtActiveClear OBJECT-TYPE
+	SYNTAX            INTEGER 
+	MAX-ACCESS        read-write
+	STATUS            current 
+	DESCRIPTION
+	   "clear active alarm according to the active table third index"   
+	::= { raisecomAlarmMgmtObejcts 6 }	
+	
+	
+	raisecomAlarmMgmtConfigTable   OBJECT-TYPE 
+     SYNTAX        SEQUENCE OF RaisecomAlarmMgmtConfigEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table specifies the information of alarm configuration."
+     ::= { raisecomAlarmMgmtObejcts 7 }
+     
+	raisecomAlarmMgmtConfigEntry   OBJECT-TYPE
+     SYNTAX        RaisecomAlarmMgmtConfigEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+          "A row in this table represents the configuration of specified alarm."
+     INDEX  { raisecomAlarmMgmtId,ifIndex }
+            ::= { raisecomAlarmMgmtConfigTable 1 }
+            
+	RaisecomAlarmMgmtConfigEntry ::= SEQUENCE {
+        raisecomAlarmMgmtId            Unsigned32,
+        raisecomAlarmMgmtClear         TruthValue,
+        raisecomAlarmMgmtReportEnable  TruthValue, 
+        raisecomAlarmMgmtMonitorEnable TruthValue,
+        raisecomAlarmMgmtInverseMode   AlarmInverseMode,  
+        raisecomAlarmMgmtModuleName    SnmpAdminString,
+        raisecomAlarmMgmtGroupName     SnmpAdminString
+        }  
+        
+	raisecomAlarmMgmtId OBJECT-TYPE
+	SYNTAX        Unsigned32
+	MAX-ACCESS    not-accessible
+	STATUS        current
+	DESCRIPTION
+         "First index of alarm config table which is equal to alarm group Id"
+     ::= { raisecomAlarmMgmtConfigEntry 1 }   
+     
+ 	raisecomAlarmMgmtClear OBJECT-TYPE
+	SYNTAX        TruthValue
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+         "The swith of alarm clear,when open the swith the related
+         active alarm entry will be deleted from alarm active table" 
+    DEFVAL { false }
+     ::= { raisecomAlarmMgmtConfigEntry 2 }   
+     
+  	raisecomAlarmMgmtReportEnable OBJECT-TYPE
+	SYNTAX        TruthValue
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+         "Enable or disable Alarm Report" 
+    DEFVAL { true }
+     ::= { raisecomAlarmMgmtConfigEntry 3 }
+  
+  	raisecomAlarmMgmtMonitorEnable OBJECT-TYPE
+	SYNTAX        TruthValue
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+         "Enable or disable alarm monitor" 
+    DEFVAL { true }
+     ::= { raisecomAlarmMgmtConfigEntry 4 } 
+     
+  	raisecomAlarmMgmtInverseMode OBJECT-TYPE
+	SYNTAX        AlarmInverseMode
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+         "The mode of alarm inverse" 
+    DEFVAL { none }
+     ::= { raisecomAlarmMgmtConfigEntry 5 }  
+      
+    raisecomAlarmMgmtModuleName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE(0..32))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+         "The module name which this alarm belongs to."
+    ::= { raisecomAlarmMgmtConfigEntry 6 } 
+    
+    raisecomAlarmMgmtGroupName OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE(0..32))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+         "The name of alarm group."
+    ::= { raisecomAlarmMgmtConfigEntry 7 }   
+    
+    -- end of alarm config            
+  END

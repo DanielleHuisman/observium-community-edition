@@ -1,0 +1,319 @@
+--**************************************************************************
+--                                                                          
+--    Copyright 2007 Broadcom Corporation                                   
+--    All Rights Reserved                                                   
+--    No portions of this material may be reproduced in any form without the
+--    written permission of:                                                
+--             Broadcom Corporation                                         
+--             16251 Laguna Canyon Road                                     
+--             Irvine, California  92618                                    
+--    All information contained in this document is Broadcom Corporation    
+--    company private, proprietary, and trade secret.                       
+--                                                                          
+--                                                                          
+--                                                                          
+--**************************************************************************
+--    Filename: brcm-ping-mgmt.mib
+--    Author:   Kevin O'Neal
+--    Creation Date: June 15, 2006
+--
+--**************************************************************************
+--    Description:
+--
+--		private MIB for runtime management of ping thread.
+--		
+--**************************************************************************
+--    Revision History:
+--
+--**************************************************************************
+
+BRCM-PING-MGMT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Integer32,
+    Unsigned32,
+    IpAddress,
+    TimeTicks,
+    Counter32
+        FROM SNMPv2-SMI
+    DisplayString,
+    TruthValue
+        FROM SNMPv2-TC
+    InetAddressType,
+    InetAddress
+        FROM INET-ADDRESS-MIB
+    cableDataMgmtBase
+        FROM BRCM-CABLEDATA-MGMT-MIB;
+                
+pingMgmt MODULE-IDENTITY
+    LAST-UPDATED "200702050000Z"
+    ORGANIZATION "Broadcom Corporation"
+    CONTACT-INFO
+        "	BANANA-CABLEDATA
+                (cableData branch of the
+                Broadcom Assigned Numbers and Naming Authority)
+                Broadcom Corporation
+
+        Postal: 4385 River Green Parkway
+                Duluth, GA  30096
+                USA
+
+           Tel: +1 770 232-0018
+
+        E-mail: banana-cabledata@broadcom.com"
+    DESCRIPTION
+        "Broadcom proprietary MIB for runtime management and configuration
+         of objects related to ICMP ping."
+    REVISION      "200702050000Z"
+    DESCRIPTION
+        "Module description was updated. 
+         - Missing imports were added.
+         - Incorrect syntax for pingTargetAddress defval was corrected."
+    REVISION      "200606150000Z"
+    DESCRIPTION
+        "Initial version of this MIB module."
+    ::= { cableDataMgmtBase 5 }
+    
+pingTargetAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The type of internet address used for pingTargetAddress.  
+        
+         This object may be changed while a ping is in progress."
+    DEFVAL { ipv4 }
+    ::= { pingMgmt 1 }
+    
+pingTargetAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Sets the internet address of the entity to be pinged.  Note that if
+         an all-zeros value is specified for this object, then the ping will
+         be sent to the default gateway, if one exists.
+        
+         This object may be changed while a ping is in progress."
+    DEFVAL { '00000000'h }
+    ::= { pingMgmt 2 }
+    
+pingNumPkts OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows the client to set the number of pings to be sent.  This can be
+         set to any number between 1 and (2^32 - 1), or can be set to 'infinite'
+         by setting the value to 0.
+        
+         Note that if set to infinite, then the ping must be stopped explicitly
+         in order to get it to stop.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { 3 }
+    ::= { pingMgmt 3 }
+    
+pingPktStartSize OBJECT-TYPE
+    SYNTAX      Unsigned32 (64..1518)
+    UNITS       "bytes"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows the client to set the initial size of the ping packets that will 
+         be sent.  This size includes the LLC header, IP header, ICMP header, 
+         and the CRC32 at the end.  You must specify values between 64 and 1518, 
+         which are the min and max size Ethernet frames.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { 64 }
+    ::= { pingMgmt 4 }
+    
+pingPktEndSize OBJECT-TYPE
+    SYNTAX      Unsigned32 (64..1518)
+    UNITS       "bytes"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows the client to set the final size of the ping packets that will 
+         be sent.  This size includes the LLC header, IP header, ICMP header, 
+         and the CRC32 at the end.  You must specify values between 64 and 1518, 
+         which are the min and max size Ethernet frames.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { 64 }
+    ::= { pingMgmt 5 }
+    
+pingPktStepSize OBJECT-TYPE
+    SYNTAX      Integer32 (-1454..1454)
+    UNITS       "bytes"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of bytes by which each subsequent ping packet
+         is incremented.
+         
+         The step amount can be any number from 0 (which leaves the ping size
+         constant) up to (2^32 - 1).  Note that after adding the step amount to
+         the current ping size, if this is greater than the end size, then the
+         current size will be wrapped around to the start size.
+         
+         If you want to send ping packets of the same size every time, set
+         the start and end size to be equal, and the step amount to be 0.
+         
+         To do a sweeping ping of every packet size, set start to 64, end to
+         1518, and step amount to 1.  You can set step amount to -1 to sweep in
+         the other direction.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { 0 }
+    ::= { pingMgmt 6 }
+    
+pingInterval OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows the client to set the amount of time (in milliseconds) that the
+         device will sleep before sending a ping.  Generally, this is the time
+         between when a ping reply is received and when the next ping will be
+         sent.
+        
+         Note that the amount of time between sending one ping and sending the
+         next ping varies depending on whether or not you enable waiting for
+         replies, and how long it takes to receive the reply.
+        
+         If waiting for replies is disabled, then this is the time between 
+         sending one ping and sending the next ping.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { 0 }
+    ::= { pingMgmt 7 }
+    
+pingTimeout OBJECT-TYPE
+    SYNTAX      Integer32 (-1..65535)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows the client to set the amount of time (in milliseconds) that the
+         device should wait for a reply after sending a ping.
+         
+         If set to any non-negative value, then the device will send a ping and 
+         wait for a response for the specified amount of time.  Event if 
+         set to 0, the thread will check for and process a reply packet.
+         
+         If set to -1, then the device will not wait at all, and won't even 
+         check for any replies.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { 5000 }
+    ::= { pingMgmt 8 }
+    
+pingVerifyReply OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enables/disables verification of ping replies.  If enabled, and if 
+         waiting for replies is enabled, then if a reply is received, it will 
+         verify that it matches the ping that was sent, and that all of the 
+         data is intact.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { true }
+    ::= { pingMgmt 9 }
+    
+pingIpStackNumber OBJECT-TYPE
+    SYNTAX      Integer32 (0..8)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows the client to select the IP stack from which the pings will be
+         sent.  Specifying 0 means that the pings will be sent from the same IP
+         stack on which this MIB is hosted.
+         
+         This object may not be changed while a ping is in progress."
+    DEFVAL { 0 }
+    ::= { pingMgmt 10 }
+    
+pingNow OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Starts or stops the pings, as well as indicating whether a ping is in
+         progress when read.  If a ping is already in progress and this object
+         is set to true(1), then the ping will continue but the ping statistics
+         will be reset.
+         
+         This object may be changed while a ping is in progress."
+    DEFVAL { true }
+    ::= { pingMgmt 11 }
+    
+pingPktsSent OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of packets sent since the ping was started."
+    ::= { pingMgmt 12 }
+    
+pingRepliesReceived OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of replies received since the ping was started."
+    ::= { pingMgmt 13 }
+    
+pingRepliesVerified OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of replies which were verified since the ping was 
+         started."
+    ::= { pingMgmt 14 }
+    
+pingOctetsSent OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the total number of octets that have been sent in pings
+         since the ping was started."
+    ::= { pingMgmt 15 }
+    
+pingOctetsReceived OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the total number of octets that have been sent in pings
+         since the ping was started."
+    ::= { pingMgmt 16 }
+    
+pingIcmpErrors OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the total ICMP errors which have been received since the 
+         ping was started."
+    ::= { pingMgmt 17 }
+    
+pingLastIcmpError OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates value of the last ICMP error which was received, if any.  If 
+         there have been no errors, this object will have a value of 0."
+    ::= { pingMgmt 18 }
+    
+END

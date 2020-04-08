@@ -1,0 +1,2249 @@
+-- ============================================================
+-- Description :
+--
+--                  Rainbow Services Management Information Base
+--
+--                         06/06/2006
+--
+-- 
+-- ============================================================
+
+RAINBOW-SERVICES-MIB	DEFINITIONS ::= BEGIN
+	IMPORTS
+		rainbow
+			FROM RAINBOW-MIB
+		DisplayString, RowStatus, MacAddress, TEXTUAL-CONVENTION
+			FROM SNMPv2-TC
+		MODULE-IDENTITY, OBJECT-TYPE, IpAddress, Integer32, Counter32, Unsigned32
+			FROM SNMPv2-SMI;
+
+	rainbowServices	MODULE-IDENTITY
+		LAST-UPDATED	"200606061500Z"
+		ORGANIZATION	"Alvarion Ltd."
+		CONTACT-INFO	"Alvarion Customer Service
+		Postal: Alvarion Ltd.
+			Barzel 21
+			Tel Aviv 69710 
+			ISRAEL
+               	E-mail: CS_Coordinator@alvarion.com"
+		DESCRIPTION		
+				"Rainbow Services"
+		REVISION		"200606061500Z"
+		DESCRIPTION		
+				"Revision 2.5"
+		::=  {  rainbow  100  }
+
+
+	RainbowServiceType ::= TEXTUAL-CONVENTION 
+		STATUS			current
+		DESCRIPTION		"The Service Type:
+                         Layer II (1) service transports Layer 2 (Ethernet) frames between a subscriber's site and the Network Resource 
+                         located behind the provider's backbone and/or between subscriber sites. Layer II service supports also telephony 
+                         services (same services that are available with the VoIP service) for Voice Gateways that use the proprietary DRAP protocol.
+                         PPPoE (2) service provides connectivity between a PPPoE (Point-to-Point Protocol over Ethernet) enabled devices at the 
+                         subscriber's site and a PPPoE aware Access Concentrator behind the Base Station/Micro Base Station.
+                         VoIP (3) service provides telephony services through an external Voice Gateway connected to the Subscriber Unit's data port. 
+                         The VoIP service is designed for Voice Gateways that use the proprietary DRAP protocol to identify VoIP sessions and to 
+                         verify optimal handling of these sessions by the wireless network."
+		SYNTAX 			INTEGER  { rbLayerII ( 1 ) , rbPPPoE ( 2 ) , rbVoIP ( 3 ) } 
+
+
+--	alvarion	OBJECT IDENTIFIER
+--		::=  {  enterprises  12394  }
+
+--	products	OBJECT IDENTIFIER
+--		::=  {  alvarion  1  }
+
+--	rainbow	OBJECT IDENTIFIER
+--		::=  {  products  2  }
+			
+	rbServiceGeneralConfig	OBJECT IDENTIFIER
+		::=  {  rainbowServices  1  }
+
+	rbServiceTemplate	OBJECT IDENTIFIER
+		::=  {  rainbowServices  2  }
+
+	rbServices	OBJECT IDENTIFIER
+		::=  {  rainbowServices  3  }
+
+	rbQoSProfiles	OBJECT IDENTIFIER
+		::=  {  rainbowServices  4  }
+
+	rbPolicyRules	OBJECT IDENTIFIER
+		::=  {  rainbowServices  5  }
+
+	rbForwardingRules	OBJECT IDENTIFIER
+		::=  {  rainbowServices  6  }
+
+	rbSubscribersInfo	OBJECT IDENTIFIER
+		::=  {  rainbowServices  7  }
+	
+	rbFilteringSystem	OBJECT IDENTIFIER
+		::=  {  rainbowServices  8  }
+       
+	rbXmlErrorReport	OBJECT IDENTIFIER
+		::=  {  rainbowServices  10  }
+
+
+-- ============================================================
+-- Rainbow Subscribers Configuration Table
+-- ============================================================
+	rbSubscriberTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbSubscriberEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A table of Subscribers"
+		::=  { rbSubscribersInfo  1 }
+
+	rbSubscriberEntry	OBJECT-TYPE
+		SYNTAX		RbSubscriberEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Subscribers Table. Includes parameters of the relevant Subscriber."
+		INDEX		{  rbSubscriberIdx  }
+		::=  { rbSubscriberTable 1 }
+
+	RbSubscriberEntry  ::=  SEQUENCE {
+		rbSubscriberIdx  		Unsigned32,
+		rbSubscriberID  		DisplayString,
+		rbSubscriberFirstName  	DisplayString,
+		rbSubscriberLastName  	DisplayString,
+		rbSubscriberAdminStatus INTEGER,
+		rbSubscriberInfo  		DisplayString,
+		rbASubscriberRowStatus  RowStatus
+		}
+
+
+	rbSubscriberIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32   
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the relevant Subscriber Entry."
+		::=  {  rbSubscriberEntry  1  }
+
+	rbSubscriberID	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE ( 1 .. 32  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The Name of the relevant Subscriber. Must be unique in the device."
+		::=  {  rbSubscriberEntry  2  }
+
+	rbSubscriberFirstName	OBJECT-TYPE	
+		SYNTAX			DisplayString ( SIZE ( 0 .. 50  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Subscriber's First Name. An optional parameter for information purposes."
+		::=  {  rbSubscriberEntry  3  }
+
+	rbSubscriberLastName	OBJECT-TYPE	
+		SYNTAX			DisplayString ( SIZE ( 0 .. 50  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Subscriber's Last Name. An optional parameter for information purposes."
+		::=  {  rbSubscriberEntry  4  }
+
+	rbSubscriberAdminStatus	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Subscriber's Admin Status. If the Admin status is disabled, the Subscriber will not get Services."
+		DEFVAL			{ enable }
+		::=  {  rbSubscriberEntry  5  }
+
+	rbSubscriberInfo	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE ( 0 .. 50  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Subscriber's additional info. An optional parameter for information purposes."
+		::=  {  rbSubscriberEntry  6  }
+
+	rbASubscriberRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbSubscriberEntry  7  }
+
+
+-- ============================================================
+-- Rainbow Service Templates Configuration Table
+-- ============================================================
+	rbServiceTemplateConfigTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbServiceTemplateConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A table of Service Templates (Profiles)."
+		::=  { rbServiceTemplate  1 }
+
+	rbServiceTemplateConfigEntry	OBJECT-TYPE
+		SYNTAX		RbServiceTemplateConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Service Templates Table. Includes parameters of the relevant Service Template."
+		INDEX		{  rbServiceTemplateType, rbServiceTemplateIdx  }
+		::=  { rbServiceTemplateConfigTable 1 }
+
+	RbServiceTemplateConfigEntry  ::=  SEQUENCE {
+		rbServiceTemplateType  						RainbowServiceType,
+		rbServiceTemplateIdx  						Unsigned32,
+		rbServiceTemplateName  						DisplayString,
+		rbServiceTemplateID  						Unsigned32,
+		rbServiceTemplateBaseVLAN  					Integer32,
+		rbServiceTemplateBaseSignallingVLAN  		Integer32,
+		rbServiceTemplateBaseDhcpVLAN  				Integer32,
+		rbServiceTemplateForwardDhcpRequest  		INTEGER,
+		rbServiceTemplateNumberOfSimultaneousCalls  Integer32,
+		rbServiceTemplatePolicyRuleIdx  			Unsigned32,
+		rbServiceTemplatePolicyRuleName  			DisplayString,
+		rbServiceTemplateForwardingRuleIdx  		Unsigned32,
+		rbServiceTemplateForwardingRuleName  		DisplayString,
+		rbAServiceTemplateRowStatus  				RowStatus,
+		rbServiceTemplateQoSMarkingMode  			INTEGER,
+		rbServiceTemplateQoSMarkingValue  			Integer32,
+		rbServiceTemplateVLANTransparencyMode	 	INTEGER,
+		rbServiceTemplateClass                      INTEGER
+		}
+
+
+	rbServiceTemplateType	OBJECT-TYPE	
+		SYNTAX			RainbowServiceType
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Service Type of the Service Template. The Service Template Type can be set only for a new Service Template (write-once). 
+				 The Service Template Type of an existing Service Template cannot be changed (read-only)."
+		::=  {  rbServiceTemplateConfigEntry  1  }
+
+	rbServiceTemplateIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the relevant Service Template Entry."
+		::=  {  rbServiceTemplateConfigEntry  2  }
+
+	rbServiceTemplateName	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE ( 1 .. 32  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The Name of the Service Template -  unique per Device."
+		::=  {  rbServiceTemplateConfigEntry  3  }
+
+	rbServiceTemplateID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Service Template ID assigned by the Device (DB ID) - unique per Device."
+		::=  {  rbServiceTemplateConfigEntry  4  }
+
+	rbServiceTemplateBaseVLAN	OBJECT-TYPE	
+		SYNTAX			Integer32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The VLAN tag (VPL ID) used in the backbone domain. A number in the range between 
+				 0 and 4094. A value of 4095 means No VPL ID.
+				 Not applicable if VLAN Transparency Mode is enabled."
+		::=  {  rbServiceTemplateConfigEntry  5  }
+
+	rbServiceTemplateBaseSignallingVLAN  OBJECT-TYPE
+	    SYNTAX			Integer32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION	
+				"Not used!"
+		::=  {  rbServiceTemplateConfigEntry  6  }		
+			    
+	rbServiceTemplateBaseDhcpVLAN    OBJECT-TYPE
+	    SYNTAX			Integer32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION	
+				"Not used!"
+		::=  {  rbServiceTemplateConfigEntry  7  }
+		
+	rbServiceTemplateForwardDhcpRequest     OBJECT-TYPE
+	    SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION	
+				"Not used!"
+		::=  {  rbServiceTemplateConfigEntry  8  }
+
+	rbServiceTemplateNumberOfSimultaneousCalls    OBJECT-TYPE
+	    SYNTAX			Integer32 ( 0 .. 50 )
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION	
+				"The maximum number of simultaneous VoIP calls (DRAP-based) that can be supported. 
+				 Applicable only for Layer II and VoIP Services."
+		::=  {  rbServiceTemplateConfigEntry  9  }
+		
+	rbServiceTemplatePolicyRuleIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index of the selected entry in the Policy Rules Table = selected Policy Rule. 
+				 Not applicable for VoIP services!"				
+		::=  {  rbServiceTemplateConfigEntry  10  }
+
+	rbServiceTemplatePolicyRuleName	OBJECT-TYPE	
+		SYNTAX			DisplayString ( SIZE (0..32))
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Name of the selected Policy Rule. Not applicable for VoIP services!"
+		::=  {  rbServiceTemplateConfigEntry  11  }
+
+	rbServiceTemplateForwardingRuleIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index of the selected entry in the row in Forwarding Rules Table = selected Forwarding Rule.
+				 Not applicable if VLAN Transparency Mode is enabled. 
+				 The Service Type defined in the selected Forwarding Rule must match the one defined for the Service Template."
+		::=  {  rbServiceTemplateConfigEntry  12  }
+
+	rbServiceTemplateForwardingRuleName	OBJECT-TYPE	
+		SYNTAX			DisplayString ( SIZE (0..32))
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The name of the selected Forwarding Rule."
+		::=  {  rbServiceTemplateConfigEntry  13  }
+
+	rbAServiceTemplateRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active.
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbServiceTemplateConfigEntry  14  }
+
+	rbServiceTemplateQoSMarkingMode	OBJECT-TYPE	
+		SYNTAX			INTEGER  { transparent( 1 ), rb8021p ( 2 ), rbDSCP ( 3 )  }
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The  method the device uses to mark the uplink traffic to the backbone. 
+				 transparent (1): No Priority Marking. The system forwards the frames to the uplink network without any changes.
+                 rb8021p (2): All frames are marked with the configured Base VLAN (VPL ID) and 802.1p QoS Marking Value. 
+                 If no Base VLAN is configured (Base VLAN = 4095), the 802.1Q header will include a VLAN ID = 0.
+                 rbDSCP (3): All frames are marked with the configured DSCP QoS Marking Value."
+		::=  {  rbServiceTemplateConfigEntry  15  }
+		
+	rbServiceTemplateQoSMarkingValue	OBJECT-TYPE	
+		SYNTAX			Integer32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Marking value used to mark frames forwarded to thebackbone. Applicable only if the selected QoS Marking 
+				 Mode is either 802.1p (rp8021p) or DSCP (rbDSCP).
+				 For 802.1p Marking Mode the range is from 0 to 7.
+                 For DSCP Marking Mode the range is from 0 to 63."
+		::=  {  rbServiceTemplateConfigEntry  16  }	
+
+	rbServiceTemplateVLANTransparencyMode	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable( 1 ), disable ( 2 )  }
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The VLAN Transparency Mode defines the method of transferring packets
+				 to the operator's upstream network. 
+				 When set to enable, data packets sent from the Base Station to the backbone
+				 will be transferred transparently. 
+				 When set to disable, data packets sent from the Base Station to the backbone 
+				 will be transferred with a VLAN tag according to the VPL ID. 
+				 The VLAN ID in tagged frames arriving from the wireless network will be replaced by the VPL ID."
+		::=  {  rbServiceTemplateConfigEntry  17  }
+
+	rbServiceTemplateClass	OBJECT-TYPE	
+		SYNTAX			INTEGER  { local ( 1 ) , global ( 2 ) } 
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"Service Template Class: Local definition or Global (Managed) definition using an XML File.
+				 In a Global Service Template all parameters become read-only."
+		::=  {  rbServiceTemplateConfigEntry  18  }
+		
+
+-- ============================================================
+-- Rainbow Services Configuration Table
+-- Service configuration parameters for specific SU	are retrieved 
+-- using Subscriber Index 
+-- Applicable only for Permanent SUs  
+-- ============================================================
+	rbServiceConfigTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbServiceConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		deprecated
+		DESCRIPTION	
+			"A table of Services."
+		::=  { rbServices  1 }
+
+	rbServiceConfigEntry	OBJECT-TYPE
+		SYNTAX		RbServiceConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		deprecated
+		DESCRIPTION	
+			"An entry in the Services Table. Includes parameters of the relevant Service."
+		INDEX		{  rbSubscriberIdx, rbServiceIdx }
+		::=  { rbServiceConfigTable 1 }
+
+	RbServiceConfigEntry  ::=  SEQUENCE {
+		rbServiceIdx                     Unsigned32,
+		rbServiceType                    RainbowServiceType,		
+		rbServiceName                    DisplayString,
+		rbServiceID                      Unsigned32,
+		rbServiceServiceTemplateIdx      Unsigned32,
+		rbServiceServiceTemplateName     DisplayString,
+		rbServiceServiceTemplateID       Unsigned32,
+		rbServiceSwitchingGroupIdx       Unsigned32,
+		rbServiceAdminStatus             INTEGER,
+		rbServiceOperStatus              INTEGER,
+		rbAServiceRowStatus              RowStatus,
+		rbServiceClientSiteVLANList      OCTET STRING,
+		rbServiceClientSiteVLANListCount Integer32,
+		rbServiceSuMacAddress            MacAddress,
+		rbServiceAUSlotNumber            Integer32,
+		rbServiceVLANHybridMode          INTEGER,
+		rbServiceVLANClassificationMode  INTEGER,
+		rbServiceAccessVLAN              Integer32
+		}
+
+
+	rbServiceIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"The index of the relevant Service Entry."
+		::=  {  rbServiceConfigEntry  1  }
+		
+	rbServiceType	OBJECT-TYPE	
+		SYNTAX			RainbowServiceType
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"The Service Type is determined by the Service Template type (read-only)."
+		::=  {  rbServiceConfigEntry  2  }
+
+	rbServiceName	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE (1..32))
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"Service Name - unique per subscriber. The same Service Name may be assigned to any number of Subscribers."
+		::=  {  rbServiceConfigEntry  3  }
+
+	rbServiceID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"The Service ID assigned by the Device (DB ID) - unique per Device."
+		::=  {  rbServiceConfigEntry  4  }
+
+	rbServiceServiceTemplateIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"The index of the selected entry in the Service Templates Table = selected Service Template.
+				 When updating an existing Service, the Service Type defined in the selected Service Template 
+				 must match the one already defined for the Service."
+		::=  {  rbServiceConfigEntry  5  }
+
+	rbServiceServiceTemplateName	OBJECT-TYPE	
+		SYNTAX			DisplayString  (SIZE (0..32))
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"The name of the selected Service Template."
+		::=  {  rbServiceConfigEntry  6  }
+
+	rbServiceServiceTemplateID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"The ID of the selected Service Template."
+		::=  {  rbServiceConfigEntry  7  }
+
+	rbServiceSwitchingGroupIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"Not used in current version."
+		::=  {  rbServiceConfigEntry  8  }
+
+	rbServiceAdminStatus	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"Service Admin status. If the Admin Status is disabled, the Service will not be available to the Subscriber."
+		DEFVAL			{ enable }
+		::=  {  rbServiceConfigEntry  9  }
+
+	rbServiceOperStatus	OBJECT-TYPE	
+		SYNTAX			INTEGER  { up ( 1 ) , down ( 2 ) , unknown ( 3 ) } 
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"Service Operational Status"
+		::=  {  rbServiceConfigEntry  10  }
+
+	rbAServiceRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbServiceConfigEntry  11  }
+
+	rbServiceClientSiteVLANList	OBJECT-TYPE	
+		SYNTAX			OCTET STRING  ( SIZE ( 0 .. 24  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"A list of up to 16 (15 if Hybrid VLAN Mode is enabled) VLAN IDs
+				 at the Subscribers site that are used as classifiers for the Service. 
+				 An empty list means No VLAN IDs. 
+				 To prepare the list: Arrange all VLAN IDs in ascending order without gaps
+				 using hexadecimal digits (3 hexadecimal digits/VLAN ID). 
+				 If the list contains less than 16 VLAN IDs, add null (empty) VLANs up to 
+				 a total of 48 hexadecimal digits. Convert the list to a string of 24 octets."
+		::=  {  rbServiceConfigEntry  12  }
+
+	rbServiceClientSiteVLANListCount OBJECT-TYPE
+	    SYNTAX			Integer32
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"Number of non-null VLAN IDs in the  rbServiceClientSiteVLANList."
+		::=  {  rbServiceConfigEntry  13  }
+
+	rbServiceSuMacAddress	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"The MAC Address of the SU associated with the Service. SU MAC Address of an existing Service can be 
+				 modified only if the Admin Status is set to disable."
+		::=  {  rbServiceConfigEntry  14  }
+
+	rbServiceAUSlotNumber	OBJECT-TYPE	
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			deprecated
+		DESCRIPTION		
+				"The slot number of the AU serving the applicable SU. This parameter is not applicable if the SU is 
+				 served by a Micro Base Station."
+		::=  {  rbServiceConfigEntry  15  }
+
+	rbServiceVLANHybridMode	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"Hybrid VLAN Mode of operation enables classification of both tagged and untagged packets
+				 or untagged packets only, according to the following rules:
+				 - Hybrid VLAN Mode disabled and Client Site VLAN List is not empty: Only packets tagged with
+				 a VLAN ID that exists in the VLAN List will be forwarded. VLAN List can include up to 16 entries.
+				 - Hybrid VLAN Mode disabled and Client Site VLAN List is empty: All (both untagged and
+				 tagged with any VLAN ID) will be forwarded.
+				 - Hybrid VLAN Mode enabled and Client Site VLAN List is not empty: Untagged packets, 
+				 and packets tagged with a VLAN ID that exists in the VLAN List will be forwarded. 
+				 VLAN List can include up to 15 entries.
+				 - Hybrid VLAN Mode enabled and Client Site VLAN List is empty: Only untagged frames
+				 will be forwarded."
+		DEFVAL			{ enable }
+		::=  {  rbServiceConfigEntry  16  }
+
+	rbServiceVLANClassificationMode	OBJECT-TYPE	
+		SYNTAX			INTEGER  { off ( 1 ) , on ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"VLAN Classification Mode.
+				 The VLAN Classification feature enables using VLAN ID for classification of
+				 transparent service downlink traffic before transmission to the destination MAC address.
+				 The VLAN Classification feature supports applications where multiple VLANs are associated
+				 with a single MAC address, allowing to assign different services to different VLANs.
+                 VLAN Classification Mode can be set to On only if the following conditions are met: 
+                 1. The VLAN Transparency Mode of the applicable Service Profile is set to On.
+                 2. A single VLAN ID is defined for the Service. This means that the allowed combinations are:
+                    a) Hybrid VLAN Mode is Off and the VLAN List includes a single VLAN ID, or
+                    b) Hybrid VLAN Mode is On and the VLAN List is empty.
+                 All Services assigned to the same SU must be configured with the same
+                 VLAN Classification Mode (Either On or Off)."
+		DEFVAL			{ off }
+		::=  {  rbServiceConfigEntry  17  }
+
+	rbServiceAccessVLAN	OBJECT-TYPE	
+		SYNTAX			Integer32 ( 0 .. 4095 )
+		MAX-ACCESS		read-write
+		STATUS			deprecated
+		DESCRIPTION		
+				"The Access VLAN parameter enables defining a VLAN ID to be used with untagged packets
+				 received on the Ethernet port of the SU. This parameter is applicable only for
+				 a transparent service (VLAN Transparency Mode is On) with Hybrid Mode set to On, 
+				 or a transparent service with Hybrid Mode set to Off and an empty VLAN list.
+				 A number in the range between 0 and 4094. A value of 4095 means No Access VLAN."
+		::=  {  rbServiceConfigEntry  18  }
+
+-- ============================================================
+-- Rainbow Services Configuration Table
+-- Service configuration parameters for specific SU	are retrieved 
+-- using MacAddress
+-- Read-only for Temporary SUs
+-- ============================================================
+	rbSuServiceConfigTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbSuServiceConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A table of Services by SU MAC Address."
+		::=  { rbServices  2 }
+
+	rbSuServiceConfigEntry	OBJECT-TYPE
+		SYNTAX		RbSuServiceConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Services Table. Includes parameters of the relevant Service."
+		INDEX		{  rbSuServiceMacAddress, rbSuServiceIdx }
+		::=  { rbSuServiceConfigTable 1 }
+
+	RbSuServiceConfigEntry  ::=  SEQUENCE {
+		rbSuServiceMacAddress              MacAddress,
+		rbSuServiceIdx                     Unsigned32,
+		rbSuServiceRbType                  RainbowServiceType,		
+		rbSuServiceName                    DisplayString,
+		rbSuServiceID                      Unsigned32,
+		rbSuSubscriberIdx				   Unsigned32,
+		rbSuServiceTemplateIdx             Unsigned32,
+		rbSuServiceTemplateName            DisplayString,
+		rbSuServiceTemplateID              Unsigned32,
+		rbSuServiceSwitchingGroupIdx       Unsigned32,
+		rbSuServiceAdminStatus             INTEGER,
+		rbSuServiceOperStatus              INTEGER,
+		rbSuServiceClientSiteVLANList      OCTET STRING,
+		rbSuServiceClientSiteVLANListCount Integer32,
+		rbSuServiceAUSlotNumber            Integer32,
+		rbSuServiceVLANHybridMode          INTEGER,
+		rbSuServiceVLANClassificationMode  INTEGER,
+		rbSuServiceAccessVLAN  		       Integer32,
+		rbSuServiceRowStatus               RowStatus
+		}
+
+
+	rbSuServiceMacAddress	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The MAC Address of the SU associated with the Service."
+		::=  {  rbSuServiceConfigEntry  1  }
+
+	rbSuServiceIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the relevant Service Entry."
+		::=  {  rbSuServiceConfigEntry  2  }
+		
+	rbSuServiceRbType	OBJECT-TYPE	
+		SYNTAX			RainbowServiceType
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Service Type is determined by the Service Template type (read-only)."
+		::=  {  rbSuServiceConfigEntry  3  }
+
+	rbSuServiceName	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE (1..32))
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Service Name - unique per subscriber (for Permanent SUs).
+				 The same Service Name may be assigned to any number of Subscribers."
+		::=  {  rbSuServiceConfigEntry  4  }
+
+	rbSuServiceID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Service ID assigned by the Device (DB ID) - unique per Device."
+		::=  {  rbSuServiceConfigEntry  5  }
+
+	rbSuSubscriberIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32   
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index of the selected entry in the Subscribers Table.
+				 Not applicable for a Temporary SU."
+		::=  {  rbSuServiceConfigEntry  6  }
+
+	rbSuServiceTemplateIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index of the selected entry in the Service Templates Table = selected Service Template.
+				 When updating an existing Service, the Service Type defined in the selected Service Template 
+				 must match the one already defined for the Service."
+		::=  {  rbSuServiceConfigEntry  7  }
+
+	rbSuServiceTemplateName	OBJECT-TYPE	
+		SYNTAX			DisplayString  (SIZE (0..32))
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The name of the selected Service Template."
+		::=  {  rbSuServiceConfigEntry  8  }
+
+	rbSuServiceTemplateID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The ID of the selected Service Template."
+		::=  {  rbSuServiceConfigEntry  9  }
+
+	rbSuServiceSwitchingGroupIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"Not used in current version."
+		::=  {  rbSuServiceConfigEntry  10  }
+
+	rbSuServiceAdminStatus	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Service Admin status. If the Admin Status is disabled,
+				 the Service will not be available to the Subscriber."
+		DEFVAL			{ enable }
+		::=  {  rbSuServiceConfigEntry  11  }
+
+	rbSuServiceOperStatus	OBJECT-TYPE	
+		SYNTAX			INTEGER  { up ( 1 ) , down ( 2 ) , unknown ( 3 ) } 
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"Service Operational Status."
+		::=  {  rbSuServiceConfigEntry  12  }
+
+	rbSuServiceClientSiteVLANList	OBJECT-TYPE	
+		SYNTAX			OCTET STRING  ( SIZE ( 0 .. 24  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"A list of up to 16 (15 if Hybrid VLAN Mode is enabled) VLAN IDs
+				 at the Subscribers site that are used as classifiers for the Service. 
+				 An empty list means No VLAN IDs. 
+				 To prepare the list: Arrange all VLAN IDs in ascending order without gaps
+				 using hexadecimal digits (3 hexadecimal digits/VLAN ID). 
+				 If the list contains less than 16 VLAN IDs, add null (empty) VLANs up to 
+				 a total of 48 hexadecimal digits. Convert the list to a string of 24 octets."
+		::=  {  rbSuServiceConfigEntry  13  }
+
+	rbSuServiceClientSiteVLANListCount OBJECT-TYPE
+	    SYNTAX			Integer32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Number of non-null VLAN IDs in the rbServiceClientSiteVLANList."
+		::=  {  rbSuServiceConfigEntry  14  }
+
+	rbSuServiceAUSlotNumber	OBJECT-TYPE	
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The slot number of the AU serving the applicable SU.
+				 This parameter is not applicable if the SU is served by a Micro Base Station."
+		::=  {  rbSuServiceConfigEntry  15  }
+
+	rbSuServiceVLANHybridMode	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Hybrid VLAN Mode of operation enables classification of both tagged and untagged packets
+				 or untagged packets only, according to the following rules:
+				 - Hybrid VLAN Mode disabled and Client Site VLAN List is not empty: Only packets tagged with
+				 a VLAN ID that exists in the VLAN List will be forwarded. VLAN List can include up to 16 entries.
+				 - Hybrid VLAN Mode disabled and Client Site VLAN List is empty: All (both untagged and
+				 tagged with any VLAN ID) will be forwarded.
+				 - Hybrid VLAN Mode enabled and Client Site VLAN List is not empty: Untagged packets, 
+				 and packets tagged with a VLAN ID that exists in the VLAN List will be forwarded. 
+				 VLAN List can include up to 15 entries.
+				 - Hybrid VLAN Mode enabled and Client Site VLAN List is empty: Only untagged frames
+				 will be forwarded."
+		DEFVAL			{ enable }
+		::=  {  rbSuServiceConfigEntry  16  }
+
+	rbSuServiceVLANClassificationMode	OBJECT-TYPE	
+		SYNTAX			INTEGER  { off ( 1 ) , on ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"VLAN Classification Mode.
+				 The VLAN Classification feature enables using VLAN ID for classification of
+				 transparent service downlink traffic before transmission to the destination MAC address.
+				 The VLAN Classification feature supports applications where multiple VLANs are associated
+				 with a single MAC address, allowing to assign different services to different VLANs.
+                 VLAN Classification Mode can be set to On only if the following conditions are met: 
+                 1. The VLAN Transparency Mode of the applicable Service Profile is set to On.
+                 2. A single VLAN ID is defined for the Service. This means that the allowed combinations are:
+                    a) Hybrid VLAN Mode is Off and the VLAN List includes a single VLAN ID, or
+                    b) Hybrid VLAN Mode is On and the VLAN List is empty.
+                 All Services assigned to the same SU must be configured with the same
+                 VLAN Classification Mode (Either On or Off)."
+		DEFVAL			{ off }
+		::=  {  rbSuServiceConfigEntry  17  }
+
+	rbSuServiceAccessVLAN	OBJECT-TYPE	
+		SYNTAX			Integer32 ( 0 .. 4095 )
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The Access VLAN parameter enables defining a VLAN ID to be used with untagged packets
+				 received on the Ethernet port of the SU. This parameter is applicable only for
+				 a transparent service (VLAN Transparency Mode is On) with Hybrid Mode set to On, 
+				 or a transparent service with Hybrid Mode set to Off and an empty VLAN list.
+				 A number in the range between 0 and 4094. A value of 4095 means No Access VLAN."
+		::=  {  rbSuServiceConfigEntry  18  }
+
+	rbSuServiceRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbSuServiceConfigEntry  19  }
+
+
+-- ============================================================
+-- Rainbow Services Mapping Table
+-- MacAddress for specific SU is retrieved using SU's name
+-- ============================================================
+	rbSuMappingTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbSuMappingEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A table of SUs MacAddress registered in the system."
+		::=  { rbServices  3 }
+
+	rbSuMappingEntry	OBJECT-TYPE
+		SYNTAX		RbSuMappingEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Mapping Table."
+		INDEX		{  rbSuMappingSysName }
+		::=  { rbSuMappingTable 1 }
+
+	RbSuMappingEntry  ::=  SEQUENCE {
+		rbSuMappingSysName          DisplayString,
+		rbSuMappingMacAddress       MacAddress
+		}
+
+
+	rbSuMappingSysName	OBJECT-TYPE	
+		SYNTAX			DisplayString (SIZE (1..32))
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The SU's name (User Name in SUs operating in Advanced Si mode).
+				 For the table having string as index the corresponding SNMP object key
+				 must have as the count of components the following:
+                 - 1st ULONG is destined for length of the string;
+                 - next number of ULONGs is destined for ascii value of each character in the string.
+                 To enable correct alphanumeric sorting of the rbSuMappingTable,
+                 the rbSuMappingSysName key should have the same first component and it should be 32 - 
+                 the max rbSuMappingSysName key length. GUI appliccation have to make sure 
+                 32 will be the first component in the string and string will be ended by '\0'"
+		::=  {  rbSuMappingEntry  1  }
+
+	rbSuMappingMacAddress	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The MAC address of the SU associated with the SU's name (User Name)." 
+		::=  {  rbSuMappingEntry  2  }
+		
+
+-- ============================================================
+-- Rainbow QoS Profile Configuration Table
+-- ============================================================
+	rbQoSProfileConfigTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbQoSProfileConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A table of QoS Profiles."
+		::=  { rbQoSProfiles  1 }
+
+	rbQoSProfileConfigEntry	OBJECT-TYPE
+		SYNTAX		RbQoSProfileConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the QoS Profiles Table. Includes parameters of the relevant QoS Profile."
+		INDEX		{  rbQoSProfileIdx  }
+		::=  { rbQoSProfileConfigTable 1 }
+
+	RbQoSProfileConfigEntry  ::=  SEQUENCE {
+		rbQoSProfileIdx  		Unsigned32,
+		rbQoSProfileName  		DisplayString,
+		rbQoSProfileID  		Unsigned32,
+		rbQoSProfileType  		INTEGER,
+		rbQoSProfileParam1  	Unsigned32,
+		rbQoSProfileParam2  	Unsigned32,
+		rbQoSProfileParamTime   INTEGER,
+		rbAQoSProfileRowStatus  RowStatus,
+		rbQoSProfileClass       INTEGER
+		}
+
+
+	rbQoSProfileIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the relevant QoS Profile Entry."
+		::=  {  rbQoSProfileConfigEntry  1  }
+
+	rbQoSProfileName	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE ( 1 .. 32  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"QoS Profile Name - unique per Device."
+		::=  {  rbQoSProfileConfigEntry  2  }
+
+	rbQoSProfileID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The QoS Profile ID assigned by the Device - unique per Device."
+		::=  {  rbQoSProfileConfigEntry  3  }
+
+	rbQoSProfileType OBJECT-TYPE 
+	  SYNTAX   INTEGER  { rbCG (0),  rbRT ( 1 ) , rbNRT ( 2 ) , rbBE ( 3 ) }
+	  MAX-ACCESS  read-write
+	  STATUS   current
+	  DESCRIPTION  
+	    "The QoS Profile Type:
+         CG - (Continuing Grant) service is tailored for carrying constant bit-rate (CBR) real-time services characterized by fixed size data packets on a periodic basis such as VoIP or E1/T1.
+         RT (Real-Time) polling service is designed to meet the needs of Real Time Variable Bit Rate like services characterized by requirements for guaranteed rate and delay such as streaming video or audio.
+         NRT (Non-Real-Time) polling service is designed to meet the needs of Non Real Time Variable Bit Rate services, such as file transfer and Internet access, 
+         that are characterized by requirement for a guaranteed rate, but can tolerate longer delays and are rather insensitive to jitter.
+         BE (Best Effort) service is for services where neither throughput nor delay guarantees are provided."
+	  ::=  {  rbQoSProfileConfigEntry  4  }
+
+	rbQoSProfileParam1	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"For QOS Profile type RT-VR or NRT-VR, this parameter is CIR (1-12000 in Kbps). 
+				 For QoS Profile type CG this parameter is the Packet Size (64-1550 in bytes including 4 bytes CRC and 4 bytes VLAN tag).
+				 For QoS Profile type BE this parameter is not applicable."
+		::=  {  rbQoSProfileConfigEntry  5  }
+
+	rbQoSProfileParam2	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"For QOS Profile type BE or NRT-VR, this parameter is MIR (1-12000 in Kbps). 
+				 For QoS Profile type CG this parameter is the Sample Interval (5-100 in milliseconds in steps of 5).
+				 For QoS Profile type RT-VR this parameter is not applicable."
+		::=  {  rbQoSProfileConfigEntry  6  }
+
+	rbQoSProfileParamTime	OBJECT-TYPE	
+		SYNTAX			INTEGER { short ( 1 ) , medium ( 2 ) , long ( 3 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The CT (Committed Time) parameter defines the time window over which the information rate is averaged to ensure compliance with the CIR or MIR parameter. 
+				 This parameter is not applicable for QoS Profile Type CG."
+		::=  {  rbQoSProfileConfigEntry  7  }
+
+	rbAQoSProfileRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbQoSProfileConfigEntry  8  }
+
+	rbQoSProfileClass	OBJECT-TYPE	
+		SYNTAX			INTEGER  { local ( 1 ) , global ( 2 ) } 
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"QoS Profile Class: Local definition or Global (Managed) definition using an XML File.
+				 In a Global QoS Profile all parameters become read-only."
+		::=  {  rbQoSProfileConfigEntry  9  }
+
+    
+-- ============================================================
+-- Rainbow Policy Rules config Table
+-- ============================================================
+	rbPolicyRuleConfigTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbPolicyRuleConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A Table of Policy rules."
+		::=  { rbPolicyRules  1 }
+
+	rbPolicyRuleConfigEntry	OBJECT-TYPE
+		SYNTAX		RbPolicyRuleConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Policy Rules Table. Includes parameters of the relevant Policy Rule."
+		INDEX		{  rbPolicyRuleIdx  }
+		::=  { rbPolicyRuleConfigTable 1 }
+
+	RbPolicyRuleConfigEntry  ::=  SEQUENCE {
+		rbPolicyRuleIdx  				Unsigned32,
+		rbPolicyRuleName  				DisplayString,
+		rbPolicyRuleID  				Unsigned32,
+		rbPolicyRulePriorityType  		INTEGER,
+		rbPolicyRuleUpQoSProfileIdx1  	Unsigned32,
+		rbPolicyRuleUpQoSUpperLimit1  	Unsigned32,
+		rbPolicyRuleUpQoSProfileIdx2  	Unsigned32,
+		rbPolicyRuleUpQoSUpperLimit2  	Unsigned32,
+		rbPolicyRuleUpQoSProfileIdx3  	Unsigned32,
+		rbPolicyRuleUpQoSUpperLimit3  	Unsigned32,
+		rbPolicyRuleUpQoSProfileIdx4  	Unsigned32,
+		rbPolicyRuleUpQoSUpperLimit4  	Unsigned32,
+		rbPolicyRuleDownQoSProfileIdx1  Unsigned32,
+		rbPolicyRuleDownQoSUpperLimit1  Unsigned32,
+		rbPolicyRuleDownQoSProfileIdx2  Unsigned32,
+		rbPolicyRuleDownQoSUpperLimit2  Unsigned32,
+		rbPolicyRuleDownQoSProfileIdx3  Unsigned32,
+		rbPolicyRuleDownQoSUpperLimit3  Unsigned32,
+		rbPolicyRuleDownQoSProfileIdx4  Unsigned32,
+		rbPolicyRuleDownQoSUpperLimit4  Unsigned32,
+		rbAPolicyRuleRowStatus  		RowStatus,
+		rbPolicyRuleClass              INTEGER
+		}
+
+
+	rbPolicyRuleIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the relevant Policy Rule Entry."
+		::=  {  rbPolicyRuleConfigEntry  1  }
+
+	rbPolicyRuleName	OBJECT-TYPE	
+		SYNTAX			DisplayString  (SIZE (1..32))
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Policy Rule Name - unique per Device"
+		::=  {  rbPolicyRuleConfigEntry  2  }
+
+	rbPolicyRuleID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Policy Rule ID assigned by the Device (DB ID) - unique per Device."
+		::=  {  rbPolicyRuleConfigEntry  3  }
+
+	rbPolicyRulePriorityType	OBJECT-TYPE	
+		SYNTAX			INTEGER  { rbDSCP ( 1 ) , rb8021p ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The prioritization mechanism used by the Policy Rule: DSCP or 802.1p."
+		::=  {  rbPolicyRuleConfigEntry  4  }
+
+	rbPolicyRuleUpQoSProfileIdx1	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Uplink Range 1."
+		::=  {  rbPolicyRuleConfigEntry  6  }
+
+	rbPolicyRuleUpQoSUpperLimit1	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Uplink Range 1."
+		::=  {  rbPolicyRuleConfigEntry  7  }
+
+	rbPolicyRuleUpQoSProfileIdx2	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Uplink Range 2."
+		::=  {  rbPolicyRuleConfigEntry  9  }
+
+	rbPolicyRuleUpQoSUpperLimit2	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Uplink Range 2."
+		::=  {  rbPolicyRuleConfigEntry  10  }
+
+	rbPolicyRuleUpQoSProfileIdx3	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Uplink Range 3."
+		::=  {  rbPolicyRuleConfigEntry  12  }
+
+	rbPolicyRuleUpQoSUpperLimit3	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Uplink Range 3."
+		::=  {  rbPolicyRuleConfigEntry  13  }
+
+	rbPolicyRuleUpQoSProfileIdx4	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Uplink Range 4."
+		::=  {  rbPolicyRuleConfigEntry  15  }
+
+	rbPolicyRuleUpQoSUpperLimit4	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Uplink Range 4."
+		::=  {  rbPolicyRuleConfigEntry  16  }
+
+	rbPolicyRuleDownQoSProfileIdx1	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Downlink Range 1."
+		::=  {  rbPolicyRuleConfigEntry  18  }
+
+	rbPolicyRuleDownQoSUpperLimit1	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Downlink Range 1."
+		::=  {  rbPolicyRuleConfigEntry  19  }
+
+	rbPolicyRuleDownQoSProfileIdx2	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Downlink Range 2."
+		::=  {  rbPolicyRuleConfigEntry  21  }
+
+	rbPolicyRuleDownQoSUpperLimit2	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Downlink Range 2."
+		::=  {  rbPolicyRuleConfigEntry  22  }
+
+	rbPolicyRuleDownQoSProfileIdx3	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Downlink Range 3."
+		::=  {  rbPolicyRuleConfigEntry  24  }
+
+	rbPolicyRuleDownQoSUpperLimit3	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Downlink Range 3."
+		::=  {  rbPolicyRuleConfigEntry  25  }
+
+	rbPolicyRuleDownQoSProfileIdx4	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile selected for Downlink Range 4."
+		::=  {  rbPolicyRuleConfigEntry  27  }
+
+	rbPolicyRuleDownQoSUpperLimit4	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The upper limit for Downlink Range 4."
+		::=  {  rbPolicyRuleConfigEntry  28  }
+
+	rbAPolicyRuleRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbPolicyRuleConfigEntry  29  }
+
+	rbPolicyRuleClass	OBJECT-TYPE	
+		SYNTAX			INTEGER  { local ( 1 ) , global ( 2 ) } 
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"Policy Rule Class: Local definition or Global (Managed) definition using an XML File.
+				 In a Global Policy Rule all parameters become read-only."
+		::=  {  rbPolicyRuleConfigEntry  30  }
+
+
+-- ============================================================
+-- Forwarding Rule Config Table
+-- ============================================================
+	rbForwardingRuleConfigTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbForwardingRuleConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A table of Forwarding Rules."
+		::=  { rbForwardingRules  2 }
+
+	rbForwardingRuleConfigEntry	OBJECT-TYPE
+		SYNTAX		RbForwardingRuleConfigEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Forwarding Rules Table. Includes parameters of the relevant Forwarding Rule."
+		INDEX		{  	rbForwardingRuleType ,rbForwardingRuleIdx  }
+		::=  { rbForwardingRuleConfigTable 1 }
+
+	RbForwardingRuleConfigEntry  ::=  SEQUENCE {
+		rbForwardingRuleType                RainbowServiceType,
+		rbForwardingRuleIdx                 Unsigned32,
+		rbForwardingRuleName                DisplayString,
+		rbForwardingRuleID                  Unsigned32,
+		rbForwardingRuleUnicastRelaying     INTEGER,
+		rbForwardingRuleMulticastRelaying   INTEGER,
+		rbForwardingUnknownAddrPolicy       INTEGER,
+		rbForwardingRuleMulticastVLAN  		Integer32,
+		rbForwardingRuleMulticastQoSIdx     Unsigned32,
+		rbAForwardingRuleRowStatus          RowStatus,
+		rbForwardingRuleClass               INTEGER
+		}
+
+
+	rbForwardingRuleType	OBJECT-TYPE	
+		SYNTAX			RainbowServiceType
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Service Type of the Forwarding Rule.
+                 The Service Type can be set only for a new Forwarding Rule (write-once). The Service Template Type of 
+                 an existing Forwarding Rule cannot be changed (read-only)."
+		::=  {  rbForwardingRuleConfigEntry  1  }
+		
+	rbForwardingRuleIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the relevant Forwarding Rule Entry."
+		::=  {  rbForwardingRuleConfigEntry  2  }
+
+	rbForwardingRuleName	OBJECT-TYPE	
+		SYNTAX			DisplayString (SIZE (1..32))
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Forwarding Rule name - unique per Device."
+		::=  {  rbForwardingRuleConfigEntry  3  }
+
+	rbForwardingRuleID	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The Forwarding Rule ID assigned by the Device (DB ID) - unique per Device."
+		::=  {  rbForwardingRuleConfigEntry  4  }
+
+	rbForwardingRuleUnicastRelaying	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Applicable only to Layer II and VoIP Service Types (not applicable to PPPoE Service Type). Unicast Relaying 
+				 enable/disable. When the Unicast Relaying parameter is enabled, unicast packets originating from devices on the 
+				 wireless link can be transmitted back to the wireless link devices. If disabled, these packets are not sent to 
+				 the wireless link even if they are intended for devices on the wireless link. "
+		::=  {  rbForwardingRuleConfigEntry  6  }
+
+	rbForwardingRuleMulticastRelaying	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Applicable only to Layer II and VoIP Service Types (not applicable to PPPoE Service Type). Multicast Relaying 
+				 enable/disable. When the Broadcast Relaying parameter is enabled, broadcast packets originating from devices on the 
+				 wireless link are transmitted by the AU back to the wireless link devices, as well as to the backbone. If disabled, 
+				 these packets are sent only to the backbone and are not sent back to the wireless link."
+		::=  {  rbForwardingRuleConfigEntry  7  }
+    
+    rbForwardingUnknownAddrPolicy OBJECT-TYPE	
+		SYNTAX			INTEGER  { reject ( 1 ) , forward ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Applicable only to Layer II and VoIP Service Types (not applicable to PPPoE Service Type). 
+				 Unknown Address Forwarding Policy: 
+				 Reject: The AU/Micro Base Station will transmit packets only to those addresses that the AU knows to exist on the 
+				 wireless link side.
+                 Forward: Enables the transmission of all packets, except those sent to addresses that the AU/Micro Base Station 
+                 recognizes as being on its wired backbone side."
+		::=  {  rbForwardingRuleConfigEntry  8  }
+		
+	rbForwardingRuleMulticastVLAN	OBJECT-TYPE	
+		SYNTAX			Integer32 ( 0 .. 4096 )
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Applicable only to support services to an SU with SW version below 2.0. 
+				 The VLAN ID to be attached to mulicast messages in the downlink in order 
+				 to enable full support of the VLAN feature. A number in the range between 0 and 4094.
+				 A value of 4095 means No Multicast VLAN. A value of 4096 is reserved only for Transparent Forwarding Rule."
+		::=  {  rbForwardingRuleConfigEntry  9  }
+
+    rbForwardingRuleMulticastQoSIdx OBJECT-TYPE	
+		SYNTAX			Unsigned32 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index in the QoS Profiles Table of the QoS Profile to be used for broadcasts and multicasts in the downlink."
+		::=  {  rbForwardingRuleConfigEntry  10  }
+		
+	rbAForwardingRuleRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus  
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbForwardingRuleConfigEntry  11  }
+
+	rbForwardingRuleClass	OBJECT-TYPE	
+		SYNTAX			INTEGER  { local ( 1 ) , global ( 2 ) } 
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"Forwarding Rule Class: Local definition or Global (Managed) definition using an XML File.
+				 In a Global Forwarding Rule all parameters become read-only."
+		::=  {  rbForwardingRuleConfigEntry  12  }
+
+
+-- ============================================================
+-- Service Filtering System Tables
+-- ============================================================
+   	
+	rbL2FilteringRules	OBJECT IDENTIFIER
+		::=  {  rbFilteringSystem  1  }
+
+	rbL2FilteringRuleTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbL2FilteringRuleEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A Table of rules for L2 filters."
+		::=  { rbL2FilteringRules  1 }
+
+	rbL2FilteringRuleEntry	OBJECT-TYPE
+		SYNTAX		RbL2FilteringRuleEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the L2 Filtering Rules Table. Includes parameters of the relevant L2 Rule."
+		INDEX		{ rbL2FilteringRuleIdx }
+		::=  { rbL2FilteringRuleTable 1 }
+
+	RbL2FilteringRuleEntry  ::=  SEQUENCE {
+		rbL2FilteringRuleIdx            Unsigned32,		
+		rbL2FilteringRuleRowStatus      RowStatus,
+		rbL2FilteringRuleName           DisplayString,
+		rbL2FilteringRuleSrcMacAddress  MacAddress,
+		rbL2FilteringRuleSrcMask        MacAddress,
+		rbL2FilteringRuleDestMacAddress MacAddress,
+		rbL2FilteringRuleDestMask       MacAddress,
+		rbL2FilteringRuleEthType        Integer32
+		}
+
+
+	rbL2FilteringRuleIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32   
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the L2 Filtering Rule Entry."
+		::=  {  rbL2FilteringRuleEntry  1  }
+
+	rbL2FilteringRuleRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Used to manage the creation and deletion of table rows (update is not available). 
+				 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbL2FilteringRuleEntry  2  }
+
+	rbL2FilteringRuleName	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE ( 1 .. 32  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L2 Filtering Rule name - unique per Device."
+		::=  {  rbL2FilteringRuleEntry  3  }
+
+	rbL2FilteringRuleSrcMacAddress	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L2 Filtering Rule Source MAC Address. 00-00-00-00-00-00 means ANY MAC address. If the Source MAC Address is specified, 
+				 then the Destination MAC Address must be ANY, and vice versa. Both Source and Destination MAC Addresses may be ANY."
+		::=  {  rbL2FilteringRuleEntry  4  }
+
+	rbL2FilteringRuleSrcMask	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L2 Filtering Rule Source MAC Address Mask. FF-FF-FF-FF-FF-FF means NO Mask. 
+				 If the Source MAC Address is ANY, the Mask is not applicable.
+				 For the Micro Base Station the Mask is not applicable."
+		::=  {  rbL2FilteringRuleEntry  5  }
+
+	rbL2FilteringRuleDestMacAddress	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L2 Filtering Rule Destination MAC Address. 00-00-00-00-00-00 means ANY MAC address. If the Source MAC Address is specified, 
+				 then the Destination MAC Address must be ANY, and vice versa. Both Source and Destination MAC Addresses may be ANY."
+		::=  {  rbL2FilteringRuleEntry  6  }
+
+	rbL2FilteringRuleDestMask	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L2 Filtering Rule Destination MAC Address Mask. FF-FF-FF-FF-FF-FF means NO Mask. 
+				 If the Source MAC Address is ANY, the Mask is not applicable.
+				 For the Micro Base Station the Mask is not applicable."
+		::=  {  rbL2FilteringRuleEntry  7  }
+
+	rbL2FilteringRuleEthType	OBJECT-TYPE	
+		SYNTAX			Integer32 ( 0 .. 65535 )
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The L2 Filtering Rule Ethernet type. The range is from 0 to 65535. 0 means ANY Ethertype."
+		::=  {  rbL2FilteringRuleEntry  8  }
+
+
+-- ============================================================
+
+	rbL34FilteringRules	OBJECT IDENTIFIER
+		::=  {  rbFilteringSystem  2  }
+
+	rbL34FilteringRuleTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbL34FilteringRuleEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A Table of rules for L3/L4 filters."
+		::=  { rbL34FilteringRules  1 }
+
+	rbL34FilteringRuleEntry	OBJECT-TYPE
+		SYNTAX		RbL34FilteringRuleEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the L3/L4 Filtering Rules Table. Includes parameters of the relevant L3/L4 Rule."
+		INDEX		{ rbL34FilteringRuleIdx }
+		::=  { rbL34FilteringRuleTable 1 }
+
+	RbL34FilteringRuleEntry  ::=  SEQUENCE {
+		rbL34FilteringRuleIdx            Unsigned32,		
+		rbL34FilteringRuleRowStatus      RowStatus,
+		rbL34FilteringRuleName           DisplayString,
+		rbL34FilteringRuleSrcIpAddress   IpAddress,
+		rbL34FilteringRuleSrcMask        IpAddress,
+		rbL34FilteringRuleDestIpAddress  IpAddress,
+		rbL34FilteringRuleDestMask       IpAddress,
+		rbL34FilteringRuleIpProtocol     Integer32,
+		rbL34FilteringRuleSrcUdpTcpPort  Integer32,
+		rbL34FilteringRuleDestUdpTcpPort Integer32
+		}
+
+	rbL34FilteringRuleIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32   
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the L3/L4 Filtering Rule Entry."
+		::=  {  rbL34FilteringRuleEntry  1  }
+
+	rbL34FilteringRuleRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Used to manage the creation and deletion of table rows (update is not available). 
+				 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbL34FilteringRuleEntry  2  }
+
+	rbL34FilteringRuleName	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE ( 1 .. 32  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3/L4 Filtering Rule name - unique per Device."
+		::=  {  rbL34FilteringRuleEntry  3  }
+
+	rbL34FilteringRuleSrcIpAddress	OBJECT-TYPE	
+		SYNTAX			IpAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3/L4 Filtering Rule Source IP Address. 254.255.255.255 means ANY IP address. If the Source IP Address is specified, 
+				 then the Destination IP Address must be ANY, and vice versa. Both Source and Destination IP Addresses 
+				 may be ANY. A combination where both Source and Destination IP Addresses, both Source and Destination 
+				 UDP/TCP Ports, and IP Protocol are defined as ANY, is not allowed."
+		::=  {  rbL34FilteringRuleEntry  4  }
+
+	rbL34FilteringRuleSrcMask	OBJECT-TYPE	
+		SYNTAX			IpAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3/L4 Filtering Rule Source Mask. 255.255.255.255 means NO Mask.
+				 If the Source IP Address is ANY, the Mask is not applicable.
+				 For the Micro Base Station the Mask is not applicable."
+		::=  {  rbL34FilteringRuleEntry  5  }
+
+	rbL34FilteringRuleDestIpAddress	OBJECT-TYPE	
+		SYNTAX			IpAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3/L4 Filtering Rule Destination IP Address. 254.255.255.255 means ANY IP address. If the Source IP Address is specified, 
+				 then the Destination IP Address must be ANY, and vice versa. Both Source and Destination IP Addresses 
+				 may be ANY. A combination where both Source and Destination IP Addresses, both Source and Destination 
+				 UDP/TCP Ports, and IP Protocol are defined as ANY, is not allowed."
+		::=  {  rbL34FilteringRuleEntry  6  }
+
+	rbL34FilteringRuleDestMask	OBJECT-TYPE	
+		SYNTAX			IpAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3/L4 Filtering Rule Destination Mask. 255.255.255.255 means NO Mask.
+				 If the Source IP Address is ANY, the Mask is not applicable.
+				 For the Micro Base Station the Mask is not applicable."
+		::=  {  rbL34FilteringRuleEntry  7  }
+
+	rbL34FilteringRuleIpProtocol	OBJECT-TYPE	
+		SYNTAX			Integer32  ( 0 .. 255 ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3/L4 Filtering Rule Defined IP Protocol. The range is from 0 to 255. 255 means ANY protocol."
+		::=  {  rbL34FilteringRuleEntry  8  }
+
+	rbL34FilteringRuleSrcUdpTcpPort	OBJECT-TYPE	
+		SYNTAX			Integer32  ( 0 .. 65535 ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3, L4 Filtering Rule Source UDP/TCP Port. 65535 means ANY Port. Each L3/L4 Filtering Rule must include 
+				either a Source or a Destination Port. If the Source Port is specified, then the Destination Port must 
+				be ANY, and vice versa. Both Source and Destination UDP/TCP Ports may be ANY."
+		::=  {  rbL34FilteringRuleEntry  9  }
+
+	rbL34FilteringRuleDestUdpTcpPort	OBJECT-TYPE	
+		SYNTAX			Integer32  ( 0 .. 65535 ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"L3, L4 Filtering Rule Destination UDP/TCP Port. 65535 means ANY Port. Each L3/L4 Filtering Rule must include 
+				 either a Source or a Destination Port. If the Source Port is specified, then the Destination Port must be ANY, 
+				 and vice versa. Both Source and Destination UDP/TCP Ports may be ANY."
+		::=  {  rbL34FilteringRuleEntry  10  }
+
+
+-- ============================================================
+	rbInterfaceFiltering	OBJECT IDENTIFIER
+		::=  {  rbFilteringSystem  3  }
+
+	rbInterfaceFilteringTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbInterfaceFilteringEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A Table of Filtering parameters per Interface. This is a static table with two entries."
+		::=  { rbInterfaceFiltering  1 }
+
+	rbInterfaceFilteringEntry	OBJECT-TYPE
+		SYNTAX		RbInterfaceFilteringEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Interface Filtering Table. Includes Filtering parameters of the relevant Interface."
+		INDEX		{ rbInterfaceFilteringType, rbInterfaceFilteringIdx }
+		::=  { rbInterfaceFilteringTable 1 }
+
+	RbInterfaceFilteringEntry  ::=  SEQUENCE {
+		rbInterfaceFilteringType             INTEGER,
+		rbInterfaceFilteringIdx              Unsigned32,		
+		rbInterfaceFilteringName             DisplayString,
+		rbInterfaceFilteringAdminStatus      INTEGER,
+		rbInterfaceFilteringActiveFilterType INTEGER,
+		rbInterfaceFilteringAction           INTEGER,
+		rbInterfaceFilteringDeleteAllFilteringRules    INTEGER,
+		rbInterfaceFilteringResetAllFilteringCounters  INTEGER,
+		rbInterfaceFilteringNonMatchingPacketsCounter  Counter32
+		}
+
+	rbInterfaceFilteringType	OBJECT-TYPE	
+		SYNTAX			INTEGER  { fromWireless  ( 1 ) , fromNetwork ( 2 ) } 
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"Interface Filtering Type."
+		::=  {  rbInterfaceFilteringEntry  1  }
+
+	rbInterfaceFilteringIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32   
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the Entry."
+		::=  {  rbInterfaceFilteringEntry  2  }
+
+	rbInterfaceFilteringName	OBJECT-TYPE	
+		SYNTAX			DisplayString  ( SIZE ( 1 .. 32  ) ) 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Interface Filtering name - unique per Device. Read-only in the current version.
+				 The read-only names are From Wireless (Idx 1) and From Network (Idx 2)."
+		::=  {  rbInterfaceFilteringEntry  3  }
+
+	rbInterfaceFilteringAdminStatus	OBJECT-TYPE	
+		SYNTAX			INTEGER  { enable ( 1 ) , disable ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Interface Filtering Admin Status."
+		::=  {  rbInterfaceFilteringEntry  4  }
+
+	rbInterfaceFilteringActiveFilterType	OBJECT-TYPE	
+		SYNTAX			INTEGER  { filterL2 ( 1 ) , filterL34 ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Interface Filtering Active Filter Type."
+		::=  {  rbInterfaceFilteringEntry  5  }
+
+	rbInterfaceFilteringAction	OBJECT-TYPE	
+		SYNTAX			INTEGER  { deny ( 1 ) , allow ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Interface Filtering Action."
+		::=  {  rbInterfaceFilteringEntry  6  }
+
+	rbInterfaceFilteringDeleteAllFilteringRules	OBJECT-TYPE	
+		SYNTAX			INTEGER  { doNothing ( 0 ) , deleteAllRules ( 1 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Used to delete all Filtering Rules defined for the Interface Filtering. Filtering Rules per Interface 
+				 are defined using the Filters Table."
+		::=  {  rbInterfaceFilteringEntry  7  }
+
+	rbInterfaceFilteringResetAllFilteringCounters	OBJECT-TYPE	
+		SYNTAX			INTEGER  { doNothing ( 0 ) , resetCounters ( 1 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Used to reset all Filtering Counters of the Interface Filtering, including the Non Matching Packets Counters."
+		::=  {  rbInterfaceFilteringEntry  8  }
+
+	rbInterfaceFilteringNonMatchingPacketsCounter   OBJECT-TYPE
+		SYNTAX		    Counter32 
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"A counter for the Non Matching Packets (per interface)."
+		::=  {  rbInterfaceFilteringEntry  9 }
+
+
+-- ============================================================
+	rbFilters	OBJECT IDENTIFIER
+		::=  {  rbFilteringSystem  4  }
+
+	rbFilterTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbFilterEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A Table of filters."
+		::=  { rbFilters  1 }
+
+	rbFilterEntry	OBJECT-TYPE
+		SYNTAX		RbFilterEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Filter Table."
+		INDEX		{ rbInterfaceFilteringIdx, rbFilterRuleType, rbFilterRuleIndex }
+		::=  { rbFilterTable 1 }
+
+	RbFilterEntry  ::=  SEQUENCE {
+		rbFilterRuleType       INTEGER,
+		rbFilterRuleIndex      Unsigned32,		
+		rbFilterRowStatus      RowStatus
+		}
+
+	rbFilterRuleType	OBJECT-TYPE	
+		SYNTAX			INTEGER  { filterL2 ( 1 ) , filterL34 ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The Type of the relevant Filtering Rule."
+		::=  {  rbFilterEntry  1  }
+
+	rbFilterRuleIndex	OBJECT-TYPE	
+		SYNTAX			Unsigned32   
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index of the Filtering Rule in the relevant Filtering Rules Table. Serves also as an index of the entry."
+		::=  {  rbFilterEntry  2  }
+
+	rbFilterRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Used to manage the creation and deletion of table rows (update is not available). 
+				 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbFilterEntry  3  }
+
+
+-- ============================================================
+	rbFilterCounters	OBJECT IDENTIFIER
+		::=  {  rbFilteringSystem  5  }
+
+	rbFilteringCounterTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbFilteringCounterEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A Table of Filtering Counters. Counters are available per Interface Filtering and Filtering Rule."
+		::=  { rbFilterCounters  1 }
+
+	rbFilteringCounterEntry	OBJECT-TYPE
+		SYNTAX		RbFilteringCounterEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the Filtering Counter Table. Includes parameters of the relevant Filtering Rule."
+		INDEX		{ rbInterfaceFilteringIdx, rbInterfaceFilteringActiveFilterType, rbCountRuleIdx }
+		::=  { rbFilteringCounterTable 1 }
+
+	RbFilteringCounterEntry  ::=  SEQUENCE {
+		rbCountRuleIdx     Unsigned32,
+		rbResetCounter     INTEGER,
+		rbRuleMatchCount   Counter32
+		}
+
+	rbCountRuleIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32   
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the Filtering Rule in the relevant Filtering Rules Table."
+		::=  {  rbFilteringCounterEntry  1  }
+
+	rbResetCounter	OBJECT-TYPE	
+		SYNTAX			INTEGER  { doNothing ( 0 ) , resetCounter ( 1 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Used to reset the Interface Filtering Rule Counter."
+		::=  {  rbFilteringCounterEntry  2  }
+
+	rbRuleMatchCount   OBJECT-TYPE
+		SYNTAX		    Counter32 
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The number of packets that matched the Filtering Rule."
+		::=  {  rbFilteringCounterEntry  3 }
+		
+
+-- ============================================================
+	rbMACAddressDenyList	OBJECT IDENTIFIER
+		::=  {  rbFilteringSystem  6  }
+
+	rbMACAddressDenyListCounters	OBJECT IDENTIFIER
+		::=  {  rbMACAddressDenyList  1  }
+
+   	rbDenyListCounterReset	OBJECT-TYPE	
+		SYNTAX			INTEGER  { doNothing ( 0 ) , resetCounter ( 1 ) } 
+   		MAX-ACCESS		read-write
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to reset the MAC Address Deny List Counter."
+   		::=  {  rbMACAddressDenyListCounters  1  }
+
+   	rbDenyListWirelessPacketCounter	OBJECT-TYPE	
+   		SYNTAX			Counter32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"MAC Address Deny List Counter from Wireless Interface.
+   				 Counts the packets that were rejected because either the source or 
+   				 destination MAC Address is included in the MAC Address Deny List."
+   		::=  {  rbMACAddressDenyListCounters  2  }
+
+   	rbDenyListNetworkPacketCounter	OBJECT-TYPE	
+   		SYNTAX			Counter32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"MAC Address Deny List Counter from Network Interface.
+   				 Counts the packets that were rejected because either the source or 
+   				 destination MAC Address is included in the MAC Address Deny List."
+   		::=  {  rbMACAddressDenyListCounters  3  }
+   		
+
+	rbMACAddressDenyListTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbMACAddressDenyListEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"MAC Address Deny List Table."
+		::=  { rbMACAddressDenyList 2 }
+
+	rbMACAddressDenyListEntry	OBJECT-TYPE
+		SYNTAX		RbMACAddressDenyListEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the MAC Address Deny List Table. Packets whose source or destination is included in the MAC Address Deny List will be rejected."
+		INDEX		{ rbMACAddressDenyMacAddress }
+		::=  { rbMACAddressDenyListTable 1 }
+
+	RbMACAddressDenyListEntry  ::=  SEQUENCE {
+		rbMACAddressDenyMacAddress     MacAddress,
+		rbMACAddressDenyListRowStatus  RowStatus
+		}
+
+	rbMACAddressDenyMacAddress	OBJECT-TYPE	
+		SYNTAX			MacAddress
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The MAC Address of the entry in the MAC Address Deny List Table."
+		::=  {  rbMACAddressDenyListEntry  1  }
+
+	rbMACAddressDenyListRowStatus	OBJECT-TYPE	
+		SYNTAX			RowStatus
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"Control for creating and deleting entries.  Entries may be modified while active.
+                 active (1) - means that the entry is available for use by the managed device and relevant parameters 
+                 may be modified;
+                 createAndGo (4) is used for creating a new entry and to have its status automatically set to active;
+                 destroy (6) is used for deleting an existing entry."
+		::=  {  rbMACAddressDenyListEntry  2  }
+
+
+-- ============================================================
+	-- Service General Parameters
+-- ============================================================
+		
+   	rbGetNewPolicyRuleID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the Policy Rules Table."
+   		::=  {  rbServiceGeneralConfig  1  }
+   		
+   	rbGetNewServiceID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the Service Table."
+   		::=  {  rbServiceGeneralConfig  2  }
+   		
+   	rbGetNewServiceTemplateID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the Service Template Table."
+   		::=  {  rbServiceGeneralConfig  3  }
+   		
+   	rbGetNewSubscriberID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the Subscriber Table."
+   		::=  {  rbServiceGeneralConfig  4  }
+   		
+   	rbGetNewQoSProfileID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the QoS Profile Table."
+   		::=  {  rbServiceGeneralConfig  5  }
+
+   	rbGetNewForwardingRuleID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32   
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the Forwarding Rules Table."
+   		::=  {  rbServiceGeneralConfig  6  }
+   		
+	rbServiceWorkingMode	OBJECT-TYPE	
+		SYNTAX			INTEGER  { professionalMode ( 1 ) , lightMode ( 2 ) } 
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The Service Mode:
+                 Professional (Advanced) Mode enables denial of services to SUs operating
+                 in Standard mode that are not defined in the Device.
+                 An SU operating in Standard mode must be defined in the Device before it can be registered
+                 and receive any service.
+                 An SU operating in Advanced Si mode will be authenticated and provisioned (or rejected) 
+                 by the RADIUS Server.
+                 In Light (Quick) Mode, an undefined SU operating in Standard mode will be added
+                 to the database as Temporary and the subscriber will be able to use only services 
+                 based on the Default Service Template(s).
+                 An undefined SU operating in Advanced Si mode will be added to the database and provisioned
+                 with services based on the Default Service Template(s) only if its Password is 
+                 either quickynikynyoky or blank."
+		DEFVAL			{ lightMode }
+		::=  {  rbServiceGeneralConfig  7  }
+   	
+	rbDfltServiceTemplateTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbDfltServiceTemplateEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			    "A Table of Default Service Templates that are used by the Device to provide Default Services. 
+			     The table can hold up to two Default Service Templates. 
+			     It can hold one Service Template of any Service Type (Layer II or PPPoE or VoIP). 
+			     It can hold two Service Templates, but only the following combinations are allowed:
+                 a. One PPPoE and one Layer II Service Templates.
+                 b. One PPPoE and one VoIP Service Templates."
+		::=  { rbServiceGeneralConfig  8 }
+
+	rbDfltServiceTemplateEntry	OBJECT-TYPE
+		SYNTAX		RbDfltServiceTemplateEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			    "An entry in the Default Service Templates Table.
+			     Includes parameters of the relevant Default Service Template."
+		INDEX		{ rbDfltServiceTemplateType }
+		::=  { rbDfltServiceTemplateTable 1 }
+
+	RbDfltServiceTemplateEntry  ::=  SEQUENCE {
+		rbDfltServiceTemplateType	RainbowServiceType,		
+		rbDfltServiceTemplateIdx	Unsigned32
+		}
+
+
+	rbDfltServiceTemplateType	OBJECT-TYPE	
+		SYNTAX			RainbowServiceType
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The name of the Service Template identified by the rbDflteServiceTemplateIdx. Read-only. 
+				 It also serves as the index of the table."
+		::=  {  rbDfltServiceTemplateEntry  1  }
+		
+	rbDfltServiceTemplateIdx	OBJECT-TYPE	
+		SYNTAX			Unsigned32
+		MAX-ACCESS		read-write
+		STATUS			current
+		DESCRIPTION		
+				"The index of the selected Service Template Entry in the Service Templates Table."
+		::=  {  rbDfltServiceTemplateEntry  2  }   		
+		
+		
+-- ============================================================
+	-- Filter General Parameters
+-- ============================================================
+		
+	rbFilterGeneralConfig	OBJECT IDENTIFIER
+		::=  {  rbFilteringSystem  7  }
+
+   	rbGetNewL2FilterRuleID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the L2 filter Rules Table."
+   		::=  {  rbFilterGeneralConfig  1  }
+   		
+   	rbGetNewL34FilterRuleID	OBJECT-TYPE	
+   		SYNTAX			Unsigned32
+   		MAX-ACCESS		read-only
+   		STATUS			current
+   		DESCRIPTION		
+   				"Used to get from Device the next free index for the L34 filter Rules Table."
+   		::=  {  rbFilterGeneralConfig  2  }
+
+
+-- ============================================================
+	-- Rainbow XML Error Table
+-- ============================================================
+
+	rbXmlErrorReportTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE  OF  RbXmlErrorReportEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"A table of XML Error Reports."
+		::=  { rbXmlErrorReport  1 }
+
+	rbXmlErrorReportEntry	OBJECT-TYPE
+		SYNTAX		RbXmlErrorReportEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION	
+			"An entry in the XML Error Table. Includes Errors that encountered while parsing an XML file."
+		INDEX		{  rbXmlErrorIdx  }
+		::=  { rbXmlErrorReportTable 1 }
+
+	RbXmlErrorReportEntry  ::=  SEQUENCE {
+		rbXmlErrorIdx         Integer32,
+		rbXmlFolderType       INTEGER,
+		rbXmlElementType      INTEGER,
+		rbXmlErrorType        INTEGER,
+		rbXmlFileLineNumber   Integer32
+		}
+
+
+	rbXmlErrorIdx	OBJECT-TYPE	
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The index of the relevant Entry."
+		::=  {  rbXmlErrorReportEntry  1  }
+
+	rbXmlFolderType OBJECT-TYPE 
+	  SYNTAX            INTEGER { undefined (0), serviceProfiles ( 1 ) }
+	  MAX-ACCESS        read-only
+	  STATUS            current
+	  DESCRIPTION  
+	            "The type of the folder reported by the row."
+	  ::=  {  rbXmlErrorReportEntry  2  }
+
+	rbXmlElementType OBJECT-TYPE 
+	  SYNTAX            INTEGER {
+	                        undefined (0),  
+	                        qosProfile ( 1 ) , 
+	                        forwardingRule ( 2 ) , 
+	                        priorityClassifier ( 3 ) , 
+	                        serviceProfile ( 4 )
+	                        }
+	  MAX-ACCESS        read-only
+	  STATUS            current
+	  DESCRIPTION  
+	            "The type of the element reported by the row."
+	  ::=  {  rbXmlErrorReportEntry  3  }
+
+	rbXmlErrorType OBJECT-TYPE 
+	  SYNTAX            INTEGER { 
+
+-- DBQ Related Errors
+                     noError ( 0 ),                             -- No error
+                     illegalTableId ( 1 ),                      -- Illegal table ID
+                     deleteSuFailure ( 2 ),                     -- Can't delete a registered SU
+                     oneL2fwrulePerVpl ( 3 ),                   -- Only one L2 or one Voice and/or one PPPoE Forwarding Rules are permitted for the same VPLID
+                     sameServiceTypeOnVlan ( 4 ),               -- Can't create 2 services with either the same type of service, or L2 and Voice serviced on the same VLAN
+                     dbAddFailure ( 5 ),                        -- Data base add record error
+                     dbUpdateFailure ( 6 ),                     -- Data base update record error               
+                     dbDeleteFailure ( 7 ),                     -- Data base delete record error               
+                     keyMissing ( 8 ),                          -- Missing key in added record                 
+                     addedRecordAlreadyExists ( 9 ),            -- Added record already exists                 
+                     addSmRecNeeded ( 10 ),                     -- Missing record in SM table                  
+                     addSuRecNeeded ( 11 ),                     -- Missing record in SU table                  
+                     addPipeRecNeeded ( 12 ),                   -- Missing/undeclared Service             
+                     addPriorityClassRecNeeded ( 13 ),          -- Missing/undeclared Priority Classifier
+                     addFwRulesRecNeeded  ( 14 ),               -- Missing/undeclared Forwarding Rule     
+                     addIpAddrsRulesRecNeeded  ( 15 ),          -- Missing/undeclared IP Addressing Rule  
+                     addProfileRecNeeded  ( 16 ),               -- Missing/undeclared Service Profile    
+                     addSubscriberRecNeeded ( 17 ),             -- Missing/undeclared Subscriber         
+                     addVlanListNeeded ( 18 ),                  -- Missing/undeclared VLAN List    
+                     addQosRecNeeded ( 19 ),                    -- Missing/undeclared QoS Profile                 
+                     updatedRecordNotExists ( 20 ),             -- Updated record does not exist              
+                     deletedRecordNotExists ( 21 ),             -- Deleted record does not exist               
+                     deletePipeRecNeeded ( 22 ),                -- Delete service record first                 
+                     deleteProfileRecNeeded ( 23 ),             -- Delete Service Profile record first         
+                     deleteFwRulesRecNeeded ( 24 ),             -- Delete Forwarding Rules record first        
+                     deletePriorityRecNeeded ( 25 ),            -- Delete Priority Classification record first 
+                     deleteDefaultProfileNeeded  ( 26 ),        -- Delete Default Service Profile first        
+                     deletePriorityDefDscpRecNeeded ( 27 ),     -- Missing DSCP record in Priority Classification table
+                     wrongPriorityType ( 28 ),                  -- Wrong priority type
+                     wrongUpPriorityRanges ( 29 ),              -- Wrong Priority Classification up link range  
+                     wrongDnPriorityRanges ( 30 ),              -- Wrong Priority Classification down link range
+                     addTooManyConnections ( 31 ),              -- Too many connections for this Priority Classification
+                     serviceHandling ( 32 ),                    -- Error while handling Service
+                     illeagalTranstype ( 33 ),                  -- Illegal transaction type  
+                     illeagalSustatus  ( 34 ),                  -- Can't add/update/delete a temporary SU's service
+                     addedKeyAlreadyExists ( 35 ),              -- One of added record unique keys already exists 
+                     fileDoesNotExist ( 36 ),                   -- File doesn't exist
+                     tableIsFull ( 37 ),                        -- Table is full
+                     deleteSuServicesNeeded  ( 38 ),            -- Delete all SU's services first
+                     differentServiceType ( 39 ),               -- Can't change Service Profile type
+                     differentForwardingType  ( 40 ),           -- Can't change Forwarding Rule type
+                     differentForwardSrvcType ( 41 ),           -- Mismatch between Service profile type and forwarding rule type
+                     tooManyVlans ( 42 ),                       -- Too many VLAN IDs defined for service
+                     updateSuStatus ( 43 ),                     -- Can't change SU status when SU is not in service
+                     changeSu ( 44 ),                           -- Can't change SU MAC address for an enabled Service Pipe
+                     vlanMismatch ( 45 ),                       -- Can't allocate on the same SU pipes with and without VLANs
+                     wrongVlanId ( 46 ),                        -- Wrong VLAN ID (0 To 4094 expected)
+                     wrongCgQosValues ( 47 ),                   -- Wrong CG QoS values (max rate can't exceed 12mbit/sec)
+                     maxVlanPerSuExcedded ( 48 ),               -- Maximum number of VLAN's allowed for SU is 16
+                     duplicateRecordName ( 49 ),                -- Duplicate record name
+                     deleteTransparentFwRule ( 50 ),            -- Can't delete transparent forwarding rule
+                     transparentVlanVplMismatch ( 51 ),         -- Transparent VLAN ID and VPL mismatch
+                     transparentFwProfileMismatch ( 52 ),       -- Transparent Forwarding Rule and Service Profile mismatch
+                     missingTransparentFwRule ( 53 ),           -- Missing transparent forwarding rule
+                     globalProfile ( 54 ),                      -- Can't change global profile
+                     wrongCirValue ( 55 ),                      -- Wrong CIR value                            
+                     wrongMirValue  ( 56 ),                     -- Wrong MIR value                            
+                     invalidMaxCallsValue  ( 57 ),              -- Invalid value of maximum number of calls    
+                     invalidSampleRate  ( 58 ),                 -- Invalid sample interval                    
+                     invalidPacketSize  ( 59 ),                 -- Invalid packet size                           
+                     invalidFwRuleParameter ( 60 ),             -- Invalid Forwarding Rule parameter           
+                     nullProfileName ( 61 ),                    -- Null profile name
+                     invalidQosType ( 62 ),                     -- Invalid QoS type
+                     invalidPriorityClassifierType ( 63 ),      -- Invalid Priority Classifier type
+                     invalidCT ( 64 ),                          -- Invalid CT 
+                     invalidTransparencyMode ( 65 ),            -- Invalid transparency mode
+                     oneVlanPermittedForVlanClassMode ( 66 ),   -- Only one VLAN permitted when VLAN classification mode is ON
+                     accessVlanMismatch      ( 67 ),            -- Access VLAN permitted only for empty VLAN list or for Hybrid mode ON with VLAN list
+                     accessVlanDuplicate     ( 68 ),            -- Access VLAN can not be equal to any VLAN in the SU VLAN list
+                     oneAccessVlanPerSU      ( 69 ),            -- Only one Access VLAN allowed per SU
+                     changTransparentFWRuleName       ( 70 ),   -- Changing transparent forwarding rule name is not allowed
+-- XML General Errors
+                     unknownError ( 1000 ),                     -- Unknown error
+                     xmlParseFormatErr ( 1001 ),                -- XML file format error
+                     xmlParseSyntaxErr ( 1002 ),                -- XML file syntax error
+                     xmlParseUnresolvedProfileErr ( 1003 )      -- XML file unresolved profile error
+                            }
+	  MAX-ACCESS        read-only
+	  STATUS            current
+	  DESCRIPTION  
+	            "The type of the error encountered while parsing the XML file."
+	  ::=  {  rbXmlErrorReportEntry  4  }
+
+	rbXmlFileLineNumber	OBJECT-TYPE	
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION		
+				"The line number in the XML file where the error was encountered."
+		::=  {  rbXmlErrorReportEntry  5  }
+
+
+-- ============================================================
+
+END

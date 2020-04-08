@@ -1,0 +1,706 @@
+XEROX-JOB-MONITORING-EXT-MIB DEFINITIONS ::= BEGIN
+
+--  Module: XCMI Extensions to PWG Job Monitoring MIB
+--  File:   45pwgjmx.mib
+--  Date:   01 April 2005 - Version 5.401.pub
+
+IMPORTS
+    MODULE-IDENTITY,
+        OBJECT-TYPE,
+        OBJECT-IDENTITY,
+        NOTIFICATION-TYPE,
+        Counter32
+            FROM SNMPv2-SMI             -- IETF RFC 1442/1902/2578
+    TEXTUAL-CONVENTION,
+        TruthValue
+            FROM SNMPv2-TC              -- IETF RFC 1443/1903/2579
+    MODULE-COMPLIANCE,
+--      NOTIFICATION-GROUP,
+        OBJECT-GROUP
+            FROM SNMPv2-CONF            -- IETF RFC 1444/1904/2580
+    jmJobEntry,
+        jmJobState,
+        jmJobStateReasons1,
+        jmNumberOfInterveningJobs,
+        jmJobKOctetsPerCopyRequested,
+        jmJobKOctetsProcessed,
+        jmJobImpressionsPerCopyRequested,
+        jmJobImpressionsCompleted
+            FROM Job-Monitoring-MIB     -- IETF RFC 2707
+    xeroxCommonMIB
+            FROM XEROX-COMMON-MIB
+    Ordinal32,
+        XcmGenSNMPv2ErrorStatus
+            FROM XEROX-GENERAL-TC;
+
+xcmJmxMIB MODULE-IDENTITY
+    LAST-UPDATED "0211070000Z" -- 01 April 2005
+    ORGANIZATION "Xerox Corporation - XCMI Working Group"
+    CONTACT-INFO
+        "           XCMI Editors
+        Email:      coherence@crt.xerox.com
+
+        "
+    DESCRIPTION
+        "Version:   5.401.pub
+
+
+        The MIB module for job administration and job notifications for
+        systems that implement the PWG Job Monitoring MIB (RFC 2707).
+
+        See: Section 7 'Conformance Requirements and Implementers Guide'
+        of the XCMI Job Monitoring TC (40jobtc.txt) for implementation
+        and conformance guidance for the PWG Job Monitoring MIB
+        (RFC 2707) and for mapping to the XCMI Job Monitoring MIB.
+
+        Copyright (C) 2001-2002 Xerox Corporation. All Rights Reserved."
+    ::= { xeroxCommonMIB 83 }
+
+--
+--  Textual conventions for this MIB module
+--
+
+XcmJmxGroupSupport ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The terse conformance statement of ALL mandatory, conditionally
+        mandatory, and optional PWG Job Monitoring MIB (RFC 2707)
+        and XCMI Ext to PWG Job Monitoring MIB objects which are
+        supported by this management agent implementation (i.e.,
+        version) on this host system, specified in a bit-mask.
+
+        The current set of values (which may be extended in the future)
+        is given below:
+
+        --  PWG Job Monitoring MIB groups
+              1 : jmGeneralGroup                -- 2**0
+              2 : jmJobIDGroup                  -- 2**1
+              4 : jmJobGroup                    -- 2**2
+              8 : jmAttributeGroup              -- 2**3
+        --  XCMI Ext to PWG Job Monitoring MIB groups
+             16 : jmxGeneralGroup               -- 2**4
+             32 : jmxJobAdminGroup              -- 2**5
+             64 : jmxJobTrapsGroup              -- 2**6
+            128 : jmxJobOperationTrapsGroup     -- 2**7
+
+        Usage:  Conforming management agents shall ALWAYS accurately
+        report their support for PWG Job Monitoring MIB (RFC 2707)
+        and XCMI Ext to PWG Job Monitoring MIB object groups."
+    SYNTAX      INTEGER (0..2147483647)  -- biggest int = 2**31-1
+
+XcmJmxJobAdminOperation ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The current or most recent administrative operation on this job
+        (submitted via SNMP, IPP, or any other job control protocol)."
+    REFERENCE
+        "See:   Section 3.3 'Job Operations'
+                in IPP Model and Semantics [RFC-2911].
+        See:    Section 4 'Job Operations'
+                in IPP Job and Printer Admin Operations [IPP-ADMIN].
+
+
+        See:    'xcmHrDevMgmtCommandDataTag' textual convention,
+                Section 3.4 'XCMI Standard Tagged Management Data', and
+                Section 3.5 'Simple Device Management Requests' in
+                XCMI Host Resources Ext TC (for security issues).
+        See:    Section 3.5.3 'Secure Simple Device Mgmt Requests' in
+                XCMI Security TC (for security issues).
+        See:    'xcmJmxJobAdmin[Status|InProgress]'"
+    SYNTAX      INTEGER {
+        other(1),
+        unknown(2),
+        --  REQUIRED job operation defined in [RFC-2911]
+        cancelJob(3),                   -- Section 3.3.3 of [RFC-2911]
+        --  OPTIONAL job operations defined in [RFC-2911]
+        holdJob(4),                     -- Section 3.3.5 of [RFC-2911]
+        releaseJob(5),                  -- Section 3.3.6 of [RFC-2911]
+        restartJob(6),                  -- Section 3.3.7 of [RFC-2911]
+        --  OPTIONAL job operations defined in [IPP-ADMIN]
+        reprocessJob(7),                -- Section 4.1 [IPP-ADMIN]
+        suspendJob(8),                  -- Section 4.3.1 [IPP-ADMIN]
+        resumeJob(9),                   -- Section 4.3.2 [IPP-ADMIN]
+        promoteJob(10)                  -- Section 4.4.1 [IPP-ADMIN]
+    }
+
+XcmJmxJobAccntSupport ::= TEXTUAL-CONVENTION
+    STATUS    current
+    DESCRIPTION
+        "Presence and configuration of a Job Accounting on the device.
+         Note: This enumeration may be extended for more granularity in
+         the future."
+    SYNTAX    INTEGER {
+                  other(1),
+                  on(3),
+                  off(4),
+                  notPresent(5)
+                  }
+
+--
+--  Object definitions for this MIB module
+--
+
+xcmJmxMIBObjects        OBJECT IDENTIFIER ::= { xcmJmxMIB 1 }
+
+--      General Group (MANDATORY)
+--
+--      Implementation of this group is MANDATORY, i.e.,
+--      mandatory for systems which implement this MIB module.
+
+xcmJmxGeneral           OBJECT IDENTIFIER ::= { xcmJmxMIBObjects 1 }
+
+xcmJmxGeneralTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF XcmJmxGeneralEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+
+
+        "A table of general counters and information for ease of use of
+        the XCMI Ext to PWG Job Monitoring MIB and the
+        PWG Job Monitoring MIB (RFC 2707) on this host system.
+
+        Usage:  The ONLY valid row in the 'xcmJmxGeneralTable'
+        shall ALWAYS have an 'xcmJmxGeneralIndex' of one ('1')."
+    ::= { xcmJmxGeneral 2 }
+
+xcmJmxGeneralEntry OBJECT-TYPE
+    SYNTAX      XcmJmxGeneralEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry of general counters and information for ease of use of
+        the XCMI Ext to PWG Job Monitoring MIB and the
+        PWG Job Monitoring MIB (RFC 2707) on this host system.
+
+        Usage:  The ONLY valid row in the 'xcmJmxGeneralTable'
+        shall ALWAYS have an 'xcmJmxGeneralIndex' of one ('1')."
+    INDEX       { xcmJmxGeneralIndex }
+    ::= { xcmJmxGeneralTable 1 }
+
+XcmJmxGeneralEntry ::= SEQUENCE {
+        --  Job Monitoring General Info
+        xcmJmxGeneralIndex              Ordinal32,
+        xcmJmxGeneralGroupSupport       XcmJmxGroupSupport,
+        xcmJmxGeneralJobCreatedCount    Counter32,
+        xcmJmxGeneralJobCompletedCount  Counter32,
+        xcmJmxGeneralJobOperationCount  Counter32,
+        xcmJmxGeneralJobTrapCount       Counter32,
+        xcmJmxGeneralJobAccntSupport    XcmJmxJobAccntSupport
+    }
+
+xcmJmxGeneralIndex OBJECT-TYPE
+    SYNTAX      Ordinal32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A unique value used by this host system to identify this
+        conceptual row in the 'xcmJmxGeneralTable'.
+
+        Usage:  The ONLY valid row in the 'xcmJmxGeneralTable'
+        shall ALWAYS have an 'xcmJmxGeneralIndex' of one ('1')."
+    ::= { xcmJmxGeneralEntry 1 }
+
+xcmJmxGeneralGroupSupport OBJECT-TYPE
+    SYNTAX      XcmJmxGroupSupport
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The terse conformance statement of ALL mandatory, conditionally
+        mandatory, and optional PWG Job Monitoring MIB (RFC 2707)
+        and XCMI Ext to PWG Job Monitoring MIB objects which are
+        supported by this management agent implementation (i.e.,
+
+
+        version) on this host system, specified in a bit-mask.
+
+        Usage:  Conforming management agents shall ALWAYS accurately
+        report their support for PWG Job Monitoring MIB (RFC 2707)
+        and XCMI Ext to PWG Job Monitoring MIB object groups."
+    DEFVAL      { 31 }                  -- mandatory groups supported
+    ::= { xcmJmxGeneralEntry 2 }
+
+xcmJmxGeneralJobCreatedCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of jobs that have been created on this
+        managed system.  The managed system MAY preserve this count
+        across initializations and resets.
+
+        Usage: If the value of this counter is not preserved across 
+        initializations and resets, then it SHALL be set to zero upon
+        system initialization or reset.
+
+        Usage: A managed system SHALL return zero if the number of jobs 
+created is not known."
+    ::= { xcmJmxGeneralEntry 3 }
+
+xcmJmxGeneralJobCompletedCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of jobs that have completed on this
+        managed system. The managed system MAY preserve this count
+        across initializations and resets.
+
+        Usage: If the value of this counter is not preserved across
+        initializations and resets, then it SHALL be set to zero upon
+        system initialization or reset.
+
+        Usage: A managed system SHALL return zero if the number of jobs
+        created is not known."
+    ::= { xcmJmxGeneralEntry 4 }
+
+xcmJmxGeneralJobOperationCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of job operations that have been executed on this
+        managed system. The managed system MAY preserve this count
+        across initializations and resets.
+
+        Usage: If the value of this counter is not preserved across
+        initializations and resets, then it SHALL be set to zero upon
+        system initialization or reset.
+
+
+        Usage: A managed system SHALL return zero if the number of jobs
+        created is not known."
+    ::= { xcmJmxGeneralEntry 5 }
+
+xcmJmxGeneralJobTrapCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total number of job traps that have been sent from this
+        managed system. The managed system MAY preserve this count
+        across initializations and resets.
+
+        Usage: If the value of this counter is not preserved across
+        initializations and resets, then it SHALL be set to zero upon
+        system initialization or reset.
+
+        Usage: A managed system SHALL return zero if the number of jobs
+        created is not known."
+    ::= { xcmJmxGeneralEntry 6 }
+
+xcmJmxGeneralJobAccntSupport OBJECT-TYPE
+    SYNTAX      XcmJmxJobAccntSupport
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This is a way to turn the Job Accounting in the
+        device on and off when the printer supports the
+        PWG job accounting mib. If the job accounting within the
+        device is off then the group support will report no
+        no group supported. If job accounting is on then the 
+        appropriate groups will be reported as supported."
+    DEFVAL      { on }                  -- mandatory groups supported
+    ::= { xcmJmxGeneralEntry 7 }
+
+--      Job Admin Group (OPTIONAL)
+--
+--      Implementation of this group is OPTIONAL
+
+xcmJmxJobAdmin          OBJECT IDENTIFIER ::= { xcmJmxMIBObjects 2 }
+
+xcmJmxJobAdminTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF XcmJmxJobAdminEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing job operation requests for control
+        of jobs on this host system."
+    REFERENCE
+        "See:   'jmJobTable' in Job Monitoring MIB [RFC-2707]."
+    ::= { xcmJmxJobAdmin 1 }
+
+
+xcmJmxJobAdminEntry OBJECT-TYPE
+    SYNTAX      XcmJmxJobAdminEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing a job operation request for control
+        of a job on this host system."
+    AUGMENTS    { jmJobEntry }
+    ::= { xcmJmxJobAdminTable 1 }
+
+XcmJmxJobAdminEntry ::= SEQUENCE {
+        --  Job Admin Info
+        xcmJmxJobAdminOperation            XcmJmxJobAdminOperation,
+        xcmJmxJobAdminStatus               XcmGenSNMPv2ErrorStatus,
+        xcmJmxJobAdminInProgress           TruthValue
+    }
+
+xcmJmxJobAdminOperation OBJECT-TYPE
+    SYNTAX      XcmJmxJobAdminOperation
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The current or most recent administrative operation on this job
+        (submitted via SNMP, IPP, or any other job control protocol).
+
+        Usage:  Conforming management agents shall ALWAYS 'reject' any
+        SNMP Set-Request to 'xcmJmxJobAdminOperation'
+        while another job operation request is already in progress
+        (i.e., while 'xcmJmxJobAdminInProgress' is 'true'),
+        with 'badValue' (SNMPv1) or 'inconsistentValue' (SNMPv2/v3)."
+    REFERENCE
+        "See:   Section 3.3 'Job Operations'
+                in IPP Model and Semantics [RFC-2911].
+        See:    Section 4 'Job Operations'
+                in IPP Job and Printer Admin Operations [IPP-ADMIN].
+        See:    'xcmHrDevMgmtCommandDataTag' textual convention,
+                Section 3.4 'XCMI Standard Tagged Management Data', and
+                Section 3.5 'Simple Device Management Requests' in
+                XCMI Host Resources Ext TC (for security issues).
+        See:    Section 3.5.3 'Secure Simple Device Mgmt Requests' in
+                XCMI Security TC (for security issues).
+        See:    'xcmJmxJobAdmin[Status|InProgress]'"
+    DEFVAL      { unknown }             -- unknown job operation
+    ::= { xcmJmxJobAdminEntry 1 }
+
+xcmJmxJobAdminStatus OBJECT-TYPE
+    SYNTAX      XcmGenSNMPv2ErrorStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The job operation error status associated with
+
+
+        this conceptual row in 'xcmJmxJobAdminTable'.
+
+        Usage:  Conforming management agents shall ALWAYS set this
+        object to the value returned in an SNMP Set-Response PDU when
+        a job operation request is 'accepted', ie, when
+        'xcmJmxJobAdminInProgress' goes from 'false' to 'true'.
+
+        Usage:  Conforming management agents shall ALWAYS set this
+        object to the value of the completion status of the (possibly
+        deferred) job operation request, when
+        'xcmJmxJobAdminInProgress' goes from 'true' to 'false'."
+    REFERENCE
+        "See:   'xcmJmxJobAdmin[Operation|InProgress]'"
+--  DEFVAL      { noError }             -  no job operation error status
+    ::= { xcmJmxJobAdminEntry 2 }
+
+xcmJmxJobAdminInProgress OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The job operation in progress status associated with
+        this conceptual row in 'xcmJmxJobAdminTable'.
+
+        'true' if job operation is in progress; otherwise, 'false'.
+
+        Usage:  Conforming management agents shall ALWAYS 'reject' any
+        SNMP Set-Request to 'xcmJmxJobAdminOperation'
+        while another job operation request is already in progress
+        (i.e., while 'xcmJmxJobAdminInProgress' is 'true'),
+        with 'badValue' (SNMPv1) or 'inconsistentValue' (SNMPv2/v3)."
+    REFERENCE
+        "See:   'xcmJmxJobAdmin[Operation|Status]'"
+    DEFVAL      { false }               -- no job operation in progress
+    ::= { xcmJmxJobAdminEntry 3 }
+
+--
+--  Notification definitions for this MIB module (Traps and Informs)
+--
+
+xcmJmxMIBNotifications  OBJECT IDENTIFIER ::= { xcmJmxMIB 2 }
+
+--      Job Traps Group (OPTIONAL)
+--
+--      Implementation of this group is OPTIONAL
+
+xcmJmxJobOperationV1Enterprise OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap
+        for a Job operation complete event sent by this managed system."
+    ::= { xcmJmxMIBNotifications 1 }
+
+xcmJmxJobOperationV2TrapPrefix
+
+
+    OBJECT IDENTIFIER ::= { xcmJmxJobOperationV1Enterprise 0 }
+
+xcmJmxJobOperationV2Trap NOTIFICATION-TYPE
+    OBJECTS {
+        jmJobState,
+        jmJobStateReasons1,
+        xcmJmxJobAdminOperation,
+        xcmJmxJobAdminStatus
+    }
+    STATUS      current
+    DESCRIPTION
+        "This SMIv2 trap corresponds to a Job operation complete event.
+
+        The values of 'jmGeneralJobSetIndex' and 'jmJobIndex' for
+        use with 'jmJobTable' for this Job are conveyed in the
+        instance qualifier (OID suffix) of 'jmJobOperation'.
+
+        Additional variable-bindings MAY be appended to this trap:
+        - Systems with the Host Resources MIB (RFC 2790) MAY add
+          'hrSystemDate'
+          (compare to IPP 'printer-current-time')
+        - Systems MAY add other variable-bindings from any MIB"
+    REFERENCE
+        "See:   'xcmJmxJobAdminOperation' in this MIB."
+    ::= { xcmJmxJobOperationV2TrapPrefix 1 }
+
+xcmJmxJobStateV1Enterprise OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap
+        for a Job state changed event sent by this managed system."
+    ::= { xcmJmxMIBNotifications 2 }
+
+xcmJmxJobStateV2TrapPrefix
+    OBJECT IDENTIFIER ::= { xcmJmxJobStateV1Enterprise 0 }
+
+xcmJmxJobStateV2Trap NOTIFICATION-TYPE
+    OBJECTS {
+        jmJobState,
+        jmJobStateReasons1
+    }
+    STATUS      current
+    DESCRIPTION
+        "This SMIv2 trap corresponds to IPP 'job-state-changed' event.
+
+        The values of 'jmGeneralJobSetIndex' and 'jmJobIndex' for
+        use with 'jmJobTable' for this Job are conveyed in the
+        instance qualifier (OID suffix) of 'jmJobState'.
+
+        Additional variable-bindings MAY be appended to this trap:
+        - Systems with the Host Resources MIB (RFC 2790) MAY add
+          'hrSystemDate'
+          (compare to IPP 'printer-current-time')
+
+
+        - Systems MAY add other variable-bindings from any MIB"
+    REFERENCE
+        "See:   Section 5.3.2 'notify-events' in [IPP-NOT]."
+    ::= { xcmJmxJobStateV2TrapPrefix 1 }
+
+xcmJmxJobCreatedV1Enterprise OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap
+        for a Job created event sent by this managed system."
+    ::= { xcmJmxMIBNotifications 3 }
+
+xcmJmxJobCreatedV2TrapPrefix
+    OBJECT IDENTIFIER ::= { xcmJmxJobCreatedV1Enterprise 0 }
+
+xcmJmxJobCreatedV2Trap NOTIFICATION-TYPE
+    OBJECTS {
+        jmJobState,
+        jmJobStateReasons1,
+        jmNumberOfInterveningJobs
+    }
+    STATUS      current
+    DESCRIPTION
+        "This SMIv2 trap corresponds to IPP 'job-created' event."
+    REFERENCE
+        "See:   Section 5.3.2 'notify-events' in [IPP-NOT]."
+    ::= { xcmJmxJobCreatedV2TrapPrefix 1 }
+
+xcmJmxJobCompletedV1Enterprise OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap
+        for a Job completed event sent by this managed system."
+    ::= { xcmJmxMIBNotifications 4 }
+
+xcmJmxJobCompletedV2TrapPrefix
+    OBJECT IDENTIFIER ::= { xcmJmxJobCompletedV1Enterprise 0 }
+
+xcmJmxJobCompletedV2Trap NOTIFICATION-TYPE
+    OBJECTS {
+        jmJobState,
+        jmJobStateReasons1,
+        jmJobKOctetsProcessed,
+        jmJobImpressionsCompleted
+    }
+    STATUS      current
+    DESCRIPTION
+        "This SMIv2 trap corresponds to IPP 'job-completed' event."
+    REFERENCE
+        "See:   Section 5.3.2 'notify-events' in [IPP-NOT]."
+    ::= { xcmJmxJobCompletedV2TrapPrefix 1 }
+
+
+xcmJmxJobStoppedV1Enterprise OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap
+        for a Job stopped event sent by this managed system."
+    ::= { xcmJmxMIBNotifications 5 }
+
+xcmJmxJobStoppedV2TrapPrefix
+    OBJECT IDENTIFIER ::= { xcmJmxJobStoppedV1Enterprise 0 }
+
+xcmJmxJobStoppedV2Trap NOTIFICATION-TYPE
+    OBJECTS {
+        jmJobState,
+        jmJobStateReasons1,
+        jmJobKOctetsProcessed,
+        jmJobImpressionsCompleted
+    }
+    STATUS      current
+    DESCRIPTION
+        "This SMIv2 trap corresponds to IPP 'job-stopped' event."
+    REFERENCE
+        "See:   Section 5.3.2 'notify-events' in [IPP-NOT]."
+    ::= { xcmJmxJobStoppedV2TrapPrefix 1 }
+
+xcmJmxJobConfigV1Enterprise OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap
+        for a Job config changed event sent by this managed system."
+    ::= { xcmJmxMIBNotifications 6 }
+
+xcmJmxJobConfigV2TrapPrefix
+    OBJECT IDENTIFIER ::= { xcmJmxJobConfigV1Enterprise 0 }
+
+xcmJmxJobConfigV2Trap NOTIFICATION-TYPE
+    OBJECTS {
+        jmJobState,
+        jmJobStateReasons1,
+        jmNumberOfInterveningJobs
+    }
+    STATUS      current
+    DESCRIPTION
+        "This SMIv2 trap corresponds to IPP 'job-config-changed' event."
+    REFERENCE
+        "See:   Section 5.3.2 'notify-events' in [IPP-NOT]."
+    ::= { xcmJmxJobConfigV2TrapPrefix 1 }
+
+
+xcmJmxJobProgressV1Enterprise OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap
+        for a Job progress event sent by this managed system."
+    ::= { xcmJmxMIBNotifications 7 }
+
+xcmJmxJobProgressV2TrapPrefix
+    OBJECT IDENTIFIER ::= { xcmJmxJobProgressV1Enterprise 0 }
+
+xcmJmxJobProgressV2Trap NOTIFICATION-TYPE
+    OBJECTS {
+        jmJobKOctetsPerCopyRequested,
+        jmJobKOctetsProcessed,
+        jmJobImpressionsPerCopyRequested,
+        jmJobImpressionsCompleted
+    }
+    STATUS      current
+    DESCRIPTION
+        "This SMIv2 trap corresponds to an IPP 'job-progress' event."
+    REFERENCE
+        "See:   Section 5.3.2 'notify-events' in [IPP-NOT]."
+    ::= { xcmJmxJobProgressV2TrapPrefix 1 }
+
+--
+--  Conformance Information
+--
+
+xcmJmxMIBConformance    OBJECT IDENTIFIER ::= { xcmJmxMIB 3 }
+
+--
+--  Compliance Statements
+--
+
+xcmJmxMIBCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+        "The compliance statement for agents that implement this
+        Job Admin MIB."
+    MODULE -- this module
+    MANDATORY-GROUPS { xcmJmxGeneralGroup }
+--  GROUP { xcmJmxJobAdmin }
+
+--  GROUP       xcmJmxJobTrapsGroup
+--  DESCRIPTION
+--      "Implementation of this group is CONDITIONALLY MANDATORY;
+--      mandatory for systems which send Job traps via SNMP."
+
+--  GROUP       xcmJmxJobOperationTrapsGroup
+--  DESCRIPTION
+--      "Implementation of this group is CONDITIONALLY MANDATORY;
+--      mandatory for systems which manage jobs via SNMP and that
+--      send Job traps via SNMP."
+
+
+--  OBJECT      xcmJmxJobAdminOperation
+--  SYNTAX      INTEGER { other(1), unknown(2), cancelJob(3) }
+--  DESCRIPTION
+--      "It is conformant to implement this object with only the above
+--      enumerated values for the 'XcmJmxJobAdminOperation' textual
+--      convention supported."
+
+    ::= { xcmJmxMIBConformance 1 }
+
+xcmJmxMIBObjectGroups   OBJECT IDENTIFIER ::= { xcmJmxMIBConformance 2 }
+
+xcmJmxGeneralGroup OBJECT-GROUP
+    OBJECTS {
+        xcmJmxGeneralGroupSupport,
+        xcmJmxGeneralJobCreatedCount,
+        xcmJmxGeneralJobCompletedCount,
+        xcmJmxGeneralJobOperationCount,
+        xcmJmxGeneralJobTrapCount
+    }
+    STATUS  current
+    DESCRIPTION
+        "The general group."
+    ::= { xcmJmxMIBObjectGroups 1 }
+
+xcmJmxJobAdminGroup OBJECT-GROUP
+    OBJECTS {
+        xcmJmxJobAdminOperation,
+        xcmJmxJobAdminStatus,
+        xcmJmxJobAdminInProgress
+    }
+    STATUS  current
+    DESCRIPTION
+        "The job administration group."
+    ::= { xcmJmxMIBObjectGroups 2 }
+
+xcmJmxMIBTrapGroups     OBJECT IDENTIFIER ::= { xcmJmxMIBConformance 3 }
+
+--  xcmJmxJobTrapsGroup NOTIFICATION-GROUP
+--      NOTIFICATIONS {
+--          xcmJmxJobStateV2Trap,
+--          xcmJmxJobCreatedV2Trap,
+--          xcmJmxJobCompletedV2Trap,
+--          xcmJmxJobStoppedV2Trap,
+--          xcmJmxJobConfigV2Trap,
+--          xcmJmxJobProgressV2Trap
+--          }
+--      STATUS  current
+--      DESCRIPTION
+--          "The job event notification group."
+--      ::= { xcmJmxMIBTrapGroups 1 }
+
+--  xcmJmxJobOperationTrapsGroup NOTIFICATION-GROUP
+--      NOTIFICATIONS {
+
+
+--          xcmJmxJobOperationV2Trap
+--          }
+--      STATUS  current
+--      DESCRIPTION
+--          "The job operation event notification group."
+--      ::= { xcmJmxMIBTrapGroups 2 }
+
+END

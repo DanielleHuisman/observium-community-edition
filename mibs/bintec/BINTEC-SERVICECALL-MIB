@@ -1,0 +1,229 @@
+-- This file is corresponding to Release 9.1.10.101 from 2014/08/11 00:00:00
+
+
+---------------------------------------------------------------------------
+-- (C)opyright 2011-2014 bintec elmeg GmbH, All Rights Reserved
+-- $RCSfile: mib-service,v $ 
+-- $Revision: 1.6 $
+-- $Date: 2014-02-07 10:37:49 $
+-- Author: Johannes Thumshirn
+---------------------------------------------------------------------------
+BINTEC-SERVICECALL-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, mib-2,
+    TimeTicks,
+    enterprises                 FROM SNMPv2-SMI
+    IpAddress                   FROM RFC1155-SMI
+    DisplayString               FROM SNMPv2-TC
+    admin-2			FROM BINTEC-MIB;
+
+
+serviceCallMIB MODULE-IDENTITY
+    LAST-UPDATED "201206010000Z"
+    ORGANIZATION "bintec elmeg GmbH"
+    CONTACT-INFO
+            "EMail:   info@bintec-elmeg.com
+	     Web:     www.bintec-elmeg.com
+	    "
+    DESCRIPTION
+            "The MIB module for service call entities. "
+    REVISION      "201106080000Z"
+    DESCRIPTION
+            "Initial version." 
+    ::= { admin-2 8 }
+
+--
+-- The Service Call Group
+--
+    serviceCallAdmin OBJECT IDENTIFIER ::= { serviceCallMIB 1 }
+
+    serviceCallDaemonAdminStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            enabled(1),
+            disabled(2)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object shows the current status of the service call daemon.
+         It may be used to turn the service call daemon on and off."
+        DEFVAL { disabled }
+        ::= { serviceCallAdmin 1 }
+
+    serviceCallDaemonOperStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            enabled(1),
+            disabled(2)
+        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+        "This object shows the current operational state of the service call
+        daemon."
+        DEFVAL { disabled }
+        ::= { serviceCallAdmin 2 }
+
+    serviceCallServiceHostAddress OBJECT-TYPE
+        SYNTAX DisplayString 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object identifies the host to be called on a service request."
+    ::= { serviceCallAdmin 3 }
+    
+    serviceCallServiceHostPort OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object identifies the port to be called on the service host."
+    ::= { serviceCallAdmin 4 }
+
+    serviceCallDefaultShorthold OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object identifies the time in seconds to wait before closing an
+        inactive service call."
+    ::= { serviceCallAdmin 6 }
+
+    serviceCallTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF ServiceCallEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+	"The (conceptual) table listing the service calls."
+    ::= { serviceCallMIB 2 }
+
+    serviceCallEntry OBJECT-TYPE
+        SYNTAX ServiceCallEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+	"An entry (conceptual row) representing a service call."
+        INDEX { serviceCallIndex, serviceCallTicket }
+    ::= { serviceCallTable 1 }
+    
+    ServiceCallEntry ::= SEQUENCE {
+        serviceCallIndex                INTEGER,
+        serviceCallOperStatus           INTEGER,
+        serviceCallAdminStatus          INTEGER,
+        serviceCallType                 INTEGER,
+        serviceCallForwardedService     INTEGER,
+        serviceCallForwardedIP          IpAddress,
+        serviceCallTicket               DisplayString,
+        serviceCallDuration             TimeTicks
+    }
+
+    serviceCallIndex OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+        "A unique identifier for a service call."
+    ::= { serviceCallEntry 1 }
+
+    serviceCallOperStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            idle(1),
+            start(2),
+            running(3),
+            done(4),
+            error(5),
+            blocked(6)
+        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+        "This object identifies the current operational state of this service
+        call.
+	Idle: The entry has been created but the daemon has not started calling yet.
+	Start: The service call is started, but the authentication procedure is not yet done.
+	Running: The service call is up and running.
+	Done: The service call is completed and the row will be deleted.
+	Error: Somewhere something went wrong.
+       Blocked: Retry in a few seconds (This state usually is reached when
+                network is currently unavailable.
+	" 
+        DEFVAL { idle }
+    ::= { serviceCallEntry 2 }
+    
+    serviceCallAdminStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+            enabled(1),
+            disabled(2),
+            delete(3)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object identifies the current administrative state of this
+        service call."
+        DEFVAL { enabled }
+    ::= { serviceCallEntry 3 }
+
+     serviceCallType OBJECT-TYPE
+        SYNTAX INTEGER {
+            pbx(1),
+            phone(2)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object identifies the type of service call, it can either be the
+        PBX itself or a phone attached to the pbx."
+        DEFVAL { pbx }
+    ::= { serviceCallEntry 4 }
+
+    serviceCallForwardedService OBJECT-TYPE
+        SYNTAX INTEGER {
+            control(1),
+            http(2),
+            https(3),
+            shell(4),
+            trace(5)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object identifies the service to be forwarded to the service
+        technician. The services are:
+	Control: A commuication channel between serviced and B.A.B.E. used for signalling commands.
+	Http: Http on port 80.
+	Https: Https (using SSL) on port 443.
+	Shell: Telnet using port 23.
+	Trace: Bricktrace for packet capture analysis using port 7000. 
+	"
+        DEFVAL { control }
+    ::= { serviceCallEntry 5 }
+
+    serviceCallForwardedIP OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+        "This object identifies the IP address of the device the service call is
+        pointed to."        
+    ::= { serviceCallEntry 6 }
+
+    serviceCallTicket OBJECT-TYPE
+        SYNTAX DisplayString (SIZE (0..14))
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+        "This object identifies the service ticket for this service call."
+    ::= { serviceCallEntry 7 }
+
+    serviceCallDuration OBJECT-TYPE
+        SYNTAX      
+                    TimeTicks
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+        "This object identifies the duration of the current service call."
+        DEFVAL { 0 }
+    ::= { serviceCallEntry 8 }
+
+END

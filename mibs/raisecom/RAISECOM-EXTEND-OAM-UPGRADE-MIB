@@ -1,0 +1,266 @@
+-- MibName=raisecomRemoteUpgrade
+-- =======================================================================
+-- Version info 
+--
+-- Version 0.1 Created 2006.9.11 by LIAOBIN
+-- This version of MIB is created just for management of extend OAM remote
+-- upgrade. 
+-- Copyright(c) 2003-2006 by RAISECOM TECH, Ltd. 
+-- =======================================================================
+
+-- ===========================================================================
+
+--
+-- RAISECOM base management objects
+--            
+
+RAISECOM-EXTEND-OAM-UPGRADE-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+		MODULE-IDENTITY,
+		OBJECT-TYPE,
+		NOTIFICATION-TYPE ,
+		Integer32,
+		IpAddress,
+		Unsigned32
+			FROM SNMPv2-SMI
+		DisplayString,
+		TimeStamp,
+		RowStatus,
+		TruthValue
+			FROM SNMPv2-TC    
+		DateAndTime,
+		EnableVar
+			FROM SWITCH-TC       
+		raisecomAgent		
+			FROM RAISECOM-BASE-MIB;
+	
+	raisecomRemoteUpgrade    MODULE-IDENTITY
+		LAST-UPDATED 	"200608110000Z"
+		ORGANIZATION 	"RAISECOM TECH, Ltd."
+		CONTACT-INFO 	"www.raisecom.com"
+		DESCRIPTION  	
+		    "The MIB module defining objects for remote upgrade management"
+		::= { raisecomAgent  11}  
+                
+	-- groups                 
+	raisecomExtendOamUpgradeGroup	OBJECT IDENTIFIER ::= {raisecomRemoteUpgrade 1}
+	
+	
+    -- raisecomExtendOamUpgradeGroup
+    		
+   	raisecomExtendOamUpgradeMibObjects OBJECT IDENTIFIER ::= { raisecomExtendOamUpgradeGroup 1 }
+	raisecomExtendOamMibTraps   OBJECT IDENTIFIER ::= { raisecomExtendOamUpgradeGroup 2 }
+
+    raisecomExtendOamUpgradeNextIndex OBJECT-TYPE
+		    SYNTAX Unsigned32(1..2147483647)
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Object specifying a unique entry in the rcExtendOamUpgradeTable. 
+		        A management station wishing to initiate an upgrade to remote 
+		        device with extend OAM should get this object value as an index 
+		        to create an request entry in the following table."
+		    ::= { raisecomExtendOamUpgradeMibObjects 1 }
+   
+   
+	raisecomExtendOamUpgradeTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomExtendOamUpgradeEntry
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "A table of Upgrade requests."
+		    ::= { raisecomExtendOamUpgradeMibObjects 2 }
+
+	raisecomExtendOamUpgradeEntry OBJECT-TYPE
+		    SYNTAX RaisecomExtendOamUpgradeEntry
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "A Upgrade request."
+		    INDEX { raisecomExtendOamUpgradeIndex }
+		    ::= { raisecomExtendOamUpgradeTable 1 }
+
+	RaisecomExtendOamUpgradeEntry ::= SEQUENCE {
+		    raisecomExtendOamUpgradeIndex 			Unsigned32,
+		    raisecomExtendOamUpgradeType	 		INTEGER,
+		    raisecomExtendOamUpgradeFileType	 	INTEGER,
+		    raisecomExtendOamUpgradeFileName 		DisplayString,
+		    raisecomExtendOamUpgradeNotificationOnComplete 	TruthValue,
+		    raisecomExtendOamUpgradeState 			INTEGER,    
+		    raisecomExtendOamUpgradeDevices			OCTET STRING,
+		    raisecomExtendOamUpgradeEntryRowStatus 	RowStatus
+	    	    }
+
+	raisecomExtendOamUpgradeIndex OBJECT-TYPE
+		    SYNTAX Unsigned32(1..2147483647)
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Object, of which value is generated from the scalar 
+		        raisecomExtendOamUpgradeNextIndex, specifies a unique entry 
+		        in the raisecomExtendOamUpgradeTable.  "
+		    ::= { raisecomExtendOamUpgradeEntry 1 }
+
+	raisecomExtendOamUpgradeType OBJECT-TYPE
+		    SYNTAX INTEGER {download(1),upload(2)}
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specify the direction of the upgrade. 
+		        download means write file to remote device. 
+		        upload means get file from remote device."
+		    ::= { raisecomExtendOamUpgradeEntry 2 }
+
+	raisecomExtendOamUpgradeFileType OBJECT-TYPE
+		    SYNTAX INTEGER {
+	        		   image (1),
+                       startupconfig (2),
+                       runningconfig (3),
+                       others (4),
+                       bootstrap (5),
+                       fpga (6)
+	        		   }
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "File type to be upgraded."
+		        		       
+		    ::= { raisecomExtendOamUpgradeEntry 3 }
+
+	 raisecomExtendOamUpgradeFileName OBJECT-TYPE
+		    SYNTAX DisplayString
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Name of file on local device to be upgraded. If upload, it specifies 
+		        the name of file and the type of storage to be saved, otherwise the 
+		        name and storage of source file to be downloaded."
+		    ::= {  raisecomExtendOamUpgradeEntry 4 }
+
+	 raisecomExtendOamUpgradeNotificationOnComplete OBJECT-TYPE
+		    SYNTAX TruthValue
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specifies whether or not a  rcExtendOamUpgradeNotificationOnCompleteTrap       
+		        notification should be issued on completion of transfer. If such 
+		        notification is desired, it is the responsibility of the management entity 
+		        to ensure that the SNMP administrative model is configured in the way that 
+		        allows the notification to be delivered."
+		    DEFVAL { false }
+		    ::= {  raisecomExtendOamUpgradeEntry 5 }
+
+	 raisecomExtendOamUpgradeState OBJECT-TYPE
+		    SYNTAX  INTEGER {
+				        waiting(1),
+				        getsource(2),
+				        writedest(3),
+				        completed(4)
+				     }
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specifies the state of this Upgrade request.
+		        This value of this object is instantiated only after the row
+		        has been instantiated, i.e. after the  raisecomExtendOamUpgradeEntryRowStatus
+		        has been made active."
+		    ::= {  raisecomExtendOamUpgradeEntry 6 }
+
+	 raisecomExtendOamUpgradeDevices OBJECT-TYPE
+		    SYNTAX OCTET STRING (SIZE(2..255))
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specifies the Devices to be upgraded ."
+		    ::= {  raisecomExtendOamUpgradeEntry 7 }
+
+	 raisecomExtendOamUpgradeEntryRowStatus OBJECT-TYPE
+		    SYNTAX RowStatus
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "The status of this table entry.  Once the entry status is
+		        set to active, the associated entry cannot be modified until
+		        the request completes ."
+		    ::= {  raisecomExtendOamUpgradeEntry 8 }
+	
+
+	raisecomExtendOamUpgradeStatusTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomExtendOamUpgradeStatusEntry
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "A table of Upgrade statuses."
+		    ::= { raisecomExtendOamUpgradeMibObjects 3 }
+
+	raisecomExtendOamUpgradeStatusEntry OBJECT-TYPE
+		    SYNTAX RaisecomExtendOamUpgradeStatusEntry
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "A Upgrade status."
+		    INDEX { raisecomExtendOamUpgradeStatusIndex, raisecomExtendOamUpgradeStatusDevice }
+		    ::= { raisecomExtendOamUpgradeStatusTable 1 }
+
+	RaisecomExtendOamUpgradeStatusEntry ::= SEQUENCE {
+		    raisecomExtendOamUpgradeStatusIndex 			Unsigned32,
+		    raisecomExtendOamUpgradeStatusDevice	 		INTEGER,
+		    raisecomExtendOamUpgradeFailCause 		INTEGER
+	    	    }
+
+
+ 	raisecomExtendOamUpgradeStatusIndex OBJECT-TYPE
+		    SYNTAX Unsigned32(1..2147483647)
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomExtendOamUpgradeStatusTable."
+		    ::= { raisecomExtendOamUpgradeStatusEntry 1 }
+
+	raisecomExtendOamUpgradeStatusDevice OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specify the direction of the upgrade. 
+		        download means write file to remote device. 
+		        upload means get file from remote device."
+		    ::= { raisecomExtendOamUpgradeStatusEntry 2 }
+
+	 raisecomExtendOamUpgradeFailCause OBJECT-TYPE
+		    SYNTAX  INTEGER {
+		    			noerror(1),
+				        invalidfilename(2),
+				        fileopenfail(3),
+				        filewritefail(4),
+				        nomem(5),
+				        filetoolarge(6),
+				        oamlinkbusy(7),
+				        oamtimeout(8),
+				        oamnotconnnected(9),
+				        remotenotsupport (10),
+				        unknown(11),
+				        invalidupgradetype(12),
+				        invalidfiletype(13),
+				        filecheckfail(14)		        
+				    }
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "The reason why the Upgrade operation failed.
+		        This object is instantiated only when the 
+		        raisecomExtendOamUpgradeState for this  entry is 
+		        in the completed state."
+		    ::= {  raisecomExtendOamUpgradeStatusEntry 3 }
+
+		    
+	raisecomExtendOamUpgradeCompletion NOTIFICATION-TYPE
+           OBJECTS {raisecomExtendOamUpgradeDevices}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that completion of upgrade for specific devices."
+       		::= { raisecomExtendOamMibTraps 1 }
+              
+END

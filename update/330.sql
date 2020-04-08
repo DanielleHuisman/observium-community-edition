@@ -1,0 +1,1 @@
+ALTER TABLE  `oids` CHANGE  `oid`  `oid` VARCHAR( 1024 ) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL , CHANGE  `oid_descr`  `oid_descr` VARCHAR( 256 ) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL , CHANGE  `oid_name`  `oid_name` VARCHAR( 512 ) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL ;

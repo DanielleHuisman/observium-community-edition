@@ -1,0 +1,314 @@
+--  *****************************************************************
+--  DLINKPRIME-TIME-MIB.mib : D-Link Time MIB
+--
+--  Copyright (c) 2014 D-Link Corporation, all rights reserved.
+--
+--  *****************************************************************
+DLINKPRIME-TIME-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY,OBJECT-TYPE, IpAddress,
+        Unsigned32                  FROM SNMPv2-SMI
+        OBJECT-GROUP,MODULE-COMPLIANCE			
+                                    FROM SNMPv2-CONF
+        TEXTUAL-CONVENTION,DateAndTime,
+        TruthValue,DisplayString,
+        RowStatus                   FROM SNMPv2-TC      
+        InterfaceIndexOrZero        FROM IF-MIB    
+        InetAddressType,InetAddress FROM INET-ADDRESS-MIB       
+        dlinkPrimeCommon            FROM DLINK-ID-REC-MIB;
+
+
+    dlinkPrimeTimeMIB MODULE-IDENTITY
+        LAST-UPDATED "201404260000Z"
+        ORGANIZATION "D-Link Corp."
+        CONTACT-INFO
+            "        D-Link Corporation
+
+             Postal: No. 289, Sinhu 3rd Rd., Neihu District,
+                     Taipei City 114, Taiwan, R.O.C
+             Tel:     +886-2-66000123
+             E-mail: tsd@dlink.com.tw
+            "
+        DESCRIPTION
+            "This MIB module defines objects for Time and Simple Network Time
+            Protocol (SNTP)."
+        REVISION "201404260000Z"
+        DESCRIPTION
+            "This is the first version of the MIB file. 
+            "
+    ::= { dlinkPrimeCommon 23 }
+
+    DlinkTimeSummerTimeValue ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "2d-1d-1d,1d:1d"
+        STATUS       current
+        DESCRIPTION
+            "Denotes Summer Time starts or ends time.
+            This value is always interpreted within the context of a 
+            dpTimeSummerTimeAutoSwitchMode value.
+            When dpTimeSummerTimeAutoSwitchMode is disable(1), this value is not
+            meaningful.
+        
+            When dpTimeSummerTimeAutoSwitchMode is date(2), the format is defined as follows:    
+        
+            octets    contents    range
+            ------    --------    -----------
+               1-2        year    2000..2037
+                 3        date    1..31
+                 4       month    1..12 where January = 1 December = 12
+                 5        hour    0..23
+                 6      minute    0..59
+             
+             For example, the first Feb 2000 at 13:30pm should be given as 07 d0 01 02 0d 1e
+             For the first May 2000 at 1:20am should be given as 07 d0 01 05 01 14                     
+         "
+    SYNTAX       OCTET STRING (SIZE (6))
+
+-- -----------------------------------------------------------------------------
+    dpTimeMIBNotifications     OBJECT IDENTIFIER ::= { dlinkPrimeTimeMIB 0 }
+    dpTimeMIBObjects           OBJECT IDENTIFIER ::= { dlinkPrimeTimeMIB 1 }
+    dpTimeMIBConformance       OBJECT IDENTIFIER ::= { dlinkPrimeTimeMIB 2 }
+    
+-- -----------------------------------------------------------------------------
+    dpTimeGeneral         OBJECT IDENTIFIER ::= { dpTimeMIBObjects 1 }
+
+    dpTimeSntpEnabled OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the state of SNTP function.
+            Setting this object to 'true' will enable SNTP function.
+            "
+        ::= { dpTimeGeneral 1 }
+    
+    dpTimeSntpPollInterval OBJECT-TYPE
+        SYNTAX          Unsigned32 (30..99999)
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION 
+            "This object indicates the interval for the SNTP client to
+            synchronize its clock with server."
+        DEFVAL      { 720 }
+        ::= { dpTimeGeneral 2 }
+            
+-- -----------------------------------------------------------------------------
+    dpTimeClock                   OBJECT IDENTIFIER ::= { dpTimeMIBObjects 2 }    
+
+    dpTimeManagedClock OBJECT-TYPE
+        SYNTAX          DateAndTime
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "Use the object to manually set the system clock."
+        ::= { dpTimeClock 1 }
+
+    dpTimeCurrentTimeSource OBJECT-TYPE
+        SYNTAX          INTEGER { 
+            sntp(1), 
+            noTimeSource(2)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "The object indicates the clock source."
+        ::= { dpTimeClock 2 }
+
+    dpTimeCurrentTime  OBJECT-TYPE
+        SYNTAX          DateAndTime
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the current system time. System time can
+            be disciplined or adjusted by RTC, SNTP, or configured by user.
+            "
+        ::= { dpTimeClock 3 }
+
+-- -----------------------------------------------------------------------------    
+
+    dpTimeSummerTime         OBJECT IDENTIFIER ::= { dpTimeClock 4 }
+
+    dpTimeSummerTimeAutoSwitchMode OBJECT-TYPE
+        SYNTAX          INTEGER  { 
+            disable(1), 
+            date(2) 
+        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the mode of the system to automatically
+            switch to Summer Time (Daylight Saving Time).
+            disable(1) - The Daylight Saving Time feature is disabled.
+            date(2) - The Daylight Saving Time feature is enabled. 
+                      The Summer Time should start and end on the specified date
+                      of the specified month.  
+            "
+        DEFVAL { disable }
+        ::= { dpTimeSummerTime 1 }
+        
+    dpTimeSummerTimeTimeZone OBJECT-TYPE
+        SYNTAX          INTEGER (-779..839)
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION 
+            "Local time offset in minutes from GMT."          
+        ::= { dpTimeSummerTime 2 }
+        
+    dpTimeSummerTimeStart OBJECT-TYPE
+        SYNTAX          DlinkTimeSummerTimeValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION 
+            "This object indicates when the Summer Time starts.
+            This value is always interpreted within the context of a 
+            dpTimeSummerTimeAutoSwitchMode value.             
+            "             
+        ::= { dpTimeSummerTime 3 }
+        
+    dpTimeSummerTimeEnd OBJECT-TYPE
+        SYNTAX          DlinkTimeSummerTimeValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object indicates when the Summer Time ends.
+            This value is always interpreted within the context of a 
+            dpTimeSummerTimeAutoSwitchMode value.
+            "  
+        ::= { dpTimeSummerTime 4 }
+  
+    dpTimeSummerTimeOffset  OBJECT-TYPE
+        SYNTAX      INTEGER (30|60|90|120)
+        UNITS       "Minutes"
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The value of this object indicates number of minutes to add
+            or to subtract during Summer Time. This object is not meaningful
+            when dpTimeSummerTimeAutoSwitchMode object is 'disable'."
+        DEFVAL { 60 }
+        ::= { dpTimeSummerTime 5 }
+
+-- -----------------------------------------------------------------------------
+    dpTimeServer                  OBJECT IDENTIFIER ::= { dpTimeMIBObjects 3 }
+    
+    dpTimeSntpServerAddr  OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "IP address of the time server which provides the clock
+             synchronization."
+        ::= { dpTimeServer 1 }
+        
+    dpTimeSntpServerStratum  OBJECT-TYPE
+        SYNTAX          Unsigned32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the SNTP server stratum."
+        ::= { dpTimeServer 2 }
+        
+    dpTimeSntpServerVersion  OBJECT-TYPE
+        SYNTAX          Unsigned32
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the SNTP server version."
+        ::= { dpTimeServer 3 }
+        
+    dpTimeSntpServerLastReceive OBJECT-TYPE
+        SYNTAX          Unsigned32
+        UNITS           "seconds"
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the elapsed time that the SNTP time has
+            been synchronized.             
+            "
+        ::= { dpTimeServer 4 }
+
+
+--  ***************************************************************************	
+--  Conformance
+--  ***************************************************************************			   		
+	dpTimeCompliances OBJECT IDENTIFIER ::= { dpTimeMIBConformance 1 }
+		
+	dpTimeCompliance MODULE-COMPLIANCE
+		STATUS current
+		DESCRIPTION 
+			"The compliance statement for entities which implement the 
+			DLINKPRIME-TIME-MIB."
+		MODULE -- this module
+		MANDATORY-GROUPS { 
+		    dpTimeSysInfoGroup	   		   
+		}
+				
+		GROUP    dpTimeClockGroup 
+        DESCRIPTION
+           "This group is conditionally mandatory and must be implemented by
+		    the agent only if system clock can be manually configured."
+		   		   
+		GROUP    dpTimeSntpGroup 
+        DESCRIPTION
+           "This group is conditionally mandatory and must be implemented by
+		    the agent only if SNTP feature is supported."
+		        		        
+        GROUP    dpTimeSummerTimeCfgGroup 
+        DESCRIPTION
+           "This group is conditionally mandatory and must be implemented by
+		   the agent only if Daylight Saving Time feature is supported.
+		   "
+		::= { dpTimeCompliances 1 }
+
+-- units of conformance		
+	dpTimeGroups OBJECT IDENTIFIER ::= { dpTimeMIBConformance 2 }
+		
+	dpTimeSysInfoGroup OBJECT-GROUP
+		OBJECTS { 		    
+		    dpTimeCurrentTimeSource,
+		    dpTimeCurrentTime	    
+		}
+		STATUS current
+		DESCRIPTION 
+			"A collection of objects provides the information for system time."
+		::= { dpTimeGroups 1 }
+	
+	dpTimeClockGroup OBJECT-GROUP
+		OBJECTS { 		    
+		    dpTimeManagedClock
+     	}
+		STATUS          current
+		DESCRIPTION 
+			"A collection of objects provides configuration for system time."
+		::= { dpTimeGroups 2 }
+			
+	dpTimeSntpGroup OBJECT-GROUP
+		OBJECTS { 
+		   	dpTimeSntpEnabled,
+		    dpTimeSntpPollInterval,
+		    dpTimeSntpServerAddr,
+		   	dpTimeSntpServerStratum,
+		   	dpTimeSntpServerVersion,
+		   	dpTimeSntpServerLastReceive
+		}
+		STATUS current
+		DESCRIPTION 
+			"A collection of objects provides configuration for SNTP."
+			::= { dpTimeGroups 3 }
+	
+	dpTimeSummerTimeCfgGroup OBJECT-GROUP
+		OBJECTS { 		    		    
+		    dpTimeSummerTimeAutoSwitchMode,
+		    dpTimeSummerTimeTimeZone,
+		    dpTimeSummerTimeStart,
+		    dpTimeSummerTimeEnd,
+		    dpTimeSummerTimeOffset
+		}
+		STATUS current
+		DESCRIPTION 
+			"A collection of objects provides configuration for Daylight
+			Saving Time feature."
+		::= { dpTimeGroups 4 }
+	
+	
+END

@@ -1,0 +1,260 @@
+--  *****************************************************************
+--  DLINKPRIME-SNMP-MIB.mib : SNMP management MIB
+--
+--  Copyright (c) 2014 D-Link Corporation, all rights reserved.
+--
+--  *****************************************************************
+DLINKPRIME-SNMP-MIB DEFINITIONS ::= BEGIN
+
+	IMPORTS
+   		MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+   		Unsigned32, IpAddress
+       		FROM SNMPv2-SMI
+   		DisplayString, TruthValue
+       		FROM SNMPv2-TC
+   		MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+       		FROM SNMPv2-CONF               		
+        SnmpEngineID, SnmpAdminString, SnmpSecurityModel                      
+            FROM SNMP-FRAMEWORK-MIB
+        ifIndex, InterfaceIndexOrZero
+            FROM IF-MIB                  
+   		dlinkPrimeCommon		
+            FROM DLINK-ID-REC-MIB;
+       
+   
+   dlinkPrimeSnmpMIB	MODULE-IDENTITY
+   		LAST-UPDATED "201406030000Z"
+   		ORGANIZATION "D-Link Corp."
+        CONTACT-INFO
+            "        D-Link Corporation
+
+             Postal: No. 289, Sinhu 3rd Rd., Neihu District,
+                     Taipei City 114, Taiwan, R.O.C
+             Tel:     +886-2-66000123
+             E-mail: tsd@dlink.com.tw
+            "
+        DESCRIPTION
+            "This MIB module defines objects for configuring SNMP 
+            ( Simple Network Management Protocol )"
+            
+        REVISION "201406030000Z"
+        DESCRIPTION
+            "This is the first version of the MIB file for 'SNMP'
+            functionality."  
+       
+        ::= { dlinkPrimeCommon 15 } 
+            
+-- -----------------------------------------------------------------------------
+    
+	dpSnmpMIBNotifications 	OBJECT IDENTIFIER ::= { dlinkPrimeSnmpMIB 0 }
+	dpSnmpMIBObjects 		OBJECT IDENTIFIER ::= { dlinkPrimeSnmpMIB 1 }
+	dpSnmpMIBConformance	OBJECT IDENTIFIER ::= { dlinkPrimeSnmpMIB 2 }
+
+-- -------------------------------------------------------------------------- 
+	dpSnmpGeneral			OBJECT IDENTIFIER ::= { dpSnmpMIBObjects 1 }
+		
+	dpSnmpServiceEnabled OBJECT-TYPE
+   		SYNTAX          TruthValue
+  		MAX-ACCESS      read-write
+   		STATUS          current
+   		DESCRIPTION
+           "A Boolean value represents the SNMP server is Enabled or Disabled."
+   		::= { dpSnmpGeneral 1 }
+        
+-- -------------------------------------------------------------------------- 
+	dpSnmpMIBTrap				OBJECT IDENTIFIER ::= { dpSnmpMIBObjects 2 }
+	
+	dpSnmpTrapGlobalEnabled OBJECT-TYPE
+       	SYNTAX          TruthValue
+  		MAX-ACCESS      read-write
+   		STATUS          current
+   		DESCRIPTION
+            "A Boolean value to represent the global state of sending of trap
+            packets.
+            "
+   		::= { dpSnmpMIBTrap 1 }
+
+    dpSnmpTrapGlobalNotifyEnable OBJECT-TYPE
+        SYNTAX          BITS {         
+            linkUp(0),
+            linkDown(1),
+            coldStart(2),
+            warmStart(3),
+            authentication(4)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object indicates global state about whether a specified
+            notification is enabled or not.
+            If a bit corresponding to a notification is set to 1, then 
+            the specified notification can be generated.
+
+            linkUp(0)    - sending a standard linkUp notification (defined in IF-MIB). 
+            linkDown(1)  - sending a standard linkDown notification (defined in IF-MIB).  
+            coldStart(2) - sending a standard coldStart notification (defined in SNMPv2-MIB).
+            warmStart(3) - sending a standard warmStart notification (defined in SNMPv2-MIB).
+            Note: please use snmpEnableAuthenTraps (defined in SNMPv2-MIB) to control 
+            the generation of authenticationFailure traps.
+            "
+        ::= { dpSnmpMIBTrap 2 }
+      
+-- -------------------------------------------------------------------------- 	 
+    dpSnmpAccessCfg 			OBJECT IDENTIFIER ::= { dpSnmpMIBObjects 3 }
+         
+    dpSnmpCommunityTable  OBJECT-TYPE
+        SYNTAX          SEQUENCE OF DpSnmpCommunityEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table consists of a list of communities.
+            "       
+        ::= { dpSnmpAccessCfg 1 }
+
+    dpSnmpCommunityEntry  OBJECT-TYPE
+        SYNTAX          DpSnmpCommunityEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "An entry defines additional information which is not covered at
+            snmpCommunityTable (defined in SNMP-COMMUNITY-MIB).
+            An entry appears in this table when a community is created in 
+            snmpCommunityTable.
+            "
+        INDEX     { dpSnmpCommunityName }
+        ::= { dpSnmpCommunityTable 1 }
+
+    DpSnmpCommunityEntry ::= SEQUENCE {
+        dpSnmpCommunityName               SnmpAdminString,
+        dpSnmpCommunityAccessListName     DisplayString       
+    }
+
+    dpSnmpCommunityName  OBJECT-TYPE
+        SYNTAX          SnmpAdminString
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+           "This object indicates the name of the community."
+        ::= { dpSnmpCommunityEntry 1 }
+   	
+    dpSnmpCommunityAccessListName  OBJECT-TYPE
+        SYNTAX          DisplayString 
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+           "This object indicates the name of a standard access list to control
+           the user to use this community string to access to the SNMP agent. 
+           Specify the valid user in the source address field of the access 
+           list entry.
+           A zero length string indicates the access list is not specified.          
+           "
+        ::= { dpSnmpCommunityEntry 3 }
+
+-- --------------------------------------------------------------------------
+    dpSnmpHostTable  OBJECT-TYPE
+        SYNTAX          SEQUENCE OF DpSnmpHostEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table consists of a list of recipients for the SNMP
+            notification. 
+            "       
+        ::= { dpSnmpAccessCfg 2 }
+
+    dpSnmpHostEntry  OBJECT-TYPE
+        SYNTAX          DpSnmpHostEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "An entry consists of additional informaiton which is not covered
+            at snmpTargetAddrTable and snmpTargetParamsTable (defined in 
+            SNMP-TARGET-MIB).           
+            An entry appears in this table when a target address is created in 
+            snmpTargetAddrTable.
+            "            
+        INDEX     { dpSnmpHostIndex }
+        ::= { dpSnmpHostTable 1 }
+
+    DpSnmpHostEntry ::= SEQUENCE {
+        dpSnmpHostIndex         Unsigned32,
+        dpSnmpHostIPv4Addr      IpAddress,
+        dpSnmpHostSecurity      INTEGER,
+        dpSnmpHostCommunityName SnmpAdminString       
+    }
+     
+	dpSnmpHostIndex     OBJECT-TYPE
+		SYNTAX          Unsigned32
+		MAX-ACCESS      not-accessible
+		STATUS  current
+		DESCRIPTION
+		      "The ID number for this entry."
+		::= { dpSnmpHostEntry 1 }		
+
+    dpSnmpHostIPv4Addr  OBJECT-TYPE
+        SYNTAX          IpAddress
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+           "This object indicates the IPv4 address of the recipients."
+        ::= { dpSnmpHostEntry 2 }
+
+    dpSnmpHostSecurity  OBJECT-TYPE
+        SYNTAX  INTEGER {
+            v1(1),
+            v2c(2)
+        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+           "This object indicates the User-based Security Model for the recipients."
+        ::= { dpSnmpHostEntry 3 }
+
+    dpSnmpHostCommunityName OBJECT-TYPE
+        SYNTAX              SnmpAdminString (SIZE(1..16))
+        MAX-ACCESS          read-write
+        STATUS              current
+        DESCRIPTION
+           "This object indicates the address name of the recipients."
+        ::= { dpSnmpHostEntry 4 }
+
+--  ***************************************************************************	
+--  Conformance
+--  ***************************************************************************			   		
+	dpSnmpCompliances OBJECT IDENTIFIER ::= { dpSnmpMIBConformance 1 }
+		
+-- units of conformance		
+	dpSnmpGroups OBJECT IDENTIFIER ::= { dpSnmpMIBConformance 2 }
+		
+	dpSnmpSysCfgGroup OBJECT-GROUP
+		OBJECTS { 
+		    dpSnmpServiceEnabled	    
+		}
+		STATUS current
+		DESCRIPTION 
+			"A collection of objects provides the information for SNMP server."
+		::= { dpSnmpGroups 1 }
+		
+	dpSnmpTrapCfgGroup OBJECT-GROUP
+		OBJECTS { 
+		    dpSnmpTrapGlobalEnabled,
+		    dpSnmpTrapGlobalNotifyEnable    
+		}
+		STATUS current
+		DESCRIPTION 
+			"A collection of objects provides system-wide control of traps."
+			::= { dpSnmpGroups 2 }
+	
+	dpSnmpCommunityExtGroup OBJECT-GROUP
+        OBJECTS         { 
+            dpSnmpCommunityAccessListName
+        }
+        STATUS          current
+        DESCRIPTION
+            "The collection of objects provides configuration for community feature
+            which extends SNMP community. 
+            "
+            ::= { dpSnmpGroups 3 }
+    			
+
+END
+

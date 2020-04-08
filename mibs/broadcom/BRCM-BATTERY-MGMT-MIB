@@ -1,0 +1,847 @@
+--****************************************************************************
+--
+-- Copyright (c) 2005-2009 Broadcom Corporation
+--
+-- This program is the proprietary software of Broadcom Corporation and/or
+-- its licensors, and may only be used, duplicated, modified or distributed
+-- pursuant to the terms and conditions of a separate, written license
+-- agreement executed between you and Broadcom (an "Authorized License").
+-- Except as set forth in an Authorized License, Broadcom grants no license
+-- (express or implied), right to use, or waiver of any kind with respect to
+-- the Software, and Broadcom expressly reserves all rights in and to the
+-- Software and all intellectual property rights therein.  IF YOU HAVE NO
+-- AUTHORIZED LICENSE, THEN YOU HAVE NO RIGHT TO USE THIS SOFTWARE IN ANY WAY,
+-- AND SHOULD IMMEDIATELY NOTIFY BROADCOM AND DISCONTINUE ALL USE OF THE
+-- SOFTWARE.  
+--
+-- Except as expressly set forth in the Authorized License,
+--
+-- 1.     This program, including its structure, sequence and organization,
+-- constitutes the valuable trade secrets of Broadcom, and you shall use all
+-- reasonable efforts to protect the confidentiality thereof, and to use this
+-- information only in connection with your use of Broadcom integrated circuit
+-- products.
+--
+-- 2.     TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SOFTWARE IS PROVIDED
+-- "AS IS" AND WITH ALL FAULTS AND BROADCOM MAKES NO PROMISES, REPRESENTATIONS
+-- OR WARRANTIES, EITHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, WITH
+-- RESPECT TO THE SOFTWARE.  BROADCOM SPECIFICALLY DISCLAIMS ANY AND ALL
+-- IMPLIED WARRANTIES OF TITLE, MERCHANTABILITY, NONINFRINGEMENT, FITNESS FOR
+-- A PARTICULAR PURPOSE, LACK OF VIRUSES, ACCURACY OR COMPLETENESS, QUIET
+-- ENJOYMENT, QUIET POSSESSION OR CORRESPONDENCE TO DESCRIPTION. YOU ASSUME
+-- THE ENTIRE RISK ARISING OUT OF USE OR PERFORMANCE OF THE SOFTWARE.
+--
+-- 3.     TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL BROADCOM
+-- OR ITS LICENSORS BE LIABLE FOR (i) CONSEQUENTIAL, INCIDENTAL, SPECIAL,
+-- INDIRECT, OR EXEMPLARY DAMAGES WHATSOEVER ARISING OUT OF OR IN ANY WAY
+-- RELATING TO YOUR USE OF OR INABILITY TO USE THE SOFTWARE EVEN IF BROADCOM
+-- HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES; OR (ii) ANY AMOUNT IN
+-- EXCESS OF THE AMOUNT ACTUALLY PAID FOR THE SOFTWARE ITSELF OR U.S. $1,
+-- WHICHEVER IS GREATER. THESE LIMITATIONS SHALL APPLY NOTWITHSTANDING ANY
+-- FAILURE OF ESSENTIAL PURPOSE OF ANY LIMITED REMEDY.
+--
+--****************************************************************************
+--    Filename: brcm-battery-mgmt.mib
+--    Author:   Kevin O'Neal
+--    Creation Date: February 11, 2005
+--
+--**************************************************************************
+--    Description:
+--
+--		private MIB for runtime (not factory) management of battery
+--		
+--**************************************************************************
+--    Revision History:
+--
+--**************************************************************************
+
+BRCM-BATTERY-MGMT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-IDENTITY,
+    OBJECT-TYPE,
+    Integer32,
+    Unsigned32
+        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION,
+    TruthValue,
+    DateAndTime,
+    DisplayString
+        FROM SNMPv2-TC
+    cableDataMgmtMIBObjects
+        FROM BRCM-CABLEDATA-MGMT-MIB
+    PositiveInteger
+        FROM UPS-MIB;
+                
+batteryMgmt MODULE-IDENTITY
+    LAST-UPDATED "200912140000Z"
+    ORGANIZATION "Broadcom Corporation"
+    CONTACT-INFO
+        "	BANANA-CABLEDATA
+                (cableData branch of the
+                Broadcom Assigned Numbers and Naming Authority)
+                Broadcom Corporation
+
+        Postal: 4385 River Green Parkway
+                Duluth, GA  30096
+                USA
+
+           Tel: +1 770 232-0018
+
+        E-mail: banana-cabledata@broadcom.com"
+    DESCRIPTION
+        "Broadcom proprietary MIB for runtime management of objects related
+         to battery powered devices."
+    REVISION      "200912140000Z"
+	DESCRIPTION
+		"Added new alarm bcmAlarmLowPower"
+	REVISION      "200903050000Z"
+	DESCRIPTION
+		"Corrected return values from battChargerLifeTestStatus and added notes
+		 to battNextLifeTest"
+	REVISION	  "200810100000Z"
+	DESCRIPTION
+		"Added objects to facilitate automated testing of periodic life cycle test."
+	REVISION      "200807100000Z"
+	DESCRIPTION
+	    "Added objects for control of periodic life testing and hardware faults."
+    REVISION      "200806180000Z"
+    DESCRIPTION
+        "Added group batteryThermalMgmt."        
+    REVISION      "200803210000Z"
+    DESCRIPTION
+        "Changed max-access of battChargerMaximumCharge to read-only."        
+    REVISION      "200709260000Z"
+    DESCRIPTION
+        "Added object battTemperature to the batteryTable."        
+    REVISION      "200702050000Z"
+    DESCRIPTION
+        "Module description was updated. 
+         Compilability issues were cleaned up: 
+         - Chronological order of revision history was corrected.
+         - Range restriction was added to object battIndex."
+    REVISION      "200612080000Z"
+    DESCRIPTION
+        "Added alarm bcmAlarmTempBadDischargeInhibited.
+         Changed names of bcmAlarmBadTempChargeSuspended and 
+         bcmAlarmBadTempPowerReduced to bcmAlarmTempBadChargeSuspended
+         and bcmAlarmTempBadPowerReduced for naming consistency with 
+         upsAlarmTempBad from the UPS-MIB."
+    REVISION      "200606200000Z"
+    DESCRIPTION
+        "Added objects related to per-pack EEPROM data to the batteryTable."        
+    REVISION      "200602080000Z"
+    DESCRIPTION
+        "Added object battErrors to the batteryTable."    
+    REVISION      "200602070100Z"
+    DESCRIPTION
+        "Added objects battEstimatedMinutesRemaining and
+         battEstimatedChargeRemaining to the batteryTable."
+    REVISION      "200602070000Z"
+    DESCRIPTION
+        "Added alarms bcmAlarmBadTempChargeSuspended and 
+         bcmAlarmBadTempPowerReduced."
+    REVISION      "200512010000Z"
+    DESCRIPTION
+        "Added group batteryBcmAlarms and object 
+         battChargerLowChargeThreshold."         
+    REVISION      "200508230000Z"
+    DESCRIPTION
+        "Added group batteryPowerMgmt."
+    REVISION      "200504190000Z"
+    DESCRIPTION
+        "Added object battChargerReplaceBatteryThreshold."                              
+    REVISION      "200502110000Z"
+    DESCRIPTION
+        "Initial version of this MIB module."
+    ::= { cableDataMgmtMIBObjects 10 }
+
+HardwareFault ::= TEXTUAL-CONVENTION
+   STATUS       current
+   DESCRIPTION
+           "This data type represents a bit-mask of potential hardware fault 
+		    conditions in the battChargerHardwareFaultsAllowed and 
+			battChargerHardwareFaultsDetected	 entries."
+	SYNTAX		BITS {
+					chargerOverVoltageFault(0),
+					chargerOverCurrentFault(1),
+					chargerPrequalVoltageFault(3),
+					chargerDischargeOverCurrentFault(4),
+					chargerGeneralDischargeFault(5),
+					chargerInputOverVoltageFault(8),
+					chargerUnexpectedBatteryVoltage(9),
+					chargerUnexpectedBatteryCurrent(10),
+					chargerBatteryOverVoltage(11),
+					chargerBatteryEnablesShorted(12)
+				}
+    
+batteryMgmtBase OBJECT IDENTIFIER ::= { batteryMgmt 1 }
+
+batteryTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BatteryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of batteries present on the system."
+    ::= { batteryMgmtBase 1 }
+    
+batteryEntry OBJECT-TYPE
+    SYNTAX      BatteryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry describing the characteristics of an individual battery."
+    INDEX   { battIndex }
+    ::= { batteryTable 1 }
+    
+BatteryEntry ::= 
+    SEQUENCE    {
+                battIndex                       Integer32,
+                battCapacity                    Unsigned32,
+                battMaximumVoltage              Unsigned32,
+                battMinimumVoltage              Unsigned32, 
+                battMeasuredVoltage             Unsigned32,
+                battIsValid                     TruthValue,
+                battIsSelected                  TruthValue,
+                battEstimatedMinutesRemaining   PositiveInteger,
+                battEstimatedChargeRemaining    INTEGER,
+                battErrors                      Unsigned32,
+                battEpromRevision               DisplayString,
+                battPackSupplier                DisplayString,
+                battModelNumber                 DisplayString,
+                battSerialNumber                DisplayString,
+                battCellSupplier                DisplayString,
+                battCellCapacity                DisplayString,
+                battCellDateCode                DisplayString,
+                battPackDateCode                DisplayString,
+                battTemperature                 Integer32,
+				battPackGUID					DisplayString,
+                battActualCapacity              Unsigned32,
+				battAge							Unsigned32,
+				battNextLifeTest				DisplayString
+				battDischargeTable				OCTET STRING,
+				battCompressedDischargeTable	OCTET STRING,
+				battInvalidateNonVolSlot		INTEGER
+    }
+    
+battIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Identifies the instance number of this individual battery."
+    ::= { batteryEntry 1 }
+
+battCapacity OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliamp hours"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The charge capacity of this battery."
+    ::= { batteryEntry 2 }
+
+battMaximumVoltage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "millivolts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The voltage at which this battery is considered to be fully charged.  
+         Note that if battChargerMaximumCharge is set to less than 100%, the 
+         battery will never be charged to this voltage."
+    ::= { batteryEntry 3 }
+
+battMinimumVoltage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "millivolts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The voltage at which this battery is considered to be fully 
+         discharged."
+    ::= { batteryEntry 4 }
+
+battMeasuredVoltage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "millivolts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The most recently measured voltage of this battery."
+    ::= { batteryEntry 5 }
+
+battIsValid OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates whether this battery is considered valid by the battery
+         charger.  A value of false(2) here indicates some kind of failure
+         with this battery."
+    ::= { batteryEntry 6 }
+
+battIsSelected OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates whether this battery is currently selected for charging or
+         discharging."
+    ::= { batteryEntry 7 }
+    
+battEstimatedMinutesRemaining OBJECT-TYPE
+   SYNTAX      PositiveInteger
+   UNITS       "minutes"
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+           "An estimate of the time to depletion of this battery's charge
+            under the present load conditions if the utility power
+            is off and remains off, or if it were to be lost and
+            remain off."
+   ::= { batteryEntry 8 }
+
+battEstimatedChargeRemaining OBJECT-TYPE
+   SYNTAX      INTEGER (0..100)
+   UNITS       "percent"
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+           "An estimate of this battery's charge remaining expressed
+            as a percent of full charge."
+   ::= { batteryEntry 9 }
+   
+battErrors OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of errors reported by the charger when trying
+         to charge this battery.  This object should always have a value of
+         zero if all is well with the charger and the battery."
+    ::= { batteryEntry 10 }
+
+battEpromRevision OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The version of the battery EPROM."
+    ::= { batteryEntry 11 }
+
+battPackSupplier OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Battery Pack Supplier"
+    ::= { batteryEntry 12 }
+
+battModelNumber OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Battery Model Number."
+    ::= { batteryEntry 13 }
+
+battSerialNumber OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Battery Serial Number."
+    ::= { batteryEntry 14 }
+
+battCellSupplier OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Battery Cell Supplier."
+    ::= { batteryEntry 15 }
+
+battCellCapacity OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Battery Cell Capacity."
+    ::= { batteryEntry 16 }
+
+battCellDateCode OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Battery Cell Date Code(mmddyy)."
+    ::= { batteryEntry 17 }
+
+battPackDateCode OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Battery Pack Date Code(mmddyy)."
+    ::= { batteryEntry 18 }
+    
+battTemperature OBJECT-TYPE
+   SYNTAX     Integer32
+   UNITS      "degrees Centigrade"
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+       "The temperature as reported by this battery.  If the battery pack does
+        not support temperature measurement then this object will not be
+        supported."
+   ::= { batteryEntry 19 }
+
+battPackGUID OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The battery pack globally unique ID (0x<cc><iiiiiiii><ff>).
+		 Where <cc> is an 8-bit CRC, <iiiiiiii> is the 48-bit ID, and <ff> is
+		 the 8-bit family code.  If the hardware does not support reading
+		 the GUID then this object will not be supported."
+    ::= { batteryEntry 20 }
+
+battActualCapacity OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliamp hours"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current maximum charge capacity of this battery.  If the hardware
+		 does not support periodic life testing, this will return the same
+		 value as battDesignCapacity"
+    ::= { batteryEntry 21 }
+
+battAge OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..100)
+    UNITS       "percent"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Specifies the current age of the battery as a percentage of its design
+		capacity.  This value could be calculated by dividing battActualCapacity
+		by battDesignCapacity (however, this value clips at 100%.)"
+    ::= { batteryEntry 22 }
+
+battNextLifeTest OBJECT-TYPE
+	SYNTAX     	DisplayString
+	MAX-ACCESS 	read-write
+	STATUS		current
+	DESCRIPTION
+		"Returns/specifies the date and time of the next life test (mmddyyyy hh:mm:ss)
+		 for the specified pack. If the charger does not support periodic life 
+		 testing then this object will not be supported.  Setting this object to 
+		 a value that resolves to a date in the past triggers an immediate life test.
+		 Note than any character - not just a space character - may be used to 
+		 separate the date and time portions when setting this value."
+	::= { batteryEntry 23 }
+
+battDischargeTable OBJECT-TYPE
+    SYNTAX      OCTET STRING
+	MAX-ACCESS	read-only
+    STATUS      current
+    DESCRIPTION
+        "Returns the full discharge table for the specified battery as a comma-delimited string"
+    ::= { batteryEntry 24 }
+
+battCompressedDischargeTable  OBJECT-TYPE
+    SYNTAX      OCTET STRING
+	MAX-ACCESS	read-only
+    STATUS      current
+    DESCRIPTION
+        "Returns the compressed discharge table from the specified battery"
+    ::= { batteryEntry 25 }
+
+battInvalidateNonVolSlot OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1)
+	MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+        "Invalidates the specified non-vol slot"
+    ::= { batteryEntry 26 }
+
+batteryCharger OBJECT IDENTIFIER ::= { batteryMgmt 2 }
+
+battChargerMicrocodeVersion OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The version of the battery charger microcode."
+    ::= { batteryCharger 1 }
+
+battChargerMicrocodeBuildTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The build date and time of the battery charger microcode."
+    ::= { batteryCharger 2 }
+
+battChargerInputVoltage OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "millivolts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The most recently measured input voltage to the battery charger.
+         Typically, if operating on battery power, this value will approach
+         zero.  If operating on utility power, this value will approach the
+         value of the power supplied to the device."
+    ::= { batteryCharger 3 }
+
+battChargerState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                initializing(1),
+				idle(2),
+                sleep(3),
+                chargeInit(4),
+                preQualification(5),
+                fastCharge(6),
+                trickleCharge(7),
+                topOff(8),
+                discharge(9),
+                forcedDischarge(10),
+                eternalSleep(11)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current state of the battery charger.  Note that all states may
+         not be supported on all types of chargers."
+    ::= { batteryCharger 4 }
+
+battChargerMaximumCharge OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..100)
+    UNITS       "percent"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Reports the level to which the charger will charge the batteries."
+    ::= { batteryCharger 5 }
+    
+battChargerReplaceBatteryThreshold OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..100)
+    UNITS       "percent"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the minimum charge percentage that the battery must be able
+         to reach when charging.  If a battery cannot be charged above this
+         percentage, it will be considered bad and battIsValid will transition
+         to false(2)."
+    ::= { batteryCharger 6 }
+    
+battChargerLowChargeThreshold OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..100)
+    UNITS       "percent"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the charge percentage at which the bcmAlarmLowBatteryCharge
+         will be raised."
+    DEFVAL { 25 }
+    ::= { batteryCharger 7 }
+
+battChargerHardwareFaultsAllowed OBJECT-TYPE
+	SYNTAX		HardwareFault
+	MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the hardware faults that are currently allowed to affect the
+		 battery subsystem. If the charger does not support hardware faults then 
+		 this object will not be supported. See bcmAlarmHardwareFault for a description
+		 of appropriate usage. Default value is all faults enabled."
+    ::= { batteryCharger 8 }
+
+battChargerHardwareFaultsDetected OBJECT-TYPE
+	SYNTAX		HardwareFault
+	MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the hardware faults that are currently active in the battery 
+		 subsystem.  Writing any valoe to this entry caues ALL faults to be reset.
+		 See bcmAlarmHardwareFault for a description of appropriate usage. If the charger
+		 does not support hardware faults then this object will not be supported.
+		 Default value is zero (0)."
+    ::= { batteryCharger 9 }
+
+battChargerLifeTestInterval OBJECT-TYPE
+	SYNTAX		Unsigned32 (0..365)
+	MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of days between periodic life tests (default = 180).
+		If the charger does not support periodic life testing then this object 
+		will not be supported."
+    ::= { batteryCharger 10 }
+
+battChargerLifeTestEnable OBJECT-TYPE
+	SYNTAX		TruthValue
+	MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies whether or not periodic life testing is enabled. If the charger 
+		does not support periodic life testing then this object will not be supported.
+		Default value is FALSE."
+    ::= { batteryCharger 11 }
+    
+battChargerLifeTestTOD OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the time of day (hh:mm) using a 24-hour clock at which battery 
+		life testing will be scheduled. If the charger does not support periodic 
+		life testing then this object will not be supported. Default value is '22:00'."
+    ::= { batteryCharger 12 }
+    
+battChargerLifeTestStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                lTStateIdle(1),
+				lTStateBegin(2),
+                lTStatePTD(3),
+				lTStateStartCharge(4),
+                lTStateHWIMP(5),
+                lTStateCharge(6),
+                lTStateStartSWIMP(7),
+                lTStateComplSWIMP(8),
+                lTStateDischarge(9),
+                lTStateComplete(10)
+    }
+	MAX-ACCESS	read-only
+    STATUS      current
+    DESCRIPTION
+        "Returns the current life test state"
+    ::= { batteryCharger 13 }
+
+battChargerAbortLifeTest OBJECT-TYPE
+	SYNTAX		TruthValue
+	MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+        "Setting this to TRUE aborts an in-progress life test.  Reads always return 
+		 FALSE.  No effect if a life test is not currently in progress.  If the 
+		 charger does not support periodic life testing then this object will not 
+		 be supported."
+    ::= { batteryCharger 14 }
+
+batteryPowerMgmt OBJECT IDENTIFIER ::= { batteryMgmt 3 }
+
+batteryPowerMgmtInterfaces OBJECT IDENTIFIER ::= { batteryPowerMgmt 1 }
+
+battPowerMgmtCmDelay OBJECT-TYPE
+    SYNTAX      Integer32 (-1..2147483647)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of seconds following transition to battery power
+         before the DOCSIS CM interface will enter power management mode.  If
+         set to -1, the interface will never enter power management mode and 
+         will remain at full power until utility power is restored or battery
+         charge is depleted."
+    DEFVAL { 0 }
+    ::= { batteryPowerMgmtInterfaces 1 }
+    
+battPowerMgmtEthernetDelay OBJECT-TYPE
+    SYNTAX      Integer32 (-1..2147483647)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of seconds following transition to battery power
+         before the ethernet interface will enter power management mode.  If
+         set to -1, the interface will never enter power management mode and 
+         will remain at full power until utility power is restored or battery
+         charge is depleted."
+    DEFVAL { 0 }
+    ::= { batteryPowerMgmtInterfaces 2 }
+    
+battPowerMgmtUsbDelay OBJECT-TYPE
+    SYNTAX      Integer32 (-1..2147483647)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of seconds following transition to battery power
+         before the USB interface will enter power management mode.  If
+         set to -1, the interface will never enter power management mode and 
+         will remain at full power until utility power is restored or battery
+         charge is depleted."
+    DEFVAL { 0 }
+    ::= { batteryPowerMgmtInterfaces 3 }
+    
+battPowerMgmtWiFiDelay OBJECT-TYPE
+    SYNTAX      Integer32 (-1..2147483647)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of seconds following transition to battery power
+         before the WiFi interface will enter power management mode.  If
+         set to -1, the interface will never enter power management mode and 
+         will remain at full power until utility power is restored or battery
+         charge is depleted."
+    DEFVAL { 0 }
+    ::= { batteryPowerMgmtInterfaces 4 }
+    
+battPowerMgmtBluetoothDelay OBJECT-TYPE
+    SYNTAX      Integer32 (-1..2147483647)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of seconds following transition to battery power
+         before the bluetooth interface will enter power management mode.  If
+         set to -1, the interface will never enter power management mode and 
+         will remain at full power until utility power is restored or battery
+         charge is depleted."
+    DEFVAL { 0 }
+    ::= { batteryPowerMgmtInterfaces 5 }
+    
+battPowerMgmtHpnaDelay OBJECT-TYPE
+    SYNTAX      Integer32 (-1..2147483647)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the number of seconds following transition to battery power
+         before the HPNA interface will enter power management mode.  If
+         set to -1, the interface will never enter power management mode and 
+         will remain at full power until utility power is restored or battery
+         charge is depleted."
+    DEFVAL { 0 }
+    ::= { batteryPowerMgmtInterfaces 6 }
+    
+-- batteryBcmAlarms provides a node under which enterprise-specific alarm
+-- OIDs may be defined for use in the upsAlarmTable.
+    
+batteryBcmAlarms OBJECT IDENTIFIER ::= { batteryMgmt 4 }
+
+bcmAlarmLowBatteryCharge OBJECT-IDENTITY
+   STATUS     current
+   DESCRIPTION
+           "The value of upsEstimatedChargeRemaining is less than or equal
+            to the value of battChargerLowChargeThreshold."
+   ::= { batteryBcmAlarms  1 }
+   
+bcmAlarmTempBadChargeSuspended OBJECT-IDENTITY
+   STATUS     current
+   DESCRIPTION
+           "The temperature of the device has exceeded operational limits
+            for safe battery charging, and battery charging has been suspended."
+   ::= { batteryBcmAlarms  2 }
+   
+bcmAlarmTempBadPowerReduced OBJECT-IDENTITY
+   STATUS     current
+   DESCRIPTION
+           "The temperature of the device has exceeded operational limits,
+            and the device has been placed in low power mode in an to attempt
+            to reduce heat production."
+   ::= { batteryBcmAlarms  3 }
+   
+bcmAlarmBatteryMissing OBJECT-IDENTITY
+   STATUS     current
+   DESCRIPTION
+           "There are no batteries installed in the device and the device will
+            not be capable of sustaining power in the event of utility power
+            loss."
+   ::= { batteryBcmAlarms  4 }
+   
+bcmAlarmTempBadDischargeInhibited OBJECT-IDENTITY
+   STATUS     current
+   DESCRIPTION
+           "The temperature of the device has exceeded operational limits
+            for safe battery discharging, and battery discharging has been 
+            inhibited."
+   ::= { batteryBcmAlarms  5 }
+   
+bcmAlarmHardwareFault OBJECT-IDENTITY
+	STATUS 	current
+	DESCRIPTION
+		"Indicates that a hardware fault that is enabled in battChargerHardwareFaultsAllowed
+		 has been detected in battChargerHardwareFaultsDetected (i.e. the logical AND
+		 of these two objects is non-zero)."
+	::= { batteryBcmAlarms 6 }
+    
+bcmAlarmLowPower OBJECT-IDENTITY
+	STATUS 	current
+	DESCRIPTION
+		"Indicates that the system has been placed into low power mode in order
+         to extend battery life."
+	::= { batteryBcmAlarms 7 }
+
+batteryThermalMgmt OBJECT IDENTIFIER ::= { batteryMgmt 5 }
+   
+batteryThermalSensorTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BatteryThermalSensorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of thermal sensors present on the system."
+    ::= { batteryThermalMgmt 1 }
+    
+batteryThermalSensorEntry OBJECT-TYPE
+    SYNTAX      BatteryThermalSensorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry describing a single thermal sensor."
+    INDEX   { battThermalSensorType, battThermalSensorIndex }
+    ::= { batteryThermalSensorTable 1 }
+    
+BatteryThermalSensorEntry ::= 
+    SEQUENCE    {
+                battThermalSensorType           INTEGER,
+                battThermalSensorIndex          Integer32,
+                battThermalSensorDescription    DisplayString,
+                battThermalSensorTemperature    Integer32
+    }
+    
+battThermalSensorType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                batteryPackSensor(1),
+                boardLevelTemperatureSensor(2),
+                thermalShutdownControllerSensor(3)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Identifies the type of this thermal sensor."
+    ::= { batteryThermalSensorEntry 1 }
+    
+battThermalSensorIndex OBJECT-TYPE
+    SYNTAX      Integer32 (0..8)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Identifies the instance number of this thermal sensor."
+    ::= { batteryThermalSensorEntry 2 }
+    
+battThermalSensorDescription OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A textual description of this thermal sensor."
+    ::= { batteryThermalSensorEntry 3 }
+    
+battThermalSensorTemperature OBJECT-TYPE
+   SYNTAX     Integer32
+   UNITS      "degrees Centigrade"
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+       "The temperature as reported by this thermal sensor."
+   ::= { batteryThermalSensorEntry 4 }
+
+END

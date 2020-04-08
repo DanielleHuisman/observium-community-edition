@@ -1,0 +1,608 @@
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Trend Micro, Inc.
+-- Copyright information is in the DESCRIPTION section of the MODULE-IDENTITY.
+-- 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+TPT-NGFW-POLICY-MIB
+
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+  InetAddress,
+  InetAddressType
+    FROM INET-ADDRESS-MIB
+    
+  MODULE-COMPLIANCE,
+  NOTIFICATION-GROUP,
+  OBJECT-GROUP
+    FROM SNMPv2-CONF
+    
+  Counter64,
+  MODULE-IDENTITY, 
+  NOTIFICATION-TYPE,
+  OBJECT-TYPE,
+  Unsigned32
+    FROM SNMPv2-SMI
+
+  SnmpAdminString
+    FROM SNMP-FRAMEWORK-MIB
+
+  DateAndTime,
+  TEXTUAL-CONVENTION
+    FROM SNMPv2-TC
+    
+  tptNgfwSystemSerial
+    FROM TPT-NGFW-SYSTEM-INFO-MIB
+    
+  tpt-ngfw-compls,
+  tpt-ngfw-groups,
+  tpt-ngfw-objs,
+  tpt-ngfw-eventsV2,
+  tpt-ngfw-params
+    FROM TPT-NGFW-REG-MIB
+;
+
+tptNgfwPolicy MODULE-IDENTITY
+  LAST-UPDATED "201605251854Z" -- May 25, 2016
+  ORGANIZATION "Trend Micro, Inc."
+  CONTACT-INFO "www.trendmicro.com"
+  DESCRIPTION
+    "
+     Policy information and notifications for TippingPoint Next-Generation Firewall products. This
+     includes Firewall rules, IPS, Reputation profiles, Quarantine.
+
+     Copyright (C) 2016 Trend Micro Incorporated. All Rights Reserved.
+     
+     Trend Micro makes no warranty of any kind with regard to this material,
+     including, but not limited to, the implied warranties of merchantability
+     and fitness for a particular purpose. Trend Micro shall not be liable for
+     errors contained herein or for incidental or consequential damages in
+     connection with the furnishing, performance, or use of this material. This
+     document contains proprietary information, which is protected by copyright. No
+     part of this document may be photocopied, reproduced, or translated into
+     another language without the prior written consent of Trend Micro. The
+     information is provided 'as is' without warranty of any kind and is subject to
+     change without notice. The only warranties for Trend Micro products and
+     services are set forth in the express warranty statements accompanying such
+     products and services. Nothing herein should be construed as constituting an
+     additional warranty. Trend Micro shall not be liable for technical or editorial
+     errors or omissions contained herein. TippingPoint(R), the TippingPoint logo, and
+     Digital Vaccine(R) are registered trademarks of Trend Micro. All other company
+     and product names may be trademarks of their respective holders. All rights
+     reserved. This document contains confidential information, trade secrets or
+     both, which are the property of Trend Micro. No part of this documentation may
+     be reproduced in any form or by any means or used to make any derivative work
+     (such as translation, transformation, or adaptation) without written permission
+     from Trend Micro or one of its subsidiaries. All other company and product
+     names may be trademarks of their respective holders.
+    "
+
+  REVISION "201605251854Z" -- May 25, 2016 
+  DESCRIPTION "Updated copyright information. Minor MIB syntax fixes."
+  
+  REVISION    "201303131200Z" -- March 12, 2013
+  DESCRIPTION "Initial version of NGFW Policy MIB."
+
+::= { tpt-ngfw-objs 4 } 
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Textual Conventions
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+EventSource ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The firewall rule or inspection profile that triggered a policy 
+               notification.
+              "
+  SYNTAX      INTEGER { firewall(1), ips(2), reputation(3), quarantine(4) }
+
+FirewallEventType ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The type of firewall event detected: a session start or 
+               end, an application detection, or network traffic
+               was blocked.
+              "
+  SYNTAX      INTEGER { sessionStart(1), applicationDetect(2), sessionEnd(3),
+                        blockedByFirewall(4) }
+
+EventSeverity ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The severity of a network event.
+              "
+  SYNTAX      INTEGER { info(1), low(2), minor(3), major(4), critical(5) }
+
+ActionType ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The action taken by a policy to either block, permit, trust,
+               rate-limit, or quarantine network traffic.
+              "
+  SYNTAX      INTEGER { permit(1), rateLimit(2), trust(3), block(4),
+                        quarantine(5) }              
+
+PacketTraceVersion ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The version of a packet trace collected and saved or none.
+              "
+  SYNTAX      INTEGER { packetTraceV1(1), packetTraceV2(2), none(3) }
+  
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- NGFW Policy Notification
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptNgfwPolicyNotifyTime OBJECT-TYPE
+  SYNTAX      DateAndTime
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The time when the firewall detected a network event and generated
+               this policy notification.
+              "
+::= { tpt-ngfw-params 20 }
+
+tptNgfwPolicyNotifyEventSource OBJECT-TYPE
+  SYNTAX      EventSource
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The policy component (Firewall, IPS, Reputation, Quarantine) that detected
+               a network event and generated this notification.
+              "
+::= { tpt-ngfw-params 21 }
+
+tptNgfwPolicyNotifyEventType OBJECT-TYPE
+  SYNTAX      FirewallEventType
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "If the notify event was generated by the firewall, this object
+               indicates what type of event was detected.
+              "
+::= { tpt-ngfw-params 22 }
+
+tptNgfwPolicyNotifyEventSeverity OBJECT-TYPE
+  SYNTAX      EventSeverity
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The severity of the detected network event.
+              "
+::= { tpt-ngfw-params 23 }
+
+tptNgfwPolicyNotifyCorrelationId OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..255)) 
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "A 128-bit identifier in decimal format. This ID is used to correlate firewall 
+               events. For example, a firewall session started and ended notification will
+               have the same correlation ID.
+              "
+::= { tpt-ngfw-params 24 }
+
+tptNgfwPolicyNotifyActionType OBJECT-TYPE
+  SYNTAX      ActionType
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The type of action taken on network traffic matching a firewall rule or
+               inspection profile.
+              "
+::= { tpt-ngfw-params 25 }
+
+tptNgfwPolicyNotifyAction OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..80))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "This object provides additional description of a firewall action.
+               For example, when a quarantine action occurs, this object details if the action 
+               was to place traffic in or out of quarantine.
+              "
+::= { tpt-ngfw-params 26 }
+
+tptNgfwPolicyNotifyActionSetName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..255))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The action set name associated with the firewall rule that detected an event.
+              "
+::= { tpt-ngfw-params 27 }
+
+tptNgfwPolicyNotifyRuleName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..50))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The firewall rule name that has generated the notification.
+              "
+::= { tpt-ngfw-params 28 }
+
+tptNgfwPolicyNotifyInInterface OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..40))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The interface name that is receiving the traffic that triggered a 
+               firewall action.
+              "
+::= { tpt-ngfw-params 29 }
+
+tptNgfwPolicyNotifyOutInterface OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..40))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The interface name sending the suspect traffic.
+              "
+::= { tpt-ngfw-params 30 }
+
+tptNgfwPolicyNotifySrcIpAddrType OBJECT-TYPE
+  SYNTAX      InetAddressType
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The IP address type of the network traffic source.
+              "
+::= { tpt-ngfw-params 31 }
+
+tptNgfwPolicyNotifySrcIpAddr OBJECT-TYPE
+  SYNTAX      InetAddress
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The source IP address generating the network traffic that has
+               triggered a firewall action.
+              "
+::= { tpt-ngfw-params 32 }
+
+tptNgfwPolicyNotifySrcPort OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The source port generating the network traffic.
+              "
+::= { tpt-ngfw-params 33 }
+
+tptNgfwPolicyNotifySrcTransIpAddr OBJECT-TYPE
+  SYNTAX      InetAddress
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The translated (NAT) source IP address.
+              "
+::= { tpt-ngfw-params 34 }
+
+tptNgfwPolicyNotifySrcTransPort OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The translated (NAT) source port.
+              "
+::= { tpt-ngfw-params 35 }
+
+tptNgfwPolicyNotifyDestIpAddrType OBJECT-TYPE
+  SYNTAX      InetAddressType
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current  
+  DESCRIPTION "The destination IP address type.
+              "
+::= { tpt-ngfw-params 36 }
+
+tptNgfwPolicyNotifyDestIpAddr OBJECT-TYPE
+  SYNTAX      InetAddress
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The source IP address receiving network traffic that triggered a
+               firewall action.
+              "
+::= { tpt-ngfw-params 37 }
+
+tptNgfwPolicyNotifyDestPort OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The source port receiving the network traffic.
+              "
+::= { tpt-ngfw-params 38 }
+
+tptNgfwPolicyNotifyDestTransIpAddr OBJECT-TYPE
+  SYNTAX      InetAddress
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The translated (NAT) destination IP address.
+              "
+::= { tpt-ngfw-params 39 }
+
+tptNgfwPolicyNotifyDestTransPort OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The translated (NAT) destination port.
+              "
+::= { tpt-ngfw-params 40 }
+
+tptNgfwPolicyNotifyProtocol OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..40))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The transport protocol of the suspect traffic.
+              "
+::= { tpt-ngfw-params 41 }
+
+tptNgfwPolicyNotifyApplicationName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..80))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The application name generating network traffic that has triggered
+               a firewall rule.
+              "
+::= { tpt-ngfw-params 42 }
+
+tptNgfwPolicyNotifyUserName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..80))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The user name, if available, that is responsible for generating
+               network traffic triggering a firewall action.
+              "
+::= { tpt-ngfw-params 43 }
+
+tptNgfwPolicyNotifyBytesIn OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "Source to destination bytes.
+              "
+::= { tpt-ngfw-params 44 }
+
+tptNgfwPolicyNotifyBytesOut OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "Destination to source bytes.
+              "
+::= { tpt-ngfw-params 45 }
+
+tptNgfwPolicyNotifyStartTimeSec OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The time, in seconds, from EPOC (January 1, 1970 00:00:00) when the 
+               event was detected.
+              "
+::= { tpt-ngfw-params 46 }
+
+tptNgfwPolicyNotifyStartTimeNano OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The fractional time, in nanoseconds, when the event was detected.
+              "
+::= { tpt-ngfw-params 47 }
+
+tptNgfwPolicyNotifyRateLimit OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The rate-limit, in kbps, of the action set associated with
+               this notification.
+              "
+::= { tpt-ngfw-params 48 }
+
+tptNgfwPolicyNotifyPktTraceVer OBJECT-TYPE
+  SYNTAX      PacketTraceVersion
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The packet trace version.
+              "
+::= { tpt-ngfw-params 49 }
+
+tptNgfwPolicyNotifyPktTraceId OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The bucket identifier for a packet trace.
+              "
+::= { tpt-ngfw-params 50 }
+
+tptNgfwPolicyNotifyPktTraceBegin OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The starting sequence number for a packet trace.
+              "
+::= { tpt-ngfw-params 51 }
+
+tptNgfwPolicyNotifyPktTraceEnd OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The ending sequence number for a packet trace.
+              "
+::= { tpt-ngfw-params 52 }
+
+tptNgfwPolicyNotifyFilterName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..40))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The descriptive name of the filter maching the data stream.
+              "
+::= { tpt-ngfw-params 53 }
+
+tptNgfwPolicyNotifyProfileName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..80))
+  MAX-ACCESS  accessible-for-notify
+
+  STATUS      current 
+  DESCRIPTION "Profile name.
+              "
+::= { tpt-ngfw-params 54 }
+
+tptNgfwPolicyNotifyPolicyName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..80))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The firewall policy name that matched network traffic and caused the firewall to
+               take an action.
+              "
+::= { tpt-ngfw-params 55 }
+
+tptNgfwPolicyNotifyVlanId OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..40))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The VLAN tag that the network traffic occured on.
+              "
+::= { tpt-ngfw-params 56 }
+
+tptNgfwPolicyNotifyHitCount OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "Hit count. The number of times, the firewall detected a particulare event
+               as defined by a rule or inspection profile.
+              "
+::= { tpt-ngfw-params 57 }
+
+tptNgfwPolicyNotifyMsgParams OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..255))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "A string containing parameters (separated by vertical bars) matching the 
+               Message in the Digital Vaccine (the XML tag is Message).
+              "
+::= { tpt-ngfw-params 58 }
+
+tptNgfwPolicyNotifyPeriod OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The aggregation period, in minutes, when the condition is frist detected and
+               this notification sent.
+              "
+::= { tpt-ngfw-params 59 }
+
+tptNgfwPolicyNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                    tptNgfwSystemSerial,
+                    tptNgfwPolicyNotifyTime,
+                    tptNgfwPolicyNotifyEventSource,
+                    tptNgfwPolicyNotifyEventType,
+                    tptNgfwPolicyNotifyEventSeverity,
+                    tptNgfwPolicyNotifyCorrelationId,
+                    tptNgfwPolicyNotifyActionType,
+                    tptNgfwPolicyNotifyAction,
+                    tptNgfwPolicyNotifyRuleName,
+                    tptNgfwPolicyNotifyInInterface,
+                    tptNgfwPolicyNotifyOutInterface,
+                    tptNgfwPolicyNotifySrcIpAddrType,
+                    tptNgfwPolicyNotifySrcIpAddr,
+                    tptNgfwPolicyNotifySrcPort,
+                    tptNgfwPolicyNotifySrcTransIpAddr,
+                    tptNgfwPolicyNotifySrcTransPort,
+                    tptNgfwPolicyNotifyDestIpAddrType,
+                    tptNgfwPolicyNotifyDestIpAddr,
+                    tptNgfwPolicyNotifyDestPort,
+                    tptNgfwPolicyNotifyDestTransIpAddr,
+                    tptNgfwPolicyNotifyDestTransPort,
+                    tptNgfwPolicyNotifyProtocol,
+                    tptNgfwPolicyNotifyApplicationName,
+                    tptNgfwPolicyNotifyUserName,
+                    tptNgfwPolicyNotifyBytesIn,
+                    tptNgfwPolicyNotifyBytesOut,
+                    tptNgfwPolicyNotifyStartTimeSec,
+                    tptNgfwPolicyNotifyStartTimeNano,
+                    tptNgfwPolicyNotifyRateLimit,
+                    tptNgfwPolicyNotifyPktTraceVer,
+                    tptNgfwPolicyNotifyPktTraceId,
+                    tptNgfwPolicyNotifyPktTraceBegin,
+                    tptNgfwPolicyNotifyPktTraceEnd,
+                    tptNgfwPolicyNotifyFilterName,
+                    tptNgfwPolicyNotifyProfileName,
+                    tptNgfwPolicyNotifyPolicyName,
+                    tptNgfwPolicyNotifyVlanId,
+                    tptNgfwPolicyNotifyHitCount,
+                    tptNgfwPolicyNotifyMsgParams,
+                    tptNgfwPolicyNotifyPeriod
+              }
+  STATUS      current
+  DESCRIPTION "A notification sent when a firewall rule, IPS, Reputation, or
+               Quarantine profile detects a network event of interest.
+              "
+::= { tpt-ngfw-eventsV2 10 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Groups
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptNgfwPolicyGroup OBJECT-GROUP
+  OBJECTS     {
+                    tptNgfwPolicyNotifyTime,
+                    tptNgfwPolicyNotifyEventSource,
+                    tptNgfwPolicyNotifyEventType,
+                    tptNgfwPolicyNotifyEventSeverity,
+                    tptNgfwPolicyNotifyCorrelationId,
+                    tptNgfwPolicyNotifyActionType,
+                    tptNgfwPolicyNotifyActionSetName,
+                    tptNgfwPolicyNotifyAction,
+                    tptNgfwPolicyNotifyRuleName,
+                    tptNgfwPolicyNotifyInInterface,
+                    tptNgfwPolicyNotifyOutInterface,
+                    tptNgfwPolicyNotifySrcIpAddrType,
+                    tptNgfwPolicyNotifySrcIpAddr,
+                    tptNgfwPolicyNotifySrcPort,
+                    tptNgfwPolicyNotifySrcTransIpAddr,
+                    tptNgfwPolicyNotifySrcTransPort,
+                    tptNgfwPolicyNotifyDestIpAddrType,
+                    tptNgfwPolicyNotifyDestIpAddr,
+                    tptNgfwPolicyNotifyDestPort,
+                    tptNgfwPolicyNotifyDestTransIpAddr,
+                    tptNgfwPolicyNotifyDestTransPort,
+                    tptNgfwPolicyNotifyProtocol,
+                    tptNgfwPolicyNotifyApplicationName,
+                    tptNgfwPolicyNotifyUserName,
+                    tptNgfwPolicyNotifyBytesIn,
+                    tptNgfwPolicyNotifyBytesOut,
+                    tptNgfwPolicyNotifyStartTimeSec,
+                    tptNgfwPolicyNotifyStartTimeNano,
+                    tptNgfwPolicyNotifyRateLimit,
+                    tptNgfwPolicyNotifyPktTraceVer,
+                    tptNgfwPolicyNotifyPktTraceId,
+                    tptNgfwPolicyNotifyPktTraceBegin,
+                    tptNgfwPolicyNotifyPktTraceEnd,
+                    tptNgfwPolicyNotifyFilterName,
+                    tptNgfwPolicyNotifyProfileName,
+                    tptNgfwPolicyNotifyPolicyName,
+                    tptNgfwPolicyNotifyVlanId,
+                    tptNgfwPolicyNotifyHitCount,
+                    tptNgfwPolicyNotifyMsgParams,
+                    tptNgfwPolicyNotifyPeriod
+              }
+ 
+  STATUS      current
+  DESCRIPTION "Policy group consisting of firewall, IPS, Reputation, and Quarantine
+               information.
+              "
+::= { tpt-ngfw-groups 7 }
+
+tptNgfwPolicyNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+                    tptNgfwPolicyNotify
+                  }
+                  
+    STATUS        current
+    DESCRIPTION   "Notification sent from TippingPoint Next-generation Firewall rules and inspection
+                   profiles.
+                  "
+::= { tpt-ngfw-groups 8 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Compliances
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptNgfwPolicyCompl MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION "Compliance for TippingPoint Next-generation Firewall policies.
+                "
+    MODULE
+      MANDATORY-GROUPS { tptNgfwPolicyGroup, tptNgfwPolicyNotificationGroup }
+::= { tpt-ngfw-compls 4 }
+
+END

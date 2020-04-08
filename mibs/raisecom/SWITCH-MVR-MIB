@@ -1,0 +1,892 @@
+--MibName=rcMvr
+-- *****************************************************************
+-- switch-mvr-mib.mib:  Raisecom MVR MIB file
+--
+-- May 2005, zhaohongce
+--
+-- Copyright (c) 1994-2000, 2001 by Raisecom, Inc.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+
+SWITCH-MVR-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Integer32     	 			FROM SNMPv2-SMI
+    RowStatus,TruthValue		FROM SNMPv2-TC 
+    PortList, Vlanset, EnableVar	FROM SWITCH-TC 
+
+    iscomSwitch	            	FROM RAISECOM-BASE-MIB;
+         
+rcMvr MODULE-IDENTITY
+    LAST-UPDATED "0506200000Z"
+    ORGANIZATION "raisecom Group"
+    CONTACT-INFO
+                "       Raise Systems
+                        
+                Postal: Beijing,
+                        China
+
+                   Tel: 86-010-82884499
+
+                E-mail: zhaohongce@raisecom.com"
+    DESCRIPTION
+            "The MIB module for MVR and igmp filter."
+    ::= { iscomSwitch 21}   
+    
+------------------------------------------------------------------------------
+--
+--  rcMvr - IGMP filter and MVR Parameters
+--
+--  This group is used to instrument the Layer 2 IGMP filter and MVR support.
+--
+------------------------------------------------------------------------------    
+------------------------------------------------------------------------------
+rcMvrConfig			OBJECT IDENTIFIER ::= {	rcMvr 1 }
+rcIgmpFilterConfig		OBJECT IDENTIFIER ::= {	rcMvr 2 }
+
+------------------------------------------------------------------------------
+--
+-- MVR Config Group
+--
+
+rcMvrEnable OBJECT-TYPE
+	SYNTAX      EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object controls whether the MVR is enabled 
+                on the device. A disable(2) value will prevent the
+                MVR on the device."
+        DEFVAL { disable }
+        ::= { rcMvrConfig 1 }
+
+rcMvrVlan OBJECT-TYPE
+        SYNTAX     Vlanset
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Indicates the multicast VLAN ID, which is connected to multicast router."
+        ::= { rcMvrConfig 2 }
+
+rcMvrMaxGroups OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "Indicates the maximum MVR multicast groups supported by
+            this device."
+        ::= { rcMvrConfig 3 }
+
+rcMvrCurrentGroups OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "Indicates the current MVR multicast groups configured by user."
+        ::= { rcMvrConfig 4 }
+
+rcMvrQureyTime OBJECT-TYPE
+        SYNTAX     INTEGER (60..36000)
+        UNITS "tenths of second"
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Indicates the MVR entry will be timeout if no REPORT packet
+            received after the time."
+        DEFVAL {600}
+        ::= { rcMvrConfig 5 }
+
+rcMvrOperMode OBJECT-TYPE
+        SYNTAX     INTEGER {dynamic(1),compatible(2)}
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "Indicates the MVR operate mode. A value of dynamic(1) Indicates the uplink 
+            port will initiatively send JOIN packet to the multicast group, compatible(2)
+            indicates the join action is determined by user hosts."
+        DEFVAL { compatible }
+        ::= { rcMvrConfig 6 }       
+
+rcMvrGroupTable	OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcMvrGroupEntry
+        MAX-ACCESS      not-accessible
+        STATUS current
+        DESCRIPTION
+                "This table contains entries that identify lists of
+                 IP Multicast groups configured on the device. "
+        ::= { rcMvrConfig 7 }
+
+rcMvrGroupEntry OBJECT-TYPE
+	    SYNTAX     RcMvrGroupEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "An entry (conceptual row) in the rcMvrGroupTable.
+                 The entry identify the IP multicast groups which user want to receive."
+        INDEX      { rcMvrGroupVlan, rcMvrGroupAddress }
+        ::= { rcMvrGroupTable 1 }
+
+RcMvrGroupEntry ::= 
+SEQUENCE {    
+        rcMvrGroupVlan          INTEGER,
+		rcMvrGroupAddress		IpAddress,
+        rcMvrGroupRowStatus		RowStatus
+        }
+        
+rcMvrGroupVlan OBJECT-TYPE
+        SYNTAX        INTEGER  
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+	DESCRIPTION  
+		"Index identifying this entry.
+		the multicast vlan of this groups which user want to receive."
+        ::= { rcMvrGroupEntry 1 }
+
+rcMvrGroupAddress OBJECT-TYPE
+        SYNTAX        IpAddress  
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+	DESCRIPTION  
+		"Index identifying this entry.
+		the IP multicast groups which user want to receive."
+        ::= { rcMvrGroupEntry 2 }
+        
+rcMvrGroupRowStatus OBJECT-TYPE
+	SYNTAX	RowStatus
+	ACCESS	read-create
+	STATUS	current
+	DESCRIPTION
+		"The row status of this entry."
+	::= { rcMvrGroupEntry 3 }
+
+--
+-- MVR Information Group
+--
+
+rcMvrIFTable	OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcMvrIFEntry
+        MAX-ACCESS      not-accessible
+        STATUS current
+        DESCRIPTION
+                "This table contains entries that identify the configured MVR 
+                information for each port."
+        ::= { rcMvrConfig 8 }
+
+rcMvrIFEntry OBJECT-TYPE
+	SYNTAX     RcMvrIFEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "An entry (conceptual row) in the rcMvrGroupTable.
+                 The entry identify the configured MVR 
+                information for the port."
+        INDEX      { rcMvrPortIndex }
+        ::= { rcMvrIFTable 1 }
+
+RcMvrIFEntry ::= 
+SEQUENCE {
+                rcMvrPortIndex			INTEGER,
+                rcMvrPortEnable			TruthValue,
+                rcMvrType			INTEGER,
+                rcMvrImmediate			EnableVar,
+                rcMvrPortStatus			INTEGER
+        }
+
+rcMvrPortIndex OBJECT-TYPE
+        SYNTAX        INTEGER  
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+	DESCRIPTION  
+		"Index identifying this entry."
+        ::= { rcMvrIFEntry 1 }
+
+rcMvrPortEnable OBJECT-TYPE
+        SYNTAX EnableVar
+        MAX-ACCESS read-write 
+        STATUS current
+        DESCRIPTION     
+                "This object controls whether the MVR is enabled 
+                on the port. A false disable(2) will prevent the
+                MVR on the port, and the configuration on the port will 
+                be set to default value."
+        ::= { rcMvrIFEntry 2 }
+
+rcMvrType OBJECT-TYPE
+        SYNTAX INTEGER { non-mvr(0),source(1), receiver(2) }
+        MAX-ACCESS read-write 
+        STATUS current
+        DESCRIPTION     
+                "This object describes the MVR type of the port.
+                source(1) specifies the port as uplink port which receive 
+                the multicast flow sent by router.receiver(2) specifies 
+                the port connected to user host.non-mvr(0) specifies the port 
+                is neither source nor receiver."
+        ::= { rcMvrIFEntry 3 }
+
+
+rcMvrImmediate OBJECT-TYPE
+        SYNTAX EnableVar 
+        MAX-ACCESS read-write 
+        STATUS current
+        DESCRIPTION     
+                "This object indicates the whether enable the immediate leave.
+                enable(1) specifies enable the immediate leave."
+        ::= { rcMvrIFEntry 4 }
+
+rcMvrPortStatus OBJECT-TYPE
+        SYNTAX        INTEGER { active(1), inactive(2) }
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+                "This object defines the status of the port.
+		 Active(1) specifies the port is a part of a VLAN.
+		 Inactive(2) specifies the port is not a part of a VLAN."
+        ::= { rcMvrIFEntry 5 }
+
+
+--
+--  The per interface MVR configuration table
+--
+
+rcMvrMemberTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcMvrMemberEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION                   
+                "This table contains the list of IP multicast group that 
+                allow user join."
+        ::= { rcMvrConfig 9 } 
+
+rcMvrMemberEntry OBJECT-TYPE
+	SYNTAX     RcMvrMemberEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Each entry contains the IP multicast group that 
+                allow user join."
+        INDEX      { rcMvrMemberPort,rcMvrMemberVlan,rcMvrMemberGroupAddress}
+        ::= { rcMvrMemberTable 1 }
+
+RcMvrMemberEntry ::= SEQUENCE {
+                rcMvrMemberPort			INTEGER,
+                rcMvrMemberVlan			INTEGER,
+                rcMvrMemberGroupAddress		IpAddress,
+                rcMvrMemberGroupType		INTEGER,
+                rcMvrMemberRowStatus		RowStatus,
+                rcMvrMemberReplicableVlans  Vlanset
+        }
+
+rcMvrMemberPort OBJECT-TYPE
+        SYNTAX        INTEGER
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+        DESCRIPTION
+		 "Index identifying this entry."
+        ::= { rcMvrMemberEntry 1 }
+        
+rcMvrMemberVlan OBJECT-TYPE
+        SYNTAX        INTEGER (1..4094)
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies the multicast VLAN that allow user join."
+        ::= { rcMvrMemberEntry 2 }
+        
+rcMvrMemberGroupAddress OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies the IP multicast group that allow user join."
+        ::= { rcMvrMemberEntry 3 }
+
+rcMvrMemberGroupType OBJECT-TYPE
+        SYNTAX        INTEGER { static(1), dynamic(2) }
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+                "This object defines the status of the multicast group.
+		 static(1) specifies the port join the IP multicast group by staticly configured.
+		 dynamic(2) specifies the port join the IP multicast group by IGMP join packet."
+        ::= { rcMvrMemberEntry 4 }
+
+rcMvrMemberRowStatus OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-create 
+        STATUS        current
+        DESCRIPTION
+		 "The row status of this entry. When the 'rcMvrEnable' and 'rcMvrIpmcReplicationEnable'
+		  object are both enabled, the Max access of this object is read-only."
+        ::= { rcMvrMemberEntry 5 }
+
+rcMvrMemberReplicableVlans  OBJECT-TYPE
+        SYNTAX        Vlanset
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+		 "The IP multicast replicaton vlan bitlist."
+        ::= { rcMvrMemberEntry 6 }
+
+--
+-- MVR port statistics information table
+--
+rcMvrPortStatisticsTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcMvrPortStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION                   
+                "This table contains entries that note statistics information of 
+                the IGMP packets received on each port."
+        ::= { rcMvrConfig 10 }   
+        
+rcMvrPortStatisticsEntry OBJECT-TYPE
+    	SYNTAX     RcMvrPortStatisticsEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Each entry contains the statistics information of 
+                the IGMP packets received on each port."
+        INDEX      { rcMvrPortStatisticsPortid }
+        ::= { rcMvrPortStatisticsTable 1 }
+
+RcMvrPortStatisticsEntry ::= SEQUENCE {
+                rcMvrPortStatisticsPortid			INTEGER,
+                rcMvrPortStatisticsClear			INTEGER,
+                rcMvrPortStatisticsRecvQueryPkts    Counter,
+                rcMvrPortStatisticsRecvReportPkts   Counter, 
+                rcMvrPortStatisticsRecvLeavePkts    Counter,
+                rcMvrPortStatisticsDropQueryPkts    Counter,  
+                rcMvrPortStatisticsDropReportPkts   Counter,    
+                rcMvrPortStatisticsDropLeavePkts    Counter,
+                rcMvrPortLastReplaceNewMulticast    IpAddress,  
+                rcMvrPortLastReplaceOldMulticast    IpAddress, 
+                rcMvrPortReplaceTotalCount          Counter
+        }
+
+rcMvrPortStatisticsPortid OBJECT-TYPE
+        SYNTAX        INTEGER
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+        DESCRIPTION
+		 "Index identifying this entry."
+        ::= { rcMvrPortStatisticsEntry 1 }
+        
+rcMvrPortStatisticsClear OBJECT-TYPE
+        SYNTAX        INTEGER {read(0),clear(1)}
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+		 "Set this object 1 to clear all the information of MVR port statistics.
+		 Get this object will always return 0."
+        ::= { rcMvrPortStatisticsEntry 2 }
+
+rcMvrPortStatisticsRecvQueryPkts OBJECT-TYPE
+        SYNTAX        Counter
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the count of query packet received on this port."
+        ::= { rcMvrPortStatisticsEntry 3 }
+
+rcMvrPortStatisticsRecvReportPkts OBJECT-TYPE
+        SYNTAX        Counter
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the count of report packet received on this port."
+        ::= { rcMvrPortStatisticsEntry 4 }   
+        
+rcMvrPortStatisticsRecvLeavePkts OBJECT-TYPE
+        SYNTAX        Counter
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the count of leave packet received on this port."
+        ::= { rcMvrPortStatisticsEntry 5 }  
+        
+rcMvrPortStatisticsDropQueryPkts OBJECT-TYPE
+        SYNTAX        Counter
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the count of query packet droped on this port."
+        ::= { rcMvrPortStatisticsEntry 6 }  
+        
+rcMvrPortStatisticsDropReportPkts OBJECT-TYPE
+        SYNTAX        Counter
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the count of report packet droped on this port."
+        ::= { rcMvrPortStatisticsEntry 7 }
+
+rcMvrPortStatisticsDropLeavePkts OBJECT-TYPE
+        SYNTAX        Counter
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the count of leave packet droped on this port."
+        ::= { rcMvrPortStatisticsEntry 8 }   
+               
+rcMvrPortLastReplaceNewMulticast OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the new multicast IP address of the last replace."
+        ::= { rcMvrPortStatisticsEntry 9 }
+                 
+rcMvrPortLastReplaceOldMulticast OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes the old multicast IP address of the last replace."
+        ::= { rcMvrPortStatisticsEntry 10 }
+
+rcMvrPortReplaceTotalCount OBJECT-TYPE
+        SYNTAX        Counter
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+		 "The object notes count of replace taken place on this port."
+        ::= { rcMvrPortStatisticsEntry 11 }     
+        
+rcMvrProxySuppressionEnable OBJECT-TYPE      
+        SYNTAX      EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object controls whether the proxy suppression is enabled on the device.
+               A disable(2) value will prevent the proxy suppression on the device."
+        DEFVAL { disable }
+        ::= { rcMvrConfig 11 }
+        
+rcIgmpQuerierEnable OBJECT-TYPE      
+        SYNTAX      EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object controls whether the IGMP querier is enabled on the device.
+               A disable(2) value will prevent the IGMP querier on the device."
+        DEFVAL { disable }
+        ::= { rcMvrConfig 12 }
+        
+rcMvrProxySourceIpAddress OBJECT-TYPE      
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object specify the source IP address for MVR proxy and querier.
+               If not configure this object ,the default value is the IP address on 
+               IP interface 0.Then if the IP address on IP interface 0 is none, the 
+               default value is 0.0.0.0."
+        ::= { rcMvrConfig 13 }     
+        
+rcIgmpQueryInterval OBJECT-TYPE
+        SYNTAX     INTEGER (10..65535)
+        UNITS "Seconds"
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "This object specify interval time that querier send general query packet.
+            The default value is 60s."
+        DEFVAL {60}
+        ::= { rcMvrConfig 14 }
+        
+rcMvrProxyQueryMaxReponseInterval OBJECT-TYPE
+        SYNTAX     INTEGER (1..25)
+        UNITS "Seconds"
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "This object specify max response time for host to response the MVR proxy.
+            The default value is 10s."
+        DEFVAL {10}
+        ::= { rcMvrConfig 15 }
+        
+rcMvrProxyQueryLastMemberInterval OBJECT-TYPE
+        SYNTAX     INTEGER (1..25)
+        UNITS "Seconds"
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "This object specify last member query interval.When last member leave the 
+            group,MVR proxy will send the special group query packet.If MVR proxy receive
+            none report packet of this group in the last member query interval, MVR proxy
+            will delete this group from multicast transmit table.The default value is 1s."
+        DEFVAL {1}
+        ::= { rcMvrConfig 16 }      
+        
+rcMvrIpmcReplicationEnable OBJECT-TYPE
+        SYNTAX     EnableVar
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "This object controls whether the IP multicast replication is enabled on the device. 
+            A disable(2) value will prevent the IP multicast replication on the device. 
+            The ` rcMvrEnable ' object must be set to `disable' prior to modify this object value.
+            If 'rcMvrEnable' and 'rcMvrIpmcReplicationEnable' are both enabled , 
+            setting ` rcMvrEnable ' to `disable' will automatically set 'rcMvrIpmcReplicationEnable' 
+            to `disable'."
+        DEFVAL {disable}
+        ::= { rcMvrConfig 17 }
+
+           
+------------------------------------------------------------------------------
+--
+-- IGMP Filter Config Group
+--
+
+rcIgmpFilterEnable OBJECT-TYPE
+	SYNTAX      EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object controls whether the IGMP filtering
+                is enabled on the device. A disable(2) value will 
+                prevent the IGMP filtering action on the device."
+        DEFVAL { enable }
+        ::= { rcIgmpFilterConfig 1 }
+
+rcIgmpFilterMaxProfiles OBJECT-TYPE
+        SYNTAX     INTEGER
+        UNITS      "profiles"
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "Indicates the maximum number of profiles supported by
+            this device.  A value of zero indicates no limitation on
+            the number of profiles."
+        ::= { rcIgmpFilterConfig 2 }
+
+
+--
+-- IGMP Filter Information Group
+--
+rcIgmpFilterAddEntry OBJECT-TYPE
+        SYNTAX INTEGER (1..1024)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Indicates adding a IGMP profile entry. The value imply the profile number."
+        ::= { rcIgmpFilterConfig 3 }
+
+rcIgmpFilterDelEntry OBJECT-TYPE
+        SYNTAX INTEGER (1..1024)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Indicates deleting a IGMP profile entry. The value imply the profile number."
+        ::= { rcIgmpFilterConfig 4 }  
+        
+        
+rcIgmpFilterTable	OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcIgmpFilterEntry
+        MAX-ACCESS      not-accessible
+        STATUS current
+        DESCRIPTION
+                "This table contains entries that identify lists of
+                 IP Multicast groups for each profile configured on
+                 the device. 
+
+                 Each entry contains a range of contiguous IP
+                 Multicast groups associated to a profile index.
+                 Multiple rcIgmpFilterEntry may be associated
+                 with the same rcIgmpFilterProfileIndex.
+
+                 All the rcIgmpFilterEntry with  the same profile index 
+		 are subjected to the same IGMP filtering action as 
+		 defined in rcIgmpFilterProfileAction.
+
+		 Each profile index may be associated with zero or more 
+		 ports through rcIgmpFilterIFPortIndex object 
+		 in rcIgmpFilterIFTable.
+		 The maximum number of entries is determined by
+                 rcIgmpFilterMaxProfiles."
+
+        ::= { rcIgmpFilterConfig 5 }
+
+rcIgmpFilterEntry OBJECT-TYPE
+	SYNTAX     RcIgmpFilterEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "An entry (conceptual row) in the rcIgmpFilterTable."
+        INDEX      { rcIgmpFilterProfileIndex,
+        		rcIgmpFilterStartAddress }
+        ::= { rcIgmpFilterTable 1 }
+
+RcIgmpFilterEntry ::= 
+SEQUENCE {
+                rcIgmpFilterProfileIndex		INTEGER,
+                rcIgmpFilterStartAddress		IpAddress,
+                rcIgmpFilterEndAddress			IpAddress,
+                rcIgmpFilterProfileAction		INTEGER,
+                rcIgmpFilterRowStatus			RowStatus
+        }
+
+rcIgmpFilterProfileIndex OBJECT-TYPE
+        SYNTAX        INTEGER (1..1024)  
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+	DESCRIPTION  
+		"Index identifying this entry."
+        ::= { rcIgmpFilterEntry 1 }
+
+
+rcIgmpFilterStartAddress OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS not-accessible 
+        STATUS current
+        DESCRIPTION     
+                "This object describes the start of the IP multicast 
+                 group address of a contiguous range which will be
+                 subjected to filtering operation."
+        ::= { rcIgmpFilterEntry 2 }
+
+
+rcIgmpFilterEndAddress OBJECT-TYPE
+        SYNTAX IpAddress 
+        MAX-ACCESS read-create 
+        STATUS current
+        DESCRIPTION     
+                "This object indicates the end of the IP multicast
+                 group address of a contiguous range which will be 
+                 subjected to filtering operation."
+        ::= { rcIgmpFilterEntry 3 }
+
+rcIgmpFilterProfileAction OBJECT-TYPE
+        SYNTAX        INTEGER { permit(1), deny(2) }
+        MAX-ACCESS    read-create 
+        STATUS        current
+        DESCRIPTION
+                "This object defines the action for
+                 filtering IGMP reports for this profile.
+
+		 If the object is set to deny(2):
+                 then all IGMP reports associated to IP multicast
+                 groups included in the profile identified by
+                 rcIgmpFilterProfileIndex will be dropped.
+
+                 If the object is set to permit(1):
+                 then all IGMP reports associated to IP multicast
+                 groups not included in the profile identified by
+                 rcIgmpFilterProfileIndex will be dropped."
+        DEFVAL { permit }         
+        ::= { rcIgmpFilterEntry 4 }
+
+rcIgmpFilterRowStatus OBJECT-TYPE
+	SYNTAX	RowStatus
+	ACCESS	read-create
+	STATUS	current
+	DESCRIPTION
+		"The row status	of this	entry."
+	::= { rcIgmpFilterEntry 5 }
+
+
+--
+--  The per interface IGMP filtering configuration table
+--
+
+rcIgmpFilterIFTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcIgmpFilterIFEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION                   
+                "This table contains the list of ports that can 
+		 support IGMP filter feature."
+        ::= { rcIgmpFilterConfig 6 } 
+
+rcIgmpFilterIFEntry OBJECT-TYPE
+	SYNTAX     RcIgmpFilterIFEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Each entry contains the configuration for associating
+                 the IGMP filter profile index with the port.
+
+                 An entry is created for each of the IGMP filter capable 
+                 port on the system.
+   
+                 The entry is removed on removal of corresponding 
+                 port from system."
+        INDEX      { rcIgmpFilterIFPortIndex }
+        ::= { rcIgmpFilterIFTable 1 }
+
+RcIgmpFilterIFEntry ::= SEQUENCE {
+		rcIgmpFilterIFPortIndex		INTEGER,
+                rcIgmpFilterIFProfileIndex	INTEGER,
+                rcIgmpFilterIFMaxGroups		INTEGER,
+                rcIgmpFilterIFCurrentGroups	INTEGER,
+                rcIgmpFilterIFMaxGroupsAction	INTEGER
+        }
+
+rcIgmpFilterIFPortIndex OBJECT-TYPE
+        SYNTAX        INTEGER 
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies which IGMP filter profile applies to this 
+		  port. If the value of this MIB object matches the 
+		  value of rcIgmpFilterProfileIndex in rcIgmpFilterTable, 
+		  the corresponding profile configuration will apply to
+		  this port. 
+ 
+                  A value of zero indicates no profile is associated
+                  with corresponding port.
+
+                  The filtering action on each port is also
+                  defined by the associated profile."
+        ::= { rcIgmpFilterIFEntry 1 }
+        
+        
+rcIgmpFilterIFProfileIndex OBJECT-TYPE
+        SYNTAX        INTEGER (0..1024)
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies which IGMP filter profile applies to this 
+		  port. If the value of this MIB object matches the 
+		  value of rcIgmpFilterProfileIndex in rcIgmpFilterTable, 
+		  the corresponding profile configuration will apply to
+		  this interface. 
+ 
+                  A value of zero indicates no profile is associated
+                  with corresponding port.
+
+                  The filtering action on each port is also
+                  defined by the associated profile."
+        ::= { rcIgmpFilterIFEntry 2 }
+        
+rcIgmpFilterIFMaxGroups OBJECT-TYPE
+        SYNTAX        INTEGER (0..65535) 
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies the max multicast group numbers that allow this 
+		  port join. 
+                  A value of zero indicates no max limitation is associated
+                  with corresponding interface."
+        DEFVAL { 0 }           
+        ::= { rcIgmpFilterIFEntry 3 }
+
+rcIgmpFilterIFCurrentGroups OBJECT-TYPE
+        SYNTAX        INTEGER (0..65535) 
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies the current multicast group numbers that this 
+		  port has joined."
+        ::= { rcIgmpFilterIFEntry 4 }
+                
+rcIgmpFilterIFMaxGroupsAction OBJECT-TYPE
+        SYNTAX        INTEGER { deny(1), replace(2) } 
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies which action will take place on the port when exceed the 
+		  max multicast group numbers. 
+                  A value of deny(1) indicates deny join the multicast group when 
+                  exceed the max multicast group numbers.
+                  A value of replace(2) indicates allow to replace the existed multicast group 
+                  when exceed the max multicast group numbers.But now not supported."
+        DEFVAL { deny }           
+        ::= { rcIgmpFilterIFEntry 5 }    
+        
+--
+--  The per vlan IGMP filtering configuration table
+--
+rcIgmpFilterVlanTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcIgmpFilterVlanEntry 
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION                   
+                "This table contains the list of vlans that can 
+ 	support IGMP filter feature."
+        ::= { rcIgmpFilterConfig 7 }  
+        
+rcIgmpFilterVlanEntry OBJECT-TYPE
+    	SYNTAX     RcIgmpFilterVlanEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Each entry contains the configuration for associating
+                 the IGMP filter profile index with the vlan. "
+        INDEX      { rcIgmpFilterIFPortIndex }
+        ::= { rcIgmpFilterVlanTable 1 }
+  
+RcIgmpFilterVlanEntry ::= SEQUENCE {
+		        rcIgmpFilterVLANIndex	     	INTEGER,
+                rcIgmpFilterVlanProfileIndex	INTEGER,
+                rcIgmpFilterVlanMaxGroups		INTEGER,
+                rcIgmpFilterVlanCurrentGroups	INTEGER,
+                rcIgmpFilterVlanMaxGroupsAction	INTEGER
+        }   
+        
+rcIgmpFilterVLANIndex OBJECT-TYPE
+        SYNTAX        INTEGER 
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+        DESCRIPTION
+		 "Index identifying this entry."
+        ::= { rcIgmpFilterVlanEntry 1 }
+         
+
+rcIgmpFilterVlanProfileIndex OBJECT-TYPE
+        SYNTAX        INTEGER (1..1024) 
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+		 "Specifies which IGMP filter profile applies to this 
+		  vlan. If the value of this MIB object matches the 
+		  value of rcIgmpFilterProfileIndex in rcIgmpFilterTable, 
+		  the corresponding profile configuration will apply to
+		  this vlan. 
+ 
+                  A value of zero indicates no profile is associated
+                  with corresponding vlan.
+
+                  The filtering action on each port is also
+                  defined by the associated profile."
+        ::= { rcIgmpFilterVlanEntry 2 }
+
+rcIgmpFilterVlanMaxGroups OBJECT-TYPE
+        SYNTAX        INTEGER (0..65535) 
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies the max multicast group numbers that allow this 
+		  vlan join. 
+                  A value of zero indicates no max limitation is associated
+                  with corresponding vlan."
+        DEFVAL { 0 }           
+        ::= { rcIgmpFilterVlanEntry 3 }
+
+rcIgmpFilterVlanCurrentGroups OBJECT-TYPE
+        SYNTAX        INTEGER (0..65535) 
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies the current multicast group numbers that this 
+		  vlan has joined."
+        ::= { rcIgmpFilterVlanEntry 4 }
+                
+rcIgmpFilterVlanMaxGroupsAction OBJECT-TYPE
+        SYNTAX        INTEGER { deny(1), replace(2) } 
+        MAX-ACCESS    read-write 
+        STATUS        current
+        DESCRIPTION
+		 "Specifies which action will take place on the vlan when exceed the 
+		  max multicast group numbers. 
+                  A value of deny(1) indicates deny join the multicast group when 
+                  exceed the max multicast group numbers.
+                  A value of replace(2) indicates allow to replace the first multicast 
+                  group on the vlan when exceed the max multicast group numbers."
+        DEFVAL { deny }           
+        ::= { rcIgmpFilterVlanEntry 5 }         
+--end MVR group --
+
+END

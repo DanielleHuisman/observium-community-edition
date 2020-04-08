@@ -1,0 +1,1 @@
+ALTER TABLE `slas` ADD `sla_target` VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `sla_tag`;

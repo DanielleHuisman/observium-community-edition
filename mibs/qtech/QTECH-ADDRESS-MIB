@@ -1,0 +1,529 @@
+-- *****************************************************************
+-- QTECH-ADDRESS-MIB.mib:  Qtech Address MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by Qtech Networks Co.,Ltd.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+QTECH-ADDRESS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Unsigned32
+                FROM SNMPv2-SMI
+        RowStatus,
+        TimeStamp,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        IfIndex
+                FROM QTECH-TC
+        EnabledStatus 
+                FROM P-BRIDGE-MIB
+        qtechMgmt
+                FROM QTECH-SMI;
+
+qtechAddressMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "Qtech Networks Co.,Ltd."
+        CONTACT-INFO
+                " 
+                Tel: 4008-111-000 
+
+                E-mail: service@qtech.com.cn"
+        DESCRIPTION
+                "This module defines qtech address mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { qtechMgmt 22}
+
+qtechAddressMIBObjects OBJECT IDENTIFIER ::= { qtechAddressMIB 1 }
+
+qtechAddressManagementObjects OBJECT IDENTIFIER ::= { qtechAddressMIBObjects 1 }
+
+qtechAddressNotificationObjects OBJECT IDENTIFIER ::= { qtechAddressMIBObjects 2 }
+
+ 
+--
+-- qtech Address Filter 
+--
+qtechDynamicAddressCurrentNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "The currunt number of dynamic MAC address ."
+    ::= { qtechAddressManagementObjects 1 } 
+    
+qtechStaticAddressCurrentNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "The currunt number of static MAC address ."
+    ::= { qtechAddressManagementObjects 2 }
+
+qtechFilterAddressCurrentNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "Current number of the filtering MAC address."
+    ::= { qtechAddressManagementObjects 3 }
+
+qtechAddressAvailableNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "Total Mac Address Space Available."
+    ::= { qtechAddressManagementObjects 4 }
+
+qtechMacAddressTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QtechMacAddressEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "The table of address MAC address include dynamic mac address,
+               static mac address and filter mac address."
+    ::= { qtechAddressManagementObjects 5 }
+
+qtechMacAddressEntry OBJECT-TYPE
+        SYNTAX  QtechMacAddressEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "The entry of MAC address table."
+        INDEX   { qtechMacAddressFdbId,qtechMacAddress}
+    ::= { qtechMacAddressTable 1 }
+
+ QtechMacAddressEntry ::=
+     SEQUENCE {
+             qtechMacAddressFdbId Unsigned32,
+             qtechMacAddress MacAddress,
+             qtechMacAddressPort IfIndex,
+             qtechMacAddressType INTEGER,      
+             qtechMacAddressStatus RowStatus                    
+   }
+
+qtechMacAddressFdbId OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+            "The VID of vlan which the Address address blongs to."
+    ::= { qtechMacAddressEntry 1 }
+    
+qtechMacAddress OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "The MAC address which will be address static address."
+    ::= { qtechMacAddressEntry 2 }
+
+qtechMacAddressPort OBJECT-TYPE
+        SYNTAX       IfIndex
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+            "Interface(port or trunk) number of the port from which a frame must
+             be received in order  for this entry's filtering information to apply."
+    ::= { qtechMacAddressEntry 3 }
+    
+qtechMacAddressType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                  dynamic(1),
+                  static(2),
+                  filter(3)                   
+              }
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+              "Only 'static' and 'filter' allow to be set to this object."
+    ::= { qtechMacAddressEntry 4 }
+        
+qtechMacAddressStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "entry status of this entry. and the means in this enviraments can
+            reffer to the text-convention definition of the RowStatus."
+    ::= { qtechMacAddressEntry 5 }
+
+
+--Address Notification
+qtechMacNotiGlobalEnabled  OBJECT-TYPE
+    SYNTAX        EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether the MAC notification feature is currently 
+         running in the device.
+
+        Setting this object to disabled(2) disables the MAC notification
+        feature globally thus disabling the feature at each interface.
+
+        Setting this object to enabled(1) will start the MAC notification
+        feature running in the device. If the feature is already
+        running, setting to enabled(1) has no effect. Once the MAC
+        notification is enabled, whether the feature is running at each
+        interface is controlled by the qtechMacNotiIfCfgTable."   
+        
+    ::= { qtechAddressNotificationObjects 1 }
+
+qtechMacNotificationInterval  OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..3600)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object specifies the maximum interval of time in units of seconds
+         between MacChangedNotifications being generated by the device.
+        
+        If the value of qtechMacNotiGlobalEnabled is eanbled(1), the
+        device will send out the generated MacChangedNotifications
+        and archive the MAC change notification events in the
+        QtechMacNotiHisTable.  
+        
+        If the value of this object is equal to 0, the device will 
+        generate MacChangedNotifications and archive the MAC 
+        change notification events in the QtechMacNotiHisTable as soon as
+        there is MAC address learnt or removed by the device.
+
+        If the value of this object is greater than 0, the device will
+        wait for a period of time equal to the value of this object
+        before generate the MacChangedNotifications and archive
+        the MAC change notification events in the QtechMacNotiHisTable."
+    DEFVAL { 1 }
+    ::= { qtechAddressNotificationObjects 2 }
+
+qtechMacNotiHisTableMaxLength OBJECT-TYPE
+    SYNTAX          Unsigned32 (0..200)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The upper limit on the number of entries that the
+        QtechMacNotiHisTable may contain.  A value of 0 will
+        prevent any history from being retained. When this
+        table is full, the oldest entry will be deleted and
+        a new one will be created."
+    DEFVAL  { 50 }
+    ::= { qtechAddressNotificationObjects 3 }
+    
+qtechMacNotiHisTableCurrentLength OBJECT-TYPE
+    SYNTAX          Unsigned32   
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of entries that the QtechMacNotiHisTable contain currently."
+    ::= { qtechAddressNotificationObjects 4 }    
+
+qtechMacNotiHisTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF QtechMacNotiHisEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table will archive the dynamic MAC change notification events 
+        generated by this device."
+    ::= { qtechAddressNotificationObjects 5 }
+
+qtechMacNotiHisEntry OBJECT-TYPE
+    SYNTAX     QtechMacNotiHisEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A dynamic MAC change notification message that was previously
+        generated by this device.  Each entry is indexed by a message
+        index."
+    INDEX   { qtechMacNotiHisIndex }
+    ::= { qtechMacNotiHisTable 1 }
+
+QtechMacNotiHisEntry ::=
+    SEQUENCE {
+        qtechMacNotiHisIndex
+                Unsigned32,
+        qtechMacNotiHisMacChangedMsg
+                OCTET STRING,
+        qtechMacNotiHisTimestamp
+                TimeStamp
+    }
+
+qtechMacNotiHisIndex OBJECT-TYPE
+    SYNTAX          Unsigned32 (1..4294967295)
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "An index that uniquely identifies a MAC change notification
+        event previously generated by the device. This index qtechs at
+        1 and increases by one when a MAC change notification is 
+        generated.  When it reaches the maximum value, the agent wraps
+        the value back to 1."
+    ::= { qtechMacNotiHisEntry 1 }
+
+qtechMacNotiHisMacChangedMsg OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(1..254))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This object contains the information of a MAC change
+        notification event. It consists of several sections packed
+        together in the format of '<section1><section2>...'.
+        
+        Each tuple consist of 11 octets in the format of
+        '<operation><VLAN><MAC><Interface>' where 
+
+        <operation> is of size 1 octet and supports the following values
+          0 - End of MIB object.
+          1 - MAC learnt.
+          2 - MAC removed.
+
+        <VLAN> is vlan number of the VLAN which the MAC address is
+        belonged to and has size of 2 octet.
+
+        <MAC> is the Layer2 Mac Address and has size of 6 octets.
+
+        <Interface> is the value for the interface from which the MAC 
+        address is learnt and has size of 2 octets."
+    ::= { qtechMacNotiHisEntry 2 }
+
+qtechMacNotiHisTimestamp  OBJECT-TYPE
+    SYNTAX          TimeStamp
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The value of sysUpTime when the MacChangedNotification
+        containing the information denoted by the qtechMacNotiHisMacChangedMsg
+        object in this entry was generated."
+    ::= { qtechMacNotiHisEntry 3 }
+
+
+-- Qtech Mac Notification Interface Config Table
+
+qtechMacNotiIfCfgTable  OBJECT-TYPE
+    SYNTAX        SEQUENCE OF QtechMacNotiIfCfgEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table enables or disables the generation of notification
+        at each interface when MAC address is learnt or removed." 
+    ::= { qtechAddressNotificationObjects 6 }
+
+qtechMacNotiIfCfgEntry  OBJECT-TYPE
+    SYNTAX        QtechMacNotiIfCfgEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Each entry contains the configuration for enabling the
+        MAC notification at each interface that supports this
+        feature." 
+    INDEX { qtechMacNotiIfIndex }
+    ::= { qtechMacNotiIfCfgTable 1 }
+
+QtechMacNotiIfCfgEntry  ::= SEQUENCE {
+    qtechMacNotiIfIndex IfIndex,
+    qtechIfMacAddrLearntEnable    EnabledStatus, 
+    qtechIfMacAddrRemovedEnable   EnabledStatus 
+}
+
+qtechMacNotiIfIndex OBJECT-TYPE
+     SYNTAX   IfIndex
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+            "IfIndex vale of interface."
+    ::= { qtechMacNotiIfCfgEntry 1 }
+       
+qtechIfMacAddrLearntEnable OBJECT-TYPE
+    SYNTAX        EnabledStatus 
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether this interface is enabled to send 
+        MacChangedNotification when it learns a new MAC address. This
+        variable has no effect when the value of qtechMacNotiGlobalEnabled
+        object is disabled(2).
+
+        Setting this object to enabled(1) enables the sending of
+        MacChangedNotification when this interface learns a 
+        new MAC address.
+
+        Setting this object to disabled(2) disables the sending
+        of MacChangedNotification when this interface learns
+        a new MAC address."      
+    DEFVAL { disabled }
+    ::= { qtechMacNotiIfCfgEntry 2 }
+
+qtechIfMacAddrRemovedEnable OBJECT-TYPE
+    SYNTAX        EnabledStatus 
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether this interface is enabled to send 
+        MacChangedNotification when a MAC address which it learnt
+        previously is removed from the forwarding table. This variable
+        has no effect when the value of qtechMacNotiGlobalEnabled object
+        is disabled(2). 
+
+        Setting this object to enabled(1) enables the sending of
+        MacChangedNotification when a MAC address which this
+        interface learnt previously is removed from the forwarding
+        table.
+
+        Setting this object to disabled(2) disables the sending of
+        MacChangedNotification when a MAC address which this
+        interface learnt previously is removed from the forwarding
+        table."
+    DEFVAL { disabled }
+    ::= { qtechMacNotiIfCfgEntry 3 }
+
+
+qtechMacIfLearnTable  OBJECT-TYPE
+    SYNTAX        SEQUENCE OF QtechMacIfLearnEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table enables or disables the generation of notification
+        at each interface when MAC address learning enable or disable." 
+    ::= { qtechAddressNotificationObjects 7 }
+
+qtechMacIfLearnEntry  OBJECT-TYPE
+    SYNTAX        QtechMacIfLearnEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The configuration of each entry illustrates whether each 
+         interface supports the MAC address-learning ability." 
+    INDEX { qtechMacIfLearnIfIndex }
+    ::= { qtechMacIfLearnTable 1 }
+
+QtechMacIfLearnEntry  ::= SEQUENCE {
+    qtechMacIfLearnIfIndex IfIndex,
+    qtechMacIfLearnEnable  EnabledStatus 
+}
+
+qtechMacIfLearnIfIndex OBJECT-TYPE
+     SYNTAX   IfIndex
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+            "IfIndex vale of interface."
+    ::= { qtechMacIfLearnEntry 1 }
+       
+qtechMacIfLearnEnable OBJECT-TYPE
+    SYNTAX        EnabledStatus 
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether this interface is enabled to learn MAC address. 
+         This variable has no effect when the value of qtechMacIfLearnEnable
+         object is disabled(2).
+
+        Setting this object to be enabled(1) enables the interface to learn MAC address.
+
+        Setting this object to be disabled(2) disables the interface to learn MAC address."      
+    DEFVAL { enabled }
+    ::= { qtechMacIfLearnEntry 2 }
+
+qtechMacGlobalLearnEnabled  OBJECT-TYPE
+    SYNTAX        EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether this device is enabled to learn MAC address. 
+        Setting this object to be enabled(1) enables the device to learn MAC address.
+        Setting this object to be disabled(2) disables the device to learn MAC address."      
+    DEFVAL { enabled }
+    ::= { qtechAddressNotificationObjects 8 }
+    
+--
+-- Notification 
+--
+
+qtechAddressTraps      OBJECT IDENTIFIER ::= { qtechAddressMIB 2 }
+
+macChangedNotification NOTIFICATION-TYPE
+    OBJECTS { qtechMacNotiHisMacChangedMsg} 
+    STATUS  current
+    DESCRIPTION
+        "This notification is generated when there is enough MAC
+        address information to fully occupy a maximum size SNMP trap
+        message. This notification is also generated when there
+        is at least one MAC address changed or removed and the amount
+        of time elapsed from the previous notification is greater
+        than the maximum wait time denoted by qtechMacNotificationInterval object. 
+
+        If there are more MAC addresses information than can fit into
+        one qtechMacNotiHisMacChangedMsg object, then multiple notifications
+        will be generated." 
+    ::= { qtechAddressTraps 1 } 
+    
+    
+qtechAddressMIBConformance OBJECT IDENTIFIER ::= { qtechAddressMIB 3 }
+qtechAddressMIBCompliances OBJECT IDENTIFIER ::= { qtechAddressMIBConformance 1 }
+qtechAddressMIBGroups      OBJECT IDENTIFIER ::= { qtechAddressMIBConformance 2 }
+
+
+-- compliance statements
+
+qtechAddressMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the Qtech MAC Address MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { qtechMacAddressMIBGroup,
+                                   qtechAddressNotificationMIBGroup
+                 }
+        ::= { qtechAddressMIBCompliances 1 }
+                
+-- units of conformance
+       
+qtechMacAddressMIBGroup OBJECT-GROUP
+        OBJECTS {
+                qtechDynamicAddressCurrentNum,
+                qtechStaticAddressCurrentNum,
+                qtechFilterAddressCurrentNum,
+                qtechAddressAvailableNum,       
+                qtechMacAddressFdbId,
+                qtechMacAddress,
+                qtechMacAddressPort,
+                qtechMacAddressType,      
+                qtechMacAddressStatus
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing address address to a
+                Qtech agent."
+        ::= { qtechAddressMIBGroups 1 }                         
+        
+qtechAddressNotificationMIBGroup OBJECT-GROUP
+        OBJECTS {
+                qtechMacNotiGlobalEnabled,
+                qtechMacNotificationInterval,
+                qtechMacNotiHisTableMaxLength,
+                qtechMacNotiHisTableCurrentLength,
+                qtechMacNotiHisIndex,
+                qtechMacNotiHisMacChangedMsg,
+                qtechMacNotiHisTimestamp,
+                qtechMacNotiIfIndex,
+                qtechIfMacAddrLearntEnable, 
+                qtechIfMacAddrRemovedEnable
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing port address to a
+                Qtech agent."
+        ::= { qtechAddressMIBGroups 2 }                                         
+        
+END

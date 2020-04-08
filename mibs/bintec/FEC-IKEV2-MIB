@@ -1,0 +1,474 @@
+-- This file is corresponding to Release 9.1.10.101 from 2014/08/11 00:00:00
+
+
+---------------------------------------------------------------------------
+-- (C)opyright 2010-2014 bintec elmeg GmbH
+-- $RCSfile: mib-ikev2,v $
+-- $Revision: 1.6 $
+-- $Date: 2014-02-07 11:21:02 $
+---------------------------------------------------------------------------
+
+FEC-IKEV2-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, enterprises, 
+    IpAddress, TimeTicks, Counter32, snmpModules, mib-2, Unsigned32, Counter64
+        FROM SNMPv2-SMI
+    DisplayString, TestAndIncr, TimeStamp
+        FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
+    ipsec, Date, HexValue, BitValue
+        FROM BINTEC-MIB;
+ 
+---------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+
+ikev2MIB MODULE-IDENTITY
+    LAST-UPDATED "201103020000Z"
+    ORGANIZATION "bintec elmeg GmbH"
+    CONTACT-INFO "EMail:   info@bintec-elmeg.com
+                  Web:     www.bintec-elmeg.com"
+    DESCRIPTION  "Management Information for IKEv2 of IPSec Subsystem"
+
+    ::= { ipsec 252 }
+
+---------------------------------------------------------------------------
+
+-- IKE Security Associations Table
+
+	ikev2SaTable OBJECT-TYPE
+            SYNTAX  SEQUENCE OF Ikev2SaEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+		"This table contains the list of currently active IKE security
+		 associations, that are created using IKEv2 protocol."
+	::= { ipsec 21 }
+
+	ikev2SaEntry OBJECT-TYPE
+            SYNTAX  Ikev2SaEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+		"This object contains an IKE security association."
+	    INDEX   {
+		ikev2SaIndex
+	    }
+            ::= { ikev2SaTable 1 }
+
+	Ikev2SaEntry ::=
+            SEQUENCE {
+		ikev2SaIndex			INTEGER,
+		ikev2SaState			INTEGER, 
+		ikev2SaAuthMethod		INTEGER,
+		ikev2SaEncAlg			INTEGER,
+		ikev2SaIntegAlg			INTEGER,
+		ikev2SaPrfAlg			INTEGER,
+		ikev2SaGroup			INTEGER,
+		ikev2SaRole			INTEGER, 
+		ikev2SaLocalId			DisplayString,
+		ikev2SaRemoteId			DisplayString,
+		ikev2SaLocalIp			IpAddress,
+		ikev2SaRemoteIp			IpAddress,
+		ikev2SaSpiI			OCTET STRING,
+		ikev2SaSpiR			OCTET STRING,
+		ikev2SaCreated			Date,
+		ikev2SaLastUsed			Date,
+		ikev2SaExpires			Date,
+		ikev2SaNumCerts			INTEGER,
+		ikev2SaNumNegotiations		INTEGER, 
+		ikev2SaBytes			INTEGER, 
+		ikev2SaPeerIndex		INTEGER, 
+		ikev2SaLocalPort		INTEGER,
+		ikev2SaRemotePort		INTEGER 
+            }
+
+	ikev2SaIndex OBJECT-TYPE
+	    SYNTAX INTEGER
+            MAX-ACCESS  read-only
+            STATUS  current
+            DESCRIPTION
+		 "A unique index for this entry."
+	::= { ikev2SaEntry 1 }
+
+	ikev2SaState OBJECT-TYPE
+	    SYNTAX INTEGER {
+		negotiating(1), -- the SA is still being negotiated
+		established(2),	-- the SA negotiation is finished
+		waiting-for-remove(3), -- the SA is waiting for removal
+		delete(7)	       -- mark the SA for deletion
+	    }
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"This object specifies the state of the SA.
+		  Possible values:
+		   negotiating(1),        -- the SA is still being negotiated
+		   established(2),        -- the SA negotiation is finished
+		   waiting-for-remove(3), -- the SA is waiting for removal
+		   delete(7)	          -- mark the SA for deletion."
+	    DEFVAL { negotiating }
+	::= { ikev2SaEntry 2 }
+
+	ikev2SaAuthMethod OBJECT-TYPE
+	    SYNTAX INTEGER {
+		pre-sh-key(1), 	-- Authentication using pre shared keys
+		dss-sig(2), 	-- Authentication using DSS signatures
+		rsa-sig(3), 	-- Authentication using RSA signatures
+		rsa-enc(4), 	-- Authentication using RSA encryption
+		rsa-enc-rev(5) 	-- Authentication using revised RSA encryption
+	    }
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The authentication method used when creating this SA.
+		  Possible values:
+		   pre-sh-key(1), 	-- Authentication using pre shared keys
+		   dss-sig(2), 	  -- Authentication using DSS signatures
+		   rsa-sig(3), 	  -- Authentication using RSA signatures
+		   rsa-enc(4), 	  -- Authentication using RSA encryption
+		   rsa-enc-rev(5) -- Authentication using revised RSA encryption."
+	::= { ikev2SaEntry 3 }
+
+	ikev2SaEncAlg OBJECT-TYPE
+	    SYNTAX INTEGER {
+		des(2),
+		des3(3),
+		rc5(4),
+		idea(5),
+		cast(6),
+		blowfish(7),
+		aes-cbc(12),
+		aes-ctr(13)
+	    }
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The encryption algorithm used for the IKE_SA.
+		  Possible values:
+		   des(2),
+		   des3(3),
+	           rc5(4),
+		   idea(5),
+		   cast(6),
+		   blowfish(7),
+		   aes-cbc(12),
+		   aes-ctr(13)"
+	::= { ikev2SaEntry 4 }
+
+	ikev2SaIntegAlg OBJECT-TYPE
+	    SYNTAX INTEGER {
+		hmac-md5-96(1),		-- The MD5 hash algorithm
+		hmac-sha1-96(2)	 	-- The Secure Hash Algorithm
+	    }
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The integrity protection algorithm used for the IKE_SA.
+		  Possible values:
+		   hmac-md5-96(1),
+		   hmac-sha1-96(2)"
+	::= { ikev2SaEntry 5 }
+
+	ikev2SaPrfAlg OBJECT-TYPE
+	    SYNTAX INTEGER {
+		hmac-md5(1),		-- The MD5 hash algorithm
+		hmac-sha1(2)		-- The Secure Hash Algorithm
+	    }
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The hash algorithm used for the pseudo random function.
+		  Possible values:
+		   hmac-md5(1),	
+		   hmac-sha1(2)"
+	::= { ikev2SaEntry 6 }
+
+	ikev2SaGroup OBJECT-TYPE
+	    SYNTAX INTEGER
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The Diffie-Hellman group used for the IKE_SA.
+		  Possible values:
+		   1	- DH-group 768-bit MODP,	
+		   2	- DH-group 1024-bit MODP"
+	::= { ikev2SaEntry 7 }
+
+	ikev2SaRole OBJECT-TYPE
+	    SYNTAX INTEGER {
+		initiator(1), 	-- this end initiated the SA negotiation
+		responder(2)	-- the remote end initiated the SA negotiation
+	    }
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"This object specifies by which side the SA
+		 negotiation was initiated.
+		  Possible values:
+		   initiator(1), -- this end	initiated the SA negotiation 
+		   responder(2)  -- the remote end initiated the SA negotiation."
+	::= { ikev2SaEntry 8 }
+
+	ikev2SaLocalId OBJECT-TYPE
+	    SYNTAX DisplayString
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The local ID used for authentication."
+	::= { ikev2SaEntry 9 }
+
+	ikev2SaRemoteId OBJECT-TYPE
+	    SYNTAX DisplayString
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The remote ID used for authentication."
+	::= { ikev2SaEntry 10 }
+
+	ikev2SaLocalIp OBJECT-TYPE
+	    SYNTAX IpAddress
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The local IP address used in the IKE communication."
+	::= { ikev2SaEntry 11 }
+
+	ikev2SaRemoteIp OBJECT-TYPE
+	    SYNTAX IpAddress
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The remote IP address used in the IKE communication."
+	::= { ikev2SaEntry 12 }
+
+	ikev2SaSpiI OBJECT-TYPE
+	    SYNTAX OCTET STRING
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The SPI of the initiator."
+	::= { ikev2SaEntry 13 }
+
+	ikev2SaSpiR OBJECT-TYPE
+	    SYNTAX OCTET STRING
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The SPI of the responder."
+	::= { ikev2SaEntry 14 }
+
+	ikev2SaCreated OBJECT-TYPE
+	    SYNTAX  Date 
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+		"Time the SA was created."
+	::= { ikev2SaEntry 15 }
+
+	ikev2SaLastUsed OBJECT-TYPE
+	    SYNTAX  Date 
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+		"Time the SA was used last."
+	::= { ikev2SaEntry 16 }
+
+	ikev2SaExpires OBJECT-TYPE
+	    SYNTAX  Date 
+	    MAX-ACCESS  read-only
+	    STATUS  current
+	    DESCRIPTION
+		"Time the SA will expire."
+	::= { ikev2SaEntry 17 }
+
+	ikev2SaNumCerts OBJECT-TYPE
+	    SYNTAX INTEGER	
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The number of certificates received from the remote
+		 side when negotiating this SA."
+	::= { ikev2SaEntry 18 }
+
+	ikev2SaNumNegotiations OBJECT-TYPE
+	    SYNTAX INTEGER
+            MAX-ACCESS  read-only
+            STATUS  current
+            DESCRIPTION
+		 "This object specifies the number of currently active 
+		  negotiations for this SA."
+	::= { ikev2SaEntry 19 }
+
+	ikev2SaBytes OBJECT-TYPE
+	    SYNTAX INTEGER
+            MAX-ACCESS  read-only
+            STATUS  current
+            DESCRIPTION
+		 "Number of bytes transmitted using this SA."
+	::= { ikev2SaEntry 20 }
+
+	ikev2SaPeerIndex OBJECT-TYPE
+	    SYNTAX INTEGER
+	    MAX-ACCESS read-only
+	    STATUS current
+	    DESCRIPTION
+		"The index of the peer for which this SA was created."
+	::= { ikev2SaEntry 21 }
+
+	ikev2SaLocalPort OBJECT-TYPE
+	    SYNTAX INTEGER (0..65535)
+            MAX-ACCESS  read-only
+            STATUS  current
+            DESCRIPTION
+		 "Local port currently used for the SA."
+	::= { ikev2SaEntry 22 }
+
+	ikev2SaRemotePort OBJECT-TYPE
+	    SYNTAX INTEGER (0..65535)
+            MAX-ACCESS  read-only
+            STATUS  current
+            DESCRIPTION
+		 "Remote port currently used for the SA."
+	::= { ikev2SaEntry 23 }
+
+-- End IKE Security Associations Table
+
+
+-- IKEv2 Profile Table
+
+	ikev2ProfileTable OBJECT-TYPE
+            SYNTAX  SEQUENCE OF Ikev2ProfileEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+		"This table contains the list of IKE_SA profiles.
+		 these profiles are neede when using IKEv2 protocol."
+	::= { ipsec 22 }
+
+	ikev2ProfileEntry OBJECT-TYPE
+            SYNTAX  Ikev2ProfileEntry
+            MAX-ACCESS  not-accessible
+            STATUS  current
+            DESCRIPTION
+		"This object contains an IKE_SA profile."
+	    INDEX   {
+		ikev2PrfIndex
+	    }
+            ::= { ikev2ProfileTable 1 }
+
+	Ikev2ProfileEntry ::=
+	    SEQUENCE {
+		ikev2PrfIndex			Unsigned32,
+		ikev2PrfDescription		DisplayString,
+		ikev2PrfProposal		Unsigned32,
+		ikev2PrfBlockTime		INTEGER,
+		ikev2PrfNatT			INTEGER,
+		ikev2PrfMtuMax			INTEGER,
+		ikev2PrfLifeSeconds		Unsigned32,
+		ikev2PrfAliveCheck		INTEGER
+	    }
+
+	ikev2PrfIndex OBJECT-TYPE
+	    SYNTAX Unsigned32 (1..4294967295)
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"A unique index identifying this entry."
+	::= { ikev2ProfileEntry 1 }
+
+	ikev2PrfDescription OBJECT-TYPE
+	    SYNTAX DisplayString
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"An optional description for this profile."
+	::= { ikev2ProfileEntry 2 }
+
+	ikev2PrfProposal OBJECT-TYPE
+	    SYNTAX Unsigned32
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"The index of the first IKE proposal which may be used
+		 for IKE SA negotiation with this profile."
+	::= { ikev2ProfileEntry 3 }
+
+	ikev2PrfBlockTime OBJECT-TYPE
+	    SYNTAX INTEGER (-1..86400) 
+		UNITS "seconds"
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"This object specifies the time in seconds for which a peer is
+		 blocked for any IPSec operations after a phase 1 initiator
+		 negotiation failed.
+		  Special values:
+		   -1: use settings from global profile (do not block by default)
+		    0: do not block the peer at all."
+	    DEFVAL { -1 }
+	::= { ikev2ProfileEntry 4 }
+
+	ikev2PrfNatT OBJECT-TYPE
+	    SYNTAX INTEGER {
+		enabled(1), 	-- enable Nat-Traversal
+		disabled(2),	-- disable Nat-Traversal
+		default(3),   	-- use value from default profile 
+                                -- (enabled, if this is the default profile)
+		delete(4)   	-- mark this entry for deletion 
+	    }
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"This object specifies whether NAT-Traversal is enabled
+		  Possible values:
+		   enabled(1), 	-- enable Nat-Traversal
+		   disabled(2),	-- disable Nat-Traversal
+		   default(3)   -- use value from default profile 
+                                -- (disabled, if this is the default profile)."
+	    DEFVAL { default }
+	::= { ikev2ProfileEntry 5 }
+
+	ikev2PrfMtuMax OBJECT-TYPE
+	    SYNTAX INTEGER (0..65535)
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"The maximum MTU value allowed for ipsecPeerMtu.
+		 Zero means use value from global profile, 
+		 if this is the global profile, 1418 is assumed.
+		 Nonzero values smaller than 214 are reset to the minimum of 214."
+	    DEFVAL { 0 }
+	::= { ikev2ProfileEntry 6 }
+
+	ikev2PrfLifeSeconds OBJECT-TYPE
+	    SYNTAX Unsigned32
+		UNITS "seconds"
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"The time (in seconds) after which an SA will be rekeyed."
+	    DEFVAL { 3600 }
+	::= { ikev2ProfileEntry 7 }
+
+	ikev2PrfAliveCheck OBJECT-TYPE
+	    SYNTAX INTEGER {
+		enabled(1), 	-- enable alive check
+		disabled(2)	-- disable alive check
+	    }
+	    MAX-ACCESS read-write
+	    STATUS current
+	    DESCRIPTION
+		"This object specifies if a check is done to see whether the 
+		 other endpoint is alive.
+		(only for IKEv2)."
+	    DEFVAL { enabled }
+	::= { ikev2ProfileEntry 8 }
+
+-- End IKE SA Profile Table (IKEv2)
+
+
+
+END

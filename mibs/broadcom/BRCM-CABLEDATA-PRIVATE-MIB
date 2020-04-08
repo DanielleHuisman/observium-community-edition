@@ -1,0 +1,194 @@
+--**************************************************************************
+--                                                                          
+--    Copyright 2007 Broadcom Corporation                                   
+--    All Rights Reserved                                                   
+--    No portions of this material may be reproduced in any form without the
+--    written permission of:                                                
+--             Broadcom Corporation                                         
+--             16251 Laguna Canyon Road                                     
+--             Irvine, California  92618                                    
+--    All information contained in this document is Broadcom Corporation    
+--    company private, proprietary, and trade secret.                       
+--                                                                          
+--                                                                          
+--                                                                          
+--**************************************************************************
+--    Filename: brcm-cabledata-private.mib
+--    Author:   Kevin O'Neal
+--    Creation Date: 4-june-2002
+--
+--**************************************************************************
+--    Description:
+--
+--		private MIB for cableData products
+--		
+--**************************************************************************
+--    Revision History:
+--
+--**************************************************************************
+
+BRCM-CABLEDATA-PRIVATE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32
+        FROM SNMPv2-SMI
+    RowStatus
+        FROM SNMPv2-TC
+    cableDataPrivate
+        FROM BRCM-CABLEDATA-SMI;
+                
+cableDataPrivateMIB MODULE-IDENTITY
+    LAST-UPDATED "200702050000Z"
+    ORGANIZATION "Broadcom Corporation"
+    CONTACT-INFO
+        "	BANANA-CABLEDATA
+                (cableData branch of the
+                Broadcom Assigned Numbers and Naming Authority)
+                Broadcom Corporation
+
+        Postal: 4385 River Green Parkway
+                Duluth, GA  30096
+                USA
+
+           Tel: +1 770 232-0018
+
+        E-mail: banana-cabledata@broadcom.com"
+    DESCRIPTION
+        "Broadcom proprietary MIB which defines a root node for the 'private'
+         branch of the MIB tree.  This branch is only accessible in factory
+         and engineering configurations and is not intended for runtime use.
+         
+         This MIB also provides a mechanism for entering factory or engineering
+         modes and for securing the mechanism."
+    REVISION      "200702050000Z"
+    DESCRIPTION
+        "Module description was updated. 
+         Compilability issues were cleaned up: 
+         - Range restriction was added to object cdPvtMibEnableKeyIndex."
+    REVISION      "200206040000Z"
+    DESCRIPTION
+        "Initial version of this MIB module."
+    ::= { cableDataPrivate 1 }
+        
+cableDataPrivateMIBObjects OBJECT IDENTIFIER ::= { cableDataPrivateMIB 1}
+
+cableDataPrivateBase OBJECT IDENTIFIER ::= { cableDataPrivateMIBObjects 1 }
+        
+cdPrivateMibEnable OBJECT-TYPE
+    SYNTAX      INTEGER {
+                disabled(0),
+                factory(1),
+                engineering(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Setting this object to disabled(0) causes the entire cableDataPrivate 
+        branch of the MIB to permanently disappear.  Once all private 
+        operations are complete, this object should be set to disabled(0).  
+        Setting this object to factory(1) will expose the 
+        cableDataPrivateFactory branch, but will hide the 
+        cableDataPrivateEngineering branch.  Setting this object to 
+        engineering(2) will expose the cableDataPrivateEngineering branch
+        in addition to the cableDataPrivateFactory branch.  Initial value for 
+        this object is factory(1)."
+    ::= { cableDataPrivateBase 1 }
+    
+cdPrivateMibEnableKeyTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CdPrivateMibEnableKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table which may be used to re-enable the private MIB after
+         privateMibEnable is set to false.  This table contains a list
+         of keys, all of which must be set to their current values in a single
+         SNMP-SET PDU in order to set privateMibEnable back to manufacturing.
+         If the table is empty, then this mechanism is disabled and the private
+         MIB cannot be re-enabled.  The number of keys required to re-enable
+         the private MIB is controlled at configuration time by the number of
+         entries created in the table.  Although there is no theoretical
+         maximum to the number of keys which may be required, a particular
+         device is likely to have non-volatile storage constraints which
+         will limit the maximum number of entries.  If an attempt is made to
+         create more rows than the device can support, an error code of
+         NO CREATION will be returned."
+    ::= { cableDataPrivateBase 2 }
+
+cdPrivateMibEnableKeyEntry OBJECT-TYPE
+    SYNTAX      CdPrivateMibEnableKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry identifying a single key value used to re-enable the private
+         MIB once it has been disabled."
+    INDEX   { cdPvtMibEnableKeyIndex }
+    ::= { cdPrivateMibEnableKeyTable 1 }
+
+CdPrivateMibEnableKeyEntry ::= 
+    SEQUENCE    {
+                cdPvtMibEnableKeyIndex          Integer32,
+                cdPvtMibEnableKeyValue          OCTET STRING,
+                cdPvtMibEnableKeyStatus         RowStatus
+    }
+    
+cdPvtMibEnableKeyIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..8)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A unique value used to identify this key instance.  Note that the
+         indices need not be sequential, although they must be positive.
+         Also note that a particular device may have non-volatile storage
+         constraints which limit the value of this object.  If an attempt is
+         made to create a row which has an index that is not valid for the
+         particular device, an error code of NO CREATION will be returned."
+    ::= { cdPrivateMibEnableKeyEntry 1 }
+    
+cdPvtMibEnableKeyValue OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A value used to control re-enabling of the private MIB once it has
+         been disabled.  If the private MIB is disabled, the only value which
+         may be successfully set to this object is its current value.  If the
+         MIB is enabled, then this value may be set to any value in order to
+         configure the table.  Note that there is no theoretical limit to the
+         size of this string, although a particular device is likely to have
+         non-volatile storage constraints which will limit the size of the
+         value.  If an attempt is made to set this value to too large of a 
+         string, an error code of WRONG LENGTH will be returned.  Also note 
+         that this value may contain hex values as well as ASCII printable 
+         ones."
+    DEFVAL { "" }
+    ::= { cdPrivateMibEnableKeyEntry 2 }
+    
+cdPvtMibEnableKeyStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the status of rows in this table. Rows in this 
+         table may be created by either the create-and-go or create-and-wait 
+         paradigms.  There is no restriction on changing values in a row of 
+         this table while the row is active.  Setting the value of this object 
+         to active (either directly or indirectly via create-and-go) will cause 
+         the row to be written to non-volatile storage.  Changing the value of
+         cdPrivateEnableKeyValue while the row is active will also cause the
+         row to be written to non-volatile storage."
+    ::= { cdPrivateMibEnableKeyEntry 3 }
+    
+    
+-- 
+-- cableDataFactory OBJECT IDENTIFIER ::= { cdPrivateMibObjects 2 }
+-- see BRCM-CABLEDATA-FACTORY-MIB
+--
+
+-- 
+-- cableDataEngineering OBJECT IDENTIFIER ::= { cdPrivateMibObjects 3 }
+-- see BRCM-CABLEDATA-ENGINEERING-MIB
+--
+
+END

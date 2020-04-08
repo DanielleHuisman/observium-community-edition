@@ -1,0 +1,579 @@
+-- =================================================================
+-- Copyright (c) 2004-2015 Hangzhou H3C Tech. Co., Ltd. All rights reserved.
+--
+-- Description: stack mib
+-- Reference: STACK-MIB
+-- Version: V1.3
+-- History:
+--   V1.0 Created by ranbin
+--        Initial version 2008-04-30
+--   V1.1 2012-02-24 Modified by zhengwei
+--        Changed the range of link delay to 0 to 30000 ms
+--   V1.2 2013-08-16 Updated by wangpengju
+--        Added a new node h3cStackPortForwardingPath to h3cStackPortInfoTable
+--        2013-10-23 Updated by zhengwei
+--        Added notification nodes because MAD group work status changed:
+--        h3cStackMadBfdChangeNormal
+--        h3cStackMadBfdChangeFailure
+--        h3cStackMadLacpChangeNormal
+--        h3cStackMadLacpChangeFailure
+--   V1.3 2014-08-11 Updated by SongHao
+--        Added h3cStackDomainId.
+--        2014-11-20 Updated by songhao
+--        Added h3cStackPortConfigActivate in h3cStackGlobalConfig.
+--        h3cStackLinkDelayInterval was changed to in the range of 0 to 2147483647 ms.
+-- =================================================================
+H3C-STACK-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        h3cCommon
+    FROM HUAWEI-3COM-OID-MIB
+        entPhysicalIndex
+    FROM ENTITY-MIB
+        ifIndex, ifDescr
+    FROM IF-MIB
+        Integer32, OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE, Unsigned32
+    FROM SNMPv2-SMI;
+
+h3cStack MODULE-IDENTITY
+    LAST-UPDATED "201411200850Z"
+    ORGANIZATION
+        "Hangzhou H3C Technologies Co., Ltd."
+    CONTACT-INFO
+        "Platform Team H3C Technologies Co., Ltd.
+         Hai-Dian District Beijing P.R. China
+         Http://www.h3c.com
+         Zip:100085"
+    DESCRIPTION
+        "This MIB is used to manage STM (Stack Topology Management)
+         information for IRF (Intelligent Resilient Framework) device.
+         This MIB is applicable to IRF-capable products.  Some objects in
+         this MIB may be used only for some specific products, so users should
+         refer to the related documents to acquire more detailed information."
+    REVISION "201411200850Z"
+    DESCRIPTION
+        "Added h3cStackPortConfigActivate in h3cStackGlobalConfig.
+         h3cStackLinkDelayInterval was changed to in the range of 0 to
+         2147483647 ms."
+    REVISION "201408110641Z"
+    DESCRIPTION
+        "Added h3cStackDomainId."
+    REVISION "201310230000Z"
+    DESCRIPTION
+        "Added notification nodes because MAD group work status changed:
+        h3cStackMadBfdChangeNormal
+        h3cStackMadBfdChangeFailure
+        h3cStackMadLacpChangeNormal
+        h3cStackMadLacpChangeFailure"
+    REVISION "201308160000Z"
+    DESCRIPTION
+        "Added a new node h3cStackPortForwardingPath to h3cStackPortInfoTable."
+    REVISION "201202240000Z"
+    DESCRIPTION
+        "Change the range of link-delay to 0-30000ms."
+    REVISION "200804301650Z"             -- 30th April, 2007 at 16:50 GMT
+    DESCRIPTION
+        "The initial revision of this MIB module."
+    ::= { h3cCommon 91 }
+
+
+-- Scalar MIB objects, which are considered as global variables
+-- Global Level Configuration
+
+h3cStackGlobalConfig OBJECT IDENTIFIER ::= { h3cStack 1 }
+
+h3cStackMaxMember OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of members in a stack."
+    ::= { h3cStackGlobalConfig 1 }
+
+h3cStackMemberNum OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of members currently in a stack."
+    ::= { h3cStackGlobalConfig 2 }
+
+h3cStackMaxConfigPriority OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The highest priority that can be configured for a member in a stack."
+    ::= { h3cStackGlobalConfig 3 }
+
+h3cStackAutoUpdate OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            disabled(1),
+            enabled(2)
+        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The function for automatically updating the image from the master to
+         a device that is attempting to join the stack.
+         When a new device tries to join a stack, STM verifies the image
+         consistency between the joining device and the master.
+         If the joining device uses a different image version than the master,
+         the function updates the joining device with the image of the master.
+         When this function is disabled, the new device can't join the stack
+         if it uses a different software version than the master.
+
+        disabled: disable auto update function
+        enabled: enable auto update function"
+    ::= { h3cStackGlobalConfig 4 }
+
+h3cStackMacPersistence OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            notPersist(1),
+            persistForSixMin(2),
+            persistForever(3)
+        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The mode of bridge MAC address persistence.  When a stack starts,
+         the bridge MAC address of the master is used as that of the stack.
+         When the master leaves the stack, the bridge MAC address of the
+         stack changes depending on the mode of bridge MAC address persistence.
+
+        notPersist: The bridge MAC address of the new master is used
+         as that of the stack immediately.
+        persistForSixMin: The original bridge MAC address will be reserved for six
+         minutes.  In this period, if the master that has left rejoins the stack,
+         the bridge MAC address of the stack will not change.
+         If the old master doesn't rejoin the stack within this period, the
+         bridge MAC address of the new master will be used as that of the stack.
+        persistForever: Whether the master leaves or not, the bridge MAC address
+         of the stack will never change."
+    ::= { h3cStackGlobalConfig 5 }
+
+h3cStackLinkDelayInterval OBJECT-TYPE
+    SYNTAX      Integer32 (0..2147483647)
+    UNITS       "millisecond"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Delay for stack ports to report a link down event.  If the link comes up
+         before the delay timer expires, the stack port will not report the link
+         down event.  If the link is not recovered before the delay timer expires,
+         the stack port will report the change.  If the delay is set to 0,
+         the stack ports will report a link down event without delay.
+
+        0: no delay
+        other value(ms): delay time"
+    ::= { h3cStackGlobalConfig 6 }
+
+h3cStackTopology OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            chainConn(1),
+            ringConn(2)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Stack topology.
+
+        chainConn: daisy-chain connection
+        ringConn: ring connection"
+    ::= { h3cStackGlobalConfig 7 }
+
+h3cStackDomainId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Domain ID of the IRF fabric that is used to uniquely identify an IRF fabric.
+        Domain IDs prevent IRF fabrics from interfering with one another."
+    ::= { h3cStackGlobalConfig 8 }
+
+h3cStackPortConfigActivate OBJECT-TYPE
+    SYNTAX INTEGER
+        {
+            none(1),
+            set(2)
+        }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "After connecting the physical interfaces between two devices and
+        binding them to the correct IRF ports, you must
+        activate the settings on the IRF ports.  This operation merges the two
+        devices into one IRF fabric.  The system activates the IRF port
+        settings automatically in the following situations:
+        1. The configuration file that the device starts with contains
+        IRF port bindings.
+        2. You are binding physical interfaces to an IRF port after an IRF fabric
+        is formed.
+
+        none: If the user sets this object to none, this object will return
+              a success without performing any operation.
+
+        set: Activates the settings on the IRF ports.
+             After the settings is activated, this object will return to
+             none at the next reading."
+    DEFVAL { none }
+    ::= { h3cStackGlobalConfig 9 }
+
+-- Device Level Configuration
+h3cStackDeviceConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF H3cStackDeviceConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage device information in a stack."
+    ::= { h3cStack 2 }
+
+h3cStackDeviceConfigEntry OBJECT-TYPE
+    SYNTAX      H3cStackDeviceConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage device information in a stack."
+    INDEX
+        {
+            entPhysicalIndex
+        }
+    ::= { h3cStackDeviceConfigTable 1 }
+
+H3cStackDeviceConfigEntry ::= SEQUENCE
+    {
+        h3cStackMemberID          Integer32,
+        h3cStackConfigMemberID    Integer32,
+        h3cStackPriority          Integer32,
+        h3cStackPortNum           Integer32,
+        h3cStackPortMaxNum        Integer32
+    }
+
+h3cStackMemberID OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The member ID of the device in a stack."
+    ::= { h3cStackDeviceConfigEntry 1 }
+
+h3cStackConfigMemberID OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The configured member ID of the device.  The valid value ranges from
+         1 to the value in h3cStackMaxMember.  The configured member ID will
+         take effect at a reboot if it is unique within the stack."
+    ::= { h3cStackDeviceConfigEntry 2 }
+
+h3cStackPriority OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The priority of a device in the stack.  The valid value ranges from
+         1 to the value in h3cStackMaxConfigPriority."
+    ::= { h3cStackDeviceConfigEntry 3 }
+
+h3cStackPortNum OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of stack ports enabled on a device."
+    ::= { h3cStackDeviceConfigEntry 4 }
+
+h3cStackPortMaxNum OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum number of stack ports on a device."
+    ::= { h3cStackDeviceConfigEntry 5 }
+
+
+-- Board Level Configuration
+h3cStackBoardConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF H3cStackBoardConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage MPU information for a stack."
+    ::= { h3cStack 3 }
+
+h3cStackBoardConfigEntry OBJECT-TYPE
+    SYNTAX      H3cStackBoardConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage MPU information for a stack."
+    INDEX
+        {
+            entPhysicalIndex
+        }
+    ::= { h3cStackBoardConfigTable 1 }
+
+H3cStackBoardConfigEntry ::= SEQUENCE
+    {
+        h3cStackBoardRole              INTEGER,
+        h3cStackBoardBelongtoMember    Integer32
+    }
+
+h3cStackBoardRole OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            slave(1),
+            master(2),
+            loading(3),
+            other(4)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The role of the MPU in a stack.
+
+        slave: Standby MPU
+        master: Master MPU
+        loading: Standby MPU is loading the software image from the master.
+        other: other"
+    ::= { h3cStackBoardConfigEntry 1 }
+
+h3cStackBoardBelongtoMember OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Member ID of the device that holds the current board."
+    ::= { h3cStackBoardConfigEntry 2 }
+
+
+-- stack port Information
+h3cStackPortInfoTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF H3cStackPortInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage stack port information
+         for IRF stacked devices."
+    ::= { h3cStack 4 }
+
+h3cStackPortInfoEntry OBJECT-TYPE
+    SYNTAX      H3cStackPortInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage stack port information
+         for IRF stacked devices."
+    INDEX
+        {
+            h3cStackMemberID,
+            h3cStackPortIndex
+        }
+    ::= { h3cStackPortInfoTable 1 }
+
+H3cStackPortInfoEntry ::= SEQUENCE
+    {
+        h3cStackPortIndex     Integer32,
+        h3cStackPortEnable    INTEGER,
+        h3cStackPortStatus    INTEGER,
+        h3cStackNeighbor      Integer32,
+        h3cStackPortForwardingPath    OCTET STRING
+    }
+
+h3cStackPortIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The index of a stack port of the device."
+    ::= { h3cStackPortInfoEntry 1 }
+
+h3cStackPortEnable OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            disabled(1),
+            enabled(2)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The status of a stack port of the device.  If no physical
+         interfaces are added to the stack port, its status is disabled.
+         If the stack port has physical interfaces, its status is enabled.
+
+        disabled: The stack port is disabled.
+        enabled: The stack port is enabled."
+    ::= { h3cStackPortInfoEntry 2 }
+
+h3cStackPortStatus OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            up(1),
+            down(2),
+            silent(3),
+            disabled(4)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The link status of a stack port on the device.
+
+        up: A physical link is present on the stack port.
+        down: No physical link is present on the stack port.
+        silent: The link state of the stack port is up,
+                but the port can't transmit or receive traffic.
+        disabled: The stack port doesn't contain physical links."
+    ::= { h3cStackPortInfoEntry 3 }
+
+h3cStackNeighbor OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The member ID of the stack port's neighbor.  0 means no
+         neighbor exists."
+    ::= { h3cStackPortInfoEntry 4 }
+
+h3cStackPortForwardingPath OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..511))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "List of egress member IDs on a stack port.
+         Each member device uses the egress member ID lists to choose the outgoing
+         stack port for known unicast frames to be sent out of other member devices.
+         The egress member ID lists are comma separated.
+         A zero-length string means no egress members exist.
+
+         For example:
+           In a ring stack of 1-2-3-4-5-7-1,
+           if h3cStackPortForwardingPath.1.1 returns '7,5,4',
+           IRF-port 1/1 will be the outgoing port for frames to reach members 7, 5,
+           and 4 from member 1."
+    ::= { h3cStackPortInfoEntry 5 }
+
+-- Physical interface Information
+h3cStackPhyPortInfoTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF H3cStackPhyPortInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage information about physical
+         interfaces that can be used for IRF stacking."
+    ::= { h3cStack 5 }
+
+h3cStackPhyPortInfoEntry OBJECT-TYPE
+    SYNTAX      H3cStackPhyPortInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains objects to manage information about physical
+         interfaces that can be used for IRF stacking."
+    INDEX
+        {
+            entPhysicalIndex
+        }
+    ::= { h3cStackPhyPortInfoTable 1 }
+
+H3cStackPhyPortInfoEntry ::= SEQUENCE
+    {
+        h3cStackBelongtoPort    Integer32
+    }
+
+h3cStackBelongtoPort OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The index of the stack port to which the physical interface is added.
+         0 means the physical interface is not added to any stack port.
+         The value will take effect when IRF is enabled on the device."
+    ::= { h3cStackPhyPortInfoEntry 1 }
+
+--
+-- Notification definitions
+--
+-- =================================================================
+-- Traps are defined below.
+h3cStackTrap OBJECT IDENTIFIER ::= { h3cStack 6 }
+
+-- All objects used for TRAP only are defined here.
+h3cStackTrapOjbects OBJECT IDENTIFIER ::= { h3cStackTrap 0 }
+
+h3cStackPortLinkStatusChange  NOTIFICATION-TYPE
+    OBJECTS
+        {
+            h3cStackMemberID,
+            h3cStackPortIndex,
+            h3cStackPortStatus
+        }
+
+    STATUS      current
+    DESCRIPTION
+        "The h3cStackPortLinkStatusChange trap indicates that the link status
+         of the stack port has changed."
+    ::= { h3cStackTrapOjbects 1 }
+
+h3cStackTopologyChange  NOTIFICATION-TYPE
+    OBJECTS
+        {
+            h3cStackTopology
+        }
+    STATUS      current
+    DESCRIPTION
+        "The h3cStackTopologyChange trap indicates that the topology type of
+         the IRF stack has changed."
+    ::= { h3cStackTrapOjbects 2 }
+
+h3cStackMadBfdChangeNormal NOTIFICATION-TYPE
+    OBJECTS
+        {
+            ifIndex,
+            ifDescr
+        }
+    STATUS      current
+    DESCRIPTION
+        "The h3cStackMadBfdChangeNormal trap indicates that the BFD MAD function
+        changed to the normal state."
+    ::= { h3cStackTrapOjbects 3 }
+
+h3cStackMadBfdChangeFailure NOTIFICATION-TYPE
+    OBJECTS
+        {
+            ifIndex,
+            ifDescr
+        }
+    STATUS      current
+    DESCRIPTION
+        "The h3cStackMadBfdChangeFailure trap indicates that the BFD MAD function
+        changed to the failure state."
+    ::= { h3cStackTrapOjbects 4 }
+
+h3cStackMadLacpChangeNormal NOTIFICATION-TYPE
+    OBJECTS
+        {
+            ifIndex,
+            ifDescr
+        }
+    STATUS      current
+    DESCRIPTION
+        "The h3cStackMadLacpChangeNormal trap indicates that the LACP MAD function
+        changed to the normal state."
+    ::= { h3cStackTrapOjbects 5 }
+
+h3cStackMadLacpChangeFailure NOTIFICATION-TYPE
+    OBJECTS
+        {
+            ifIndex,
+            ifDescr
+        }
+    STATUS      current
+    DESCRIPTION
+        "The h3cStackMadLacpChangeFailure trap indicates that the LACP MAD function
+        changed to the failure state."
+    ::= { h3cStackTrapOjbects 6 }
+END

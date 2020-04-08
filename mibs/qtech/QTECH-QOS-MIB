@@ -1,0 +1,1137 @@
+-- *****************************************************************
+-- QTECH-QOS-MIB.mib:  Qtech QoS MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by Qtech Networks Co.,Ltd.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+QTECH-QOS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        Counter64,
+        Unsigned32
+                FROM SNMPv2-SMI
+        DisplayString
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus,
+        IfIndex
+                FROM QTECH-TC    
+        EnabledStatus 
+                FROM P-BRIDGE-MIB                            
+        qtechMgmt
+                FROM QTECH-SMI;
+
+qtechQoSMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "Qtech Networks Co.,Ltd."
+        CONTACT-INFO
+                " 
+                Tel: 4008-111-000 
+
+                E-mail: service@qtech.com.cn"
+        DESCRIPTION
+                "This module defines qtech QoS(Policy-Based Quality of Service) mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { qtechMgmt 18}
+
+-- Priority configure
+
+qtechQoSPriorityMIBObjects OBJECT IDENTIFIER ::= { qtechQoSMIB 1 }
+
+qtechQoSGlobalStatus OBJECT-TYPE
+    SYNTAX  EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+           "QoS function status"
+         ::={ qtechQoSPriorityMIBObjects 1 }
+                  
+qtechPriorityTrafficClassNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of the traffic class the priority can mapping to.
+            Traffic class is a  number in the range (1..qtechPriorityTrafficClassNum)"
+        ::= { qtechQoSPriorityMIBObjects 2 }
+
+qtechPriorityClassNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Number of the priority class.
+             The range of Priority class is (0..(qtechPriorityClassNum-1))"
+        ::= { qtechQoSPriorityMIBObjects 3 }
+
+qtechPriorityDscpMaxValue OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "max value of the dscp in system."
+        ::= { qtechQoSPriorityMIBObjects 4 }
+    
+qtechTrafficClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping evaluated User Priority to Traffic
+            Class, for forwarding by the bridge.  Traffic class is a
+            number in the range (1..qtechPriorityTrafficClassNum)."
+    ::= { qtechQoSPriorityMIBObjects 5 }
+    
+qtechTrafficClassEntry OBJECT-TYPE
+        SYNTAX QtechTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "User Priority to Traffic Class mapping."
+        INDEX { qtechTrafficClassPriority }
+    ::= { qtechTrafficClassTable 1 }
+
+    
+QtechTrafficClassEntry ::=
+        SEQUENCE {
+        qtechTrafficClassPriority
+                INTEGER,
+        qtechTrafficClass
+                INTEGER,
+        qtechPriorityToDscp
+                Integer32
+        }
+    
+qtechTrafficClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The Priority value determined for the received frame.
+            This value is equivalent to the priority indicated in
+            the tagged frame received, or one of the evaluated
+            priorities, determined according to the media-type.
+    
+            For untagged frames received from Ethernet media, this
+            value is equal to the qtechPortDefaultUserPriority value
+            for the ingress port.
+    
+            For untagged frames received from non-Ethernet media,
+            this value is equal to the qtechRegenUserPriority value
+            for the ingress port and media-specific user priority.
+            
+            This value is in the range(0..(qtechPriorityClassNum-1))"
+    ::= { qtechTrafficClassEntry 1 }
+    
+qtechTrafficClass OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The Traffic Class the received frame is mapped to, Its value
+            ranges between 0 and the value of the object qtechPriorityTrafficClass - 1.
+            The priority is higher if this value is bigger."
+    ::= { qtechTrafficClassEntry 2 }
+    
+qtechPriorityToDscp OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Dscp value of priority mapping to."
+    ::= { qtechTrafficClassEntry 3 }
+
+-- mapping of dscp to priority
+qtechDscpClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechDscpClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping evaluated dscp to priority."
+    ::= { qtechQoSPriorityMIBObjects 6 }
+    
+qtechDscpClassEntry OBJECT-TYPE
+        SYNTAX QtechDscpClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A entry mapping evaluated dscp to priority."
+        INDEX { qtechDscpClass }
+    ::= { qtechDscpClassTable 1 }
+    
+QtechDscpClassEntry ::=
+        SEQUENCE {
+        qtechDscpClass
+                INTEGER,
+        qtechDscpTrafficClassPriority
+                INTEGER                
+        }
+
+qtechDscpClass OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Dscp value.This value is even number in 0 between62"
+    ::= { qtechDscpClassEntry 1 }
+        
+qtechDscpTrafficClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The priority which dscp value mapped to.            
+            This value is in the range(0..(qtechPriorityClassNum-1))"
+    ::= { qtechDscpClassEntry 2 }
+             
+
+qtechPriorityTrafficClassOperMode OBJECT-TYPE
+        SYNTAX INTEGER{
+                   qos-sp(1),  -- SP arithmetic
+                   qos-wrr(2),  -- WRR arithmetic
+                   qos-drr(3)
+               }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The global arithmetic type which the priority traffic class use."  
+        ::= { qtechQoSPriorityMIBObjects 7 }
+        
+qtechPriorityBandWidth OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The global weight setting for every queue  
+             Each octet indicate a traffic class queue in the range(1..255)
+              ,first octet indicate first queue. 
+              The string length equal to qtechPriorityTrafficClassNum."  
+        ::= { qtechQoSPriorityMIBObjects 8 }
+        
+        
+qtechIfPriorityTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechIfPriorityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table that contains information about every interface"
+    ::= { qtechQoSPriorityMIBObjects 9 }
+
+qtechIfPriorityEntry OBJECT-TYPE
+        SYNTAX QtechIfPriorityEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of Default User Priorities for each interface."
+        INDEX { qtechIfPriorityIfIndex }
+    ::= { qtechIfPriorityTable 1 }
+    
+QtechIfPriorityEntry ::=
+        SEQUENCE {
+            qtechIfPriorityIfIndex
+                IfIndex,
+            qtechIfPriority
+                Integer32,
+            qtechIfPriTrafficClassOperMode
+                INTEGER,
+            qtechIfPriorityBandwidth
+                OCTET STRING,
+            qtechIfPriorityQosTrustMode
+                INTEGER
+        }
+qtechIfPriorityIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            ""
+     ::= { qtechIfPriorityEntry 1 }
+                
+qtechIfPriority OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The default ingress User Priority for this interface.
+            This value is in the range (0..(qtechPriorityClassNum-1))"
+    ::= { qtechIfPriorityEntry 2 }
+      
+--qtechIfPriorityDscpMutation OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp Mutation name of this interface match. It indicate that 
+--            this interface doesn't match any dscp mutation which this string is null"
+--        ::= { qtechIfPriorityEntry  3 }  
+
+qtechIfPriTrafficClassOperMode OBJECT-TYPE
+        SYNTAX INTEGER{
+                   qos-sp(1),  -- SP arithmetic
+                   qos-wrr(2),  -- WRR arithmetic
+                   qos-drr(3)
+               }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The arithmetic type which the priority traffic class use in this interface."  
+        ::= { qtechIfPriorityEntry 3 }
+            
+qtechIfPriorityBandwidth OBJECT-TYPE
+        SYNTAX OCTET STRING
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The weight of every queue on a interface. 
+             Each octet indicate a traffic class queue in the range(1..255)
+              ,first octet indicate first queue. 
+              The string length equal to qtechPriorityTrafficClassNum."  
+        ::= { qtechIfPriorityEntry 4 }
+
+qtechIfPriorityQosTrustMode OBJECT-TYPE
+        SYNTAX INTEGER{
+               not-trust(1),       
+               trust-cos(2),
+               trust-dscp(3),
+               trust-ip-precedence(4)  
+           } 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "QoS trust mode  for this interface."
+    ::= { qtechIfPriorityEntry 5 }
+
+-- ippre to dscp table
+qtechIpPreClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechIpPreClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table mapping ip precedence to dscp value." 
+    ::= { qtechQoSPriorityMIBObjects 10 }
+    
+qtechIpPreClassEntry OBJECT-TYPE
+        SYNTAX QtechIpPreClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Ip precedence to dscp mapping."
+        INDEX { qtechIpPreClassPriority }
+    ::= { qtechIpPreClassTable 1 }
+
+    
+QtechIpPreClassEntry ::=
+        SEQUENCE {
+        qtechIpPreClassPriority
+                INTEGER,
+        qtechIpPreToDscp
+                Integer32
+        }
+    
+qtechIpPreClassPriority OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The Ip precedence value determined for the received frame."
+    ::= { qtechIpPreClassEntry 1 }
+    
+    
+qtechIpPreToDscp OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Dscp value of priority mapping to."
+    ::= { qtechIpPreClassEntry 2 }
+
+-- Rate limit support
+qtechIfRateLimitTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechIfRateLimitEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of rate limit interface objects."
+        ::= { qtechQoSPriorityMIBObjects 11 }
+    
+qtechIfRateLimitEntry OBJECT-TYPE
+        SYNTAX QtechIfRateLimitEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entry ACL interface information."
+        INDEX { qtechIfRateLimitIndex }
+        ::= { qtechIfRateLimitTable 1 }
+
+QtechIfRateLimitEntry ::=
+        SEQUENCE {
+            qtechIfRateLimitIndex IfIndex,
+            qtechIfRateLimitInMaxBandWidth Unsigned32,
+            qtechIfRateLimitInBurstFlowLimit Integer32,
+            qtechIfRateLimitOutMaxBandWidth Unsigned32,
+            qtechIfRateLimitOutBurstFlowLimit Integer32
+        }
+
+qtechIfRateLimitIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            " "
+        ::= { qtechIfRateLimitEntry 1 }
+
+qtechIfRateLimitInMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Input maximum bandwidth of in units of kbps.
+             0 indicate that bandwidth will be not limitted."
+        ::= { qtechIfRateLimitEntry 2 }
+        
+qtechIfRateLimitInBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Input limit of burst traffic in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { qtechIfRateLimitEntry 3 }
+
+qtechIfRateLimitOutMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Ouput maximum bandwidth of in units of kbps.
+             0 indicate that bandwidth will be not limitted."
+        ::= { qtechIfRateLimitEntry 4 }
+        
+qtechIfRateLimitOutBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Ouput limit of burst traffic in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { qtechIfRateLimitEntry 5 }
+
+-- queue support
+qtechIfQueueSupportTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechIfQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "List queues of interfaces."
+        ::= { qtechQoSPriorityMIBObjects 12 }
+    
+qtechIfQueueSupportEntry OBJECT-TYPE
+        SYNTAX QtechIfQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Queue Entry."
+        INDEX { qtechIfIndex, qtechIfQueueIndex}
+        ::= { qtechIfQueueSupportTable 1 }
+
+QtechIfQueueSupportEntry ::=
+        SEQUENCE {
+            qtechIfIndex IfIndex,
+            qtechIfQueueIndex Integer32,
+            qtechIfQueueSupportTransmitPacket Counter64,
+            qtechIfQueueSupportTransmitBytes Counter64,
+            qtechIfQueueSupportDropPacket Counter64,
+            qtechIfQueueSupportDropBytes Counter64
+        }
+
+qtechIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Interface index."
+        ::= { qtechIfQueueSupportEntry 1 }
+		
+qtechIfQueueIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Queue index."
+        ::= { qtechIfQueueSupportEntry 2 }
+
+qtechIfQueueSupportTransmitPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit packets of queues."
+        ::= { qtechIfQueueSupportEntry 3 }
+        
+qtechIfQueueSupportTransmitBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit bytes of queues."
+        ::= { qtechIfQueueSupportEntry 4 }
+
+qtechIfQueueSupportDropPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of queues."
+        ::= { qtechIfQueueSupportEntry 5 }
+        
+qtechIfQueueSupportDropBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of queues."
+        ::= { qtechIfQueueSupportEntry 6 }
+		
+-- multicast queue support
+qtechIfMulticastQueueSupportTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechIfMulticastQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "List multicast queues of interfaces."
+        ::= { qtechQoSPriorityMIBObjects 13 }
+    
+qtechIfMulticastQueueSupportEntry OBJECT-TYPE
+        SYNTAX QtechIfMulticastQueueSupportEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Multicast Queue Entry."
+        INDEX { qtechIfIndexMulticast, qtechIfMulticastQueueIndex}
+        ::= { qtechIfMulticastQueueSupportTable 1 }
+
+QtechIfMulticastQueueSupportEntry ::=
+        SEQUENCE {
+            qtechIfIndexMulticast IfIndex,
+            qtechIfMulticastQueueIndex Integer32,
+            qtechIfMulticastQueueSupportTransmitPacket Counter64,
+            qtechIfMulticastQueueSupportTransmitBytes Counter64,
+            qtechIfMulticastQueueSupportDropPacket Counter64,
+            qtechIfMulticastQueueSupportDropBytes Counter64
+        }
+
+qtechIfIndexMulticast OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Interface index."
+        ::= { qtechIfMulticastQueueSupportEntry 1 }
+		
+qtechIfMulticastQueueIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Multicast Queue index."
+        ::= { qtechIfMulticastQueueSupportEntry 2 }
+
+qtechIfMulticastQueueSupportTransmitPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit packets of multicast queues."
+        ::= { qtechIfMulticastQueueSupportEntry 3 }
+        
+qtechIfMulticastQueueSupportTransmitBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Transmit bytes of multicast queues."
+        ::= { qtechIfMulticastQueueSupportEntry 4 }
+
+qtechIfMulticastQueueSupportDropPacket OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of multicast queues."
+        ::= { qtechIfMulticastQueueSupportEntry 5 }
+        
+qtechIfMulticastQueueSupportDropBytes OBJECT-TYPE
+        SYNTAX Counter64 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Drop packets of multicast queues."
+        ::= { qtechIfMulticastQueueSupportEntry 6 }
+		
+--------------------------------------------------------------
+-- QoS traffic classification
+---------------------------------------------------------------
+qtechQoSTrafficClassMIBObjects OBJECT IDENTIFIER ::= { qtechQoSMIB 2 }
+
+qtechQoSTrafficClassTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechQoSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos traffic classification entries."
+        ::= { qtechQoSTrafficClassMIBObjects 1 }
+    
+qtechQoSTrafficClassEntry OBJECT-TYPE
+        SYNTAX QtechQoSTrafficClassEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS traffic classification entry.Every valid QoS traffic 
+                 classification entry need make use of a QtechAclEntry which
+                 qtechAclFlowAction is 'permit'."  
+        INDEX { qtechQosClassMapName }
+        ::= { qtechQoSTrafficClassTable 1 }
+        
+QtechQoSTrafficClassEntry ::= 
+        SEQUENCE {
+                qtechQosClassMapName DisplayString,
+                qtechQosClassAclName DisplayString,
+                qtechQosClassMapEntryStatus ConfigStatus
+        }
+qtechQosClassMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS class map.This value is unique for every entry.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { qtechQoSTrafficClassEntry  1 }
+         
+qtechQosClassAclName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (0..32))
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Access list name of this class map match.Null indicate that this class 
+            map doesn't match any acl"
+        ::= { qtechQoSTrafficClassEntry  2 } 
+        
+qtechQosClassMapEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a class map entry,
+             and set its value to invalid will delete this entry."
+        ::= { qtechQoSTrafficClassEntry 3 }
+        
+
+qtechQoSPoliceMapTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechQoSPoliceMapEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos police map entries."
+        ::= { qtechQoSTrafficClassMIBObjects 2 }
+    
+qtechQoSPoliceMapEntry OBJECT-TYPE
+        SYNTAX QtechQoSPoliceMapEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS police map entry."  
+        INDEX { qtechQosPoliceMapName}
+        ::= { qtechQoSPoliceMapTable 1 }
+        
+QtechQoSPoliceMapEntry ::= 
+        SEQUENCE {
+                qtechQosPoliceMapName DisplayString,
+                qtechQosPoliceMapEntryStatus ConfigStatus
+        }
+qtechQosPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS police map.
+             When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { qtechQoSPoliceMapEntry  1 }
+                
+qtechQosPoliceMapEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+        ::= { qtechQoSPoliceMapEntry 2 }
+
+qtechQoSPoliceMapConfTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechQoSPoliceMapConfEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of Qos police map config entries."
+        ::= { qtechQoSTrafficClassMIBObjects 3 }
+    
+qtechQoSPoliceMapConfEntry OBJECT-TYPE
+        SYNTAX QtechQoSPoliceMapConfEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "QoS police map config entry."  
+        INDEX { qtechQoSPoliceCfgPoliceMapName,qtechQoSPoliceCfgClassMapName}
+        ::= { qtechQoSPoliceMapConfTable 1 }
+        
+QtechQoSPoliceMapConfEntry ::= 
+        SEQUENCE {
+                qtechQoSPoliceCfgPoliceMapName DisplayString,
+                qtechQoSPoliceCfgClassMapName DisplayString,
+                qtechQoSPoliceMapConfMaxBandWidth Unsigned32,
+                qtechQoSPoliceMapConfBurstFlowLimit Integer32,
+                qtechQoSPoliceMapConfExceedAction INTEGER,
+                qtechQoSPoliceMapConfExceedDscp Integer32,
+                qtechQoSPoliceMapConfNewDscp Integer32,
+                qtechQoSPoliceMapCfgEntryStatus ConfigStatus,
+                qtechQoSPoliceMapConfMaxHighBandWidth Unsigned32
+        }
+qtechQoSPoliceCfgPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Name of this QoS police map.
+             When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { qtechQoSPoliceMapConfEntry  1 }
+         
+qtechQoSPoliceCfgClassMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "A QoS class map name of this police map match.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { qtechQoSPoliceMapConfEntry  2 } 
+    
+qtechQoSPoliceMapConfMaxBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Maximum bandwidth of this traffic classification in units of bps.
+            If the Maximum bandwidth is greater than the maximum value
+            reportable by this object then this object should report its
+            maximum value (4,294,967,295) and qtechQoSPoliceMapConfMaxBandWidth
+             must be used to set or report the Maximum bandwidth. 
+             0 indicate that bandwidth will be not limitted."
+        ::= { qtechQoSPoliceMapConfEntry 3 }
+        
+qtechQoSPoliceMapConfBurstFlowLimit OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Limit of burst traffic of this traffic classification in units of byte.
+             0 indicate that burst traffic will be not limitted."
+        ::= { qtechQoSPoliceMapConfEntry 4 }
+                
+        
+qtechQoSPoliceMapConfExceedAction OBJECT-TYPE
+        SYNTAX INTEGER{
+               discard(1),     --discard part exceeded bandwidth of traffic
+               modify-dscp(2)  --modify dscp value of packet exceeded bandwidth
+        }
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The action deal with the traffic exceeded bandwidth."
+        ::= { qtechQoSPoliceMapConfEntry 5 }        
+        
+qtechQoSPoliceMapConfExceedDscp OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The new dscp value will replaces the old dscp value of packet when 
+             traffic of packet has exceeded bandwidth. This value has meaning only
+             when value of qtechQoSPoliceMapConfExceedAction is 'modify-dscp' ."
+        ::= { qtechQoSPoliceMapConfEntry 6 }
+        
+qtechQoSPoliceMapConfNewDscp OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The new dscp value will replaces the old dscp value of packet regardless
+             whether the traffic has exceeded bandwidth. Setting this value to -1 indicate
+             that the dscp value of packet will not be modifed"            
+        ::= { qtechQoSPoliceMapConfEntry 7 }        
+        
+qtechQoSPoliceMapCfgEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+        ::= { qtechQoSPoliceMapConfEntry 8 }
+
+    
+qtechQoSPoliceMapConfMaxHighBandWidth OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Maximum bandwidth of this traffic classification in units of kbps.
+            0 indicate that bandwidth will be not limitted.
+            when qtechQoSPoliceMapConfMaxBandWidth is equal to ,this object display
+            the real  Maximum bandwidth of this traffic classification"
+        ::= { qtechQoSPoliceMapConfEntry 9 }
+        
+--qtechQosPoliceIfTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF QtechQosPoliceIfEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "list of QoS Police Map interface objects."
+--        ::= { qtechQoSTrafficClassMIBObjects 4 } this oid is obsolete
+--    
+--qtechQosPoliceIfEntry OBJECT-TYPE
+--        SYNTAX QtechQosPoliceIfEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "Entry ACL interface information."
+--        INDEX { qtechQosPoliceIfIndex }
+--        ::= { qtechQosPoliceIfTable 1 }
+--
+--QtechQosPoliceIfEntry ::=
+--        SEQUENCE {
+--            qtechQosPoliceIfIndex IfIndex,
+--            qtechIfPoliceMapName  DisplayString
+--        }
+--
+--qtechQosPoliceIfIndex OBJECT-TYPE
+--        SYNTAX IfIndex
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            " "
+--        ::= { qtechQosPoliceIfEntry 1 }
+--
+--qtechIfPoliceMapName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Police map name of this interface match. It indicate that 
+--            this interface doesn't match any ACL which this string is null"
+--        ::= { qtechQosPoliceIfEntry  2 }        
+
+qtechQosPoliceIfExtTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechQosPoliceIfExtEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of QoS Police Map interface objects."
+        ::= { qtechQoSTrafficClassMIBObjects 5 }
+    
+qtechQosPoliceIfExtEntry OBJECT-TYPE
+        SYNTAX QtechQosPoliceIfExtEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Entry ACL interface information."
+        INDEX { qtechQosPoliceIfIndex }
+        ::= { qtechQosPoliceIfExtTable 1 }
+
+QtechQosPoliceIfExtEntry ::=
+        SEQUENCE {
+            qtechQosPoliceIfIndex IfIndex,
+            qtechIfInPoliceMapName  DisplayString,
+            qtechIfOutPoliceMapName  DisplayString
+        }
+
+qtechQosPoliceIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            " "
+        ::= { qtechQosPoliceIfExtEntry 1 }
+
+qtechIfInPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Police map name of this interface ingress match. It indicate that 
+            this interface doesn't match any ACL which this string is null"
+        ::= { qtechQosPoliceIfExtEntry  2 }        
+
+qtechIfOutPoliceMapName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Police map name of this interface egress match. It indicate that 
+            this interface doesn't match any ACL which this string is null"
+        ::= { qtechQosPoliceIfExtEntry  3 }        
+
+-- conformance information
+
+qtechQoSMIBConformance OBJECT IDENTIFIER ::= { qtechQoSMIB 3 }
+qtechQoSMIBCompliances OBJECT IDENTIFIER ::= { qtechQoSMIBConformance 1 }
+qtechQoSMIBGroups      OBJECT IDENTIFIER ::= { qtechQoSMIBConformance 2 }
+
+
+-- compliance statements
+
+qtechQoSMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the Qtech QoS MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { 
+                          qtechQoSPriorityMIBGroup,
+                          qtechQoSTrafficClassMIBGroup 
+                          }
+        ::= { qtechQoSMIBCompliances 1 }
+
+-- units of conformance
+
+qtechQoSPriorityMIBGroup OBJECT-GROUP
+        OBJECTS {
+                qtechQoSGlobalStatus, 
+                qtechPriorityTrafficClassNum,
+                qtechPriorityClassNum,
+                qtechPriorityDscpMaxValue,
+                
+                qtechTrafficClassPriority,
+                qtechTrafficClass,
+                qtechPriorityToDscp,
+                
+                qtechDscpClass,
+                qtechDscpTrafficClassPriority,
+                                                 
+                qtechPriorityTrafficClassOperMode,
+                qtechPriorityBandWidth,
+                
+                qtechIfPriorityIfIndex,
+                qtechIfPriority,
+                qtechIfPriTrafficClassOperMode,
+                qtechIfPriorityBandwidth,
+                qtechIfPriorityQosTrustMode,
+
+                qtechIpPreClassPriority,
+                qtechIpPreToDscp
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qos priority ability to a
+                Qtech agent."
+        ::= { qtechQoSMIBGroups 1 }        
+        
+qtechQoSTrafficClassMIBGroup OBJECT-GROUP
+        OBJECTS {
+                qtechQosClassMapName,
+                qtechQosClassAclName,
+                qtechQosClassMapEntryStatus,
+                
+                qtechQosPoliceMapName,
+--                qtechQosPoliceClassMapName,
+                qtechQosPoliceMapEntryStatus,
+                
+                qtechQoSPoliceCfgPoliceMapName,
+                qtechQoSPoliceCfgClassMapName,
+                qtechQoSPoliceMapConfMaxBandWidth,
+                qtechQoSPoliceMapConfExceedAction,
+                qtechQoSPoliceMapConfExceedDscp,
+                qtechQoSPoliceMapConfNewDscp,
+                qtechQoSPoliceMapCfgEntryStatus, 
+                qtechQoSPoliceMapConfMaxHighBandWidth,               
+                
+                qtechQosPoliceIfIndex,
+                qtechIfInPoliceMapName,
+                qtechIfOutPoliceMapName
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qos traffic classification ability to a
+                Qtech agent."
+        ::= { qtechQoSMIBGroups 2 }                
+        
+END
+
+
+-- mapping of ip precedence to dscp
+--qtechIpPrecToDscpTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF QtechIpPrecToDscpEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "A table mapping evaluated ip precedence to dscp."
+--    ::= { qtechQoSPriorityMIBObjects 6 }
+--    
+--qtechIpPrecToDscpEntry OBJECT-TYPE
+--        SYNTAX QtechIpPrecToDscpEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--            "A entry mapping evaluated ip precedence to dscp."
+--        INDEX { qtechDscpIpPrecToDscpIpPrec }
+--    ::= { qtechIpPrecToDscpTable 1 }
+--    
+--QtechIpPrecToDscpEntry ::=
+--        SEQUENCE {
+--        qtechDscpIpPrecToDscpIpPrec
+--                Integer32,
+--        qtechIpPrecToDscpDscp
+--                Integer32                
+--        }
+--qtechDscpIpPrecToDscpIpPrec OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "The ip precedence which dscp value mapped to."
+--    ::= { qtechIpPrecToDscpEntry 1 }
+--
+--qtechIpPrecToDscpDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp value."
+--    ::= { qtechIpPrecToDscpEntry 2 }
+--           
+--
+--qtechDscpMutationTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF QtechDscpMutationEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--               "A table of Dscp Mutation request entries."
+--        ::= { qtechQoSPriorityMIBObjects 7 }
+--    
+--qtechDscpMutationEntry OBJECT-TYPE
+--        SYNTAX QtechDscpMutationEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--                "Entry contains Dscp Mutation name"  
+--        INDEX { qtechDscpMutationName }
+--        ::= { qtechDscpMutationTable 1 }
+--        
+--QtechDscpMutationEntry ::= 
+--        SEQUENCE {
+--                qtechDscpMutationName DisplayString,
+--                qtechDscpMutationStatus ConfigStatus
+--        } 
+--           
+--qtechDscpMutationName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp mutation name of this entry.This value is unique for every entry
+--            When this string be used as an index,Value of a sub-identifier equal 
+--            ASCII value of corresponding character(first sub-identifier corresponds
+--            first character of string). The number of sub-identifiers of this string
+--            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+--            will be filled in tail."
+--        ::= { qtechDscpMutationEntry  1 }
+--                
+--qtechDscpMutationStatus OBJECT-TYPE
+--        SYNTAX ConfigStatus
+--        MAX-ACCESS read-create
+--        STATUS current
+--        DESCRIPTION
+--            "Status of this entry, set this object to valid will creat a entry,
+--             and set its value to invalid will delete this entry."
+--        ::= { qtechDscpMutationEntry 2 }    
+--
+--qtechDscpMutationMapTable OBJECT-TYPE
+--        SYNTAX SEQUENCE OF QtechDscpMutationMapEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--               "A table of Dscp Mutation mapping input dscp to output dscp entries .
+--                Default mapping is that output dscp value equals input
+--                dscp value.The table doesn't include default mapping."
+--        ::= { qtechQoSPriorityMIBObjects 8 }
+--    
+--qtechDscpMutationMapEntry OBJECT-TYPE
+--        SYNTAX QtechDscpMutationMapEntry
+--        MAX-ACCESS not-accessible
+--        STATUS current
+--        DESCRIPTION
+--                "Entry of Dscp Mutation mapping."  
+--        INDEX { qtechDscpMutationMapName }
+--        ::= { qtechDscpMutationMapTable 1 }
+--        
+--QtechDscpMutationMapEntry ::= 
+--        SEQUENCE {
+--                qtechDscpMutationMapName DisplayString,
+--                qtechDscpMutationInputDscp Integer32,
+--                qtechDscpMutationOutputDscp Integer32
+--        } 
+--           
+--qtechDscpMutationMapName OBJECT-TYPE
+--        SYNTAX DisplayString(SIZE (1..32))
+--        MAX-ACCESS read-only
+--        STATUS current
+--        DESCRIPTION
+--            "Dscp mutation name of this entry.This value is unique for every entry
+--            When this string be used as an index,Value of a sub-identifier equal 
+--            ASCII value of corresponding character(first sub-identifier corresponds
+--            first character of string). The number of sub-identifiers of this string
+--            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+--            will be filled in tail."
+--        ::= { qtechDscpMutationMapEntry  1 }
+--
+--qtechDscpMutationInputDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Input dscp value."
+--        ::= { qtechDscpMutationMapEntry 2 }
+--
+--qtechDscpMutationOutputDscp OBJECT-TYPE
+--        SYNTAX Integer32
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "Output dscp value."
+--       ::= { qtechDscpMutationMapEntry 3 }    
+

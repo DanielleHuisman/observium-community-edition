@@ -1,0 +1,645 @@
+-- *****************************************************************
+-- QTECH-QINQ-MIB.mib:  Qtech QINQ MIB file
+--
+-- September 2010, miaoshifu
+--
+-- Copyright (c) 2010 by Qtech Networks Co.,Ltd.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+QTECH-QINQ-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32
+                FROM SNMPv2-SMI
+        VlanId
+                FROM Q-BRIDGE-MIB
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        IfIndex
+                FROM QTECH-TC        
+        EnabledStatus
+        	FROM P-BRIDGE-MIB
+        TEXTUAL-CONVENTION
+                FROM SNMPv2-TC        
+        qtechMgmt
+                FROM QTECH-SMI;
+
+qtechQinQMIB MODULE-IDENTITY
+        LAST-UPDATED "200909090000Z"
+        ORGANIZATION "Qtech Networks Co.,Ltd."
+        CONTACT-INFO
+                " 
+                Tel: 4008-111-000 
+
+                E-mail: service@qtech.com.cn"
+        DESCRIPTION
+                "This module defines qtech vlan mibs."
+        REVISION      "200909090000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { qtechMgmt 53}
+
+qtechQINQMIBObjects OBJECT IDENTIFIER ::= { qtechQinQMIB 1 }
+
+VlanList ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Each octet within this value specifies a set of eight
+        vlans, with the first octet specifying vlans 1 through
+        8, the second octet specifying vlans 9 through 16, etc.
+        Within each octet, the most significant bit represents
+        the lowest numbered vlan, and the least significant bit
+        represents the highest numbered vlan.  Thus, each vlan
+        of the bridge is represented by a single bit within the
+        value of this object.  If that bit has a value of '1',
+        then that vlan is included in the set of vlans; the vlan
+        is not included if its bit has a value of '0'."
+    SYNTAX      OCTET STRING
+
+
+-- ---------------------------------------------------------- --
+-- A table for configuring 802.1q tunnel port.
+-- ---------------------------------------------------------- -- 
+qtechQinQPortConfigTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechQinQPortConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table for configuring 802.1q tunnel port mode, native 
+            vlan and allowed vlan"
+        ::= { qtechQINQMIBObjects 1 }
+    
+qtechQinQPortConfigEntry OBJECT-TYPE
+        SYNTAX QtechQinQPortConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            " "
+        INDEX { qtechQinQPortConfigIndex}
+        ::= { qtechQinQPortConfigTable 1 }
+    
+QtechQinQPortConfigEntry ::=
+        SEQUENCE {
+        qtechQinQPortConfigIndex IfIndex,
+        qtechQinQPortConfigMode INTEGER,
+        qtechQinQPortNativeVlan   VlanId,
+        qtechQinQPortAllowedUntagVlanList VlanList,
+        qtechQinQPortAllowedTagVlanList VlanList
+        }
+        
+qtechQinQPortConfigIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "port index."
+        ::= { qtechQinQPortConfigEntry 1 }
+              
+qtechQinQPortConfigMode OBJECT-TYPE
+        SYNTAX INTEGER {
+            other(1),          -- the mode of interface is not 802.1q tunnel
+            dot1q-tunnel(2)    -- the mode of interface is 802.1q tunnel port
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Port mode, indicates that port is an 
+             other(1), dot1q-tunnel(2)."
+        ::= { qtechQinQPortConfigEntry 2 }
+
+qtechQinQPortNativeVlan OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The value indicate the VID of the native vlan of that this port .
+             This field is effective for only dot1q_tunnel port."
+        ::= { qtechQinQPortConfigEntry 3 }
+
+qtechQinQPortAllowedUntagVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The set of vlans that should transmit egress packets 
+             for this VLAN as untagged. 
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'. This field
+             is effective for only 802.1q tunnel port."
+        ::= { qtechQinQPortConfigEntry 4 }
+
+qtechQinQPortAllowedTagVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The set of vlans that should transmit egress packets 
+             for this VLAN as tagged. 
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'. This field
+             is effective for only 802.1q tunnel."
+        ::= { qtechQinQPortConfigEntry 5 }
+
+
+-- ---------------------------------------------------------- --
+-- configuring global Service TPID value.
+-- ---------------------------------------------------------- -- 
+    qtechQinQServiceTPIDValue  OBJECT-TYPE
+        SYNTAX      Integer32 (1..65535)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Ethernet protocol type configured for service VLAN tags
+            globally.  The ethernet protocol type is also the TPID(Tag
+            Protocol Identity) field of a VLAN tag described in 802.1q
+            document.  This value can be also configured for an
+            individual interface.  The node that configure this
+            value for a single interface is qtechQinQIfServiceTPIDValue,
+            who has no association with qtechQinQServiceTPIDValue.
+            That meas, a switch can only support one of them. only
+            support interface configuration or only support global
+            configuration.
+            The default Service TPID value is 0x8100."
+        ::= { qtechQINQMIBObjects 2 }
+
+-- ---------------------------------------------------------- --
+-- A table for configuring Service TPID value for interfaces.
+-- ---------------------------------------------------------- -- 
+qtechQinQIfServiceTPIDConfigTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechQinQIfServiceTPIDConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "An entry for configuring Service TPID functions for
+            interfaces."
+        ::= { qtechQINQMIBObjects 3 }
+    
+qtechQinQIfServiceTPIDConfigEntry OBJECT-TYPE
+        SYNTAX QtechQinQIfServiceTPIDConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "An entry for configuring Service TPID function for
+            interfaces."
+        INDEX { qtechQinQIfServiceTPIDConfigIfIndex}
+        ::= { qtechQinQIfServiceTPIDConfigTable 1 }
+    
+QtechQinQIfServiceTPIDConfigEntry ::=
+        SEQUENCE {
+        qtechQinQIfServiceTPIDConfigIfIndex IfIndex,
+        qtechQinQIfServiceTPIDValue   Integer32
+        }    
+    
+qtechQinQIfServiceTPIDConfigIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "port index."
+        ::= { qtechQinQIfServiceTPIDConfigEntry 1 }  
+
+qtechQinQIfServiceTPIDValue    OBJECT-TYPE
+        SYNTAX      Integer32 (1..65535)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Service TPID value configured for an interface.
+            The default Service TPID value is 0x8100."
+        ::= { qtechQinQIfServiceTPIDConfigEntry 2 }
+
+-- ---------------------------------------------------------- --
+-- A table for configuring priority copy for interfaces.
+-- ---------------------------------------------------------- -- 
+qtechQinQPriorityCopyTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QtechQinQPriorityCopyEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring priority field in 802.1Q-in-Q
+            outer VLAN tag for interfaces. This feature copy the
+            priority of an inner VLAN tag to the priority of an 
+            outer VLAN tag."
+        ::= { qtechQINQMIBObjects  4  }
+
+qtechQinQPriorityCopyEntry OBJECT-TYPE
+        SYNTAX  QtechQinQPriorityCopyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring priority copy function for
+            interfaces."
+        INDEX   { qtechQinQPriorityCopyIfIndex }		
+        ::= { qtechQinQPriorityCopyTable 1}
+
+QtechQinQPriorityCopyEntry ::=
+        SEQUENCE {
+		            qtechQinQPriorityCopyIfIndex  IfIndex,
+		            qtechQinQPriorityCopyPortStatus   EnabledStatus 
+		    }
+
+qtechQinQPriorityCopyIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { qtechQinQPriorityCopyEntry 1 }
+
+qtechQinQPriorityCopyPortStatus OBJECT-TYPE
+        SYNTAX  EnabledStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+             "The value enabled(1) indicates that priority copy should 
+             be enabled on this interface. When disabled(2), priority 
+             copy is disabled on this interface."
+        ::= { qtechQinQPriorityCopyEntry 2 }   
+
+-- ---------------------------------------------------------- --
+-- A table for configuring priority remark for interfaces.
+-- ---------------------------------------------------------- -- 
+
+qtechQinQPriorityRemarkTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QtechQinQPriorityRemarkEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring priority field in 802.1Q-in-Q
+            outer VLAN tag for interfaces. This feature uses the
+            priority of an inner VLAN tag to remark the priority
+            of an outer VLAN tag."
+        ::= { qtechQINQMIBObjects  5  }
+
+qtechQinQPriorityRemarkEntry OBJECT-TYPE
+        SYNTAX  QtechQinQPriorityRemarkEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring priority remark function for
+            interfaces."
+        INDEX   { qtechQinQPriorityRemarkIfIndex, 
+                  qtechQinQPriorityValue
+                }		
+        ::= { qtechQinQPriorityRemarkTable 1}
+
+QtechQinQPriorityRemarkEntry ::=
+        SEQUENCE {
+		        	qtechQinQPriorityRemarkIfIndex  IfIndex,
+            		qtechQinQPriorityValue Integer32,
+            		qtechQinQPriorityRemarkValue Integer32
+		    }
+
+qtechQinQPriorityRemarkIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { qtechQinQPriorityRemarkEntry 1 }
+
+qtechQinQPriorityValue  OBJECT-TYPE
+        SYNTAX      Integer32 (0..7)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The priority value in inner VLAN tag. Since the priority
+            range is from 0 to 7, yet the index range is from 1 to 8.
+            Thus, the actual priority value equals to the value that
+            subtracts 1 from corresponding index value."
+        ::= { qtechQinQPriorityRemarkEntry 2 }
+
+qtechQinQPriorityRemarkValue  OBJECT-TYPE
+        SYNTAX      Integer32 (0..7)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The new priority value used to fill outer tag."
+        ::= { qtechQinQPriorityRemarkEntry 3 }
+
+-- ------------------------------------------------------------------ --
+-- A table for configuring selective QINQ based on VLAN for interfaces.
+-- ------------------------------------------------------------------ -- 
+qtechselectiveQinQBasedOnVlanTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QtechselectiveQinQBasedOnVlanEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring vlan field in 802.1Q-in-Q outer 
+            VLAN tag for interfaces. This feature adds an outer VLAN 
+            tag based on inbound VLAN IDs, modifies outer VLAN tag 
+            based on inner VLAN IDs, modifies outer VLAN tag based on
+            outer VLAN IDs, modifies outer VLAN tag based on outer VLAN
+            ID and inner VLAN IDs."
+        ::= { qtechQINQMIBObjects  6  }
+
+qtechselectiveQinQBasedOnVlanEntry OBJECT-TYPE
+        SYNTAX  QtechselectiveQinQBasedOnVlanEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring vlan field in 802.1Q-in-Q
+            outer VLAN tag based on VLAN for interfaces."
+        INDEX   { qtechselectiveQinQBasedOnVlanIfIndex, 
+        		  qtechselectiveQinQBasedOnVlanType,
+                  qtechselectiveQinQBasedOnVlanOuterVlanID,
+				  qtechselectiveQinQBasedOnVlanOldOuterVlanID  }		
+        ::= { qtechselectiveQinQBasedOnVlanTable 1}
+
+QtechselectiveQinQBasedOnVlanEntry ::=
+        SEQUENCE {
+		        	qtechselectiveQinQBasedOnVlanIfIndex  IfIndex,
+		        	qtechselectiveQinQBasedOnVlanType     INTEGER,
+            		qtechselectiveQinQBasedOnVlanOuterVlanID Integer32,
+            		qtechselectiveQinQBasedOnVlanOldOuterVlanID Integer32,
+            		qtechselectiveQinQBasedOnVlanVlanList VlanList
+		    }
+
+qtechselectiveQinQBasedOnVlanIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { qtechselectiveQinQBasedOnVlanEntry 1 }
+
+qtechselectiveQinQBasedOnVlanType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            addOuterTag(1),       				
+            -- add an outer VLAN tag based on VLAN.
+            modifyOuterTagBaseInnerTag(2),    	
+            -- modify the outer VLAN tag based on inner VLAN IDs.
+            modifyOuterTagBaseOuterTag(3),     	
+            -- modify the inner VLAN tag based on outer VLAN IDs.
+            modifyOuterTagBaseInnerAndOuterTag(4) 
+            -- modify the inner VLAN tag based on old outer VLAN ID and inner VLAN IDs.   
+            }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "802.1Q-in-Q strategy type."
+    ::= { qtechselectiveQinQBasedOnVlanEntry 2 }
+
+qtechselectiveQinQBasedOnVlanOuterVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The outer VLAN ID."
+        ::= { qtechselectiveQinQBasedOnVlanEntry 3 }
+
+qtechselectiveQinQBasedOnVlanOldOuterVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The old outer VLAN ID of original 802.1Q packets.
+            This field is only effective for mofifying outer 
+            VLAN tag based on old outer VLAN ID and inner VLAN
+            IDs."
+        ::= { qtechselectiveQinQBasedOnVlanEntry 4 }
+
+qtechselectiveQinQBasedOnVlanVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The inbound VLAN IDs which need 802.1Q-in-Q processing. 
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'. This field
+             is effective for only 802.1q tunnel port."
+        ::= { qtechselectiveQinQBasedOnVlanEntry 5 }
+
+
+-- ------------------------------------------------------------------ --
+-- A table for configuring selective QINQ based on ACL for interfaces.
+-- ------------------------------------------------------------------ -- 
+qtechselectiveQinQBasedOnAclTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QtechselectiveQinQBasedOnAclEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring vlan field in 802.1Q-in-Q VLAN tag
+            for interfaces. This feature adds an outer VLAN tag based on 
+            ACL, modifies the outer VLAN tag based on ACL or modifies the
+            inner VLAN tag based on ACL."
+        ::= { qtechQINQMIBObjects  7  }
+
+qtechselectiveQinQBasedOnAclEntry OBJECT-TYPE
+        SYNTAX  QtechselectiveQinQBasedOnAclEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring vlan field in 802.1Q-in-Q
+            VLAN tag for interfaces."
+        INDEX   { qtechselectiveQinQBasedOnAclIfIndex, 
+                  qtechselectiveQinQBasedOnAclType,
+                  qtechselectiveQinQBasedOnAclAclID}		
+        ::= { qtechselectiveQinQBasedOnAclTable 1}
+
+QtechselectiveQinQBasedOnAclEntry ::=
+        SEQUENCE {
+		        	qtechselectiveQinQBasedOnAclIfIndex  IfIndex,
+		        	qtechselectiveQinQBasedOnAclType   INTEGER,
+		        	qtechselectiveQinQBasedOnAclAclID  Integer32,
+            		qtechselectiveQinQBasedOnAclVlanID Integer32
+		    }
+
+qtechselectiveQinQBasedOnAclIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { qtechselectiveQinQBasedOnAclEntry 1 }
+
+
+qtechselectiveQinQBasedOnAclType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            addOuterTag(1),       -- add an outer VLAN tag based on ACL
+            modifyOuterTag(2),    -- modify the outer VLAN tag based on ACL
+            modifyInnerTag(3)     -- modify the inner VLAN tag based on ACL            
+        }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "802.1Q-in-Q strategy type."
+    ::= { qtechselectiveQinQBasedOnAclEntry 2 }
+
+qtechselectiveQinQBasedOnAclAclID  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The ACL index."
+        ::= { qtechselectiveQinQBasedOnAclEntry 3 }
+
+qtechselectiveQinQBasedOnAclVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The VLAN ID."
+        ::= { qtechselectiveQinQBasedOnAclEntry 4 }
+
+-- ------------------------------------------------------------------ --
+-- A table for configuring vlan mapping for interfaces.
+-- ------------------------------------------------------------------ -- 
+qtechQinQVlanMappingTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QtechQinQVlanMappingEntry
+        MAX-ACCESS not-accessible
+        STATUS   current
+        DESCRIPTION
+            " A table for configuring 802.1Q-in-Q vlan mapping for interfaces."
+        ::= { qtechQINQMIBObjects  8  }
+
+qtechQinQVlanMappingEntry OBJECT-TYPE
+        SYNTAX  QtechQinQVlanMappingEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            " An entry for configuring vlan mapping for interfaces."
+        INDEX   { qtechQinQVlanMappingIfIndex, 
+                  qtechQinQVlanMappingType, 
+		  qtechQinQVlanMappingNewVlanID  }		
+        ::= { qtechQinQVlanMappingTable 1}
+
+QtechQinQVlanMappingEntry ::=
+        SEQUENCE {
+		        	qtechQinQVlanMappingIfIndex  	IfIndex,
+		        	qtechQinQVlanMappingType 		INTEGER,
+            		qtechQinQVlanMappingNewVlanID 	Integer32,
+            		qtechQinQVlanMappingOldVlanList VlanList,
+		        	qtechQinQVlanMappingOldVlanID  Integer32
+		    }
+
+qtechQinQVlanMappingIfIndex OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "port index."          
+	      ::= { qtechQinQVlanMappingEntry 1 }
+
+qtechQinQVlanMappingType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            vlanMappingIn(1),       				
+            -- ingress vlan mapping strategy.
+            vlanMappingOut(2)    	
+            -- egress vlan mapping strategy. 
+            }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "vlan mapping strategy type."
+        ::= { qtechQinQVlanMappingEntry 2 }
+
+qtechQinQVlanMappingNewVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The new VLAN ID of original ingress or egress 802.1Q packets."
+        ::= { qtechQinQVlanMappingEntry 3 }
+
+qtechQinQVlanMappingOldVlanList OBJECT-TYPE
+        SYNTAX VlanList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The old VLAN IDs of original ingress 802.1Q packets.
+             Each octet within this value specifies a set of eight
+             vlans, with the first octet specifying vlans 1 through
+             8, the second octet specifying vlans 9 through 16, etc.
+             Within each octet, the most significant bit represents
+             the lowest numbered vlan, and the least significant bit
+             represents the highest numbered vlan.  Thus, each vlan
+             of the bridge is represented by a single bit within the
+             value of this object.  If that bit has a value of '1',
+             then that vlan is included in the set of vlans; the vlan
+             is not included if its bit has a value of '0'.
+             This field is effective for ingress vlan mapping strategy."
+        ::= { qtechQinQVlanMappingEntry 4 }
+
+qtechQinQVlanMappingOldVlanID  OBJECT-TYPE
+        SYNTAX      Integer32 (1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The old VLAN ID of original egress 802.1Q packets.
+	     This field is effective for egress vlan mapping strategy."
+        ::= { qtechQinQVlanMappingEntry 5 }
+
+
+qtechQinQMIBConformance OBJECT IDENTIFIER ::= { qtechQinQMIB 2 }
+qtechQinQMIBCompliances OBJECT IDENTIFIER ::= { qtechQinQMIBConformance 1 }
+qtechQinQMIBGroups      OBJECT IDENTIFIER ::= { qtechQinQMIBConformance 2 }
+
+
+-- compliance statements
+
+qtechQinQMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the Qtech QINQ MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { 
+                      qtechQinQMIBGroup  
+                 }
+         ::= { qtechQinQMIBCompliances 1 }
+         
+qtechQinQMIBGroup OBJECT-GROUP
+        OBJECTS {
+              qtechQinQPortConfigMode,
+              qtechQinQPortNativeVlan,
+              qtechQinQPortAllowedUntagVlanList,
+              qtechQinQPortAllowedTagVlanList,
+              qtechQinQServiceTPIDValue,
+              qtechQinQIfServiceTPIDValue,
+		          qtechQinQPriorityCopyPortStatus,
+            	qtechQinQPriorityValue,
+            	qtechQinQPriorityRemarkValue,
+		        	qtechselectiveQinQBasedOnVlanType,
+            	qtechselectiveQinQBasedOnVlanOuterVlanID,
+            	qtechselectiveQinQBasedOnVlanOldOuterVlanID,
+            	qtechselectiveQinQBasedOnVlanVlanList,
+		        	qtechselectiveQinQBasedOnAclType,
+		        	qtechselectiveQinQBasedOnAclAclID,
+            	qtechselectiveQinQBasedOnAclVlanID,
+            	qtechQinQVlanMappingNewVlanID   
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing qinq managment."
+        ::= { qtechQinQMIBGroups 1 }
+END

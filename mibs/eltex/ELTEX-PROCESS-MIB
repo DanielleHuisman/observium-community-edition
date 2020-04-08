@@ -1,0 +1,730 @@
+ELTEX-PROCESS-MIB DEFINITIONS ::= BEGIN
+
+-- Title:   ELTEX PROCESS MIB
+-- Version: 1.0
+-- Date:    2 May 2017
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Counter64,
+    Gauge32,
+    Unsigned32
+        FROM SNMPv2-SMI
+        
+    TruthValue,
+    RowStatus
+        FROM SNMPv2-TC
+
+    PhysicalIndex
+        FROM ENTITY-MIB
+
+    eltexLtd
+        FROM ELTEX-SMI-ACTUAL
+
+    EltexPercent,
+    EltexThresholdRelation
+        FROM ELTEX-TC
+
+    SyslogSeverity
+        FROM SYSLOG-TC-MIB;
+
+eltexProcessMIB MODULE-IDENTITY
+    LAST-UPDATED "201705020000Z"
+    ORGANIZATION "Eltex Enterprise, Ltd."
+    CONTACT-INFO 
+        "www.eltex.nsk.ru"
+    DESCRIPTION
+        "The ELTEX-PROCESS-MIB is used to describe the utilization of CPU and RAM
+        resources by system processes"
+    REVISION     "201705020000Z"
+    DESCRIPTION  "Initial revision of ELTEX-PROCESS-MIB."
+    ::= { eltexLtd 41 }
+
+------------------------------------------------------------------------------
+eltexProcessMIBObjects OBJECT IDENTIFIER ::= { eltexProcessMIB 1 }
+
+eltexProcessCPU OBJECT IDENTIFIER ::= { eltexProcessMIBObjects 1 }
+------------------------------------------------------------------------------
+
+eltexProcessCPUMonitorTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexProcessCPUMonitorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of overall CPU statistics."
+    ::= { eltexProcessCPU 1 }
+
+eltexProcessCPUMonitorEntry OBJECT-TYPE
+    SYNTAX      EltexProcessCPUMonitorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Overall information about the CPU load. Entries in this table come and go
+        as CPUs are added and removed from the system."
+    INDEX       { eltexProcessCPUMonitorIndex, eltexProcessCPUMonitorInterval }
+    ::= { eltexProcessCPUMonitorTable 1 }
+
+EltexProcessCPUMonitorEntry ::= SEQUENCE {
+    eltexProcessCPUMonitorIndex
+        Unsigned32,
+    eltexProcessCPUMonitorInterval
+        Unsigned32,
+    eltexProcessCPUMonitorPhysicalIndex
+        PhysicalIndex,
+    eltexProcessCPUMonitorValue
+        EltexPercent,
+    eltexProcessCPUMonitorValidValue
+        TruthValue,
+    eltexProcessCPUMonitorThresholdFreeIndex
+        Unsigned32
+}
+
+eltexProcessCPUMonitorIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "An index that uniquely represents a CPU (or group of CPUs)
+        whose CPU load information is reported by a row in this table.
+        This index is assigned arbitrarily by the engine
+        and is not saved over reboots."
+    ::= { eltexProcessCPUMonitorEntry 1 }
+
+eltexProcessCPUMonitorInterval OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "seconds"
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Time interval for calculating the average load of CPU."
+    ::= { eltexProcessCPUMonitorEntry 2 }
+
+eltexProcessCPUMonitorPhysicalIndex OBJECT-TYPE
+    SYNTAX          PhysicalIndex
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Physical index of a CPU from entPhysicalTable."
+    ::= { eltexProcessCPUMonitorEntry 3 }
+
+eltexProcessCPUMonitorValue OBJECT-TYPE
+    SYNTAX          EltexPercent
+    UNITS           "percent"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The overall CPU busy percentage in the last eltexProcessCPUMonitorInterval
+        period."
+    ::= { eltexProcessCPUMonitorEntry 4 }
+
+eltexProcessCPUMonitorValidValue OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates whether or not the eltexProcessCPUMonitorValue 
+        contain accurate data. If an instance of this object has the value false, 
+        the values of eltexProcessCPUMonitorValidValue in the conceptual row may contain
+        inaccurate information."
+    ::= { eltexProcessCPUMonitorEntry 5 }
+
+eltexProcessCPUMonitorThresholdFreeIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the minimal value of eltexProcessCPUThresholdIndex that
+        isn't in use by any threshold configured in eltexProcessCPUThresholdTable and
+        which can be used as index to create a new eltexProcessCPUThresholdEntry instance."
+    ::= { eltexProcessCPUMonitorEntry 6 }
+-------------------------------------------------------------------------------------------
+--THRESHOLDS
+-------------------------------------------------------------------------------------------
+eltexProcessCPUThreshold OBJECT IDENTIFIER ::= { eltexProcessCPU 2 }
+-------------------------------------------------------------------------------------------
+
+eltexProcessCPUThresholdNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field enables the generation of eltexProcessCPUThresholdNotification
+        globally on the device.
+
+        If this object value is 'false', then no eltexProcessCPUThresholdNotification
+        will be generated on this device. If this object value is 'true', then
+        notification will be generated."
+    DEFVAL      { false }
+    ::= { eltexProcessCPUThreshold 1 }
+
+eltexProcessCPUThresholdRecoveryNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field enables the generation of eltexProcessCPUThresholdRecoveryNotification
+        globally on the device.
+
+        If this object value is 'false', then no eltexProcessCPUThresholdRecoveryNotification
+        will be generated on this device. If this object value is 'true', then
+        notification will be generated."
+    DEFVAL      { false }
+    ::= { eltexProcessCPUThreshold 2 }
+---------------------------------------------------------------------------
+
+eltexProcessCPUThresholdTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexProcessCPUThresholdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the thresholds severity, relation, and comparison value
+        for a CPU.
+
+        List of notification sending conditions:
+
+        Val - eltexProcessCPUMonitorValue
+        Thr - eltexProcessCPUThresholdValue
+        Int - eltexProcessCPUThresholdFlappingInterval
+        abs - absolute value
+
+        +----------------+------------------------+------------------------+
+        | Relation       | Notification Condition |   Recovery Condition   |
+        +----------------+------------------------+------------------------+
+        | greaterThan    |       Val >  Thr       |   Val <  (Thr - Int)   |
+        | greaterOrEqual |       Val >= Thr       |   Val <= (Thr - Int)   |
+        | lessThan       |       Val <  Thr       |   Val >  (Thr + Int)   |
+        | lessOrEqual    |       Val <= Thr       |   Val >= (Thr + Int)   |
+        | equalTo        |       Val == Thr       |  abs(Val - Thr) > Int  |
+        | notEqualTo     |  abs(Val - Thr) > Int  |       Val == Thr       |
+        +----------------+------------------------+------------------------+
+        "
+    ::= { eltexProcessCPUThreshold 3 }
+
+eltexProcessCPUThresholdEntry OBJECT-TYPE
+    SYNTAX      EltexProcessCPUThresholdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry describes the threshold for a CPU."
+    INDEX       { eltexProcessCPUMonitorIndex, eltexProcessCPUThresholdIndex, eltexProcessCPUMonitorInterval }
+    ::= { eltexProcessCPUThresholdTable 1 }
+
+EltexProcessCPUThresholdEntry ::= SEQUENCE {
+    eltexProcessCPUThresholdIndex
+        Unsigned32,
+    eltexProcessCPUThresholdRowStatus
+        RowStatus,
+    eltexProcessCPUThresholdValue
+        EltexPercent,
+    eltexProcessCPUThresholdFlappingInterval
+        EltexPercent,
+    eltexProcessCPUThresholdSeverity
+        SyslogSeverity,
+    eltexProcessCPUThresholdRelation
+        EltexThresholdRelation,
+    eltexProcessCPUThresholdNotificationEnable
+        TruthValue,
+    eltexProcessCPUThresholdRecoveryNotificationEnable
+        TruthValue,
+    eltexProcessCPUThresholdEvaluation
+        TruthValue
+}
+
+eltexProcessCPUThresholdIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An index unique within a CPU entity. This index permits
+        CPU to have thresholds with the same index.
+
+        The first free index can be obtained from the field
+        eltexProcessCPUMonitorThresholdFreeIndex in the table 
+        eltexProcessCPUMonitorTable."
+    ::= { eltexProcessCPUThresholdEntry 1 }
+
+eltexProcessCPUThresholdRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the RowStatus of this entry."
+    ::= { eltexProcessCPUThresholdEntry 2 }
+
+eltexProcessCPUThresholdValue OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates value of threshold in percents."
+    ::= { eltexProcessCPUThresholdEntry 3 }
+
+eltexProcessCPUThresholdFlappingInterval OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the value of flapping interval. This field is
+        necessary for determining the moment of sending 
+        eltexProcessCPUThresholdRecoveryNotification."
+    DEFVAL      { 0 }
+    ::= { eltexProcessCPUThresholdEntry 4 }
+
+eltexProcessCPUThresholdSeverity OBJECT-TYPE
+    SYNTAX      SyslogSeverity
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the severity of this threshold."
+    DEFVAL      { alert }
+    ::= { eltexProcessCPUThresholdEntry 5 }
+
+eltexProcessCPUThresholdRelation OBJECT-TYPE
+    SYNTAX      EltexThresholdRelation
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the relation between eltexProcessCPUMonitorValue
+        and eltexProcessCPUThresholdValue required to trigger the alarm."
+    ::= { eltexProcessCPUThresholdEntry 6 }
+
+eltexProcessCPUThresholdNotificationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field controls generation of eltexProcessCPUThresholdNotification
+        for this threshold.
+
+        When this field is 'true', generation of notifications is enabled for this
+        threshold. When this field is 'false', generation of notifications
+        is disabled for this threshold."
+    DEFVAL      { true }
+    ::= { eltexProcessCPUThresholdEntry 7 }
+
+eltexProcessCPUThresholdRecoveryNotificationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field controls generation of eltexProcessCPUThresholdRecoveryNotification
+        for this threshold.
+
+        When this field is 'true', generation of notifications is enabled for this
+        threshold. When this field is 'disable', generation of notifications
+        is disabled for this threshold."
+    DEFVAL      { true }
+    ::= { eltexProcessCPUThresholdEntry 8 }
+    
+eltexProcessCPUThresholdEvaluation OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the result of the most recent evaluation of the threshold."
+    ::= { eltexProcessCPUThresholdEntry 9 }
+
+---------------------------------------------------------------------------
+eltexProcessMemory OBJECT IDENTIFIER ::= { eltexProcessMIBObjects 2 }
+---------------------------------------------------------------------------
+
+eltexProcessMemoryTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexProcessMemoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of overall RAM statistics."
+    ::= { eltexProcessMemory 1 }
+
+eltexProcessMemoryEntry OBJECT-TYPE
+    SYNTAX      EltexProcessMemoryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Overall information about the RAM."
+    INDEX       { eltexProcessMemoryIndex }
+    ::= { eltexProcessMemoryTable 1 }
+
+EltexProcessMemoryEntry ::= SEQUENCE {
+    eltexProcessMemoryIndex
+        Unsigned32,
+    eltexProcessMemoryPhysicalIndex
+        PhysicalIndex,
+    eltexProcessMemoryTotal
+        Gauge32,
+    eltexProcessMemoryTotalOverflow
+        Gauge32,
+    eltexProcessMemoryHCTotal
+        Counter64,
+    eltexProcessMemoryFreePercent
+        EltexPercent,
+    eltexProcessMemoryFree
+        Gauge32,
+    eltexProcessMemoryFreeOverflow
+        Gauge32,
+    eltexProcessMemoryHCFree
+        Counter64,
+    eltexProcessMemoryThresholdFreeIndex
+        Unsigned32
+}
+
+eltexProcessMemoryIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "An index that uniquely represents a memory whose 
+        load information is reported by a row in this table.
+        This index is assigned arbitrarily by the engine
+        and is not saved over reboots."
+    ::= { eltexProcessMemoryEntry 1 }
+
+eltexProcessMemoryPhysicalIndex OBJECT-TYPE
+    SYNTAX          PhysicalIndex
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Physical index of a RAM from entPhysicalTable."
+    ::= { eltexProcessMemoryEntry 2 }
+
+eltexProcessMemoryTotal OBJECT-TYPE
+    SYNTAX          Gauge32
+    UNITS           "bytes"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The overall CPU wide system memory size which is currently in system."
+    ::= { eltexProcessMemoryEntry 3 }
+
+eltexProcessMemoryTotalOverflow OBJECT-TYPE
+    SYNTAX          Gauge32
+    UNITS           "bytes"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This object represents the upper 32-bit of eltexProcessMemoryTotal.
+
+        This object needs to be supported only when the value of
+        eltexProcessMemoryTotal exceeds 32-bit, otherwise this object value
+        would be set to 0."
+    ::= { eltexProcessMemoryEntry 4 }
+
+eltexProcessMemoryHCTotal OBJECT-TYPE
+    SYNTAX          Counter64
+    UNITS           "bytes"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The overall CPU wide system memory which is currently in system.
+
+        This object is a 64-bit version of eltexProcessMemoryTotal."
+    ::= { eltexProcessMemoryEntry 5 }
+
+eltexProcessMemoryFreePercent OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The overall CPU wide system memory which is currently free in percents."
+    ::= { eltexProcessMemoryEntry 6 }
+
+eltexProcessMemoryFree OBJECT-TYPE
+    SYNTAX          Gauge32
+    UNITS           "bytes"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The overall CPU wide system memory which is currently free in bytes."
+    ::= { eltexProcessMemoryEntry 7 }
+
+eltexProcessMemoryFreeOverflow OBJECT-TYPE
+    SYNTAX          Gauge32
+    UNITS           "bytes"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This object represents the upper 32-bit of eltexProcessMemoryFree.
+
+        This object needs to be supported only when the value of
+        eltexProcessMemoryFree exceeds 32-bit, otherwise this object value
+        would be set to 0."
+    ::= { eltexProcessMemoryEntry 8 }
+
+eltexProcessMemoryHCFree OBJECT-TYPE
+    SYNTAX          Counter64
+    UNITS           "bytes"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The overall CPU wide system memory which is currently free.
+
+        This object is a 64-bit version of eltexProcessMemoryFree."
+    ::= { eltexProcessMemoryEntry 9 }
+
+eltexProcessMemoryThresholdFreeIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the minimal value of eltexProcessMemoryThresholdIndex that
+        isn't in use by any threshold configured in eltexProcessMemoryThresholdTable and
+        which can be used as index to create a new eltexProcessMemoryThresholdEntry instance."
+    ::= { eltexProcessMemoryEntry 10 }
+-------------------------------------------------------------------------------------------
+--THRESHOLDS
+-------------------------------------------------------------------------------------------
+eltexProcessMemoryThreshold OBJECT IDENTIFIER ::= { eltexProcessMemory 2 }
+----------------------------------------------------------------------------------------
+
+eltexProcessMemoryThresholdNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field enables the generation of eltexProcessMemoryThresholdNotification
+        globally on the device.
+
+        If this object value is 'false', then no eltexProcessMemoryThresholdNotification
+        will be generated on this device. If this object value is 'true', then notification
+        will be generated."
+    DEFVAL      { false }
+    ::= { eltexProcessMemoryThreshold 1 }
+
+eltexProcessMemoryThresholdRecoveryNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field enables the generation of eltexProcessMemoryThresholdRecoveryNotification
+        globally on the device.
+
+        If this object value is 'false', then no 
+        eltexProcessMemoryThresholdRecoveryNotification will be generated on this device.
+        If this object value is 'true', then notification will be generated."
+    DEFVAL      { false }
+    ::= { eltexProcessMemoryThreshold 2 }
+
+----------------------------------------------------------------------------------------
+
+eltexProcessMemoryThresholdTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexProcessMemoryThresholdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the thresholds severity, relation, and comparison value
+        for a memory.
+
+        List of notification sending conditions:
+
+        Val - eltexProcessMemoryFreePercent
+        Thr - eltexProcessMemoryThresholdValue
+        Int - eltexProcessMemoryThresholdFlappingInterval
+        abs - absolute value
+
+        +----------------+------------------------+------------------------+
+        | Relation       | Notification Condition |   Recovery Condition   |
+        +----------------+------------------------+------------------------+
+        | greaterThan    |       Val >  Thr       |   Val <  (Thr - Int)   |
+        | greaterOrEqual |       Val >= Thr       |   Val <= (Thr - Int)   |
+        | lessThan       |       Val <  Thr       |   Val >  (Thr + Int)   |
+        | lessOrEqual    |       Val <= Thr       |   Val >= (Thr + Int)   |
+        | equalTo        |       Val == Thr       |  abs(Val - Thr) > Int  |
+        | notEqualTo     |  abs(Val - Thr) > Int  |       Val == Thr       |
+        +----------------+------------------------+------------------------+
+        "
+    ::= { eltexProcessMemoryThreshold 3 }
+
+eltexProcessMemoryThresholdEntry OBJECT-TYPE
+    SYNTAX      EltexProcessMemoryThresholdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry describes the threshold for a memory."
+    INDEX       { eltexProcessMemoryIndex, eltexProcessMemoryThresholdIndex }
+    ::= { eltexProcessMemoryThresholdTable 1 }
+
+EltexProcessMemoryThresholdEntry ::= SEQUENCE {
+    eltexProcessMemoryThresholdIndex
+        Unsigned32,
+    eltexProcessMemoryThresholdRowStatus
+        RowStatus,
+    eltexProcessMemoryThresholdValue
+        EltexPercent,
+    eltexProcessMemoryThresholdFlappingInterval
+        EltexPercent,
+    eltexProcessMemoryThresholdSeverity
+        SyslogSeverity,
+    eltexProcessMemoryThresholdRelation
+        EltexThresholdRelation,
+    eltexProcessMemoryThresholdNotificationEnable
+        TruthValue,
+    eltexProcessMemoryThresholdRecoveryNotificationEnable
+        TruthValue,
+    eltexProcessMemoryThresholdEvaluation
+        TruthValue
+}
+
+eltexProcessMemoryThresholdIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An index unique within a memory entity. This index permits
+        memory to have thresholds with the same index.
+
+        The first free index can be obtained from the field
+        eltexProcessMemoryThresholdFreeIndex in the table 
+        eltexProcessMemoryTable."
+    ::= { eltexProcessMemoryThresholdEntry 1 }
+    
+eltexProcessMemoryThresholdRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the RowStatus of this entry."
+    ::= { eltexProcessMemoryThresholdEntry 2 }
+
+eltexProcessMemoryThresholdValue OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Indicates the value of the threshold for field eltexProcessMemoryFreePercent."
+    ::= { eltexProcessMemoryThresholdEntry 3 }
+
+eltexProcessMemoryThresholdFlappingInterval OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the value of flapping interval. This field is
+        necessary for determining the moment of sending 
+        eltexProcessMemoryThresholdRecoveryNotification."
+    DEFVAL      { 0 }
+    ::= { eltexProcessMemoryThresholdEntry 4 }
+
+eltexProcessMemoryThresholdSeverity OBJECT-TYPE
+    SYNTAX      SyslogSeverity
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Indicates the severity of this threshold."
+    DEFVAL      { alert }
+    ::= { eltexProcessMemoryThresholdEntry 5 }
+
+eltexProcessMemoryThresholdRelation OBJECT-TYPE
+    SYNTAX      EltexThresholdRelation
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Indicates the relation between sensor value  and threshold value,
+        required to trigger the alarm."
+    ::= { eltexProcessMemoryThresholdEntry 6 }
+
+eltexProcessMemoryThresholdNotificationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Controls generation of notifications for this threshold.
+
+        When this field is 'true', generation of notifications is enabled for
+        this threshold. When this field is 'false', generation of notifications
+        is disabled for this threshold."
+    DEFVAL      { true }
+    ::= { eltexProcessMemoryThresholdEntry 7 }
+
+eltexProcessMemoryThresholdRecoveryNotificationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Controls generation of notifications for this threshold.
+
+        When this field is 'true', generation of notifications is enabled for
+        this threshold. When this field is 'false', generation of notifications
+        is disabled for this threshold."
+    DEFVAL      { true }
+    ::= { eltexProcessMemoryThresholdEntry 8 }
+
+eltexProcessMemoryThresholdEvaluation OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the result of the most recent evaluation of the threshold."
+    ::= { eltexProcessMemoryThresholdEntry 9 }
+
+------------------------------------------------------------------------------------------
+--Notifications
+------------------------------------------------------------------------------------------
+eltexProcessMIBNotification OBJECT IDENTIFIER ::= { eltexProcessMIB 2 }
+
+eltexProcessMIBNotificationPrefix  OBJECT IDENTIFIER ::= { eltexProcessMIBNotification 0 }
+------------------------------------------------------------------------------------------
+
+eltexProcessCPUThresholdNotification NOTIFICATION-TYPE
+    OBJECTS {
+        eltexProcessCPUThresholdSeverity,
+        eltexProcessCPUMonitorValue
+    }
+    STATUS current
+    DESCRIPTION
+        "The notification is generated when the value of 
+        eltexProcessCPUThresholdEvaluation changes from false to true. 
+
+        Notifications can be disabled for a threshold by 
+        eltexProcessCPUThresholdNotificationEnable field or globally by 
+        eltexProcessCPUThresholdNotificationGlobalEnable."
+    ::= { eltexProcessMIBNotificationPrefix 1 }
+
+eltexProcessCPUThresholdRecoveryNotification NOTIFICATION-TYPE
+    OBJECTS {
+        eltexProcessCPUThresholdSeverity,
+        eltexProcessCPUMonitorValue
+    }
+    STATUS current
+    DESCRIPTION
+        "The notification is generated when the value of 
+        eltexProcessCPUThresholdEvaluation changes from true to false. 
+
+        Notifications can be disabled for a threshold by 
+        eltexProcessCPUThresholdRecoveryNotificationEnable field or globally by 
+        eltexProcessCPUThresholdRecoveryNotificationGlobalEnable."
+    ::= { eltexProcessMIBNotificationPrefix 2 }
+
+eltexProcessMemoryThresholdNotification NOTIFICATION-TYPE
+    OBJECTS {
+        eltexProcessMemoryThresholdSeverity,
+        eltexProcessMemoryFreePercent
+    }
+    STATUS current
+    DESCRIPTION
+        "The notification is generated when the value of 
+        eltexProcessMemoryThresholdEvaluation changes from false to true. 
+
+        Notifications can be disabled for a threshold by 
+        eltexProcessMemoryThresholdNotificationEnable field or globally by 
+        eltexProcessMemoryThresholdNotificationGlobalEnable."
+    ::= { eltexProcessMIBNotificationPrefix 3 }
+
+eltexProcessMemoryThresholdRecoveryNotification NOTIFICATION-TYPE
+    OBJECTS {
+        eltexProcessMemoryThresholdSeverity,
+        eltexProcessMemoryFreePercent
+    }
+    STATUS current
+    DESCRIPTION
+        "The notification is generated when the value of 
+        eltexProcessMemoryThresholdEvaluation changes from true to false. 
+
+        Notifications can be disabled for a threshold by 
+        eltexProcessMemoryThresholdRecoveryNotificationEnable field or globally by 
+        eltexProcessMemoryThresholdRecoveryNotificationGlobalEnable."
+    ::= { eltexProcessMIBNotificationPrefix 4 }
+
+END
+

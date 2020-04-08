@@ -1,0 +1,1 @@
+ALTER TABLE `wifi_aps` ADD `ap_admin_status` VARCHAR(45) NOT NULL AFTER `ap_status`, ADD `ap_uptime` INT NOT NULL AFTER `ap_admin_status`, ADD `ap_control_uptime` INT NOT NULL AFTER `ap_uptime`, ADD `ap_control_latency` INT NOT NULL AFTER `ap_control_uptime`;

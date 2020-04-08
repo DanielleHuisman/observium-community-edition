@@ -1,0 +1,882 @@
+-- MibName=rcL3
+SWITCH-L3-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        Counter32, Gauge32,
+        Unsigned32, Integer32,
+        IpAddress                               FROM SNMPv2-SMI
+ 
+        InetAddress                             FROM INET-ADDRESS-MIB
+       
+        RowStatus, TruthValue,
+        MacAddress               FROM SNMPv2-TC    
+        
+        PortList                                FROM SWITCH-TC
+        
+          
+        Vlanset				FROM SWITCH-TC 
+     
+        iscomSwitch	            	FROM RAISECOM-BASE-MIB;
+
+    	        
+    rcL3 MODULE-IDENTITY
+        LAST-UPDATED    "0412200000Z"  -- Dec 20, 2004
+        ORGANIZATION    "Wind River Systems, Inc."
+        CONTACT-INFO    "Wind River Systems, Inc.
+                         E-mail: support@windriver.com"
+
+        DESCRIPTION     "ROSE Generic Layer 3 MIB definition."
+
+        REVISION        "0412200000Z"  -- Dec 20, 2004
+        DESCRIPTION     "Initial MIB creation."
+
+        ::= {iscomSwitch 16}
+
+-- -------------------------------------------------------------------------- --
+--  groups in the ROSE Layer 3 MIB
+-- -------------------------------------------------------------------------- --
+    rcL3IpSubnet           OBJECT IDENTIFIER ::= { rcL3 1 }
+    rcL3IpStatic           OBJECT IDENTIFIER ::= { rcL3 2 }    
+    rcL3IpRoute            OBJECT IDENTIFIER ::= { rcL3 3 }
+-- ----------------------------------------------------------------------------
+--
+--  rcL3IpSubnet:
+--      This group is used to configure and retrieve subnet parameters
+--      required for the basic routing functionality.  Before a "L2/L3 hybrid"
+--      VLAN or a "L3 only" interface is used for routing, it must be assigned
+--      to at least one subnet.  Although ROSE supports multiple subnets per
+--      VLAN or L3 interface, ROSE recommends using one subnet per interface.
+--
+--      Note that the subnet IP address is added indirectly.  It is calculated
+--      by logically AND'ing the Agent's IP address (rcL3IpSubnetAgentIpAddr)
+--      for this subnet with its subnet mask (rcL3IpSubnetMask).  These
+--      subnets are automatically added to the software Routing Table by IP
+--      and can be seen in the rcL3IpDynamicRouteTable.
+--
+--      For a L2/L3 hybrid switch, a static VLAN must be created for the
+--      specified rcL3IpSubnetVidIface VLAN ID value before this entry can
+--      be used.
+--
+--      Note that one of the entries for the first interface in this table
+--      is directly mapped to the IP address parameters in the ROSE Common MIB
+--      (ROSE-COMMON-MIB; i.e., rcCommonIPIpAddress, rcCommonIPNetMask).
+--      This allows the initial agent IP address to be set using the serial
+--      console, BOOTP, or DHCP.  The remaining subnet entries can be entered
+--      using SNMP or the Web management interfaces.
+--
+-- -------------------------------------------------------------------------- --
+--
+    rcL3IpSubnetMaxRows  OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The maximum possible number of rows in the 'rcL3IpSubnetTable'."
+        ::= { rcL3IpSubnet 1 }
+
+    rcL3IpSubnetCurrentRows  OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The current number of rows in the 'rcL3IpSubnetTable'."
+        ::= { rcL3IpSubnet 2 }
+
+    rcL3IpSubnetTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcL3IpSubnetEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table of subnet parameters.  There is one entry
+             available for each of the 'rcL3IpSubnetMaxRows'
+             supported IP subnets."
+        ::= { rcL3IpSubnet 3 }
+
+    rcL3IpSubnetEntry OBJECT-TYPE
+        SYNTAX RcL3IpSubnetEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of subnet parameters."
+        INDEX { rcL3IpSubnetIfIndex, rcL3IpSubnetIpAddress }
+        ::= { rcL3IpSubnetTable 1 }
+
+    RcL3IpSubnetEntry ::= SEQUENCE {
+        rcL3IpSubnetIfIndex        	Integer32,
+        rcL3IpSubnetIpAddress    	IpAddress,
+        rcL3IpSubnetMask           	IpAddress,
+        rcL3IpSubnetVlans     Vlanset,
+        rcL3IpSubnetName           	OCTET STRING,  
+        rcL3IpSubnetRowStatus      	RowStatus,     
+        rcL3IpSubnetAllowPortList   PortList
+    }
+
+    rcL3IpSubnetIfIndex  OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "DURABLE:
+             The ifIndex of the interface associated with this subnet."
+        ::= { rcL3IpSubnetEntry 1 }
+
+    rcL3IpSubnetIpAddress  OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "DURABLE:
+             The network management station uses this IP Address to talk
+             with the Agent on this subnet.  This IP address logically
+             AND'ed with 'rcL3IpSubnetMask' yields the actual subnet
+             value for this subnet."
+        ::= { rcL3IpSubnetEntry 2 }
+
+    rcL3IpSubnetMask  OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "DURABLE:
+             The subnet mask for this subnet.  It contains 1's in the
+             bit positions for the net and subnet IDs and 0's in the
+             bit positions for host ID.  The 1's must be contiguous,
+             starting with the left most bit."
+        ::= { rcL3IpSubnetEntry 3 }
+
+    rcL3IpSubnetVlans  OBJECT-TYPE
+        SYNTAX Vlanset 
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "DURABLE: { default=0:all }
+             For a L2/L3 hybrid switch, this object contains the actual
+             VLAN ID (VID) from 1 to 4094 or 0 if the VID is unassigned.
+             For a L3 only switch, this object contains the actual switch
+             interface from 1 to 4094 or 0 if unassigned.
+             
+             Changing this object for this row causes all rows with the same
+             'rcL3IpSubnetIfIndex' as this row to be changed to this new
+             'rcL3IpSubnetVidIface' value."
+        ::= { rcL3IpSubnetEntry 4 }
+
+    rcL3IpSubnetName  OBJECT-TYPE
+        SYNTAX OCTET STRING (SIZE (0..16))
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "DURABLE:  { '':all )
+             A user reference name for this subnet."
+        ::= { rcL3IpSubnetEntry 5 }                                  
+
+    rcL3IpSubnetRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "DURABLE:
+             This object indicates the status of this entry.  A row in this
+             table must be created using the createAndWait(5) action state
+             (i.e., createAndGo(4) is not supported).  This object can only
+             be set to active(1) after all objects for this row are valid.
+             The 'rcL3IpSubnetName' is optional.
+             
+             Note that the notInService(2) state is not supported.  Objects
+             in this table row can be changed when this object is notReady(3)
+             or active(1)."
+        ::= { rcL3IpSubnetEntry 6 }
+
+    rcL3IpSubnetAllowPortList OBJECT-TYPE  
+        SYNTAX      PortList
+   		MAX-ACCESS  read-create
+    	STATUS      current
+    	DESCRIPTION    
+    	     "Allow ports of the vlan."
+        ::= { rcL3IpSubnetEntry 7 }
+  
+-- -------------------------------------------------------------------------- --
+--
+--  rcL3IpStatic:
+--      This group is used to configure and retrieve static routes for both
+--      host and subnet IP destinations.
+--
+--      This group is independent of the underlying switch hardware and
+--      architecture.  It indicates how many Host IDs and Subnet IDs that
+--      the hardware can directly support, if any.  In general, hardware
+--      entries route much faster than software entries.
+--      
+--      The user can choose to reserve zero, some, or all of the available
+--      hardware entries for use as static routes.  The remaining entries,
+--      if any, are reserved for dynamic routes (e.g., RIP, OSPF, etc.).
+--
+--      Note that the default route entry (0.0.0.0) cannot be placed in this
+--      table.  If the default route was ever placed into the hardware route
+--      table, unknown routes would never be sent to the CPU (i.e., this would
+--      prevent new routes from being learned and/or placed into the hardware
+--      route table).  The default route is reserved for use by the agent.
+--
+-- -------------------------------------------------------------------------- --
+--
+    rcL3IpStaticMaxHwHosts  OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS deprecated
+        DESCRIPTION
+            "The maximum number, if any, of hosts that the hardware
+             can support in its routing table.
+             
+             Note that if the hardware supports both hosts and subnets
+             in the same table, this number represents both and 
+             'rcL3IpStaticMaxHwSubnets' is zero (0)."
+        ::= { rcL3IpStatic 1 }
+
+    rcL3IpStaticNumStaticHwHosts  OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-only
+        STATUS deprecated
+        DESCRIPTION
+            "DURABLE:
+             The number of 'rcL3IpStaticMaxHwHosts' hosts that the user
+             would like to reserve for static routes.  A SNMPv1 badValue
+             or SNMPv2 wrongValue is returned if the user attempts to use
+             a value less than zero or greater than 'rcL3IpStaticMaxHwHosts'.
+             
+             WARNING: This value is only used during system initialization
+             (i.e., after a reset)." 
+        DEFVAL {1024}
+        ::= { rcL3IpStatic 2 }
+
+    rcL3IpStaticMaxHwSubnets  OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS deprecated
+        DESCRIPTION
+            "The maximum number, if any, of subnets that the hardware
+             can support in its routing table.
+
+             Note that if the hardware supports both hosts and subnets
+             in the same table, this value is zero (0)."
+        ::= { rcL3IpStatic 3 }
+
+    rcL3IpStaticNumStaticHwSubnets  OBJECT-TYPE
+        SYNTAX Unsigned32 
+        MAX-ACCESS read-only
+        STATUS deprecated
+        DESCRIPTION
+            "DURABLE:
+             The number of 'rcL3IpStaticMaxHwSubnets' subnets that the user
+             would like to reserve for static routes.  An A SNMPv1 badValue
+             or SNMPv2 wrongValue is returned if the user attempts to use a
+             value less than zero or greater than 'rcL3IpStaticMaxHwSubnets'.
+             
+             WARNING: This value is only used during system initialization
+             (i.e., after a reset)."
+        ::= { rcL3IpStatic 4 }
+
+    rcL3IpStaticRouteMaxRows  OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The maximum possible number of rows in the 
+             'rcL3IpStaticRouteTable'."
+        ::= { rcL3IpStatic 5 }
+
+    rcL3IpStaticRouteCurrentRows  OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The current number of rows in the 'rcL3IpStaticRouteTable'."
+        ::= { rcL3IpStatic 6 }   
+        
+   rcL3IpStaticRouteTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcL3IpStaticRouteEntry
+        MAX-ACCESS not-accessible
+        STATUS deprecated
+        DESCRIPTION
+            "A table of static routes."
+        ::= { rcL3IpStatic 7 }
+
+    rcL3IpStaticRouteEntry OBJECT-TYPE
+        SYNTAX RcL3IpStaticRouteEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of static route parameters."
+        INDEX { rcL3IpStaticDestIpAddress }
+        ::= { rcL3IpStaticRouteTable 1 }
+
+    RcL3IpStaticRouteEntry ::= SEQUENCE {
+        rcL3IpStaticDestIpAddress     IpAddress,
+        rcL3IpStaticMask           IpAddress,
+        rcL3IpStaticNextHop        IpAddress,
+        rcL3IpStaticName           OCTET STRING,
+        rcL3IpStaticUseHw          TruthValue,
+        rcL3IpStaticInHw           TruthValue,
+        rcL3IpStaticGateway        TruthValue,
+        rcL3IpStaticRowStatus      RowStatus
+    }
+
+    rcL3IpStaticDestIpAddress  OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "DURABLE:
+             The static route host or subnet IP destination address.
+             All IP destination addresses must be non-zero."
+        ::= { rcL3IpStaticRouteEntry 1 }
+
+    rcL3IpStaticMask  OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "DURABLE:
+             The mask for this IP destination.  It contains 1's in the
+             bit positions for the net and subnet IDs and 0's in the
+             bit positions for host ID.  The 1's must be contiguous,
+             starting with the left most bit.
+             
+             Note that a host route uses a 255.255.255.255 mask."
+        ::= { rcL3IpStaticRouteEntry 2 }
+
+    rcL3IpStaticNextHop OBJECT-TYPE
+        SYNTAX  IpAddress
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The IP address of the next hop of this route.
+            (In the case of a route bound to an interface
+            which is realized via a broadcast media, the value
+            of this field is the agent's IP address on that
+            interface.)"
+        ::= { rcL3IpStaticRouteEntry 3 }
+
+    rcL3IpStaticName  OBJECT-TYPE
+        SYNTAX OCTET STRING (SIZE (0..255))
+        MAX-ACCESS read-create
+        STATUS obsolete
+        DESCRIPTION
+            "DURABLE:  { '':all )
+             A user reference name for this Static Route."
+        ::= { rcL3IpStaticRouteEntry 4 }
+
+    rcL3IpStaticUseHw  OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS read-create
+        STATUS obsolete
+        DESCRIPTION
+            "DURABLE: { false:all )
+             By setting this object to true(1), the user indicates the
+             desire to use hardware routing for this entry.  To disable
+             hardware routing for this entry, set this object to false(2).
+             If the underlying switch fabric does not support hardware
+             routing, this object is ignored.
+
+             There is usually limited space in the hardware routing table.
+             Consequently, if the user enables hardware routing on 'too'
+             many entries, the agent assigns routes on a first come, first
+             serve basis (i.e., the user may not get the expected results)."
+        DEFVAL  { false }
+        ::= { rcL3IpStaticRouteEntry 5 }
+
+    rcL3IpStaticInHw  OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "If this object is true(1), this static route is actually in
+             the hardware Route Table.  Otherwise it is false(2)."
+        ::= { rcL3IpStaticRouteEntry 6 }
+
+    rcL3IpStaticGateway  OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "DURABLE: { false:all )
+             By setting this object to true(1), the user indicates that this
+             subnet route is a gateway route (i.e., connected to external
+             router).  By setting it to false(2), the user indicates that this
+             is a direct route.  If 'rcL3IpStaticMask' is '255.255.255.255'
+             (i.e., a host route) for this entry, this object cannot be set
+             to true(1)."
+        DEFVAL  { false }
+        ::= { rcL3IpStaticRouteEntry 7 }
+
+    rcL3IpStaticRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "DURABLE:
+             This object indicates the status of this entry.  A row in this
+             table must be created using the createAndWait(5) action state
+             (i.e., createAndGo(4) is not supported).  This object can only
+             be set to active(1) after all objects for this row are valid.
+             The 'rcL3IpStaticName' is optional.
+             
+             Note that the notInService(2) state is not supported.  Objects
+             in this table row can be changed when this object is notReady(3)
+             or active(1)."
+        ::= { rcL3IpStaticRouteEntry 8 } 
+        
+    raisecomIpv6RMDefaultGateway  OBJECT-TYPE
+        SYNTAX InetAddress 
+        MAX-ACCESS read-write
+        STATUS deprecated
+        DESCRIPTION
+            "This address is used only when ip 
+             routing is not-forwarding." 
+        ::= { rcL3IpStatic 8 } 
+
+
+    rcL3StaticRouteTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcL3StaticRouteEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table of static routes."
+        ::= { rcL3IpStatic 9 }
+
+    rcL3StaticRouteEntry OBJECT-TYPE
+        SYNTAX RcL3StaticRouteEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A list of static route parameters."
+        INDEX {rcL3StaticRouteType, rcL3StaticDestAddress ,rcL3StaticPrefixLen,rcL3StaticNextHop }
+        ::= { rcL3StaticRouteTable 1 }
+
+    RcL3StaticRouteEntry ::= SEQUENCE { 
+        rcL3StaticRouteType         INTEGER,
+        rcL3StaticDestAddress       InetAddress,
+        rcL3StaticPrefixLen          Unsigned32,
+        rcL3StaticNextHop           InetAddress,
+        rcL3StaticGateway           TruthValue,         
+        rcL3StaticDistance          Unsigned32,        
+        rcL3StaticRowStatus         RowStatus 
+    }    
+    
+     rcL3StaticRouteType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            ipv4(1),       
+            ipv6(2)              
+              }
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Ip route type."
+        ::= { rcL3StaticRouteEntry 1}      
+        
+    rcL3StaticDestAddress  OBJECT-TYPE
+        SYNTAX InetAddress
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "DURABLE:
+             The static route host or subnet IP destination address.
+             All IP destination addresses must be non-zero."
+        ::= { rcL3StaticRouteEntry 2 }
+
+    rcL3StaticPrefixLen  OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            " ip prefix length"
+        ::= { rcL3StaticRouteEntry 3 }
+
+    rcL3StaticNextHop OBJECT-TYPE
+        SYNTAX  InetAddress
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The IP address of the next hop of this route.
+            (In the case of a route bound to an interface
+            which is realized via a broadcast media, the value
+            of this field is the agent's IP address on that
+            interface.)"
+        ::= { rcL3StaticRouteEntry 4 }   
+        
+    rcL3StaticGateway  OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "DURABLE: { false:all )
+             By setting this object to true(1), the user indicates that this
+             subnet route is a gateway route (i.e., connected to external
+             router).  By setting it to false(2), the user indicates that this
+             is a direct route.  If 'rcL3IpStaticMask' is '255.255.255.255'
+             (i.e., a host route) for this entry, this object cannot be set
+             to true(1)."
+        DEFVAL  { false }
+        ::= { rcL3StaticRouteEntry 5 }   
+        
+   rcL3StaticDistance OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The distance of the static route"
+        ::= { rcL3StaticRouteEntry 6 }
+
+    rcL3StaticRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "DURABLE:
+             This object indicates the status of this entry.  A row in this
+             table must be created using the createAndWait(5) action state
+             (i.e., createAndGo(4) is not supported).  This object can only
+             be set to active(1) after all objects for this row are valid.
+             The 'rcL3IpStaticName' is optional.
+             
+             Note that the notInService(2) state is not supported.  Objects
+             in this table row can be changed when this object is notReady(3)
+             or active(1)."
+        ::= { rcL3StaticRouteEntry 7 }       
+    
+	rcL3IpStaticEcmpPathSelectMode  OBJECT-TYPE
+         SYNTAX INTEGER{ 
+         		other(0),  
+         		SIP(1),
+         		DIP(2),
+         		L4Port(3),
+         		DIPxorL4Port(4)
+	        	}        
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "ECMP path select mode" 
+        ::= { rcL3IpStatic 10 } 
+	
+	
+	
+	
+-- -------------------------------------------------------------------------- --
+--
+--  rcL3IpRoute:
+--      The MIB II Routing Table (ipRouteTable) does not include the 
+--      information required to support the UNIX style "netstat -nr" command.
+--      This group replicates some of the ipRouteTable objects and adds
+--      additional objects to support the "netstat -nr" functionality.
+--
+--      Note that the "netstat -nr" functionality has not been implemented.
+--
+--      This table also provides 'RowStatus' support for the 'ipRouteTable'
+--      objects contained in this table.
+--
+--      The ipRouteTable objects are not actually duplicated, but use the IDB+
+--      "alternate object" capability to point back to the MIB II ipRouteTable.
+--      Note that the utilized ipRouteTable objects are presented here
+--      in a more logical order (similar to RFC1354).
+--
+-- -------------------------------------------------------------------------- --
+--
+    rcL3IpRouteTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF RcL3IpRouteEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Provides Routing Table access.  This table can be used to
+             modify or add Routing Table entries.  Changes made with this
+             table are not saved to NVM (nonvolatile memory).  To save
+             static routes to NVM, use the rcL3IpStaticRouteTable."
+        ::= { rcL3IpRoute 1 }
+        
+    rcL3IpRouteEntry OBJECT-TYPE
+        SYNTAX  RcL3IpRouteEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Provides enough routing information to support the UNIX style
+             'netstat -nr' command and to support maintenance of the
+             Routing Table."
+        INDEX   { rcL3IpRouteDest }
+        ::= { rcL3IpRouteTable 1 }
+
+    RcL3IpRouteEntry ::=
+        SEQUENCE {
+            rcL3IpRouteDest        IpAddress,
+            rcL3IpRouteMask        IpAddress,
+            rcL3IpRouteNextHopIp   IpAddress,
+            rcL3IpRouteNextHopMac  MacAddress,
+            rcL3IpRouteIfIndex     Integer32,
+            rcL3IpRouteType        INTEGER,
+            rcL3IpRouteProto       INTEGER,
+            rcL3IpRouteAge         Unsigned32,
+            rcL3IpRouteMetric1     Integer32,
+            rcL3IpRouteUsingHw     TruthValue,
+            rcL3IpRouteIsStatic    TruthValue,
+            rcL3IpRouteFlags       Unsigned32,
+            rcL3IpRouteRef         Gauge32,
+            rcL3IpRouteUse         Counter32,
+            rcL3IpRouteRowStatus   RowStatus
+        }
+
+    rcL3IpRouteDest OBJECT-TYPE
+        SYNTAX  IpAddress
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The destination IP address of this route.  An
+            entry with a value of 0.0.0.0 is considered a
+            default route.  Multiple routes to a single
+            destination can appear in the table, but access to
+            such multiple entries is dependent on the table-
+            access mechanisms defined by the network
+            management protocol in use."
+        ::= { rcL3IpRouteEntry 1 }
+
+    rcL3IpRouteMask OBJECT-TYPE
+        SYNTAX  IpAddress
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Indicate the mask to be logical-ANDed with the
+            destination address before being compared to the
+            value in the rcL3IpRouteDest field.
+
+            If the value of the rcL3IpRouteDest is 0.0.0.0 (a
+            default route), then the mask value is also
+            0.0.0.0.  It should be noted that all IP routing
+            subsystems implicitly use this mechanism."
+        ::= { rcL3IpRouteEntry 2 }
+        
+    rcL3IpRouteNextHopIp OBJECT-TYPE
+        SYNTAX  IpAddress
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The IP address of the next hop of this route.
+            (In the case of a route bound to an interface
+            which is realized via a broadcast media, the value
+            of this field is the agent's IP address on that
+            interface.)"
+        ::= { rcL3IpRouteEntry 3 }
+
+    rcL3IpRouteNextHopMac OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The six byte MAC address of the next hop of this
+            route.  If the underlying hardware does not support this
+            object, an octet string of zero length is returned."
+        ::= { rcL3IpRouteEntry 4 }
+
+    rcL3IpRouteIfIndex OBJECT-TYPE
+        SYNTAX  Integer32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The index value which uniquely identifies the
+            local interface through which the next hop of this
+            route should be reached.  The interface identified
+            by a particular value of this index is the same
+            interface as identified by the same value of
+            ifIndex."
+        ::= { rcL3IpRouteEntry 5 }
+
+    rcL3IpRouteType OBJECT-TYPE
+        SYNTAX  INTEGER {
+            other(1),       -- none of the following
+            invalid(2),     -- an invalidated route
+            direct(3),      -- route to directly connected (sub-)network
+            indirect(4)     -- route to a non-local 
+                            -- host/network/sub-network
+                }
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The type of route.  Note that the values
+            direct(3) and indirect(4) refer to the notion of
+            direct and indirect routing in the IP architecture.
+
+            Setting this object to the value invalid(2) has
+            the effect of invalidating the corresponding entry
+            in the rcL3IpRouteTable object.  That is, it
+            effectively disassociates the destination
+            identified with said entry from the route
+            identified with said entry.  It is an
+            implementation-specific matter as to whether the
+            agent removes an invalidated entry from the table.
+            Accordingly, management stations must be prepared
+            to receive tabular information from agents that
+            corresponds to entries not currently in use.
+            Proper interpretation of such entries requires
+            examination of the relevant rcL3IpRouteType object."
+        ::= { rcL3IpRouteEntry 6 }
+
+    rcL3IpRouteProto OBJECT-TYPE
+        SYNTAX  INTEGER {
+            other(1),       -- none of the following
+
+                            -- non-protocol information,
+            local(2),       -- e.g., manually configured entries
+
+            netmgmt(3),     -- set via a network management protocol
+
+            icmp(4),        -- obtained via ICMP, e.g., Redirect
+
+                            -- the remaining values are all gateway
+                            -- routing protocols
+            egp(5),
+            ggp(6),
+            hello(7),
+            rip(8),
+            is-is(9),
+            es-is(10),
+            ciscoIgrp(11),
+            bbnSpfIgp(12),
+            ospf(13),
+            bgp(14)
+                }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The routing mechanism via which this route was
+            learned.  Inclusion of values for gateway routing
+            protocols is not intended to imply that hosts
+            should support those protocols."
+        ::= { rcL3IpRouteEntry 7 }
+
+    rcL3IpRouteAge OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The number of seconds since this route was last
+            updated or otherwise determined to be correct.
+            Note that no semantics of `too old' can be implied
+            except through knowledge of the routing protocol
+            by which the route was learned."
+        ::= { rcL3IpRouteEntry 8 }
+
+    rcL3IpRouteMetric1 OBJECT-TYPE
+        SYNTAX  Integer32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The primary routing metric for this route.  The
+            semantics of this metric are determined by the
+            routing-protocol specified in the route's
+            rcL3IpRouteProto value.  If this metric is not used,
+            its value should be set to -1."
+        ::= { rcL3IpRouteEntry 9 }
+
+    rcL3IpRouteUsingHw OBJECT-TYPE
+        SYNTAX  TruthValue
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "This object is true(1) if this route is contained in
+            the hardware routing table; otherwise, it is false(2)."
+        ::= { rcL3IpRouteEntry 10 }
+
+    rcL3IpRouteIsStatic OBJECT-TYPE
+        SYNTAX  TruthValue
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "This object is true(1) if this route is defined in the
+            'rcL3IpStaticRouteTable'.  This object is false(2) if this
+            route was created dynamically (e.g., with RIP, OSPF) or was
+            manually created using this table ('rcL3IpRouteTable') or 
+            the RFC1213 'ipRouteTable'."
+        ::= { rcL3IpRouteEntry 11 }
+
+    rcL3IpRouteFlags OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "Not implemented.  Returns '0'.
+             
+             Contains the information required for a netstat-like
+             'Flags' field.
+             
+             The flags field represents a decimal value of the flags
+             specified for a given route.  The following is a list of
+             currently available flag values:
+                 0x1     | - route is usable (that is, 'up')
+                 0x2     | - destination is a gateway
+                 0x4     | - host specific routing entry
+                 0x8     | - host or net unreachable
+                 0x10    | - created dynamically (by redirect)
+                 0x20    | - modified dynamically (by redirect)
+                 0x40    | - message confirmed
+                 0x80    | - subnet mask present
+                 0x100   | - generate new routes on use
+                 0x200   | - external daemon resolves name
+                 0x400   | - generated by ARP
+                 0x800   | - manually added (static)
+                 0x1000  | - just discard packets (during updates)
+                 0x2000  | - modified by management protocol
+                 0x4000  | - protocol specific routing flag
+                 0x8000  | - protocol specific routing flag
+
+            For example, if the entry in the Routing Table has a flag
+            value of decimal 5, (0x1 OR'ed with 0x4), then this route
+            is 'up' and usable and is host-specific."
+        ::= { rcL3IpRouteEntry 12 }
+
+    rcL3IpRouteRef OBJECT-TYPE
+        SYNTAX  Gauge32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "Not implemented.  Returns '0'.
+            
+             Contains the information required for the netstat 'Ref'
+             field, which indicates the number active uses for this
+             route."
+        ::= { rcL3IpRouteEntry 13 }
+
+    rcL3IpRouteUse OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "Not implemented.  Returns '0'.
+            
+             Contains the information required for the netstat 'Use'
+             field, which indicates the number of packets sent with
+             this route."
+        ::= { rcL3IpRouteEntry 14 }
+
+    rcL3IpRouteRowStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "This object indicates the status of this entry.  A row in this
+             table must be created using the createAndWait(5) action state
+             (i.e., createAndGo(4) is not supported).  This object can only
+             be set to active(1) for the specified 'rcL3IpRouteDest' index
+             value after the 'rcL3IpRouteMask' and 'rcL3IpRouteNextHop'
+             objects for this row are valid.  Setting 'rcL3IpRouteType' is
+             optional.
+             
+             Note that the notInService(2) state is not supported.  Objects
+             in this table row can be changed when this object is notReady(3)
+             or active(1)."
+        ::= { rcL3IpRouteEntry 15 }           
+        
+	
+
+		
+		
+		
+
+--
+-- END of ROSE-L3-MIB
+--
+
+END

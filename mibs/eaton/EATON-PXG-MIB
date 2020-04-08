@@ -1,0 +1,488 @@
+EATON-PXG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+      MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Gauge32, 
+        Integer32
+           FROM SNMPv2-SMI
+      TimeStamp
+           FROM SNMPv2-TC
+      entPhysicalName
+           FROM ENTITY-MIB
+      SnmpAdminString
+           FROM SNMP-FRAMEWORK-MIB
+      MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP 
+           FROM SNMPv2-CONF
+      powerChain
+           FROM EATON-OIDS;
+
+pxgMIB MODULE-IDENTITY
+    LAST-UPDATED "200801300000Z"
+    ORGANIZATION "Eaton Corporation"
+    CONTACT-INFO
+        "Eaton Power Quality Technical Support (PQTS) group
+            www.eaton.com/powerxpert 
+            Technical Resource Center phone numbers 
+            United States:  1.800.843.9433 or 919.870.3028
+            Canada:  1.800.461.9166 ext. 260
+            All other countries:  Call your local service representative." 
+    DESCRIPTION
+        "The MIB module for objects and notifications supported by 
+         Eaton's Toolkit-enabled Power Xpert Gateways.
+
+        Copyright (C) Eaton Corporation (2006-2007)."
+
+
+    REVISION        "200801300000Z"
+    DESCRIPTION
+        "Added powerChainAlarmUpdated and notes."
+
+    REVISION        "200707050000Z"
+    DESCRIPTION
+        "Used accessible-for-notify where appropriate for trap-only vars."
+
+    REVISION        "200704100000Z"
+    DESCRIPTION
+        "Renamed from TOOLKIT-MIB to better EATON-PXG-MIB.
+         Added powerChainAlarmClosed trap and closed alarmLevel."
+
+    REVISION        "200701030000Z"
+    DESCRIPTION
+        "Added activeAlarmsTable and corresponding Notifications."
+
+    REVISION        "200610130000Z"
+    DESCRIPTION
+        "Initial Version of pxgMIB.
+         Provides Notifications and supporting objects."
+
+    ::= { powerChain 1 }
+
+--  ::= { enterprises 534  8  1  }
+-- pxgMib { iso org(3) dod(6) internet(1) private(4)
+--       enterprises(1) eaton(534) powerChain(8) (1) }
+
+
+pxgMIBObjects OBJECT IDENTIFIER ::= { pxgMIB 1 }
+
+-- MIB contains these groups
+eventInfo OBJECT IDENTIFIER ::= { pxgMIBObjects 1 }
+alarms    OBJECT IDENTIFIER ::= { pxgMIBObjects 2 }
+
+
+--
+-- eventInfo group
+--
+-- The objects defined in the eventInfo group are all inaccessible
+--  (to external MIB browsers).  They are used exclusively as OBJECTS 
+--  in pxgNotifications; the transient nature of this data
+--  is the reason it is kept inaccessible except to internal processes.
+
+eventID       OBJECT-TYPE
+    SYNTAX        Integer32 (1..2147483647)
+    MAX-ACCESS    accessible-for-notify
+    STATUS        current
+    DESCRIPTION
+        "A unique identifier for the event."
+    ::= { eventInfo 1 }
+
+eventSequenceIndex    OBJECT-TYPE
+    SYNTAX        Integer32 (1..2147483647)
+    MAX-ACCESS    accessible-for-notify
+    STATUS        current
+    DESCRIPTION
+        "A unique identifier for a sequence of events
+         using the same EventId."
+    ::= { eventInfo 2 }
+
+eventDescription  OBJECT-TYPE
+    SYNTAX        SnmpAdminString
+    MAX-ACCESS    accessible-for-notify
+    STATUS        current
+    DESCRIPTION
+        "A human-readable text description of the Event or Alarm."
+    ::= { eventInfo 3 }
+
+eventValue    OBJECT-TYPE
+    SYNTAX        SnmpAdminString
+    MAX-ACCESS    accessible-for-notify
+    STATUS        current
+    DESCRIPTION
+        "A human-readable text representation of the source and 
+         value of the node that caused the Event or Alarm.
+         This text should be of the form 'SourcePath = Value'
+         where SourcePath is the address of the node within the
+         BACnetWS+ node tree, as accessed with web service calls."
+    ::= { eventInfo 4 }
+
+
+--
+-- alarms group
+--
+-- This group contains the table of active alarms and a count of 
+--  alarms currently active.  The vars are similar to the eventInfo group
+--  but these vars are visible to MIB browsers.
+
+numAlarmsPresent OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The present number of active alarm conditions."
+    ::= { alarms 1 }
+
+activeAlarmsTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF ActiveAlarmsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A list of alarm table entries.  The table contains
+        zero, one, or many rows at any moment, depending upon
+        the number of alarm conditions in effect.  The table
+        is initially empty at agent startup.  The agent
+        creates a row in the table each time an alarm condition 
+        is detected and deletes that row when that alarm is no
+        longer active.
+
+        The numbering of the table entries, using alarmID, is 
+        sparse.
+
+        The number of rows in the table at any given time is
+        reflected by the value of numAlarmsPresent."
+    ::= { alarms 2 }
+
+activeAlarmsEntry OBJECT-TYPE
+    SYNTAX     ActiveAlarmsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "An entry containing information applicable to a
+        particular alarm."
+    INDEX { alarmID }
+    ::= { activeAlarmsTable 1 }
+
+ActiveAlarmsEntry ::= SEQUENCE {
+    alarmID             Integer32,
+    alarmSequenceIndex  Integer32,
+    alarmDescription    SnmpAdminString,
+    alarmValue          SnmpAdminString,
+    alarmLevel          INTEGER,
+    alarmTime           TimeStamp
+    }
+
+
+alarmID       OBJECT-TYPE
+    SYNTAX        Integer32 (1..2147483647)
+    MAX-ACCESS    accessible-for-notify
+    STATUS        current
+    DESCRIPTION
+        "A unique identifier for the alarm.
+         This var is not-accessible when browsing the table."
+    ::= { activeAlarmsEntry 1 }
+
+alarmSequenceIndex    OBJECT-TYPE
+    SYNTAX        Integer32 (1..2147483647)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "A unique identifier for a sequence of alarms
+         using the same alarmID."
+    ::= { activeAlarmsEntry 2 }
+
+alarmDescription  OBJECT-TYPE
+    SYNTAX        SnmpAdminString
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "A human-readable text description of the Event or Alarm."
+    ::= { activeAlarmsEntry 3 }
+
+alarmValue    OBJECT-TYPE
+    SYNTAX        SnmpAdminString
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "A human-readable text representation of the source and 
+         value of the node that caused the Event or Alarm.
+         This text should be of the form 'SourcePath = Value'
+         where SourcePath is the address of the node within the
+         BACnetWS+ node tree, as accessed with web service calls."
+    ::= { activeAlarmsEntry 4 }
+
+alarmLevel OBJECT-TYPE
+    SYNTAX INTEGER {
+        critical (1),
+        cautionary (2),
+        acknowledged (3),
+        active (4),
+        cleared (5),
+        closed (6),
+        unknown (7)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Enumerated value that tells the present level (status) of
+         an activeAlarmsEntry.
+        critical (1) - The alarm is at a critical level.
+        cautionary (2) - The alarm is at a cautionary level
+                         (a less severe level than critical).
+        acknowledged (3) - The user has acknowledged, but not yet closed, 
+                           the cautionary or critical alarm.
+        active (4)  - Not used; would be a status for an event.
+        cleared (5) - A transient internal level, not normally seen.
+        closed (6)  - A transient internal level, not normally seen because
+                      the activeAlarmsEntry is removed when closed.
+        unknown (7) - Alarm status is not known.  Not normally seen."
+    ::= { activeAlarmsEntry 5 }
+
+alarmTime OBJECT-TYPE
+    SYNTAX     TimeStamp
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The value of sysUpTime when the alarm condition was
+        detected.  If the alarm condition was detected at the
+        time of agent startup and presumably existed before
+        agent startup, the value of alarmTime shall equal 0."
+    ::= { activeAlarmsEntry 6 }
+
+
+
+-- Notifications
+pxgNotifications OBJECT IDENTIFIER ::= { pxgMIB 0 }
+
+-- These notifications are mapped from the BACnet-WS+ Alarms and
+-- Events, and are triggered by the publishing of an Alarm or Event 
+-- via the BACnet-WS+ web services.
+
+-- This first set provides the same set of (otherwise inaccessible) 
+--    eventXXX OBJECTS with data from one Event Update instance, plus 
+--    entPhysicalName.1: DisplayName given to the root device or server
+--      (with entPhysicalIndex always = 1)
+
+powerChainCriticalAlarmEvent NOTIFICATION-TYPE
+   OBJECTS { eventID, eventSequenceIndex, eventDescription, 
+             eventValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "A Critical Alarm has occurred in a Power Chain Device.
+         Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 1 }
+
+powerChainCautionaryAlarmEvent NOTIFICATION-TYPE
+   OBJECTS { eventID, eventSequenceIndex, eventDescription, 
+             eventValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "A Cautionary Alarm has occurred in a Power Chain Device.
+         Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 2 }
+
+powerChainAlarmEventAcknowledged NOTIFICATION-TYPE
+   OBJECTS { eventID, eventSequenceIndex, eventDescription, 
+             eventValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "A user has Acknowledged a Critical or Cautionary Alarm.
+         This does NOT clear or 'close' a latched Alarm.
+         Alarm and source information are contained in the OBJECTS."
+    ::= { pxgNotifications 3 }
+
+powerChainEventCleared NOTIFICATION-TYPE
+   OBJECTS { eventID, eventSequenceIndex, eventDescription, 
+             eventValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "The condition that raised the Alarm or Event no longer exists;
+         the three types of Events have different outcomes:
+         1) A latching Alarm is still considered active and will need to be 
+            Closed by a user Close Acknowledgement.
+         2) A non-latching Alarm is closed and its Alarm sequence completed.
+         3) An Event is closed and its Event sequence completed.
+         Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 4 }
+
+powerChainEvent NOTIFICATION-TYPE
+   OBJECTS { eventID, eventSequenceIndex, eventDescription, 
+             eventValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "A non-alarming Event has occurred in a Power Chain Device.
+         Event and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 5 }
+
+powerChainAlarmEventClosed NOTIFICATION-TYPE
+   OBJECTS { eventID, eventSequenceIndex, eventDescription, 
+             eventValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "A user has Closed a Critical or Cautionary Alarm.
+         This Close Acknowledgement has 'closed' a latched Alarm and
+         completed its sequence.
+         Alarm and source information are contained in the OBJECTS."
+    ::= { pxgNotifications 6 }
+
+
+-- This second set is similar to the first set, but uses the vars
+--    from the activeAlarmsTable, which are accessible.
+--    This set does not include a notice for an Event level entry, since 
+--    this would not ever appear in the activeAlarmsTable.
+--    entPhysicalName.1: DisplayName given to the root device or server
+--      (with entPhysicalIndex always = 1)
+--
+-- The sequence of notifications for a latching alarm might look like this:
+--    __Event___          ->  __powerChain_Notice__       SeqID   alarmLevel
+--    The alarm occurs    -> powerChainCautionaryAlarm    0       cautionary
+--    Shifts to critical  -> powerChainCriticalAlarm      1       critical
+--    Cause removed       -> powerChainAlarmUpdated       2       critical
+--    Recurs at critical  -> powerChainAlarmUpdated       3       critical
+--    User acknowledges   -> powerChainAlarmAcknowledged  4       acknowledged
+--    Cause removed again -> powerChainAlarmUpdated       5       acknowledged
+--    User closes         -> powerChainAlarmClosed        6       closed
+--    (Alarm removed)     -> powerChainAlarmCleared       6       closed
+
+
+powerChainCriticalAlarm NOTIFICATION-TYPE
+   OBJECTS { alarmID, alarmSequenceIndex, alarmDescription, 
+             alarmValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+       "A Critical Alarm has occurred in a Power Chain Device.
+        Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 7 }
+
+powerChainCautionaryAlarm NOTIFICATION-TYPE
+   OBJECTS { alarmID, alarmSequenceIndex, alarmDescription, 
+             alarmValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+       "A Cautionary Alarm has occurred in a Power Chain Device.
+        Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 8 }
+
+powerChainAlarmAcknowledged NOTIFICATION-TYPE
+   OBJECTS { alarmID, alarmSequenceIndex, alarmDescription, 
+             alarmValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+       "A user has Acknowledged a Critical or Cautionary Alarm.
+        This does NOT clear or 'close' a latched Alarm.
+        Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 9 }
+
+powerChainAlarmCleared NOTIFICATION-TYPE
+   OBJECTS { alarmID, alarmSequenceIndex, alarmDescription, 
+             alarmValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "The condition that raised the Alarm or Event no longer exists;
+         the three types of Events have different outcomes:
+         1) A latching Alarm is still considered active and will need to be 
+            Closed by a user Close Acknowledgement.
+         2) A non-latching Alarm is closed and its Alarm sequence completed.
+         3) An Event is closed and its Event sequence completed.
+         Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 10 }
+
+powerChainAlarmClosed NOTIFICATION-TYPE
+   OBJECTS { alarmID, alarmSequenceIndex, alarmDescription, 
+             alarmValue, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "A user has Closed a Critical or Cautionary Alarm.
+         This Close Acknowledgement has 'closed' a latched Alarm and
+         completed its sequence.
+         Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 11 }
+
+powerChainAlarmUpdated NOTIFICATION-TYPE
+   OBJECTS { alarmID, alarmSequenceIndex, alarmDescription, 
+             alarmValue, alarmLevel, entPhysicalName  
+           }
+   STATUS             current
+   DESCRIPTION
+        "An update to the alarm entry at alarmID has occurred;
+         however, the alarmLevel has not changed due to this update.
+         This is normally seen with latching alarms when condition that caused
+         the alarm is removed or recurs before the alarm has been closed.
+         Alarm and source information are contained in the OBJECTS."
+   ::= { pxgNotifications 12 }
+
+
+
+
+--
+-- Conformance-related definitions
+--
+pxgConformance OBJECT IDENTIFIER ::= { pxgMIB 2 }
+
+tkEventGroup  OBJECT-GROUP
+    OBJECTS { eventID, eventSequenceIndex, eventDescription, 
+              eventValue }
+    STATUS  current
+    DESCRIPTION
+        "The eventInfo objects that are only accessible to notifications."
+    ::= { pxgConformance 1 }
+
+tkAlarmTableGroup  OBJECT-GROUP
+    OBJECTS { alarmID, alarmSequenceIndex, alarmDescription, 
+              alarmValue, alarmLevel, alarmTime, numAlarmsPresent }
+    STATUS  current
+    DESCRIPTION
+        "The activeAlarms objects that are accessible to MIB browsers
+         and notifications, except that alarmID is only accessible to
+         notifications."
+    ::= { pxgConformance 2 }
+
+tkEventNotifyGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { powerChainCriticalAlarmEvent, powerChainCautionaryAlarmEvent, 
+                    powerChainAlarmEventAcknowledged, powerChainEventCleared,
+                    powerChainEvent, powerChainAlarmEventClosed }
+    STATUS  current
+    DESCRIPTION
+        "The Alarm and Event notifications which use the eventInfo objects."
+    ::= { pxgConformance 3 }
+
+tkAlarmNotifyGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { powerChainCriticalAlarm, powerChainCautionaryAlarm, 
+                    powerChainAlarmAcknowledged, powerChainAlarmCleared,
+                    powerChainAlarmClosed, powerChainAlarmUpdated }
+    STATUS  current
+    DESCRIPTION
+        "The Alarm notifications which use the activeAlarmTable objects."
+    ::= { pxgConformance 4 }
+
+
+tkSimpleCompliance MODULE-COMPLIANCE
+    STATUS     current
+    DESCRIPTION
+       "The compliance statement for Power Xpert Gateway implementations that 
+        do not implement the activeAlarmsTable."
+    MODULE -- this module
+       MANDATORY-GROUPS  { tkEventGroup, tkEventNotifyGroup }
+    ::= { pxgConformance 5 }
+
+tkAlarmsTableCompliance MODULE-COMPLIANCE
+    STATUS     current
+    DESCRIPTION
+       "The compliance statement for Power Xpert Gateway implementations that  
+        do implement the activeAlarmsTable.  
+        The eventInfo objects are still used for Event-only notices."
+    MODULE -- this module
+       MANDATORY-GROUPS  { tkEventGroup, tkAlarmTableGroup,
+                           tkEventNotifyGroup, tkAlarmNotifyGroup }
+    ::= { pxgConformance 6 }
+
+
+END
+

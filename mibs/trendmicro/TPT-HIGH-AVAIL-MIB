@@ -1,0 +1,508 @@
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Trend Micro, Inc.
+-- Copyright information is in the DESCRIPTION section of the MODULE-IDENTITY.
+-- 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+TPT-HIGH-AVAIL-MIB
+
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+  MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, 
+  Integer32, Unsigned32, Counter64
+    FROM SNMPv2-SMI
+
+  TEXTUAL-CONVENTION
+    FROM SNMPv2-TC
+
+  EnabledOrNot
+    FROM TPT-PORT-CONFIG-MIB
+
+  tpt-tpa-objs, tpt-tpa-eventsV2, tpt-tpa-unkparams
+    FROM TPT-TPAMIBS-MIB
+  ;
+
+tpt-high-avail-objs MODULE-IDENTITY
+  LAST-UPDATED "201609081854Z" -- Sep 8, 2016
+  ORGANIZATION "Trend Micro, Inc."
+  CONTACT-INFO "www.trendmicro.com"
+  DESCRIPTION
+    "Device information related to high availability.
+
+     Copyright (C) 2016 Trend Micro Incorporated. All Rights Reserved.
+     
+     Trend Micro makes no warranty of any kind with regard to this material,
+     including, but not limited to, the implied warranties of merchantability
+     and fitness for a particular purpose. Trend Micro shall not be liable for
+     errors contained herein or for incidental or consequential damages in
+     connection with the furnishing, performance, or use of this material. This
+     document contains proprietary information, which is protected by copyright. No
+     part of this document may be photocopied, reproduced, or translated into
+     another language without the prior written consent of Trend Micro. The
+     information is provided 'as is' without warranty of any kind and is subject to
+     change without notice. The only warranties for Trend Micro products and
+     services are set forth in the express warranty statements accompanying such
+     products and services. Nothing herein should be construed as constituting an
+     additional warranty. Trend Micro shall not be liable for technical or editorial
+     errors or omissions contained herein. TippingPoint(R), the TippingPoint logo, and
+     Digital Vaccine(R) are registered trademarks of Trend Micro. All other company
+     and product names may be trademarks of their respective holders. All rights
+     reserved. This document contains confidential information, trade secrets or
+     both, which are the property of Trend Micro. No part of this documentation may
+     be reproduced in any form or by any means or used to make any derivative work
+     (such as translation, transformation, or adaptation) without written permission
+     from Trend Micro or one of its subsidiaries. All other company and product
+     names may be trademarks of their respective holders.
+    "
+  
+  REVISION "201609081854Z" -- Sep 8, 2016
+  DESCRIPTION "Added new FaultCause values to support TPS. Updated description of highAvailTransparentPartner."
+
+  REVISION "201605251854Z" -- May 25, 2016
+  DESCRIPTION "Updated copyright information. Minor MIB syntax fixes."
+   
+  ::= { tpt-tpa-objs 6 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Textual convention(s) specific to high availability
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+FaultState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "The current fault state of the device."
+  SYNTAX      INTEGER { normal(0), fallback(1) }
+
+FaultCause ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "The reason for the current fault state of the device."
+  SYNTAX      INTEGER { none(0), suspended-task(1),  out-of-memory(2), 
+                        hardware-breakpoint(3), tse-failure(4), 
+                        watchdog-timeout(5), user-reset(6), user-fallback(7),
+                        threshold-failure(8), software-watchdog-timeout(9),
+                        oam-fault(10), hard-disk-disable(11),
+                        initialization-failure (12), 
+                        internal-link-failure (13),
+                        multiple-fan-failures (14),
+                        packet-egress-integrity (15),
+                        stack-master (16), 
+                        waiting-on-stack (17), 
+                        spike-reboot-or-halt (18),
+			process-error (19),
+			low-health-score (20) }
+
+ConnectionState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "State of the connection between a device and its transparent HA partner."
+  SYNTAX      INTEGER { not-connected(0), unresponsive(1) , connected(2) }
+
+PerfProtPhase ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "The performance protection phase (entering, continuing, or exiting)."
+  SYNTAX      INTEGER { entering(1), continuing(2) , exiting(3) }
+
+ZphaState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "Whether ZPHA bypass is currently in effect."
+  SYNTAX      INTEGER { normal(0), ips-bypass(1) }
+
+ZphaAction ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "The ZPHA action (normal or bypass)."
+  SYNTAX      INTEGER { unknown(0), normal(1), bypass(2) }
+
+ZphaMode ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "The ZPHA fiber mode (single or multi)."
+  SYNTAX      INTEGER { unknown(0), single(2), multi(3) }
+
+ZphaPresent ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "Whether segmental ZPHA is supported on the device."
+  SYNTAX      INTEGER { absent(0), present(1) }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Global high availability information
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+highAvailTimeStamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The time of the last transition of the fault state (in seconds since 
+     January 1, 1970).  This value is zero if the fault state has not changed 
+     since the last reboot."
+  ::= { tpt-high-avail-objs 1 }  
+
+highAvailFaultState OBJECT-TYPE
+  SYNTAX      FaultState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The current fault state of the device."
+  ::= { tpt-high-avail-objs 2 }  
+
+highAvailFaultCause OBJECT-TYPE
+  SYNTAX      FaultCause
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The reason for the current fault state of the device."
+  ::= { tpt-high-avail-objs 3 }  
+
+highAvailThresholdEnabled OBJECT-TYPE
+  SYNTAX      EnabledOrNot
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The current fallback threshold enabled setting for the device."
+  ::= { tpt-high-avail-objs 4 }  
+
+highAvailThresholdPercent OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "If the fallback threshold is enabled, the percent (0-100) packet loss at 
+     which the device is configured to enter the fallback state."
+  ::= { tpt-high-avail-objs 5 }  
+
+highAvailEnabled OBJECT-TYPE
+  SYNTAX      EnabledOrNot
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "Whether intrinisic high availability is enabled for this device."
+  ::= { tpt-high-avail-objs 6 }  
+
+highAvailTransparentState OBJECT-TYPE
+  SYNTAX      ConnectionState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "State of the connection to the device's transparent HA partner."
+  ::= { tpt-high-avail-objs 7 }  
+
+highAvailTransparentEnabled OBJECT-TYPE
+  SYNTAX      EnabledOrNot
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "Whether transparent high availability is enabled for this device."
+  ::= { tpt-high-avail-objs 8 }  
+
+highAvailTransparentPartner OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..64))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "Network address OR serial number of the device's transparent HA partner."
+  ::= { tpt-high-avail-objs 9 }  
+
+highAvailZeroPowerState OBJECT-TYPE
+  SYNTAX      ZphaState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The current zero-power HA state of the device."
+  ::= { tpt-high-avail-objs 10 }  
+
+highAvailZeroPowerQuantity OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The number of segments with zero-power HA modules."
+  ::= { tpt-high-avail-objs 11 }  
+
+highAvailZeroPowerTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF HighAvailZeroPowerEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION 
+    "Table of IP addresses on the device and their attributes."
+  ::= { tpt-high-avail-objs 12 }  
+
+highAvailZeroPowerEntry OBJECT-TYPE
+  SYNTAX      HighAvailZeroPowerEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION 
+    "An entry in the host IP address table.
+     Rows cannot be created or deleted."
+  INDEX       { highAvailZeroPowerIndex }
+  ::= { highAvailZeroPowerTable 1 }
+
+HighAvailZeroPowerEntry ::= SEQUENCE {
+  highAvailZeroPowerIndex           Unsigned32,
+  highAvailZeroPowerSegment         OCTET STRING (SIZE (0..127)),
+  highAvailZeroPowerActive          ZphaState,
+  highAvailZeroPowerAction          ZphaAction,
+  highAvailZeroPowerMode            ZphaMode
+}
+
+highAvailZeroPowerIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION 
+    "Index into the ZPHA table, starting with 1."
+  ::= { highAvailZeroPowerEntry 1 }
+
+highAvailZeroPowerSegment OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..127))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The name of the segment to which the ZPHA is attached."
+  ::= { highAvailZeroPowerEntry 2 }
+
+highAvailZeroPowerActive OBJECT-TYPE
+  SYNTAX      ZphaState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "Whether the ZPHA is currently active on this segment."
+  ::= { highAvailZeroPowerEntry 3 }
+
+highAvailZeroPowerAction OBJECT-TYPE
+  SYNTAX      ZphaAction
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The action (usually bypass) that the segment takes when ZPHA is active."
+  ::= { highAvailZeroPowerEntry 4 }
+
+highAvailZeroPowerMode OBJECT-TYPE
+  SYNTAX      ZphaMode
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "The fiber mode (single or multi) of this ZPHA."
+  ::= { highAvailZeroPowerEntry 5 }
+
+highAvailZeroPowerPresence OBJECT-TYPE
+  SYNTAX      ZphaPresent
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "An indication of whether ZPHA is supported on the device."
+  ::= { tpt-high-avail-objs 13 }  
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- HA notifications
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptIhaNotifyDeviceID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the device sending this notification."
+  ::= { tpt-tpa-unkparams 81 }
+
+tptIhaNotifyTimeStamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time of this notification (in seconds since January 1, 1970)."
+  ::= { tpt-tpa-unkparams 82 }
+
+tptIhaNotifyFaultState OBJECT-TYPE
+  SYNTAX      FaultState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The current fault state of the device."
+  ::= { tpt-tpa-unkparams 83 }
+
+tptIhaNotifyFaultCause OBJECT-TYPE
+  SYNTAX      FaultCause
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The reason for the current fault state of the device."
+  ::= { tpt-tpa-unkparams 84 }
+
+tptIhaNotify NOTIFICATION-TYPE
+  OBJECTS     { tptIhaNotifyDeviceID,     tptIhaNotifyTimeStamp, 
+                tptIhaNotifyFaultState,   tptIhaNotifyFaultCause }
+  STATUS      current
+  DESCRIPTION
+    "Notification: Used to inform the management station of changes in 
+     the intrinsic HA fault state on the device."
+  ::= { tpt-tpa-eventsV2 15 }
+
+
+-- Transparent HA state change notification
+
+tptTrhaNotifyDeviceID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the device sending this notification."
+  ::= { tpt-tpa-unkparams 86 }
+
+tptTrhaNotifyTimeStamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time of this notification (in seconds since January 1, 1970)."
+  ::= { tpt-tpa-unkparams 87 }
+
+tptTrhaNotifyNewState OBJECT-TYPE
+  SYNTAX      ConnectionState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The new transparent HA state of the device."
+  ::= { tpt-tpa-unkparams 88 }
+
+tptTrhaNotify NOTIFICATION-TYPE
+  OBJECTS     { tptTrhaNotifyDeviceID,     tptTrhaNotifyTimeStamp, 
+                tptTrhaNotifyNewState      }
+  STATUS      current
+  DESCRIPTION
+    "Notification: Used to inform the management station of changes in 
+     the transparent HA state on the device."
+  ::= { tpt-tpa-eventsV2 18 }
+
+
+-- Zero Power HA state change notification
+
+tptZphaNotifyDeviceID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the device sending this notification."
+  ::= { tpt-tpa-unkparams 161 }
+
+tptZphaNotifyTimeStamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time of this notification (in seconds since January 1, 1970)."
+  ::= { tpt-tpa-unkparams 162 }
+
+tptZphaNotifySegmentName OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..128))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The name of the segment whose ZPHA changed state, or an empty string to 
+     indicate the external ZPHA."
+  ::= { tpt-tpa-unkparams 163 }
+
+tptZphaNotifyNewState OBJECT-TYPE
+  SYNTAX      ZphaState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The new state of the ZPHA that has changed."
+  ::= { tpt-tpa-unkparams 164 }
+
+tptZphaNotify NOTIFICATION-TYPE
+  OBJECTS     { tptZphaNotifyDeviceID,     tptZphaNotifyTimeStamp, 
+                tptZphaNotifySegmentName,  tptZphaNotifyNewState      }
+  STATUS      current
+  DESCRIPTION
+    "Notification: Used to inform the management station of changes in 
+     a ZPHA state on the device."
+  ::= { tpt-tpa-eventsV2 24 }
+
+
+-- Performance protection state change notification
+
+tptPerfProtNotifyDeviceID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the device sending this notification."
+  ::= { tpt-tpa-unkparams 141 }
+
+tptPerfProtNotifyTimeStamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time of this notification (in seconds since January 1, 1970)."
+  ::= { tpt-tpa-unkparams 142 }
+
+tptPerfProtNotifyPhase OBJECT-TYPE
+  SYNTAX      PerfProtPhase
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Whether entering, remaining in, or exiting performance protection mode."
+  ::= { tpt-tpa-unkparams 143 }
+
+tptPerfProtNotifyPacketLoss OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The current packet loss rate per thousand (percent * 10).
+     When exiting performance protection mode, this value is 0."
+  ::= { tpt-tpa-unkparams 144 }
+
+tptPerfProtNotifyLossThreshold OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The current packet loss threshold per thousand (percent * 10)."
+  ::= { tpt-tpa-unkparams 145 }
+
+tptPerfProtNotifyDuration OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of seconds performance protection will be in force."
+  ::= { tpt-tpa-unkparams 146 }
+
+tptPerfProtNotifyMissedAlerts OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of alerts missed during the performance protection period.
+     When entering performance protection mode, this value is 0."
+  ::= { tpt-tpa-unkparams 147 }
+
+tptPerfProtNotify NOTIFICATION-TYPE
+  OBJECTS     { tptPerfProtNotifyDeviceID,      tptPerfProtNotifyTimeStamp, 
+                tptPerfProtNotifyPhase,         tptPerfProtNotifyPacketLoss, 
+                tptPerfProtNotifyLossThreshold, tptPerfProtNotifyDuration, 
+                tptPerfProtNotifyMissedAlerts   }
+  STATUS      current
+  DESCRIPTION
+    "Notification: Used to inform the management station of changes in 
+     performance protection on the device."
+  ::= { tpt-tpa-eventsV2 21 }
+
+
+END
+

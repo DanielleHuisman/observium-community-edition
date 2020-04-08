@@ -1,0 +1,3 @@
+ALTER TABLE `devices` CHANGE `uptime` `uptime` INT(11) UNSIGNED NULL DEFAULT NULL, ADD `last_rebooted` INT UNSIGNED NULL AFTER `uptime`;
+ALTER TABLE `devices` DROP `is_polling`, DROP `is_discovering`;
+DELETE FROM `entity_attribs` WHERE `attrib_type` IN ('imagingdrum_c_oid','imagingdrum_c_cap_oid','imagingdrum_m_oid','imagingdrum_m_cap_oid','imagingdrum_y_oid','imagingdrum_y_cap_oid','imagingdrum_k_oid','imagingdrum_k_cap_oid','wastebox_oid','transferroller_oid','transferroller_cap_oid','pagecount_oid','pagecounter','drum-c','drum-m','drum-y','drum-k','wastebox','transferroller', 'last_rebooted');

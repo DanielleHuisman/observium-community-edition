@@ -1,0 +1,507 @@
+PEPLINK-BALANCE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+	MODULE-IDENTITY, OBJECT-TYPE, Integer32, 
+	Counter32, Counter64, TimeTicks,
+	IpAddress, enterprises						FROM SNMPv2-SMI
+	TEXTUAL-CONVENTION							FROM SNMPv2-TC
+	MODULE-COMPLIANCE, OBJECT-GROUP				FROM SNMPv2-CONF;
+
+
+peplinkBalance MODULE-IDENTITY
+    LAST-UPDATED "200903050000Z"
+    ORGANIZATION "Peplink"
+    CONTACT-INFO
+		"Peplink
+		http://www.peplink.com
+		Support: http://www.peplink.com/contact/support/
+		Email: info@peplink.com
+		Twitter: @peplink
+		"
+    DESCRIPTION
+            "MIB module for Peplink Balance."
+    REVISION     "200903050000Z"
+    DESCRIPTION
+		"Revised this MIB to add more OID items."
+    REVISION     "200903050000Z"
+    DESCRIPTION
+		"Initial release."
+    ::= { enterprises peplink(23695) 1 }
+
+-- Local type define ----------------------------------------------------------
+
+TableIndex ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+            "A unique value, greater than zero, for each interface or
+            interface sub-layer in the managed system.  It is
+            recommended that values are assigned contiguously starting
+            from 1.  The value for each interface sub-layer must remain
+            constant at least from one re-initialization of the entity's
+            network management system to the next re-initialization."
+    SYNTAX       Integer32 (1..2147483647)
+
+ConnectionNum ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+            "A unique value, greater than zero, for each WAN connection
+			number."
+    SYNTAX       Integer32 (1..2147483647)
+
+NameString ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "80a"
+    STATUS       current
+    DESCRIPTION
+            "Balance name string."
+    SYNTAX       OCTET STRING (SIZE (0..80))
+
+PortSpeedType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+            "Describe the port speed and type."
+    SYNTAX       INTEGER {
+                     unknown(0),
+                     auto(1),
+                     fullDulplex10(2),
+                     halfDulplex10(3),
+                     fullDulplex100(4),
+                     halfDulplex100(5),
+                     fullDulplex1000(6),
+                     halfDulplex1000(7)
+                 }
+
+-- System status --------------------------------------------------------------
+
+balanceStatus OBJECT IDENTIFIER ::= { peplinkBalance 1 }
+
+-- System information
+
+balanceSystem OBJECT IDENTIFIER ::= { balanceStatus 1 }
+
+balFirmware OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"Balance firmware version."
+    ::= { balanceSystem 1 }
+
+balSerialNumber OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"Balance serial number."
+    ::= { balanceSystem 2 }
+
+balTime OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"Balance system time."
+    ::= { balanceSystem 3 }
+
+balUpTime OBJECT-TYPE
+    SYNTAX		TimeTicks
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"Balance up time (in hundredths of a second) since the 
+				system was last re-initialized."
+    ::= { balanceSystem 4 }
+
+balanceLan OBJECT IDENTIFIER ::= { balanceSystem 6 }
+
+balLanStatus OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"Balance LAN status (up/down)."
+    ::= { balanceLan 1 }
+
+balLanIp OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"Balance LAN IP address."
+    ::= { balanceLan 2 }
+
+balLanSubnetMask OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION	"Balance LAN sub-net mask."
+    ::= { balanceLan 3 }
+
+-- Link status of virtual WAN
+
+balLinkStatus OBJECT IDENTIFIER ::= { balanceStatus 2 }
+
+balLinkNumber OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION	"The number of network interfaces (regardless of their
+				current state) present on this system."
+    ::= { balLinkStatus 1 }
+
+linkTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF LinkStatusEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of link status."
+	::= { balLinkStatus 2 }
+
+linkEntry OBJECT-TYPE
+	SYNTAX		LinkStatusEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { linkConnNum }
+	::= { linkTable 1 }
+
+LinkStatusEntry ::=
+	SEQUENCE {
+		linkConnNum					ConnectionNum,
+		linkName					NameString,
+		linkStatus					NameString,
+		linkThroughputIn			Counter32,
+		linkThroughputOut			Counter32,
+		linkDataTransferred			Counter64
+	}
+
+linkConnNum OBJECT-TYPE
+	SYNTAX		ConnectionNum
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Virtual WAN index number (1-based, unique)."
+	::= { linkEntry 1 }
+
+linkName OBJECT-TYPE
+	SYNTAX		NameString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"Balance link status (connecting/connected/link down)."
+	::= { linkEntry 2 }
+
+linkStatus OBJECT-TYPE
+	SYNTAX		NameString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"Balance link status (connecting/connected/link down)."
+	::= { linkEntry 3 }
+
+linkThroughputIn OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of inbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being deliverable to a higher-layer protocol.  One
+				possible reason for discarding such a packet could be to
+				free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				balanceWanCounterDiscontinuityTime."
+	::= { linkEntry 4 }
+
+linkThroughputOut OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of outbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being transmitted.  One possible reason for discarding
+				such a packet could be to free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				balanceWanCounterDiscontinuityTime."
+	::= { linkEntry 5 }
+
+linkDataTransferred OBJECT-TYPE
+	SYNTAX		Counter64
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The numbe of bytes transferred through."
+	::= { linkEntry 6 }
+
+-- Link IP address of virtual WAN
+
+linkIpTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF LinkIpEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of link status."
+	::= { balLinkStatus 3 }
+
+linkIpEntry OBJECT-TYPE
+	SYNTAX		LinkIpEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { linkIpConnNum, linkIpIndex }
+	::= { linkIpTable 1 }
+
+LinkIpEntry ::=
+	SEQUENCE {
+		linkIpConnNum				ConnectionNum,
+		linkIpIndex					TableIndex,
+		linkIp						IpAddress
+	}
+
+linkIpConnNum OBJECT-TYPE
+	SYNTAX		ConnectionNum
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Virtual WAN index number."
+	::= { linkIpEntry 1 }
+
+linkIpIndex OBJECT-TYPE
+	SYNTAX		TableIndex
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Virtual WAN index number."
+	::= { linkIpEntry 2 }
+
+linkIp OBJECT-TYPE
+	SYNTAX		IpAddress
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"Balance link IP address list."
+	::= { linkIpEntry 3 }
+
+-- Physical WAN port usage
+
+wanUsageTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF WanUsageEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of interface entries."
+	::= { balanceStatus 3 }
+
+wanUsageEntry OBJECT-TYPE
+	SYNTAX		WanUsageEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { wanUsageIndex }
+	::= { wanUsageTable 1 }
+
+WanUsageEntry ::=
+	SEQUENCE {
+		wanUsageIndex				TableIndex,
+		wanUsageThroughputIn		Counter32,
+		wanUsageThroughputOut		Counter32,
+		wanUsageDataTransferred		Counter64
+	}
+
+wanUsageIndex OBJECT-TYPE
+	SYNTAX		TableIndex
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Physical WAN index number."
+	::= { wanUsageEntry 1 }
+
+wanUsageThroughputIn OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of inbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being deliverable to a higher-layer protocol.  One
+				possible reason for discarding such a packet could be to
+				free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				balanceWanCounterDiscontinuityTime."
+	::= { wanUsageEntry 2 }
+
+wanUsageThroughputOut OBJECT-TYPE
+	SYNTAX		Counter32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The number of outbound packets which were chosen to be
+				discarded even though no errors had been detected to prevent
+				their being transmitted.  One possible reason for discarding
+				such a packet could be to free up buffer space.
+				
+				Discontinuities in the value of this counter can occur at
+				re-initialization of the management system, and at other
+				times as indicated by the value of
+				balanceWanCounterDiscontinuityTime."
+	::= { wanUsageEntry 3 }
+
+wanUsageDataTransferred OBJECT-TYPE
+	SYNTAX		Counter64
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION	"The numbe of bytes transferred through."
+	::= { wanUsageEntry 4 }
+
+-- Maintenance ----------------------------------------------------------------
+balanceMaintenance OBJECT IDENTIFIER ::= { peplinkBalance 2 }
+
+balReboot OBJECT-TYPE
+    SYNTAX		NameString
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION	"Reboot the Balance. Write 'enable' to take effect."
+    ::= { balanceMaintenance 1 }
+
+-- LAN config -----------------------------------------------------------------
+balanceLanConfig OBJECT IDENTIFIER ::= { peplinkBalance 3 }
+
+portLanSpeedConfig OBJECT-TYPE
+	SYNTAX		PortSpeedType
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION	"Set Balance LAN port speed (Auto/10baseT-FD/
+				10baseT-HD/100baseTx-FD/100baseTx-HD/1000baseTx-FD/
+				1000baseTx-HD."
+	::= { balanceLanConfig 1 }
+
+portWanSpeedConfigTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF PortSpeedConfigEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"A list of interface entries."
+	::= { balanceLanConfig 2 }
+
+portWanSpeedConfigEntry OBJECT-TYPE
+	SYNTAX		PortSpeedConfigEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"An entry containing management information applicable to a
+				particular interface."
+	INDEX   { portWanSpeedConfigIndex }
+	::= { portWanSpeedConfigTable 1 }
+
+PortSpeedConfigEntry ::=
+	SEQUENCE {
+		portWanSpeedConfigIndex			TableIndex,
+		portWanSpeedConfig				PortSpeedType
+	}
+
+portWanSpeedConfigIndex OBJECT-TYPE
+	SYNTAX		TableIndex
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION	"Physical LAN/WAN port name."
+	::= { portWanSpeedConfigEntry 1 }
+
+portWanSpeedConfig OBJECT-TYPE
+	SYNTAX		PortSpeedType
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION	"Set Balance WAN port speed (Auto/10baseT-FD/
+				10baseT-HD/100baseTx-FD/100baseTx-HD/1000baseTx-FD/
+				1000baseTx-HD."
+	::= { portWanSpeedConfigEntry 2 }
+
+lanConfigIp OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION	"Set Balance LAN IP address."
+    ::= { balanceLanConfig 3 }
+
+lanConfigSubnetMask OBJECT-TYPE
+    SYNTAX		IpAddress
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION	"Set Balance LAN sub-net mask."
+    ::= { balanceLanConfig 4 }
+
+-- Compliance Statements ------------------------------------------------------
+
+balanceConformance OBJECT IDENTIFIER ::= { peplinkBalance 50 }
+
+balCompliances OBJECT IDENTIFIER ::= { balanceConformance 1 }
+balGroups      OBJECT IDENTIFIER ::= { balanceConformance 2 }
+
+balCompliance MODULE-COMPLIANCE
+	STATUS		current
+	DESCRIPTION	"Balance compliance groups."
+	MODULE		-- compliance to the containing MIB module
+
+	GROUP balSystemGroup
+		DESCRIPTION
+			"Balance system group."
+
+	GROUP balLinkGroup
+		DESCRIPTION
+			"Balance link group."
+
+	GROUP balWanGroup
+		DESCRIPTION
+			"Balance WAN group."
+
+	GROUP balSetGroup
+		DESCRIPTION
+			"Balance set group."
+	::= { balCompliances 1 }
+
+	balSystemGroup OBJECT-GROUP
+		OBJECTS {
+			balFirmware,
+			balSerialNumber,
+			balTime,
+			balUpTime,
+			balLanStatus,
+			balLanIp,
+			balLanSubnetMask
+		}
+		STATUS current
+		DESCRIPTION
+			"Balance system status group."
+		::= { balGroups 1 }
+
+	balLinkGroup OBJECT-GROUP
+		OBJECTS {
+			balLinkNumber,
+			linkName,
+			linkStatus,
+			linkIp,
+			linkThroughputIn,
+			linkThroughputOut,
+			linkDataTransferred
+		}
+		STATUS current
+		DESCRIPTION
+			"Balance system status group."
+		::= { balGroups 2 }
+
+	balWanGroup OBJECT-GROUP
+		OBJECTS {
+			wanUsageThroughputIn,
+			wanUsageThroughputOut,
+			wanUsageDataTransferred
+		}
+		STATUS current
+		DESCRIPTION
+			"Balance system status group."
+		::= { balGroups 3 }
+
+	balSetGroup OBJECT-GROUP
+		OBJECTS {
+			balReboot,
+			portWanSpeedConfig,
+			portLanSpeedConfig,
+			lanConfigIp,
+			lanConfigSubnetMask
+		}
+		STATUS current
+		DESCRIPTION
+			"Balance system status group."
+		::= { balGroups 4 }
+
+
+END

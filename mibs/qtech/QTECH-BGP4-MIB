@@ -1,0 +1,513 @@
+-- *****************************************************************
+-- QTECH-BGP4-MIB.mib:  QTECH BGP4 MIB file
+--
+-- April 2003, HuangChongbin
+--
+-- Copyright (c) 2003 by Qtech Networks Co.,Ltd.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+
+QTECH-BGP4-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, 
+        OBJECT-TYPE, 
+        Unsigned32,
+        Counter32
+              FROM SNMPv2-SMI
+        TruthValue,
+        TEXTUAL-CONVENTION
+              FROM SNMPv2-TC
+        InetAutonomousSystemNumber 	
+	            FROM INET-ADDRESS-MIB
+        bgpPeerEntry,
+        bgpPeerRemoteAddr
+              FROM BGP4-MIB
+        qtechMgmt
+              FROM QTECH-SMI;         
+
+-- BEGIN£ºMODULE-IDENTITY
+qtechBgp4MIB MODULE-IDENTITY    
+        LAST-UPDATED "200304010000Z"
+        ORGANIZATION "Qtech Networks Co.,Ltd."
+        CONTACT-INFO
+                " 
+                Tel: 4008-111-000 
+                
+                E-mail: service@qtech.com.cn"
+        DESCRIPTION
+                "This module defines qtech bgp4 mibs."
+        REVISION      "200304010000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { qtechMgmt 38}        
+-- END£ºMODULE-IDENTITY
+
+
+-- BEGIN£ºNoun definition 
+QtechBgpID ::= TEXTUAL-CONVENTION
+	DISPLAY-HINT "1d."
+	STATUS	     current
+	DESCRIPTION
+	    "The representation of a BGP Identifier.  The BGP
+	     Identifier should be represented in the OCTET STRING
+	     as with the first OCTET of the string containing
+	     the first OCTET of the BGP Identifier received or sent
+	     in the OPEN packet and so on.
+
+	     Even though the BGP Identifier is trending away from
+	     an IP address it is still displayed as if it was one,
+	     even when it would be an illegal IP address."
+	SYNTAX OCTET STRING(SIZE (4))                             
+-- END£ºNoun definition 
+
+
+-- BEGIN£ºqtechBgpBaseScalars
+
+qtechBgpBaseScalars
+	OBJECT IDENTIFIER ::= { qtechBgp4MIB 1 }
+
+-- BEGIN£ºqtechBgpSupportedCapabilities
+-- BGP Capabilities information
+
+qtechBgpSupportedCapabilities
+        OBJECT IDENTIFIER ::= { qtechBgpBaseScalars 1 }
+        
+qtechBgpCapabilitySupportAvailable OBJECT-TYPE
+	SYNTAX	   TruthValue
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "This value is TRUE if capability support is
+	     available."
+	::= { qtechBgpSupportedCapabilities 1 }
+	
+qtechBgpSupportedCapabilitiesTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF QtechBgpSupportedCapabilityEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Table of supported BGP-4 capabilities."
+	::= { qtechBgpSupportedCapabilities 2 }
+	
+qtechBgpSupportedCapabilitiesEntry OBJECT-TYPE
+	SYNTAX	   QtechBgpSupportedCapabilityEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Information about supported capabilities indexed
+	     by capability number."
+	INDEX {
+	    qtechBgpSupportedCapabilityCode
+	}
+	::= { qtechBgpSupportedCapabilitiesTable 1 }
+	
+QtechBgpSupportedCapabilityEntry ::= SEQUENCE {
+	qtechBgpSupportedCapabilityCode
+	    Unsigned32,
+	qtechBgpSupportedCapability
+	    TruthValue
+    }
+    
+qtechBgpSupportedCapabilityCode OBJECT-TYPE
+	SYNTAX	   Unsigned32 (0..255)
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "Index of supported capability.  The index directly
+	     corresponds with the BGP-4 Capability Advertisement
+	     Capability Code."
+	::= { qtechBgpSupportedCapabilitiesEntry 1 }
+	
+qtechBgpSupportedCapability OBJECT-TYPE
+	SYNTAX	   TruthValue
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "This value is True if this capability is supported,
+	     False otherwise."
+	::= { qtechBgpSupportedCapabilitiesEntry 2 }
+	
+-- END£ºqtechBgpSupportedCapabilities
+
+-- BEGIN£ºqtechBgpBaseScalarExtensions
+-- BGP Extensions
+
+qtechBgpBaseScalarExtensions
+        OBJECT IDENTIFIER ::= { qtechBgpBaseScalars 2 }
+        
+-- Base Scalar Route Reflection Extensions
+qtechBgpBaseScalarRouteReflectExts OBJECT IDENTIFIER ::=
+	{ qtechBgpBaseScalarExtensions 1 }
+
+qtechBgpRouteReflector OBJECT-TYPE
+	SYNTAX	    TruthValue
+	MAX-ACCESS  read-only
+	STATUS	    current
+	DESCRIPTION
+	    "This value is TRUE if this implementation supports the
+	     BGP Route Reflection Extension and is enabled as a
+	     route reflector.  If the BGP Route Reflection extension
+	     is not supported this value must be FALSE."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { qtechBgpBaseScalarRouteReflectExts 1 }
+
+qtechBgpClusterId OBJECT-TYPE
+	SYNTAX	    QtechBgpID
+	MAX-ACCESS  read-only 
+	STATUS	    current
+	DESCRIPTION
+	    "The configured Cluster-ID of the BGP Speaker.  This will
+	     default to the BGP Speaker's qtechBgpIdentifier if this
+	     speaker is functioning as a route reflector and an
+	     explicit Cluster-ID has not been configured.
+
+	     A value of 0.0.0.0 will be present if Route Reflection is
+	     not enabled."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { qtechBgpBaseScalarRouteReflectExts 2 }
+
+-- Base Scalar AS Confederation Extensions
+ 
+qtechBgpBaseScalarASConfedExts OBJECT IDENTIFIER ::=
+        { qtechBgpBaseScalarExtensions 2 }
+
+qtechBgpConfederationRouter OBJECT-TYPE
+	SYNTAX	   TruthValue
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "This value is TRUE if this implementation supports the
+	     BGP AS Confederations Extension and this router is
+	     configured to be in a confederation."
+	REFERENCE
+	    "RFC 3065 - Autonomous System Confederations for BGP"
+	::= { qtechBgpBaseScalarASConfedExts 1 }
+
+qtechBgpConfederationId OBJECT-TYPE
+	SYNTAX	   InetAutonomousSystemNumber
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The local Confederation Identification Number.
+	    
+	     This value will be zero (0) if this BGP Speaker is not
+	     a confederation router."
+	REFERENCE
+	    "RFC 3065 - Autonomous System Confederations for BGP"
+	    ::= { qtechBgpBaseScalarASConfedExts 2 }
+
+-- END£ºqtechBgpBaseScalarExtensions
+
+-- END£ºqtechBgpBaseScalars
+
+-- BEGIN£ºqtechBgpPeer
+
+qtechBgpPeer
+	OBJECT IDENTIFIER ::= { qtechBgp4MIB 2 }
+
+-- BEGIN£ºqtechBgpPeerPrefixInfoTable
+
+qtechBgpPeerPrefixInfoTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF QtechBgpPeerPrefixInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "This table contains prefix info with peers,
+                 One entry per BGP peer ."
+        ::= { qtechBgpPeer 1 }
+
+qtechBgpPeerPrefixInfoEntry  OBJECT-TYPE
+        SYNTAX     QtechBgpPeerPrefixInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Entry containing information about the
+                connection with a BGP peer."
+        AUGMENTS {
+	    bgpPeerEntry
+	}
+        ::= { qtechBgpPeerPrefixInfoTable 1 }
+
+QtechBgpPeerPrefixInfoEntry ::= SEQUENCE {
+        qtechBgpPeerPrefixLimit       Unsigned32,
+        qtechBgpPeerPrefixAccepted    Counter32,
+        qtechBgpPeerPrefixAdvertised  Counter32
+        }
+    
+qtechBgpPeerPrefixLimit  OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..4294967295)
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+                "Max number of route prefixes accepted on this 
+                 connection"
+        ::= { qtechBgpPeerPrefixInfoEntry 1 }
+        
+qtechBgpPeerPrefixAccepted  OBJECT-TYPE  
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+                "Number of Route prefixes received on this connnection,
+                 which are accepted after applying filters. Possible
+                 filters are route maps, prefix lists, distributed
+                 lists, etc."
+        ::= { qtechBgpPeerPrefixInfoEntry 2 } 
+
+qtechBgpPeerPrefixAdvertised  OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+                "Counter which gets incremented when a route prefix
+                 is advertised on this connection. This object is
+                 initialized to zero when the peer is configured or 
+                 the router is rebooted"
+        ::= { qtechBgpPeerPrefixInfoEntry 3 }
+
+-- END£ºqtechBgpPeerPrefixInfoTable
+
+-- BEGIN£ºqtechBgpPeerCapabilities
+
+qtechBgpPeerCapabilities
+	OBJECT IDENTIFIER ::= { qtechBgpPeer 2 }
+
+-- BEGIN£ºqtechBgpPeerCapsAnnouncedTable
+-- Announced Capabilities
+
+qtechBgpPeerCapsAnnouncedTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF QtechBgpPeerCapsAnnouncedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "This table contains the capabilities
+	     that are announced to a given peer."
+	::= { qtechBgpPeerCapabilities 1 }
+
+qtechBgpPeerCapsAnnouncedEntry OBJECT-TYPE
+	SYNTAX	   QtechBgpPeerCapsAnnouncedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "These entries are keyed by a BGP-4 peer remote
+	     address and the BGP Capability Code"
+	INDEX {
+	    bgpPeerRemoteAddr,
+	    qtechBgpPeerCapAnnouncedCode
+	}
+	::= { qtechBgpPeerCapsAnnouncedTable 1 }
+
+QtechBgpPeerCapsAnnouncedEntry ::= SEQUENCE {
+	qtechBgpPeerCapAnnouncedCode
+	    Unsigned32,
+	qtechBgpPeerCapAnnouncedValue
+	    OCTET STRING
+    }
+
+qtechBgpPeerCapAnnouncedCode OBJECT-TYPE
+	SYNTAX	   Unsigned32 (0..255)
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The BGP Capability Advertisement Capability Code."
+	::= { qtechBgpPeerCapsAnnouncedEntry 1 }
+
+qtechBgpPeerCapAnnouncedValue OBJECT-TYPE
+	SYNTAX	   OCTET STRING (SIZE(0..255))
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The value of the announced capability."
+	::= { qtechBgpPeerCapsAnnouncedEntry 2 }
+
+-- END£ºqtechBgpPeerCapsAnnouncedTable
+
+-- BEGIN£ºqtechBgpPeerCapsReceivedTable
+-- Received Capabilities
+
+qtechBgpPeerCapsReceivedTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF QtechBgpPeerCapsReceivedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "This table contains the capabilities
+	    that are supported for a given peer."
+	::= { qtechBgpPeerCapabilities 2 }
+
+qtechBgpPeerCapsReceivedEntry OBJECT-TYPE
+	SYNTAX	   QtechBgpPeerCapsReceivedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "These entries are keyed by a BGP-4 peer remote
+	    address and the BGP Capability Code"
+	INDEX {
+	    bgpPeerRemoteAddr,
+	    qtechBgpPeerCapReceivedCode
+	}
+	::= { qtechBgpPeerCapsReceivedTable 1 }
+
+QtechBgpPeerCapsReceivedEntry ::= SEQUENCE {
+	qtechBgpPeerCapReceivedCode
+	    Unsigned32,
+	qtechBgpPeerCapReceivedValue
+	    OCTET STRING
+    }
+
+qtechBgpPeerCapReceivedCode OBJECT-TYPE
+	SYNTAX	   Unsigned32 (0..255)
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The BGP Capability Advertisement Capability Code."
+	::= { qtechBgpPeerCapsReceivedEntry 1 }
+
+qtechBgpPeerCapReceivedValue OBJECT-TYPE
+	SYNTAX	   OCTET STRING (SIZE(0..255))
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The value of the announced capability."
+	::= { qtechBgpPeerCapsReceivedEntry 3 }
+
+-- END£ºqtechBgpPeerCapsReceivedTable
+	
+-- END£ºqtechBgpPeerCapabilities
+
+-- BEGIN£ºqtechBgpPeerExtensions
+
+qtechBgpPeerExtensions
+	OBJECT IDENTIFIER ::= { qtechBgpPeer 3 }
+
+-- BEGIN£º
+-- Peer Route Reflection Extensions
+
+qtechBgpPeerRouteReflectionExts
+	OBJECT IDENTIFIER ::= { qtechBgpPeerExtensions 1 }
+
+qtechBgpPeerReflectorClientTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF QtechBgpPeerReflectorClientEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Table of route reflection client settings on a per-peer
+	     basis."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { qtechBgpPeerRouteReflectionExts 1 }
+
+qtechBgpPeerReflectorClientEntry OBJECT-TYPE
+	SYNTAX	   QtechBgpPeerReflectorClientEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Entry containing data on a per-peer basis on whether
+	     the peer is configured as a route reflector client."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	AUGMENTS {
+	    bgpPeerEntry
+	}
+	::= { qtechBgpPeerReflectorClientTable 1 }
+
+QtechBgpPeerReflectorClientEntry ::= SEQUENCE {
+	qtechBgpPeerReflectorClient
+	    INTEGER
+    }
+
+qtechBgpPeerReflectorClient OBJECT-TYPE
+	SYNTAX	  INTEGER {
+	    nonClient(0),
+	    client(1),
+	    meshedClient(2)
+	}
+	MAX-ACCESS  read-only
+	STATUS	    current
+	DESCRIPTION
+	    "This value indicates whether the given peer is a
+	     reflector client of this router, or not.  A value of
+	     nonClient indicates that this peer is not a reflector
+	     client.  A value of client indicates that this peer is a
+	     reflector client that is not fully meshed with other
+	     reflector clients.	 A value of meshedClient indicates
+	     that the peer is a reflector client and is fully meshed
+	     with all other reflector clients.
+
+	     This value must be nonClient (0) for BGP external peers."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { qtechBgpPeerReflectorClientEntry 1 }
+
+-- Peer AS Confederations Extensions
+
+qtechBgpPeerASConfederationExts
+	OBJECT IDENTIFIER ::= { qtechBgpPeerExtensions 2 }
+
+qtechBgpPeerConfedMemberTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF QtechBgpPeerConfedMemberEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Table of confederation member settings on a per-peer
+	     basis."
+	REFERENCE
+	    "RFC 3065 - BGP Confederations"
+	::= { qtechBgpPeerASConfederationExts 1 }
+
+qtechBgpPeerConfedMemberEntry OBJECT-TYPE
+	SYNTAX	   QtechBgpPeerConfedMemberEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Entry containing data on a per-peer basis on whether
+	     the peer is configured as a BGP confederation member."
+	REFERENCE
+	    "RFC 3065 - BGP Confederations"
+	AUGMENTS {
+	    bgpPeerEntry
+	}
+	::= { qtechBgpPeerConfedMemberTable 1 }
+
+QtechBgpPeerConfedMemberEntry ::= SEQUENCE {
+	qtechBgpPeerConfedMember
+	    TruthValue
+    }
+    
+qtechBgpPeerConfedMember OBJECT-TYPE
+	SYNTAX	    TruthValue
+	MAX-ACCESS  read-only
+	STATUS	    current
+	DESCRIPTION
+	    "This value indicates whether the given peer is in our
+	     confederation or not."
+	REFERENCE
+	    "RFC 3065 - BGP Confederations"
+	::= { qtechBgpPeerConfedMemberEntry 1 }
+	
+-- END£ºqtechBgpPeerExtensions	 
+	
+-- END£ºqtechBgpPeer
+
+-- BEGIN£ºConformance Information
+
+qtechBgpConformance
+	OBJECT IDENTIFIER ::= { qtechBgp4MIB 3 }
+
+qtechBgpMIBCompliances OBJECT IDENTIFIER ::=
+	{ qtechBgpConformance 1 }
+qtechBgpMIBGroups	OBJECT IDENTIFIER ::=
+	{ qtechBgpConformance 2 }
+
+-- END£ºConformance Information
+
+END
+
+
+	
+
+
+

@@ -1,0 +1,1281 @@
+ELTEX-IPSLA-MIB DEFINITIONS ::= BEGIN
+
+-- Title:      ELTEX IP Service Level Agreements Extension Private
+-- Version:    1.0
+-- Date:       21 Apr 2015
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, IpAddress,
+    Counter32                                       FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, TruthValue, RowStatus,
+    DisplayString, TimeStamp                        FROM SNMPv2-TC
+    InterfaceIndexOrZero                            FROM IF-MIB
+    eltexLtd                                        FROM ELTEX-SMI-ACTUAL;
+
+eltexIpSlaMIB MODULE-IDENTITY
+    LAST-UPDATED "201505250000Z"
+    ORGANIZATION "Eltex Ltd."
+    CONTACT-INFO
+        "http://www.eltex.nsk.ru"
+    DESCRIPTION
+        "This module defines a MIB for IP Service Level
+        Agreements Application. IP SLA operations allows
+        to analyze IP service levels by using active
+        traffic monitoring.
+
+        Each of IP SLA operation is described by protocol
+        it uses and type of performance metric.
+
+        IP SLA Objects
+        |--- Application Group
+        |    |--- Responder Administration
+        |         |--- UDP Jitter Responder Defenitions
+        |
+        |--- Administration Group
+        |    |--- Overall Control Administration
+        |    |--- ICMP Echo Administration Definitions
+        |    |--- UDP Jitter Administration Definitions
+        |
+        |--- Statistics Collection Group
+        |    |--- Overall Control Statistics
+        |    |--- ICMP Echo Statistics Definitions
+        |    |--- UDP Jitter Statistics Definitions
+        |
+        |--- Schedule Configuration
+        |
+        |--- History Collection Group
+
+        IP SLA Notifications
+        |
+        "
+    ::= { eltexLtd 32 }
+
+-- ----------------------------------------
+-- IP Service Level Agreements MIB Objects
+-- ----------------------------------------
+
+eltexIpSlaObjects  OBJECT IDENTIFIER
+    ::= { eltexIpSlaMIB 1 }
+
+-- IP Service Level Agreements Object Groups
+
+
+eltexIpSlaAppl  OBJECT IDENTIFIER
+    ::= { eltexIpSlaObjects 1 }
+
+eltexIpSlaAdmin  OBJECT IDENTIFIER
+    ::= { eltexIpSlaObjects 2 }
+
+eltexIpSlaStats  OBJECT IDENTIFIER
+    ::= { eltexIpSlaObjects 3 }
+
+eltexIpSlaSchedule  OBJECT IDENTIFIER
+    ::= { eltexIpSlaObjects 4 }
+
+--eltexIpSlaHistory  OBJECT IDENTIFIER
+--    ::= { eltexIpSlaObjects 5 }
+
+-- Operation type textual convention
+
+EltexIpSlaOperationType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION
+        "Specifies the type of IP SLA operation."
+    SYNTAX          INTEGER  {
+                        icmp-echo       (1),
+                        udp-jitter      (2)
+-- Reserved types
+--                      udp-echo        (3),
+--                      path-jitter     (4),
+--                      path-echo       (5),
+--                      ethernet-jitter (6),
+--                      ethernet-echo   (7),
+--                      tcp-connect     (8),
+--                      dhcp            (9),
+--                      dns             (10),
+--                      ftp             (11),
+--                      http            (12)
+                    }
+
+-- Operation status textual convention
+
+EltexIpSlaOperationStatus ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION
+        "Specifies the status of IP SLA operation."
+    SYNTAX          INTEGER  {
+                        active          (1),
+                        inactive        (2)
+                    }
+
+-- Responder control
+
+eltexIpSlaApplResponder OBJECT IDENTIFIER
+    ::= { eltexIpSlaAppl 13 }
+
+eltexIpSlaApplResponderUdpJitterPort OBJECT-TYPE
+    SYNTAX          INTEGER (0..65535)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Defines UDP port number which is listened by IP SLA responder
+        for UDP Jitter operations"
+    DEFVAL          { 0 }
+    ::= { eltexIpSlaApplResponder 1 }
+
+-- Overall Control Administration Table
+
+eltexIpSlaAdminCtrlTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexIpSlaAdminCtrlEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A table of IP SLA overall control administration definitions.
+
+        The IP SLA control is located in multiple tables. This
+        first table defines the most common SLA configuration. The
+        following tables contain objects which configure scheduling,
+        information gathering, and notification generation. All of
+        these tables using this table's index as their own."
+    ::= { eltexIpSlaAdmin 1 }
+
+eltexIpSlaAdminCtrlEntry OBJECT-TYPE
+    SYNTAX          EltexIpSlaAdminCtrlEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A row entry representing a single IP SLA operation."
+    INDEX           { eltexIpSlaAdminCtrlIndex }
+    ::= { eltexIpSlaAdminCtrlTable 1 }
+
+EltexIpSlaAdminCtrlEntry ::= SEQUENCE {
+        eltexIpSlaAdminCtrlIndex              INTEGER,
+        eltexIpSlaAdminCtrlType               EltexIpSlaOperationType,
+        eltexIpSlaAdminCtrlStatus             EltexIpSlaOperationStatus,
+        eltexIpSlaAdminCtrlFrequency          INTEGER,
+        eltexIpSlaAdminCtrlTag                DisplayString,
+        eltexIpSlaAdminCtrlOwner              DisplayString,
+        eltexIpSlaAdminCtrlRowStatus          RowStatus
+}
+
+eltexIpSlaAdminCtrlIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This field specifies index for all IP SLA tables.
+        Rows with identic index in each of following tables
+        describes the same IP SLA operation as this table does."
+    ::= { eltexIpSlaAdminCtrlEntry 1 }
+
+eltexIpSlaAdminCtrlType OBJECT-TYPE
+    SYNTAX          EltexIpSlaOperationType
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This field specifies type of IP SLA operation."
+    ::= { eltexIpSlaAdminCtrlEntry 2 }
+
+eltexIpSlaAdminCtrlStatus OBJECT-TYPE
+    SYNTAX          EltexIpSlaOperationStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This field specifies status of IP SLA operation."
+    ::= { eltexIpSlaAdminCtrlEntry 3 }
+
+eltexIpSlaAdminCtrlFrequency OBJECT-TYPE
+    SYNTAX          INTEGER (0..604800)
+    UNITS           "seconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Specifies the duration between initiating each IP SLA
+        operation.
+
+        This object cannot be set to a value which would be a
+        shorter duration than operation timeout."
+    DEFVAL          { 60 }
+    ::= { eltexIpSlaAdminCtrlEntry 4 }
+
+eltexIpSlaAdminCtrlTag OBJECT-TYPE
+    SYNTAX          DisplayString (SIZE  (0..128))
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The field provides description tag for IP SLA operation."
+    DEFVAL          { "" }
+    ::= { eltexIpSlaAdminCtrlEntry 5 }
+
+eltexIpSlaAdminCtrlOwner OBJECT-TYPE
+    SYNTAX          DisplayString (SIZE  (0..32))
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The field describes owner of the IP SLA operation."
+    DEFVAL          { "" }
+    ::= { eltexIpSlaAdminCtrlEntry 6 }
+
+eltexIpSlaAdminCtrlRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The status of the MIB entry."
+    ::= { eltexIpSlaAdminCtrlEntry 7 }
+
+-- ICMP Echo Administration Table
+
+eltexIpSlaAdminIcmpEchoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexIpSlaAdminIcmpEchoEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A table of ICMP Echo operation definitions."
+    ::= { eltexIpSlaAdmin 2 }
+
+eltexIpSlaAdminIcmpEchoEntry OBJECT-TYPE
+    SYNTAX          EltexIpSlaAdminIcmpEchoEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A row entry representing a single ICMP Echo operation."
+    INDEX           { eltexIpSlaAdminIcmpEchoIndex }
+    ::= { eltexIpSlaAdminIcmpEchoTable 1 }
+
+EltexIpSlaAdminIcmpEchoEntry ::= SEQUENCE {
+        eltexIpSlaAdminIcmpEchoIndex              INTEGER,
+        eltexIpSlaAdminIcmpEchoTargetAddress      IpAddress,
+        eltexIpSlaAdminIcmpEchoSourceAddress      IpAddress,
+        eltexIpSlaAdminIcmpEchoSourceInterface    InterfaceIndexOrZero,
+        eltexIpSlaAdminIcmpEchoTimeOut            INTEGER,
+        eltexIpSlaAdminIcmpEchoReqDataSize        INTEGER,
+        eltexIpSlaAdminIcmpEchoTOS                INTEGER,
+        eltexIpSlaAdminIcmpEchoRowStatus          RowStatus
+}
+
+eltexIpSlaAdminIcmpEchoIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This field specifies index for ICMP Echo operation.
+        Index of each row must match the index in eltexIpSlaAdminCtrl table."
+    ::= { eltexIpSlaAdminIcmpEchoEntry 1 }
+
+eltexIpSlaAdminIcmpEchoTargetAddress OBJECT-TYPE
+    SYNTAX          IpAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A string which specifies IP address of the destination."
+    ::= { eltexIpSlaAdminIcmpEchoEntry 2 }
+
+eltexIpSlaAdminIcmpEchoSourceAddress OBJECT-TYPE
+    SYNTAX          IpAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A string which specifies the source IP address."
+    ::= { eltexIpSlaAdminIcmpEchoEntry 3 }
+
+eltexIpSlaAdminIcmpEchoSourceInterface OBJECT-TYPE
+    SYNTAX          InterfaceIndexOrZero
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A string which specifies the source interface."
+    ::= { eltexIpSlaAdminIcmpEchoEntry 4 }
+
+eltexIpSlaAdminIcmpEchoTimeOut OBJECT-TYPE
+    SYNTAX          INTEGER (0..3600000)
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Specifies the duration to wait for a IP SLA operation
+        completion.
+
+        For connection oriented protocols, this may cause the
+        connection to be closed by the operation.  Once closed, it
+        will be assumed that the connection reestablishment
+        will be performed.  To prevent unwanted closure of
+        connections, be sure to set this value to a realistic
+        connection timeout."
+    DEFVAL          { 1000 }
+    ::= { eltexIpSlaAdminIcmpEchoEntry 5 }
+
+eltexIpSlaAdminIcmpEchoReqDataSize OBJECT-TYPE
+    SYNTAX          INTEGER (0..1432)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object represents the number of octets to be
+        placed into packages send during IP SLA operation"
+    DEFVAL          { 56 }
+    ::= { eltexIpSlaAdminIcmpEchoEntry 6 }
+
+eltexIpSlaAdminIcmpEchoTOS OBJECT-TYPE
+    SYNTAX          INTEGER (0..255)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object represents the type of service octet in an
+        IP header."
+    REFERENCE
+        "Refer to the following documents for TOS definition.
+               RFC791/1349  for IPv4, IPv6, draft-ietf-diffserv-header-02.txt"
+    DEFVAL          { 0 }
+    ::= { eltexIpSlaAdminIcmpEchoEntry 7 }
+
+eltexIpSlaAdminIcmpEchoRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The status of the MIB entry."
+    ::= { eltexIpSlaAdminIcmpEchoEntry 8 }
+
+-- Operation status textual convention
+
+EltexIpSlaStatsOperStatus ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION
+        "Specifies the status of IP SLA operation."
+    SYNTAX          INTEGER  {
+                        unknown     (0),
+                        ok          (1),
+                        failed      (2)
+                    }
+
+-- UDP Jitter Administration Table
+
+eltexIpSlaAdminUdpJitterTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexIpSlaAdminUdpJitterEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A table of UDP Jitter operation definitions."
+    ::= { eltexIpSlaAdmin 3 }
+
+eltexIpSlaAdminUdpJitterEntry OBJECT-TYPE
+    SYNTAX          EltexIpSlaAdminUdpJitterEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A row entry representing a single UDP Jitter operation."
+    INDEX           { eltexIpSlaAdminUdpJitterIndex }
+    ::= { eltexIpSlaAdminUdpJitterTable 1 }
+
+EltexIpSlaAdminUdpJitterEntry ::= SEQUENCE {
+        eltexIpSlaAdminUdpJitterIndex             INTEGER,
+        eltexIpSlaAdminUdpJitterTargetAddress     IpAddress,
+        eltexIpSlaAdminUdpJitterTargetPort        INTEGER,
+        eltexIpSlaAdminUdpJitterSourceAddress     IpAddress,
+        eltexIpSlaAdminUdpJitterSourcePort        INTEGER,
+        eltexIpSlaAdminUdpJitterSourceInterface   InterfaceIndexOrZero,
+        eltexIpSlaAdminUdpJitterInterval          INTEGER,
+        eltexIpSlaAdminUdpJitterNumPackets        INTEGER,
+        eltexIpSlaAdminUdpJitterTimeOut           INTEGER,
+        eltexIpSlaAdminUdpJitterReqDataSize       INTEGER,
+        eltexIpSlaAdminUdpJitterTOS               INTEGER,
+        eltexIpSlaAdminUdpJitterRowStatus         RowStatus
+}
+
+eltexIpSlaAdminUdpJitterIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This field specifies index for UdpJitter operation.
+        Index of each row must match the index in eltexIpSlaAdminCtrl table."
+    ::= { eltexIpSlaAdminUdpJitterEntry 1 }
+
+eltexIpSlaAdminUdpJitterTargetAddress OBJECT-TYPE
+    SYNTAX          IpAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A string which specifies IP address of the destination."
+    ::= { eltexIpSlaAdminUdpJitterEntry 2 }
+
+eltexIpSlaAdminUdpJitterTargetPort OBJECT-TYPE
+    SYNTAX          INTEGER (0..65535)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A number of destination UDP port."
+    ::= { eltexIpSlaAdminUdpJitterEntry 3 }
+
+eltexIpSlaAdminUdpJitterSourceAddress OBJECT-TYPE
+    SYNTAX          IpAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A string which specifies the source IP address."
+    ::= { eltexIpSlaAdminUdpJitterEntry 4 }
+
+eltexIpSlaAdminUdpJitterSourcePort OBJECT-TYPE
+    SYNTAX          INTEGER (0..65535)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A number of source UDP port."
+    ::= { eltexIpSlaAdminUdpJitterEntry 5 }
+
+eltexIpSlaAdminUdpJitterSourceInterface OBJECT-TYPE
+    SYNTAX          InterfaceIndexOrZero
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A string which specifies the source interface."
+    DEFVAL          { 0 }
+    ::= { eltexIpSlaAdminUdpJitterEntry 6 }
+
+eltexIpSlaAdminUdpJitterInterval OBJECT-TYPE
+    SYNTAX          INTEGER (0..60000)
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This value represents the inter-packet delay between packets
+        and is in milliseconds. This value is currently used for
+        Jitter probe. This object is applicable to jitter probe only."
+    DEFVAL          { 20 }
+    ::= { eltexIpSlaAdminUdpJitterEntry 7 }
+
+eltexIpSlaAdminUdpJitterNumPackets OBJECT-TYPE
+    SYNTAX          INTEGER (0..1000)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This value represents the number of packets that need to be
+        transmitted. This value is currently used for Jitter probe.
+        This object is applicable to jitter probe only."
+    DEFVAL          { 10 }
+    ::= { eltexIpSlaAdminUdpJitterEntry 8 }
+
+eltexIpSlaAdminUdpJitterTimeOut OBJECT-TYPE
+    SYNTAX          INTEGER (0..3600000)
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Specifies the duration to wait for a IP SLA operation
+        completion.
+
+        For connection oriented protocols, this may cause the
+        connection to be closed by the operation.  Once closed, it
+        will be assumed that the connection reestablishment
+        will be performed.  To prevent unwanted closure of
+        connections, be sure to set this value to a realistic
+        connection timeout."
+    DEFVAL          { 1000 }
+    ::= { eltexIpSlaAdminUdpJitterEntry 9 }
+
+eltexIpSlaAdminUdpJitterReqDataSize OBJECT-TYPE
+    SYNTAX          INTEGER (0..1432)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object represents the number of octets to be
+        placed into packages send during IP SLA operation"
+    DEFVAL          { 30 }
+    ::= { eltexIpSlaAdminUdpJitterEntry 10 }
+
+eltexIpSlaAdminUdpJitterTOS OBJECT-TYPE
+    SYNTAX          INTEGER (0..255)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object represents the type of service octet in an
+        IP header."
+    REFERENCE
+        "Refer to the following documents for TOS definition.
+               RFC791/1349  for IPv4, IPv6, draft-ietf-diffserv-header-02.txt"
+    DEFVAL          { 0 }
+    ::= { eltexIpSlaAdminUdpJitterEntry 11 }
+
+eltexIpSlaAdminUdpJitterRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The status of the MIB entry."
+    ::= { eltexIpSlaAdminUdpJitterEntry 12 }
+
+-- ICMP Echo Operation Statictics Table
+
+eltexIpSlaStatsIcmpEchoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexIpSlaStatsIcmpEchoEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The database of ICMP Echo operation statistics."
+    ::= { eltexIpSlaStats 2 }
+
+eltexIpSlaStatsIcmpEchoEntry OBJECT-TYPE
+    SYNTAX          EltexIpSlaStatsIcmpEchoEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A row entry representing an IP SLA operation."
+    INDEX           { eltexIpSlaStatsIcmpEchoIndex }
+    ::= { eltexIpSlaStatsIcmpEchoTable 1 }
+
+EltexIpSlaStatsIcmpEchoEntry ::= SEQUENCE {
+        eltexIpSlaStatsIcmpEchoIndex          INTEGER,
+        eltexIpSlaStatsIcmpEchoLastStatus     EltexIpSlaStatsOperStatus,
+        eltexIpSlaStatsIcmpEchoLastLatency    INTEGER,
+        eltexIpSlaStatsIcmpEchoMinLatency     INTEGER,
+        eltexIpSlaStatsIcmpEchoAvgLatency     INTEGER,
+        eltexIpSlaStatsIcmpEchoMaxLatency     INTEGER,
+        eltexIpSlaStatsIcmpEchoOperationsCtr  Counter32,
+        eltexIpSlaStatsIcmpEchoSuccessesCtr   Counter32,
+        eltexIpSlaStatsIcmpEchoFailuresCtr    Counter32,
+        eltexIpSlaStatsIcmpEchoTimeoutCtr     Counter32,
+        eltexIpSlaStatsIcmpEchoUnreachNetCtr  Counter32,
+        eltexIpSlaStatsIcmpEchoUnreachHostCtr Counter32,
+        eltexIpSlaStatsIcmpEchoUnreachProtCtr Counter32,
+        eltexIpSlaStatsIcmpEchoExTimeTransCtr Counter32,
+        eltexIpSlaStatsIcmpEchoExTimeReassCtr Counter32,
+        eltexIpSlaStatsIcmpEchoUnableSendCtr  Counter32,
+        eltexIpSlaStatsIcmpEchoBadReplyCtr    Counter32
+}
+
+eltexIpSlaStatsIcmpEchoIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The index of ICMP Echo statistics row. It matches the indexes
+        of operations in the Overall Control Group tables."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 1 }
+
+eltexIpSlaStatsIcmpEchoLastStatus OBJECT-TYPE
+    SYNTAX          EltexIpSlaStatsOperStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The string contains a status of the last completed operation."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 2 }
+
+eltexIpSlaStatsIcmpEchoLastLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "A latency measured during the last completed operation."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 3 }
+
+eltexIpSlaStatsIcmpEchoMinLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest latency measured during all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 4 }
+
+eltexIpSlaStatsIcmpEchoAvgLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average of latencies measured during all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 5 }
+
+eltexIpSlaStatsIcmpEchoMaxLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The highest of latencies measured during all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 6 }
+
+eltexIpSlaStatsIcmpEchoOperationsCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of all operations which were tried
+        to perform."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 7 }
+
+eltexIpSlaStatsIcmpEchoSuccessesCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of successfully completed operations."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 8 }
+
+eltexIpSlaStatsIcmpEchoFailuresCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of unsuccessfully completed operations."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 9 }
+
+eltexIpSlaStatsIcmpEchoTimeoutCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        by timeout."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 10 }
+
+eltexIpSlaStatsIcmpEchoUnreachNetCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to unreachable net."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 11 }
+
+eltexIpSlaStatsIcmpEchoUnreachHostCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to unreachable host."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 12 }
+
+eltexIpSlaStatsIcmpEchoUnreachProtCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to unreachable protocol."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 13 }
+
+eltexIpSlaStatsIcmpEchoExTimeTransCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to exceeded TTL in transit."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 14 }
+
+eltexIpSlaStatsIcmpEchoExTimeReassCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to exceeded time of fragment reassembly."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 15 }
+
+eltexIpSlaStatsIcmpEchoUnableSendCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        while sending a request packet."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 16 }
+
+eltexIpSlaStatsIcmpEchoBadReplyCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to bad reply data."
+    ::= { eltexIpSlaStatsIcmpEchoEntry 17 }
+
+-- UDP Jitter Operation Statictics Table
+
+eltexIpSlaStatsUdpJitterTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexIpSlaStatsUdpJitterEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The database of UDP Jitter operation statistics."
+    ::= { eltexIpSlaStats 3 }
+
+eltexIpSlaStatsUdpJitterEntry OBJECT-TYPE
+    SYNTAX          EltexIpSlaStatsUdpJitterEntry
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "A row entry representing an IP SLA operation."
+    INDEX           { eltexIpSlaStatsUdpJitterIndex }
+    ::= { eltexIpSlaStatsUdpJitterTable 1 }
+
+EltexIpSlaStatsUdpJitterEntry ::= SEQUENCE {
+        eltexIpSlaStatsUdpJitterIndex             INTEGER,
+        eltexIpSlaStatsUdpJitterLastStatus        EltexIpSlaStatsOperStatus,
+        eltexIpSlaStatsUdpJitterLastLatency       INTEGER,
+        eltexIpSlaStatsUdpJitterNumLatency        INTEGER,
+        eltexIpSlaStatsUdpJitterSumLatency        INTEGER,
+        eltexIpSlaStatsUdpJitterMinLatency        INTEGER,
+        eltexIpSlaStatsUdpJitterAvgLatency        INTEGER,
+        eltexIpSlaStatsUdpJitterMaxLatency        INTEGER,
+        eltexIpSlaStatsUdpJitterNumSDLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterSumSDLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterMinSDLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterAvgSDLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterMaxSDLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterNumDSLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterSumDSLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterMinDSLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterAvgDSLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterMaxDSLatency      INTEGER,
+        eltexIpSlaStatsUdpJitterNumSDPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterSumSDPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMinSDPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterAvgSDPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMaxSDPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterNumDSPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterSumDSPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMinDSPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterAvgDSPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMaxDSPosJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterNumSDNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterSumSDNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMinSDNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterAvgSDNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMaxSDNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterNumDSNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterSumDSNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMinDSNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterAvgDSNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterMaxDSNegJitter    INTEGER,
+        eltexIpSlaStatsUdpJitterOperationsCtr     Counter32,
+        eltexIpSlaStatsUdpJitterSuccessesCtr      Counter32,
+        eltexIpSlaStatsUdpJitterFailuresCtr       Counter32,
+        eltexIpSlaStatsUdpJitterTimeoutCtr        Counter32,
+        eltexIpSlaStatsUdpJitterUnreachNetCtr     Counter32,
+        eltexIpSlaStatsUdpJitterUnreachHostCtr    Counter32,
+        eltexIpSlaStatsUdpJitterUnreachPortCtr    Counter32,
+        eltexIpSlaStatsUdpJitterUnreachProtCtr    Counter32,
+        eltexIpSlaStatsUdpJitterExTimeTransCtr    Counter32,
+        eltexIpSlaStatsUdpJitterExTimeReassCtr    Counter32,
+        eltexIpSlaStatsUdpJitterUnableSendCtr     Counter32,
+        eltexIpSlaStatsUdpJitterBadReplyCtr       Counter32,
+        eltexIpSlaStatsUdpJitterPacketsOOSCtr     Counter32
+}
+
+eltexIpSlaStatsUdpJitterIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The index of UDP Jitter statistics row. It matches the indexes
+        of operations in the Overall Control Group tables."
+    ::= { eltexIpSlaStatsUdpJitterEntry 1 }
+
+eltexIpSlaStatsUdpJitterLastStatus OBJECT-TYPE
+    SYNTAX          EltexIpSlaStatsOperStatus
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The string contains a status of the last completed operation."
+    ::= { eltexIpSlaStatsUdpJitterEntry 2 }
+
+eltexIpSlaStatsUdpJitterLastLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "A two-way latency measured during the last completed operation."
+    ::= { eltexIpSlaStatsUdpJitterEntry 3 }
+
+eltexIpSlaStatsUdpJitterNumLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of two-way latencies measured during  all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 4 }
+
+eltexIpSlaStatsUdpJitterSumLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The sum of two-way latencies measured during  all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 5 }
+
+eltexIpSlaStatsUdpJitterMinLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest two-way latency measured during all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 6 }
+
+eltexIpSlaStatsUdpJitterAvgLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average of two-way latencies measured during all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 7 }
+
+eltexIpSlaStatsUdpJitterMaxLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The highest of two-way latencies measured during all successfully
+        completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 8 }
+
+eltexIpSlaStatsUdpJitterNumSDLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of one-way source-to-destination latencies measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 9 }
+
+eltexIpSlaStatsUdpJitterSumSDLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The sum of one-way source-to-destination latencies measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 10 }
+
+eltexIpSlaStatsUdpJitterMinSDLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest one-way source-to-destination latency measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 11 }
+
+eltexIpSlaStatsUdpJitterAvgSDLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average one-way source-to-destination latency measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 12 }
+
+eltexIpSlaStatsUdpJitterMaxSDLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The maximum one-way source-to-destination latency measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 13 }
+
+eltexIpSlaStatsUdpJitterNumDSLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of one-way destination-to-source latencies measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 14 }
+
+eltexIpSlaStatsUdpJitterSumDSLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The sum of one-way destination-to-source latencies measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 15 }
+
+eltexIpSlaStatsUdpJitterMinDSLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest one-way destination-to-source latency measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 16 }
+
+eltexIpSlaStatsUdpJitterAvgDSLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average one-way destination-to-source latency measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 17 }
+
+eltexIpSlaStatsUdpJitterMaxDSLatency OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The maximum one-way destination-to-source latency measured
+        during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 18 }
+
+eltexIpSlaStatsUdpJitterNumSDPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of one-way source-to-destination positive jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 19 }
+
+eltexIpSlaStatsUdpJitterSumSDPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The sum of one-way source-to-destination positive jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 20 }
+
+eltexIpSlaStatsUdpJitterMinSDPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest one-way source-to-destination positive jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 21 }
+
+eltexIpSlaStatsUdpJitterAvgSDPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average one-way source-to-destination positive jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 22 }
+
+eltexIpSlaStatsUdpJitterMaxSDPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The maximum one-way source-to-destination positive jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 23 }
+
+eltexIpSlaStatsUdpJitterNumDSPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of one-way destination-to-source positive jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 24 }
+
+eltexIpSlaStatsUdpJitterSumDSPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The sum of one-way destination-to-source positive jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 25 }
+
+eltexIpSlaStatsUdpJitterMinDSPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest one-way destination-to-source positive jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 26 }
+
+eltexIpSlaStatsUdpJitterAvgDSPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average one-way destination-to-source positive jitter
+        measured  during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 27 }
+
+eltexIpSlaStatsUdpJitterMaxDSPosJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The maximum one-way destination-to-source positive jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 28 }
+
+eltexIpSlaStatsUdpJitterNumSDNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of one-way source-to-destination negative jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 29 }
+
+eltexIpSlaStatsUdpJitterSumSDNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The sum of one-way source-to-destination negative jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 30 }
+
+eltexIpSlaStatsUdpJitterMinSDNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest one-way source-to-destination negative jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 31 }
+
+eltexIpSlaStatsUdpJitterAvgSDNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average one-way source-to-destination negative jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 32 }
+
+eltexIpSlaStatsUdpJitterMaxSDNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The maximum one-way source-to-destination negative jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 33 }
+
+eltexIpSlaStatsUdpJitterNumDSNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of one-way destination-to-source negative jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 34 }
+
+eltexIpSlaStatsUdpJitterSumDSNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The sum oflowest one-way destination-to-source negative jitters
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 35 }
+
+eltexIpSlaStatsUdpJitterMinDSNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The lowest one-way destination-to-source negative jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 36 }
+
+eltexIpSlaStatsUdpJitterAvgDSNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The average one-way destination-to-source negative jitter
+        measured  during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 37 }
+
+eltexIpSlaStatsUdpJitterMaxDSNegJitter OBJECT-TYPE
+    SYNTAX          INTEGER
+    UNITS           "milliseconds"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The maximum one-way destination-to-source negative jitter
+        measured during all successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 38 }
+
+eltexIpSlaStatsUdpJitterOperationsCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of all operations which were tried
+        to perform."
+    ::= { eltexIpSlaStatsUdpJitterEntry 39 }
+
+eltexIpSlaStatsUdpJitterSuccessesCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of successfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 40 }
+
+eltexIpSlaStatsUdpJitterFailuresCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of unsuccessfully completed operations."
+    ::= { eltexIpSlaStatsUdpJitterEntry 41 }
+
+eltexIpSlaStatsUdpJitterTimeoutCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        by timeout."
+    ::= { eltexIpSlaStatsUdpJitterEntry 42 }
+
+eltexIpSlaStatsUdpJitterUnreachNetCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to unreachable net."
+    ::= { eltexIpSlaStatsUdpJitterEntry 43 }
+
+eltexIpSlaStatsUdpJitterUnreachHostCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to unreachable host."
+    ::= { eltexIpSlaStatsUdpJitterEntry 44 }
+
+eltexIpSlaStatsUdpJitterUnreachPortCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to unreachable UDP port."
+    ::= { eltexIpSlaStatsUdpJitterEntry 45 }
+
+eltexIpSlaStatsUdpJitterUnreachProtCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to unreachable protocol."
+    ::= { eltexIpSlaStatsUdpJitterEntry 46 }
+
+eltexIpSlaStatsUdpJitterExTimeTransCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to exceeded TTL in transit."
+    ::= { eltexIpSlaStatsUdpJitterEntry 47 }
+
+eltexIpSlaStatsUdpJitterExTimeReassCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to exceeded time of fragment reassembly."
+    ::= { eltexIpSlaStatsUdpJitterEntry 48 }
+
+eltexIpSlaStatsUdpJitterUnableSendCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        while sending a request packet."
+    ::= { eltexIpSlaStatsUdpJitterEntry 49 }
+
+eltexIpSlaStatsUdpJitterBadReplyCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of operations which were failed
+        due to bad reply data."
+    ::= { eltexIpSlaStatsUdpJitterEntry 50 }
+
+eltexIpSlaStatsUdpJitterPacketsOOSCtr OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Indicates the number of packets recievied out of sequence."
+    ::= { eltexIpSlaStatsUdpJitterEntry 51 }
+
+-- Schedule start/stop triggers
+eltexIpSlaScheduleStartTrigger OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Writing operation's index in this scalar triggers
+        starting of the operation."
+    ::= { eltexIpSlaSchedule 1 }
+
+eltexIpSlaScheduleStopTrigger OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Writing operation's index in this scalar triggers
+        stopping of the operation."
+    ::= { eltexIpSlaSchedule 2 }
+
+-- NOTIFICATION DEFINITIONS
+--
+-- This section defines the traps that
+-- can be generated by the agent.
+
+--eltexIpSlaNotifications OBJECT IDENTIFIER
+--    ::= { eltexIpSlaMIB 2 }
+
+END

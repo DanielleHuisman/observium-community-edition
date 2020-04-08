@@ -1,0 +1,1301 @@
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Trend Micro, Inc.
+-- Copyright information is in the DESCRIPTION section of the MODULE-IDENTITY.
+-- 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+TPT-NGFW-CLUSTER-MIB
+
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+  InetAddress,
+  InetAddressType
+    FROM INET-ADDRESS-MIB
+    
+  MODULE-COMPLIANCE,
+  NOTIFICATION-GROUP,
+  OBJECT-GROUP
+    FROM SNMPv2-CONF
+    
+  Counter64,
+  MODULE-IDENTITY, 
+  NOTIFICATION-TYPE,
+  OBJECT-TYPE,
+  Unsigned32,
+  TimeTicks
+    FROM SNMPv2-SMI
+
+  SnmpAdminString
+    FROM SNMP-FRAMEWORK-MIB
+
+  DateAndTime,
+  MacAddress,
+  TEXTUAL-CONVENTION,
+  TruthValue
+    FROM SNMPv2-TC
+
+  tpt-ngfw-compls,
+  tpt-ngfw-groups,
+  tpt-ngfw-objs,
+  tpt-ngfw-eventsV2,
+  tpt-ngfw-params,
+  Severity,
+  tptNgfwNotifySeverity
+    FROM TPT-NGFW-REG-MIB
+
+  DuplexSetting,
+  AutoNegotiation,
+  LineSpeed
+    FROM TPT-PORT-CONFIG-MIB
+ 
+  tptNgfwSystemSerial
+    FROM TPT-NGFW-SYSTEM-INFO-MIB
+;
+
+tptNgfwCluster MODULE-IDENTITY
+  LAST-UPDATED "201605251854Z" -- May 25, 2016
+  ORGANIZATION "Trend Micro, Inc."
+  CONTACT-INFO "www.trendmicro.com"
+  DESCRIPTION
+    "This MIB defines TippingPoint Next-Generation Firewall Cluster and HA management information.
+    
+     Cluster information includes details on configuration, cluster membership, device's 
+     role (active/passive) in a cluster as well as overall health and status for
+     monitoring purposes.
+     
+     High-availability information provides details on the device's membership in 
+     Fail-over Groups and the status of feature state synchronization across nodes in 
+     the group and cluster.
+     
+     Copyright (C) 2016 Trend Micro Incorporated. All Rights Reserved.
+     
+     Trend Micro makes no warranty of any kind with regard to this material,
+     including, but not limited to, the implied warranties of merchantability
+     and fitness for a particular purpose. Trend Micro shall not be liable for
+     errors contained herein or for incidental or consequential damages in
+     connection with the furnishing, performance, or use of this material. This
+     document contains proprietary information, which is protected by copyright. No
+     part of this document may be photocopied, reproduced, or translated into
+     another language without the prior written consent of Trend Micro. The
+     information is provided 'as is' without warranty of any kind and is subject to
+     change without notice. The only warranties for Trend Micro products and
+     services are set forth in the express warranty statements accompanying such
+     products and services. Nothing herein should be construed as constituting an
+     additional warranty. Trend Micro shall not be liable for technical or editorial
+     errors or omissions contained herein. TippingPoint(R), the TippingPoint logo, and
+     Digital Vaccine(R) are registered trademarks of Trend Micro. All other company
+     and product names may be trademarks of their respective holders. All rights
+     reserved. This document contains confidential information, trade secrets or
+     both, which are the property of Trend Micro. No part of this documentation may
+     be reproduced in any form or by any means or used to make any derivative work
+     (such as translation, transformation, or adaptation) without written permission
+     from Trend Micro or one of its subsidiaries. All other company and product
+     names may be trademarks of their respective holders.
+    "
+
+  REVISION "201605251854Z" -- May 25, 2016 
+  DESCRIPTION "Updated copyright information. Minor MIB syntax fixes."
+  
+  REVISION    "201503190930Z" -- March 19, 2015
+  DESCRIPTION "Added new HA member states."
+
+  REVISION    "201301171030Z" -- January 17, 2013
+  DESCRIPTION "Initial version of NGFW Cluster MIB."
+
+::= { tpt-ngfw-objs 2 } 
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Textual Conventions
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+FailoverGrpMode ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The operational mode of a fail-over group. There are two modes:
+               Active/Active and Active/Passive.
+              "
+  SYNTAX      INTEGER { activePassive(1), activeActive(2) }
+
+LinkState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The link state of a port.
+              "
+  SYNTAX      INTEGER { up(1), down(2) }
+                        
+CfgControl ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "Indicates if the device in under local or remote configuration
+               control.
+              "
+  SYNTAX      INTEGER { disabled(1), none(2), local(3), remote(4) }
+
+SyncState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "Reports the overall feature state synchronization for a cluster.
+              "
+  SYNTAX      INTEGER { inSync(1), outOfSync(2), notInit(3), error(4), pending(5) }
+
+HaState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The high-availability state of a cluster member.
+              "
+  SYNTAX      INTEGER { active(1), 
+                        passive(2),
+                        failed(3),
+                        standby(4),
+                        disabled(5),
+                        unknown(6),
+                        activeNoPartner(7),
+                        starting(8),
+                        stopping(9) }
+
+HealthState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The overall health of a hardware or software component on the device.
+              "
+  SYNTAX      INTEGER { normal(1), warning(2), critical(3) }
+
+ClusterMemberRejectReason ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The reason for rejecting the membership of a device into a cluster.
+              "
+  SYNTAX      INTEGER { duplicateNodeId(1) }
+  
+FailoverGroupState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The state of a HA fail-over group. A running state indicates that
+               the fail-over group is active and working with both an active and
+               passive device. Degraded state indicates that the fail-over group
+               is active without a fail-over (or passive) device. Stopped state
+               indicates that the fail-over group in not operational.
+              "
+  SYNTAX      INTEGER { running(1), degraded(2), stopped(3) }
+  
+ComponentType ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The type of physical component monitored on the device.
+              "
+  SYNTAX      INTEGER { swSal(1), 
+                        cpu(2), 
+                        memory(3), 
+                        swDisk(4), 
+                        swLink(5), 
+                        hwFan(6),
+                        hwTmp(7), 
+                        hwVol(8), 
+                        hwVid(9), 
+                        hwAny(10), 
+                        hwPsu(11), 
+                        unknown(12) }                    
+  
+ThresholdLimitType ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "Define if a threshold is an upper or a lower bound.
+              "
+  SYNTAX      INTEGER { upper(1), lower(2) }
+  
+ThresholdRelation ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "Indicates if a value is above or below a threshold value.
+              "
+  SYNTAX      INTEGER { above(1), below(2) }
+  
+ConsistencyCheckType ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "The type of consistency check.
+              "
+  SYNTAX      INTEGER { configuration(1), software(2), hardware(3) }
+           
+MasterLocation ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION "Is the master configuration reference local or remote to the device in
+               a cluster.
+              "
+  SYNTAX      INTEGER { local(1), remote(2) }       
+--
+-- Cluster
+--
+
+tptNgfwClusterName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..30))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The cluster's unique name.
+              "
+::= { tptNgfwCluster 1 }
+
+tptNgfwClusterEnabled OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Indicates if cluster feature support is enabled.
+              "
+::= { tptNgfwCluster 2 }
+
+tptNgfwClusterMemberId OBJECT-TYPE
+  SYNTAX      Unsigned32 (1..15)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "This is the cluster member's unique device ID.
+              "
+::= { tptNgfwCluster 3 }
+
+tptNgfwClusterMemberName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..30))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The cluster member's name."
+::= { tptNgfwCluster 4 }
+
+tptNgfwClusterStandby OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is the device in a standby state and not active in the cluster."
+::= { tptNgfwCluster 5 }
+
+tptNgfwClusterSwConstChecks OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Are software consistency checks enabled.
+              "
+::= { tptNgfwCluster 6 }
+
+tptNgfwClusterHwConstChecks OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Are hardware consistency checks enabled.
+              "
+::= { tptNgfwCluster 7 }
+
+tptNgfwClusterCfgConstChecks OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Are configuration consistency checks enabled.
+              "
+::= { tptNgfwCluster 8 }
+
+--
+-- Member Status Table
+--
+
+tptNgfwClusterMemberStatusTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF TptNgfwClusterMemberStatusTableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A table providing summary information about each cluster member's 
+               configuration, status, and health.
+              "
+::= { tptNgfwCluster 9 }
+
+tptNgfwClusterMemberStatusTableEntry OBJECT-TYPE
+  SYNTAX      TptNgfwClusterMemberStatusTableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A table entry containing information for each cluster member.
+              "
+  INDEX { tptNgfwClusterMemberStatusId }
+::= { tptNgfwClusterMemberStatusTable 1 }
+
+TptNgfwClusterMemberStatusTableEntry ::= SEQUENCE {
+  tptNgfwClusterMemberStatusId           Unsigned32,
+  tptNgfwClusterMemberStatusName         SnmpAdminString,
+  tptNgfwClusterMemberStatusSerialNo     SnmpAdminString,
+  tptNgfwClusterMemberStatusHwModel      SnmpAdminString,
+  tptNgfwClusterMemberStatusSwVersion    SnmpAdminString,
+  tptNgfwClusterMemberStatusUptime       TimeTicks,
+  tptNgfwClusterMemberStatusJoinTime     DateAndTime,
+  tptNgfwClusterMemberStatusSmsManaged   TruthValue,
+  tptNgfwClusterMemberStatusCfgControl   CfgControl,
+  tptNgfwClusterMemberStatusCfgStateSync SyncState,
+  tptNgfwClusterMemberStatusEnabled      TruthValue,
+  tptNgfwClusterMemberStatusHaState      HaState,
+  tptNgfwClusterMemberStatusHealthState  HealthState,
+  tptNgfwClusterMemberStatusHealthScore  Unsigned32,
+  tptNgfwClusterMemberStatusMaster       TruthValue
+}
+
+tptNgfwClusterMemberStatusId OBJECT-TYPE
+  SYNTAX      Unsigned32 (1..15)
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "The unique cluster member ID.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 1 }
+
+tptNgfwClusterMemberStatusName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..30))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The cluster member's name.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 2 }
+
+tptNgfwClusterMemberStatusSerialNo OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..31))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The cluster member's serial number. 
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 3 }
+
+tptNgfwClusterMemberStatusHwModel OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..31))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The members hardware model number.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 4 }
+
+tptNgfwClusterMemberStatusSwVersion OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..31))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The member's currently running software version. 
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 5 }
+
+tptNgfwClusterMemberStatusUptime OBJECT-TYPE
+  SYNTAX      TimeTicks
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The time (in 100th/second) since the system was powered on.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 6 }
+
+tptNgfwClusterMemberStatusJoinTime OBJECT-TYPE
+  SYNTAX      DateAndTime
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The date and time when the device joined the cluster. 
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 7 }
+
+tptNgfwClusterMemberStatusSmsManaged OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Indicates if the cluster member is managed by SMS.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 8 }
+
+tptNgfwClusterMemberStatusCfgControl OBJECT-TYPE
+  SYNTAX      CfgControl
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Reports how the device's configuration is managed.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 9 }
+
+tptNgfwClusterMemberStatusCfgStateSync OBJECT-TYPE
+  SYNTAX      SyncState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The system wide configuration synchronization state.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 10 }
+
+tptNgfwClusterMemberStatusEnabled OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is clustering enabled on the member device.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 11 }
+
+tptNgfwClusterMemberStatusHaState OBJECT-TYPE
+  SYNTAX      HaState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The state of high-availability features.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 12 }
+
+tptNgfwClusterMemberStatusHealthState OBJECT-TYPE
+  SYNTAX      HealthState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The overall health of a member in the cluster.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 13 }
+
+tptNgfwClusterMemberStatusHealthScore OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..100)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The numeric health score indicating the members health.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 14 }
+
+tptNgfwClusterMemberStatusMaster OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is the member the master node for the cluster's fail-over group.
+              "
+::= { tptNgfwClusterMemberStatusTableEntry 15 }
+
+--
+-- Cluster Subgroup Top-level Nodes
+--
+
+tptNgfwClusterTraffic OBJECT IDENTIFIER ::= { tptNgfwCluster 10 }
+tptNgfwClusterHa      OBJECT IDENTIFIER ::= { tptNgfwCluster 11 }
+
+--
+-- TippingPoint Cluster Traffic (TCT)
+--
+
+tptNgfwClusterTctIpAddrType OBJECT-TYPE
+  SYNTAX      InetAddressType
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The type of IP address used for cluster traffic.
+              "
+::= { tptNgfwClusterTraffic 1 }
+
+tptNgfwClusterTctIpAddr OBJECT-TYPE
+  SYNTAX      InetAddress
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The IPv4 address used for cluster traffic. 
+              "
+::= { tptNgfwClusterTraffic 2 }
+
+tptNgfwClusterTctMulticastAddrType OBJECT-TYPE
+  SYNTAX      InetAddressType
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The HA port multicast address type.
+              "
+::= { tptNgfwClusterTraffic 3 }
+
+tptNgfwClusterTctMulticastAddr OBJECT-TYPE
+  SYNTAX      InetAddress
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The IPv4 multicast address used for cluster traffic.
+              "
+::= { tptNgfwClusterTraffic 4 }
+
+tptNgfwClusterTctPort OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..65534)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The port used for cluster traffic. 
+              "
+::= { tptNgfwClusterTraffic 5 }
+
+tptNgfwClusterTctTtl OBJECT-TYPE
+  SYNTAX      Unsigned32 (1..255)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The time-to-live (TTL) setting for cluster traffic. 
+              "
+::= { tptNgfwClusterTraffic 6 }
+
+tptNgfwClusterTctMtu OBJECT-TYPE
+  SYNTAX      Unsigned32 (576..9216)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "IP MTU value for cluster traffic.
+              "
+::= { tptNgfwClusterTraffic 7 }
+
+tptNgfwClusterTctTimeout OBJECT-TYPE
+  SYNTAX      Unsigned32 (100..10000)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Timeout in seconds for cluster traffic."
+::= { tptNgfwClusterTraffic 8 }
+
+tptNgfwClusterTctRetries OBJECT-TYPE
+  SYNTAX      Unsigned32 (1..10)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The number retry attempts made for cluster traffic."
+::= { tptNgfwClusterTraffic 9 }
+
+tptNgfwClusterTctPortSpeed OBJECT-TYPE
+  SYNTAX      LineSpeed
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The HA port line speed. 
+              "
+::= { tptNgfwClusterTraffic 10 }
+
+tptNgfwClusterTctPortDuplex OBJECT-TYPE
+  SYNTAX      DuplexSetting
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The current duplex state of the HA port.
+              "
+::= { tptNgfwClusterTraffic 11 }
+
+tptNgfwClusterTctPortAutoNeg OBJECT-TYPE
+  SYNTAX      AutoNegotiation
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is flow control on, off,or auto-negotiated for the HA port.
+              "
+::= { tptNgfwClusterTraffic 12 }
+
+tptNgfwClusterTctLinkState OBJECT-TYPE
+  SYNTAX      LinkState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is the HA link up, or down. 
+              "
+::= { tptNgfwClusterTraffic 13 }
+
+tptNgfwClusterTctEncryptionEnabled OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is cluster traffic encrypted. 
+              "
+::= { tptNgfwClusterTraffic 14 }
+
+--
+-- High-Availability (HA)
+--
+
+tptNgfwClusterHaEnabled OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is the High-availability feature turned on.
+              "
+::= { tptNgfwClusterHa 1 }
+
+tptNgfwClusterHaGlobalStateSyncEnabled OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is feature state synchronization globally enabled. This
+               overrides the configuration for each individual feature. 
+              "
+::= { tptNgfwClusterHa 2 }
+
+tptNgfwClusterHaMode OBJECT-TYPE
+  SYNTAX      HaState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "what mode is the HA feature running in.
+              "
+::= { tptNgfwClusterHa 3 }
+
+--
+-- HA Feature Sync Table
+--
+
+tptNgfwClusterHaFeatSyncTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF TptNgfwClusterHaFeatSyncTableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A table containing configuration information for each feature
+               that support state synchronization.
+              "
+::= { tptNgfwClusterHa 4 }
+
+tptNgfwClusterHaFeatSyncTableEntry OBJECT-TYPE
+  SYNTAX      TptNgfwClusterHaFeatSyncTableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A entry for each feature that supports state synchronization.
+              "
+  INDEX { tptNgfwClusterHaFeatSyncFeature }
+  ::= { tptNgfwClusterHaFeatSyncTable 1 }
+
+TptNgfwClusterHaFeatSyncTableEntry ::= SEQUENCE {
+  tptNgfwClusterHaFeatSyncFeature      SnmpAdminString,
+  tptNgfwClusterHaFeatSyncEnabled      TruthValue,
+  tptNgfwClusterHaFeatSyncLogSeverity  Severity
+}
+
+tptNgfwClusterHaFeatSyncFeature OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..32))
+  MAX-ACCESS  not-accessible 
+  STATUS      current
+  DESCRIPTION "The HA feature name. 
+              "
+::= { tptNgfwClusterHaFeatSyncTableEntry 1 }
+
+tptNgfwClusterHaFeatSyncEnabled OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is the HA feature have state synchronization turned on. 
+              "
+::= { tptNgfwClusterHaFeatSyncTableEntry 2 }
+
+tptNgfwClusterHaFeatSyncLogSeverity OBJECT-TYPE
+  SYNTAX      Severity
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "What is the logging level for the feature state synchronization. 
+              "
+::= { tptNgfwClusterHaFeatSyncTableEntry 3 }
+
+--
+-- Fail-over Group Table
+--
+
+tptNgfwClusterHaFgTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF TptNgfwClusterHaFgEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A table of fail-over groups within a cluster configuration. 
+              "
+::= { tptNgfwClusterHa 5 }
+
+tptNgfwClusterHaFgEntry OBJECT-TYPE
+  SYNTAX      TptNgfwClusterHaFgEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "An entry for a fail-over group in a cluster.
+              "
+  INDEX { tptNgfwClusterHaFgIndex }
+::= { tptNgfwClusterHaFgTable 1 }
+
+TptNgfwClusterHaFgEntry ::= SEQUENCE {
+  tptNgfwClusterHaFgIndex   Unsigned32,
+  tptNgfwClusterHaFgId      Unsigned32,
+  tptNgfwClusterHaFgName    SnmpAdminString,
+  tptNgfwClusterHaFgBaseMac MacAddress,
+  tptNgfwClusterHaFgMode    FailoverGrpMode
+}
+
+tptNgfwClusterHaFgIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "The fail-over group index. 
+              "
+::= { tptNgfwClusterHaFgEntry 1 }
+
+tptNgfwClusterHaFgId OBJECT-TYPE
+  SYNTAX      Unsigned32 (1..10)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The fail-over group ID. 
+              "
+::= { tptNgfwClusterHaFgEntry 2 }
+
+tptNgfwClusterHaFgName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..32))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The fail-over group name. 
+              "
+::= { tptNgfwClusterHaFgEntry 3 }
+
+tptNgfwClusterHaFgBaseMac OBJECT-TYPE
+  SYNTAX      MacAddress
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The base MAC address for the fail-ver group. 
+              "
+::= { tptNgfwClusterHaFgEntry 4 }
+
+tptNgfwClusterHaFgMode OBJECT-TYPE
+  SYNTAX      FailoverGrpMode
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The operational mode of the fail-over group. 
+              "
+::= { tptNgfwClusterHaFgEntry 5 }
+
+--
+-- Failover Group Membership Table
+--
+
+tptNgfwClusterHaFgMemberTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF TptNgfwClusterHaFgMemberEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A table of fail-over group memberships for this device. 
+              "
+  ::= { tptNgfwClusterHa 6 }
+
+tptNgfwClusterHaFgMemberEntry OBJECT-TYPE
+  SYNTAX      TptNgfwClusterHaFgMemberEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A entry with a relationship to a fail-over group.
+              "
+  INDEX { tptNgfwClusterHaFgId }
+  ::= { tptNgfwClusterHaFgMemberTable 1 }
+
+TptNgfwClusterHaFgMemberEntry ::= SEQUENCE {
+  tptNgfwClusterHaFgMemberId   Unsigned32,
+  tptNgfwClusterHaFgMemberName SnmpAdminString
+}
+
+tptNgfwClusterHaFgMemberId OBJECT-TYPE
+  SYNTAX      Unsigned32 (1..15)
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The fail-over group ID this device is a member of. 
+              "
+::= { tptNgfwClusterHaFgMemberEntry 1 }
+
+tptNgfwClusterHaFgMemberName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..32))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The fail-over group name this device is a member of.
+              "
+::= { tptNgfwClusterHaFgMemberEntry 2 }
+
+--
+-- HA Feature Synch Table
+--
+
+tptNgfwClusterHaFeatSyncStatusTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF TptNgfwClusterHaFeatSyncStatusTableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A table of HA feature state synchronization configuration 
+               and state.
+              "
+::= { tptNgfwClusterHa 7 }
+
+tptNgfwClusterHaFeatSyncStatusTableEntry OBJECT-TYPE
+  SYNTAX      TptNgfwClusterHaFeatSyncStatusTableEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "A entry for a HA feature that has state synchronized within
+               a fail-over group.
+              "
+  INDEX { tptNgfwClusterHaFeatSyncStatusFeature }
+::= { tptNgfwClusterHaFeatSyncStatusTable 1 }
+
+TptNgfwClusterHaFeatSyncStatusTableEntry ::= SEQUENCE {
+  tptNgfwClusterHaFeatSyncStatusFeature         SnmpAdminString,
+  tptNgfwClusterHaFeatSyncStatusEnabled         TruthValue,
+  tptNgfwClusterHaFeatSyncStatusSyncState       SyncState,
+  tptNgfwClusterHaFeatSyncStatusSyncStateReason SnmpAdminString,
+  tptNgfwClusterHaFeatSyncStatusTotalEntries    Counter64,
+  tptNgfwClusterHaFeatSyncStatusAddEntries      Counter64,
+  tptNgfwClusterHaFeatSyncStatusDelEntries      Counter64
+}
+
+tptNgfwClusterHaFeatSyncStatusFeature OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..32))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION "The name of the feature which support state synchronization. 
+              "
+::= { tptNgfwClusterHaFeatSyncStatusTableEntry 1 }
+
+tptNgfwClusterHaFeatSyncStatusEnabled OBJECT-TYPE
+  SYNTAX      TruthValue
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "Is feature state synchronization enabled. 
+              "
+::= { tptNgfwClusterHaFeatSyncStatusTableEntry 2 }
+
+tptNgfwClusterHaFeatSyncStatusSyncState OBJECT-TYPE
+  SYNTAX      SyncState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The current condition of feature state synchronization.
+              "
+::= { tptNgfwClusterHaFeatSyncStatusTableEntry 3 }
+
+tptNgfwClusterHaFeatSyncStatusSyncStateReason OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..255))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "A text description of they current feature state synchronization.
+              "
+::= { tptNgfwClusterHaFeatSyncStatusTableEntry 4 }
+
+tptNgfwClusterHaFeatSyncStatusTotalEntries OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The total number of entries for the feature.
+              "
+::= { tptNgfwClusterHaFeatSyncStatusTableEntry 5 }
+
+tptNgfwClusterHaFeatSyncStatusAddEntries OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION "The number of added entries for the feature.
+              "
+::= { tptNgfwClusterHaFeatSyncStatusTableEntry 6 }
+
+tptNgfwClusterHaFeatSyncStatusDelEntries OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current 
+  DESCRIPTION "The number of deleted entries for the feature.
+              "
+::= { tptNgfwClusterHaFeatSyncStatusTableEntry 7 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Notifications
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  
+tptNgfwClusterMemberJoinNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                tptNgfwSystemSerial,
+                tptNgfwClusterName, 
+                tptNgfwClusterMemberId, 
+                tptNgfwClusterMemberName, 
+                tptNgfwClusterTctIpAddrType, 
+                tptNgfwClusterTctIpAddr,
+                tptNgfwNotifySeverity
+               }
+  STATUS      current
+  DESCRIPTION "A notification indicating that a device has joined a cluster.
+              "
+::= { tpt-ngfw-eventsV2 1 }
+
+tptNgfwClusterMemberLeaveNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                tptNgfwSystemSerial,
+                tptNgfwClusterName,
+                tptNgfwClusterMemberId,
+                tptNgfwClusterMemberName,
+                tptNgfwClusterTctIpAddrType,
+                tptNgfwClusterTctIpAddr,
+                tptNgfwNotifySeverity
+               }
+  STATUS      current
+  DESCRIPTION "A notification indicating that a device has left a cluster.
+              "
+::= { tpt-ngfw-eventsV2 2 }
+
+tptNgfwClusterMemberRejectNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                tptNgfwSystemSerial,
+                tptNgfwClusterTctIpAddrType, 
+                tptNgfwClusterTctIpAddr, 
+                tptNgfwClusterMemberId, 
+                tptNgfwClusterMemberRejectNotifyReason,
+                tptNgfwNotifySeverity
+              }
+  STATUS      current
+  DESCRIPTION "A notification indicating that a device's attempt to join a
+               cluster failed.
+              "
+::= { tpt-ngfw-eventsV2 3 }
+
+tptNgfwClusterHaStateSyncMessageLossNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                 tptNgfwSystemSerial,
+                 tptNgfwClusterHaStateSyncNotifyFeature,
+                 tptNgfwNotifySeverity
+              }
+  STATUS      current
+  DESCRIPTION "Feature state synchronization has lost updates with peer.
+              "
+::= { tpt-ngfw-eventsV2 4 }
+
+tptNgfwClusterHaStateSyncQueueFullNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                 tptNgfwSystemSerial,
+                 tptNgfwClusterHaStateSyncNotifyFeature,
+                 tptNgfwNotifySeverity
+              }
+  STATUS      current
+  DESCRIPTION "Feature state synchronization Buffers have been filled.
+              "
+::= { tpt-ngfw-eventsV2 5 }
+
+tptNgfwClusterHealthChangeNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                tptNgfwSystemSerial,
+                tptNgfwClusterHealthChangeNotifyState,
+                tptNgfwClusterHealthChangeNotifyScore,
+                tptNgfwClusterHealthChangeNotifyStateUpperLimit,
+                tptNgfwClusterHealthChangeNotifyStateLowerLimit,
+                tptNgfwNotifySeverity
+              }
+  STATUS      current
+  DESCRIPTION "A notification indicating how the device's health score
+               has changed.
+              "
+::= { tpt-ngfw-eventsV2 6 }
+
+tptNgfwClusterHaFgStateChangeNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                tptNgfwSystemSerial,
+                tptNgfwClusterHaFgName, 
+                tptNgfwClusterHaFgId, 
+                tptNgfwClusterHaFgStateChangeNotifyState, 
+                tptNgfwClusterHaFgStateChangeNotifyActiveDeviceId,
+                tptNgfwClusterHaFgStateChangeNotifyPassiveDeviceId,
+                tptNgfwNotifySeverity
+              }
+  STATUS      current
+  DESCRIPTION "A notification indicating the state of a HA fail-over group has
+               changed to the specified state.
+              "
+::= { tpt-ngfw-eventsV2 7 }
+
+tptNgfwClusterCmpStateChangeNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                tptNgfwSystemSerial,
+                tptNgfwClusterCmpStateChangeNotifyType,
+                tptNgfwClusterCmpStateChangeNotifyName,
+                tptNgfwClusterCmpStateChangeNotifyState,
+                tptNgfwClusterCmpStateChangeNotifyValue,
+                tptNgfwClusterCmpStateChangeNotifyUnits,
+                tptNgfwClusterCmpStateChangeNotifyThreshold,
+                tptNgfwClusterCmpStateChangeNotifyLimitType,
+                tptNgfwClusterCmpStateChangeNotifyRelation,
+                tptNgfwNotifySeverity
+              }
+  STATUS      current
+  DESCRIPTION " A notification sent when a component has exceeded
+                a monitored threshold value.
+              "
+::= { tpt-ngfw-eventsV2 8 }
+
+tptNgfwClusterConstChkFailedNotify NOTIFICATION-TYPE
+  OBJECTS     { 
+                tptNgfwSystemSerial,
+                tptNgfwClusterConstChkFailedNotifyType,
+                tptNgfwClusterConstChkFailedNotifyMaster,
+                tptNgfwNotifySeverity
+              }
+  STATUS      current
+  DESCRIPTION " A notification sent if any cluster configuration, software, 
+                or hardware consistency check fails.
+              "
+::= { tpt-ngfw-eventsV2 9 }
+
+--
+-- Notify Objects
+--
+
+tptNgfwClusterMemberRejectNotifyReason OBJECT-TYPE
+  SYNTAX      ClusterMemberRejectReason
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The reason a device was not accepted into a cluster configuration.
+              "
+::= { tpt-ngfw-params 1 }
+
+tptNgfwClusterHaStateSyncNotifyFeature OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..32))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The name of a HA feature.
+              "
+::= { tpt-ngfw-params 2 }
+
+tptNgfwClusterHealthChangeNotifyState OBJECT-TYPE
+  SYNTAX      HealthState
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The device's current state based on a health score. 
+              "
+::= { tpt-ngfw-params 3 }
+
+tptNgfwClusterHealthChangeNotifyScore OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..100)
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The current health score between 0-100. The value will
+               be between the upper and lower bounds (inclusive).
+              "
+::= { tpt-ngfw-params 4 }
+
+tptNgfwClusterHealthChangeNotifyStateUpperLimit OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..100)
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The upper bound of health score range.
+              "
+::= { tpt-ngfw-params 5 }
+
+tptNgfwClusterHealthChangeNotifyStateLowerLimit OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..100)
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The lower bound of health score range.
+              "
+::= { tpt-ngfw-params 6 }
+
+tptNgfwClusterHaFgStateChangeNotifyState OBJECT-TYPE
+  SYNTAX      FailoverGroupState
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The current fail-over group state.
+              "
+::= { tpt-ngfw-params 7 }
+
+tptNgfwClusterHaFgStateChangeNotifyActiveDeviceId OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..100)
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The ID of the active device in a fail-over group.
+              "
+::= { tpt-ngfw-params 8 }
+
+tptNgfwClusterHaFgStateChangeNotifyPassiveDeviceId OBJECT-TYPE
+  SYNTAX      Unsigned32 (0..10)
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The ID of the passive device in a fail-over group.
+              "
+::= { tpt-ngfw-params 9 }
+
+tptNgfwClusterCmpStateChangeNotifyType OBJECT-TYPE
+  SYNTAX      ComponentType
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The type of component on the device that has exceeded a 
+               monitored threshold level.
+              "
+::= { tpt-ngfw-params 10 }
+
+tptNgfwClusterCmpStateChangeNotifyName OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE (0..255))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The name of the component on the device that has exceeded a 
+               monitored threshold level.
+              "
+::= { tpt-ngfw-params 11 }
+
+tptNgfwClusterCmpStateChangeNotifyState OBJECT-TYPE
+  SYNTAX      HealthState
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The current state of the component.
+              "
+::= { tpt-ngfw-params 12 }
+
+tptNgfwClusterCmpStateChangeNotifyValue OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..255))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The current component's measured value.
+              "
+::= { tpt-ngfw-params 13 }
+
+tptNgfwClusterCmpStateChangeNotifyUnits OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..25))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The component's units of measure.
+              "
+::= { tpt-ngfw-params 14 }
+
+tptNgfwClusterCmpStateChangeNotifyThreshold OBJECT-TYPE
+  SYNTAX      SnmpAdminString (SIZE(0..255))
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The threshold value the component has exceeded.
+              "
+::= { tpt-ngfw-params 15 }  
+
+tptNgfwClusterCmpStateChangeNotifyLimitType OBJECT-TYPE
+  SYNTAX      ThresholdLimitType
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "Is the threshold value a upper or lower limit.
+              "
+::= { tpt-ngfw-params 16 } 
+
+tptNgfwClusterCmpStateChangeNotifyRelation OBJECT-TYPE
+  SYNTAX      ThresholdRelation
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "Indicates if the component's current value is above or below the
+               specified threshold value.
+              "
+::= { tpt-ngfw-params 17 } 
+              
+tptNgfwClusterConstChkFailedNotifyType OBJECT-TYPE
+  SYNTAX      ConsistencyCheckType
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The type of consistency check that failed.
+              "
+::= { tpt-ngfw-params 18 } 
+
+tptNgfwClusterConstChkFailedNotifyMaster OBJECT-TYPE
+  SYNTAX      MasterLocation
+  MAX-ACCESS  accessible-for-notify
+  STATUS      current 
+  DESCRIPTION "The location of the master reference.
+              "
+::= { tpt-ngfw-params 19 }
+         
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Groups
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptNgfwClusterGroup OBJECT-GROUP
+  OBJECTS     {
+                tptNgfwClusterName,
+                tptNgfwClusterEnabled,
+                tptNgfwClusterMemberId,
+                tptNgfwClusterMemberName,
+                tptNgfwClusterStandby,
+                tptNgfwClusterSwConstChecks,
+                tptNgfwClusterHwConstChecks,
+                tptNgfwClusterCfgConstChecks,
+                
+                tptNgfwClusterMemberStatusName,
+                tptNgfwClusterMemberStatusSerialNo,
+                tptNgfwClusterMemberStatusHwModel,
+                tptNgfwClusterMemberStatusSwVersion,
+                tptNgfwClusterMemberStatusUptime,
+                tptNgfwClusterMemberStatusJoinTime,
+                tptNgfwClusterMemberStatusSmsManaged,
+                tptNgfwClusterMemberStatusCfgControl,
+                tptNgfwClusterMemberStatusCfgStateSync,
+                tptNgfwClusterMemberStatusEnabled,
+                tptNgfwClusterMemberStatusHaState,
+                tptNgfwClusterMemberStatusHealthState,
+                tptNgfwClusterMemberStatusHealthScore,
+                tptNgfwClusterMemberStatusMaster,
+                
+                tptNgfwClusterMemberRejectNotifyReason,
+                
+                tptNgfwClusterHealthChangeNotifyState,
+                tptNgfwClusterHealthChangeNotifyScore,
+                tptNgfwClusterHealthChangeNotifyStateUpperLimit,
+                tptNgfwClusterHealthChangeNotifyStateLowerLimit,
+                
+                tptNgfwClusterCmpStateChangeNotifyType,
+                tptNgfwClusterCmpStateChangeNotifyName,
+                tptNgfwClusterCmpStateChangeNotifyState,
+                tptNgfwClusterCmpStateChangeNotifyValue,
+                tptNgfwClusterCmpStateChangeNotifyUnits,
+                tptNgfwClusterCmpStateChangeNotifyThreshold,
+                tptNgfwClusterCmpStateChangeNotifyLimitType,
+                tptNgfwClusterCmpStateChangeNotifyRelation,
+                
+                tptNgfwClusterConstChkFailedNotifyType,
+                tptNgfwClusterConstChkFailedNotifyMaster
+                
+              }
+
+  STATUS      current
+  
+  DESCRIPTION "Compliance group for general cluster information and membership
+               table. This group is mandatory.
+              "
+::= { tpt-ngfw-groups 2 }
+
+tptNgfwClusterTrafficGroup OBJECT-GROUP
+  OBJECTS      {
+                 tptNgfwClusterTctIpAddrType,
+                 tptNgfwClusterTctIpAddr,
+                 tptNgfwClusterTctMulticastAddrType,
+                 tptNgfwClusterTctMulticastAddr,
+                 tptNgfwClusterTctPort,
+                 tptNgfwClusterTctTtl,
+                 tptNgfwClusterTctMtu,
+                 tptNgfwClusterTctTimeout,
+                 tptNgfwClusterTctRetries,
+                 tptNgfwClusterTctPortSpeed,
+                 tptNgfwClusterTctPortDuplex,
+                 tptNgfwClusterTctPortAutoNeg,
+                 tptNgfwClusterTctLinkState,
+                 tptNgfwClusterTctEncryptionEnabled
+               }
+
+  STATUS       current
+  
+  DESCRIPTION  "Compliance group for TippingPoint Cluster Traffic configuration
+                information. This group is mandatory.
+               "
+::= { tpt-ngfw-groups 3 }
+
+tptNgfwClusterHaGroup OBJECT-GROUP
+  OBJECTS     {
+                tptNgfwClusterHaEnabled,
+                tptNgfwClusterHaGlobalStateSyncEnabled,
+                tptNgfwClusterHaMode,
+
+                tptNgfwClusterHaFeatSyncEnabled,
+                tptNgfwClusterHaFeatSyncLogSeverity,
+
+                tptNgfwClusterHaFgId,
+                tptNgfwClusterHaFgName,
+                tptNgfwClusterHaFgBaseMac,
+                tptNgfwClusterHaFgMode,
+                
+                tptNgfwClusterHaFgMemberId,
+                tptNgfwClusterHaFgMemberName,
+                
+                tptNgfwClusterHaFeatSyncStatusEnabled,
+                tptNgfwClusterHaFeatSyncStatusSyncState,
+                tptNgfwClusterHaFeatSyncStatusSyncStateReason,
+                tptNgfwClusterHaFeatSyncStatusTotalEntries,
+                tptNgfwClusterHaFeatSyncStatusAddEntries,
+                tptNgfwClusterHaFeatSyncStatusDelEntries,
+                
+                tptNgfwClusterHaStateSyncNotifyFeature,
+                                
+                tptNgfwClusterHaFgStateChangeNotifyState,
+                tptNgfwClusterHaFgStateChangeNotifyActiveDeviceId,
+                tptNgfwClusterHaFgStateChangeNotifyPassiveDeviceId
+              }
+ 
+  STATUS      current
+  
+  DESCRIPTION "Compliance group for HA related configuration. This group
+               is mandatory. 
+              "
+::= { tpt-ngfw-groups 4 }
+
+tptNgfwClusterNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { 
+                    tptNgfwClusterMemberJoinNotify, 
+                    tptNgfwClusterMemberLeaveNotify,
+                    tptNgfwClusterMemberRejectNotify,
+                    tptNgfwClusterHaStateSyncMessageLossNotify,
+                    tptNgfwClusterHaStateSyncQueueFullNotify,
+                    tptNgfwClusterHealthChangeNotify,
+                    tptNgfwClusterHaFgStateChangeNotify,
+                    tptNgfwClusterCmpStateChangeNotify,
+                    tptNgfwClusterConstChkFailedNotify
+                  }
+                  
+    STATUS        current
+    
+    DESCRIPTION   "A group of notifications related to cluster configuration,
+                   status and health.
+                  "
+::= { tpt-ngfw-groups 5 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Compliances
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptNgfwClusterCfgCompl MODULE-COMPLIANCE
+     STATUS      current
+     DESCRIPTION "Compliance group for NGFW cluster MIB.
+                 "
+     MODULE
+       MANDATORY-GROUPS { tptNgfwClusterGroup, tptNgfwClusterTrafficGroup,
+            tptNgfwClusterHaGroup, tptNgfwClusterNotificationGroup }
+::= { tpt-ngfw-compls 2 }
+
+END
+

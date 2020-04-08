@@ -1,0 +1,359 @@
+--	HWg-PWR MIB 1.02
+--		History:
+--
+--		1.00	 2.04.2010 Marek Hummel  - Created
+--		1.01	 2.04.2010 Marek Hummel  - Add Input Dry Contacts
+--		1.02	 20.2.2017 Marek Hummel  - Fix pwrStateToAlarm, pwrStateToNormal trap definition, rename mtvalValue to mtvalMbusValue								
+-- 		1.03	 9.10.201  Marek Hummel  - Add meter secondary address in text format 
+--
+
+HWG-PWR-MIB DEFINITIONS ::= BEGIN
+IMPORTS
+	OBJECT-TYPE			FROM RFC-1212
+	TRAP-TYPE			FROM RFC-1215
+	enterprises			FROM RFC1155-SMI
+	sysName, DisplayString		FROM RFC1213-MIB
+	TRAP-TYPE			FROM RFC-1215;
+
+--
+-- Type Definitions
+--
+PositiveInteger ::= INTEGER (1..2147483647)	-- 0x7FFF FFFF
+Txt8 ::= DisplayString (SIZE (0..8))
+Txt16 ::= DisplayString (SIZE (0..16))
+SensorValue ::= INTEGER
+SensorID ::= INTEGER
+
+OpenClose ::= INTEGER {
+		open (0),
+		close (1)
+	}
+
+AlarmState ::= INTEGER {
+		invalid (0),
+		normal (1),
+		alarm (2)
+	}
+
+--
+-- Node Definitions
+--
+
+hwgroup		OBJECT IDENTIFIER ::= { enterprises 21796 }
+x390		OBJECT IDENTIFIER ::= { hwgroup 4 }
+hwgpwr		OBJECT IDENTIFIER ::= { x390 6 }
+
+-- Root objects
+info		OBJECT IDENTIFIER ::= { hwgpwr 70 }
+meters		OBJECT IDENTIFIER ::= { hwgpwr 1 }
+input		OBJECT IDENTIFIER ::= { hwgpwr 2 }
+
+infoAddressMAC OBJECT-TYPE
+	SYNTAX	DisplayString (SIZE (0..17))
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"MAC address in text form.
+		It is here to distinguish devices in trap messages."
+	::= { info 1 }
+
+-- Meters Number -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+mtNumber OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Pocet pripojenych M-BUS meridel"
+	::= { meters 1 }
+
+-- Meter Table -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+mtTableMeters OBJECT-TYPE
+	SYNTAX	SEQUENCE OF MtEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"A unique value for each meter."
+	::= { meters 2 }
+
+mtEntry OBJECT-TYPE
+	SYNTAX	MtEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"An entry containing information applicable to a
+		particular sensor."
+	INDEX { mtIndex }
+	::= { mtTableMeters 1 }
+
+MtEntry ::= SEQUENCE {
+	mtIndex		PositiveInteger,
+	mtName		Txt16,
+	mtAddr		PositiveInteger,
+	mtSecAddr	PositiveInteger,
+	mtValNumber PositiveInteger,
+	mtSecAddrTxt Txt8	
+}
+
+mtIndex OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The meter index."
+	::= { mtEntry 1 }
+
+mtName OBJECT-TYPE
+	SYNTAX	Txt16
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Mater name."
+	::= { mtEntry 2 }
+
+mtAddr OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Meter primary address."
+	::= { mtEntry 3 }
+
+mtSecAddr OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Meter secondary address int format."
+	::= { mtEntry 4 }
+
+mtValNumber OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Number of values."
+	::= { mtEntry 5 }
+
+mtSecAddrTxt OBJECT-TYPE
+	SYNTAX	Txt8
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Secondary address text format."
+	::= { mtEntry 6 }	
+
+
+-- Meter Value Table  -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+mtvalTableValues OBJECT-TYPE
+	SYNTAX	SEQUENCE OF MtvalEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"A unique value for each meter."
+	::= { meters 3 }
+
+mtvalEntry OBJECT-TYPE
+	SYNTAX	MtvalEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"An entry containing information applicable to a
+		particular sensor."
+	INDEX { mtvalIndex }
+	::= { mtvalTableValues 1 }
+
+MtvalEntry ::= SEQUENCE {
+	mtvalIndex		 PositiveInteger,
+	mtvalName		 Txt16,
+	mtvalUnit		 Txt8,
+	mtvalTarif		 PositiveInteger,
+	mtvalExp		 PositiveInteger,
+	mtvalMbusValue	 PositiveInteger,
+	mtvalTxtValue	 Txt8,
+	mtvalAlarmState  AlarmState,
+	mtvalZeroOffset INTEGER
+
+}
+
+mtvalIndex OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The sensor index."
+	::= { mtvalEntry 1 }
+
+mtvalName OBJECT-TYPE
+	SYNTAX	Txt16
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Jmeno parametru."
+	::= { mtvalEntry 2 }
+
+mtvalUnit OBJECT-TYPE
+	SYNTAX	Txt8
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Jednotka parametru."
+	::= { mtvalEntry 3 }
+
+mtvalTarif OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Tarif parametru."
+	::= { mtvalEntry 4 }
+
+mtvalExp OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Exponent parametru."
+	::= { mtvalEntry 5 }
+
+mtvalMbusValue OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Aktualni hodnota prarametru v ciselnem formatu. Hodnota bez exponentu a ZeroOffsetu"
+	::= { mtvalEntry 6 }
+
+mtvalTxtValue OBJECT-TYPE
+	SYNTAX	Txt8
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Aktualni hodnota prarametru v textovem formatu. Hodnota se zapocitanym exponentm"
+	::= { mtvalEntry 7 }
+
+mtvalAlarmState OBJECT-TYPE
+	SYNTAX	AlarmState
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Value Alarm State"
+	::= { mtvalEntry 8 }
+
+mtvalZeroOffset OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"Value Zero Offset."
+	::= { mtvalEntry 9 }
+
+-- Input Dry Contacts   -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+inpNumber OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"Number of Input Dry Contacts"
+	::= { input 1 }
+
+inpTable OBJECT-TYPE
+	SYNTAX	SEQUENCE OF InpEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"A list of binary input entries."
+	::= { input 2 }
+
+inpEntry OBJECT-TYPE
+	SYNTAX	InpEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"An entry containing information applicable
+		to a particular binary input."
+	INDEX { inpIndex }
+	::= { inpTable 1 }
+
+InpEntry ::= SEQUENCE {
+	inpIndex		PositiveInteger,
+	inpName			Txt16,
+	inpValue		OpenClose,
+	inpValueName	Txt8,
+	inpAlarmState	AlarmState
+}
+
+inpIndex OBJECT-TYPE
+	SYNTAX	PositiveInteger
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The binary input index."
+	::= { inpEntry 1 }
+
+inpName OBJECT-TYPE
+	SYNTAX	Txt16
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The binary input name."
+	::= { inpEntry 2 }
+
+inpValue OBJECT-TYPE
+	SYNTAX	OpenClose
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The binary input value."
+	::= { inpEntry 3 }
+
+inpValueName OBJECT-TYPE
+	SYNTAX	Txt8
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The binary input name."
+	::= { inpEntry 4 }
+
+inpAlarmState OBJECT-TYPE
+	SYNTAX	AlarmState
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The binary input alarm state."
+	::= { inpEntry 5 }
+
+-- Trap Definitions  -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
+pwrStateToAlarm	TRAP-TYPE
+	ENTERPRISE	hwgpwr
+	VARIABLES	{ mtvalIndex, mtvalName, mtvalUnit, mtvalTarif, mtvalExp, mtvalMbusValue, mtvalTxtValue, mtvalAlarmState }
+	DESCRIPTION
+		"Value changed to Alarm state."
+	::= 1
+
+pwrStateToNormal	TRAP-TYPE
+	ENTERPRISE	hwgpwr
+	VARIABLES	{ mtvalIndex, mtvalName, mtvalUnit, mtvalTarif, mtvalExp, mtvalMbusValue, mtvalTxtValue, mtvalAlarmState }
+	DESCRIPTION
+		"Value changed to Normal state."
+	::= 2
+
+inContactStateToAlarm	TRAP-TYPE
+	ENTERPRISE	hwgpwr
+	VARIABLES	{ sysName, infoAddressMAC, inpIndex, inpName, inpValue, inpValueName, inpAlarmState }
+	DESCRIPTION
+		"Input Dry Contact to Alarm state."
+	::= 3
+
+inContactStateToNormal	TRAP-TYPE
+	ENTERPRISE	hwgpwr
+	VARIABLES	{ sysName, infoAddressMAC, inpIndex, inpName, inpValue, inpValueName, inpAlarmState  }
+	DESCRIPTION
+		"Input Dry Contact to Normal state."
+	::= 4
+
+
+
+
+
+END

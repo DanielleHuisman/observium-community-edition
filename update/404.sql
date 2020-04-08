@@ -1,0 +1,10 @@
+ALTER TABLE `devices_mibs` DROP INDEX `mib`;
+ALTER TABLE `devices_mibs` DROP `table_name`;
+ALTER TABLE `devices_mibs` CHANGE `oid` `object` TEXT CHARACTER SET latin1 COLLATE latin1_general_ci NULL DEFAULT NULL COMMENT 'Table or Object or Numeric. Latin charset for 1byte chars!';
+ALTER TABLE `devices_mibs` CHANGE `mib` `mib` VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_general_ci NULL DEFAULT NULL COMMENT 'Latin charset for 1byte chars!';
+ALTER TABLE `devices_mibs` ADD `use` ENUM('mib','object') CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL AFTER `object`;
+ALTER TABLE `devices_mibs` ADD UNIQUE `mib_object` (`device_id`, `mib`(128), `object`(512));
+-- SET FOREIGN_KEY_CHECKS=0;
+DELETE FROM `devices_mibs` WHERE `device_id` NOT IN (SELECT `device_id` FROM `devices`);
+ALTER TABLE `devices_mibs` ADD CONSTRAINT `mibs_devices` FOREIGN KEY (`device_id`) REFERENCES `devices`(`device_id`) ON DELETE CASCADE ON UPDATE NO ACTION;
+-- SET FOREIGN_KEY_CHECKS=1;

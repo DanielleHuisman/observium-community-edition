@@ -1,0 +1,188 @@
+#! /usr/bin/env python
+
+"""
+
+ Observium
+
+   This file is part of Observium.
+
+ @package        observium
+ @subpackage     definitions
+ @author         Mike Stupalov <mike@observium.org>
+ @copyright      (C) 2006-2013 Adam Armstrong, (C) 2013-2018 Observium Limited
+
+"""
+
+"""
+    Required modules
+"""
+
+try:
+    import sys
+except:
+    print("ERROR: missing required python module: %s" % ('sys'))
+
+try:
+    import os
+except:
+    print("ERROR: missing required python module: %s" % ('os'))
+    sys.exit(1)
+
+try:
+    import glob
+except:
+    print("ERROR: missing required python module: %s" % ('glob'))
+    sys.exit(1)
+
+try:
+    import argparse
+except:
+    print("ERROR: missing required python module: %s" % ('argparse'))
+    sys.exit(1)
+
+try:
+    import re
+except:
+    print("ERROR: missing required python module: %s" % ('re'))
+    sys.exit(1)
+
+"""
+    Parse arguments
+"""
+
+parser = argparse.ArgumentParser(description='Split monolithic MIB definition into multiple files.')
+parser.add_argument('MIB',            nargs='+',                          help='MIB definition file.')
+#parser.add_argument('-f', '--force',  action='store_true', default=False, help='Force rename file if same MIB already exist.')
+#parser.add_argument('-s', '--silent', action='store_true', default=False, help='Do not show messages about already correct MIB name.')
+#parser.add_argument('-d', '--debug', action='store_true', default=False, help='Enable debug output.')
+
+# Parse passed arguments
+args = parser.parse_args()
+#print(args)
+
+"""
+    Initial variables
+"""
+
+# base script name
+scriptname      = os.path.basename(sys.argv[0])
+
+# major/minor python version: (2,7), (3,2)
+python_version  = sys.version_info[:2]
+
+#print(scriptname)
+#print(python_version)
+
+# force rename
+#force = args.force
+#silent = args.silent
+
+# patterns
+pattern_begin = '^\s*\$mib\s+=\s+[\'"](\S+?)[\'"]\s*;' # $mib = 'SNMPv2-MIB';
+pattern_dir   = '^\s*\$config\[[\'"]mibs[\'"]\]\S+\[[\'"]mib_dir[\'"]\]\s+=\s+[\'"](\S+?)[\'"];' # $config['mibs'][$mib]['mib_dir'] = 'rfc';
+comments_end  = '\n\s*(?://[^\n]*|/\*(?:(?!\*/).)*\*/)\s*$' # comments at end of definition
+
+for mibs in args.MIB:
+    files = glob.glob(mibs)
+    #print(files)
+
+    for file in files:
+        file_name, file_ext = os.path.splitext(file)
+        #file_name = os.path.basename(file)
+        #dir_name  = os.path.dirname(file)
+
+        #print(file_name)
+        #print(dir_name)
+
+        # open file with MIB
+        try:
+            f = open(file, 'r')
+        except:
+            if os.path.isdir(file):
+                print('skipping \'%s\' -- dir' % file)
+            else:
+                print('skipping \'%s\' -- unable to open' % file)
+            continue
+
+        mibs     = 0
+        mib_dirs = 0
+        definitions = {}
+        # Loop file for mib definitions
+        for line in f:
+            # Find next mib definition
+            match = re.match(pattern_begin, line)
+            if match:             # Start of mib definition
+                if mibs > 0:
+                    # Detect comments from end of collect, since this must be in next defintition
+                    comments = True
+                    while comments:
+                        regex = re.compile(comments_end, re.DOTALL)
+                        comments = regex.search(collect)
+                        if comments:
+                            line = comments.group(0) + line # append to next definition
+                            collect = regex.sub('', collect) # remove from current
+
+                    # Store previos definition into dict
+                    try:
+                        definitions[mib_dir] += collect
+                    except:
+                        definitions[mib_dir] = collect
+
+                mib_dir = ''   # reset mib_dir, for exclude mistakes
+                collect = line # start new definition
+                mibs += 1
+            elif mibs > 0:
+                collect += line
+
+                # Find mib_dir for current definition
+                match = re.match(pattern_dir, line)
+                if match:             # Find mib_dir for current definition
+                    mib_dir = match.group(1)
+
+        # also store last definition into dict
+        try:
+            definitions[mib_dir] += collect
+        except:
+            definitions[mib_dir] = collect
+
+        f.close() # close MIB file
+
+base_dir = '/opt/observium/includes/definitions/mibs/' # hard code
+head = """<?php
+/**
+ * Observium
+ *
+ *   This file is part of Observium.
+ *
+ * @package        observium
+ * @subpackage     definitions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2018 Observium Limited
+ *
+ */
+
+"""
+
+for mib_dir in definitions:
+    if mib_dir == '':
+        file_name = '_unknown.inc.php'
+    elif mib_dir == 'rfc' or mib_dir == 'net-snmp':
+        # keep rfc and net-snmp in main file (required for load first some vars in other mibs)
+        continue
+    else:
+        file_name = mib_dir + '.inc.php'
+    file_name = base_dir + file_name
+    print(file_name)
+
+    try:
+        n = open(file_name, 'w')
+    except:
+        print('WARNING: file \'%s\' not have write permissions.' % file_name)
+        break
+    
+    n.write(head + definitions[mib_dir] + "\n\n// EOF\n")
+    #print(definitions[mib_dir])
+    n.close() # close new file
+
+#print(definitions)
+
+# EOF

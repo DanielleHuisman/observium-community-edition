@@ -1,0 +1,283 @@
+-- *****************************************************************
+-- DLINKPRIME-POE-MIB.mib : D-Link extensions to POWER-ETHERNET-MIB (PoE)
+--
+-- Copyright (c) 2014 D-Link Corporation, all rights reserved.
+--
+-- *****************************************************************
+DLINKPRIME-POE-MIB DEFINITIONS ::= BEGIN
+
+     IMPORTS
+        OBJECT-GROUP, MODULE-COMPLIANCE, NOTIFICATION-GROUP 
+            FROM SNMPv2-CONF
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32 
+            FROM SNMPv2-SMI
+        DisplayString,TruthValue
+            FROM SNMPv2-TC
+        pethPsePortIndex
+            FROM POWER-ETHERNET-MIB
+        dlinkPrimeCommon
+            FROM DLINK-ID-REC-MIB;
+
+
+    dlinkPrimePoeExtMIB MODULE-IDENTITY
+        LAST-UPDATED "201404260000Z"
+        ORGANIZATION "D-Link Corp."
+        CONTACT-INFO
+                "        D-Link Corporation
+                 Postal: No. 289, Sinhu 3rd Rd., Neihu District,
+                         Taipei City 114, Taiwan, R.O.C
+                 Tel:     +886-2-66000123
+                 E-mail: tsd@dlink.com.tw
+                "
+        DESCRIPTION
+                "A MIB module for extending POWER-ETHERNET-MIB specified in 
+                RFC 3621.
+                " 
+        REVISION "201404260000Z"
+        DESCRIPTION
+                 "Initial version of this MIB module."
+        ::= { dlinkPrimeCommon 11 }
+
+-- -----------------------------------------------------------------------------
+    dpPoeMIBNotifications OBJECT IDENTIFIER ::= { dlinkPrimePoeExtMIB 0 }       
+    dpPoeMIBObjects       OBJECT IDENTIFIER ::= { dlinkPrimePoeExtMIB 1 }
+    dpPoeMIBConformance   OBJECT IDENTIFIER ::= { dlinkPrimePoeExtMIB 2 }
+
+------------------------------------------------------------------------------------------------------
+    dpPoeIfObjects  OBJECT IDENTIFIER ::= { dpPoeMIBObjects 1 }  
+                
+    dpPoeIfCfgTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF DpPoeIfCfgEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+             "This table consists of a list of PoE configuration 
+             information for ports."
+        ::= { dpPoeIfObjects 1 }   
+       
+    dpPoeIfCfgEntry OBJECT-TYPE
+        SYNTAX        DpPoeIfCfgEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+             "An entry contains PoE configuration on a port."
+        INDEX { 
+            pethPsePortIndex
+        }
+        ::= { dpPoeIfCfgTable 1 }    
+        
+    DpPoeIfCfgEntry ::=            SEQUENCE {
+        dpPoeIfState             INTEGER,
+        dpPoeIfMaxPower          Integer32,
+        dpPoeIfTimeRange         DisplayString
+    }      
+        
+    dpPoeIfState OBJECT-TYPE
+        SYNTAX      INTEGER {
+           auto(1),          
+           never(2),
+           static(3),
+           class1(4),
+           class2(5),
+           class3(6),
+           class4(7)
+        }
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "This object indicates the PoE state of the entry.
+            auto(1) -  the port will automatically detect the PD and provision
+                power to the PD. The max wattage value which can be provisioned
+                to the port is determined by dpPoeIfMaxPower. If dpPoeIfMaxPower
+                is unspecified, then the class of the PD auto determines the
+                maximum wattage which can be provisioned. The PD will not be
+                provisioned if it requests more wattage than the max wattage
+                which is determined.               
+            never(2) - indicates the port will not supply power to connected PD;
+            static(3) - indicates manager pre-allocate power budget to the port
+                by configuring the dpPoeIfMaxPower object. The power budget is allocated
+                to the port even though there is no PD connected to the port. 
+                If dpPoeIfMaxPower is not configured, default value is 15400mW for 802.3af 
+                and 30000mW for 802.3at.
+            class1(4)~class4(7) - Configures PoE port power limit. "
+
+        DEFVAL {auto}
+        ::= { dpPoeIfCfgEntry 1 }
+
+    dpPoeIfMaxPower OBJECT-TYPE
+        SYNTAX          Integer32 (0 | 1000..30000)
+        UNITS           "milliwatts"
+        MAX-ACCESS      read-write
+        STATUS           current
+        DESCRIPTION
+              "This object indicates the max wattage value which can 
+               be provisioned to the port.
+               Note: This object is valid only while the dpPoeIfState 
+               object is configured as static."
+        ::= { dpPoeIfCfgEntry 2 } 
+        
+    dpPoeIfTimeRange OBJECT-TYPE
+        SYNTAX          DisplayString (SIZE (0..8))
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+              "This object indicates the name of time-range profile to delineate
+               the activation period.
+               A zero length string indicates the time-range is not specified."
+        ::= { dpPoeIfCfgEntry 3 }
+
+------------------------------------------------------------------------------------------------------
+    dpPoeIfInfoObjects  OBJECT IDENTIFIER ::= { dpPoeIfObjects 2 }
+
+    dpPoeIfStatusTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF DpPoeIfStatusEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+             "This table consists of a list of PoE status for ports."
+        ::= { dpPoeIfInfoObjects 1 } 
+                         
+    dpPoeIfStatusEntry  OBJECT-TYPE
+        SYNTAX          DpPoeIfStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+             "An entry consists of PoE status for a port."
+        INDEX { pethPsePortIndex }
+        ::= { dpPoeIfStatusTable 1 }  
+        
+    DpPoeIfStatusEntry ::=         SEQUENCE {
+        dpPoeIfDetectStatus     INTEGER,
+        dpPoeIfFaultyType       INTEGER
+    } 
+
+    dpPoeIfDetectStatus OBJECT-TYPE
+        SYNTAX          INTEGER             {
+            disabled(1),
+            searching(2),
+            requesting(3),
+            delivering(4),
+            faulty(5)
+        }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION
+             "This object indicates the operational status of the port PD detection.
+             disabled(1) - PSE function is disabled.
+             searching(2) - Remote PD is not connected.
+             requesting(3) - Remote PD is inserted, but the PSE doesn't provide power yet.
+             delivering(4) - Remote PD is now powering by PoE system.
+             faulty(5) - Device detection or a powered device is in a faulty state.
+             "
+        ::= { dpPoeIfStatusEntry 1 }  
+            
+    dpPoeIfFaultyType OBJECT-TYPE
+        SYNTAX        INTEGER {     
+            notApplicable(0),
+            mpsAbsent(1),
+            pdShort(2),
+            overload(3),
+            powerDenied(4),
+            thermalShutdown(5),
+            startupFailure(6),
+            classificationFailure(7)
+        }
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "This object indicates the specific faulty type. It is meaningful
+            only when dpPoeIfDetectStatus object is 'faulty'.
+            notApplicable(0) - indicates this object is meaningless, e.g. the 
+                dpPoeIfDetectStatus is not 'faulty'.
+            mpsAbsent(1) - indicates MPS(Maintain Power Signature) Absent
+            pdShort(2) - indicates PD Short
+            overload(3) - indicates Overload
+            powerDenied(4) - indicates Power Denied
+            thermalShutdown(5)- indicates Thermal Shutdown
+            startupFailure(6) -  indicates Startup Failure
+            classificationFailure(7) - indicates Classification Failure(IEEE 802.3at)
+            "
+        ::= { dpPoeIfStatusEntry 2 }
+
+------------------------------------------------------------------------------------------------------
+    dpPoeIfMeasurementTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF DpPoEIfMeasurementEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+            "This table consists of a list of POE measurement 
+            information for ports."
+        ::= { dpPoeIfInfoObjects 2 } 
+                         
+    dpPoeIfMeasurementEntry  OBJECT-TYPE
+        SYNTAX          DpPoEIfMeasurementEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION
+             "An entry consists of PoE measurement information of a port."
+        INDEX { 
+            pethPsePortIndex 
+        }
+        ::= { dpPoeIfMeasurementTable 1 }  
+        
+    DpPoEIfMeasurementEntry ::=        SEQUENCE {
+        dpPoeIfPower             Integer32
+    } 
+ 
+     dpPoeIfPower OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+             "This object indicates consumption power of port in milliwatts."
+        ::= { dpPoeIfMeasurementEntry 1 }  
+
+-- *****************************************************************************
+-- MIB Notifications 
+-- *****************************************************************************
+
+-- *****************************************************************************
+-- MIB Conformance statements
+-- *****************************************************************************
+    dpPoeMIBCompliances  OBJECT IDENTIFIER  ::= { dpPoeMIBConformance 1 }
+
+    dpPoeMIBGroups  OBJECT IDENTIFIER  ::= { dpPoeMIBConformance 2 }   
+    dpPoeMIBCompliance MODULE-COMPLIANCE
+        STATUS          current
+        DESCRIPTION
+            "The compliance statement for entities which implement the
+             DLINKPRIME-POE-MIB."
+        MODULE          -- this module
+        MANDATORY-GROUPS { 
+            dpPoeGroupCfgGroup,
+            dpPoeIfCfgGroup,
+            dpPoeGroupInfoGroup,
+            dpPoeIfInfoGroup,
+            dpPoeIfErrorStateNotificationGroup
+        }
+
+        ::= { dpPoeMIBCompliances 1 }
+
+    dpPoeIfCfgGroup OBJECT-GROUP
+        OBJECTS {
+             dpPoeIfState,
+             dpPoeIfMaxPower,
+             dpPoeIfTimeRange
+        }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects configure or display the ports information."
+        ::= { dpPoeMIBGroups 1 }
+
+    dpPoeIfInfoGroup OBJECT-GROUP
+        OBJECTS {
+             dpPoeIfDetectStatus,
+             dpPoeIfFaultyType,
+             dpPoeIfPower
+        }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects display the ports information."
+        ::= { dpPoeMIBGroups 2 } 
+                                                                                                                
+END          

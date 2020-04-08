@@ -1,0 +1,2061 @@
+-- MibName=raisecomRemoteManagementLocal
+-- =======================================================================
+-- Version info 
+--
+-- Version 0.1 Created 2006.9.11 by CHENJUNYONG
+-- This version of MIB is created just for extoam remote management on local devices. 
+--
+-- Copyright(c) 2003-2005 by RAISECOM TECH, Ltd. 
+-- =======================================================================
+
+-- =========================================================================== 
+-- modify: 
+-- 01, 20070613, ly, add raisecomRemoteDeviceName£¬modify raisecomRemotePortType
+-- =======================================================================
+
+-- =========================================================================== 
+
+--
+-- RAISECOM remote device management objects
+--            
+
+RAISECOM-REMOTE-MANAGEMENT-LOCAL-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+		MODULE-IDENTITY,
+		OBJECT-TYPE,
+		NOTIFICATION-TYPE ,
+		Integer32,
+		IpAddress,
+		Unsigned32
+			FROM SNMPv2-SMI
+		DisplayString,		
+		RowStatus,
+		TruthValue
+			FROM SNMPv2-TC    
+		EnableVar,
+		PortList
+			FROM SWITCH-TC     
+		EntryStatus
+			FROM SWITCH-RMON-MIB   -- rmonMib.mib
+		ifIndex
+			FROM RFC1213-MIB  
+		raisecomAgent		
+			FROM RAISECOM-BASE-MIB;
+	
+	raisecomRemoteManagementLocal    MODULE-IDENTITY
+		LAST-UPDATED 	"200608170000Z"
+		ORGANIZATION 	"RAISECOM TECH, Ltd."
+		CONTACT-INFO 	"www.raisecom.com"
+		DESCRIPTION  	
+		    "The MIB module defining objects for remote management on local devices."
+		::= { raisecomAgent  12}   
+		
+RcRemoteVlanStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "  Specifies the status of vlan to be performed. 
+        The value 'vlan-forbid' will forbid vlan function in the equipment.
+        The value 'vlan-dot1q' will allow 802.1Q vlan function to work in the equipment.  
+        The value 'vlan-port' will allow port vlan function to work in the equipment.
+      " 
+    REFERENCE
+       "raisecomRemoteManagementLocal"
+    SYNTAX      INTEGER {
+                  vlan-forbid        (1),
+                  vlan-dot1q         (2),
+                  vlan-port          (3)
+                }         
+
+RcRemotePortTagStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "  Specifies the status of tag in the port. 
+        The value 'untag' means there is no tags in the port.
+        The value 'tag' means there is a tag in the port.  
+      " 
+    REFERENCE
+       "raisecomRemoteManagementLocal"
+    SYNTAX      INTEGER {
+                  untag              (1),
+                  tag                (2)
+                  }
+		                        
+		                        
+RcRemoteConfigFrameSendStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "  Specifies the status of send config packet to the remote device. 
+        The value 'send' means the config packet should be sent to the remote device and not saved.
+        The value 'save' means the config packet is just saved as default file in local device. 
+        The value 'sendandsave' means the config packet should be sent to the remote device also 
+        saved as default file in local device.   
+        The value 'waitting' means the config packet is sending or saving.
+        The value 'successful' means the config packet is sent or saved successfully.
+        The value 'failed' means the config packet is failed to send or save.
+      " 
+    REFERENCE
+       "raisecomRemoteManagementLocal"
+    SYNTAX      INTEGER {
+		        	send(1), 
+		        	save(2), 
+		        	sendandsave(3),
+		        	waitting(4),
+		        	successful(5),
+		       		failed(6)
+		       		}            
+		       		         
+RcRemoteSfpDdmMode ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "  Specifies the mode of SFP DDM. 
+        The value 'unknown' means the remote SFP DDM mode is unknown.
+        The value 'inside' means the remote SFP DDM mode is inside.  
+        The value 'outside' means the remote SFP DDM mode is outside.
+      " 
+    REFERENCE
+       "raisecomRemoteManagementLocal"
+    SYNTAX      INTEGER {
+                  unknown            (0),
+                  inside  	 		 (1),
+                  outside            (2)                  
+                  }
+	                        
+RcRemoteSfpDdmAlarmStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "  Specifies the status of SFP DDM alarm. 
+        The value 'normal' means the remote SFP DDM is normal.
+        The value 'low' means the remote SFP DDM is lower than threshold.  
+        The value 'high' means the remote SFP DDM is higher than threshold.
+      " 
+    REFERENCE
+       "raisecomRemoteManagementLocal"
+    SYNTAX      INTEGER {
+                  normal             (0),
+                  low				 (1),
+                  high               (2)                  
+                  }
+                
+-- groups            
+	
+   	raisecomRemoteManagementLocalMibObjects OBJECT IDENTIFIER ::= { raisecomRemoteManagementLocal 1 }
+	raisecomRemoteManagementLocalMibTraps   OBJECT IDENTIFIER ::= { raisecomRemoteManagementLocal 2 }
+
+
+--
+	raisecomRemoteTrapEnable OBJECT-TYPE
+		    SYNTAX EnableVar
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Specifies whether traps should be generated 
+		        when receives OAM notifications from remote devices."
+		    ::= { raisecomRemoteManagementLocalMibObjects 1 }
+   
+   
+	raisecomRemoteInvariableInfoTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteInvariableInfoEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Basic information of remote devices."
+		    ::= { raisecomRemoteManagementLocalMibObjects 2 }
+
+	raisecomRemoteInvariableInfoEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteInvariableInfoEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry for basic information of each remote device."
+		    INDEX { raisecomRemoteInvariableInfoIndex }
+		    ::= { raisecomRemoteInvariableInfoTable 1 }
+
+	RaisecomRemoteInvariableInfoEntry ::= SEQUENCE {
+		    raisecomRemoteInvariableInfoIndex 	INTEGER,		    
+		    raisecomRemoteSysOid                OBJECT IDENTIFIER,
+		    raisecomRemoteModuleType        INTEGER,
+		    raisecomRemoteOidCapability 	TruthValue,
+		    raisecomRemoteFileTransCapability 	TruthValue,
+		    raisecomRemoteOtherCapability 	INTEGER,
+		    raisecomRemoteMainChipId 		INTEGER,
+		    raisecomRemoteFpgaChipId 			INTEGER,
+		    raisecomRemoteFpgaSwVer 		OCTET STRING,
+		    raisecomRemoteSystemSwVer 		OCTET STRING,    
+		    raisecomRemoteSystemHwVer		OCTET STRING,
+		    raisecomRemotePortNum  		INTEGER,      
+		    raisecomRemoteDeviceName    OCTET STRING,     
+		    raisecomRemoteInvariableInfoStatus	EntryStatus
+	    	    }
+
+	raisecomRemoteInvariableInfoIndex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomRemoteTrapEnable."
+		    ::= { raisecomRemoteInvariableInfoEntry 1 }
+
+	raisecomRemoteSysOid OBJECT-TYPE
+		    SYNTAX OBJECT IDENTIFIER
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The vendor's authoritative identification of the network 
+		        management subsystem contained in the entity.  This value 
+		        provides an easy and unambiguous means for determining `what 
+		        kind of box' the remote device is. "
+		    DEFVAL { 0 }
+		    ::= { raisecomRemoteInvariableInfoEntry 2 }
+		    
+    raisecomRemoteModuleType OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies module type of remote device."		    
+		    ::= { raisecomRemoteInvariableInfoEntry 3 }
+
+	raisecomRemoteOidCapability OBJECT-TYPE
+		    SYNTAX TruthValue
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "An indication of whether the device support OID parse."
+		      DEFVAL {false}   		       
+		    ::= { raisecomRemoteInvariableInfoEntry 4 }
+
+	raisecomRemoteFileTransCapability OBJECT-TYPE
+		    SYNTAX  TruthValue
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "An indication of whether the device support file transfer via oam."
+		    DEFVAL {false}
+		    ::= { raisecomRemoteInvariableInfoEntry 5 }
+
+	 raisecomRemoteOtherCapability OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This  object specifies oam capbilities set supported by remote device.
+		         The value of 2^n (n>=0&&n<32) stands for each oam capability. 2^0 stands 
+		         for IP configuration capability ,2^1 stands for SNMP community configuration 
+		         capability,2^2 stands for port configuration,2^3 stands for environment monitor
+		         capability, 2^4 stands for reboot opration, 2^5 stands for write operation, 
+		         2^6 stands for erase remote configuration file capability, 2^7 stands for hostname
+		         configuration, 2^8 stands for extend-oam notification enable capability.		      
+		         Several 2^n ORed value stands for corresponding capabilities¡¯ combination.
+		         For example,the value of 3 equal 2^0 OR 2^1,so value of 3 indicates remote device 
+		         supports IP configuration and SNMP community configuration capabilities concurrently ."
+		    DEFVAL {0}    
+		    ::= { raisecomRemoteInvariableInfoEntry 6 }
+
+	 raisecomRemoteMainChipId OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The main chip id of remote device, probably the id of switch chip 
+		        contained in remote device."
+		     DEFVAL {0} 
+		    ::= {  raisecomRemoteInvariableInfoEntry 7 }
+
+	raisecomRemoteFpgaChipId OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The FPGA chip id of remote device."
+		     DEFVAL {0}     
+		    ::= {  raisecomRemoteInvariableInfoEntry 8 }
+
+	raisecomRemoteFpgaSwVer OBJECT-TYPE
+		    SYNTAX OCTET STRING
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The FPGA software version of remote device."
+		    ::= {  raisecomRemoteInvariableInfoEntry 9 }
+
+	 raisecomRemoteSystemSwVer OBJECT-TYPE
+		    SYNTAX OCTET STRING
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Remote devices system software version."
+		    ::= {  raisecomRemoteInvariableInfoEntry 10 }
+
+	 raisecomRemoteSystemHwVer OBJECT-TYPE
+		    SYNTAX  OCTET STRING
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Remote devices system hardware version."
+		    ::= {  raisecomRemoteInvariableInfoEntry 11 }
+
+	 raisecomRemotePortNum OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The port number of remote device."
+		    ::= {  raisecomRemoteInvariableInfoEntry 12 }
+	
+	 raisecomRemoteDeviceName OBJECT-TYPE
+		    SYNTAX OCTET STRING
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The name of remote device."
+		    ::= {  raisecomRemoteInvariableInfoEntry 13 }	
+	 
+	 raisecomRemoteInvariableInfoStatus OBJECT-TYPE
+		    SYNTAX  EntryStatus
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The status of this invariable information entry."
+		    ::= {  raisecomRemoteInvariableInfoEntry 14 }
+
+-- raisecomRemoteEnvironmentTable
+
+	raisecomRemoteEnvironmentTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteEnvironmentEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Environment information of remote devices."
+		    ::= { raisecomRemoteManagementLocalMibObjects 3 }
+
+	raisecomRemoteEnvironmentEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteEnvironmentEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry for environment information of remote devices."
+		    INDEX { raisecomRemoteEnvironmentIndex }
+		    ::= { raisecomRemoteEnvironmentTable 1 }
+
+	RaisecomRemoteEnvironmentEntry ::= SEQUENCE {
+		    raisecomRemoteEnvironmentIndex	INTEGER,		    
+		    raisecomRemoteTemperature       INTEGER,
+		    raisecomRemoteVolt3300 	INTEGER,
+		    raisecomRemoteVolt2500 	INTEGER,
+		    raisecomRemoteVolt1800	INTEGER,
+		    raisecomRemoteVolt1200	INTEGER,
+		    raisecomRemoteVoltNormal  INTEGER		      		    
+		    }
+
+	raisecomRemoteEnvironmentIndex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomRemoteEnvironmentTable. "
+		    ::= { raisecomRemoteEnvironmentEntry 1 }
+
+	raisecomRemoteTemperature OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The current environment temperature of remote device."		       		       
+		    DEFVAL {65535}
+		    ::= { raisecomRemoteEnvironmentEntry 2 }	
+		    
+	raisecomRemoteVolt3300  OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Current voltage value of 3.3v of remote device."		     		       
+		    DEFVAL {65535}
+		    ::= { raisecomRemoteEnvironmentEntry 3 }
+		    
+	raisecomRemoteVolt2500  OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Current voltage value of 2.5v of remote device."
+		    DEFVAL {65535}		     		       
+		    ::= { raisecomRemoteEnvironmentEntry 4 }
+		    
+	raisecomRemoteVolt1800  OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Current voltage value of 1.8v of remote device."
+		    DEFVAL {65535}		     		       
+		    ::= { raisecomRemoteEnvironmentEntry 5 }	
+		    	    		   		    	    
+	raisecomRemoteVolt1200  OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Current voltage value of 1.2v of remote device."		     		       
+		    DEFVAL {65535}
+		    ::= { raisecomRemoteEnvironmentEntry 6 }
+		    
+    raisecomRemoteVoltNormal  OBJECT-TYPE
+		    SYNTAX INTEGER{
+		                    normal(1),
+		                    high(2),
+		                    low(3)		        
+	                      }  
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies whether remote votage is in normal range or not."    		       
+		    ::= { raisecomRemoteEnvironmentEntry 7 }
+		    
+-- raisecomRemoteSysCfgTable  
+   
+	raisecomRemoteSysCfgTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteSysCfgEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "A table of remote device system config."
+		    ::= { raisecomRemoteManagementLocalMibObjects 4 }
+
+	raisecomRemoteSysCfgEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteSysCfgEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote device system config."
+		    INDEX { raisecomRemoteSysCfgIndex }
+		    ::= { raisecomRemoteSysCfgTable 1 }
+
+	RaisecomRemoteSysCfgEntry ::= SEQUENCE {
+		    raisecomRemoteSysCfgIndex 		INTEGER,		    
+		    raisecomRemoteSysOperation          INTEGER,
+		    raisecomRemoteSysOperationState 	INTEGER,
+		    raisecomRemoteHostName 		OCTET STRING (SIZE (1..32)),
+		    raisecomRemoteOamNotificationEnable	EnableVar,
+		    raisecomRemoteMaxAllowedFrameLength INTEGER   		    
+		    }
+
+	raisecomRemoteSysCfgIndex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomRemoteSysCfgTable. "
+		    ::= { raisecomRemoteSysCfgEntry 1 }
+
+	raisecomRemoteSysOperation OBJECT-TYPE
+		    SYNTAX INTEGER{
+        			ready(1),
+        			write(2),
+        			erase(3),
+        			reboot(4)}
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Specifies system command in remote device.Currently,support three
+		         types command:reboot,write and erase.Reboot command is used to reset
+		         remote device,write is used to save startup-config file in remote device,
+		         and erase is used to erase startup-config file of remote device."
+		    DEFVAL {ready}		    
+		    ::= { raisecomRemoteSysCfgEntry 2 }
+
+	raisecomRemoteSysOperationState OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	ready(1),
+		        	running(2),
+		        	successful(3),
+		       		failed(4)}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Specifies the state of this system operation to remote device."
+		     DEFVAL {ready}   		       
+		    ::= { raisecomRemoteSysCfgEntry 3 }
+
+	raisecomRemoteHostName OBJECT-TYPE
+		    SYNTAX  OCTET STRING (SIZE(1..32))
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Host name of Remote device."		    
+		    ::= { raisecomRemoteSysCfgEntry 4 }
+
+	 raisecomRemoteOamNotificationEnable OBJECT-TYPE
+		    SYNTAX EnableVar
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Specifies whether or not remote device send OAM notificaton frames."		       
+		    ::= { raisecomRemoteSysCfgEntry 5 }	
+		    
+    raisecomRemoteMaxAllowedFrameLength OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies max ethernet frame length  of remote device." 		    		    
+		    ::= { raisecomRemoteSysCfgEntry 6 }	
+
+-- raisecomRemoteCommunityTable
+
+	raisecomRemoteCommunityTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteCommunityEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "A table of SNMPv1/v2c community string of remote devices."
+		    ::= { raisecomRemoteManagementLocalMibObjects 5 }
+
+	raisecomRemoteCommunityEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteCommunityEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of community of remote devices."
+		    INDEX { raisecomRemoteSysCfgIndex }
+		    ::= { raisecomRemoteCommunityTable 1 }
+
+	RaisecomRemoteCommunityEntry ::= SEQUENCE {
+		    raisecomRemoteCommunityIndex 	INTEGER,		    
+		    raisecomRemoteCommunityName         OCTET STRING (SIZE (1..20)),
+		    raisecomRemoteCommunityPermission 	INTEGER
+		    }
+
+	raisecomRemoteCommunityIndex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomRemoteCommunityTable. "
+		    ::= { raisecomRemoteCommunityEntry 1 }
+
+	raisecomRemoteCommunityName OBJECT-TYPE
+		    SYNTAX OCTET STRING (SIZE (1..20))
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The SNMPv1/v2c community name string in remote device.
+		        In remote device's community table,the index of this community
+		        is 3,and the view for this community is 'internet'."		    		    
+		    ::= { raisecomRemoteCommunityEntry 2 }
+
+	raisecomRemoteCommunityPermission OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        		readOnly(1),
+               			readWrite(2),
+               			invalid(3)
+               			}
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the type of access allowed. 
+		        'readOnly(1)' allows GET operations (i.e., GET, 
+		        GET-NEXT, GET-BULK) and 'readWrite(2)' allows both 
+		        GET and SET operations."
+		     DEFVAL {readOnly}   		       
+		    ::= { raisecomRemoteCommunityEntry 3 }
+
+-- raisecomRemoteL3Table
+
+	raisecomRemoteL3Table OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteL3Entry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "A table of remote subnet parameters. "
+		    ::= { raisecomRemoteManagementLocalMibObjects 6 }
+
+	raisecomRemoteL3Entry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteL3Entry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of L3 subnet parameters of remote devices."
+		    INDEX { raisecomRemoteL3Index }
+		    ::= { raisecomRemoteL3Table 1 }
+
+	RaisecomRemoteL3Entry ::= SEQUENCE {
+		    raisecomRemoteL3Index 	INTEGER,		    
+		    raisecomRemoteL3IpAddr      IpAddress,
+		    raisecomRemoteL3Mask 	IpAddress,
+		    raisecomRemoteL3VidIface	INTEGER  (1..4094),
+		    raisecomRemoteL3VidMemberPorts	PortList,
+		    raisecomRemoteL3VidUntaggedPorts	PortList,
+		    raisecomRemoteL3DefaultGateway 	IpAddress,
+		    raisecomRemoteL3ObIpAddr		IpAddress,
+            raisecomRemoteL3ObMask            IpAddress
+		    }
+
+	raisecomRemoteL3Index OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomRemoteL3Table. "
+		    ::= { raisecomRemoteL3Entry 1 }
+
+	raisecomRemoteL3IpAddr OBJECT-TYPE
+		    SYNTAX IpAddress
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The IP Address of remote device.  This IP address 
+		        logically AND'ed with 'raisecomRemoteL3Mask' yields 
+		        the actual subnet value for this subnet.Set the object
+		        as '0.0.0.0' means delete IP address of remote devices "		    		    
+		    ::= { raisecomRemoteL3Entry 2 }
+
+	raisecomRemoteL3Mask OBJECT-TYPE
+		    SYNTAX IpAddress
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The subnet mask for this remote subnet.  It contains 1's 
+		        in the bit positions for the net and subnet IDs and 0's in 
+		        the bit positions for host ID.  The 1's must be contiguous, 
+		        starting with the left most bit."		        		       
+		    ::= { raisecomRemoteL3Entry 3 }
+
+	raisecomRemoteL3VidIface OBJECT-TYPE
+		    SYNTAX INTEGER (1..4094)
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object contains the actual VLAN ID (VID) from 1 to 4094.
+		         It is actually the management vlan of remote device."		        		       
+		    ::= { raisecomRemoteL3Entry 4 }
+
+	 raisecomRemoteL3VidMemberPorts OBJECT-TYPE
+		    SYNTAX PortList
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The set of ports which are permanently assigned to the egress
+		         list for this VLAN by management.Changes to a bit in this object
+		          affect the per-port per-VLAN Registrar control for Registration
+		          Fixed for the relevant GVRP state machine on each port.  A port
+		          may not be added in this set if it is already a member of the set 
+		          of ports in dot1qVlanForbiddenEgressPorts.  The default value of 
+		          this object is a string of zeros of appropriate length, indicating 
+		          not fixed."		        		       
+		    ::= { raisecomRemoteL3Entry 5}
+		    
+	raisecomRemoteL3VidUntaggedPorts OBJECT-TYPE
+		    SYNTAX PortList
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The set of ports which should transmit egress packets for this VLAN 
+		        as untagged.  The default value of this object for the default VLAN 
+		        (dot1qVlanIndex = 1) is a string of appropriate length including all 
+		        ports.  There is no specified default for other VLANs. If a device agent 
+		        cannot support the set of ports being set then it will reject the set 
+		        operation with an error. An example might be if a manager attempts to set 
+		        more than one VLAN to be untagged on egress where the device does not support 
+		        this IEEE 802.1Q option."		        		       
+		    ::= { raisecomRemoteL3Entry 6 }
+	
+	raisecomRemoteL3DefaultGateway  OBJECT-TYPE
+		    SYNTAX IpAddress
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "With this object to Set or get default gateway of remote devices."		        		       
+		    ::= { raisecomRemoteL3Entry 7 }
+	 raisecomRemoteL3ObIpAddr	OBJECT-TYPE
+		    SYNTAX IpAddress
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+			"The out IP Address of remote device."
+		    ::= { raisecomRemoteL3Entry 8 }		    		    		    		    
+ 	raisecomRemoteL3ObMask OBJECT-TYPE
+		    SYNTAX IpAddress
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The subnet mask for this remote subnet."		        		       
+		    ::= { raisecomRemoteL3Entry 9 }
+            
+            		    
+-- raisecomRemotePortTable
+	 
+   	raisecomRemotePortTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemotePortEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "A table of remote devices port properties. "
+		    ::= { raisecomRemoteManagementLocalMibObjects 7 }
+
+	raisecomRemotePortEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemotePortEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry for port control and status information in remote devices."
+		    INDEX { raisecomRemoteIfindex, raisecomRemotePortIfindex}
+		    ::= { raisecomRemotePortTable 1 }
+
+	RaisecomRemotePortEntry ::= SEQUENCE {
+		    raisecomRemoteIfindex  	INTEGER,
+		    raisecomRemotePortIfindex		INTEGER,		    
+		    raisecomRemotePortType              INTEGER,
+		    raisecomRemotePortName 		OCTET STRING,
+		    raisecomRemotePortAdminStatus 	TruthValue,
+		    raisecomRemotePortOperStatus 	INTEGER,
+		    raisecomRemotePortDuplexSpeedSet 	INTEGER,
+		    raisecomRemotePortDuplexSpeedGet 	INTEGER,
+		    raisecomRemotePortFlowControlEnable 	EnableVar,
+		    raisecomRemotePortFlowControlStatus 	EnableVar,    
+		    raisecomRemotePortIngressRate	INTEGER (0..1048576),
+		    raisecomRemotePortEgressRate  	INTEGER (0..1048576),		
+		    raisecomRemotePortFaultPassEnable	EnableVar,
+		    raisecomRemotePortFaultPassPorts    PortList,
+		    raisecomRemotePortFaultPassStatus   INTEGER,
+		    raisecomRemotePortFaultReturnEnable INTEGER ,
+		    raisecomRemotePortFaultReturnStatus   INTEGER,
+		    raisecomRemotePortSD   INTEGER,
+		    raisecomRemoteOptModuleType  	INTEGER,
+		    raisecomRemotePortDescr   OCTET STRING (SIZE (1..255))		        
+		    }		   
+
+	raisecomRemoteIfindex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The ifIndex value based 1 which identifies the unique interface of local device."
+		    ::= { raisecomRemotePortEntry 1 }
+
+	raisecomRemotePortIfindex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The ifIndex value based 1 which identifies the unique interface of remote device."
+		    ::= { raisecomRemotePortEntry 2 }
+
+	raisecomRemotePortType OBJECT-TYPE
+		    SYNTAX INTEGER{
+        			inexistence(0),
+        			fx-1000M(1), 
+        			tx-1000M(2), 
+        			fx-100M(3), 
+        			tx-100M(4)
+        			}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Port type in remote devices,same as slot type."		         		       
+		    ::= { raisecomRemotePortEntry 3 }
+
+	raisecomRemotePortName OBJECT-TYPE
+		    SYNTAX OCTET STRING (SIZE (1..32))
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The  port  name of  remote devices."		    
+		    ::= { raisecomRemotePortEntry 4 }
+
+	 raisecomRemotePortAdminStatus OBJECT-TYPE
+		    SYNTAX INTEGER {
+             				up(1), 
+            				down(2)
+       	 			   }
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The administrative state of the port on remote devices."		        
+		    ::= { raisecomRemotePortEntry 5 }
+
+	 raisecomRemotePortOperStatus OBJECT-TYPE
+		    SYNTAX INTEGER {
+             				up(1), 
+             				down(2)
+       				   }
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The current operational state of the interface in remote devices."		      
+		    ::= {  raisecomRemotePortEntry 6 }
+
+	raisecomRemotePortDuplexSpeedSet OBJECT-TYPE
+		    SYNTAX  INTEGER {
+             				autonegotiate(1),
+             				half-10(2),
+             				full-10(3),
+             				half-100(4),
+            				full-100(5), 
+             				half-1000(6),
+             				full-1000(7)
+        			   }
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The desired speed and duplex of the interface in remote devices."		          
+		    ::= {  raisecomRemotePortEntry 7 }
+
+	raisecomRemotePortDuplexSpeedGet OBJECT-TYPE
+		    SYNTAX  INTEGER {
+             				 unknown(1),
+            				 half-10(2),
+            				 full-10(3),
+            				 half-100(4),
+            				 full-100(5), 
+            				 half-1000(6),
+            				 full-1000(7),
+           				 illegal(99)
+       				   }
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The actual speed and duplex for this interface.   If the interface 
+		        is not configured for an acceptable value, a value of illegal(99) is 
+		        returned. A value of unknown(1) is returned when the interface is down."
+		    ::= {  raisecomRemotePortEntry 8 }
+
+	 raisecomRemotePortFlowControlEnable OBJECT-TYPE
+		    SYNTAX EnableVar
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Set the flow control on the interface to enable(1) or disable(2)."		    
+		    ::= {  raisecomRemotePortEntry 9 }
+
+	 raisecomRemotePortFlowControlStatus OBJECT-TYPE
+		    SYNTAX  EnableVar
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The actual port flow control status of remote device."
+		    ::= {  raisecomRemotePortEntry 10 }
+
+	 raisecomRemotePortIngressRate OBJECT-TYPE
+		    SYNTAX INTEGER  (0..1048576)
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The value is the ingress rate( Kbps) of the port."
+		    ::= {  raisecomRemotePortEntry 11 }
+
+	 raisecomRemotePortEgressRate OBJECT-TYPE
+		    SYNTAX INTEGER  (0..1048576)
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The value is the egress rate( Kbps) of the port."
+		    ::= {  raisecomRemotePortEntry 12 }
+
+	 raisecomRemotePortFaultPassEnable OBJECT-TYPE
+		    SYNTAX  EnableVar
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Set fault pass to enable(1) or disable(2) on the port in remote device."
+		    ::= {  raisecomRemotePortEntry 13 }
+		    
+	raisecomRemotePortFaultPassPorts OBJECT-TYPE
+		    SYNTAX  PortList
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The ports set which should be down when fault pass occurs.If 
+		        the value is 0,stands for fault pass function is disable on 
+		        this port,otherwise fault pass function  is enable and the ports 
+		        set specifies which ports should be down when fault pass occurs."
+		    ::= {  raisecomRemotePortEntry 14 }
+		    
+	raisecomRemotePortFaultPassStatus OBJECT-TYPE
+		    SYNTAX  INTEGER  {  
+	           			normal (1),
+	           			down (2)
+	       			     }
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Port state changging result of fault pass. If normal(1), there is no 
+		        fault pass occurring. If down(2), the port is down because of fault 
+		        pass occurring."
+		    ::= {  raisecomRemotePortEntry 15 }
+		    
+	raisecomRemotePortFaultReturnEnable OBJECT-TYPE
+		    SYNTAX  INTEGER	{
+	          			 enable (1),
+	          			 disable (2),
+	          			 unavailable(3)
+        				} 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Set fault return on the port in remote device to enable(1) or disable(2). 
+		        This value of TP is unavailable."
+		    ::= {  raisecomRemotePortEntry 16 }
+		    
+	raisecomRemotePortFaultReturnStatus OBJECT-TYPE
+		    SYNTAX INTEGER {
+	           			normal (1),
+	           			down (2),
+	           			unavailable(3)
+        			   } 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Port state changging result of fault return.If normal(1), there 
+		        is no fault return occurring.If down(2), the port is down result 
+		        of fault return occurring.This value of TP is unavailable."
+		    ::= {  raisecomRemotePortEntry 17 }
+		    
+	raisecomRemotePortSD OBJECT-TYPE
+		    SYNTAX  INTEGER    {
+	         			 normal (1),
+	         			 sd (2),
+	          			 unavailable(3)
+        				} 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "SD status. This value of TP is unavailable."
+		    ::= {  raisecomRemotePortEntry 18 }
+		    
+	raisecomRemoteOptModuleType OBJECT-TYPE
+		    SYNTAX  INTEGER   {      
+      	     				optical-M(1),
+      	     				optical-S1(2),
+      	     				optical-S2(3),
+      	     				optical-S3(4),
+      	     				optical-SS13(5), 
+      	     				optical-SS15(6),
+      	     				optical-SS23(7),
+      	     				optical-SS25(8),
+      	     				optical-SS35(9),
+       	  				unknown(10)   	     	   	
+       	  				} 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "Optical module type of remote device port."
+		    ::= {  raisecomRemotePortEntry 19 }
+		    
+	raisecomRemotePortDescr OBJECT-TYPE
+		    SYNTAX  OCTET STRING (SIZE (1..255))
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "The description of a port in remote device."
+		    ::= {  raisecomRemotePortEntry 20 }
+   
+   
+-- raisecomRemotePortStatsTable
+
+	raisecomRemotePortStatsTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemotePortStatsEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "A table of remote devices port statistics."
+		    ::= { raisecomRemoteManagementLocalMibObjects 8 }
+
+	raisecomRemotePortStatsEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemotePortStatsEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices port statistics."
+		    INDEX { raisecomRemoteStatsIfindex, raisecomRemoteStatsPortIfindex}
+		    ::= { raisecomRemotePortStatsTable 1 }
+
+	RaisecomRemotePortStatsEntry ::= SEQUENCE {
+		    raisecomRemoteStatsIfindex 		INTEGER,
+		    raisecomRemoteStatsPortIfindex	INTEGER,		    
+		    raisecomRemotePortInOctets          Counter64,
+		    raisecomRemotePortInPkts 		Counter64,
+		    raisecomRemotePortInUcastPkts 	Counter64,
+		    raisecomRemotePortInMulticastPkts 	Counter64,
+		    raisecomRemotePortInBroadcastPkts 	Counter64,
+		    raisecomRemotePortOutOctets 	Counter64,
+		    raisecomRemotePortOutPkts 		Counter64,
+		    raisecomRemotePortOutUcastPkts 	Counter64,    
+		    raisecomRemotePortOutMulticastPkts	Counter64,
+		    raisecomRemotePortOutBroadcastPkts  Counter64,		
+		    raisecomRemotePortErrorPkts 	Counter32,
+		    raisecomRemotePortDropEvents    	Counter32,
+		    raisecomRemotePortCRCAlignErrors    Counter32,
+		    raisecomRemotePortUndersizePkts 	Counter32 ,
+		    raisecomRemotePortOversizePkts   	Counter32,
+		    raisecomRemotePortFragments   	Counter32,
+		    raisecomRemotePortJabbers  		Counter32,
+		    raisecomRemotePortCollisions   	Counter32		        
+		    }		   
+
+	raisecomRemoteStatsIfindex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The ifIndex value based 1 which identifies the unique interface of local device."
+		    ::= { raisecomRemotePortStatsEntry 1 }
+
+	raisecomRemoteStatsPortIfindex OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The ifIndex value based 1 which identifies the unique interface of remote device."
+		    ::= { raisecomRemotePortStatsEntry 2 }
+
+	raisecomRemotePortInOctets OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of octets received on the port."		         		       
+		    ::= { raisecomRemotePortStatsEntry 3 }
+		    
+	raisecomRemotePortInPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets received on the port.."		         		       
+		    ::= { raisecomRemotePortStatsEntry 4 }
+		    
+	raisecomRemotePortInUcastPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The number of packets, delivered by this sub-layer to  a 
+		        higher (sub-)layer, which were not addressed to a  multicast 
+		        or broadcast address at this sub-layer."		         		       
+		    ::= { raisecomRemotePortStatsEntry 5 }
+		    
+	raisecomRemotePortInMulticastPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The number of packets, delivered by this sub-layer to a 
+		        higher (sub-)layer, which were addressed to a multicast 
+		        address at this sub-layer. For a MAC layer  protocol, this
+		         includes both Group and Functional addresses"		         		       
+		    ::= { raisecomRemotePortStatsEntry 6 }
+		    
+	raisecomRemotePortInBroadcastPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The number of packets, delivered by this sub-layer to a higher (sub-)layer,
+		         which were addressed to a broadcast address at this sub-layer."		         		       
+		    ::= { raisecomRemotePortStatsEntry 7 }
+	
+	raisecomRemotePortOutOctets OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of octets transmitted out of the port, 
+		        including framing characters."		         		       
+		    ::= { raisecomRemotePortStatsEntry 8 }
+		    
+	raisecomRemotePortOutPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets transmitted out of the port."		         		       
+		    ::= { raisecomRemotePortStatsEntry 9 }
+		    
+	raisecomRemotePortOutUcastPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets that higher-level protocols requested be 
+		        transmitted, and which were not addressed to a multicast or broadcast
+		        address at this sub-layer, including those that were discarded or not sent."		         		       
+		    ::= { raisecomRemotePortStatsEntry 10 }
+		    
+	raisecomRemotePortOutMulticastPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets that higher-level protocols requested be transmitted,
+		         and which were  addressed to a multicast address at this sub-layer, including those
+		         that were discarded or not sent.  For a MAC layer protocol, this includes both 
+		         Group and  Functional addresses."		         		       
+		    ::= { raisecomRemotePortStatsEntry 11 }
+		    
+	raisecomRemotePortOutBroadcastPkts OBJECT-TYPE
+		    SYNTAX Counter64
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets that higher-level protocols requested be transmitted,
+		         and which were  addressed to a broadcast address at this sub-layer, including 
+		         those that were discarded or not sent. "		         		       
+		    ::= { raisecomRemotePortStatsEntry 12 }
+		    
+	raisecomRemotePortErrorPkts OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of bad packets received by a specific port of remote device."		         		       
+		    ::= { raisecomRemotePortStatsEntry 13 }
+		    
+	raisecomRemotePortDropEvents OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of events in which packets were dropped by 
+		        the probe due to lack of resources. Note that this number is 
+		        not necessarily the number of packets dropped; it is just the
+		         number of times this  condition has been detected."		         		       
+		    ::= { raisecomRemotePortStatsEntry 14 }
+		    
+	raisecomRemotePortCRCAlignErrors OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets received that had a length (excluding
+		         framing bits, but including FCS octets) of between 64 and 1518 octets,
+		         inclusive, but but had either a bad  Frame Check Sequence (FCS) with
+		         an integral number of octets (FCS Error) or a bad FCS with a 
+		         non-integral number of octets (Alignment Error)."		         		       
+		    ::= { raisecomRemotePortStatsEntry 15 }
+		    
+	raisecomRemotePortUndersizePkts OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets received that were less than 64 octets
+		         long (excluding framing bits, but including FCS octets) and were 
+		         otherwise well formed."		         		       
+		    ::= { raisecomRemotePortStatsEntry 16 }
+		    
+	raisecomRemotePortOversizePkts OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets received that were longer than 1518
+		         octets (excluding framing bits,  but including FCS octets) and
+		         were otherwise  well formed."		         		       
+		    ::= { raisecomRemotePortStatsEntry 17 }
+		    
+	raisecomRemotePortFragments OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets received that were less than 64 octets 
+		        in length (excluding framing bits but   including FCS octets) and had
+		        either a bad Frame Check Sequence (FCS) with an integral number of
+		        octets (FCS Error) or a bad FCS with a non-integral number of octets 
+		        (Alignment Error)."		         		       
+		    ::= { raisecomRemotePortStatsEntry 18 }	    	    	    	    		    
+		    		    		    	    		    		   	    		    		    		    
+	raisecomRemotePortJabbers OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The total number of packets received that were longer than 1518
+		         octets (excluding framing bits, but including FCS octets), and
+		         had either a bad Frame Check Sequence (FCS) with an integral
+		         number of octets (FCS Error) or a bad FCS with a on-integral 
+		         number of octets (Alignment Error)."		         		       
+		    ::= { raisecomRemotePortStatsEntry 19 }
+		    
+	raisecomRemotePortCollisions OBJECT-TYPE
+		    SYNTAX Counter32
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "The best estimate of the total number of collisions on
+		         this Ethernet segment."		         		       
+		    ::= { raisecomRemotePortStatsEntry 20 }  
+ 
+-- raisecomRemoteSfpTable 
+
+	raisecomRemoteSfpTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteSfpEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table of remote devices SFP information."
+		    ::= { raisecomRemoteManagementLocalMibObjects 9 }
+
+	raisecomRemoteSfpEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteSfpEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices SFP information table."
+		    INDEX {ifIndex}
+		    ::= { raisecomRemoteSfpTable 1 }
+
+	RaisecomRemoteSfpEntry ::= SEQUENCE {
+		    raisecomRemoteSfpInterfaceId 		INTEGER,
+		    raisecomRemoteSfpExist              INTEGER,
+		    raisecomRemoteSfpMediaType          INTEGER,
+		    raisecomRemoteSfpRXLOS              INTEGER,
+		    raisecomRemoteSfpTXFault            INTEGER,
+		    raisecomRemoteSfpTXDisable          INTEGER,
+		    raisecomRemoteSfpModuleType         INTEGER,
+		    raisecomRemoteSfpOpticalInterface   INTEGER,
+		    raisecomRemoteSfpSpeedStatus        INTEGER,
+		    raisecomRemoteSfpTransportDistance 	INTEGER,
+		    raisecomRemoteSfpWaveLength	 	    INTEGER,
+		    raisecomRemoteSfpVendor	            OCTET STRING(SIZE (0..16)),
+		    raisecomRemoteSfpProductType        OCTET STRING(SIZE (0..16)),
+		    raisecomRemoteSfpVersion            OCTET STRING(SIZE (0..4)),
+		    raisecomRemoteSfpSerialNumber       OCTET STRING(SIZE (0..16))      
+		    }		   
+
+	raisecomRemoteSfpInterfaceId OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object based 1 identifies the remote port ID of SFP module location."
+			::= { raisecomRemoteSfpEntry 1 } 
+		    
+    raisecomRemoteSfpExist OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	exist(1), 
+				    notexist(2) 		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies whether remote SFP module exist." 		        	
+		    ::= { raisecomRemoteSfpEntry 2 } 
+		    
+    raisecomRemoteSfpMediaType OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        		fibersingle(0),
+               	        fiber50um(1),
+        	            fiber625um(2),
+        	            copper(3)  		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the media type of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 3 } 
+		    
+    raisecomRemoteSfpRXLOS OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	normal(1),
+				    alarm(2) 		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the RX status of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 4 }
+		    
+    raisecomRemoteSfpTXFault OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	normal(1),
+				    alarm(2)		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the TX status of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 5 }  
+		    
+    raisecomRemoteSfpTXDisable OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	enable(1),
+				    disable(2)		        	
+		       		}
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "Disable or enable the TX of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 6 }   
+		    
+    raisecomRemoteSfpModuleType OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	unknown(1),
+			        gbic(2), 
+			        sff(3), 
+			        sfp(4) 		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the remote SFP module type." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 7 }  
+		    
+     raisecomRemoteSfpOpticalInterface OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	unknown(0),
+			        sc(1), 
+			        lc(7),
+			        rj45(34) 		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the optical interface type of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 8 }
+		    
+    raisecomRemoteSfpSpeedStatus OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        unknown(0), 
+			    speed125M(1),
+			    speed155M(2),
+                speed622M(6),
+			    speed1250M(12),
+			    speed2500M(25)   		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the speed of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 9 }
+		    
+    raisecomRemoteSfpTransportDistance OBJECT-TYPE
+		    SYNTAX INTEGER(0..255) 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the transport distance of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 10 } 
+		    
+    raisecomRemoteSfpWaveLength OBJECT-TYPE
+		    SYNTAX INTEGER(0..65535) 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the wave length of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 11 }
+		    
+    raisecomRemoteSfpVendor OBJECT-TYPE
+		    SYNTAX OCTET STRING(SIZE (0..16))
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the vendor name of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 12 }
+		    
+    raisecomRemoteSfpProductType OBJECT-TYPE
+		    SYNTAX OCTET STRING(SIZE (0..16))
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the product type of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 13 }  
+		    
+    raisecomRemoteSfpVersion OBJECT-TYPE
+		    SYNTAX OCTET STRING(SIZE (0..4))
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the version of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 14 }
+		    
+	raisecomRemoteSfpSerialNumber OBJECT-TYPE
+		    SYNTAX OCTET STRING(SIZE (0..16))
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object specifies the serial number of remote SFP module." 		    		        	
+		    ::= { raisecomRemoteSfpEntry 15 }
+   
+-- raisecomRemoteDtTable  
+
+	raisecomRemoteDtTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteDtEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table of remote devices Q-in-Q."
+		    ::= { raisecomRemoteManagementLocalMibObjects 10 }
+
+	raisecomRemoteDtEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteDtEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices Q-in-Q table."
+		    INDEX {ifIndex}
+		    ::= { raisecomRemoteDtTable 1 }
+
+	RaisecomRemoteDtEntry ::= SEQUENCE {
+		    raisecomRemoteDtSwitchMode 		INTEGER,
+		    raisecomRemoteDtOuterTpid       INTEGER,
+		    raisecomRemoteDtNativeVlan      INTEGER,
+		    raisecomRemoteDtAccessPort      INTEGER		          
+		    }		   
+
+	raisecomRemoteDtSwitchMode OBJECT-TYPE
+		    SYNTAX INTEGER {
+            	transparent(1),
+        		dot1q-vlan(2),
+        		double-tagged-vlan(3)
+         	    } 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the switch mode of  remote device."
+			::= { raisecomRemoteDtEntry 1 } 
+		    
+    raisecomRemoteDtOuterTpid OBJECT-TYPE
+		    SYNTAX INTEGER (0..65535)
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the outer tpid of remote device." 		        	
+		    ::= { raisecomRemoteDtEntry 2 } 
+		    
+    raisecomRemoteDtNativeVlan OBJECT-TYPE
+		    SYNTAX INTEGER (1.. 4094)
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the native vlan ID of remote device. 
+		        On transparent mode, the native vlan is useless; on dot1q-vlan 
+		        mode, the ingress packets without tag of acess ports is tagged 
+		        with the native vlan ID; on double-tagged-vlan mode, all ingress 
+		        packets of acess ports is added a tag with the outer tpid and 
+		        the native vlan ID." 		    		        	
+		    ::= { raisecomRemoteDtEntry 3 } 
+		    
+    raisecomRemoteDtAccessPort OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	line(1),
+				    client(2) 		        	
+		       		}
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies vlan acess port of  remote device." 		    		        	
+		    ::= { raisecomRemoteDtEntry 4 }    
+ 
+-- raisecomRemoteSendConfTable
+
+	raisecomRemoteSendConfTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteSendConfEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table for send configuration to remote devices"
+		    ::= { raisecomRemoteManagementLocalMibObjects 11 }
+
+	raisecomRemoteSendConfEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteSendConfEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry for send cofiguration to remote devices."
+		    INDEX { ifIndex }
+		    ::= { raisecomRemoteSendConfTable 1 }
+
+	RaisecomRemoteSendConfEntry ::= SEQUENCE {
+		    raisecomRemoteSendConf 		INTEGER	    		        
+		    }		   
+
+	raisecomRemoteSendConf OBJECT-TYPE	
+	        SYNTAX RcRemoteConfigFrameSendStatus
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object is used to send config frame to remote device
+		        and to save config frame local."
+		     DEFVAL {successful}   	
+		    ::= { raisecomRemoteSendConfEntry 1 }
+ 
+-- raisecomRemoteInLoopbackTable
+
+	raisecomRemoteInLoopbackTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteInLoopbackEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table of remote devices inside loopback."
+		    ::= { raisecomRemoteManagementLocalMibObjects 12 }
+
+	raisecomRemoteInLoopbackEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteInLoopbackEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices inside loopback."
+		    INDEX {ifIndex}
+		    ::= { raisecomRemoteInLoopbackTable 1 }
+
+	RaisecomRemoteInLoopbackEntry ::= SEQUENCE {		    
+		    raisecomRemoteInLoopbackMacExchange         INTEGER,
+		    raisecomRemoteInLoopbackCrcRecalSet         INTEGER,
+		    raisecomRemoteInLoopbackCrcRecal            INTEGER,
+		    raisecomRemoteInLoopbackStatus              INTEGER	    		        
+		    }
+		    
+    raisecomRemoteInLoopbackMacExchange OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	exchange(1),
+		        	noexchange(2)		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "An indication of whether the remote device 
+		        exchange MAC address when loopbacking." 		        	
+		    ::= { raisecomRemoteInLoopbackEntry 1 } 
+		    
+    raisecomRemoteInLoopbackCrcRecalSet OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	recalculate(1),
+		        	norecalculate(2)		        	
+		       		}
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object is used to set whether the remote device 
+		        recalculate CRC when loopbacking. This object represents 
+		        the desired configuration when initiate remote inside loopback." 
+		    DEFVAL {norecalculate}		        	
+		    ::= { raisecomRemoteInLoopbackEntry 2 } 
+		    
+    raisecomRemoteInLoopbackCrcRecal OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	recalculate(1),
+		        	norecalculate(2)		        	
+		       		}
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "An indication of whether the remote device recalculate CRC when loopbacking." 		    		        	
+		    ::= { raisecomRemoteInLoopbackEntry 3 }
+		    
+    raisecomRemoteInLoopbackStatus OBJECT-TYPE
+		    SYNTAX INTEGER {
+		        	noloopback(1),
+		        	initiatinginloopback(2),
+		        	inloopback(3),
+		        	outloopback(4),
+		        	terminatingInloopback(5)		        	
+		       		}
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "By this object can initiate or terminate remote inside 
+		        loopback,also can get remote device loopback status." 		    		        	
+		    ::= { raisecomRemoteInLoopbackEntry 4 }
+		          
+-- raisecomRemoteVctTable   
+
+	raisecomRemoteVctTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteVctEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table of remote devices VCT information."
+		    ::= { raisecomRemoteManagementLocalMibObjects 13 }
+
+	raisecomRemoteVctEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteVctEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices VCT table."
+		    INDEX {ifIndex}
+		    ::= { raisecomRemoteVctTable 1 }
+
+	RaisecomRemoteVctEntry ::= SEQUENCE {
+		    raisecomRemoteVctAttribute 		INTEGER,
+		    raisecomRemoteVctStatus         INTEGER,
+		    raisecomRemoteVctLength         INTEGER		   	          
+		    }		   
+
+	raisecomRemoteVctAttribute OBJECT-TYPE
+		    SYNTAX INTEGER {
+            	unSupported(1), 
+                neverIssued(2), 
+                issued(3) , 
+                testing(4),
+                begin(5) 
+         	    } 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the VCT attribute of  remote device."
+			::= { raisecomRemoteVctEntry 1 } 
+		    
+    raisecomRemoteVctStatus OBJECT-TYPE
+		    SYNTAX INTEGER {
+            	normal(1), 
+                open(2), 
+                shorted(3), 
+                error(4), 
+                invalidation(5) 
+         	    } 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the VCT status of  remote device." 		        	
+		    ::= { raisecomRemoteVctEntry 2 } 
+		    
+    raisecomRemoteVctLength OBJECT-TYPE
+		    SYNTAX INTEGER 
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the VCT length of  remote device." 		    		        	
+		    ::= { raisecomRemoteVctEntry 3 }         
+		    
+		    
+-- raisecomRemoteVlanConfigTable   
+
+	raisecomRemoteVlanConfigTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteVlanConfigEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table of remote devices vlan information."
+		    ::= { raisecomRemoteManagementLocalMibObjects 14 }
+
+	raisecomRemoteVlanConfigEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteVlanConfigEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices vlan table."
+		    INDEX {ifIndex}
+		    ::= { raisecomRemoteVlanConfigTable 1 }
+
+	RaisecomRemoteVlanConfigEntry ::= SEQUENCE {
+		    raisecomRemoteVlanStatus 		RcRemoteVlanStatus,
+		    raisecomRemoteCosStatus         TruthValue, 
+		    raisecomRemoteFiberPortTagType  RcRemotePortTagStatus,
+		    raisecomRemoteFiberPortPriority Integer32 (0..7 ),   
+		    raisecomRemoteFiberPortPvid     Integer32 (1..4094 ),       
+		    raisecomRemoteCablePortTagType  RcRemotePortTagStatus,
+		    raisecomRemoteCablePortPriority Integer32 (0..7 ),   
+		    raisecomRemoteCablePortPvid     Integer32 (1..4094 ),
+		    raisecomRemoteCpuPortTagType    RcRemotePortTagStatus,
+		    raisecomRemoteCpuPortPriority   Integer32 (0..7 ),   
+		    raisecomRemoteCpuPortPvid       Integer32 (1..4094 ),
+		    raisecomRemoteSendVlanConf      RcRemoteConfigFrameSendStatus		   	          
+		    }		   
+
+	raisecomRemoteVlanStatus OBJECT-TYPE
+            SYNTAX RcRemoteVlanStatus
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the vlan status of  remote device."
+			::= { raisecomRemoteVlanConfigEntry 1 } 
+		    
+    raisecomRemoteCosStatus OBJECT-TYPE
+		    SYNTAX TruthValue
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the 802.1p COS status of  remote device.
+		        TRUE means cos is forbidden to be used.
+		        FALSE  means cos is allowed to be used" 		        	
+		    ::= { raisecomRemoteVlanConfigEntry 2 } 
+		    
+    raisecomRemoteFiberPortTagType OBJECT-TYPE
+		    SYNTAX RcRemotePortTagStatus 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the attribute of Fiber Ports' tag in remote device." 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 3 }		    
+	
+	raisecomRemoteFiberPortPriority OBJECT-TYPE
+		    SYNTAX Integer32 (0..7 ) 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the Priority of Fiber Ports' tag in remote device.
+		        The default value is '0'" 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 4 }	        
+
+	raisecomRemoteFiberPortPvid   OBJECT-TYPE
+		    SYNTAX Integer32 (1..4094 ) 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the Pvid of Fiber Ports' tag in remote device.
+		        The default value is '1'" 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 5 }     
+		    
+    raisecomRemoteCablePortTagType OBJECT-TYPE
+		    SYNTAX RcRemotePortTagStatus 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the attribute of Cable Ports' tag in remote device." 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 6 }		    
+	
+	raisecomRemoteCablePortPriority OBJECT-TYPE
+		    SYNTAX Integer32 (0..7 ) 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the Priority of Cable Ports' tag in remote device.
+		        The default value is '0'" 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 7 }	        
+
+	raisecomRemoteCablePortPvid   OBJECT-TYPE
+		    SYNTAX Integer32 (1..4094 ) 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the Pvid of Cable Ports' tag in remote device.
+		        The default value is '1'" 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 8 }  
+		    
+    raisecomRemoteCpuPortTagType OBJECT-TYPE
+		    SYNTAX RcRemotePortTagStatus 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the attribute of Cpu Ports' tag in remote device." 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 9 }		    
+	
+	raisecomRemoteCpuPortPriority OBJECT-TYPE
+		    SYNTAX Integer32 (0..7 ) 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the Priority of Cpu Ports' tag in remote device.
+		        The default value is '0'" 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 10 }	        
+
+	raisecomRemoteCpuPortPvid   OBJECT-TYPE
+		    SYNTAX Integer32 (1..4094 ) 
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the Pvid of Cpu Ports' tag in remote device.
+		        The default value is '1'" 		    		        	
+		    ::= { raisecomRemoteVlanConfigEntry 11 }        
+
+	raisecomRemoteSendVlanConf OBJECT-TYPE	
+	        SYNTAX RcRemoteConfigFrameSendStatus
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object is used to send vlan config frame to remote device
+		        and to save the config frame local."
+		     DEFVAL {successful}   	
+		    ::= { raisecomRemoteVlanConfigEntry 12 }        
+
+-- raisecomRemoteVlanGroupTable   
+
+	raisecomRemoteVlanGroupTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteVlanGroupEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table of remote devices vlan information."
+		    ::= { raisecomRemoteManagementLocalMibObjects 15 }
+
+	raisecomRemoteVlanGroupEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteVlanGroupEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices vlan group table."
+		    INDEX {ifIndex,
+		    raisecomRemoteVlanGroupIndex}
+		    ::= { raisecomRemoteVlanGroupTable 1 }
+
+	RaisecomRemoteVlanGroupEntry ::= SEQUENCE {
+		    raisecomRemoteVlanGroupIndex	Integer32 (0..15 ),
+		    raisecomRemoteVlanId            Integer32 (0..4094 ), 
+		    raisecomRemoteVlanMember        Integer32 (0..7 )		   		   	          
+		    }		   
+
+	raisecomRemoteVlanGroupIndex OBJECT-TYPE
+            SYNTAX Integer32 (0..15 )
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the index of vlan group in remote device."
+			::= { raisecomRemoteVlanGroupEntry 1 }    
+			
+	raisecomRemoteVlanId OBJECT-TYPE	
+	        SYNTAX Integer32 (0..4094 )
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the vlan id of the specify vlan group.
+		        The default vlan id of group is 1 and other group's default vlan id is 0 ."  	
+		    ::= { raisecomRemoteVlanGroupEntry 2 }		
+		    
+	raisecomRemoteVlanMember OBJECT-TYPE	
+	        SYNTAX Integer32 (0..7)
+		    ACCESS read-write
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the ports belong to the vlan group.
+		        If the frist bit is '1' means fiber port belongs to the vlan group.
+		        If the second bit is '1' means cable port belongs to the vlan group.
+		        If the third bit is '1' means cpu port belongs to the vlan group.
+		        The default value is '7' means all the ports mentioned above belong to the vlan group"  	
+		    ::= { raisecomRemoteVlanGroupEntry 3 }		        
+
+-- raisecomRemoteSfpDdmTable   
+
+	raisecomRemoteSfpDdmTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomRemoteSfpDdmEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "The table of remote devices digital detect management information."
+		    ::= { raisecomRemoteManagementLocalMibObjects 16 }
+
+	raisecomRemoteSfpDdmEntry OBJECT-TYPE
+		    SYNTAX RaisecomRemoteSfpDdmEntry
+		    ACCESS not-accessible
+		    STATUS current
+		    DESCRIPTION
+		        "Table entry of remote devices digital detect management table."
+		    INDEX {ifIndex}
+		    ::= { raisecomRemoteSfpDdmTable 1 }
+
+	RaisecomRemoteSfpDdmEntry ::= SEQUENCE {
+			raisecomRemoteSfpDdmValid           	TruthValue,
+			raisecomRemoteSfpDdmMode           		RcRemoteSfpDdmMode,
+  			raisecomRemoteSfpDdmTemperature     	INTEGER (-128000..127996),    
+			raisecomRemoteSfpDdmSupplyVolt          INTEGER (0..65500),
+			raisecomRemoteSfpDdmBiasCurrent         INTEGER (0..65500),
+			raisecomRemoteSfpDdmOpticalTxPower      INTEGER (0..65535),			
+			raisecomRemoteSfpDdmOpticalRxPower      INTEGER (0..65535),  
+			raisecomRemoteSfpDdmAlarm				TruthValue,
+			raisecomRemoteSfpDdmAlarmTemStatus 		RcRemoteSfpDdmAlarmStatus,
+			raisecomRemoteSfpDdmAlarmVoltStatus     RcRemoteSfpDdmAlarmStatus,
+			raisecomRemoteSfpDdmAlarmCurrentStatus 	RcRemoteSfpDdmAlarmStatus,
+			raisecomRemoteSfpDdmAlarmTxPowerStatus 	RcRemoteSfpDdmAlarmStatus,
+			raisecomRemoteSfpDdmAlarmRxPowerStatus 	RcRemoteSfpDdmAlarmStatus
+			} 
+     
+	raisecomRemoteSfpDdmValid OBJECT-TYPE
+            SYNTAX TruthValue
+		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the SFM in remote device is valid."
+			::= { raisecomRemoteSfpDdmEntry 1 }    
+
+	raisecomRemoteSfpDdmMode OBJECT-TYPE
+            SYNTAX RcRemoteSfpDdmMode    
+   		    ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the mode of SFP in remote device."
+			::= { raisecomRemoteSfpDdmEntry 2 }  
+				
+	raisecomRemoteSfpDdmTemperature OBJECT-TYPE
+            SYNTAX INTEGER (-128000..127996)
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies temperature of SFP in remote device. A unit is a ¡æ(1/1000Celsius). "
+			::= { raisecomRemoteSfpDdmEntry 3 }
+            
+	raisecomRemoteSfpDdmSupplyVolt OBJECT-TYPE
+            SYNTAX INTEGER (0..65500)
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the volt of SFP in remote device. A unit is 100uV."
+			::= { raisecomRemoteSfpDdmEntry 4 }
+			
+	raisecomRemoteSfpDdmBiasCurrent OBJECT-TYPE
+            SYNTAX INTEGER (0..65500)
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the bias current of SFP in remote device. A unit is 2uA."
+			::= { raisecomRemoteSfpDdmEntry 5 }
+
+ 	raisecomRemoteSfpDdmOpticalTxPower OBJECT-TYPE
+            SYNTAX INTEGER (0..65535)
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the optical transmit power of SFP in remote device. A unit is 0.1uW."
+			::= { raisecomRemoteSfpDdmEntry 6 }
+
+	raisecomRemoteSfpDdmOpticalRxPower OBJECT-TYPE
+            SYNTAX INTEGER (0..65535)
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the optical receive power of SFP in remote device. A unit is 0.1uW."
+			::= { raisecomRemoteSfpDdmEntry 7 }  
+			
+	raisecomRemoteSfpDdmAlarm  OBJECT-TYPE
+            SYNTAX TruthValue
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the SFP alarm is occur."
+			::= { raisecomRemoteSfpDdmEntry 8 } 
+            		
+	raisecomRemoteSfpDdmAlarmTemStatus OBJECT-TYPE
+            SYNTAX RcRemoteSfpDdmAlarmStatus
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the SFP alarm status of tempreture in remote device."
+			::= { raisecomRemoteSfpDdmEntry 9 }
+
+	raisecomRemoteSfpDdmAlarmVoltStatus OBJECT-TYPE
+            SYNTAX RcRemoteSfpDdmAlarmStatus
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the SFP alarm status of volt in remote device."
+			::= { raisecomRemoteSfpDdmEntry 10 }
+			
+	raisecomRemoteSfpDdmAlarmCurrentStatus OBJECT-TYPE
+            SYNTAX RcRemoteSfpDdmAlarmStatus
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the SFP alarm status of current in remote device."
+			::= { raisecomRemoteSfpDdmEntry 11 }
+			
+	raisecomRemoteSfpDdmAlarmTxPowerStatus OBJECT-TYPE
+            SYNTAX RcRemoteSfpDdmAlarmStatus
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the SFP alarm status of transmit power in remote device."
+			::= { raisecomRemoteSfpDdmEntry 12 }
+			
+	raisecomRemoteSfpDdmAlarmRxPowerStatus OBJECT-TYPE
+            SYNTAX RcRemoteSfpDdmAlarmStatus
+            ACCESS read-only
+		    STATUS current
+		    DESCRIPTION
+		        "This object identifies the SFP alarm status of receive power in remote device."
+			::= { raisecomRemoteSfpDdmEntry 13 }
+					                   
+-- raisecomRemoteManagementLocalMibTraps
+    raisecomRemotePortLinkUp NOTIFICATION-TYPE
+           OBJECTS {ifIndex, raisecomRemotePortIfindex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that link up events occurs on specific 
+               ports of remote devices by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 1 }
+       
+	raisecomRemotePortLinkDown NOTIFICATION-TYPE
+           OBJECTS {ifIndex, raisecomRemotePortIfindex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that link down events occurs on specific
+                ports of remote devices by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 2 }      
+ 
+ 	raisecomRemoteSfpDdmTemNormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the temperature of remote 
+                devices is normal by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 3 }   
+       
+    raisecomRemoteSfpDdmTemAbnormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the temperature of remote 
+                devices is abnormal(low or high) by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 4 }
+  
+ 	raisecomRemoteSfpDdmVoltNormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the volt of remote 
+                devices is normal by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 5 }
+
+	raisecomRemoteSfpDdmVoltAbnormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the volt of remote 
+                devices is abnormal(low or high) by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 6 }
+  
+ 	raisecomRemoteSfpDdmCurrentNormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the bias current of remote 
+                devices is normal by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 7 }
+
+	raisecomRemoteSfpDdmCurrentAbnormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the bias current of remote 
+                devices is abnormal(low or high) by send this trap."    
+       ::= { raisecomRemoteManagementLocalMibTraps 8 }                  
+       
+    raisecomRemoteSfpDdmTxPowerNomal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the optical transmit power of remote 
+                devices is normal by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 9 }
+     
+	raisecomRemoteSfpDdmTxPowerAbnormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the optical transmit power of remote 
+                devices is abnormal(low or high) by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 10 }  
+       
+	raisecomRemoteSfpDdmRxPowerNormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the optical recieve power of remote 
+                devices is normal by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 11 }
+
+ 	raisecomRemoteSfpDdmRxPowerAbnormal NOTIFICATION-TYPE
+           OBJECTS {ifIndex}
+           STATUS  current
+           DESCRIPTION
+               "Notify snmp manager that the optical recieve power of remote 
+                devices is abnormal(low or high) by send this trap."
+       ::= { raisecomRemoteManagementLocalMibTraps 12 }     
+ 	
+END

@@ -1,0 +1,730 @@
+PKTC-EVENT-MIB DEFINITIONS ::= BEGIN 
+
+IMPORTS  
+    MODULE-IDENTITY,  
+    OBJECT-TYPE,    
+    Unsigned32,  
+    NOTIFICATION-TYPE                FROM SNMPv2-SMI
+    DateAndTime                      FROM SNMPv2-TC 
+    clabProjPacketCable              FROM CLAB-DEF-MIB
+    SnmpAdminString                  FROM SNMP-FRAMEWORK-MIB
+    OBJECT-GROUP,
+    MODULE-COMPLIANCE,
+    NOTIFICATION-GROUP               FROM SNMPv2-CONF
+    ifPhysAddress                    FROM IF-MIB
+    InetAddressType,
+    InetAddress, 
+    InetPortNumber                   FROM INET-ADDRESS-MIB ; 
+
+pktcEventMib MODULE-IDENTITY
+    LAST-UPDATED    "200501280000Z" -- 01/28/2005
+    ORGANIZATION    "Cable Television Laboratories, Inc"
+    CONTACT-INFO
+            "Sumanth Channabasappa
+            Postal: Cable Television Laboratories, Inc.
+                    858 Coal Creek Circle
+                    Louisville, Colorado 80027
+                    U.S.A.
+            Phone:  +1 303-661-9100
+            Fax:    +1 303-661-9199
+            E-mail: mibs@cablelabs.com"
+
+    DESCRIPTION
+            "This MIB module supplies the basic management objects 
+            for event reporting
+            
+            Acknowledgements:
+              Eugene Nechamkin       -  Broadcom Corp
+              John Berg              - CableLabs, Inc.
+              Kevin Marez            - Motorola, Inc.
+              Satish Kumar           - Texas Instruments
+              Venkatesh Sunkad       - CableLabs, Inc."
+    ::=  { clabProjPacketCable 3 }
+
+   --  
+   --  
+pktcDevEventControl    OBJECT IDENTIFIER ::= { pktcEventMib 1 }  
+
+pktcDevEventThrottle   OBJECT IDENTIFIER ::= { pktcEventMib 2 }
+
+pktcDevEventStatus     OBJECT IDENTIFIER ::= { pktcEventMib 3 }
+
+pktcDevEventDescr      OBJECT IDENTIFIER ::= { pktcEventMib 4 }
+
+pktcDevEventLog        OBJECT IDENTIFIER ::= { pktcEventMib 5 }  
+
+pktcDevEvNotification  OBJECT IDENTIFIER ::= { pktcEventMib 6 }  
+   --  
+
+   ---  
+   ---   Event Reporting control objects
+   ---  
+pktcDevEvControl  OBJECT-TYPE
+    SYNTAX       BITS {
+                resetEventLogTable(0),
+                resetEventDescrTable(1)
+                }    MAX-ACCESS  read-write  
+    STATUS      current  
+    DESCRIPTION  
+            "This MIB object defines the actions related to the event 
+            log configuration. 
+
+            The MTA MUST take the appropriate action whenever 
+            a bit is set to a value of '1'. 
+
+            Setting the resetEventLogTable(0) bit to
+            a value of '1' clears the entire event log 
+            (Deletes all entries in pktcDevEventLogTable).   
+
+            Setting  resetEventDescrTable(1) to a value of '1' 
+            resets the pktcDevEventDescrTable to the
+            factory default values.
+
+            Setting a control bit to a value of '0' MUST not result in
+            any action. 
+
+            Reading this MIB object MUST always return '00'." 
+    ::= { pktcDevEventControl 1 }
+
+pktcDevEvSyslogAddressType  OBJECT-TYPE  
+    SYNTAX      InetAddressType  
+    MAX-ACCESS  read-write  
+    STATUS      current  
+    DESCRIPTION  
+            "This MIB Object defines the address type of the 
+            Syslog server. 
+            PacketCable devices implementing this MIB MUST 
+            support an InetAddressType of ipv4(1).  
+            PacketCable devices MAY optionally implement other 
+            address types. 
+
+            If an unsupported InetAddressType is used to set 
+            this object, the PacketCable device MUST reject it 
+            and report an SNMP error stating 'wrong value'.  
+
+            If an SNMP SET results in a type that does not match
+            the value contained in the MIB Object 
+            pktcDevEvSyslogAddress, the PacketCable device MUST
+            reject the SNMP SET with an 'inconsistent value' 
+            error."  
+    ::= { pktcDevEventControl 2 }
+
+pktcDevEvSyslogAddress  OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  
+            "This MIB Object contains the IP address of the 
+            Syslog server. If this is set to either 0.0.0.0 or
+            255.255.255.255 the device MUST inhibit syslog
+            transmission.  
+            The use of FQDNs is syntactically allowed, but 
+            discouraged since a failure to resolve them in a 
+            timely manner may leave the device without access to 
+            the Syslog daemon during critical network events. 
+            The type of address this object represents is defined 
+            by the MIB Object pktDevEvSyslogAddressType.
+            
+            If an SNMP SET results in a type that does not match
+            that indicated by the MIB Object 
+            pktcDevEvSyslogAddressType, the PacketCable device MUST
+            reject the SNMP SET with an 'inconsistent value' 
+            error."  
+    ::= { pktcDevEventControl 3 }  
+
+pktcDevEvSyslogUdpPort  OBJECT-TYPE
+    SYNTAX      InetPortNumber  
+    MAX-ACCESS  read-write  
+    STATUS      current  
+    DESCRIPTION
+            "This MIB Object contains the UDP Port Number of the Syslog 
+             Server. The PacketCable device must send the Syslog 
+             messages to this port on the Syslog Server."
+    DEFVAL { 514 }
+    ::= { pktcDevEventControl 4 }
+
+--  
+--   Event throttling control  
+--  
+
+pktcDevEvThrottleAdminStatus  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                unconstrained(1),
+                maintainBelowThreshold(2),
+                stopAtThreshold(3),
+                inhibited(4)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  
+
+            "This MIB Object controls the throttling of the 
+            transmitted messages upon generation of an event 
+            (SNMP/Syslog).
+
+            A value of unconstrained(1) causes event messages 
+            to be transmitted without regard to the threshold 
+            settings.
+
+            A value of maintainBelowThreshold(2) causes event
+            messages to be suppressed if the number of transmissions
+            would otherwise exceed the threshold.   
+            A value of stopAtThreshold(3) causes event message
+            transmission to cease at the threshold, and not 
+            resume until directed to do so.
+
+            A value of inhibited(4) causes all event message 
+            Transmission to be suppressed. 
+            
+            An event causing both an SNMP and a Syslog message
+            is still treated as a single event.
+
+            Writing to this object resets the thresholding state.
+            
+            Refer to MIB Objects pktcDevEvThrottleThreshold and 
+            pktcDevEvThrottleInterval for information on throttling."
+    DEFVAL { unconstrained }
+    ::= { pktcDevEventThrottle 1 }
+
+
+pktcDevEvThrottleThreshold  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains the number of events per
+            pktcDevEvThrottleInterval to be transmitted before
+            throttling.
+
+            
+            An event causing both a  SNMP and a syslog message is 
+            still treated as a single event."
+    DEFVAL { 2 }  
+    ::= { pktcDevEventThrottle 2 }
+
+pktcDevEvThrottleInterval  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION  
+
+            "This MIB Object contains the interval over which 
+             the throttle threshold applies."    DEFVAL { 1 }
+    ::= { pktcDevEventThrottle 3 }
+
+
+---
+-- Status Reporting
+---
+
+pktcDevEvTransmissionStatus OBJECT-TYPE
+
+    SYNTAX      BITS {
+                syslogThrottled(0),
+                snmpThrottled(1),
+                validSyslogServerAbsent(2),
+                validSnmpManagerAbsent(3),
+                syslogTransmitError(4),
+                snmpTransmitError(5)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object reflects the status of the event 
+             transmission.
+
+            If a bit corresponding to a state is set to a value
+            of:
+                '1', it indicates that the state is true
+                '0', it indicates that the state is false
+
+            'Event throttling' is based on thresholds and the current
+            setting of pktcDevEvThrottleAdminStatus.
+
+            'Server/Manager' indicators must be based on the 
+            availability of valid Syslog server/SNMP managers.
+
+            'Transmit Errors' must only be used in cases where the 
+            PacketCable Device can identify unavailable servers."
+            
+          
+    ::= { pktcDevEventStatus 1 }
+
+
+
+--- 
+-- Event Descriptions
+---  
+
+pktcDevEventDescrTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDevEventDescrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This MIB table contains all the possible events
+            that can be generated by the device. This includes
+            both PacketCable defined and vendor-specific events."
+    ::= { pktcDevEventDescr 1 }
+
+pktcDevEventDescrEntry OBJECT-TYPE
+    SYNTAX      PktcDevEventDescrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry in this table is created for each 
+            event the PacketCable Device implementing this
+            MIB is capable of reporting."
+    INDEX { pktcDevEventDescrId, pktcDevEventDescrEnterprise }
+	::= { pktcDevEventDescrTable 1 }
+
+PktcDevEventDescrEntry::= SEQUENCE {
+    pktcDevEventDescrId              Unsigned32,
+    pktcDevEventDescrEnterprise      Unsigned32,
+    pktcDevEventDescrFacility        INTEGER,
+    pktcDevEventDescrLevel           INTEGER,
+    pktcDevEventDescrReporting       BITS,
+    pktcDevEventDescrText            SnmpAdminString
+    }  
+
+pktcDevEventDescrId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains the event identifier for the 
+            specific event to which the priority and display
+            strings belong. 
+            The event identifier can either be PacketCable defined
+            or vendor-specific."
+    ::= { pktcDevEventDescrEntry 1 }
+
+pktcDevEventDescrEnterprise OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION  
+            "This MIB Object provides the IANA enterprise number of
+            the Organization defining the event. Thus, all PacketCable
+            defined events will contain the CableLabs IANA enterprise
+            number and for vendor-specific events it will contain
+            the IANA enterprise number of the defining organization."
+    ::= { pktcDevEventDescrEntry 2 }
+
+
+pktcDevEventDescrFacility OBJECT-TYPE
+    SYNTAX      INTEGER {
+                kernel(0), 
+                user(1), 
+                mail(2), 
+                daemon(3), 
+                auth(4), 
+                syslog(5), 
+                lpr(6),
+                news(7), 
+                uucp(8), 
+                cron(9), 
+                authPriv(10),
+                ftp(11),
+                ntp(12),
+                security(13),
+                console(14), 
+                clockDaemon(15),
+                local0(16),
+                local1(17),
+                local2(18),
+                local3(19),
+                local4(20),
+                local5(21),
+                local6(22),
+                local7(23) 
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains the facility 
+            for the event. 
+            For PacketCable events this MUST be set to
+            local0(16)."
+    ::= { pktcDevEventDescrEntry 3 }
+
+pktcDevEventDescrLevel OBJECT-TYPE
+    SYNTAX      INTEGER {
+                emergency(0),
+                alert(1),
+                critical(2),  
+                error(3),  
+                warning(4),  
+                notice(5),
+                info(6),
+                debug(7) 
+                }  
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains the priority level that 
+             is controlled by this entry. 
+            The levels are described as:
+
+            emergency(0) - A condition that makes the system unusable.
+            alert(1)     - A service-affecting condition for which
+                           immediate action must be taken.
+            critical(2)  - A service-affecting critical condition.
+            error(3)     - An error condition.
+            warning(4)   - A warning condition.
+            notice(5)    - A normal but significant condition.
+            info(6)      - An informational message.
+            debug(7)     - A debug message."
+    ::= { pktcDevEventDescrEntry 4 }
+
+pktcDevEventDescrReporting OBJECT-TYPE
+    SYNTAX      BITS {
+                local(0),
+                syslog(1),
+                snmpTrap(2),
+                snmpInform(3)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object defines the action to be taken on 
+            occurrence of this event class. 
+
+            Setting a bit to a value of '1' indicates that the
+            corresponding action will be taken upon occurrence of
+            this event, provided the required parameters are present.
+            (e.g.: Syslog Server for Syslog messages, SNMP targets for
+            SNMP traps and SNMP INFORMs etc). If none of the bits 
+            are set then no action is taken upon occurrence of the
+            event.
+
+             The default value of this MIB OBject is dependent on the 
+             value of the MIB Object 'pktcDevEventDescrLevel', for the
+             corresponding event.
+
+            For the following values of 'pktcDevEventDescrLevel':
+               emergency(0), alert(1), critical(2) and error(3),     
+            the PacketCable device MUST set the bits for local(0), 
+            syslog(1) and snmpInform(3) to a value of '1' and the rest 
+            to a value of '0'.
+
+            For all the remaining values of 'pktcDevEventDescrLevel', 
+            the PacketCable device MUST set the bits for local(0) and 
+            syslog(1) to a value of '1' and the rest to a value of 
+            '0'."
+    ::= { pktcDevEventDescrEntry 5 }
+
+pktcDevEventDescrText OBJECT-TYPE
+    SYNTAX      SnmpAdminString(SIZE (0..127))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains event display 
+            string providing a human-readable description of the 
+            event."
+    ::= { pktcDevEventDescrEntry 6 }
+
+---
+-- Events generated
+---
+pktcDevEventLogTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDevEventLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION  
+            "This MIB table contains a log of the events 
+            generated by the PacketCable device.
+            A description of all the events that can be 
+            generated by the device can be obtained from the
+            MIB table 'pktcDevEventDescrTable'."
+    ::= { pktcDevEventLog 1 }
+
+pktcDevEventLogEntry OBJECT-TYPE
+    SYNTAX      PktcDevEventLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Each entry in this table describes an event that
+            has occurred, indexed in the chronological order of 
+            generation. The details of the event are borrowed
+            from the parameters associated with the corresponding
+            event entry in 'pktcDevEventDescrTable', at the
+            time of the event generation.
+            While all entries created as such can be cleared using 
+            the MIB Object pktcDevEvControl, the Event entries 
+            themselves cannot be individually deleted."
+            
+    INDEX { pktcDevEvLogIndex }
+--DEFAULT test-function-async   	null_test_async
+--DEFAULT set-function-async    	null_set_async
+--DEFAULT get-function-async    	pktcDevEventLogEntry_get
+--DEFAULT next-function-async   	pktcDevEventLogEntry_next
+--DEFAULT cookie        		    (char *)0
+    ::= { pktcDevEventLogTable 1 }
+
+PktcDevEventLogEntry ::= SEQUENCE {
+    pktcDevEvLogIndex             Unsigned32,
+    pktcDevEvLogTime              DateAndTime,
+    pktcDevEvLogEnterprise        Unsigned32,
+    pktcDevEvLogId                Unsigned32,
+    pktcDevEvLogText              SnmpAdminString,
+    pktcDevEvLogEndpointName      SnmpAdminString,
+    pktcDevEvLogType              BITS,
+    pktcDevEvLogTargetInfo        SnmpAdminString,
+    pktcDevEvLogCorrelationId     Unsigned32,
+    pktcDevEvLogAdditionalInfo    SnmpAdminString
+    }
+
+pktcDevEvLogIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object provides relative ordering of the 
+            objects in the event log. 
+             This object will always increase except when 
+            (a) the log is reset via pktcDevEvControl, 
+            (b) the device reboots and does not implement non-volatile
+            storage for this log, 
+            (c) it reaches the value 2^31.
+            The next entry for all the above cases is 0. 
+            This also serves as an indicator of event sequence."
+    ::= { pktcDevEventLogEntry 1 }
+
+
+pktcDevEvLogTime OBJECT-TYPE
+    SYNTAX       DateAndTime
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+            "This MIB Object provides a human-readable description 
+            of the time at which the event occurred."
+    ::= { pktcDevEventLogEntry 2 }
+
+
+pktcDevEvLogEnterprise OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object provides the IANA enterprise number of
+            the Organization defining the event. Thus, all PacketCable
+            defined events will contain the CableLabs IANA enterprise
+            number and for vendor-specific events it will contain
+            the IANA enterprise number of the defining organization."
+
+
+    ::= { pktcDevEventLogEntry 3 }
+
+pktcDevEvLogId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+
+            "This MIB Object contains the event identifier for the 
+            specific event to which the priority and 
+            display strings belong. 
+            The event identifier can either be PacketCable defined
+            or vendor-specific."
+    ::= { pktcDevEventLogEntry 4 }
+
+pktcDevEvLogText OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains the contents of  
+            pktcDevEventDescrText, corresponding to the event, at 
+            the moment of generation."
+    ::= { pktcDevEventLogEntry 5 }
+
+
+pktcDevEvLogEndpointName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object provides the endpoint identifier 
+             followed by the PacketCable MTA's Fully Qualified 
+             Domain Name (FQDN) and the IP Address (IP) 
+             of the PacketCable MTA device. 
+
+             This will be denoted as follows:
+             aaln/n:<FQDN>/<IP>, where 'n' is the Endpoint number. 
+              or
+             <FQDN>/<IP> if it is not specific to an endpoint."
+
+    ::= { pktcDevEventLogEntry 6 }
+
+pktcDevEvLogType OBJECT-TYPE
+    SYNTAX      BITS {
+                local(0),
+                syslog (1),
+                trap (2),
+                inform (3)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains the kind of actions taken by 
+             the PacketCable device when the event under consideration
+             occurred. 
+
+             A bit with a value of 1 indicates the corresponding
+             action was taken. Setting it to a value of 0 indicates 
+             that the corresponding action was not taken.
+ 
+             An event may trigger one or more actions (e.g.: Syslog and
+             SNMP) or may remain as a local event since transmissions
+             could be disabled or inhibited as defined by the Throttle 
+             MIB Objects."
+             
+    ::= { pktcDevEventLogEntry 7 }
+
+pktcDevEvLogTargetInfo OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains a comma separated list of the 
+            actions taken, along with the target IP address for the 
+            generated event. 
+
+            The syntax is as:
+            <action-1/IP:port>,<action-2/IP:port>,<action-3/IP:port>
+
+            Where <action-n/IP> is to be denoted as follows:
+              For Syslog events:
+                      syslog/<IP address of the Syslog Server:port>
+              For SNMP traps:
+                      snmpTrap/<IP address of the SNMP Server:port>
+              For SNMP INFORMS:
+                      snmpInform/<IP address of the SNMP Server:port>
+
+             If there are multiple targets for the same type (SNMP 
+             Traps sent to multiple IP addresses) or if there are 
+             multiple messages sent to the same IP (Syslog and SNMP 
+             sent to the same IP address) they need to be reported
+             individually."
+    ::= { pktcDevEventLogEntry 8 }
+
+pktcDevEvLogCorrelationId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION  
+            " This MIB Object contains the correlation ID 
+            generated by the MTA as per section 5.4.5 of [7] that 
+            was being used by the MTA when the event 
+            was generated."
+    ::= { pktcDevEventLogEntry 9 }
+
+pktcDevEvLogAdditionalInfo OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This MIB Object contains additional, useful 
+            information in relation to the corresponding event that a
+            PacketCable device might wish to report (for example: 
+            parameterized data or debugging information). The format
+            is vendor-specific.
+            However, the PacketCable device is not required to 
+            implement this functionality."
+    ::= { pktcDevEventLogEntry 10 }
+
+---
+-- Notifications
+---
+
+pktcDevEvNotificationIndex  OBJECT IDENTIFIER ::= 
+                                           { pktcDevEvNotification 0 }
+
+pktcDevEvInform NOTIFICATION-TYPE
+    OBJECTS {pktcDevEvLogIndex, pktcDevEvLogTime,
+    pktcDevEvLogEnterprise,pktcDevEvLogId,
+    pktcDevEvLogEndpointName,pktcDevEvLogCorrelationId,ifPhysAddress}
+    STATUS      current
+    DESCRIPTION
+            "This Notification MIB Objects contains the Inform 
+             contents for event reporting "
+    ::= { pktcDevEvNotificationIndex 1 }
+
+pktcDevEvTrap NOTIFICATION-TYPE
+    OBJECTS {pktcDevEvLogIndex, pktcDevEvLogTime,
+    pktcDevEvLogEnterprise,pktcDevEvLogId,
+    pktcDevEvLogEndpointName,pktcDevEvLogCorrelationId,ifPhysAddress}
+    STATUS      current
+    DESCRIPTION
+            "This Notification MIB Objects contains the Trap contents 
+             for event reporting "
+    ::= { pktcDevEvNotificationIndex 2 }
+
+---
+-- Conformance/Compliance
+---
+
+pktcEventConformance  OBJECT IDENTIFIER ::= { pktcEventMib 7 }
+pktcEventCompliances  OBJECT IDENTIFIER ::= { pktcEventConformance 1 }
+pktcEventGroups       OBJECT IDENTIFIER ::= { pktcEventConformance 2 }
+
+
+pktcEventBasicCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+            "The compliance statement for devices that implement
+            Event reporting feature."
+    MODULE   --pktcEventMib
+
+
+MANDATORY-GROUPS {
+                 pktcEventGroup,
+                 pktcEventNotificationGroup
+                 }
+   -- units of conformance
+    ::= { pktcEventCompliances 3 }
+
+pktcEventGroup OBJECT-GROUP
+    OBJECTS {
+            pktcDevEvControl,
+            pktcDevEvSyslogAddressType,
+            pktcDevEvSyslogAddress,
+            pktcDevEvSyslogUdpPort,
+            pktcDevEvThrottleAdminStatus,
+            pktcDevEvThrottleThreshold,
+            pktcDevEvThrottleInterval,
+            pktcDevEvTransmissionStatus,
+            pktcDevEventDescrEnterprise,
+            pktcDevEventDescrFacility,
+            pktcDevEventDescrLevel,
+            pktcDevEventDescrReporting,
+            pktcDevEventDescrText,
+            pktcDevEvLogIndex,
+            pktcDevEvLogTime,
+            pktcDevEvLogEnterprise,
+            pktcDevEvLogId,
+            pktcDevEvLogText,
+            pktcDevEvLogEndpointName,
+            pktcDevEvLogType,
+            pktcDevEvLogTargetInfo,
+            pktcDevEvLogCorrelationId,
+            pktcDevEvLogAdditionalInfo
+            }
+
+    STATUS      current
+    DESCRIPTION
+            "Group of MIB objects for PacketCable Management Event 
+            MIB."
+    ::= { pktcEventGroups 1 }
+
+
+pktcEventNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { pktcDevEvInform, pktcDevEvTrap }
+    STATUS      current
+    DESCRIPTION
+            "Group of MIB objects for notifications related to
+            change in status of the MTA Device."
+    ::= { pktcEventGroups 2 }
+END
+

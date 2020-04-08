@@ -1,0 +1,2653 @@
+--
+-- Eltex Enterprise Specific MIB: smg MIB
+--
+-- Copyright (c) 2009-2016, Eltex Co
+-- All rights reserved.
+--
+-- The contents of this document are subject to change without notice.
+-- MIB checked by http://wwwsnmp.cs.utwente.nl/ietf/mibs/validate/
+--
+-- for traps table configure use ELTEX-FXS72::tauMegacoTrapsTable
+--
+-- smg traps described at ELTEX-SMI-ACTUAL::smgTraps
+--
+
+ELTEX-SMG DEFINITIONS ::= BEGIN
+
+IMPORTS
+	MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, OBJECT-IDENTITY,
+	Integer32, Gauge32, Counter32, IpAddress, Unsigned32
+		FROM SNMPv2-SMI
+	DisplayString, RowStatus, TimeStamp, TimeInterval, TEXTUAL-CONVENTION, MacAddress, TruthValue
+		FROM SNMPv2-TC
+		OBJECT-GROUP
+	FROM SNMPv2-CONF
+	elHardware
+		FROM ELTEX-SMI-ACTUAL;
+
+smg MODULE-IDENTITY
+	LAST-UPDATED "201006281717Z"
+	ORGANIZATION "Eltex Co"
+	CONTACT-INFO 
+			"Editor: Mikhail Gaidamaka
+			 E-mail: mikhail.gaydamaka@eltex.loc
+			 Jabber: magnoly@onil4.bulat.info
+			 Company: Eltex Ltd.
+			 Postal: Russia, Novosibirsk, Okruzhnaya Str., 29V
+			 Homepage: www.eltex.nsk.ru
+			 E-mail: eltex@eltex.nsk.ru"
+	DESCRIPTION "snmp agent for smg"
+	REVISION    "201006281717Z"
+	DESCRIPTION "added E1 32 states"
+	REVISION    "200912291545Z"
+	DESCRIPTION "first version of parametrs"
+	::= { elHardware 29 }
+
+-- textual convention types for states
+
+SmgEOnePhyState ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION ""
+  SYNTAX INTEGER {
+	off(0),
+	alarm(1),
+	lossOfSignal(2),
+	alarmIndicationSignal(3),
+	lossOfFrame(4),
+	lossOfMultiframe(5),
+	work(6),
+	test(7) }
+
+SmgMspState ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION ""
+  SYNTAX INTEGER {
+	notPresent (0),
+	noInit (1),
+	off (2),
+	failed (3),
+	recovery (4),
+	waitAck (5),
+	work (6),
+	reserved (7),
+	sswsorm (8)}
+
+SmgLstState ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION ""
+  SYNTAX INTEGER {
+	unavailable (0),
+	available (1)}
+
+SmgAlarm ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION "state for alarm flag"
+  SYNTAX INTEGER {
+	normal (0),
+	alarm (1)}
+
+SmgWork ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION "state for work flag"
+  SYNTAX INTEGER {
+	noWork (0),
+	inWork (1)}
+
+SmgStateAlarm ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION "flags for line state alarm"
+  SYNTAX INTEGER {
+	normal (0),
+	errorState (1),
+	alarmLosLofLomf (2),
+	reserved (3),
+	remoteAlarm (4)}
+
+SmgEOneChannelState ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION "state of 32 channel of current E1"
+  SYNTAX INTEGER {
+	turnedOff (0),
+	blocked (1),
+	initialized (2),
+	idle (3),
+	inDial (4),
+	inFree (5),
+	inCall (6),
+	inBusy (7),
+	outDial (8),
+	outCall (9),
+	outBusy	(10),
+	outFree (11),
+	talking (12),
+	release (13),
+	waitAck (14),
+	waitAon (15),
+	waitNum (16)}
+
+SmgMspIpChannelState ::= TEXTUAL-CONVENTION
+  STATUS current
+  DESCRIPTION "state of ip msp channel"
+  SYNTAX INTEGER {
+	idle (0),
+	preAlloc(1),
+	allocReq (2),
+	allocated (3),
+	deallocReq (4),
+	disabled (5),
+	disabledReq (6),
+	activateReq (7),
+	active (9),
+	confReq (10),
+	confActive (11)}
+
+
+SyslogHistoryLevel ::= TEXTUAL-CONVENTION
+	STATUS		current
+	DESCRIPTION	"Syslog history detailing level"
+	SYNTAX		INTEGER {
+				off (0),
+				standard (1),
+				full (2)
+			}
+			
+PmType ::= TEXTUAL-CONVENTION
+	STATUS		current
+	DESCRIPTION	" "
+	SYNTAX		INTEGER {
+		pm48x12(1),
+		pm220x12(2),
+		pm220x12V(3) }
+
+-- ABOUT DEVICE
+
+smgDevName OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION "Managed object name"
+	DEFVAL { "New smg" }
+	::= { smg 1 }
+
+smgDevType OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION "device type (mxm-12 = 1, mxe-4 = 2, mc240v3 = 3, etc)"
+	::= { smg 2 }
+
+smgFwVersion OBJECT-TYPE
+	SYNTAX OCTET STRING
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION "version info"
+	::= { smg 3 }
+
+smgEth0 OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION "IP Address Ethetnet Interface 0"
+	DEFVAL { 'c0a80001'H }
+	::= { smg 4 }
+
+smgUptime OBJECT-TYPE
+	SYNTAX OCTET STRING
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION "Application Uptime (not snmpd uptime)"
+	::= { smg 5 }
+
+smgMIBBoundary1  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION "Dummy object to prevent GETNEXT request from poking into neighbor table."
+	::= { smg 6 }
+
+-- TABLE FOR CURRENT E1 INTERFACE
+
+smgEOneTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF EOneEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "The table of parametr for current E1"
+	::= { smg 7 }
+
+eOneEntry OBJECT-TYPE
+	SYNTAX EOneEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "An entry (0...15) in the table of parametr for current E1
+					0..3 for SMG4"
+	INDEX { eOneIndex }
+	::= { smgEOneTable 1 }
+
+EOneEntry ::=
+	SEQUENCE {
+		eOneIndex		INTEGER, --1
+		eOneLineInfoPhyState 	SmgEOnePhyState, --2
+		eOneLineInfoRemAlarm 	SmgAlarm, --3
+		eOneLineInfoRemAlarmTS16	SmgAlarm, --4
+		eOneLineStateAlarm	SmgStateAlarm, --5
+		eOneLineStatePhyWork	SmgWork, --6
+		eOneLinkState		SmgWork, --7
+		eOneRSV			INTEGER, --8
+		eOneStatistTimer 	INTEGER,	 --9
+		eOneSlipUp		Counter32,	 --10
+		eOneSlipDown		Counter32,	 --11
+		eOneBERCount		Counter32,	 --12
+		eOneCVC			Counter32,	 --13
+		eOneCEC			Counter32,	 --14
+		eOneRxEqualizer		DisplayString,	 --15
+		eOneRxCount		Counter32,	 --16
+		eOneTxCount		Counter32,	 --17
+		eOneRxLow		Counter32,	 --18
+		eOneRxBig		Counter32,	 --19
+		eOneRxOvfl		Counter32,	 --20
+		eOneRxCRC		Counter32,	 --21
+		eOneTxUrun		Counter32	 --22
+	}
+
+eOneIndex OBJECT-TYPE
+	SYNTAX INTEGER (0..15)
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "Index of current E1 interface (0...15)
+					0..3 for SMG4"
+	::= { eOneEntry 1 }
+
+eOneLineInfoPhyState OBJECT-TYPE
+	SYNTAX SmgEOnePhyState
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION "E1 state: Line Info: Phy State"
+	DEFVAL { 0 }	 
+	::= { eOneEntry 2 }
+
+eOneLineInfoRemAlarm OBJECT-TYPE
+	 SYNTAX SmgAlarm
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "E1 state: Line Info: Rem Alarm"
+	 ::= { eOneEntry 3 }
+
+eOneLineInfoRemAlarmTS16 OBJECT-TYPE
+	 SYNTAX SmgAlarm
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "E1 state: Line Info: Rem Alarm TS16"
+	 ::= { eOneEntry 4 }
+
+eOneLineStateAlarm OBJECT-TYPE
+	 SYNTAX SmgStateAlarm
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "E1 state: Line state: Alarm"
+	 ::= { eOneEntry 5 }
+
+eOneLineStatePhyWork OBJECT-TYPE
+	 SYNTAX SmgWork
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "E1 state: Line state: Phy Work"
+	 ::= { eOneEntry 6 }
+
+eOneLinkState OBJECT-TYPE
+	 SYNTAX SmgWork
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "E1 state: logical link state"
+	 ::= { eOneEntry 7 }
+
+eOneRSV OBJECT-TYPE
+	 SYNTAX INTEGER
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "E1 state: RCV"
+	 ::= { eOneEntry 8 }
+
+eOneStatistTimer OBJECT-TYPE
+	 SYNTAX INTEGER
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "Statistic Timer"
+	 ::= { eOneEntry 9 }
+
+eOneSlipUp OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "SlipUp"
+	 ::= { eOneEntry 10 }
+
+eOneSlipDown OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "SlipDown"
+	 ::= { eOneEntry 11 }
+
+eOneBERCount OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "BERCount"
+	 ::= { eOneEntry 12 }
+
+eOneCVC OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "CVC"
+	 ::= { eOneEntry 13 }
+
+eOneCEC OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "CEC"
+	 ::= { eOneEntry 14 }
+
+eOneRxEqualizer OBJECT-TYPE
+	 SYNTAX DisplayString
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "RxEqualizer"
+	 ::= { eOneEntry 15 }
+
+eOneRxCount OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "RxCount"
+	 ::= { eOneEntry 16 }
+
+eOneTxCount OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "TxCount"
+	 ::= { eOneEntry 17 }
+
+eOneRxLow OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "RxLow"
+	 ::= { eOneEntry 18 }
+
+eOneRxBig OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "RxBig"
+	 ::= { eOneEntry 19 }
+
+eOneRxOvfl OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "RxOvfl"
+	 ::= { eOneEntry 20 }
+
+eOneRxCRC OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "RxCRC"
+	 ::= { eOneEntry 21 }
+
+eOneTxUrun OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "TxUrun"
+	 ::= { eOneEntry 22 }
+
+smgMIBBoundary2  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION "Dummy object to prevent GETNEXT request from poking into neighbor table."
+	::= { smg 8 }
+
+-- TABLE FOR MSP INTERFACE
+
+smgMspTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF MspEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "The table of parametr for MSP submodule"
+	::= { smg 9 }
+
+mspEntry OBJECT-TYPE
+	SYNTAX MspEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "An entry (0...7) in the table of parametr for MSP submodule
+					total 8 msp for SMG
+					6 msp for SMGM
+					1 msp for SMG4"
+	INDEX { mspIndex }
+	::= { smgMspTable 1 }
+
+MspEntry ::=
+	SEQUENCE {
+		mspIndex	INTEGER,
+		mspState	SmgMspState,
+		mspUsedConn	INTEGER,
+		mspCreateReq	Counter32,
+		mspCreated	Counter32,
+		mspDestroyReq	Counter32,
+		mspDestroyed	Counter32,
+		mspPayload DisplayString
+	}
+
+mspIndex OBJECT-TYPE
+	SYNTAX INTEGER (0..7)
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "Index of MSP interface (0...7)
+					total 8 msp for SMG
+					6 msp for SMGM
+					1 msp for SMG4"
+	::= { mspEntry 1 }
+
+mspState OBJECT-TYPE
+	 SYNTAX SmgMspState
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "	Status of MSP interface "
+	 DEFVAL { 0 }
+	 ::= { mspEntry 2 }
+
+mspUsedConn OBJECT-TYPE
+	 SYNTAX INTEGER
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "Quantity of used connection"
+	 ::= { mspEntry 3 }
+
+mspCreateReq OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "MSP counter CreateReq"
+	 ::= { mspEntry 4 }
+
+mspCreated OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "MSP counter Created"
+	 ::= { mspEntry 5 }
+
+mspDestroyReq OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "MSP counter DestroyReq"
+	 ::= { mspEntry 6 }
+
+mspDestroyed OBJECT-TYPE
+	 SYNTAX Counter32
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "MSP counter Destroyed"
+	 ::= { mspEntry 7 }
+	
+mspPayload OBJECT-TYPE
+	 SYNTAX DisplayString
+	 UNITS "%"
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "MSP payload"
+	 ::= { mspEntry 8 }
+
+smgMIBBoundary3  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION "Dummy object to prevent GETNEXT request from poking into neighbor table."
+	::= { smg 10 }
+	
+-- TABLE FOR LINKSET
+
+smgLinksetTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF LinksetEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "The table of parametr for current E1"
+	::= { smg 11 }
+
+linksetEntry OBJECT-TYPE
+	SYNTAX LinksetEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "An entry (0...15) in the table of parametr of LinkSet"
+	INDEX { linksetIndex }
+	::= { smgLinksetTable 1 }
+
+LinksetEntry ::=
+	SEQUENCE {
+		linksetIndex	INTEGER,
+		linksetState	SmgLstState
+		}
+
+linksetIndex OBJECT-TYPE
+	SYNTAX INTEGER (0..15)
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "Index of Linkset (0...15)"
+	::= { linksetEntry 1 }
+
+linksetState OBJECT-TYPE
+	 SYNTAX SmgLstState
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "	Status of Linkset "
+	 DEFVAL { 0 }
+	 ::= { linksetEntry 2 }
+
+smgMIBBoundary4  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION "Dummy object to prevent GETNEXT request from poking into neighbor table."
+	::= { smg 12 }
+
+-- TABLE FOR E1 CHANNEL STATE
+
+smgEOneChannelTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF SmgEOneChannelEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "The table of parametr for current E1"
+	::= { smg 13 }
+
+smgEOneChannelEntry OBJECT-TYPE
+	SYNTAX SmgEOneChannelEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "An entry (0...15) for current E1 with 32 channel"
+	INDEX { eOneIndex, channelEOneIndex }
+	::= { smgEOneChannelTable 1 }
+
+SmgEOneChannelEntry ::=
+	SEQUENCE {
+		channelEOneIndex	INTEGER,
+		channelEOneState	SmgEOneChannelState
+		}
+
+channelEOneIndex OBJECT-TYPE
+	SYNTAX INTEGER (0..31)
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "Index of E1 Channel (0...31)"
+	::= { smgEOneChannelEntry 1 }
+
+channelEOneState OBJECT-TYPE
+	 SYNTAX SmgEOneChannelState
+	 MAX-ACCESS read-only
+	 STATUS current
+	 DESCRIPTION "Status of E1 Channel "
+	 DEFVAL { 3 }
+	 ::= { smgEOneChannelEntry 2 }
+
+smgMIBBoundary5  OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION "Dummy object to prevent GETNEXT request from poking into neighbor table."
+	::= { smg 14 }
+
+-- TABLE FOR IP CHANNEL OF MSP
+
+smgIpMspChannelTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF SmgMspIpChannelEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "The table of parametr for ip channel of msp"
+	::= { smg 15 }
+
+smgMspIpChannelEntry OBJECT-TYPE
+	SYNTAX SmgMspIpChannelEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "An entry (0...15) for current E1 with 32 channel"
+	INDEX { mspIndex, ipMspChannelIndex }
+	::= { smgIpMspChannelTable 1 }
+
+SmgMspIpChannelEntry ::=
+	SEQUENCE {
+		ipMspChannelIndex		INTEGER,
+		ipMspChannelState		SmgMspIpChannelState,
+		ipMspChannelSiptCallref	Unsigned32,
+		ipMspChannelSrcIp		IpAddress,
+		ipMspChannelSrcPort		Unsigned32,
+		ipMspChannelSrcMac		MacAddress,
+		ipMspChannelDstIp		IpAddress,
+		ipMspChannelDstPort		Unsigned32,
+		ipMspChannelDstMac		MacAddress,
+		ipMspChannelCallingPartyNumber	DisplayString,
+		ipMspChannelCalledPartyNumber	DisplayString,
+		ipMspChannelOccupiedTime	Unsigned32
+		}
+
+ipMspChannelIndex OBJECT-TYPE
+	SYNTAX INTEGER (0..640)
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 1 }
+
+ipMspChannelState OBJECT-TYPE
+	SYNTAX SmgMspIpChannelState
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 2 }
+	
+ipMspChannelSiptCallref OBJECT-TYPE
+	SYNTAX Unsigned32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 3 }
+	
+ipMspChannelSrcIp OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 4 }
+	
+ipMspChannelSrcPort OBJECT-TYPE
+	SYNTAX Unsigned32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 5 }
+	
+ipMspChannelSrcMac OBJECT-TYPE
+	SYNTAX MacAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 6 }
+	
+ipMspChannelDstIp OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 7 }
+	
+ipMspChannelDstPort OBJECT-TYPE
+	SYNTAX Unsigned32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 8 }
+	
+ipMspChannelDstMac OBJECT-TYPE
+	SYNTAX MacAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 9 }
+	
+ipMspChannelCallingPartyNumber OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 10 }
+	
+ipMspChannelCalledPartyNumber OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 11 }
+	
+ipMspChannelOccupiedTime OBJECT-TYPE
+	SYNTAX Unsigned32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION ""
+	::= { smgMspIpChannelEntry 12 }
+
+smgMIBBoundary6 OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION "Dummy object to prevent GETNEXT request from poking into neighbor table."
+	::= { smg 16 }
+
+smgCpuLoad OBJECT IDENTIFIER ::= { smg 17 }
+
+	smgTopCpuUsr OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		--UNITS %
+		DESCRIPTION ""
+		::= { smgCpuLoad 1 }
+	
+	smgTopCpuSys OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		--UNITS %
+		DESCRIPTION ""
+		::= { smgCpuLoad 2 }
+		
+	smgTopCpuNic OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		--UNITS %
+		DESCRIPTION ""
+		::= { smgCpuLoad 3 }
+		
+	smgTopCpuIdle OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		--UNITS %
+		DESCRIPTION ""
+		::= { smgCpuLoad 4 }
+		
+	smgTopCpuIo OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		--UNITS %
+		DESCRIPTION ""
+		::= { smgCpuLoad 5 }
+		
+	smgTopCpuIrq OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		--UNITS %
+		DESCRIPTION ""
+		::= { smgCpuLoad 6 }
+		
+	smgTopCpuSirq OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		--UNITS %
+		DESCRIPTION ""
+		::= { smgCpuLoad 7 }
+		
+	smgTopCpuUsage OBJECT-TYPE
+		SYNTAX DisplayString
+		MAX-ACCESS read-only
+		STATUS obsolete -- new at smgCpuLoadTable
+		DESCRIPTION ""
+		::= { smgCpuLoad 8 }
+		
+smgMIBBoundary7 OBJECT-TYPE
+	SYNTAX     Integer32
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION "Dummy object to prevent GETNEXT request from poking into neighbor table."
+	::= { smg 18 }
+	
+smgUpdateFw OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION "SET: filename tftpaddr"
+	::= { smg 25 }
+	
+smgReboot OBJECT-TYPE
+	SYNTAX		Integer32
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION "SET: 1 to reboot"
+	::= { smg 27 }
+	
+smgSave OBJECT-TYPE
+	SYNTAX		Integer32
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION "SET: 1 to save"
+	::= { smg 29 }
+	
+	smgOid OBJECT IDENTIFIER        ::= { smg 90 }
+	smgMOid OBJECT IDENTIFIER        ::= { smg 91 }
+	smgMROid OBJECT IDENTIFIER        ::= { smg 92 }
+	smg2016Oid OBJECT IDENTIFIER        ::= { smg 93 }
+	smg4Oid OBJECT IDENTIFIER        ::= { smg 94 }
+	smg2Oid OBJECT IDENTIFIER        ::= { smg 95 }
+	msrOid OBJECT IDENTIFIER        ::= { smg 110 }
+	sbcOid OBJECT IDENTIFIER        ::= { smg 111 }
+	sbc2016Oid OBJECT IDENTIFIER ::= { smg 112 }
+	
+smgEOneBusyChannelsCounters OBJECT IDENTIFIER ::= { smg 31 }
+
+	smgEOneInstantCounters OBJECT IDENTIFIER ::= { smgEOneBusyChannelsCounters 1 }
+
+		smgEOneStream0BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 0 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 0 }
+
+		smgEOneStream1BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 1 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 1 }
+
+		smgEOneStream2BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 2 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 2 }
+
+		smgEOneStream3BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 3 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 3 }
+
+		smgEOneStream4BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 4 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 4 }
+
+		smgEOneStream5BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 5 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 5 }
+
+		smgEOneStream6BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 6 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 6 }
+
+		smgEOneStream7BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 7 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 7 }
+
+		smgEOneStream8BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 8 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 8 }
+
+		smgEOneStream9BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 9 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 9 }
+
+		smgEOneStream10BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 10 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 10 }
+
+		smgEOneStream11BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 11 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 11 }
+
+		smgEOneStream12BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 12 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 12 }
+
+		smgEOneStream13BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 13 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 13 }
+
+		smgEOneStream14BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 14 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 14 }
+
+		smgEOneStream15BusyChannelsInstantCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Instant number of busy channels for stream 15 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOneInstantCounters 15 }
+
+	smgEOnePeriodicCounters OBJECT IDENTIFIER ::= { smgEOneBusyChannelsCounters 2 }
+
+		smgEOneStream0BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 0 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 0 }
+
+		smgEOneStream1BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 1 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 1 }
+
+		smgEOneStream2BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 2 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 2 }
+
+		smgEOneStream3BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 3 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 3 }
+
+		smgEOneStream4BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 4 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 4 }
+
+		smgEOneStream5BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 5 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 5 }
+
+		smgEOneStream6BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 6 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 6 }
+
+		smgEOneStream7BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 7 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 7 }
+
+		smgEOneStream8BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 8 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 8 }
+
+		smgEOneStream9BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 9 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 9 }
+
+		smgEOneStream10BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 10 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 10 }
+
+		smgEOneStream11BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 11 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 11 }
+
+		smgEOneStream12BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 12 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 12 }
+
+		smgEOneStream13BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 13 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 13 }
+
+		smgEOneStream14BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 14 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 14 }
+
+		smgEOneStream15BusyChannelsPeriodicCounter OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	read-only
+			STATUS		current
+			DESCRIPTION	"Periodic number of busy channels for stream 15 of E1"
+			DEFVAL		{ 0 }
+		::= { smgEOnePeriodicCounters 15 }
+
+		smgEOneCounterPeriod OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	"Statistics collection period (m)"
+		::= { smgEOnePeriodicCounters 16 }
+
+smgFreeSpace OBJECT-TYPE
+	SYNTAX      DisplayString
+	MAX-ACCESS  read-only
+	STATUS      current
+	DESCRIPTION "Free space of disk subsystem, kB"
+	::= { smg 32 }
+
+smgFreeRam OBJECT-TYPE
+	SYNTAX      DisplayString
+	MAX-ACCESS  read-only
+	STATUS      current
+	DESCRIPTION "Free space of RAM, MB"
+	::= { smg 33 }
+
+smgSyslog OBJECT IDENTIFIER ::= { smg 34 }
+
+	smgSyslogTraces OBJECT IDENTIFIER ::= { smgSyslog 1 }
+	-- SyslogTraces only for SMG
+
+		smgSyslogTracesAddress OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 1 }
+
+		smgSyslogTracesPort OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 2 }
+
+		smgSyslogTracesAlarms OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 3 }
+
+		smgSyslogTracesCalls OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 4 }
+
+		smgSyslogTracesISUP OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 5 }
+
+		smgSyslogTracesSIPT OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 6 }
+
+		smgSyslogTracesQ931 OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 7 }
+
+		smgSyslogTracesRTP OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 8 }
+
+		smgSyslogTracesMSP OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 9 }
+
+		smgSyslogTracesRadius OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 10 }
+
+		smgSyslogTracesRowStatus OBJECT-TYPE
+			SYNTAX		RowStatus
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogTraces 11 }
+
+	smgSyslogHistory OBJECT IDENTIFIER ::= { smgSyslog 2 }
+	-- SyslogHistory for SMG, SBC, MSR
+
+		smgSyslogHistoryAddress OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogHistory 1 }
+
+		smgSyslogHistoryPort OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogHistory 2 }
+
+		smgSyslogHistoryLevel OBJECT-TYPE
+			SYNTAX		SyslogHistoryLevel
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogHistory 3 }
+
+		smgSyslogHistoryRowStatus OBJECT-TYPE
+			SYNTAX		RowStatus
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogHistory 4 }
+
+	smgSyslogConfig OBJECT IDENTIFIER ::= { smgSyslog 3 }
+	-- SyslogConfig for SMG, SBC, MSR
+
+		smgSyslogConfigLogsEnabled OBJECT-TYPE
+			SYNTAX		TruthValue
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogConfig 1 }
+
+		smgSyslogConfigSendToServer OBJECT-TYPE
+			SYNTAX		TruthValue
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogConfig 2 }
+
+		smgSyslogConfigAddress OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogConfig 3 }
+
+		smgSyslogConfigPort OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogConfig 4 }
+
+		smgSyslogConfigRowStatus OBJECT-TYPE
+			SYNTAX		RowStatus
+			MAX-ACCESS	read-write
+			STATUS		current
+			DESCRIPTION	""
+		::= { smgSyslogConfig 5 }
+
+smgMonitoring OBJECT IDENTIFIER ::= { smg 35 }
+
+	smgTemperature1 OBJECT-TYPE
+		SYNTAX DisplayString
+		UNITS "degrees Celsius"
+		MAX-ACCESS read-only
+		STATUS current
+		DESCRIPTION ""
+		::= { smgMonitoring 1 }
+	
+	smgTemperature2 OBJECT-TYPE
+		SYNTAX DisplayString
+		UNITS "degrees Celsius"
+		MAX-ACCESS read-only
+		STATUS current
+		DESCRIPTION ""
+		::= { smgMonitoring 2 }
+		
+	smgFan0 OBJECT-TYPE
+		SYNTAX Integer32
+		UNITS "rpm"
+		MAX-ACCESS read-only
+		STATUS current
+		DESCRIPTION ""
+		::= { smgMonitoring 3 }
+	
+	smgFan1 OBJECT-TYPE
+		SYNTAX Integer32
+		UNITS "rpm"
+		MAX-ACCESS read-only
+		STATUS current
+		DESCRIPTION ""
+		::= { smgMonitoring 4 }
+		
+	smgFan2 OBJECT-TYPE
+		SYNTAX Integer32
+		UNITS "rpm"
+		MAX-ACCESS read-only
+		STATUS current
+		DESCRIPTION "For SMG2016 only"
+		::= { smgMonitoring 5 }
+	
+	smgFan3 OBJECT-TYPE
+		SYNTAX Integer32
+		UNITS "rpm"
+		MAX-ACCESS read-only
+		STATUS current
+		DESCRIPTION "For SMG2016 only"
+		::= { smgMonitoring 6 }
+		
+smgPowerModuleTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF SmgPowerModuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "Power modules parameters"
+	::= { smg 36 }
+
+	smgPowerModuleEntry OBJECT-TYPE
+		SYNTAX SmgPowerModuleEntry
+		MAX-ACCESS not-accessible
+		STATUS current
+		DESCRIPTION "Power module entry"
+		INDEX { pmIndex }
+		::= { smgPowerModuleTable 1 }
+
+		SmgPowerModuleEntry ::=
+			SEQUENCE {
+				pmIndex INTEGER,
+				pmExist TruthValue,
+				pmPower	TruthValue,
+				pmType PmType }
+				
+			pmIndex OBJECT-TYPE
+				SYNTAX INTEGER (1..2)
+				MAX-ACCESS not-accessible
+				STATUS current
+				DESCRIPTION ""
+				::= { smgPowerModuleEntry 1 }
+			
+			pmExist OBJECT-TYPE
+				SYNTAX TruthValue
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION ""
+				::= { smgPowerModuleEntry 2 }
+				
+			pmPower OBJECT-TYPE
+				SYNTAX TruthValue
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION ""
+				::= { smgPowerModuleEntry 3 }
+				
+			pmType OBJECT-TYPE
+				SYNTAX PmType
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Has NO correct data now."
+				::= { smgPowerModuleEntry 4 }
+
+
+smgCpuLoadTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF SmgCpuLoadEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION "CPU parameters"
+	::= { smg 37 }
+
+	smgCpuLoadEntry OBJECT-TYPE
+		SYNTAX SmgCpuLoadEntry
+		MAX-ACCESS not-accessible
+		STATUS current
+		DESCRIPTION "CPU entry"
+		INDEX { cpuIndex }
+		::= { smgCpuLoadTable 1 }
+
+		SmgCpuLoadEntry ::=
+			SEQUENCE {
+				cpuIndex INTEGER,
+				cpuUsr DisplayString,
+				cpuSys DisplayString,
+				cpuNic DisplayString,
+				cpuIdle DisplayString,
+				cpuIo DisplayString,
+				cpuIrq DisplayString,
+				cpuSirq DisplayString,
+				cpuUsage DisplayString }
+
+			cpuIndex OBJECT-TYPE
+				SYNTAX INTEGER (1..4)
+				MAX-ACCESS not-accessible
+				STATUS current
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 1 }
+
+			cpuUsr OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 2 }
+	
+			cpuSys OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 3 }
+				
+			cpuNic OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 4 }
+				
+			cpuIdle OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 5 }
+		
+			cpuIo OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 6 }
+				
+			cpuIrq OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 7 }
+				
+			cpuSirq OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 8 }
+				
+			cpuUsage OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				--UNITS %
+				DESCRIPTION ""
+				::= { smgCpuLoadEntry 9 }
+				
+
+smgSipUser OBJECT IDENTIFIER ::= { smg 38 }
+
+		StaticCheckStatus OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Status search"
+				::= { smgSipUser 1 }
+
+		StaticResetCheck OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Reset search"
+				::= { smgSipUser 2 }
+
+		numActiveUsers OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "The number of active users"
+				::= { smgSipUser 3 }
+
+		numAllUsers OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Total users"
+				::= { smgSipUser 4 }
+
+		getUserByIndex OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by index"
+				::= { smgSipUser 5 }
+
+		getUserByID OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by ID"
+				::= { smgSipUser 6 }
+
+		getUserByNumplan OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by numplan, numplan + number, numplan + substring number"
+				::= { smgSipUser 7 }
+
+		getUserByNumber OBJECT-TYPE
+				SYNTAX DisplayString (SIZE(1..32))
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by number + numplan (for reset param - set NULL)"
+				::= { smgSipUser 8 }
+
+		getUserBySubNumber OBJECT-TYPE
+				SYNTAX DisplayString (SIZE(1..32))
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by substring number + numplan (for reset param - set NULL)"
+				::= { smgSipUser 9 }
+
+		TableOfUsers OBJECT-TYPE
+				SYNTAX  SEQUENCE OF TableOfUsersEntrySequence
+				MAX-ACCESS not-accessible
+				STATUS current
+				DESCRIPTION "Table of users"
+				::= { smgSipUser 10 }
+
+				TableOfUsersEntry OBJECT-TYPE
+						SYNTAX TableOfUsersEntrySequence
+						MAX-ACCESS not-accessible
+						STATUS current
+						INDEX { TableIndex }
+						::= { TableOfUsers 1 }
+
+				TableOfUsersEntrySequence ::= SEQUENCE {
+						TableIndex			INTEGER,
+						UserID				INTEGER,
+						RegState			INTEGER,
+						Numplan				INTEGER,
+						Number				DisplayString,
+						Ip					IpAddress,
+						Port				Unsigned32,
+						Domain				DisplayString,
+						MaxActiveLines		INTEGER,
+						ActiveCallCount		INTEGER,
+						RegExpires			INTEGER
+				}
+
+						TableIndex OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS not-accessible
+								STATUS current
+								DESCRIPTION "Index of the user"
+								::= { TableOfUsersEntry 1 }
+
+						UserID OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "User ID"
+								::= { TableOfUsersEntry 2 }
+
+						RegState OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Registration status"
+								::= { TableOfUsersEntry 3 }
+
+						Numplan OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Numplan"
+								::= { TableOfUsersEntry 4 }
+
+						Number OBJECT-TYPE
+								SYNTAX DisplayString
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Number"
+								::= { TableOfUsersEntry 5 }
+
+						Ip OBJECT-TYPE
+								SYNTAX IpAddress
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Ip address"
+								::= { TableOfUsersEntry 6 }
+
+						Port OBJECT-TYPE
+								SYNTAX Unsigned32
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Port"
+								::= { TableOfUsersEntry 7 }
+
+						Domain OBJECT-TYPE
+								SYNTAX DisplayString
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Domain"
+								::= { TableOfUsersEntry 8 }
+
+						MaxActiveLines OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "The maximum number of active lines"
+								::= { TableOfUsersEntry 9 }
+
+						ActiveCallCount OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "The number of active calls"
+								::= { TableOfUsersEntry 10 }
+
+						RegExpires OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Expiration of registration"
+								::= { TableOfUsersEntry 11 }
+
+		StaticModeSetings OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Option settings"
+				::= { smgSipUser 11 }
+
+		StaticSetMode OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Change option settings"
+				::= { smgSipUser 12 }
+
+		StaticSetReset OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Reset option settings"
+				::= { smgSipUser 13 }
+
+		StaticSetApply OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Apply settings option"
+				::= { smgSipUser 14 }
+
+		TableOfStSetUser OBJECT-TYPE
+				SYNTAX  SEQUENCE OF TableOfStSetUserEntrySequence
+				MAX-ACCESS not-accessible
+				STATUS current
+				DESCRIPTION "Table of user configurations"
+				::= { smgSipUser 15 }
+
+				TableOfStSetUserEntry OBJECT-TYPE
+						SYNTAX TableOfStSetUserEntrySequence
+						MAX-ACCESS not-accessible
+						STATUS current
+						INDEX { TableStSetIndex }
+						::= { TableOfStSetUser 1 }
+
+				TableOfStSetUserEntrySequence ::= SEQUENCE {
+						TableStSetIndex			INTEGER,
+						StSetId					INTEGER,
+						StSetName				DisplayString,
+						StSetIpAddr				IpAddress,
+						StSetSIPdomain			DisplayString,
+						StSetNumber				DisplayString,
+						StSetNumplan			INTEGER,
+						StSetAONnumber			DisplayString,
+						StSetAONtypeNumber		DisplayString,
+						StSetProfile			INTEGER,
+						StSetCategory			INTEGER,
+						StSetAccessCat			INTEGER,
+						StSetAuth				DisplayString,
+						StSetAuthLog			DisplayString,
+						StSetAuthPass			DisplayString,
+						StSetCliro				INTEGER,
+						StSetPbxProfile			INTEGER,
+						StSetAccessMode			INTEGER,
+						StSetLines				INTEGER,
+						StSetNoSRCportControl	INTEGER,
+						StSetBLFusage			INTEGER,
+						StSetBLFsubScribers		INTEGER,
+						StSetIntercomMode		DisplayString,
+						StSetIntercomPriority	INTEGER
+						-- StSetNumberList			DisplayString
+				}
+
+						TableSetingsIndex OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS not-accessible
+								STATUS current
+								DESCRIPTION "Index of the user"
+								::= { TableOfStSetUserEntry 1 }
+
+						StSetId OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "User ID"
+								::= { TableOfStSetUserEntry 2 }
+
+						StSetName OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..64))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "User name"
+								::= { TableOfStSetUserEntry 3 }
+
+						StSetIpAddr OBJECT-TYPE
+								SYNTAX IpAddress
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Ip address"
+								::= { TableOfStSetUserEntry 4 }
+
+						StSetSIPdomain OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..64))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Domain"
+								::= { TableOfStSetUserEntry 5 }
+
+						StSetNumber OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..32))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Number"
+								::= { TableOfStSetUserEntry 6 }
+
+						StSetNumplan OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Numplan"
+								::= { TableOfStSetUserEntry 7 }
+
+						StSetAONnumber OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..32))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "AON number"
+								::= { TableOfStSetUserEntry 8 }
+
+						StSetAONtypeNumber OBJECT-TYPE
+								SYNTAX INTEGER (0..5)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "AON type number"
+								::= { TableOfStSetUserEntry 9 }
+
+						StSetProfile OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Profile"
+								::= { TableOfStSetUserEntry 10 }
+
+						StSetCategory OBJECT-TYPE
+								SYNTAX INTEGER (0..9 | 255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Category"
+								::= { TableOfStSetUserEntry 11 }
+
+						StSetAccessCat OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Access category"
+								::= { TableOfStSetUserEntry 12 }
+
+						StSetAuth OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(4..19))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Authorization"
+								::= { TableOfStSetUserEntry 13 }
+
+						StSetAuthLog OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..64))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Login"
+								::= { TableOfStSetUserEntry 14 }
+
+						StSetAuthPass OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..64))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Password"
+								::= { TableOfStSetUserEntry 15 }
+
+						StSetCliro OBJECT-TYPE
+								SYNTAX INTEGER (0 | 1)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "CLIRO"
+								::= { TableOfStSetUserEntry 16 }
+
+						StSetPbxProfile OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "PBX profile"
+								::= { TableOfStSetUserEntry 17 }
+
+						StSetAccessMode OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Access mode"
+								::= { TableOfStSetUserEntry 18 }
+
+						StSetLines OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Lines"
+								::= { TableOfStSetUserEntry 19 }
+
+						StSetNoSRCportControl OBJECT-TYPE
+								SYNTAX INTEGER (0 | 1)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "No SRC port control"
+								::= { TableOfStSetUserEntry 20 }
+
+						StSetBLFusage OBJECT-TYPE
+								SYNTAX INTEGER (0 | 1)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "BLF usage"
+								::= { TableOfStSetUserEntry 21 }
+
+						StSetBLFsubScribers OBJECT-TYPE
+								SYNTAX INTEGER (0..200)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "BLF: number of subscribers"
+								::= { TableOfStSetUserEntry 22 }
+
+						StSetIntercomMode OBJECT-TYPE
+								SYNTAX INTEGER (0..4)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Intercom mode"
+								::= { TableOfStSetUserEntry 23 }
+
+						StSetIntercomPriority OBJECT-TYPE
+								SYNTAX INTEGER (0..4)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Intercom priority"
+								::= { TableOfStSetUserEntry 24 }
+
+						-- StSetNumberList OBJECT-TYPE
+								-- SYNTAX DisplayString
+								-- MAX-ACCESS read-write
+								-- STATUS current
+								-- DESCRIPTION "Number list"
+								-- ::= { TableOfStSetUserEntry 25 }
+
+
+smgSipUserGroup OBJECT IDENTIFIER ::= { smg 39 }
+
+		GroupCheckStatus OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Status search"
+				::= { smgSipUserGroup 1 }
+
+		GroupResetCheck OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Reset search"
+				::= { smgSipUserGroup 2 }
+
+		numGroups OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "The number of groups"
+				::= { smgSipUserGroup 3 }
+
+		numInGroup OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "The maximum number of users in the group (set index group (0..))"
+				::= { smgSipUserGroup 4 }
+
+		numActiveInGroup OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "The number of active users in the group (set index group (0..))"
+				::= { smgSipUserGroup 5 }
+
+		getGroupByIndex OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by group index (use with getGroupUserByIndex)"
+				::= { smgSipUserGroup 6 }
+
+		getGroupUserByIndex OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by user index in group (use with getGroupByIndex)"
+				::= { smgSipUserGroup 7 }
+
+		getGroupUserByID OBJECT-TYPE
+				SYNTAX Unsigned32
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by user ID"
+				::= { smgSipUserGroup 8 }
+
+		getGroupUserByNumplan OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by numplan, numplan + number, numplan + substring number"
+				::= { smgSipUserGroup 9 }
+
+		getGroupUserByNumber OBJECT-TYPE
+				SYNTAX DisplayString (SIZE(1..32))
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by number + numplan (for reset param - set NULL)"
+				::= { smgSipUserGroup 10 }
+
+		getGroupUserBySubNumber OBJECT-TYPE
+				SYNTAX DisplayString (SIZE(1..32))
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Search by substring number + numplan (for reset param - set NULL)"
+				::= { smgSipUserGroup 11 }
+
+		TableOfGroupUsers OBJECT-TYPE
+				SYNTAX  SEQUENCE OF TableOfGroupUsersEntrySequence
+				MAX-ACCESS not-accessible
+				STATUS current
+				DESCRIPTION "Table of group users"
+				::= { smgSipUserGroup 12 }
+
+				TableOfGroupUsersEntry OBJECT-TYPE
+						SYNTAX TableOfGroupUsersEntrySequence
+						MAX-ACCESS not-accessible
+						STATUS current
+						INDEX { GroupTable, GroupTableIndex }
+						::= { TableOfGroupUsers 1 }
+
+				TableOfGroupUsersEntrySequence ::= SEQUENCE {
+						GroupTable			INTEGER,
+						GroupTableIndex		INTEGER,
+						GroupUserID			INTEGER,
+						RegState			INTEGER,
+						Numplan				INTEGER,
+						Number				DisplayString,
+						Ip					IpAddress,
+						Port				Unsigned32,
+						Domain				DisplayString,
+						MaxActiveLines		INTEGER,
+						ActiveCallCount		INTEGER,
+						RegExpires			INTEGER
+				}
+
+						GroupTable OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS not-accessible
+								STATUS current
+								DESCRIPTION "Index of the group"
+								::= { TableOfGroupUsersEntry 1 }
+
+						GroupTableIndex OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS not-accessible
+								STATUS current
+								DESCRIPTION "Index of the user in group"
+								::= { TableOfGroupUsersEntry 2 }
+
+						GroupUserID OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "User ID"
+								::= { TableOfGroupUsersEntry 3 }
+
+						RegState OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Registration status"
+								::= { TableOfGroupUsersEntry 4 }
+
+						Numplan OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Numplan"
+								::= { TableOfGroupUsersEntry 5 }
+
+						Number OBJECT-TYPE
+								SYNTAX DisplayString
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Number"
+								::= { TableOfGroupUsersEntry 6 }
+
+						Ip OBJECT-TYPE
+								SYNTAX IpAddress
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Ip address"
+								::= { TableOfGroupUsersEntry 7 }
+
+						Port OBJECT-TYPE
+								SYNTAX Unsigned32
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Port"
+								::= { TableOfGroupUsersEntry 8 }
+
+						Domain OBJECT-TYPE
+								SYNTAX DisplayString
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Domain"
+								::= { TableOfGroupUsersEntry 9 }
+
+						MaxActiveLines OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "The maximum number of active lines"
+								::= { TableOfGroupUsersEntry 10 }
+
+						ActiveCallCount OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "The number of active calls"
+								::= { TableOfGroupUsersEntry 11 }
+
+						RegExpires OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Expiration of registration"
+								::= { TableOfGroupUsersEntry 12 }
+
+		GroupModeSetings OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Option settings"
+				::= { smgSipUserGroup 13 }
+
+		GroupSetMode OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Change option settings"
+				::= { smgSipUserGroup 14 }
+
+		GroupSetReset OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Reset option settings"
+				::= { smgSipUserGroup 15 }
+
+		GroupSetApply OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Apply settings option"
+				::= { smgSipUserGroup 16 }
+
+		GroupFindStatus OBJECT-TYPE
+				SYNTAX DisplayString
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Status search settings"
+				::= { smgSipUserGroup 17 }
+
+		GroupResetFindStatus OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Reset search settings"
+				::= { smgSipUserGroup 18 }
+
+		GroupByIndex OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Find group setings by index"
+				::= { smgSipUserGroup 19 }
+
+		GroupByID OBJECT-TYPE
+				SYNTAX INTEGER
+				MAX-ACCESS read-write
+				STATUS current
+				DESCRIPTION "Find group setings by ID"
+				::= { smgSipUserGroup 20 }
+
+		TableOfGroupSet OBJECT-TYPE
+				SYNTAX  SEQUENCE OF TableOfGroupSetEntrySequence
+				MAX-ACCESS not-accessible
+				STATUS current
+				DESCRIPTION "Table of users"
+				::= { smgSipUserGroup 21 }
+
+				TableOfGroupSetEntry OBJECT-TYPE
+						SYNTAX TableOfGroupSetEntrySequence
+						MAX-ACCESS not-accessible
+						STATUS current
+						INDEX { TableGroupSetIndex }
+						::= { TableOfGroupSet 1 }
+
+				TableOfGroupSetEntrySequence ::= SEQUENCE {
+						TableGroupSetIndex			INTEGER,
+						GroupSetId					INTEGER,
+						GroupSetName				DisplayString,
+						GroupSetSIPdomain			DisplayString,
+						GroupSetMaxReg				INTEGER,
+						GroupSetProfile				INTEGER,
+						GroupSetCategory			INTEGER,
+						GroupSetAccessCat			INTEGER,
+						GroupSetCliro				INTEGER,
+						GroupSetPbxProfile			INTEGER,
+						GroupSetAccessMode			INTEGER,
+						GroupSetLines				INTEGER,
+						GroupSetNumplan				INTEGER,
+						GroupSetNoSRCportControl	INTEGER,
+						GroupSetBLFusage			INTEGER,
+						GroupSetBLFsubScribers		INTEGER,
+						GroupSetIntercomMode		DisplayString,
+						GroupSetIntercomPriority	INTEGER
+				}
+
+						TableGroupSetIndex OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS not-accessible
+								STATUS current
+								DESCRIPTION "Index of the group"
+								::= { TableOfGroupSetEntry 1 }
+
+						GroupSetId OBJECT-TYPE
+								SYNTAX INTEGER
+								MAX-ACCESS read-only
+								STATUS current
+								DESCRIPTION "Group ID"
+								::= { TableOfGroupSetEntry 2 }
+
+						GroupSetName OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..64))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Group name"
+								::= { TableOfGroupSetEntry 3 }
+
+						GroupSetSIPdomain OBJECT-TYPE
+								SYNTAX DisplayString (SIZE(1..64))
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Gropu domain"
+								::= { TableOfGroupSetEntry 4 }
+
+						GroupSetMaxReg OBJECT-TYPE
+								SYNTAX INTEGER (0..2953)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "The maximum number of users in the group"
+								::= { TableOfGroupSetEntry 5 }
+
+						GroupSetProfile OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Profile"
+								::= { TableOfGroupSetEntry 6 }
+
+						GroupSetCategory OBJECT-TYPE
+								SYNTAX INTEGER (0..9 | 255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Category"
+								::= { TableOfGroupSetEntry 7 }
+
+						GroupSetAccessCat OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Access сategory"
+								::= { TableOfGroupSetEntry 8 }
+
+						GroupSetCliro OBJECT-TYPE
+								SYNTAX INTEGER (0 | 1)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "CLIRO"
+								::= { TableOfGroupSetEntry 9 }
+
+						GroupSetPbxProfile OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "PBX profile"
+								::= { TableOfGroupSetEntry 10 }
+
+						GroupSetAccessMode OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Access mode"
+								::= { TableOfGroupSetEntry 11 }
+
+						GroupSetLines OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Lines"
+								::= { TableOfGroupSetEntry 12 }
+
+						GroupSetNumplan OBJECT-TYPE
+								SYNTAX INTEGER (0..255)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Numplan"
+								::= { TableOfGroupSetEntry 13 }
+
+						GroupSetNoSRCportControl OBJECT-TYPE
+								SYNTAX INTEGER (0 | 1)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "No SRC port control"
+								::= { TableOfGroupSetEntry 14 }
+
+						GroupSetBLFusage OBJECT-TYPE
+								SYNTAX INTEGER (0 | 1)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "BLF usage"
+								::= { TableOfGroupSetEntry 15 }
+
+						GroupSetBLFsubScribers OBJECT-TYPE
+								SYNTAX INTEGER (0..200)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "BLF: number of subscribers"
+								::= { TableOfGroupSetEntry 16 }
+
+						GroupSetIntercomMode OBJECT-TYPE
+								SYNTAX INTEGER (0..4)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Intercom mode"
+								::= { TableOfGroupSetEntry 17 }
+
+						GroupSetIntercomPriority OBJECT-TYPE
+								SYNTAX INTEGER (0..4)
+								MAX-ACCESS read-write
+								STATUS current
+								DESCRIPTION "Intercom priority"
+								::= { TableOfGroupSetEntry 18 }
+
+smgChannelsVoip OBJECT IDENTIFIER ::= { smg 40 }
+
+		Voip0busyChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of busy channels for voip submodule 0"
+				::= { smgChannelsVoip 1 }
+
+		Voip1busyChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of busy channels for voip submodule 1"
+				::= { smgChannelsVoip 2 }
+
+		Voip2busyChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of busy channels for voip submodule 2"
+				::= { smgChannelsVoip 3 }
+
+		Voip3busyChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of busy channels for voip submodule 3"
+				::= { smgChannelsVoip 4 }
+
+		Voip4busyChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of busy channels for voip submodule 4"
+				::= { smgChannelsVoip 5 }
+
+		Voip5busyChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of busy channels for voip submodule 5"
+				::= { smgChannelsVoip 6 }
+
+		Voip0freeChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for voip submodule 0"
+				::= { smgChannelsVoip 7 }
+
+		Voip1freeChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for voip submodule 1"
+				::= { smgChannelsVoip 8 }
+
+		Voip2freeChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for voip submodule 2"
+				::= { smgChannelsVoip 9 }
+
+		Voip3freeChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for voip submodule 3"
+				::= { smgChannelsVoip 10 }
+
+		Voip4freeChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for voip submodule 4"
+				::= { smgChannelsVoip 11 }
+
+		Voip5freeChannels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for voip submodule 5"
+				::= { smgChannelsVoip 12 }
+
+smgChannelsE1free OBJECT IDENTIFIER ::= { smg 41 }
+
+		E1freeS0channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 0 of E1"
+				::= { smgChannelsE1free 1 }
+
+		E1freeS1channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 1 of E1"
+				::= { smgChannelsE1free 2 }
+
+		E1freeS2channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 2 of E1"
+				::= { smgChannelsE1free 3 }
+
+		E1freeS3channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 3 of E1"
+				::= { smgChannelsE1free 4 }
+
+		E1freeS4channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 4 of E1"
+				::= { smgChannelsE1free 5 }
+
+		E1freeS5channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 5 of E1"
+				::= { smgChannelsE1free 6 }
+
+		E1freeS6channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 6 of E1"
+				::= { smgChannelsE1free 7 }
+
+		E1freeS7channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 7 of E1"
+				::= { smgChannelsE1free 8 }
+
+		E1freeS8channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 8 of E1"
+				::= { smgChannelsE1free 9 }
+
+		E1freeS9channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 9 of E1"
+				::= { smgChannelsE1free 10 }
+
+		E1freeS10channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 10 of E1"
+				::= { smgChannelsE1free 11 }
+
+		E1freeS11channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 11 of E1"
+				::= { smgChannelsE1free 12 }
+
+		E1freeS12channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 12 of E1"
+				::= { smgChannelsE1free 13 }
+
+		E1freeS13channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 13 of E1"
+				::= { smgChannelsE1free 14 }
+
+		E1freeS14channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 14 of E1"
+				::= { smgChannelsE1free 15 }
+
+		E1freeS15channels OBJECT-TYPE
+				SYNTAX Counter32
+				MAX-ACCESS read-only
+				STATUS current
+				DESCRIPTION "Instant number of free channels for stream 15 of E1"
+				::= { smgChannelsE1free 16 }
+
+smgObjectGroup OBJECT-GROUP
+	OBJECTS
+	{
+		smgDevName,
+		smgDevType,
+		smgFwVersion,
+		smgEth0,
+		smgUptime,
+		
+		eOneLineInfoPhyState,
+		eOneLineInfoRemAlarm,
+		eOneLineInfoRemAlarmTS16,
+		eOneLineStateAlarm,
+		eOneLineStatePhyWork,
+		eOneLinkState,
+		eOneRSV,
+		eOneStatistTimer,
+		eOneSlipUp,
+		eOneSlipDown,
+		eOneBERCount,
+		eOneCVC,
+		eOneCEC,
+		eOneRxEqualizer,
+		eOneRxCount,
+		eOneTxCount,
+		eOneRxLow,
+		eOneRxBig,
+		eOneRxOvfl,
+		eOneRxCRC,
+		eOneTxUrun,
+		
+		mspState,
+		mspUsedConn,
+		mspCreateReq,
+		mspCreated,
+		mspDestroyReq,
+		mspDestroyed,
+		mspPayload,
+		
+		linksetState,
+
+		channelEOneState,
+
+		ipMspChannelState,
+		ipMspChannelSiptCallref,
+		ipMspChannelSrcIp,
+		ipMspChannelSrcPort,
+		ipMspChannelSrcMac,
+		ipMspChannelDstIp,
+		ipMspChannelDstPort,
+		ipMspChannelDstMac,
+		ipMspChannelCallingPartyNumber,
+		ipMspChannelCalledPartyNumber,
+		ipMspChannelOccupiedTime,
+		
+		smgTopCpuUsr,
+		smgTopCpuSys,
+		smgTopCpuNic,
+		smgTopCpuIdle,
+		smgTopCpuIo,
+		smgTopCpuIrq,
+		smgTopCpuSirq,
+		smgTopCpuUsage,
+		
+		smgMIBBoundary1,
+		smgMIBBoundary2,
+		smgMIBBoundary3,
+		smgMIBBoundary4,
+		smgMIBBoundary5,
+		smgMIBBoundary6,
+		smgMIBBoundary7,
+		
+		smgUpdateFw,
+		
+		smgReboot,
+		smgSave,
+
+		smgEOneStream0BusyChannelsInstantCounter,
+		smgEOneStream1BusyChannelsInstantCounter,
+		smgEOneStream2BusyChannelsInstantCounter,
+		smgEOneStream3BusyChannelsInstantCounter,
+		smgEOneStream4BusyChannelsInstantCounter,
+		smgEOneStream5BusyChannelsInstantCounter,
+		smgEOneStream6BusyChannelsInstantCounter,
+		smgEOneStream7BusyChannelsInstantCounter,
+		smgEOneStream8BusyChannelsInstantCounter,
+		smgEOneStream9BusyChannelsInstantCounter,
+		smgEOneStream10BusyChannelsInstantCounter,
+		smgEOneStream11BusyChannelsInstantCounter,
+		smgEOneStream12BusyChannelsInstantCounter,
+		smgEOneStream13BusyChannelsInstantCounter,
+		smgEOneStream14BusyChannelsInstantCounter,
+		smgEOneStream15BusyChannelsInstantCounter,
+		smgEOneStream0BusyChannelsPeriodicCounter,
+		smgEOneStream1BusyChannelsPeriodicCounter,
+		smgEOneStream2BusyChannelsPeriodicCounter,
+		smgEOneStream3BusyChannelsPeriodicCounter,
+		smgEOneStream4BusyChannelsPeriodicCounter,
+		smgEOneStream5BusyChannelsPeriodicCounter,
+		smgEOneStream6BusyChannelsPeriodicCounter,
+		smgEOneStream7BusyChannelsPeriodicCounter,
+		smgEOneStream8BusyChannelsPeriodicCounter,
+		smgEOneStream9BusyChannelsPeriodicCounter,
+		smgEOneStream10BusyChannelsPeriodicCounter,
+		smgEOneStream11BusyChannelsPeriodicCounter,
+		smgEOneStream12BusyChannelsPeriodicCounter,
+		smgEOneStream13BusyChannelsPeriodicCounter,
+		smgEOneStream14BusyChannelsPeriodicCounter,
+		smgEOneStream15BusyChannelsPeriodicCounter,
+		smgEOneCounterPeriod,
+		
+		smgFreeSpace,
+		smgFreeRam,
+		
+		smgSyslogTracesAddress,
+		smgSyslogTracesPort,
+		smgSyslogTracesAlarms,
+		smgSyslogTracesCalls,
+		smgSyslogTracesISUP,
+		smgSyslogTracesSIPT,
+		smgSyslogTracesQ931,
+		smgSyslogTracesRTP,
+		smgSyslogTracesMSP,
+		smgSyslogTracesRadius,
+		smgSyslogTracesRowStatus,
+		
+		smgSyslogHistoryAddress,
+		smgSyslogHistoryPort,
+		smgSyslogHistoryLevel,
+		smgSyslogHistoryRowStatus,
+		
+		smgSyslogConfigLogsEnabled,
+		smgSyslogConfigSendToServer,
+		smgSyslogConfigAddress,
+		smgSyslogConfigPort,
+		smgSyslogConfigRowStatus,
+		
+		smgTemperature1,
+		smgTemperature2,
+		smgFan0,
+		smgFan1,
+		smgFan2,
+		smgFan3,
+
+		pmExist,
+		pmPower,
+		pmType,
+		
+		cpuUsr,
+		cpuSys,
+		cpuNic,
+		cpuIdle,
+		cpuIo,
+		cpuIrq,
+		cpuSirq,
+		cpuUsage
+	}
+        STATUS  current
+        DESCRIPTION
+                " "
+        ::= { smg 100 }	
+
+                          END

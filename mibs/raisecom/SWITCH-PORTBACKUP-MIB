@@ -1,0 +1,201 @@
+--MibName=rcPortBackup
+-- *****************************************************************
+-- switch-portbackup-mib.MIB:	 switch port backup MIB file
+--
+-- Dec 2008, gxd
+--
+-- Copyright (c) 1994-2008,	2008 by	Raisecom, Inc.
+-- All rights reserved.
+-- Modify  
+-- 02£¬20100325,gxd,modify this file 
+-- 01£¬20090210,wk,rewrite this file 
+-- *****************************************************************
+
+SWITCH-PORTBACKUP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        iscomSwitch			   FROM RAISECOM-BASE-MIB  
+        RowStatus,TruthValue   FROM SNMPv2-TC
+        Vlanset		  		   FROM SWITCH-TC;
+                 
+     rcPortBackup MODULE-IDENTITY
+        LAST-UPDATED    "200812240000Z"
+        ORGANIZATION    "Raisecom, Inc."
+        CONTACT-INFO
+                "Raisecom Systems
+                        
+                Postal: Beijing,
+                        China
+
+                Tel: 86-010-82884499
+
+                E-mail: guoxiaodan@raisecom.com"
+        DESCRIPTION
+                "description of port backup group manage object."
+                ::= { iscomSwitch 40}  
+                
+         rcPortBackupObjects 			OBJECT IDENTIFIER ::= { rcPortBackup 1 }
+         rcPortBackupNotifications      OBJECT IDENTIFIER ::= { rcPortBackup 2 }  
+                         
+-- rcPortBackupTable
+
+	rcPortBackupTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RcPortBackupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of port backup group"
+    ::={ rcPortBackupObjects 1 }
+    
+
+	rcPortBackupEntry OBJECT-TYPE
+    SYNTAX      RcPortBackupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the rcPortBackupTable provides objects ."
+    INDEX        { rcPortBackupPrimaryPortIndex,rcPortBackupStandbyPort }
+    ::={ rcPortBackupTable 1 }
+    
+	RcPortBackupEntry ::= SEQUENCE {     
+		rcPortBackupPrimaryPortIndex	INTEGER,
+		rcPortBackupStandbyPort INTEGER,
+		rcPortBackupVlanlist	Vlanset,
+		rcPortBackupPrimaryPortForwardState	INTEGER,
+		rcPortBackupStandbyPortForwardState INTEGER,     
+		rcPortBackupSwitchCount INTEGER,
+	    rcPortBackupRowStatus   RowStatus,   
+	    rcPortBackupForceSwitch   TruthValue
+	}
+ 	
+	rcPortBackupPrimaryPortIndex OBJECT-TYPE
+		SYNTAX	INTEGER
+		ACCESS	read-only
+		STATUS	current
+		DESCRIPTION
+			"This object is the first index of an rcPortBackupTable. 
+			It is the primary port of a backup group."
+		::=	{ rcPortBackupEntry 1 }
+		
+	rcPortBackupStandbyPort OBJECT-TYPE
+		SYNTAX	INTEGER
+		ACCESS	read-only
+		STATUS	current
+		DESCRIPTION
+			"This object is the second index of an rcPortBackupTable. 
+			It is the standby port of a backup group."
+		::=	{ rcPortBackupEntry 2 }
+
+
+	rcPortBackupVlanlist OBJECT-TYPE
+		SYNTAX	Vlanset
+		ACCESS	read-create
+		STATUS	current
+		DESCRIPTION
+			"Backup vlan list.Within each octet, the most significant 
+			bit represents the lowest numbered vlan, and the least significant 
+			bit represents the highest numbered vlan.  Thus, each vlan is 
+			represented by a single bit within the value of this object. If that
+			bit has a value of '1' then that vlan is included in the set of vlans; 
+			the vlan is not included if its bit has a value of '0'."
+		::=	{ rcPortBackupEntry 3 }
+		
+	rcPortBackupPrimaryPortForwardState OBJECT-TYPE
+        SYNTAX INTEGER	{
+            	discarding(1),
+    			forwarding(2)
+        			}
+		ACCESS	read-only
+		STATUS	current
+		DESCRIPTION
+			"Primary port status£¬including two states: discarding and 
+			forwarding. If a primary port is at discarding state, the 
+			port only reiceive and send BPDU;If a primary port is at 
+			forwarding state,the port  reiceive and send not only 
+			BPDU but other frames."
+		::=	{ rcPortBackupEntry 4 }
+		
+	rcPortBackupStandbyPortForwardState OBJECT-TYPE
+        SYNTAX INTEGER	{
+            	discarding(1),
+    			forwarding(2)
+        			}
+		ACCESS	read-only
+		STATUS	current
+		DESCRIPTION
+			"Standby port status£¬including two states: discarding and 
+			forwarding. If a standby port is at discarding state, the 
+			port only reiceive and send BPDU;If a standby port is at 
+			forwarding state,the port  reiceive and send not only BPDU 
+			but also other frames."
+		::=	{ rcPortBackupEntry 5 }        
+		
+	rcPortBackupSwitchCount OBJECT-TYPE
+		SYNTAX	INTEGER
+		ACCESS	read-only
+		STATUS	current
+		DESCRIPTION
+			"The count of switch between primary port and standby port."
+		::=	{ rcPortBackupEntry 6 } 
+		
+	rcPortBackupRowStatus OBJECT-TYPE
+		SYNTAX	RowStatus
+		ACCESS	read-create
+		STATUS	current
+		DESCRIPTION
+			"This object allows entries to be created and deleted
+			 in the rcPortBackupTable. Deletion of an entry in
+			 this table results in a deletion of all corresponding (same
+			 rcPortBackupPrimaryPortIndex and rcPortBackupStandbyPort index values) rcPortBackupTable."
+		::=	{ rcPortBackupEntry 7 }    
+		
+	rcPortBackupForceSwitch OBJECT-TYPE   
+        SYNTAX TruthValue
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The purpose of this object is to force transition between main and backup port."
+        DEFVAL { False }
+        ::= { rcPortBackupEntry 8 }
+		               
+	rcPortBackupRestoreMode OBJECT-TYPE 
+		SYNTAX INTEGER{
+				port-up(1),
+				neighbor-discover(2),
+				disable(3)
+               }
+        ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The mode of port restoration."
+        ::= { rcPortBackupObjects 2 } 
+        
+    rcPortBackupRestoreDelay OBJECT-TYPE 
+		SYNTAX INTEGER (0..180)
+        ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The restoration delay when bridge received the restoration incident."
+        ::= { rcPortBackupObjects 3 }
+        
+    rcPortBackupBackupPortOperate NOTIFICATION-TYPE
+        OBJECTS { rcPortBackupPrimaryPortIndex,
+				  rcPortBackupStandbyPort
+            	}
+        STATUS  current
+        DESCRIPTION
+          "Backup PORT Switch TRAP"
+       ::= { rcPortBackupNotifications 1 } 
+       
+    rcPortBackupActivePortOperate NOTIFICATION-TYPE
+        OBJECTS { rcPortBackupPrimaryPortIndex,
+				  rcPortBackupStandbyPort
+            	}
+        STATUS  current
+        DESCRIPTION
+          "Backup PORT Restore TRAP"
+       ::= { rcPortBackupNotifications 2 }        
+
+			
+END
+	

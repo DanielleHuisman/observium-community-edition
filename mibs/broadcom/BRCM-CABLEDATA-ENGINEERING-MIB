@@ -1,0 +1,391 @@
+--**************************************************************************
+--                                                                          
+--    Copyright 2007 Broadcom Corporation                                   
+--    All Rights Reserved                                                   
+--    No portions of this material may be reproduced in any form without the
+--    written permission of:                                                
+--             Broadcom Corporation                                         
+--             16251 Laguna Canyon Road                                     
+--             Irvine, California  92618                                    
+--    All information contained in this document is Broadcom Corporation    
+--    company private, proprietary, and trade secret.                       
+--                                                                          
+--                                                                          
+--                                                                          
+--**************************************************************************
+--    Filename: brcm-cabledata-engineering.mib
+--    Author:   Kevin O'Neal
+--    Creation Date: 22-october-2002
+--
+--**************************************************************************
+--    Description:
+--
+--		engineering MIB for cabledata
+--		
+--**************************************************************************
+--    Revision History:
+--
+--**************************************************************************
+
+
+BRCM-CABLEDATA-ENGINEERING-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Unsigned32,
+    Integer32,
+    IpAddress
+        FROM SNMPv2-SMI
+    TruthValue,
+    DisplayString,
+    MacAddress
+        FROM SNMPv2-TC
+    cableDataPrivateMIBObjects
+        FROM BRCM-CABLEDATA-PRIVATE-MIB;
+                
+cableDataEngineering MODULE-IDENTITY
+    LAST-UPDATED "200702050000Z"
+    ORGANIZATION "Broadcom Corporation"
+    CONTACT-INFO
+        "	BANANA-CABLEDATA
+                (cableData branch of the
+                Broadcom Assigned Numbers and Naming Authority)
+                Broadcom Corporation
+
+        Postal: 4385 River Green Parkway
+                Duluth, GA  30096
+                USA
+
+           Tel: +1 770 232-0018
+
+        E-mail: banana-cabledata@broadcom.com"
+    DESCRIPTION
+        "Broadcom proprietary MIB for management and configuration of objects
+         used by engineering and development."
+    REVISION      "200702050000Z"
+    DESCRIPTION
+        "Module description was updated. 
+         Compilability issues were cleaned up: 
+         - Chronological order of revision history was corrected.
+         - Range restriction was added to objects cdEngrEJTAGDBChannel and 
+           cdEngrEJTAGDBChannel."
+    REVISION      "200611170000Z"
+    DESCRIPTION
+        "Added EJTAG objects."
+    REVISION      "200206040000Z"
+    DESCRIPTION
+        "Initial version of this MIB module."
+    ::= { cableDataPrivateMIBObjects 3 }
+
+-- Administrative assignments
+
+cableDataEngineeringBase     OBJECT IDENTIFIER ::= { cableDataEngineering 1 }
+cableDataEngineeringEjtag    OBJECT IDENTIFIER ::= { cableDataEngineeringBase 20 }
+
+-- cablemodemEngineering     OBJECT IDENTIFIER ::= { cableDataEngineering 2 }
+--    see BRCM-CM-ENGINEERING-MIB
+ 
+ 
+-- --------------------------------------------------------------------
+-- The Cable Data Engineering Base Objects
+-- --------------------------------------------------------------------
+
+cdEngrMemAccessAddress OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The memory address to access when executing a cdEngrMemAccessCommand 
+         operation."
+    ::= { cableDataEngineeringBase 1 }
+    
+cdEngrMemAccessNumBytes OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The number of bytes to read or write when executing a 
+         cdEngrMemAccessCommand operation."
+    ::= { cableDataEngineeringBase 2 }
+    
+cdEngrMemAccessData OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The data read from or to be written to the device when executing a 
+         cdEngrMemAccessCommand operation."
+    ::= { cableDataEngineeringBase 3 }
+    
+cdEngrMemAccessCommand OBJECT-TYPE
+    SYNTAX      INTEGER {
+                read(0),
+                write(1)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Setting this value to read(0) will cause the number of bytes specified
+         in cdEngrMemAccessNumBytes to be read from the address specified by
+         cdEngrMemAccessAddress, and the resulting data will be available
+         in cdEngrMemAccessData.  Setting this value to write(1) will cause the
+         number of bytes specified in cdEngrMemAccessNumBytes to be written to 
+         the memory address specified in cdEngrMemAccessAddress, using the data
+         specified in cdEngrMemAccessData."
+    ::= { cableDataEngineeringBase 4 }
+    
+
+-- --------------------------------------------------------------------
+-- The Cable Data Engineering EJTAG Objects
+-- --------------------------------------------------------------------
+       
+-- EJTAG Objects     
+--
+
+cdEngrEJTAGTPSelect  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object sets the TP that the EJTAG DSU (debug support unit)
+         will monitor."
+    ::= { cableDataEngineeringEjtag 1 }
+
+cdEngrEJTAGDisableAll  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION 
+        "This object disables all active instruction and data breaks.
+        
+        If set to a value of 'true', this object disables all active
+        instruction and data breaks.
+        
+        If set to a value of 'false', this object takes no action.
+        
+        If read this object always returns 'false'."
+    ::= { cableDataEngineeringEjtag 2 }
+
+                     
+--  The instruction_break Table
+-- 
+                    
+cdEngrEJTAGInstrBrkTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CdEngrEJTAGInstrBrkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This data table represents EJTAG Instruction Break configuration.
+        It specifies an Instruction Break for the specified channel and address
+        (with optional mask).  Hardware may place restrictions on the values
+        (e.g. bit 0 of the address is likely forced to 0, and bit 0 of the 
+        mask is forced to 1).
+
+        The default mask is 0xffffffff (all address bits relevant).  Be careful
+        when specifying a mask, since many values (like 0, 1, etc) can cause an
+        immediate break to occur.
+
+        The instruction break behaves according to this pseudo-code:
+
+        if ((ProgramCounter & Mask) == (Address & Mask))
+           Generate debug exception;"
+    ::= { cableDataEngineeringEjtag 3 } 
+    
+cdEngrEJTAGInstrBrkEntry OBJECT-TYPE
+    SYNTAX      CdEngrEJTAGInstrBrkEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this data table describes an Instruction Break.
+        There is a row for each channel supported by the hardware."
+    INDEX  { cdEngrEJTAGIBChannel}
+    ::= { cdEngrEJTAGInstrBrkTable 1 } 
+    
+CdEngrEJTAGInstrBrkEntry ::=
+    SEQUENCE {
+             cdEngrEJTAGIBChannel        Integer32,
+             cdEngrEJTAGIBEnabled        TruthValue,
+             cdEngrEJTAGIBAddress        OCTET STRING,
+             cdEngrEJTAGIBAddrMask       OCTET STRING,
+             cdEngrEJTAGIBControl        OCTET STRING
+             }
+    
+cdEngrEJTAGIBChannel  OBJECT-TYPE
+    SYNTAX      Integer32 (0..16)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The index for this table.  This object represents the channel
+        associated with the entries in this row.
+        
+        Channels within the EJTAG DSU may start with the zero value. Hence,
+        it is acceptable for this index value to be zero.
+        This index is unique for each row in the table."
+    ::= { cdEngrEJTAGInstrBrkEntry 1 }
+
+cdEngrEJTAGIBEnabled  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the enabled status of the entry.
+        
+        If set to a value of 'true', the row is enabled for breaks.
+        If set to a value of 'false', the row is not enabled."
+    ::= { cdEngrEJTAGInstrBrkEntry 2 }
+   
+cdEngrEJTAGIBAddress  OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Address for the Instruction Break.
+        The EJTAG DSU will monitor for an instruction with the address given
+        by this object."
+    ::= { cdEngrEJTAGInstrBrkEntry 3 }
+
+cdEngrEJTAGIBAddrMask  OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Address Mask for the given address for 
+        the Instruction Break. 
+        
+        The default mask is 0xffffffff (all address bits relevant). Be 
+        careful when specifying a mask, since many values (like 0, 1, etc) 
+        can cause an immediate break to occur."
+    ::= { cdEngrEJTAGInstrBrkEntry 4 }
+
+cdEngrEJTAGIBControl OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Control field for the Instruction Break."
+    ::= { cdEngrEJTAGInstrBrkEntry 5 }   
+
+--  The data_break Table
+-- 
+                    
+cdEngrEJTAGDataBrkTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF CdEngrEJTAGDataBrkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This data table represents EJTAG Data Break configuration.
+        It specifies a data break for the specified channel, address,
+        and data value (with optional address and value masks).  Hardware 
+        may place restrictions on the values (e.g. bit 0 of the address 
+        is likely forced to 0, and bit 0 of the mask is forced to 1).
+
+        The default address mask is 0xffffffff (all address bits relevant),
+        and the default value mask is 0x0f (all byte lanes relevant).  Be 
+        careful when specifying an address mask, since many values (like 0, 
+        1, etc) can cause an immediate break to occur.
+
+        The data break behaves according to this pseudo-code:
+
+        if (((DataAddr & AddressMask) == (Address & AddressMask)) &&
+           ((DataValue & ValueMask) == (Value & ValueMask)))
+              Generate debug exception;"
+    ::= { cableDataEngineeringEjtag 4 } 
+    
+cdEngrEJTAGDataBrkEntry OBJECT-TYPE
+    SYNTAX      CdEngrEJTAGDataBrkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this data table describes a Data Break.
+        There is a row for each channel supported by the hardware. "
+    INDEX  { cdEngrEJTAGDBChannel}
+    ::= { cdEngrEJTAGDataBrkTable 1 } 
+    
+CdEngrEJTAGDataBrkEntry ::=
+    SEQUENCE {
+             cdEngrEJTAGDBChannel        Integer32,
+             cdEngrEJTAGDBEnabled        TruthValue,
+             cdEngrEJTAGDBAddress        OCTET STRING,
+             cdEngrEJTAGDBAddrMask       OCTET STRING,
+             cdEngrEJTAGDBDataVal        OCTET STRING,
+             cdEngrEJTAGDBDataMask       OCTET STRING,
+             cdEngrEJTAGDBControl        OCTET STRING
+             }
+    
+cdEngrEJTAGDBChannel  OBJECT-TYPE
+    SYNTAX      Integer32 (0..16)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The index for this table.  This object represents the channel
+        associated with the entries in this row.
+       
+        Channels within the EJTAG DSU may start with the zero value. Hence,
+        it is acceptable for this index value to be zero.
+        This index is unique for each row in the table."
+    ::= { cdEngrEJTAGDataBrkEntry 1 }
+
+cdEngrEJTAGDBEnabled  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the enabled status of the entry.
+        
+        If set to a value of 'true', the row is enabled for breaks.
+        If set to a value of 'false', the row is not enabled."
+    ::= { cdEngrEJTAGDataBrkEntry 2 }
+   
+cdEngrEJTAGDBAddress  OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Address for the Data Break.
+        The EJTAG DSU will monitor for a read-write with the address given
+        by this object."
+    ::= { cdEngrEJTAGDataBrkEntry 3 }
+
+cdEngrEJTAGDBAddrMask  OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Address Mask for the given address for 
+        the Data Break. 
+        
+        The default address mask is 0xffffffff (all address bits relevant).
+        Be careful when specifying an address mask, since many values (like 0,
+        1, etc) can cause an immediate break to occur!"
+    ::= { cdEngrEJTAGDataBrkEntry 4 }
+
+cdEngrEJTAGDBDataVal OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the data value associated with the Data Break.
+        This is the data value that the EJTAG DSU looks for at the associated
+        address"
+    ::= { cdEngrEJTAGDataBrkEntry 5 }
+
+cdEngrEJTAGDBDataMask OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Data Mask for the given data value for 
+        the Data Break. 
+        The default value mask is 0x0f (all byte lanes relevant)."
+    ::= { cdEngrEJTAGDataBrkEntry 6 }
+
+cdEngrEJTAGDBControl OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Control field for the Data Break."
+    ::= { cdEngrEJTAGDataBrkEntry 7 }
+
+END

@@ -1,0 +1,532 @@
+ELTEX-STORAGE-MIB DEFINITIONS ::= BEGIN
+
+-- Title:   ELTEX STORAGE MIB
+-- Version: 1.0
+-- Date:    2 May 2017
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Counter64,
+    Gauge32,
+    Unsigned32
+        FROM SNMPv2-SMI
+
+    TEXTUAL-CONVENTION,
+    TruthValue,
+    RowStatus
+        FROM SNMPv2-TC
+
+    PhysicalIndex
+        FROM ENTITY-MIB
+
+    eltexLtd
+        FROM ELTEX-SMI-ACTUAL
+    
+    EltexPercent,
+    EltexThresholdRelation
+        FROM ELTEX-TC
+    
+    SyslogSeverity
+        FROM SYSLOG-TC-MIB;
+
+eltexStorageMIB MODULE-IDENTITY
+    LAST-UPDATED "201705020000Z"
+    ORGANIZATION "Eltex Enterprise, Ltd."
+    CONTACT-INFO 
+        "www.eltex.nsk.ru"
+    DESCRIPTION
+        "The ELTEX-STORAGE-MIB is used for describing storage devices."
+    REVISION     "201705020000Z"
+    DESCRIPTION "Initial revision of ELTEX-STORAGE-MIB."
+    ::= { eltexLtd 39 }
+
+--
+-- Textual Conventions
+--
+EltexStorageType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION  "The type of memory storage."
+    SYNTAX      INTEGER {
+                    ramfs (1),
+                    spi (2),
+                    raw-nand (3),
+                    sata (4),
+                    sd-card (5),
+                    usb (6)
+                }
+
+-------------------------------------------------------------------------------
+eltexStorageMIBObjects OBJECT IDENTIFIER ::= { eltexStorageMIB 1 }
+
+eltexStorageDevice OBJECT IDENTIFIER ::= { eltexStorageMIBObjects 1 }
+--------------------------------------------------------------------------------
+
+eltexStorageDeviceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexStorageDeviceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains information about memory storages."
+    ::= { eltexStorageDevice 1 }
+
+eltexStorageDeviceEntry OBJECT-TYPE
+    SYNTAX      EltexStorageDeviceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information about a particular memory storage."
+    INDEX       { eltexStorageDeviceIndex }
+    ::= { eltexStorageDeviceTable 1 }
+
+EltexStorageDeviceEntry ::= SEQUENCE {
+    eltexStorageDeviceIndex
+        Unsigned32,
+    eltexStorageDevicePhysicalIndex
+        PhysicalIndex,
+    eltexStorageDeviceType
+        EltexStorageType,
+    eltexStorageDeviceSize
+        Gauge32,
+    eltexStorageDeviceSizeOverflow
+        Gauge32,
+    eltexStorageDeviceHCSize
+        Counter64,
+    eltexStorageDeviceRemovable
+        TruthValue
+}
+
+eltexStorageDeviceIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "An index that uniquely represents a storage device
+        whose information is reported by a row in this table.
+        This index is assigned arbitrarily by the engine
+        and is not saved over reboots."
+    ::= { eltexStorageDeviceEntry 1 }
+
+eltexStorageDevicePhysicalIndex OBJECT-TYPE
+    SYNTAX          PhysicalIndex
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Physical index of a storage device from entPhysicalTable."
+    ::= { eltexStorageDeviceEntry 2 }
+
+eltexStorageDeviceType OBJECT-TYPE
+    SYNTAX EltexStorageType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Memory type"
+    ::= { eltexStorageDeviceEntry 3 }
+
+eltexStorageDeviceSize OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Available storage memory in bytes."
+    ::= { eltexStorageDeviceEntry 4 }
+
+eltexStorageDeviceSizeOverflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object represents the upper 32-bit of eltexStorageDeviceSize.
+        This object needs to be supported only when the value of
+        eltexStorageDeviceSize exceeds 32-bit, otherwise this object value
+        would be set to 0."
+    ::= { eltexStorageDeviceEntry 5 }
+
+eltexStorageDeviceHCSize OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The overall storage memory which is currently available at device.
+        This object is a 64-bit version of eltexStorageDeviceSize."
+    ::= { eltexStorageDeviceEntry 6 }
+
+eltexStorageDeviceRemovable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows whether storage device is removable or not."
+    ::= { eltexStorageDeviceEntry 7 }
+
+----------------------------------------------------------------------------------
+
+eltexStoragePartitionTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexStoragePartitionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains information about partitions on memory storages."
+    ::= { eltexStorageDevice 2 }
+
+eltexStoragePartitionEntry OBJECT-TYPE
+    SYNTAX      EltexStoragePartitionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information about a particular partition on memory storage."
+    INDEX       { eltexStorageDeviceIndex, eltexStoragePartitionIndex }
+    ::= { eltexStoragePartitionTable 1 }
+
+EltexStoragePartitionEntry ::= SEQUENCE {
+    eltexStoragePartitionIndex
+        Gauge32,
+    eltexStoragePartitionTotal
+        Gauge32,
+    eltexStoragePartitionTotalOverflow
+        Gauge32,
+    eltexStoragePartitionHCTotal
+        Counter64,
+    eltexStoragePartitionFreePercent
+        EltexPercent,
+    eltexStoragePartitionFree
+        Gauge32,
+    eltexStoragePartitionFreeOverflow
+        Gauge32,
+    eltexStoragePartitionHCFree
+        Counter64,
+    eltexStoragePartitionThresholdFreeIndex
+        Unsigned32
+}
+
+eltexStoragePartitionIndex OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Index of the partition on a storage device."
+    ::= { eltexStoragePartitionEntry 1 }
+
+eltexStoragePartitionTotal OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows information about total memory in bytes."
+    ::= { eltexStoragePartitionEntry 2 }
+
+eltexStoragePartitionTotalOverflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Represents the upper 32-bit of eltexStoragePartitionTotal.
+
+        This object needs to be supported only when the value of
+        eltexStoragePartitionTotal exceeds 32-bit, otherwise this object value
+        would be set to 0."
+    ::= { eltexStoragePartitionEntry 3 }
+
+eltexStoragePartitionHCTotal OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows information about total memory size in the partition in bytes.
+
+        This object is a 64-bit version of eltexStoragePartitionTotal."
+    ::= { eltexStoragePartitionEntry 4 }
+
+eltexStoragePartitionFreePercent OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows information about currently available free memory in the
+        partition in percents."
+    ::= { eltexStoragePartitionEntry 5 }
+
+eltexStoragePartitionFree OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows information about currently available free memory in the
+        partition in bytes."
+    ::= { eltexStoragePartitionEntry 6 }
+
+eltexStoragePartitionFreeOverflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Represents the upper 32-bit of eltexStoragePartitionFree.
+        
+        This object needs to be supported only when the value of
+        eltexStoragePartitionFree exceeds 32-bit, otherwise this object value
+        would be set to 0."
+    ::= { eltexStoragePartitionEntry 7 }
+
+eltexStoragePartitionHCFree OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows information about currently available free memory in the
+        partition in bytes.
+
+        This object is a 64-bit version of eltexStoragePartitionFree."
+    ::= { eltexStoragePartitionEntry 8 }
+
+eltexStoragePartitionThresholdFreeIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the minimal value of eltexStorageThresholdIndex
+        that isn't in use by any threshold configured in eltexStorageThresholdTable
+        and which can be used as index to create a new eltexStorageThresholdEntry instance."
+    ::= { eltexStoragePartitionEntry 9 }
+----------------------------------------------------------------------------------------
+--THRESHOLDS
+----------------------------------------------------------------------------------------
+eltexStorageThreshold OBJECT IDENTIFIER ::= { eltexStorageMIBObjects 2 }
+----------------------------------------------------------------------------------------
+eltexStorageThresholdNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field enables the generation of eltexStorageThresholdNotification
+        globally on the device.
+
+        If this object value is 'false', then no eltexStorageThresholdNotification
+        will be generated on this device. If this object value is 'true', then
+        notification will be generated."
+    DEFVAL      { false }
+    ::= { eltexStorageThreshold 1 }
+
+eltexStorageThresholdRecoveryNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This field enables the generation of eltexStorageThresholdRecoveryNotification
+        globally on the device.
+
+        If this object value is 'false', then no eltexStorageThresholdRecoveryNotification
+        will be generated on this device. If this object value is 'true', then
+        notification will be generated."
+    DEFVAL      { false }
+    ::= { eltexStorageThreshold 2 }
+
+----------------------------------------------------------------------------------------
+
+eltexStorageThresholdTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexStorageThresholdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the thresholds severity, relation, and comparison value
+        for a storage device.
+
+        List of notification sending conditions:
+
+        Val - eltexStoragePartitionFreePercent
+        Thr - eltexStorageThresholdValue
+        Int - eltexStorageThresholdFlappingInterval
+        abs - absolute value
+
+        +----------------+------------------------+------------------------+
+        | Relation       | Notification Condition |   Recovery Condition   |
+        +----------------+------------------------+------------------------+
+        | greaterThan    |       Val >  Thr       |   Val <  (Thr - Int)   |
+        | greaterOrEqual |       Val >= Thr       |   Val <= (Thr - Int)   |
+        | lessThan       |       Val <  Thr       |   Val >  (Thr + Int)   |
+        | lessOrEqual    |       Val <= Thr       |   Val >= (Thr + Int)   |
+        | equalTo        |       Val == Thr       |  abs(Val - Thr) > Int  |
+        | notEqualTo     |  abs(Val - Thr) > Int  |       Val == Thr       |
+        +----------------+------------------------+------------------------+
+        "
+    ::= { eltexStorageThreshold 3 }
+
+eltexStorageThresholdEntry OBJECT-TYPE
+    SYNTAX      EltexStorageThresholdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry describes the threshold for a storage device."
+    INDEX { eltexStorageDeviceIndex, eltexStoragePartitionIndex, eltexStorageThresholdIndex }
+    ::= { eltexStorageThresholdTable 1 }
+
+EltexStorageThresholdEntry ::= SEQUENCE {
+    eltexStorageThresholdIndex
+        Unsigned32,
+    eltexStorageThresholdRowStatus
+        RowStatus,
+    eltexStorageThresholdValue
+        EltexPercent,
+    eltexStorageThresholdFlappingInterval
+        EltexPercent,
+    eltexStorageThresholdSeverity
+        SyslogSeverity,
+    eltexStorageThresholdRelation
+        EltexThresholdRelation,
+    eltexStorageThresholdNotificationEnable
+        TruthValue,
+    eltexStorageThresholdRecoveryNotificationEnable
+        TruthValue,
+    eltexStorageThresholdEvaluation
+        TruthValue
+}
+
+eltexStorageThresholdIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An index unique within a partition entity. This index permits
+        partition to have thresholds with the same index.
+
+        The first free index can be obtained from the field
+        eltexStoragePartitionThresholdFreeIndex in the table
+        eltexStoragePartitionTable."
+    ::= { eltexStorageThresholdEntry 1 }
+    
+eltexStorageThresholdRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the RowStatus of this entry."
+    ::= { eltexStorageThresholdEntry 2 }
+
+eltexStorageThresholdValue OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the value of the threshold in percents."
+    ::= { eltexStorageThresholdEntry 3 }
+    
+eltexStorageThresholdFlappingInterval OBJECT-TYPE
+    SYNTAX      EltexPercent
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the value of flapping interval. This field is
+        necessary for determining the moment of sending 
+        eltexStorageFreeMemoryThresholdRecoveryNotification."
+    DEFVAL      { 0 }
+    ::= { eltexStorageThresholdEntry 4 }
+
+eltexStorageThresholdSeverity OBJECT-TYPE
+    SYNTAX      SyslogSeverity
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the severity of this threshold."
+    DEFVAL      { alert }
+    ::= { eltexStorageThresholdEntry 5 }
+
+eltexStorageThresholdRelation OBJECT-TYPE
+    SYNTAX      EltexThresholdRelation
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the relation between storage value
+        and threshold value, required to trigger the alarm."
+    ::= { eltexStorageThresholdEntry 6 }
+
+eltexStorageThresholdNotificationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field controls generation of notifications for this
+        threshold.
+
+        When this field is 'true', generation of notifications is enabled
+        for this threshold. When this field is 'false', generation of
+        notifications is disabled for this threshold."
+    DEFVAL      { true }
+    ::= { eltexStorageThresholdEntry 7 }
+
+eltexStorageThresholdRecoveryNotificationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This field controls generation of notifications for this
+        threshold.
+
+        When this field is 'true', generation of notifications is enabled
+        for this threshold. When this field is 'false', generation of
+        notifications is disabled for this threshold."
+    DEFVAL      { true }
+    ::= { eltexStorageThresholdEntry 8 }
+
+eltexStorageThresholdEvaluation OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This field indicates the result of the most recent evaluation of
+        the threshold."
+    ::= { eltexStorageThresholdEntry 9 }
+
+------------------------------------------------------------------------------------------
+--Notifications
+------------------------------------------------------------------------------------------
+eltexStorageMIBNotification OBJECT IDENTIFIER ::= { eltexStorageMIB 2 }
+
+eltexStorageMIBNotificationPrefix  OBJECT IDENTIFIER ::= { eltexStorageMIBNotification 0 }
+------------------------------------------------------------------------------------------
+
+eltexStorageFreeMemoryThresholdNotification NOTIFICATION-TYPE
+    OBJECTS {
+        eltexStoragePartitionFreePercent,
+        eltexStorageThresholdSeverity
+    }
+    STATUS current
+    DESCRIPTION
+        "The notification is generated when the value of eltexStoragePartitionFreePercent
+        satisfies the condition eltexStorageFreeMemoryThresholdRelation. Notifications
+        can be disabled for a threshold by eltexStorageFreeMemoryThresholdNotificationEnable
+        field or globally by eltexStorageFreeMemoryThresholdNotificationGlobalEnable.
+
+        The notification is generated when the value of 
+        eltexStorageThresholdEvaluation changes from false to true. 
+
+        Notifications can be disabled for a threshold by 
+        eltexStorageThresholdNotificationEnable field or globally by 
+        eltexStorageThresholdNotificationGlobalEnable."
+    ::= { eltexStorageMIBNotificationPrefix 1 }
+
+eltexStorageFreeMemoryThresholdRecoveryNotification NOTIFICATION-TYPE
+    OBJECTS {
+        eltexStoragePartitionFreePercent,
+        eltexStorageThresholdSeverity
+    }
+    STATUS current
+    DESCRIPTION
+        "The notification is generated when the value of 
+        eltexStorageThresholdEvaluation changes from true to false. 
+
+        Notifications can be disabled for a threshold by 
+        eltexStorageThresholdRecoveryNotificationEnable field or globally by 
+        eltexStorageThresholdRecoveryNotificationGlobalEnable."
+    ::= { eltexStorageMIBNotificationPrefix 2 }
+
+END
+

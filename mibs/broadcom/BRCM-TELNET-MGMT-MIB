@@ -1,0 +1,308 @@
+--**************************************************************************
+--                                                                          
+--    Copyright 2007 Broadcom Corporation                                   
+--    All Rights Reserved                                                   
+--    No portions of this material may be reproduced in any form without the
+--    written permission of:                                                
+--             Broadcom Corporation                                         
+--             16251 Laguna Canyon Road                                     
+--             Irvine, California  92618                                    
+--    All information contained in this document is Broadcom Corporation    
+--    company private, proprietary, and trade secret.                       
+--                                                                          
+--                                                                          
+--                                                                          
+--**************************************************************************
+--    Filename: brcm-telnet-mgmt.mib
+--    Author:   Kevin O'Neal
+--    Creation Date: 6-march-2003
+--
+--**************************************************************************
+--    Description:
+--
+--		private MIB for runtime (not factory) CM management
+--		
+--**************************************************************************
+--    Revision History:
+--
+--**************************************************************************
+
+BRCM-TELNET-MGMT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Integer32,
+    Unsigned32,
+    IpAddress,
+    TimeTicks
+        FROM SNMPv2-SMI
+    DisplayString,
+    TruthValue
+        FROM SNMPv2-TC
+    InetAddressType,
+    InetAddress
+        FROM INET-ADDRESS-MIB
+    cableDataMgmtBase
+        FROM BRCM-CABLEDATA-MGMT-MIB;
+                
+telnetMgmt MODULE-IDENTITY
+    LAST-UPDATED "200702050000Z"
+    ORGANIZATION "Broadcom Corporation"
+    CONTACT-INFO
+        "	BANANA-CABLEDATA
+                (cableData branch of the
+                Broadcom Assigned Numbers and Naming Authority)
+                Broadcom Corporation
+
+        Postal: 4385 River Green Parkway
+                Duluth, GA  30096
+                USA
+
+           Tel: +1 770 232-0018
+
+        E-mail: banana-cabledata@broadcom.com"
+    DESCRIPTION
+        "Broadcom proprietary MIB for runtime management and configuration
+         of objects related to telnet."
+    REVISION      "200702050000Z"
+    DESCRIPTION
+        "Module description was updated. 
+         Compilability issues were cleaned up: 
+         - Chronological order of revision history was corrected.
+         - Changed access of objects telnetHackerAddressType and 
+           telnetHackerAddress from not-accessible to accessible-for-notify
+           so that they may legally be included in the object list for
+           the telnetHackerTrap notification."
+    REVISION      "200609290000Z"
+    DESCRIPTION
+        "Added object telnetHackerInactivityTimeout."
+    REVISION      "200602020000Z"
+    DESCRIPTION
+        "Added object telnetSessionInactivityTimeout."
+    REVISION      "200506080000Z"
+    DESCRIPTION
+        "Deprecated telnetSessionIp in favor of telnetSessionAddressType
+         and telnetSessionAddress objects which are IPv6 friendly.  Also
+         added telnetHackerTable."        
+    REVISION      "200303060000Z"
+    DESCRIPTION
+        "Initial version of this MIB module."
+    ::= { cableDataMgmtBase 1 }
+    
+telnetIpStackInterfaces OBJECT-TYPE
+    SYNTAX      BITS {
+                interface1(0),
+                interface2(1),
+                interface3(2),
+                interface4(3),
+                interface5(4),
+                interface6(5),
+                interface7(6),
+                interface8(7)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the IP stack interfaces on which a telnet server
+         is active."
+    DEFVAL { '00'h }
+    ::= { telnetMgmt 1 }
+
+telnetUserName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..15))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the user name which will be allowed telnet
+         access."
+    DEFVAL { "" }
+    ::= { telnetMgmt 2 }
+
+telnetPassword OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..15))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the password which will be allowed telnet
+         access."
+    DEFVAL { "" }
+    ::= { telnetMgmt 3 }
+
+telnetServerControl OBJECT-TYPE
+    SYNTAX      INTEGER {
+                stop(0),
+                start(1)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Used to start or stop the telnet server.  When read, indicates
+         the current state of the server."
+    ::= { telnetMgmt 4 }
+
+telnetSessionIp OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      deprecated -- in favor of telnetSessionAddressType and telnetSessionAddress
+    DESCRIPTION
+        "This object gives the IP address of the most recently connected device.  
+         If no session has taken place since the last reboot, this object will 
+         read 0.0.0.0."
+    ::= { telnetMgmt 5 }
+    
+telnetSessionInProgress OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates whether or not a telnet session is currently in progress."
+    ::= { telnetMgmt 6 }
+
+telnetForceUserLogout OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If a telnet session is currently in progress, setting this object
+         to true(1) will terminate the session.  Setting to false(2) has
+         no effect.  Always returns false(2) when read."
+    ::= { telnetMgmt 7 }
+    
+telnetSessionAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The type of internet address used for telnetSessionAddress."
+    ::= { telnetMgmt 8 }
+    
+telnetSessionAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object gives the address of the most recently connected device.  
+         If no session has taken place since the last reboot, this object will 
+         report an empty string."
+    ::= { telnetMgmt 9 }
+    
+telnetHackerTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TelnetHackerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of internet addresses which have been blacklisted from telnet
+         access on this station.  Blacklisting occurs when a login attempt
+         fails a number of times from the given address."
+    ::= { telnetMgmt 10 }
+    
+telnetHackerEntry OBJECT-TYPE
+    SYNTAX      TelnetHackerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry representing a single blacklisted address."
+    INDEX   { telnetHackerAddressType, telnetHackerAddress }    
+    ::= { telnetHackerTable 1 }
+    
+TelnetHackerEntry ::= 
+    SEQUENCE    {
+                telnetHackerAddressType InetAddressType,
+                telnetHackerAddress     InetAddress,
+                telnetHackerNumAttempts Unsigned32,
+                telnetHackerLastTime    TimeTicks
+    }
+
+telnetHackerAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The type of internet address used for telnetHackerAddress."
+    ::= { telnetHackerEntry 1 }
+    
+telnetHackerAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The address of an device which has unsuccessfully attempted to log in 
+         to this station enough times to be blacklisted as a hacker."
+    ::= { telnetHackerEntry 2 }
+    
+telnetHackerNumAttempts OBJECT-TYPE
+    SYNTAX         Unsigned32
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION
+        "The number of times that the device represented by this entry has
+         attempted to log in to this station."
+    ::= { telnetHackerEntry 3 }
+    
+telnetHackerLastTime OBJECT-TYPE
+    SYNTAX         TimeTicks
+    MAX-ACCESS     read-only
+    STATUS         current
+    DESCRIPTION
+        "The value of sysUpTime when this row was created, or when the value
+         of telnetHackerNumAttempts was last incremented."
+    ::= { telnetHackerEntry 4 }
+    
+telnetSessionInactivityTimeout OBJECT-TYPE
+    SYNTAX      INTEGER (0..86400)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object controls the length of time after which a telnet session
+         will be terminated if there is no activity.  Note that if this object
+         is set to zero, the session will never be terminated due to 
+         inactivity."
+    DEFVAL { 0 }
+    ::= { telnetMgmt 11 }
+    
+telnetHackerInactivityTimeout OBJECT-TYPE
+    SYNTAX      INTEGER (-1..86400)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object controls the length of time after which an entry in the
+         telnetHackerTable will be removed if there are no further attempts to
+         access the system from the corresponding telnetHackerAddress. Note 
+         that if this object is set to zero, the telnetHackerTable will be
+         effectively disabled and no IP addresses will be blacklisted for
+         unauthorized access.  If set to -1, entries in the telnetHackerTable
+         will never be aged out and once blacklisted, only a system reboot
+         will allow another attempted login from the blacklisted address." 
+    DEFVAL { -1 }
+    ::= { telnetMgmt 12 }
+    
+
+--
+-- Notifications, aka traps.
+--
+-- Note that this MIB is rather poorly designed in that all the objects
+-- reside immediately under the MODULE-IDENTITY node, so there's no really 
+-- good node to reserve for traps.  So we'll just pick 99 which allows
+-- some room to add objects if needed.
+--
+    
+telnetTraps OBJECT IDENTIFIER ::= { telnetMgmt 99 }
+    
+telnetHackerTrap NOTIFICATION-TYPE
+    OBJECTS { 
+              telnetHackerAddressType,
+              telnetHackerAddress,
+              telnetHackerNumAttempts,
+              telnetHackerLastTime
+            }
+    STATUS current
+    DESCRIPTION
+        "An entry has been added to the telnetHackerTable, indicating repeated
+         unauthorized login attempts by the device indicated."
+    ::= { telnetTraps 1 }
+    
+END

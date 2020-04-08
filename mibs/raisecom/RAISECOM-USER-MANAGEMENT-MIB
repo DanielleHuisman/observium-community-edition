@@ -1,0 +1,458 @@
+--MibName=raisecomUserManageGroup
+-- =======================================================================
+-- Version info 
+--
+-- Version 0.1 Created 2002.5.24 by GONGGUIDONG
+-- This version of MIB is created just for management of base and user. 
+-- Transfer UserManage group from raisecom-common-management-mib.my to this file by guoxiaodan,20070716
+-- Copyright(c) 2003-2005 by RAISECOM TECH, Ltd. 
+-- =======================================================================
+--MODIFY RECORD    
+--06,20130129,guokai,  Add  raisecomUserPasswordCheckStatus
+--05,20110722,huxiangfeng,upper bound of raisecomUserRadiusAuthKey changed from 255 to 200
+--04, 20091218, hxy, add user excute command control table
+--03£¬20090806£¬gxd£¬ tacacs  mib
+--02,20090319,hxy,Add raisecomUserRadiusServerPort
+--01,20090220,gxd,tacacs+mib
+-- ===========================================================================
+
+--
+-- RAISECOM base management objects
+--            
+
+RAISECOM-USER-MANAGEMENT-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+		MODULE-IDENTITY,
+		OBJECT-TYPE,
+		NOTIFICATION-TYPE ,
+		Integer32,
+		IpAddress,
+		Unsigned32
+			FROM SNMPv2-SMI
+		RowStatus, TruthValue
+			FROM SNMPv2-TC    
+		DateAndTime,
+		EnableVar
+			FROM SWITCH-TC
+		raisecomCommonManagement
+			FROM RAISECOM-COMMON-MANAGEMENT-MIB;
+
+	raisecomUserManageGroup    MODULE-IDENTITY
+		LAST-UPDATED 	"200707200000Z"
+		ORGANIZATION 	"RAISECOM TECH, Ltd."
+		CONTACT-INFO 	"www.raisecom.com"
+		DESCRIPTION  	
+		    "The MIB module defining objects for user management functions"
+		::= { raisecomCommonManagement  2}  
+	                
+	--groups                 
+
+--	raisecomUserManageGroup 	OBJECT IDENTIFIER ::= {raisecomCommonManagement 2}
+  
+  
+
+  -- raisecomUserManageGroup
+   --scalars
+        raisecomUserLogMethod OBJECT-TYPE
+	        SYNTAX INTEGER{
+	        	local(1),
+	        	radius(2),        	
+	        	local-radius(3),
+	        	radius-local(4),
+	        	radius-local-no-response(5),
+	        	tacacs(6),
+	        	local-tacacs(7),
+	        	tacacs-local(8),
+	        	tacacs-local-no-response(9)
+	        	}        
+	        MAX-ACCESS read-write
+	        STATUS current
+	        DESCRIPTION
+	            "stand for the method for user to log in system.
+	            local for log on user to user information from local system;
+	            local_radius for get user information on local system and then from radius server;
+	            radius_local for first get user on radius server and then from local system;
+	            radius-local server-no-response for first get user on radius server and then from local system, when there is no response from radius server;
+	            tacacs+ for get user information only from tacacs+ server;
+	            local_tacacs+ for first get user information on local system and then from on tacacs+ server;
+	            tacacs+_local for first get user information on tacacs+ server and then from local system;
+	            tacacs+_local server-no-response for first get user information on tacacs+ server and then from local system when there is no response from tacacs+ server;"
+        ::= { raisecomUserManageGroup 1 }    
+        
+	raisecomUserRadiusServerAddress OBJECT-TYPE
+		SYNTAX IpAddress
+		MAX-ACCESS read-write
+		STATUS current
+		DESCRIPTION
+			"The IP Address of Radius server to store user information."
+		::= { raisecomUserManageGroup 2 }
+		
+	raisecomUserRadiusAuthKey OBJECT-TYPE
+	        SYNTAX OCTET STRING 	(SIZE (0..200))
+	        MAX-ACCESS read-write
+	        STATUS current
+	        DESCRIPTION
+	            "The shared secret text string used between the authenticator and a RADIUS server."
+        ::= { raisecomUserManageGroup 3 } 
+  
+    raisecomEnableLogMethod OBJECT-TYPE
+    SYNTAX INTEGER{
+    local(1),
+    radius(2),
+    local-radius(3),
+    radius-local(4),
+    radius-local-no-response(5),
+    tacacs(6),
+    local-tacacs(7),
+    tacacs-local(8),
+    tacacs-local-no-response(9)
+    }        
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "stand for the method for user to enable in system.
+        local for log on user to user information from local system;
+        local_radius for get user information on local system and then from radius server;
+        radius_local for first get user on radius server and then from local system;
+        radius-local server-no-response for first get user on radius server and then from local system, when there is no response from radius server;
+        tacacs+ for get user information only from tacacs+ server;
+        local_tacacs+ for first get user information on local system and then from on tacacs+ server;
+        tacacs+_local for first get user information on tacacs+ server and then from local system;
+        tacacs+_local server-no-response for first get user information on tacacs+ server and then from local system when there is noresponse from tacacs+ server;"
+   ::= { raisecomUserManageGroup 4 }
+
+     --user manage table
+    raisecomUserTable    OBJECT-TYPE
+        SYNTAX          SEQUENCE OF RaisecomUserEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "User manage table"
+    ::= { raisecomUserManageGroup 5 }
+
+    raisecomUserEntry    OBJECT-TYPE
+	SYNTAX          RaisecomUserEntry
+	MAX-ACCESS      not-accessible
+        STATUS          current
+	DESCRIPTION     "An entry in the raisecomUserTable."
+	INDEX { raisecomUserServerIP, raisecomUsername }
+    ::= { raisecomUserTable 1 }
+
+    RaisecomUserEntry ::=
+        SEQUENCE {
+        raisecomUserServerIP 		IpAddress,
+       	raisecomUsername		OCTET STRING (SIZE (1..16)),   
+       	raisecomUserPriority    	INTEGER,
+        raisecomUserStatus			INTEGER,
+        raisecomUserTerminalType    INTEGER,
+        raisecomUserPassword  OCTET STRING (SIZE (1..16)),        
+        raisecomUserOldPassword OCTET STRING (SIZE (1..16)),
+      	raisecomUserEntryRowStatus RowStatus,
+      	raisecomUserLoginType 	 INTEGER,
+      	raisecomUserTerminalIP   OCTET STRING (SIZE (4..128))       
+        }
+
+	raisecomUserServerIP         OBJECT-TYPE
+        SYNTAX          IpAddress        
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "The server ip address user belongs to.
+            local user's server ip is 0.0.0.0."
+    ::= { raisecomUserEntry 1 }   
+    
+    raisecomUsername     OBJECT-TYPE
+        SYNTAX          OCTET STRING  (SIZE (1..16))
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "The name a user login the device with."
+    ::= { raisecomUserEntry 2 }    
+
+
+    raisecomUserPriority  OBJECT-TYPE
+        SYNTAX 		INTEGER  (1..15)
+        MAX-ACCESS 	read-create
+        STATUS current
+        DESCRIPTION
+            "the priority of system user."
+        ::= { raisecomUserEntry 3 }
+    
+    
+    raisecomUserStatus          OBJECT-TYPE
+        SYNTAX          INTEGER{
+        			 	online(1),
+        			 	offline(2)
+        			 }           
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "The status of a user."
+    ::= { raisecomUserEntry 4 }
+	    
+    raisecomUserTerminalType          OBJECT-TYPE
+        SYNTAX          INTEGER{ 
+                     console(0),
+                     telnet1(1),
+                     telnet2(2),
+                     telnet3(3),
+                     telnet4(4),
+                     telnet5(5),
+                     ssh1(6),
+                     ssh2(7),
+                     ssh3(8),
+                     ssh4(9),
+                     ssh5(10)
+                     } 
+        MAX-ACCESS      read-only
+        STATUS          deprecated
+        DESCRIPTION     
+            "Connection type that the user is logon."        
+    ::= { raisecomUserEntry 5 }
+    
+    raisecomUserPassword  OBJECT-TYPE
+        SYNTAX 		OCTET STRING  (SIZE (1..16))
+        MAX-ACCESS 	read-create
+        STATUS current
+        DESCRIPTION
+            "The password of system user."
+        ::= { raisecomUserEntry 6 }
+
+    raisecomUserOldPassword  OBJECT-TYPE
+        SYNTAX 		OCTET STRING  (SIZE (1..16)) 
+        MAX-ACCESS 	read-create
+        STATUS current
+        DESCRIPTION
+            "The old password of system user."
+        ::= { raisecomUserEntry 7 }
+
+    raisecomUserEntryRowStatus  OBJECT-TYPE
+        SYNTAX 		RowStatus
+        MAX-ACCESS 	read-create
+        STATUS current
+        DESCRIPTION
+            "The status of this table entry."
+        ::= { raisecomUserEntry 8 }
+        
+    raisecomUserLoginType          OBJECT-TYPE
+        SYNTAX          INTEGER 
+                           {
+                           local(0),
+                           tacacs(1),
+                           radius(2)        
+                           } 
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "Login type of user."
+        ::= { raisecomUserEntry 9 }
+    
+    raisecomUserTerminalIP         OBJECT-TYPE
+        SYNTAX OCTET STRING 	(SIZE (4..128))        
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     
+            "The terminal ip address user belongs to.
+            console terminal ip is 0.0.0.0."
+        ::= { raisecomUserEntry 10 }
+  
+    raisecomEnableLogPassword OBJECT-TYPE
+	        SYNTAX OCTET STRING 	(SIZE (1..16))
+	        MAX-ACCESS read-write
+	        STATUS current
+	        DESCRIPTION
+	            "The password for enable log."
+        ::= { raisecomUserManageGroup 6 }
+        
+    raisecomEnableLogOldPassword OBJECT-TYPE
+	        SYNTAX OCTET STRING 	(SIZE (1..16))
+	        MAX-ACCESS read-write
+	        STATUS current
+	        DESCRIPTION
+	            "The old password for enable log."
+        ::= { raisecomUserManageGroup 7 }   
+        
+    raisecomUserTacacsPlusServerAddress OBJECT-TYPE
+          SYNTAX          IpAddress        
+          MAX-ACCESS      read-write
+          STATUS          current
+          DESCRIPTION 
+               "IP address of Tacacs+ Server."
+          ::= { raisecomUserManageGroup 8 }       
+          
+    raisecomUserTacacsPlusServerAuthKey OBJECT-TYPE
+            SYNTAX OCTET STRING 	(SIZE (0..255))
+	        MAX-ACCESS read-write
+	        STATUS current
+	        DESCRIPTION
+	            "This object specifies the name of share key tacacs+ server uses."
+            ::= { raisecomUserManageGroup 9 }   
+            
+   
+  raisecomUserTacacsPlusResultSendPkts OBJECT-TYPE
+            SYNTAX    Unsigned32						    
+	        MAX-ACCESS read-only
+	        STATUS deprecated
+	        DESCRIPTION
+	            "This object indicates the number of packets which Tacacs+ client sent to Tacacs+ server."
+            ::= { raisecomUserManageGroup 10 }    
+         
+  raisecomUserTacacsPlusResultReceivePkts OBJECT-TYPE
+            SYNTAX    Unsigned32						    
+	        MAX-ACCESS read-only
+	        STATUS deprecated
+	        DESCRIPTION
+	            "This object indicates the number of packets which Tacacs+ client received from Tacacs+ server."
+            ::= { raisecomUserManageGroup 11 }    
+  raisecomUserTacacsPlusResultErrorPkts OBJECT-TYPE
+            SYNTAX    Unsigned32						    
+	        MAX-ACCESS read-only
+	        STATUS deprecated
+	        DESCRIPTION
+	            "This object indicates the number of error packets which Tacacs+ client received from Tacacs+ server."
+            ::= { raisecomUserManageGroup 12 } 
+ 
+  raisecomUserRadiusServerPort OBJECT-TYPE
+	       SYNTAX Unsigned32
+		   MAX-ACCESS read-write
+		   STATUS current
+		   DESCRIPTION
+			   "The Port of Radius server to store user information."
+		   ::= { raisecomUserManageGroup 13 }
+		  
+  raisecomUserTacacsPlusClearStatistics OBJECT-TYPE
+            SYNTAX    TruthValue						    
+	        MAX-ACCESS read-write
+	        STATUS deprecated
+	        DESCRIPTION
+	            "The purpose of this object is to clear all the packet statistics. 
+	        Set the value to true(1) means clear current packet statistics and begin the next recalculation."
+            ::= { raisecomUserManageGroup 14 } 
+            
+     --user excute command control table
+    raisecomUserCmdCtrlTable    OBJECT-TYPE
+        SYNTAX          SEQUENCE OF raisecomUserCmdCtrlEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "User command control table"
+    ::= { raisecomUserManageGroup 15 }
+
+    raisecomUserCmdCtrlEntry    OBJECT-TYPE
+	SYNTAX          raisecomUserCmdCtrlEntry
+	MAX-ACCESS      not-accessible
+        STATUS          current
+	DESCRIPTION     "An entry in the raisecomUserCmdCtrlTable."
+	INDEX {raisecomUsername, raisecomUserCmdCtrIndex}
+    ::= { raisecomUserCmdCtrlTable 1 }
+
+    raisecomUserCmdCtrlEntry ::=
+        SEQUENCE {
+       	raisecomUserCmdCtrIndex           INTEGER,
+        raisecomUserCmdCtrType            INTEGER,
+        raisecomUserCmdCtrFirstKey        OCTET STRING,
+        raisecomUserCmdCtrSecondKey       OCTET STRING,
+      	raisecomUserCmdCtrlEntryRowStatus RowStatus	        
+        }
+
+	raisecomUserCmdCtrIndex         OBJECT-TYPE
+        SYNTAX          INTEGER (1..15)        
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+            "User command control config index, range 0 to 14"
+    ::= { raisecomUserCmdCtrlEntry 1 }   
+    
+    raisecomUserCmdCtrType         OBJECT-TYPE
+        SYNTAX          INTEGER {allow(1), disallow(2)}        
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION     
+            "User command control config type, add a command or remove a command 
+             for special user could excute"
+    ::= { raisecomUserCmdCtrlEntry 2 }    
+
+    raisecomUserCmdCtrFirstKey         OBJECT-TYPE
+        SYNTAX          OCTET STRING (SIZE(1..255))        
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION     
+            "The first key word in a command"
+    ::= { raisecomUserCmdCtrlEntry 3 }
+    
+    raisecomUserCmdCtrSecondKey         OBJECT-TYPE
+        SYNTAX          OCTET STRING (SIZE(1..255))        
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION     
+            "The second key word in a command"
+    ::= { raisecomUserCmdCtrlEntry 4 }  
+    
+    raisecomUserCmdCtrlEntryRowStatus         OBJECT-TYPE
+        SYNTAX          RowStatus        
+        MAX-ACCESS      read-create
+        STATUS          current
+        DESCRIPTION     
+            "Rowstatus for raisecomUserCmdCtrlEntryRowStatus"
+    ::= { raisecomUserCmdCtrlEntry 5 }
+    
+            
+	raisecomUserRadiusServerBackupAddress OBJECT-TYPE
+		SYNTAX IpAddress
+		MAX-ACCESS read-write
+		STATUS current
+		DESCRIPTION
+			"Backup IP Address of Radius server to store user information."
+		::= { raisecomUserManageGroup 16 }
+        
+	raisecomUserRadiusServerBackupPort OBJECT-TYPE  
+	       SYNTAX Unsigned32
+		   MAX-ACCESS read-write
+		   STATUS current
+		   DESCRIPTION
+			   "Backup Port of Radius server to store user information."
+		::= { raisecomUserManageGroup 17 }
+        
+	raisecomUserTacacsPlusServerBackupAddress OBJECT-TYPE
+		SYNTAX IpAddress
+		MAX-ACCESS read-write
+		STATUS current
+		DESCRIPTION
+			"Backup IP Address of tacacs plus server to store user information."
+		::= { raisecomUserManageGroup 18 }  
+		 
+   raisecomUserPasswordCheckStatus       OBJECT-TYPE 
+	       SYNTAX      INTEGER   { 
+	                       simple(0), 
+	                       complex(1)
+	                       }
+         	MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+              "Specifies the status of check password."  
+            DEFVAL          {simple}
+            ::= { raisecomUserManageGroup  19 }   
+            
+     --user manage table   
+    raisecomUserTrapGroup  OBJECT IDENTIFIER 
+    				::= { raisecomUserManageGroup 20 } 
+    				
+	raisecomUserLoginTrap  NOTIFICATION-TYPE
+					OBJECTS { raisecomUserPriority }
+					STATUS  current
+					DESCRIPTION
+						"User Login trap."
+					::= { raisecomUserTrapGroup 1 }  
+					  
+	raisecomUserLogoutTrap  NOTIFICATION-TYPE
+					OBJECTS { raisecomUserPriority }
+					STATUS  current
+					DESCRIPTION
+						"User Logout trap."
+					::= { raisecomUserTrapGroup 2 } 
+
+					
+END
+
+
+
+    		

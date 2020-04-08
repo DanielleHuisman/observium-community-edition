@@ -1,0 +1,668 @@
+-- Module Name: HMS132R3.MIB (SCTE 94-2)
+-- SCTE Status: Draft Revision 3
+
+SCTE-HMS-HE-RF-SWITCH-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-COMPLIANCE, OBJECT-GROUP
+	FROM SNMPv2-CONF    
+    OBJECT-TYPE, MODULE-IDENTITY, Unsigned32, Integer32
+        FROM SNMPv2-SMI
+    DisplayString
+        FROM SNMPv2-TC        
+    entPhysicalIndex
+        FROM ENTITY-MIB
+    HeFaultStatus, HeTenthdB,
+    HeTenthdBm, HeTenthdBmV, HeOnOffControl
+        FROM SCTE-HMS-HEADENDIDENT-MIB
+    heRFSwitchGroup 
+       FROM SCTE-HMS-HE-RF-MIB;
+
+
+heRFSwitchMIB MODULE-IDENTITY
+    LAST-UPDATED "200309110000Z"  -- Sep 11, 2003
+    ORGANIZATION "SCTE HMS Working Group"
+    CONTACT-INFO
+            "SCTE HMS Subcommittee, Chairman
+             mailto: standards@SCTE.org"
+
+    DESCRIPTION
+		" Change Log:
+		  1.  Added Unsigned32 and Integer32 to IMPORTS
+		  2.  Removed TEXTUAL-CONVENTION from IMPORTS
+		  3.  Corrected 4 digit date code defined in RFC2578
+		  4.	heRFSwitchWaitToRestoreTime is changed to Integer32 instead of INTEGER
+		  5.	Corrected object type definition in HeRFSwitchInputEntry sequence
+		  6.	Added double quote at the end of heRFSwitchInputExternalControl
+			description
+		  7.	Changed Rf to RF
+		  8.	Changed OID number of heRFSwitchMIBCompliances to 1 instead of 2
+		  9.	Changed the text description of SNMPv2 to SNMP for 
+			heRFSwitchBasicCompliance MODULE-COMPLIANCE"
+    REVISION  "200309110000Z"
+
+    DESCRIPTION
+		" Change Log:
+		  1.  Filled in SCTE number 94-2
+		  2.  Fixed all compile errors
+		  3.  Defined heRFSwitchInputIndex in the input entry sequence
+		  4.  Defined heRFSwitchOutputIndex in the output entry sequence"
+
+    REVISION  "200305290000Z"
+
+        DESCRIPTION		         
+                "The MIB module for the HMS HE RF Switch module 
+				entities. 
+				
+				This MIB module is for representing RF
+				switch equipment present in the headend (or indoor) 
+				and is supported by a SNMP agent.
+				
+				This MIB is limited in its scope and intended to 
+				describe an A-B (2 input and 1 output) or a crossbar 
+				RF switch.  Up to 2 RF inputs and 2 outputs 
+				are supported.  Any devices with more than 2 RF 
+				inputs or outputs shall be covered by another MIB.
+
+				This MIB does not intend to dictate all of the nuances
+				involved in changing control settings (automatic or 
+				manual mode, changing switch controls in each possible 
+				mode combination).  The most common desired behaviors 
+				are noted but specific switch operation and behavior 
+				are left to the RF switch vendors.
+
+				Not all control enumerations must be supported.  This 
+				is noted in the variables that have optional 
+				enumerations. 				
+				
+				Refer to the associated notes for information on what 
+				SNMP responses should be returned for unsupported
+				enumerations."       
+
+    ::=  {  heRFSwitchGroup 1  }
+
+heRFSwitchMIBObjects OBJECT IDENTIFIER ::= { heRFSwitchMIB 1}
+
+-- Every RF switch is modeled by the tables presented
+-- in this MIB module. These tables extend the entPhysicalTable
+-- according to RFC 2737. The extension index entPhysicalIndex uniquely
+-- identifies the RF switch.
+
+-- Every RF switch is also modeled by the following tables:
+--      entPhysicalEntry - 1 row; (defined in document: RFC2737)
+--      heCommonEntry    - 1 row. (defined in document: HMS111) 
+
+-- Every RF switch module will have its alarms modeled by the table:
+--		propertyEntry - x rows; (defined in document: HMS026)
+--		(where x is the nos. of alarmable analog properties supported 
+--      by the RF switch)
+
+--		discretePropertyEntry - y rows; (defined in document: HMS026)
+--		(where y is the nos. of alarmable digital properties supported by 
+--      the RF switch)
+
+-- Every RF switch module will have a list of currently active 
+-- alarms modeled by the table:
+--		currentAlarmEntry - z rows; (defined in document: HMS026)
+--		(where z is the nos. of current active alarms in the RF 
+--        switch)
+
+-- Thus, an A-B RF switch (2 RF inputs and one RF output) 
+-- will be represented by one row in entPhysicalTable, one row in 
+-- heCommonTable, one row in heRFSwitchUnitTable, two rows in 
+-- heRFSwitchInputTable and one row in heRFSwitchOutputTable.
+
+-- Additionally, a crossbar RF switch (2 inputs and 2 outputs) 
+-- will be represented by one row in entPhysicalTable, one row in 
+-- heCommonTable, one row in heRFSwitchUnitTable, two rows
+-- in heRFSwitchInputTable and two rows in heRFSwitchOutputTable.
+
+-- Correlation of outputs and inputs are indicated by the heRFSwitchState 
+-- variable.  Correlation of physical inputs and outputs to 
+-- heRFSwitchInputTable and heRFSwitchOutputTables rows is indicated 
+-- by the heRFSwitchInputDescription and heRFSwitchOutputDescription 
+-- variables.
+
+
+
+--      the RF Switch Unit Table
+heRFSwitchUnitTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF HeRFSwitchUnitEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table containing information about RF Switch used
+            in an indoor environment."
+    ::= { heRFSwitchMIBObjects 1 }
+
+heRFSwitchUnitEntry OBJECT-TYPE
+    SYNTAX HeRFSwitchUnitEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+            "List of information about each RF switch."
+    INDEX { entPhysicalIndex }
+        ::= { heRFSwitchUnitTable 1 }
+
+HeRFSwitchUnitEntry ::= SEQUENCE
+{
+    heRFSwitchMode						INTEGER,
+    heRFSwitchControl                   INTEGER,    
+    heRFSwitchRevertEnable             HeOnOffControl,
+    heRFSwitchState                     INTEGER,
+    heRFSwitchFailoverStatus            HeFaultStatus,
+    heRFSwitchBothInputStatus           HeFaultStatus,
+    heRFSwitchHysteresis                HeTenthdB,
+    heRFSwitchWaitToRestoreTime         Integer32,
+	heRFSwitchSensorMode				INTEGER        
+}
+
+heRFSwitchMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+        automatic(1),
+        manual(2)
+    }
+    MAX-ACCESS	  read-write
+    STATUS          current
+    DESCRIPTION
+           "This controls and/or reports the switching mode.  If 
+		   automatic(1), the RF switch will evaluate the RF 
+		   input status and make the decision to affect the switch state.  
+		   If set to manual(2), the RF switch will not affect the 
+		   switch state itself."
+
+    ::= { heRFSwitchUnitEntry 1 }
+
+
+heRFSwitchControl OBJECT-TYPE
+    SYNTAX      INTEGER {
+        pathA(1),
+        pathB(2),
+        cross(3),
+        bar(4),
+        bothA(5), 
+        bothB(6)
+    }
+    MAX-ACCESS	  read-write
+    STATUS          current
+    DESCRIPTION
+            "Sets the intended state of the RF Switch. The effect 
+			of this control will depend on the value of heRFSwitchMode.
+			If heRFSwitchMode is set to automatic, the value this 
+			control is set to will be the preferred setting.  If it is 
+			set to manual, the switch will assume this setting.  Actual 
+			switch operation while changing switch control value(s) 
+			is up to the equipment vendor. For example, if the switch 
+			is in manual mode and the operator tries to connect the 
+			output to an invalid input, the switch may or may 
+			not change state.
+			
+			Not all enumerations must be supported. For example, an 
+			A-B RF switch may support only the pathA and pathB 
+			enumerations while a cross-bar switch may support cross, 
+			bar, bothA or bothB or only cross and bar but not pathA 
+			and pathB enumerations.  See the note below about the 
+			expected SNMP response. 
+
+            A value pathA(1) connects the switch output to side A 
+			(first input) of the switch.  This enumeration is intended
+			for use by an A-B switch.
+
+            A value pathB(2) connects the switch output to side B 
+			(second input) of the switch. This enumeration is intended 
+			for use by an A-B switch.
+
+            A value cross(3) connects the switch outputs to the inputs 
+			as follows:
+			   Side A (first or primary) output is connected to side B 
+			   (second or alternate) input. 
+			   Side B (second or alternate) output is connected to 
+			   side A (first or primary) input.
+			This enumeration is intended for use by a cross-bar switch.
+
+            A value bar(4) connects the switch outputs to the inputs as 
+			follows:
+			   Side A (first or primary) output is connected to side A 
+			   (first or primary) input.
+			   Side B (second or alternate) output is connected to 
+			   side B (second or alternate) input.
+			This enumeration is intended for use by a cross-bar switch.
+
+            A value bothA(5) connects the switch outputs to the inputs as 
+			follows:
+			   Side A (first or primary) output is connected to side A 
+			   (first or primary) input.
+			   Side B (second or alternate) output is connected to 
+			   side A (first or primary) input.
+			This enumeration is intended for use by a cross-bar switch.
+
+            A value bothB(6) connects the switch outputs to the inputs 
+			as follows:
+			   Side A (first or primary) output is connected to side B 
+			   (second or alternate) input.
+			   Side B (second or alternate) output is connected to 
+			   side B (second or alternate) input.
+			This enumeration is intended for use by a cross-bar switch.
+
+
+            *** IMPORTANT ***
+            It is NOT required that an RF switch support all
+            enumerations. A SET request for an unsupported value shall
+            yield a badValue(3) error by an SNMPv1 agent or an
+            inconsistentValue(12) by an SNMPv2 agent."
+    ::= { heRFSwitchUnitEntry 2 }
+
+
+heRFSwitchRevertEnable OBJECT-TYPE
+    SYNTAX      HeOnOffControl 
+    MAX-ACCESS	  read-write
+    STATUS          current
+    DESCRIPTION
+           "This controls the use of revert switching.  
+		   
+		   If set to on, the switch will attempt to go back to the 
+		   preferred settings indicated by heRFSwitchControl if 
+		   heRFSwitchMode is set to automatic, and the input status 
+		   of the preferred input is normal.  The switch will not 
+		   attempt to revert to the settings indicated by 
+		   heRFSwitchControl until heRFSwitchWaitToRestoreTime 
+		   (if supported) has expired since the preferred input was 
+		   restored to normal levels.
+
+
+		   If set to off, the switch will not attempt to go back to 
+		   the preferred settings indicated by heRFSwitchControl if 
+		   heRFSwitchMode is set to automatic, and the input status 
+		   of the preferred input is normal.  
+		   "
+
+    ::= { heRFSwitchUnitEntry 3 }
+
+
+heRFSwitchState OBJECT-TYPE
+    SYNTAX      INTEGER {
+        pathA(1),
+        pathB(2),
+		cross(3),
+		bar(4),
+		bothA(5),
+		bothB(6)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Reports the state of the RF Switch.  Not all enumerations 
+			must be supported.  For example, an A-B RF switch may 
+			support only the pathA and pathB enumerations while a 
+			cross-bar switch may support cross, bar, bothA or bothB or 
+			only cross and bar but not pathA and pathB enumerations. 
+
+            A value pathA(1) indicates that the switch output is being
+            fed by side A (first input) of the switch.  This enumeration
+			is intended for use by an A-B switch.
+
+            A value pathB(2) indicates that the switch output is being
+            fed by side B (second input) of the switch. This enumeration
+			is intended for use by an A-B switch.
+
+            A value cross(3) indicates that the switch outputs are fed as 
+			follows:
+			   Side A (first or primary) output is connected to side B 
+			   (second or alternate) input.
+			   Side B (second or alternate) output is connected to side A 
+			   (first or primary) input.
+			   This enumeration is intended for use by a cross-bar switch.
+
+            A value bar(4) indicates that the switch outputs are fed as 
+			follows:
+			   Side A (first or primary) output is connected to side A 
+			   (first or primary) input.
+			   Side B (second or alternate) output is connected to side B 
+			   (second or alternate) input.
+			   This enumeration is intended for use by a cross-bar switch.
+
+            A value bothA(5) indicates that the switch outputs are fed as 
+			follows:
+			   Side A (first or primary) output is connected to side A 
+			   (first or primary) input.
+			   Side B (second or alternate) output is connected to side A 
+			   (first or primary) input.
+			   This enumeration is intended for use by a cross-bar switch.
+
+            A value bothB(6) indicates that the switch outputs are fed as 
+			follows:
+			   Side A (first or primary) output is connected to side B 
+			   (second or alternate) input.
+			   Side B (second or alternate) output is connected to side B 
+			   (second or alternate) input.
+			   This enumeration is intended for use by a cross-bar switch."
+
+    ::= { heRFSwitchUnitEntry 4 }
+
+
+heRFSwitchFailoverStatus OBJECT-TYPE
+    SYNTAX      HeFaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The integral status of both inputs. 
+
+            A value is fault(2), if current switch state heRFSwitchState 
+			is different than the preferred setting heRFSwitchControl, 
+			otherwise, it is normal(1). 
+
+            This object must provide for the alarm management capabilities
+            with a corresponding entry in the discretePropertyTable of
+            SCTE-HMS-PROPERTY-MIB (HMS026).
+
+            An alarm shall be recorded as an entry in the currentAlarmTable
+            of SCTE-HMS-PROPERTY-MIB (HMS026).  
+
+            A log record shall be added as an entry in the heCommonLogTable.
+
+            An heCommonAlarmEvent notification shall be sent."
+
+    ::= { heRFSwitchUnitEntry 5 }
+
+heRFSwitchBothInputStatus OBJECT-TYPE
+    SYNTAX      HeFaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The integral status of both inputs. 
+
+            A value is fault(2), if both input levels are below
+            the nominal value; otherwise, it is normal(1).
+
+            This object must provide for the alarm management capabilities
+            with a corresponding entry in the discretePropertyTable of
+            SCTE-HMS-PROPERTY-MIB (HMS026).
+
+            An alarm shall be recorded as an entry in the currentAlarmTable
+            of SCTE-HMS-PROPERTY-MIB (HMS026).  
+
+            A log record shall be added as an entry in the heCommonLogTable.
+
+            An heCommonAlarmEvent notification shall be sent."
+
+   ::= { heRFSwitchUnitEntry 6 }
+
+heRFSwitchHysteresis OBJECT-TYPE
+    SYNTAX      HeTenthdB (-20..20)
+    UNITS       "0.1 dB"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "Controls switch input hysteresis amount.  The amount of hysteresis
+			used and the ability to change it is to be determined by
+			the vendor."
+    ::= { heRFSwitchUnitEntry 7 }
+
+heRFSwitchWaitToRestoreTime OBJECT-TYPE
+    SYNTAX      Integer32 
+    UNITS       "1 sec"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "Controls hysteresis time in sec. 
+
+            If in automatic switching mode and revert mode is enabled,
+			a switch back to the original side will be delayed for 
+			the time specified by this object."
+    ::= { heRFSwitchUnitEntry 8 }
+
+heRFSwitchSensorMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+		internal (1),
+		external (2)
+	} 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "Controls what source will be used for determining input 
+			status:
+			  A value of internal(1) causes the internal RF detection 
+			  circuitry to be used.
+			  A value of external(2) will use heRFSwitchInputExternalControl 
+			  to determine input status.
+			  "
+    ::= { heRFSwitchUnitEntry 9 }
+
+
+
+
+
+--      the RF Switch Input Table
+heRFSwitchInputTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF HeRFSwitchInputEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table containing information about each RF Switch 
+			input used in an indoor environment."
+    ::= { heRFSwitchMIBObjects 2 }
+
+heRFSwitchInputEntry OBJECT-TYPE
+    SYNTAX HeRFSwitchInputEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+            "List of information about each RF switch input."
+    INDEX { entPhysicalIndex, heRFSwitchInputIndex }
+        ::= { heRFSwitchInputTable 1 }
+
+HeRFSwitchInputEntry ::= SEQUENCE
+{
+	heRFSwitchInputIndex			Unsigned32,	
+    heRFSwitchInputRFLevel         HeTenthdBmV,
+    heRFSwitchSetInputPowerThreshold    HeTenthdBmV,    
+    heRFSwitchInputStatus	            HeFaultStatus,
+    heRFSwitchInputDescription          DisplayString,
+	heRFSwitchInputExternalControl		HeFaultStatus
+}
+
+heRFSwitchInputIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Index number corresponding to the RF Input."
+    ::= { heRFSwitchInputEntry 1 }
+    
+heRFSwitchInputRFLevel OBJECT-TYPE
+    SYNTAX      HeTenthdBmV 
+    UNITS       "0.1 dBmV"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The measured RF input power for the RF switch."
+    ::= { heRFSwitchInputEntry 2 }
+
+heRFSwitchSetInputPowerThreshold OBJECT-TYPE
+    SYNTAX      HeTenthdBmV 
+    UNITS       "0.1 dBmV"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "Input power switchover point for this input."
+    ::= { heRFSwitchInputEntry 3 }
+
+heRFSwitchInputStatus OBJECT-TYPE
+    SYNTAX      HeFaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The integral status of the input. 
+
+            A value is fault(2), if the input levels are not in
+            the nominal range; otherwise, it is normal(1).
+
+            This object must provide for the alarm management capabilities
+            with a corresponding entry in the discretePropertyTable of
+            SCTE-HMS-PROPERTY-MIB (HMS026).
+
+            An alarm shall be recorded as an entry in the currentAlarmTable
+            of SCTE-HMS-PROPERTY-MIB (HMS026).  
+
+            A log record shall be added as an entry in the heCommonLogTable.
+
+            An heCommonAlarmEvent notification shall be sent."
+
+
+    ::= { heRFSwitchInputEntry 4 }
+
+heRFSwitchInputDescription OBJECT-TYPE
+	SYNTAX          DisplayString (SIZE (0..32))
+	MAX-ACCESS		read-only
+	STATUS          current
+	DESCRIPTION
+		"A description of the switch input port.  The description text is 
+		to be determined by the equipment manufacturer.  For example, 
+		Input A or Side  B."
+    ::= { heRFSwitchInputEntry 5 }
+
+heRFSwitchInputExternalControl OBJECT-TYPE
+    SYNTAX      HeFaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+
+            "This is an external control signal that indicates the status
+		of the associated input.
+
+            A value is fault(2), if the external control signal level is not in
+            the nominal range; otherwise, it is normal(1)."
+    ::= { heRFSwitchInputEntry 6 }
+
+
+--      the RF Switch Output Table
+heRFSwitchOutputTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF HeRFSwitchOutputEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table containing information about each RF Switch 
+			output used in an indoor environment."
+    ::= { heRFSwitchMIBObjects 3 }
+
+heRFSwitchOutputEntry OBJECT-TYPE
+    SYNTAX HeRFSwitchOutputEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+            "List of information about each RF switch output."
+    INDEX { entPhysicalIndex, heRFSwitchOutputIndex }
+        ::= { heRFSwitchOutputTable 1 }
+
+HeRFSwitchOutputEntry ::= SEQUENCE
+{
+	heRFSwitchOutputIndex			 Unsigned32,  
+    heRFSwitchOutputDescription      DisplayString        
+}
+
+heRFSwitchOutputIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Index number corresponding to the RF Output."
+    ::= { heRFSwitchOutputEntry 1 }
+    
+heRFSwitchOutputDescription OBJECT-TYPE
+	SYNTAX          DisplayString (SIZE (0..32))
+	MAX-ACCESS		read-only
+	STATUS          current
+	DESCRIPTION
+		"A description of the switch output port.  The description text 
+		is to be determined by the equipment manufacturer.  For example, 
+		Output A or Seconday Output."
+    ::= { heRFSwitchOutputEntry 2 }
+
+
+-- conformance information
+heRFSwitchMIBConformance OBJECT IDENTIFIER ::= { heRFSwitchMIB 2 }
+
+heRFSwitchMIBCompliances OBJECT IDENTIFIER ::= { heRFSwitchMIBConformance 1 }
+
+heRFSwitchMIBGroups      OBJECT IDENTIFIER ::= { heRFSwitchMIBConformance 2 }
+
+heRFSwitchBasicCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for SNMP HMS Headend RF 
+			Switch entities which implement the SNMP 
+			heRFSwitchMIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { heRFSwitchUnitMandatoryGroup,
+		                   heRFSwitchInputMandatoryGroup,
+						   heRFSwitchOutputMandatoryGroup
+
+                         }
+    ::= { heRFSwitchMIBCompliances 1 }
+
+heRFSwitchUnitMandatoryGroup OBJECT-GROUP
+    OBJECTS {   
+				heRFSwitchMode,						
+				heRFSwitchControl,                      
+				heRFSwitchRevertEnable,             
+				heRFSwitchState,                     
+				heRFSwitchFailoverStatus            
+			}
+    STATUS  current
+    DESCRIPTION
+            "The main group defines heRFSwitchUnitTable objects which 
+			are mandatory to all indoor RF switch modules."
+    ::= { heRFSwitchMIBGroups 1 }
+
+
+heRFSwitchInputMandatoryGroup OBJECT-GROUP
+    OBJECTS {   
+                  heRFSwitchInputStatus,
+				  heRFSwitchInputDescription
+            }
+    STATUS  current
+    DESCRIPTION
+            "The main group defines heRFSwitchInputTable objects which
+			are mandatory to all indoor RF switch modules."
+    ::= { heRFSwitchMIBGroups 2 }
+
+heRFSwitchOutputMandatoryGroup OBJECT-GROUP
+    OBJECTS {   
+              heRFSwitchOutputDescription
+            }
+    STATUS  current
+    DESCRIPTION
+            "The main group defines heRFSwitchOutputTable objects which
+			are mandatory to all indoor RF switch modules."
+    ::= { heRFSwitchMIBGroups 3 }
+
+
+heRFSwitchUnitGroup OBJECT-GROUP
+    OBJECTS { 
+				heRFSwitchBothInputStatus,            
+				heRFSwitchHysteresis,                
+				heRFSwitchWaitToRestoreTime,
+				heRFSwitchSensorMode        
+            }
+    STATUS  current
+    DESCRIPTION
+	    "The collection of heRFSwitchUnitTable objects which are used to 
+		represent the indoor RF switch module."
+    ::= { heRFSwitchMIBGroups 4 }
+
+heRFSwitchInputGroup OBJECT-GROUP
+    OBJECTS { 
+				heRFSwitchInputRFLevel,
+				heRFSwitchSetInputPowerThreshold,
+				heRFSwitchInputExternalControl
+				    
+            }
+    STATUS  current
+    DESCRIPTION
+	    "The collection of heRFSwitchInputTable objects which are used to 
+		represent the indoor RF switch module."
+    ::= { heRFSwitchMIBGroups 5 }
+
+
+
+END		

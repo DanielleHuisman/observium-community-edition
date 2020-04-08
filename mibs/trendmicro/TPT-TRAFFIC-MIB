@@ -1,0 +1,1034 @@
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Trend Micro, Inc.
+-- Copyright information is in the DESCRIPTION section of the MODULE-IDENTITY.
+-- 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+TPT-TRAFFIC-MIB
+
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+  MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, 
+  Unsigned32, Counter64
+    FROM SNMPv2-SMI
+
+  TEXTUAL-CONVENTION
+    FROM SNMPv2-TC
+
+  InterfaceIndex
+    FROM IF-MIB
+
+  tpt-tpa-objs, tpt-tpa-eventsV2, tpt-tpa-unkparams
+    FROM TPT-TPAMIBS-MIB
+  ;
+
+tpt-traffic MODULE-IDENTITY
+  LAST-UPDATED "201605251854Z" -- May 25, 2016
+  ORGANIZATION "Trend Micro, Inc."
+  CONTACT-INFO "www.trendmicro.com"
+  DESCRIPTION
+    "Traffic management (rate limiters and traffic thresholds).
+
+     Copyright (C) 2016 Trend Micro Incorporated. All Rights Reserved.
+     
+     Trend Micro makes no warranty of any kind with regard to this material,
+     including, but not limited to, the implied warranties of merchantability
+     and fitness for a particular purpose. Trend Micro shall not be liable for
+     errors contained herein or for incidental or consequential damages in
+     connection with the furnishing, performance, or use of this material. This
+     document contains proprietary information, which is protected by copyright. No
+     part of this document may be photocopied, reproduced, or translated into
+     another language without the prior written consent of Trend Micro. The
+     information is provided 'as is' without warranty of any kind and is subject to
+     change without notice. The only warranties for Trend Micro products and
+     services are set forth in the express warranty statements accompanying such
+     products and services. Nothing herein should be construed as constituting an
+     additional warranty. Trend Micro shall not be liable for technical or editorial
+     errors or omissions contained herein. TippingPoint(R), the TippingPoint logo, and
+     Digital Vaccine(R) are registered trademarks of Trend Micro. All other company
+     and product names may be trademarks of their respective holders. All rights
+     reserved. This document contains confidential information, trade secrets or
+     both, which are the property of Trend Micro. No part of this documentation may
+     be reproduced in any form or by any means or used to make any derivative work
+     (such as translation, transformation, or adaptation) without written permission
+     from Trend Micro or one of its subsidiaries. All other company and product
+     names may be trademarks of their respective holders.
+    "
+
+  REVISION "201605251854Z" -- May 25, 2016 
+  DESCRIPTION "Updated copyright information. Minor MIB syntax fixes."
+      
+  ::= { tpt-tpa-objs 8 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+--  Variable definitions
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+--  Rate Limiter Statistics
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+-- Rate limit general information
+
+rateLimitTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF RateLimitEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "High-level (non-sampled) data about an action set with a rate limit."
+  ::= { tpt-traffic 1 } 
+
+rateLimitEntry OBJECT-TYPE
+  SYNTAX      RateLimitEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the rate limit list.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { rateLimitGlobalID }
+  ::= { rateLimitTable 1 }
+
+RateLimitEntry ::= SEQUENCE {
+  rateLimitGlobalID         OCTET STRING (SIZE (0..40)), 
+  rateLimitRequestedRate    Unsigned32,
+  rateLimitActualRate       Unsigned32,
+  rateLimitPacketsSent      Counter64,
+  rateLimitPacketsDropped   Counter64,
+  rateLimitPacketsQueued    Counter64,
+  rateLimitHistNumSeconds   Unsigned32,
+  rateLimitHistNumMinutes   Unsigned32,
+  rateLimitHistNumHours     Unsigned32
+}
+
+rateLimitGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of an action set with a rate limit."
+  ::= { rateLimitEntry 1 }
+
+rateLimitRequestedRate OBJECT-TYPE
+  SYNTAX      Unsigned32 
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The bit rate (in Kbps) set requested by the action set creator."
+  ::= { rateLimitEntry 2 }
+
+rateLimitActualRate OBJECT-TYPE
+  SYNTAX      Unsigned32 
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The bit rate (in Kbps) set up at the hardware level."
+  ::= { rateLimitEntry 3 }
+
+rateLimitPacketsSent OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of packets sent via this rate limiter since last cleared."
+  ::= { rateLimitEntry 4 }
+
+rateLimitPacketsDropped OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of packets dropped by this rate limiter since last cleared."
+  ::= { rateLimitEntry 5 }
+
+rateLimitPacketsQueued OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of packets queued up to be sent via this rate limiter."
+  ::= { rateLimitEntry 6 }
+
+rateLimitHistNumSeconds OBJECT-TYPE
+  SYNTAX      Unsigned32 
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of seconds of valid historical (sampled) data available."
+  ::= { rateLimitEntry 7 }
+
+rateLimitHistNumMinutes OBJECT-TYPE
+  SYNTAX      Unsigned32 
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of minutes of valid historical (sampled) data available."
+  ::= { rateLimitEntry 8 }
+
+rateLimitHistNumHours OBJECT-TYPE
+  SYNTAX      Unsigned32 
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of hours of valid historical (sampled) data available."
+  ::= { rateLimitEntry 9 }
+
+
+-- Rate limit history seconds
+
+rateLimitHistSecondsTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF RateLimitHistSecondsEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every second for a minute."
+  ::= { tpt-traffic 2 } 
+
+rateLimitHistSecondsEntry OBJECT-TYPE
+  SYNTAX      RateLimitHistSecondsEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the rate limit history seconds table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { rateLimitHistSecondsGlobalID, rateLimitHistSecondsIndex }
+  ::= { rateLimitHistSecondsTable 1 }
+
+RateLimitHistSecondsEntry ::= SEQUENCE {
+  rateLimitHistSecondsGlobalID   OCTET STRING (SIZE (0..40)), 
+  rateLimitHistSecondsIndex      Unsigned32,
+  rateLimitHistSecondsBytesSent  Counter64,
+  rateLimitHistSecondsTimestamp  Unsigned32
+}
+
+rateLimitHistSecondsGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of an action set with a rate limit."
+  ::= { rateLimitHistSecondsEntry 1 }
+
+rateLimitHistSecondsIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-59) of the second."
+  ::= { rateLimitHistSecondsEntry 2 }
+
+rateLimitHistSecondsBytesSent OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of bytes sent via this rate limiter in the specified second."
+  ::= { rateLimitHistSecondsEntry 3 }
+
+rateLimitHistSecondsTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time SecondsBytesSent was updated (in seconds since January 1, 1970)."
+  ::= { rateLimitHistSecondsEntry 4 }
+
+
+-- Rate limit history minutes
+
+rateLimitHistMinutesTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF RateLimitHistMinutesEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every minute for an hour."
+  ::= { tpt-traffic 3 } 
+
+rateLimitHistMinutesEntry OBJECT-TYPE
+  SYNTAX      RateLimitHistMinutesEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the rate limit history minutes table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { rateLimitHistMinutesGlobalID, rateLimitHistMinutesIndex }
+  ::= { rateLimitHistMinutesTable 1 }
+
+RateLimitHistMinutesEntry ::= SEQUENCE {
+  rateLimitHistMinutesGlobalID   OCTET STRING (SIZE (0..40)), 
+  rateLimitHistMinutesIndex      Unsigned32,
+  rateLimitHistMinutesBytesSent  Counter64,
+  rateLimitHistMinutesTimestamp  Unsigned32
+}
+
+rateLimitHistMinutesGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of an action set with a rate limit."
+  ::= { rateLimitHistMinutesEntry 1 }
+
+rateLimitHistMinutesIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-59) of the minute."
+  ::= { rateLimitHistMinutesEntry 2 }
+
+rateLimitHistMinutesBytesSent OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of bytes sent via this rate limiter in the specified minute."
+  ::= { rateLimitHistMinutesEntry 3 }
+
+rateLimitHistMinutesTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time MinutesBytesSent was updated (in seconds since January 1, 1970)."
+  ::= { rateLimitHistMinutesEntry 4 }
+
+
+-- Rate limit history hours
+
+rateLimitHistHoursTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF RateLimitHistHoursEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every hour for a day."
+  ::= { tpt-traffic 4 } 
+
+rateLimitHistHoursEntry OBJECT-TYPE
+  SYNTAX      RateLimitHistHoursEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the rate limit history hours table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { rateLimitHistHoursGlobalID, rateLimitHistHoursIndex }
+  ::= { rateLimitHistHoursTable 1 }
+
+RateLimitHistHoursEntry ::= SEQUENCE {
+  rateLimitHistHoursGlobalID   OCTET STRING (SIZE (0..40)), 
+  rateLimitHistHoursIndex      Unsigned32,
+  rateLimitHistHoursBytesSent  Counter64,
+  rateLimitHistHoursTimestamp  Unsigned32
+}
+
+rateLimitHistHoursGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of an action set with a rate limit."
+  ::= { rateLimitHistHoursEntry 1 }
+
+rateLimitHistHoursIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-23) of the hour."
+  ::= { rateLimitHistHoursEntry 2 }
+
+rateLimitHistHoursBytesSent OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of bytes sent via this rate limiter in the specified hour."
+  ::= { rateLimitHistHoursEntry 3 }
+
+rateLimitHistHoursTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time HoursBytesSent was updated (in seconds since January 1, 1970)."
+  ::= { rateLimitHistHoursEntry 4 }
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Textual conventions for threshold filters
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+ThresholdFilterState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION
+    "The state of a threshold filter: red if the major threshold has been 
+     crossed, yellow if the minor threshold has been crossed, green if OK."
+  SYNTAX      INTEGER { green(1), yellow(2), red(3) }
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Traffic Threshold Filter Statistics
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+-- Traffic threshold filter general information
+
+thresholdTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF ThresholdEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "High-level (non-sampled) data about a traffic threshold filter."
+  ::= { tpt-traffic 9 } 
+
+thresholdEntry OBJECT-TYPE
+  SYNTAX      ThresholdEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic threshold filter list.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { thresholdGlobalID }
+  ::= { thresholdTable 1 }
+
+ThresholdEntry ::= SEQUENCE {
+  thresholdGlobalID         OCTET STRING (SIZE (0..40)), 
+  thresholdState            ThresholdFilterState,
+  thresholdUnits            OCTET STRING (SIZE (0..20))
+}
+
+thresholdGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of a traffic threshold filter policy group."
+  ::= { thresholdEntry 1 }
+
+thresholdState OBJECT-TYPE
+  SYNTAX      ThresholdFilterState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The state (green, yellow, red) of this traffic threshold filter."
+  ::= { thresholdEntry 2 }
+
+thresholdUnits OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..20))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The units value (e.g., packets/sec) monitored by this threshold filter."
+  ::= { thresholdEntry 3 }
+
+
+-- Traffic threshold filter history seconds
+
+thresholdHistSecondsTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF ThresholdHistSecondsEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every second for a minute."
+  ::= { tpt-traffic 5 } 
+
+thresholdHistSecondsEntry OBJECT-TYPE
+  SYNTAX      ThresholdHistSecondsEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic threshold history seconds table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { thresholdHistSecondsGlobalID, thresholdHistSecondsIndex }
+  ::= { thresholdHistSecondsTable 1 }
+
+ThresholdHistSecondsEntry ::= SEQUENCE {
+  thresholdHistSecondsGlobalID   OCTET STRING (SIZE (0..40)), 
+  thresholdHistSecondsIndex      Unsigned32,
+  thresholdHistSecondsUnitCount  Counter64,
+  thresholdHistSecondsTimestamp  Unsigned32
+}
+
+thresholdHistSecondsGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of a traffic threshold filter."
+  ::= { thresholdHistSecondsEntry 1 }
+
+thresholdHistSecondsIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-59) of the second."
+  ::= { thresholdHistSecondsEntry 2 }
+
+thresholdHistSecondsUnitCount OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The count of filter-specific units matching the traffic criteria for 
+     this filter in the specified second."
+  ::= { thresholdHistSecondsEntry 3 }
+
+thresholdHistSecondsTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time SecondsUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { thresholdHistSecondsEntry 4 }
+
+
+-- Traffic threshold filter history minutes
+
+thresholdHistMinutesTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF ThresholdHistMinutesEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every minute for an hour."
+  ::= { tpt-traffic 6 } 
+
+thresholdHistMinutesEntry OBJECT-TYPE
+  SYNTAX      ThresholdHistMinutesEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic threshold history minutes table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { thresholdHistMinutesGlobalID, thresholdHistMinutesIndex }
+  ::= { thresholdHistMinutesTable 1 }
+
+ThresholdHistMinutesEntry ::= SEQUENCE {
+  thresholdHistMinutesGlobalID   OCTET STRING (SIZE (0..40)), 
+  thresholdHistMinutesIndex      Unsigned32,
+  thresholdHistMinutesUnitCount  Counter64,
+  thresholdHistMinutesTimestamp  Unsigned32
+}
+
+thresholdHistMinutesGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of a traffic threshold filter."
+  ::= { thresholdHistMinutesEntry 1 }
+
+thresholdHistMinutesIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-59) of the minute."
+  ::= { thresholdHistMinutesEntry 2 }
+
+thresholdHistMinutesUnitCount OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the SecondsUnitCount values corresponding to this minute."
+  ::= { thresholdHistMinutesEntry 3 }
+
+thresholdHistMinutesTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time MinutesUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { thresholdHistMinutesEntry 4 }
+
+
+-- Traffic threshold filter history hours
+
+thresholdHistHoursTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF ThresholdHistHoursEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every hour for a day."
+  ::= { tpt-traffic 7 } 
+
+thresholdHistHoursEntry OBJECT-TYPE
+  SYNTAX      ThresholdHistHoursEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic threshold history hours table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { thresholdHistHoursGlobalID, thresholdHistHoursIndex }
+  ::= { thresholdHistHoursTable 1 }
+
+ThresholdHistHoursEntry ::= SEQUENCE {
+  thresholdHistHoursGlobalID   OCTET STRING (SIZE (0..40)), 
+  thresholdHistHoursIndex      Unsigned32,
+  thresholdHistHoursUnitCount  Counter64,
+  thresholdHistHoursTimestamp  Unsigned32
+}
+
+thresholdHistHoursGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of a traffic threshold filter."
+  ::= { thresholdHistHoursEntry 1 }
+
+thresholdHistHoursIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-23) of the hour."
+  ::= { thresholdHistHoursEntry 2 }
+
+thresholdHistHoursUnitCount OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the MinutesUnitCount values corresponding to this hour."
+  ::= { thresholdHistHoursEntry 3 }
+
+thresholdHistHoursTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time HoursUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { thresholdHistHoursEntry 4 }
+
+
+-- Traffic threshold filter history days
+
+thresholdHistDaysTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF ThresholdHistDaysEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every hour for a day."
+  ::= { tpt-traffic 8 } 
+
+thresholdHistDaysEntry OBJECT-TYPE
+  SYNTAX      ThresholdHistDaysEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic threshold history hours table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { thresholdHistDaysGlobalID, thresholdHistDaysIndex }
+  ::= { thresholdHistDaysTable 1 }
+
+ThresholdHistDaysEntry ::= SEQUENCE {
+  thresholdHistDaysGlobalID   OCTET STRING (SIZE (0..40)), 
+  thresholdHistDaysIndex      Unsigned32,
+  thresholdHistDaysUnitCount  Counter64,
+  thresholdHistDaysTimestamp  Unsigned32
+}
+
+thresholdHistDaysGlobalID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The global identifier of a traffic threshold filter."
+  ::= { thresholdHistDaysEntry 1 }
+
+thresholdHistDaysIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-34) of the day."
+  ::= { thresholdHistDaysEntry 2 }
+
+thresholdHistDaysUnitCount OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the HoursUnitCount values corresponding to this day."
+  ::= { thresholdHistDaysEntry 3 }
+
+thresholdHistDaysTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time DaysUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { thresholdHistDaysEntry 4 }
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Threshold filter notifications
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptThresholdNotifyDeviceID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the device sending this notification."
+  ::= { tpt-tpa-unkparams 111 }
+
+tptThresholdNotifyPolicyID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the policy causing this notification."
+  ::= { tpt-tpa-unkparams 112 }
+
+tptThresholdNotifySignatureID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the signature associated with the policy."
+  ::= { tpt-tpa-unkparams 113 }
+
+tptThresholdNotifySegmentName OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..128))
+  MAX-ACCESS  read-only
+  STATUS      obsolete
+  DESCRIPTION
+    "A string of the format <slot>:<index> that uniquely identifies the 
+     segment pertaining to this notification."
+  ::= { tpt-tpa-unkparams 114 }
+
+tptThresholdNotifyZonePair OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..128))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "A string of the format <in zone UUID>:<out zone UUID> that identifies the 
+     zone pertaining to this notification."
+  ::= { tpt-tpa-unkparams 115 }
+
+
+tptThresholdFilterNotify NOTIFICATION-TYPE
+  OBJECTS     { tptThresholdNotifyDeviceID,     tptThresholdNotifyPolicyID, 
+                tptThresholdNotifySignatureID,  tptThresholdNotifyZonePair }
+  STATUS      current
+  DESCRIPTION
+    "Notification: Used to inform the management station that a threshold 
+     filter threshold crossing has been logged."
+  ::= { tpt-tpa-eventsV2 17 }
+
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Interface traffic history
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+interfaceHistSecondsTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF InterfaceHistSecondsEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every second for a minute."
+  ::= { tpt-traffic 10 } 
+
+interfaceHistSecondsEntry OBJECT-TYPE
+  SYNTAX      InterfaceHistSecondsEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic interface history seconds table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { interfaceHistSecondsIfIndex, interfaceHistSecondsIndex }
+  ::= { interfaceHistSecondsTable 1 }
+
+InterfaceHistSecondsEntry ::= SEQUENCE {
+  interfaceHistSecondsIfIndex       InterfaceIndex,
+  interfaceHistSecondsIndex         Unsigned32,
+  interfaceHistSecondsUnitCountIn   Counter64,
+  interfaceHistSecondsUnitCountOut  Counter64,
+  interfaceHistSecondsTimestamp     Unsigned32
+}
+
+interfaceHistSecondsIfIndex OBJECT-TYPE
+  SYNTAX      InterfaceIndex
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The ifIndex of the interface for this historic data."
+  ::= { interfaceHistSecondsEntry 1 }
+
+interfaceHistSecondsIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-59) of the second."
+  ::= { interfaceHistSecondsEntry 2 }
+
+interfaceHistSecondsUnitCountIn OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The entering the interface port in octets in the specified second."
+  ::= { interfaceHistSecondsEntry 3 }
+
+interfaceHistSecondsUnitCountOut OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The leaving the interface port in octets in the specified second."
+  ::= { interfaceHistSecondsEntry 4 }
+
+interfaceHistSecondsTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time SecondsUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { interfaceHistSecondsEntry 5 }
+
+
+-- Interface traffic history minutes
+
+interfaceHistMinutesTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF InterfaceHistMinutesEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every minute for an hour."
+  ::= { tpt-traffic 11 } 
+
+interfaceHistMinutesEntry OBJECT-TYPE
+  SYNTAX      InterfaceHistMinutesEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic interface history minutes table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { interfaceHistMinutesIfIndex, interfaceHistMinutesIndex }
+  ::= { interfaceHistMinutesTable 1 }
+
+InterfaceHistMinutesEntry ::= SEQUENCE {
+  interfaceHistMinutesIfIndex       InterfaceIndex,
+  interfaceHistMinutesIndex         Unsigned32,
+  interfaceHistMinutesUnitCountIn   Counter64,
+  interfaceHistMinutesUnitCountOut  Counter64,
+  interfaceHistMinutesTimestamp     Unsigned32
+}
+
+interfaceHistMinutesIfIndex OBJECT-TYPE
+  SYNTAX      InterfaceIndex
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The ifIndex of the interface for this historic data."
+  ::= { interfaceHistMinutesEntry 1 }
+
+interfaceHistMinutesIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-59) of the minute."
+  ::= { interfaceHistMinutesEntry 2 }
+
+interfaceHistMinutesUnitCountIn OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the SecondsUnitCountIn values corresponding to this minute."
+  ::= { interfaceHistMinutesEntry 3 }
+
+interfaceHistMinutesUnitCountOut OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the SecondsUnitCountOut values corresponding to this minute."
+  ::= { interfaceHistMinutesEntry 4 }
+
+interfaceHistMinutesTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time MinutesUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { interfaceHistMinutesEntry 5 }
+
+
+-- Interface traffic history hours
+
+interfaceHistHoursTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF InterfaceHistHoursEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every hour for a day."
+  ::= { tpt-traffic 12 } 
+
+interfaceHistHoursEntry OBJECT-TYPE
+  SYNTAX      InterfaceHistHoursEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic interface history hours table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { interfaceHistHoursIfIndex, interfaceHistHoursIndex }
+  ::= { interfaceHistHoursTable 1 }
+
+InterfaceHistHoursEntry ::= SEQUENCE {
+  interfaceHistHoursIfIndex       InterfaceIndex,
+  interfaceHistHoursIndex         Unsigned32,
+  interfaceHistHoursUnitCountIn   Counter64,
+  interfaceHistHoursUnitCountOut  Counter64,
+  interfaceHistHoursTimestamp     Unsigned32
+}
+
+interfaceHistHoursIfIndex OBJECT-TYPE
+  SYNTAX      InterfaceIndex
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The ifIndex of the interface for this historic data."
+  ::= { interfaceHistHoursEntry 1 }
+
+interfaceHistHoursIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-23) of the hour."
+  ::= { interfaceHistHoursEntry 2 }
+
+interfaceHistHoursUnitCountIn OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the MinutesUnitCountIn values corresponding to this hour."
+  ::= { interfaceHistHoursEntry 3 }
+
+interfaceHistHoursUnitCountOut OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the MinutesUnitCountOut values corresponding to this hour."
+  ::= { interfaceHistHoursEntry 4 }
+
+interfaceHistHoursTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time HoursUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { interfaceHistHoursEntry 5 }
+
+
+-- Interface traffic history days
+
+interfaceHistDaysTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF InterfaceHistDaysEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Historical (sampled) data every hour for a day."
+  ::= { tpt-traffic 13 } 
+
+interfaceHistDaysEntry OBJECT-TYPE
+  SYNTAX      InterfaceHistDaysEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the traffic interface history hours table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { interfaceHistDaysIfIndex, interfaceHistDaysIndex }
+  ::= { interfaceHistDaysTable 1 }
+
+InterfaceHistDaysEntry ::= SEQUENCE {
+  interfaceHistDaysIfIndex       InterfaceIndex,
+  interfaceHistDaysIndex         Unsigned32,
+  interfaceHistDaysUnitCountIn   Counter64,
+  interfaceHistDaysUnitCountOut  Counter64,
+  interfaceHistDaysTimestamp     Unsigned32
+}
+
+interfaceHistDaysIfIndex OBJECT-TYPE
+  SYNTAX      InterfaceIndex
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The ifIndex of the interface for this historic data."
+  ::= { interfaceHistDaysEntry 1 }
+
+interfaceHistDaysIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The index (0-34) of the day."
+  ::= { interfaceHistDaysEntry 2 }
+
+interfaceHistDaysUnitCountIn OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the HoursUnitCountIn values corresponding to this day."
+  ::= { interfaceHistDaysEntry 3 }
+
+interfaceHistDaysUnitCountOut OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The average of the HoursUnitCountOut values corresponding to this day."
+  ::= { interfaceHistDaysEntry 4 }
+
+interfaceHistDaysTimestamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time DaysUnitCount was updated (in seconds since January 1, 1970)."
+  ::= { interfaceHistDaysEntry 5 }
+
+
+
+
+
+END
+

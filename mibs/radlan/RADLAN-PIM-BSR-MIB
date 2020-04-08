@@ -1,0 +1,241 @@
+RADLAN-PIM-BSR-MIB DEFINITIONS ::= BEGIN
+-- Title:      RADLAN PIM Private Extension
+-- Version:    7.60.00.00
+-- Date:       19 Sep 2011
+
+IMPORTS
+    rnd                              FROM RADLAN-MIB
+    MODULE-IDENTITY, OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Integer32, Unsigned32,
+    TimeTicks, Gauge32               FROM SNMPv2-SMI
+    RowStatus, TruthValue,
+    TEXTUAL-CONVENTION,DisplayString FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP,
+    NOTIFICATION-GROUP               FROM SNMPv2-CONF
+    InterfaceIndex,
+    InterfaceIndexOrZero             FROM IF-MIB
+    InetAddressType,
+    InetAddressPrefixLength,
+    InetAddress, InetVersion         FROM INET-ADDRESS-MIB
+    IANAipRouteProtocol              FROM IANA-RTPROTO-MIB;
+
+
+--Common Textual Conventions
+
+AdminStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "The desired administrative state of a MIB row."
+    SYNTAX      INTEGER {
+                  adminStatusUp(1),
+                  adminStatusDown(2)
+                }
+
+OperStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "The current operational state of a MIB row.  This set of values
+            is used by many Data Connection products written before 2006."
+    SYNTAX      INTEGER {
+                  operStatusUp(1),          -- active
+                  operStatusDown(2),        -- inactive
+                  operStatusGoingUp(3),     -- activating
+                  operStatusGoingDown(4),   -- deactivating
+                  operStatusActFailed(5)    -- activation failed
+                }
+
+   --
+   -- The BSR Candidate-RP Table
+   --
+
+   rlPimBsrCandidateRPTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF RlPimBsrCandidateRPEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The (conceptual) table listing the IP multicast group
+               prefixes for which the local router is to advertise
+               itself as a Candidate-RP."
+       ::= { rnd 220 }
+
+   rlPimBsrCandidateRPEntry OBJECT-TYPE
+       SYNTAX     RlPimBsrCandidateRPEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "An entry (conceptual row) in the
+                rlPimBsrCandidateRPTable."
+       INDEX      { rlPimBsrCandidateRPAddressType,
+                    rlPimBsrCandidateRPAddress }
+       ::= { rlPimBsrCandidateRPTable 1 }
+
+   RlPimBsrCandidateRPEntry ::= SEQUENCE {
+       rlPimBsrCandidateRPAddressType       InetAddressType,
+       rlPimBsrCandidateRPAddress           InetAddress,
+       rlPimBsrCandidateRPGroupPrefixList   DisplayString,
+       rlPimBsrCandidateRPBidir             TruthValue,
+       rlPimBsrCandidateRPAdvTimer          TimeTicks,
+       rlPimBsrCandidateRPPriority          Unsigned32,
+       rlPimBsrCandidateRPAdvInterval       Unsigned32,
+       rlPimBsrCandidateRPHoldtime          Unsigned32,
+       rlPimBsrCandidateRPStatus            RowStatus
+   }
+
+--
+-- Temporary DC additions {
+--
+-- In order to auto-generate the MIB definition file qp0bsrmb.h using the
+-- 'mibtool' Perl script, uncomment the following lines.
+--
+--  rlPimTmEntIndex OBJECT-TYPE
+--    SYNTAX      EntityIndex
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--            "The index of the owning DC-PIM-TM entity."
+--    ::= { rlPimBsrCandidateRPEntry 100 }
+--
+-- } End temporary DC additions
+--
+
+   rlPimBsrCandidateRPAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The Inet address type of the Candidate-RP."
+       ::= { rlPimBsrCandidateRPEntry 1 }
+
+   rlPimBsrCandidateRPAddress OBJECT-TYPE
+       SYNTAX     InetAddress (SIZE (4|8|16))
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The (unicast) address that will be advertised as a
+               Candidate-RP.  The InetAddressType is given by the
+               rlPimBsrCandidateRPAddressType object.
+
+               If this is not an address on the local router,
+               DC-PIM will not advertise it as an C-RP address."
+       ::= { rlPimBsrCandidateRPEntry 2 }
+
+--
+-- DC additions {
+
+-- Replaces explicit group address type, group address
+-- and prefix length index objects.  In DC-PIM, the RP holdtime,
+-- interval and priority apply to _every_ group prefix for which this
+-- RP address is a Candidate-RP.
+--
+   rlPimBsrCandidateRPGroupPrefixList OBJECT-TYPE
+       SYNTAX     DisplayString
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+               "Identifies a standard access list containing the
+               set of IP multicast group prefixes for which the
+               local router will advertise itself as a Candidate-RP
+               with the given RP address.
+
+               If there is any rule in the list with
+               aallStdAccessListIncluded set to 'false',
+               DC-PIM does not advertise this RP address as a
+               Candidate-RP.  Otherwise DC-PIM advertises the
+               RP address as a Candidate-RP for every IP multicast
+               group prefix corresponding to a rule in the access list
+               with row status 'active' and admin status 'up'.
+
+               rlPimBsrCandidateRPGroupPrefixList defaults to an empty string, which
+               indicates that no access list has yet been specified.
+
+               rlPimBsrCandidateRPStatus can only be set to 'active' if a
+               non-empty string has been specified for
+               rlPimBsrCandidateRPGroupPrefixList."
+       DEFVAL { "" }
+       ::= { rlPimBsrCandidateRPEntry 3 }
+
+-- } End DC additions
+
+   rlPimBsrCandidateRPBidir OBJECT-TYPE
+       SYNTAX     TruthValue
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+               "If this object is set to TRUE, this group range is
+               advertised with this RP as a BIDIR-PIM group range. If
+               it is set to FALSE, it is advertised as a PIM-SM group
+               range.
+
+               DC-PIM only supports the value FALSE for this object."
+       DEFVAL { false }
+       ::= { rlPimBsrCandidateRPEntry 5 }
+
+   rlPimBsrCandidateRPAdvTimer OBJECT-TYPE
+       SYNTAX     TimeTicks
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+               "The time remaining before the local router next sends
+               a Candidate-RP-Advertisement to the elected BSR.
+
+               This will be zero if the C-RP is shutting down or any of
+               the following conditions are true:
+                - the entity is not active
+                - the row is inactive
+                - the group prefix list is invalid
+                - the configured C-RP address is not local."
+       ::= { rlPimBsrCandidateRPEntry 6 }
+
+   rlPimBsrCandidateRPPriority OBJECT-TYPE
+       SYNTAX     Unsigned32 (0..255)
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+               "The priority for this Candidate RP advertised in
+                Candidate-RP-Advertisements.  Numerically higher values
+               for this object indicate lower priorities, with the value
+               zero denoting the highest priority."
+       REFERENCE "I-D.ietf-rlPim-sm-bsr section 3.2"
+       DEFVAL { 192 }
+       ::= { rlPimBsrCandidateRPEntry 7 }
+
+   rlPimBsrCandidateRPAdvInterval OBJECT-TYPE
+       SYNTAX     Unsigned32 (1..26214)
+       UNITS      "seconds"
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+               "A Candidate RP generates Candidate-RP-Advertisements
+               periodically. This object represents the time interval
+               in seconds between two consecutive advertisements."
+       REFERENCE "I-D.ietf-rlPim-sm-bsr section 3.2 and section 5"
+       DEFVAL { 60 }
+       ::= { rlPimBsrCandidateRPEntry 8 }
+
+   rlPimBsrCandidateRPHoldtime OBJECT-TYPE
+       SYNTAX     Unsigned32 (0..65535)
+       UNITS      "seconds"
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+               "Holdtime for this Candidate RP. The amount of time (in
+               seconds) this Candidate-RP entry is valid."
+       REFERENCE "I-D.ietf-rlPim-sm-bsr section 4.2"
+       DEFVAL { 150 }
+       ::= { rlPimBsrCandidateRPEntry 9 }
+
+   rlPimBsrCandidateRPStatus OBJECT-TYPE
+       SYNTAX     RowStatus
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+               "The status of this row, by which new entries may be
+               created, or old entries deleted from this table.
+
+               All writable objects in this entry can be modified
+               when the status of this entry is active(1)."
+       ::= { rlPimBsrCandidateRPEntry 10 }
+
+
+END

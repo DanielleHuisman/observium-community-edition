@@ -1,0 +1,152 @@
+OCNOS-PSERV-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+      OBJECT-TYPE, MODULE-IDENTITY,
+      Gauge32, Counter32, Integer32, Unsigned32,
+      IpAddress, Counter64,
+      TimeTicks, NOTIFICATION-TYPE
+          FROM SNMPv2-SMI
+      DateAndTime, DisplayString,
+      PhysAddress, RowStatus, TEXTUAL-CONVENTION
+          FROM SNMPv2-TC
+      MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+          FROM SNMPv2-CONF
+      snmpTraps
+          FROM SNMPv2-MIB
+      enterprises, OBJECT-IDENTITY
+          FROM SNMPv2-SMI
+      Ipv6Address
+          FROM IPV6-TC
+      ipi  FROM OCNOS-IPI-MODULE-MIB
+      CmmChassisObject  FROM CMM-CHASSIS-MIB;
+
+cmmSoftwareObjects MODULE-IDENTITY
+   LAST-UPDATED "201804050000Z"
+   ORGANIZATION "IP Infusion Inc."
+   CONTACT-INFO 
+       "postal: 3965 Freedom Circle, Suite 200, Santa Clara, CA 95054
+
+        email: support@ipinfusion.com
+
+        telephone: +1 408-400-1900
+        website: http://www.ipinfusion.com/"
+   DESCRIPTION 
+      "This MIB module is for managing System Software status"
+
+   REVISION      "201804050000Z"
+   DESCRIPTION 
+      "Initial Version"
+   ::= { CmmChassisObject  4 } 
+
+cmmSoftwareProcessKeepaliveTime OBJECT-TYPE
+	SYNTAX Unsigned32(30..1800) 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"software watchdog keep-alive time interval in seconds. Software watchdog monitors various OcNOS module and restarts module on detection of any software anomalies like crash or hang.Device is rebooted on detection of NSM/HSL  crash or hang."
+	DEFVAL 	{ 60 } 
+	::= { cmmSoftwareObjects 1 }
+
+cmmSoftwareProcessWatchdogStatus OBJECT-TYPE
+	SYNTAX INTEGER {disabled(0), enabled(1)} 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"This object indicates status of software watchdog monitoring . If value of this object is enabled then software watchdog is active and is monitoring software anomalies for various OcNOS modules."
+	::= { cmmSoftwareObjects 2 }
+
+cmmSoftwareProcessStatus OBJECT-TYPE
+	SYNTAX INTEGER {false(0), true(1)} 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"Global process status of all modules, if all process are running then this value will be true otherwise it wil be false"
+	::= { cmmSoftwareObjects 3 }
+
+
+cmmSoftwareProcessObjectsTable OBJECT-TYPE 
+	SYNTAX SEQUENCE OF CmmSoftwareProcessObjectsEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION 
+		"This table provides information for monitoring information for protocol Module running on the host"
+	::= { cmmSoftwareObjects 4 }
+
+cmmSoftwareProcessObjectsEntry OBJECT-TYPE
+	SYNTAX CmmSoftwareProcessObjectsEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION 
+		"An entry containing information for monitoring information for protocol Module running on the host"
+	INDEX { cmmSoftwareProcessID }
+	::= { cmmSoftwareProcessObjectsTable 1 }
+
+CmmSoftwareProcessObjectsEntry::= SEQUENCE {
+	cmmSoftwareProcessID Unsigned32,
+	cmmSoftwareProcessName OCTET STRING,
+	cmmSoftwareProcessState INTEGER,
+	cmmSoftwareProcessStartTime DateAndTime,
+	cmmSoftwareProcessLastRestartReason OCTET STRING	}
+
+cmmSoftwareProcessID OBJECT-TYPE
+	SYNTAX Unsigned32 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"Each protocol module is uniquely identified with a number, also called as protocol module id"
+	::= { cmmSoftwareProcessObjectsEntry 1 }
+
+cmmSoftwareProcessName OBJECT-TYPE
+	SYNTAX OCTET STRING 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"Protocol module name"
+	::= { cmmSoftwareProcessObjectsEntry 2 }
+
+cmmSoftwareProcessState OBJECT-TYPE
+	SYNTAX INTEGER {notrunning(0), running(1)} 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"state of the process, whether its runnning or not running."
+	::= { cmmSoftwareProcessObjectsEntry 3 }
+
+cmmSoftwareProcessStartTime OBJECT-TYPE
+	SYNTAX DateAndTime 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"The starting time of a protocol module, given in date and time."
+	::= { cmmSoftwareProcessObjectsEntry 4 }
+
+cmmSoftwareProcessLastRestartReason OBJECT-TYPE
+	SYNTAX OCTET STRING 
+	MAX-ACCESS read-only
+	STATUS current 
+	DESCRIPTION 
+		"Reason for process to shutdown provided it was running.This value will be the signal description"
+	::= { cmmSoftwareProcessObjectsEntry 5 }
+
+
+--
+-- Notifications
+--
+
+cmmSoftwareObjectsNotificationsPrefix OBJECT IDENTIFIER ::=
+        { cmmSoftwareObjects 0 }
+
+cmmSysPsDownNotification NOTIFICATION-TYPE
+   OBJECTS { cmmSoftwareProcessID, cmmSoftwareProcessName, cmmSoftwareProcessStartTime, cmmSoftwareProcessLastRestartReason }
+   STATUS  current
+   DESCRIPTION
+           "The cmmSysPsDownNotification  event is generated when a protocol module down/hung/crashes"
+   ::= { cmmSoftwareObjectsNotificationsPrefix 1 }
+
+cmmSysPsRestartNotification NOTIFICATION-TYPE
+   OBJECTS { cmmSoftwareProcessID, cmmSoftwareProcessName, cmmSoftwareProcessStartTime }
+   STATUS  current
+   DESCRIPTION
+           "The cmmSysPsRestartNotification  event is generated when a protocol module recovered from down/hung/crashes"
+   ::= { cmmSoftwareObjectsNotificationsPrefix 2 }
+END

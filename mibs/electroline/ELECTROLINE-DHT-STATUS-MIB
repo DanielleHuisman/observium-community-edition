@@ -1,0 +1,424 @@
+--**************************************************************************
+--                                                                          
+--    Copyright 2003-2004 Electroline Equipment Inc.                                   
+--    All Rights Reserved                                                                          
+--                                                                          
+--                                                                          
+--                                                                          
+--**************************************************************************
+--    Filename: ELECTROLINE-DHT-CONFIG.mib
+--    Author:   Eric Alarie
+--    Creation Date: 2003.05.13
+--
+--**************************************************************************
+--    Description:
+--
+--	This file contains the MIB definition of the Status branch 
+--  for the DHT products.
+--	It also contains the DHT specific TRAPs.
+--		
+--**************************************************************************
+--    Revision History:
+--    2003.05.13    Eric Alarie      First Release
+--    2003.07.07    Carlene Gardner  Linguistic revision
+--    2004.01.26    Carlene Gardner  Added dhtAlarmAssuranceEvent, 
+--                                   updated dhtStartTrapAckValue.   
+--    2004.01.27    Khadija Braham   Remove the word start from the MIBs of
+--                                   dhtStartTrapAcknowledgeStatusTable.
+--    2004.01.27    Carlene Gardner  Updated descriptions for alarm assurance functions.
+--    2004.02.24    Nath Mercure     Added HMS status MIBS 
+--    2006.01.16    Alain Leclerc    Added Monitoring Address and Internal Temperature
+--									 MIBs.
+--    2007.02.06    Alain Leclerc    Ajout Dlm Status
+--    2012.03.27 	Paul Zheng		 Added IMPORTS frrom RFC 4001, the TEXTUAL-CONVENTION for InetAddress and InetAddressType; 
+--    								 added 2 pairs of objects dhtInetNetworkAddressType, dhtInetNetworkAddress, and 
+--									dhtInetMonitoringNetworkAddressType, dhtInetMonitoringNetworkAddress to support IPv6 address;
+--									deprecate   
+--    2012.03.27 	Francois Charron Correction d'erreurs sur les InetType en read-write quand lesw InetAddress sont en Read-only  
+--	  2014-01-14	Alain Leclerc	Some mibs are deprecated, they have been move into the electrolineCommon branch
+--**************************************************************************
+
+ELECTROLINE-DHT-STATUS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,OBJECT-TYPE,Integer32 FROM SNMPv2-SMI
+    RowStatus  FROM SNMPv2-TC        
+    dhtStatus, electrolineDHT FROM ELECTROLINE-DHT-ROOT-MIB
+    commonPhysAddress, commonLogicalID	FROM SCTE-HMS-COMMON-MIB
+    cfgSleepVoltage	FROM ELECTROLINE-DHT-CONFIG-MIB
+    NetworkAddress FROM RFC1155-SMI
+    DisplayString  FROM RFC1213-MIB
+    InetAddress,
+    InetAddressType
+    	FROM INET-ADDRESS-MIB;     -- RFC 4001
+    
+-- Textual Conventions
+TenthdBmV ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d-1"
+        STATUS       current
+        DESCRIPTION
+            "This data type represents power levels that are normally
+             expressed in dBmV. Units are in tenths of a dBmV;
+             for example, 5.1 dBmV will be represented as 51."
+        SYNTAX       Integer32
+        
+-- Textual Conventions
+TenthdB ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d-1"
+        STATUS       current
+        DESCRIPTION
+            "This data type represents the pad value that are normally
+             expressed in dB. Units are in tenths of a dB;
+             for example, 5.1 dB will be represented as 51."
+        SYNTAX       Integer32
+
+
+HundredthsVolts ::= TEXTUAL-CONVENTION
+         DISPLAY-HINT "d-2"   
+         STATUS       current
+         DESCRIPTION
+            "suggests that a Hundredths value of 1234 be rendered as 12.34 Volts"
+         SYNTAX     INTEGER (0..65535)
+     
+
+-- **************************************************************************
+-- * START TRAP ACKNOWLEDGE
+-- *
+-- * Note that trap acknowledge for the HMS cold / warm start is required 
+-- * for the EEMS auto-discover feature to operate properly.
+-- * These MIBs are handled by the EEMS management software and do not affect the
+-- * transponder’s operation. Users who are designing their own management software may 
+-- * choose to take advantage of this feature.
+-- **************************************************************************
+dhtTrapAcknowledgeStatusTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DhtTrapAcknowledgeStatusEntry
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       " This table has one entry per EMS that supports trap assurance, either 
+         for start traps or for alarm traps or both. The value of cfgHmsEmsAddressAlarmTrapAssurance 
+         and / or cfgHmsEmsAddressStartTrapAssurance must be set to True in order to create an entry
+         in this table for a specific EMS IP address."
+ 
+    ::= { dhtStatus 1 }
+
+dhtTrapAcknowledgeStatusEntry OBJECT-TYPE
+     SYNTAX DhtTrapAcknowledgeStatusEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"This is a table entry for acknowledging an HMS cold or warm start trap, or an alarm trap."
+     INDEX { dhtTrapAckAddressIndex}
+     ::= { dhtTrapAcknowledgeStatusTable 1 }
+
+DhtTrapAcknowledgeStatusEntry ::=
+     SEQUENCE
+     {
+          dhtTrapAckAddressIndex				INTEGER,
+          dhtTrapAckValue	                    INTEGER
+     }
+
+dhtTrapAckAddressIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "The index of the EMS address table is used as index of the trap acknowledgement table."
+     ::= { dhtTrapAcknowledgeStatusEntry 1 }
+
+dhtTrapAckValue OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "Current value of the trap acknowledgement. Indicates the number of alarms sent since 
+		  the DHT was started or reset. To acknowledge receipt of trap(s), the EMS writes the value 
+		  of the dhtTrapAckValue into the bound OID. The first start trap is 1, and the first alarm 
+		  trap is 2."
+     ::= { dhtTrapAcknowledgeStatusEntry 2 }
+
+
+-- **************************************************************************
+-- * ELECTROLINE MISC. Statuses
+-- * 
+-- **************************************************************************
+dhtNetworkAddress OBJECT-TYPE
+	SYNTAX NetworkAddress
+	MAX-ACCESS read-only
+	STATUS deprecated
+	DESCRIPTION
+		"This is the RF IP address assigned by the DHCP. 
+		This object is deprecated and is replaced by dhtInetNetworkAddress."
+	::= { dhtStatus 2 }
+
+-- **************************************************************************
+-- * ELECTROLINE TROUBLE SHOOTING MIBs
+-- * 
+-- **************************************************************************
+dhtHmsStatus OBJECT IDENTIFIER
+--    STATUS current
+--    DESCRIPTION
+--     	"Group of HMS status report Mibs"
+     ::= { dhtStatus 3 }
+
+dhtHmsTibStatusInfo OBJECT IDENTIFIER
+--	STATUS current
+--	DESCRIPTION "Group of status objects related to the DHT-NA-04 model only"
+	::= { dhtHmsStatus 1 }
+	
+dhtHmsTibLineStatus OBJECT IDENTIFIER
+--	STATUS current
+--	DESCRIPTION "Group of status objects related to the DHT-NA-04 model only"
+	::= { dhtHmsTibStatusInfo 1 }
+
+
+dhtHmsTibLineRxBytes OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Counts the number of bytes received on the RS-485 line." 
+    ::= { dhtHmsTibLineStatus 1 }
+
+dhtHmsTibLineTxBytes OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Counts the number of bytes sent on the RS-485 line." 
+    ::= { dhtHmsTibLineStatus 2 }
+    
+dhtHmsTibLineTxFifoError OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Counts the number of errors that occurred on the Transmit(tx) FIFO." 
+    ::= { dhtHmsTibLineStatus 3 }  
+
+dhtHmsTibLineRxFifoError OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Counts the number of errors that occurred on the Receive(Rx) FIFO." 
+    ::= { dhtHmsTibLineStatus 4 }
+
+dhtHmsTibLineRxLineError OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Counts the number of errors that occurred on the Receive (Rx) line." 
+    ::= { dhtHmsTibLineStatus 5 }
+	
+
+
+
+dhtMonitoringNetworkAddress OBJECT-TYPE
+	SYNTAX NetworkAddress
+	MAX-ACCESS read-only
+	STATUS deprecated
+	DESCRIPTION
+		"This is the RF IP address assigned by the DHCP to the monitoring interface in DualIp mode.
+		This object is deprecated and is replaced by dhtInetMonitoringNetworkAddress."
+	::= { dhtStatus 4 }   
+	
+	
+dhtInternalTemperature  OBJECT-TYPE
+     SYNTAX INTEGER (-60..130)
+     ACCESS read-only
+     STATUS deprecated
+     DESCRIPTION 
+          "Measured temperature inside the NE's case/housing.
+          Units degrees Celsius.
+          Deprecated.  Has been move into electrolineCommon branch"     
+     ::= { dhtStatus 5 }
+
+
+dhtDlmStatus OBJECT IDENTIFIER
+--    STATUS current
+--    DESCRIPTION
+--     	"Group of Dlm status report Mibs"
+     ::= { dhtStatus 6 }
+
+fiberNodeStatus OBJECT IDENTIFIER
+--    STATUS current
+--    DESCRIPTION
+--     	"Group of fibernode status report Mibs"
+     ::= { dhtStatus 7 }
+
+dhtInetNetworkAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+            "The address type of DHT's RF interface IP address assigned by the DHCP server.
+             Values: unknown(0), ipv4(1), ipv6(2), ipv4z(3), ipv6z(4), dns(16)
+	     The update of this object is coherent to cfgHmsEmsAddressIP object.
+	     Deprecated.  Has been move into electrolineCommon branch."
+	::= { dhtStatus 8 }
+		     
+dhtInetNetworkAddress OBJECT-TYPE
+	SYNTAX InetAddress
+	MAX-ACCESS read-only
+	STATUS deprecated
+	DESCRIPTION
+		"This is the DHT's RF interface IP address assigned by the DHCP Server.
+		Deprecated.  Has been move into electrolineCommon branch."
+	::= { dhtStatus 9 }
+
+
+dhtInetMonitoringNetworkAddressType OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+            "The address type of DHT's RF interface IP address assigned by the DHCP server
+	    as monitoring interface in DualIp mode.
+             Values: unknown(0), ipv4(1), ipv6(2), ipv4z(3), ipv6z(4), dns(16)
+	     The update of this object is coherent to cfgHmsEmsAddressIP object.
+	     Deprecated.  Has been move into electrolineCommon branch"
+	::= { dhtStatus 10 }
+		     
+dhtInetMonitoringNetworkAddress OBJECT-TYPE
+	SYNTAX InetAddress
+	MAX-ACCESS read-only
+	STATUS deprecated
+	DESCRIPTION
+		"This is the DHT's RF interface IP address assigned by the DHCP Server
+		as monitoring interface in DualIp mode.
+		Deprecated.  Has been move into electrolineCommon branch"
+	::= { dhtStatus 11 }
+
+     	 
+-- **************************************************************************
+-- * ELECTROLINE SPECIFIC TRAP
+-- * 
+-- **************************************************************************
+dhtSleepModeEvent TRAP-TYPE
+	ENTERPRISE electrolineDHT
+	VARIABLES {commonPhysAddress, commonLogicalID, cfgSleepVoltage}
+	DESCRIPTION
+		"This is the SNMP trap that is generated just before the DHT enters sleep mode.
+		See also dhtCfgBatterySave for more information."
+	::= 10
+	
+dhtAlarmAssuranceEvent TRAP-TYPE
+	ENTERPRISE electrolineDHT
+	VARIABLES {commonPhysAddress, commonLogicalID, dhtTrapAckValue}
+	DESCRIPTION
+		"This SNMP trap is used for alarm assurance. The dhtTrapAckValue
+		indicates the number of alarms sent since the startup or reset of the DHT."
+	::= 11
+
+dlmAcInputVoltage OBJECT-TYPE
+    SYNTAX HundredthsVolts
+	UNITS       "Volts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Scaled representation of input 'line' Voltage." 
+    ::= { dhtDlmStatus 1 }
+
+dlmDhtInputVoltage OBJECT-TYPE
+    SYNTAX HundredthsVolts
+    UNITS       "Volts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Scaled representation of the DHT DC input voltage" 
+    ::= { dhtDlmStatus 2 }
+
+dlmRxPowerLevel OBJECT-TYPE
+    SYNTAX TenthdBmV
+    UNITS       "dBmV"
+    MAX-ACCESS  read-only 
+    STATUS      current
+    DESCRIPTION
+       "The received power level at the DLM input.  It's the modem RX power level added to the RF attenuator pad value." 
+    ::= { dhtDlmStatus 3 }
+
+dlmTxPowerLevel OBJECT-TYPE
+    SYNTAX TenthdBmV
+    UNITS       "dBmV"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The transmit power level at the DLM output.  It's the modem TX power level minus the RF attenuator pad value." 
+    ::= { dhtDlmStatus 4 }
+
+dlmRxAttenuatorPad  OBJECT-TYPE
+     SYNTAX TenthdB
+     UNITS       "dB"
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+          "The Rx Attenuator pad value.
+           If value is -2,0 the pad sens technology is not connected.  Check the wiring inside the DLM
+           If value is -1,0 there is no pad connected.
+          "
+     ::= { dhtDlmStatus 5 }
+
+dlmTxAttenuatorPad  OBJECT-TYPE
+     SYNTAX TenthdB
+     UNITS       "dB"
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+          "The Tx Attenuator pad value.
+           If value is -2,0 the pad sens technology is not connected.  Check the wiring inside the DLM
+           If value is -1,0 there is no pad connected.
+          "
+     ::= { dhtDlmStatus 6 }
+
+
+dhtFnOpticalReceiverTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF DhtFnOpticalReceiverEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "A table containing information about optical receiver in a fiber node."
+     ::= { fiberNodeStatus 1 }
+
+dhtFnOpticalReceiverEntry OBJECT-TYPE
+     SYNTAX DhtFnOpticalReceiverEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "A list of information about each optical receiver in a fiber node."
+     INDEX { dhtFnOpticalReceiverIndex }
+     ::= { dhtFnOpticalReceiverTable 1 }
+
+DhtFnOpticalReceiverEntry ::=
+     SEQUENCE
+     {
+          dhtFnOpticalReceiverIndex
+               INTEGER,
+          dhtFnOpticalReceiverType
+               DisplayString
+     }
+
+dhtFnOpticalReceiverIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into dhtFnOpticalReceiverTable.
+
+          This index is application specific.  It can be either the nth receiver, or a slot number.
+          For example, a node may have 4 receivers, numbered 1, 2, 3, 4, in slots 1, 3, 4, and 6.
+          Thus, the indexes could be .1, .3, .4, .6 (slots), OR .1, .2, .3., .4. (nth)"
+     ::= { dhtFnOpticalReceiverEntry 1 }
+
+
+dhtFnOpticalReceiverType OBJECT-TYPE
+     SYNTAX DisplayString ( SIZE(0..20) )
+     ACCESS read-only
+     STATUS optional
+     DESCRIPTION
+          "Type of optical receiver."
+     ::= { dhtFnOpticalReceiverEntry 2 }
+
+
+END

@@ -1,0 +1,204 @@
+ELTEX-POLICY-MIB DEFINITIONS ::= BEGIN
+
+-- Title:      ELTEX POLICY MIB
+-- Version:    1.01
+-- Date:       28 Dec 2016
+--
+-- 22-May-2014 Added to rlPolicyClassifierEntry service
+
+IMPORTS
+    OBJECT-TYPE, IpAddress, Unsigned32,Counter32, zeroDotZero,
+    MODULE-IDENTITY,Counter64                   FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, TruthValue, RowStatus,
+    RowPointer, DisplayString                   FROM SNMPv2-TC
+    InterfaceIndexOrZero, InterfaceIndex        FROM IF-MIB
+    diffServClassifierEntry                     FROM DIFF-SERV-MIB
+    Percents, VlanPriority                      FROM RADLAN-MIB
+    PortList                                    FROM Q-BRIDGE-MIB
+    VlanId                                      FROM Q-BRIDGE-MIB
+    rlPolicyClassifierEntry,
+    rlPolicyTrustModeEntry                      FROM RADLAN-POLICY-MIB
+    eltMes                                      FROM ELTEX-MES;
+
+eltMesPolicy MODULE-IDENTITY
+        LAST-UPDATED "201405220000Z"
+        ORGANIZATION "Eltex Ltd."
+        CONTACT-INFO
+              "www.eltex.nsk.ru"
+        DESCRIPTION
+              "The private MIB module definition generic traffic policy in Eltex devices."
+        ::= { eltMes 59 }
+
+eltPolicyClassifier OBJECT IDENTIFIER ::= { eltMesPolicy 2 }
+eltPolicyMapping    OBJECT IDENTIFIER ::= { eltMesPolicy 3 }
+
+EltPolicyTrustTypes ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Configure the port trust state
+        none    - Do not classify ingress packets with the packet CoS/DSCP values.
+        cos     - Classifies ingress packets with the packet CoS values.
+                  For untagged packets, the port default CoS is used.
+        dscp    - Classifies ingress packets with the packet DSCP values.
+        cos-dscp- Classifies ingress packets with the packet DSCP values.
+                  For non-ip tagged packets, classifies ingress packets with
+                  the packet CoS values."
+    SYNTAX  INTEGER {
+        none(0),
+        cos(1),
+        dscp(2),
+        cos-dscp(3)
+}
+
+--
+--  Classifier Table
+--
+eltPolicyClassifierTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EltPolicyClassifierEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "The table of Classifier statement."
+    ::= { eltPolicyClassifier 4 }
+
+eltPolicyClassifierEntry OBJECT-TYPE
+    SYNTAX  EltPolicyClassifierEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Classifiers can be of the ingress or post-routing phase
+         varieties.
+         Each multifield classification statement consists of the
+         following parameters."
+    AUGMENTS { rlPolicyClassifierEntry }
+    ::= { eltPolicyClassifierTable 1 }
+
+EltPolicyClassifierEntry ::= SEQUENCE {
+    eltPolicyClassifierInListVlanId1To1024      OCTET STRING,
+    eltPolicyClassifierInListVlanId1025To2048   OCTET STRING,
+    eltPolicyClassifierInListVlanId2049To3072   OCTET STRING,
+    eltPolicyClassifierInListVlanId3073To4096   OCTET STRING
+}
+
+eltPolicyClassifierInListVlanId1To1024 OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "Classifier ingress VlanId List 1."
+    ::= { eltPolicyClassifierEntry 1 }
+
+eltPolicyClassifierInListVlanId1025To2048 OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "Classifier ingress VlanId List 2."
+    ::= { eltPolicyClassifierEntry 2 }
+
+eltPolicyClassifierInListVlanId2049To3072 OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "Classifier ingress VlanId List 3."
+    ::= { eltPolicyClassifierEntry 3 }
+
+eltPolicyClassifierInListVlanId3073To4096 OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "Classifier ingress VlanId List 4."
+    ::= { eltPolicyClassifierEntry 4 }
+
+--
+--  Policy VPT to DSCP mapping
+--
+
+eltPolicyVptDscpTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltPolicyVptDscpEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table specifies The VPT to DSCP map table"
+    ::= { eltPolicyMapping 1 }
+
+eltPolicyVptDscpEntry OBJECT-TYPE
+    SYNTAX EltPolicyVptDscpEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Each entry in this table describes The DSCP assigned to a VPT value.
+         The index is VPT represent by eltPolicyVptValue."
+    INDEX { eltPolicyVptValue }
+    ::= { eltPolicyVptDscpTable 1 }
+
+EltPolicyVptDscpEntry::= SEQUENCE {
+        eltPolicyVptValue                       INTEGER,
+        eltPolicyDscpValue                      INTEGER,
+        eltPolicyVptDscpStatus                  RowStatus
+    }
+
+
+eltPolicyVptValue OBJECT-TYPE
+    SYNTAX INTEGER(0..7)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "VPT value."
+    ::= { eltPolicyVptDscpEntry 1 }
+
+eltPolicyDscpValue OBJECT-TYPE
+    SYNTAX INTEGER(0..63)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "DSCP value."
+    ::= { eltPolicyVptDscpEntry 2 }
+
+eltPolicyVptDscpStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The status of a table entry.
+        It is used to delete/Add an entry from this table."
+    ::= { eltPolicyVptDscpEntry 3 }
+
+
+--
+--  Policy port trust mode Table
+--
+
+eltPolicyTrustModeTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF EltPolicyTrustModeEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Specifies The QoS trust mode for the interfaces in basic mode"
+    ::= { eltPolicyMapping 2 }
+
+eltPolicyTrustModeEntry OBJECT-TYPE
+    SYNTAX  EltPolicyTrustModeEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Specifies The QoS trust mode for the interface in basic mode"
+    AUGMENTS { rlPolicyTrustModeEntry }
+    ::= { eltPolicyTrustModeTable 1 }
+
+EltPolicyTrustModeEntry ::= SEQUENCE {
+	eltPolicyTrustModePortMode      EltPolicyTrustTypes
+}
+
+eltPolicyTrustModePortMode OBJECT-TYPE
+    SYNTAX  EltPolicyTrustTypes
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "Defines the interface qos trust operation mode relevant for qos basic mode."
+    ::= { eltPolicyTrustModeEntry 1 }
+
+
+END

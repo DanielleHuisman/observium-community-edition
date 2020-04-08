@@ -1,0 +1,568 @@
+-- -----------------------------------------------------------------------------
+-- MIB NAME : ERPS (ITU-T G.8032) Common mib
+-- FILE NAME: ELTEX-BRIDGE-ERPS-V2-MIB.mib
+-- DATE     : 2013/04/22
+-- VERSION  : 1.00
+-- PURPOSE  : To construct the MIB structure of ERPS for proprietary enterprise
+-- -----------------------------------------------------------------------------
+
+ELTEX-BRIDGE-ERPS-MIB DEFINITIONS ::= BEGIN
+
+
+    IMPORTS
+              MODULE-IDENTITY, OBJECT-TYPE
+                    FROM SNMPv2-SMI
+              RowStatus,MacAddress,TruthValue
+                    FROM SNMPv2-TC
+              NOTIFICATION-TYPE
+                    FROM SNMPv2-SMI
+              VlanIdOrNone
+              		FROM Q-BRIDGE-MIB
+              eltexBridgeExtMIBObjects
+					FROM ELTEX-BRIDGE-EXT-MIB;
+
+    eltexErpsMIB MODULE-IDENTITY
+        LAST-UPDATED "1304220000Z"
+        ORGANIZATION "Eltex Ltd."
+        CONTACT-INFO
+            "http://www.eltex.nsk.ru"
+        DESCRIPTION
+            "The MIB module for managing Ethernet Ring Protection Switching."
+        ::= { eltexBridgeExtMIBObjects 1 }
+
+    eltexErpsCtrl                OBJECT IDENTIFIER ::= { eltexErpsMIB 1 }
+    eltexErpsInfo                OBJECT IDENTIFIER ::= { eltexErpsMIB 2 }
+    eltexErpsMgmt                OBJECT IDENTIFIER ::= { eltexErpsMIB 3 }
+    eltexErpsNotify              OBJECT IDENTIFIER ::= { eltexErpsMIB 4 }
+
+-- -----------------------------------------------------------------------------
+-- Textual conventions
+-- -----------------------------------------------------------------------------
+
+EltexErpsEnabledState ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Indicates whether the state of object is enabled or disabled.
+       "
+    REFERENCE
+       "ITU-T G.8032"
+    SYNTAX      INTEGER {
+                  enabled  (1),
+                  disabled (2)
+                }
+
+EltexErpsMgmtRAPSPortState ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Indicates Ethernet ring port state.
+       "
+    REFERENCE
+       "ITU-T G.8032"
+    SYNTAX      INTEGER {
+	                fowarding(1),
+	                blocking(2),
+	                signal-fail(3),
+                    manual-switch(4),
+                    forced-switch(5)
+                }
+
+EltexErpsMgmtRAPSPortId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Ethernet ring port id.
+       "
+    REFERENCE
+       "ITU-T G.8032"
+    SYNTAX      INTEGER {
+	                none(1),
+	                west(2),
+	                east(3)
+                }
+
+-- -----------------------------------------------------------------------------
+-- eltexErpsCtrl
+-- -----------------------------------------------------------------------------
+    eltexErpsAdminState OBJECT-TYPE
+        SYNTAX  EltexErpsEnabledState
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "This object indicates the ERPS state of the bridge."
+		DEFVAL  { disabled }
+        ::= { eltexErpsCtrl 1 }
+
+    eltexErpsLogState OBJECT-TYPE
+        SYNTAX   EltexErpsEnabledState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object indicates the ERPS log state of the bridge."
+		DEFVAL  { enabled }
+        ::= { eltexErpsCtrl 2 }
+
+    eltexErpsTrapState OBJECT-TYPE
+        SYNTAX   EltexErpsEnabledState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object indicates the ERPS trap state of the bridge."
+		DEFVAL  { enabled }
+        ::= { eltexErpsCtrl 3 }
+--
+--	eltexErpsVersion OBJECT-TYPE
+--        SYNTAX   INTEGER (1|2)
+--        MAX-ACCESS  read-write
+--        STATUS      current
+--        DESCRIPTION
+--            "This object indicates the ERPS protocol compatibility with other versions of ITU-T G.8032."
+--		DEFVAL  { 2 }
+--        ::= { eltexErpsCtrl 4 }
+--
+	eltexErpsPendingAction OBJECT-TYPE
+	    SYNTAX  INTEGER {
+	        copyPendingActive(1),
+	        copyActivePending(2)
+	    }
+	    MAX-ACCESS  read-write
+	    STATUS  current
+	    DESCRIPTION
+	        "The action to be done with the pending configuration.
+	         copyPendingActive - to copy the pending erps configuration to the active one.
+	         copyActivePending - to copy the active erps configuration to the pending one. "
+	    ::= { eltexErpsCtrl 5 }
+
+	eltexErpsPendingActionVlan OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-write
+        STATUS      current
+		DESCRIPTION
+            "Variable is associated with eltexErpsPendingAction and determines vlan_tag
+             number in config for action copying/revert on pending config"
+        ::= { eltexErpsCtrl 6 }
+
+	eltexErpsGetConfigId OBJECT-TYPE
+        SYNTAX      INTEGER{
+    		active(1),
+	        pending(2)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+		DESCRIPTION
+            "Set config id fot snmp get."
+        ::= { eltexErpsCtrl 7 }
+
+-- -----------------------------------------------------------------------------
+-- eltexErpsInfo
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- eltexErpsMgmt
+-- -----------------------------------------------------------------------------
+
+    eltexErpsMgmtRAPSVlanTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF EltexErpsMgmtRAPSVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table contains ERPS ring configuration information."
+        ::= { eltexErpsMgmt 1 }
+
+    eltexErpsMgmtRAPSVlanEntry OBJECT-TYPE
+        SYNTAX      EltexErpsMgmtRAPSVlanEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of ERPS ring configuration information."
+        INDEX    {eltexErpsMgmtRAPSVlanId}
+        ::= { eltexErpsMgmtRAPSVlanTable 1 }
+
+    EltexErpsMgmtRAPSVlanEntry ::= SEQUENCE {
+            eltexErpsMgmtRAPSVlanId
+                INTEGER,
+            eltexErpsMgmtRAPSWestPort
+                INTEGER,
+            eltexErpsMgmtRAPSWestPortState
+                EltexErpsMgmtRAPSPortState,
+            eltexErpsMgmtRAPSEastPort
+                INTEGER,
+            eltexErpsMgmtRAPSEastPortState
+                EltexErpsMgmtRAPSPortState,
+            eltexErpsMgmtRAPSRPLPort
+                EltexErpsMgmtRAPSPortId,
+            eltexErpsMgmtRAPSRPLOwnerAdminState
+                EltexErpsEnabledState,
+            eltexErpsMgmtRAPSRingMEL
+                INTEGER,
+            eltexErpsMgmtRAPSHoldOffTime
+                INTEGER,
+            eltexErpsMgmtRAPSGuardTime
+                INTEGER,
+            eltexErpsMgmtRAPSWTRTime
+                INTEGER,
+            eltexErpsMgmtRAPSRingState
+                INTEGER,
+            eltexErpsMgmtRAPSRingAdminState
+                EltexErpsEnabledState,
+            eltexErpsMgmtRAPSRPLOwnerOperStatus
+                INTEGER,
+            eltexErpsMgmtRAPSProtectionVlanRangeList1to1024
+                OCTET STRING,
+            eltexErpsMgmtRAPSProtectionVlanRangeList1025to2048
+                OCTET STRING,
+            eltexErpsMgmtRAPSProtectionVlanRangeList2049to3072
+                OCTET STRING,
+            eltexErpsMgmtRAPSProtectionVlanRangeList3073to4094
+                OCTET STRING,
+            eltexErpsMgmtRAPSRevertive
+            	TruthValue,
+            eltexErpsMgmtRAPSProtocolVersion
+            	INTEGER,
+            eltexErpsMgmtRAPSPortForcedSwitch
+                EltexErpsMgmtRAPSPortId,
+            eltexErpsMgmtRAPSPortManualSwitch
+                EltexErpsMgmtRAPSPortId,
+            eltexErpsMgmtRAPSRowStatus
+                RowStatus
+        }
+
+    eltexErpsMgmtRAPSVlanId  OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The RAPS VLAN is an index of configuration."
+        ::= { eltexErpsMgmtRAPSVlanEntry 1 }
+
+    eltexErpsMgmtRAPSWestPort OBJECT-TYPE
+        SYNTAX  INTEGER (0|1..65535)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "This is one of the Ethernet ring ports.
+            The value 0 indicates the west port is a virtual channel.
+           "
+		DEFVAL  { 0 }
+        ::= { eltexErpsMgmtRAPSVlanEntry 2 }
+
+    eltexErpsMgmtRAPSWestPortState OBJECT-TYPE
+        SYNTAX EltexErpsMgmtRAPSPortState
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "This is the west port state. It may change sometimes. When the west port
+            is configured on a virtual channel, the west port state is always fowarding.
+           "
+        ::= { eltexErpsMgmtRAPSVlanEntry 3 }
+
+    eltexErpsMgmtRAPSEastPort OBJECT-TYPE
+        SYNTAX  INTEGER (0|1..65535)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "This is the other Ethernet ring port.
+            The value 0 indicates the west port is a virtual channel.
+           "
+		DEFVAL  { 0 }
+        ::= { eltexErpsMgmtRAPSVlanEntry 4 }
+
+    eltexErpsMgmtRAPSEastPortState OBJECT-TYPE
+		SYNTAX EltexErpsMgmtRAPSPortState
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "This is the east port state. It may change sometimes. When the east port
+            is configured on a virtual channel, the east port state is always fowarding.
+           "
+        ::= { eltexErpsMgmtRAPSVlanEntry 5 }
+
+    eltexErpsMgmtRAPSRPLPort OBJECT-TYPE
+        SYNTAX EltexErpsMgmtRAPSPortId
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "When the port Enable state is enabled, the RPL port's current port role is defined by the application of the ERPS.
+           "
+		DEFVAL  { none }
+        ::= { eltexErpsMgmtRAPSVlanEntry 6 }
+
+    eltexErpsMgmtRAPSRPLOwnerAdminState OBJECT-TYPE
+        SYNTAX      EltexErpsEnabledState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The administrative value of the RPL owner state.
+             The RPL owner is an Ethernet Ring Node adjacent to the RPL that
+             is responsible for blocking its end of the RPL under normal
+             conditions."
+		DEFVAL  { disabled }
+        ::= { eltexErpsMgmtRAPSVlanEntry 7 }
+
+    eltexErpsMgmtRAPSRingMEL OBJECT-TYPE
+        SYNTAX      INTEGER (0..7)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The ring MEL is the maintenance entity group (MEG) level providing a communication channel for
+                ring automatic protection switching (RAPS) information."
+		DEFVAL  { 1 }
+        ::= { eltexErpsMgmtRAPSVlanEntry 8 }
+
+    eltexErpsMgmtRAPSHoldOffTime OBJECT-TYPE
+        SYNTAX      INTEGER (0..10000)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "In order to coordinate timing of protection switches at multiple layers."
+		DEFVAL  { 0 }
+        ::= { eltexErpsMgmtRAPSVlanEntry 9 }
+
+    eltexErpsMgmtRAPSGuardTime OBJECT-TYPE
+            SYNTAX      INTEGER (10..2000)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION
+                "This is used to prevent ring nodes from receiving outdated RAPS messages."
+		DEFVAL  { 500 }
+            ::= { eltexErpsMgmtRAPSVlanEntry 10 }
+
+    eltexErpsMgmtRAPSWTRTime OBJECT-TYPE
+        SYNTAX      INTEGER (1..12)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+                "In the revertive mode of operation, to prevent frequent operation of the protection switch due to an
+                intermittent defect, a failed working transport entity must become stable in a fault-free state."
+		DEFVAL  { 5 }
+        ::= { eltexErpsMgmtRAPSVlanEntry 11 }
+
+    eltexErpsMgmtRAPSRingState OBJECT-TYPE
+        SYNTAX      INTEGER {
+	        init(1),
+	        idle(2),
+	        protection(3),
+	        manual-switch(4),
+	        forced-switch(5),
+	        pending(6)
+
+        }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+                "This indicates the state of the ring: begin, init, idle, or protection."
+        ::= { eltexErpsMgmtRAPSVlanEntry 12 }
+
+    eltexErpsMgmtRAPSRingAdminState OBJECT-TYPE
+	    SYNTAX      EltexErpsEnabledState
+	    MAX-ACCESS  read-write
+	    STATUS      current
+	    DESCRIPTION
+                "This indicates the administrative state of the ring."
+		DEFVAL  { disabled }
+	    ::= { eltexErpsMgmtRAPSVlanEntry 13 }
+
+    eltexErpsMgmtRAPSRPLOwnerOperStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+					active(1),
+					inactive(2),
+					disabled(3)
+                   }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The current operational value of the RPL owner state. The value 'active'
+             is used to indicate that the RPL owner administrative state is enabled
+             and the device is operated as the active RPL owner. The value 'inactive'
+             is used to indicate that the RPL owner administrative state is enabled,
+             but the device is operated as the inactive RPL owner. The value
+             'disabled' is used to indicate that the RPL owner administrative
+             state of the device is disabled."
+        ::= { eltexErpsMgmtRAPSVlanEntry 14 }
+
+    eltexErpsMgmtRAPSProtectionVlanRangeList1to1024 OBJECT-TYPE
+		SYNTAX     OCTET STRING (SIZE (0..128))
+		MAX-ACCESS  read-write
+		STATUS      current
+		DESCRIPTION
+			"This object indicates the VLAN range (1-1024)
+			 that belongs to the protection VLANs."
+		DEFVAL  { "" }
+        ::= { eltexErpsMgmtRAPSVlanEntry 15 }
+
+    eltexErpsMgmtRAPSProtectionVlanRangeList1025to2048 OBJECT-TYPE
+		SYNTAX      OCTET STRING (SIZE (0..128))
+		MAX-ACCESS  read-write
+		STATUS      current
+		DESCRIPTION
+			"This object indicates the VLAN range (1025-2048)
+			 that belongs to the protection VLANs."
+		DEFVAL  { "" }
+        ::= { eltexErpsMgmtRAPSVlanEntry 16 }
+
+    eltexErpsMgmtRAPSProtectionVlanRangeList2049to3072 OBJECT-TYPE
+		SYNTAX      OCTET STRING (SIZE (0..128))
+		MAX-ACCESS  read-write
+		STATUS      current
+		DESCRIPTION
+			"This object indicates the VLAN range (2049-3072)
+			 that belongs to the protection VLANs."
+		DEFVAL  { "" }
+        ::= { eltexErpsMgmtRAPSVlanEntry 17 }
+
+    eltexErpsMgmtRAPSProtectionVlanRangeList3073to4094 OBJECT-TYPE
+		SYNTAX      OCTET STRING (SIZE (0..128))
+		MAX-ACCESS  read-write
+		STATUS      current
+		DESCRIPTION
+			"This object indicates the VLAN range (3073-4094)
+			 that belongs to the protection VLANs."
+		DEFVAL  { "" }
+        ::= { eltexErpsMgmtRAPSVlanEntry 18 }
+
+    eltexErpsMgmtRAPSRevertive OBJECT-TYPE
+	    SYNTAX      TruthValue
+	    MAX-ACCESS  read-write
+	    STATUS      current
+	    DESCRIPTION
+                "This indicates the revertive mode."
+		DEFVAL  { true }
+	    ::= { eltexErpsMgmtRAPSVlanEntry 19 }
+
+	eltexErpsMgmtRAPSProtocolVersion OBJECT-TYPE
+        SYNTAX   INTEGER (1|2)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This object indicates the ERPS protocol compatibility with other versions of ITU-T G.8032."
+		DEFVAL  { 2 }
+        ::= { eltexErpsMgmtRAPSVlanEntry 20 }
+
+    eltexErpsMgmtRAPSPortForcedSwitch OBJECT-TYPE
+        SYNTAX      EltexErpsMgmtRAPSPortId
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Forced switch port."
+		DEFVAL  { none }
+        ::= { eltexErpsMgmtRAPSVlanEntry 21 }
+
+    eltexErpsMgmtRAPSPortManualSwitch OBJECT-TYPE
+        SYNTAX      EltexErpsMgmtRAPSPortId
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Manual switch port."
+		DEFVAL  { none }
+        ::= { eltexErpsMgmtRAPSVlanEntry 22 }
+
+	eltexErpsMgmtRAPSRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "This object indicates the RowStatus of this entry."
+        ::= { eltexErpsMgmtRAPSVlanEntry 23 }
+
+-- ----------------------------------------------------------------------------
+-- eltexErpsMgmtSubRingCtrlTable
+-- ----------------------------------------------------------------------------
+
+    eltexErpsMgmtSubRingCtrlTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF EltexErpsMgmtSubRingCtrlEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table contains ERPS sub-ring configuration information."
+        ::= { eltexErpsMgmt 2 }
+
+    eltexErpsMgmtSubRingCtrlEntry OBJECT-TYPE
+        SYNTAX      EltexErpsMgmtSubRingCtrlEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "A list of ERPS sub-ring configuration information."
+        INDEX    {eltexErpsMgmtSubRingCtrlRAPSVlanId, eltexErpsMgmtSubRingCtrlSubRingRAPSVlanId}
+        ::= { eltexErpsMgmtSubRingCtrlTable 1 }
+
+    EltexErpsMgmtSubRingCtrlEntry ::= SEQUENCE {
+            eltexErpsMgmtSubRingCtrlRAPSVlanId
+                INTEGER,
+            eltexErpsMgmtSubRingCtrlSubRingRAPSVlanId
+            	INTEGER,
+            eltexErpsMgmtSubRingCtrlTCPropagationState
+                EltexErpsEnabledState,
+            eltexErpsMgmtSubRingCtrlRowStatus
+            	RowStatus
+    }
+
+    eltexErpsMgmtSubRingCtrlRAPSVlanId  OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The RAPS VLAN is an index of configuration."
+        ::= { eltexErpsMgmtSubRingCtrlEntry 1 }
+
+    eltexErpsMgmtSubRingCtrlSubRingRAPSVlanId  OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This indicates the ring control VLAN-ID of the sub-ring which connects to another ring."
+        ::= { eltexErpsMgmtSubRingCtrlEntry 2 }
+
+    eltexErpsMgmtSubRingCtrlTCPropagationState  OBJECT-TYPE
+        SYNTAX      EltexErpsEnabledState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "This indicates the state of sub-ring topology change propagation."
+		DEFVAL  { disabled }
+        ::= { eltexErpsMgmtSubRingCtrlEntry 3 }
+
+    eltexErpsMgmtSubRingCtrlRowStatus OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "This object indicates the RowStatus of this entry."
+        ::= { eltexErpsMgmtSubRingCtrlEntry 4 }
+
+-- -----------------------------------------------------------------------------
+-- eltexErpsNotify
+-- -----------------------------------------------------------------------------
+
+   eltexErpsNotifyPrefix       OBJECT IDENTIFIER ::= { eltexErpsNotify 0 }
+
+    eltexErpsSFDetectedTrap    NOTIFICATION-TYPE
+        OBJECTS     {eltexErpsNodeId }
+        STATUS      current
+        DESCRIPTION
+            "When the signal fail occurs, a trap will be generated."
+        ::= { eltexErpsNotifyPrefix 1 }
+
+    eltexErpsSFClearedTrap NOTIFICATION-TYPE
+        OBJECTS     {eltexErpsNodeId }
+        STATUS          current
+        DESCRIPTION
+            "When the signal fail clears, a trap will be generated."
+        ::= { eltexErpsNotifyPrefix 2 }
+
+    eltexErpsRPLOwnerConflictTrap   NOTIFICATION-TYPE
+        OBJECTS     {eltexErpsNodeId }
+        STATUS          current
+        DESCRIPTION
+            "When a conflict occurs, a trap will be generated."
+        ::= { eltexErpsNotifyPrefix 3 }
+
+    eltexErpsNotificationBindings   OBJECT IDENTIFIER ::= { eltexErpsNotify 2 }
+
+    eltexErpsNodeId OBJECT-TYPE
+            SYNTAX      MacAddress
+            MAX-ACCESS  accessible-for-notify
+            STATUS      current
+            DESCRIPTION
+                "This used trap object means the node MAC."
+            ::= { eltexErpsNotificationBindings 1 }
+
+END
+

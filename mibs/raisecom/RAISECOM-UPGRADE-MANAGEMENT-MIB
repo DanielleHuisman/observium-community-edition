@@ -1,0 +1,502 @@
+--MibName=raisecomOnlineUpgradeGroup
+-- =======================================================================
+-- Version info 
+--
+-- Version 0.1 Created 2007.7.20 by GUOXIAODAN
+-- This version of MIB is created just for management of base and user.
+-- Copyright(c) 2003-2005 by RAISECOM TECH, Ltd. 
+-- =======================================================================
+
+-- ===========================================================================
+--Modify Report: 
+--03,20110525,wyh,Add upload file type , syslog information file
+--02,20090914,hxy,Add raisecomOnlineUpgradeReserveDevCfg to table raisecomOnlineUpgradeTable
+--01,20081121,hxy,Add a failcase to indicate thers is error in startconfig file
+--
+-- RAISECOM base management objects
+--            
+
+RAISECOM-UPGRADE-MANAGEMENT-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+		MODULE-IDENTITY,
+		OBJECT-TYPE,
+		NOTIFICATION-TYPE ,
+		Integer32,
+		IpAddress,
+		Unsigned32
+			FROM SNMPv2-SMI
+		DisplayString,
+		TimeStamp,
+		RowStatus,
+		TruthValue
+			FROM SNMPv2-TC    
+		DateAndTime,
+		EnableVar
+			FROM SWITCH-TC
+		InetAddressType,
+		InetAddressIPv6
+			FROM INET-ADDRESS-MIB		      
+	raisecomCommonManagement
+			FROM RAISECOM-COMMON-MANAGEMENT-MIB;
+
+	raisecomOnlineUpgradeGroup    MODULE-IDENTITY
+		LAST-UPDATED 	"200707090000Z"
+		ORGANIZATION 	"RAISECOM TECH, Ltd."
+		CONTACT-INFO 	"www.raisecom.com"
+		DESCRIPTION  	
+		    "The MIB module defining objects for Online Upgrade functions"
+		::= { raisecomCommonManagement  3}  
+ 		    
+	--groups
+	                 
+--	raisecomOnlineUpgradeGroup	OBJECT IDENTIFIER ::= {raisecomCommonManagement 3}
+  	
+
+    		
+   	raisecomOnlineUpgradeMibObjects OBJECT IDENTIFIER ::= { raisecomOnlineUpgradeGroup 1 }
+	raisecomOnlineUpgradeMib        OBJECT IDENTIFIER ::= { raisecomOnlineUpgradeMibObjects 1 }
+	raisecomOnlineUpgradeMibTraps   OBJECT IDENTIFIER ::= { raisecomOnlineUpgradeGroup 2 }
+
+--  Textual Conventions
+--  Status
+--    mandatory
+--  Descr
+--    The protocol that should be used to copy the configuration file
+--    over the network. If the config file transfer is to occur locally
+--    on the SNMP agent,the method of transfer is left upto the implementation,
+--    and is not restricted to the protocols below.
+
+--	RaisecomOnlineUpgradeState ::= INTEGER {
+--				        waiting(1),
+--				        running(2),
+--				        successful(3),
+--				        failed(4)
+--				        }
+-- Textual Conventions
+--  Status
+--    mandatory
+--  Descr
+--    The state of a tftp or ftp upgrading operation.
+--     The description of each state is given below:
+--   
+--     waiting:  only one Upgrade request can run at any
+--      time. A newly activated Upgrade request
+--      is placed in this state if another request
+--      has already been activated.
+--   
+--     running: this state signifies that the Upgrade
+--      request is running.
+--   
+--     successsful: the state when a Upgrade request is
+--      successfully completed.
+--   
+--     failed: the Upgrade request was unsuccesful.
+
+--	RaisecomOnlineUpgradeFailCause ::= INTEGER {
+--				        unknown(1),
+--				        badFileName(2),
+--				        timeout(3),
+--				        noMem(4),
+--				        noConfig(5)
+--				        }
+-- Textual Conventions
+--  Status
+--    mandatory
+--  Descr
+--    The reason a Upgrade request failed.
+
+--	RaisecomOnlineUpgradeFileType ::= INTEGER {
+--	        		   image (1),
+--                        	   startupconfig (2),
+--                        	   runningconfig (3),
+--                                   others (4)
+--	        		   }
+-- Textual Conventions
+--  Status
+--    mandatory
+--  Descr
+--    The various types of files on which a Upgrade
+--    operation can be performed.
+
+    raisecomOnlineUpgradeNextIndex OBJECT-TYPE
+		    SYNTAX Unsigned32(1..2147483647)
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomOnlineUpgradeTable.  A management station
+		        wishing to initiate a Upgrade operation should use a
+		        random value for this object when creating
+		        or modifying an instance of a raisecomOnlineUpgradeEntry.
+		        The RowStatus semantics of the raisecomOnlineUpgradeEntryRowStatus
+		        object will prevent access conflicts."
+		    ::= { raisecomOnlineUpgradeMib 1 }
+   
+   
+	raisecomOnlineUpgradeTable OBJECT-TYPE
+		    SYNTAX SEQUENCE OF RaisecomOnlineUpgradeEntry
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "A table of Upgrade requests."
+		    ::= { raisecomOnlineUpgradeMib 2 }
+
+	raisecomOnlineUpgradeEntry OBJECT-TYPE
+		    SYNTAX RaisecomOnlineUpgradeEntry
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "A Upgrade request.
+       
+		        A management station wishing to create an entry should
+		        first generate a random serial number to be used  as the
+		        index to this sparse table.  The station should then create
+		        the associated instance of the row status and row index objects. 
+		        It must also, either in the same or in successive PDUs, create
+		        an instance of raisecomOnlineUpgradeSourceFileType or
+		        raisecomOnlineUpgradeDestFileType.Both of them must be the file
+		        type (i.e. startupConfig/runningconfig or image or others). If the file type is
+		        a startupConfig/runningconfig or image, a valid raisecomOnlineUpgradeServerAddress
+		        and raisecomOnlineUpgradeFileName must be created as well. If the
+		        file types is other type which represents a local file, only a valid
+		        fileName needs to be created as an extra parameter.
+       
+		        It should also modify the default values for the other
+		        configuration objects if the defaults are not appropriate.
+		       
+		        Once the appropriate instance of all the configuration
+		        objects have been created, either by an explicit SNMP
+		        set request or by default, the row status should be set
+		        to active to initiate the request. Note that this entire
+		        procedure may be initiated via a single set request which
+		        specifies a row status of createAndGo as well as specifies
+		        valid values for the non-defaulted configuration objects.
+		       
+		        Once the Upgrade request has been created (i.e. the
+		        raisecomOnlineUpgradeEntryRowStatus has been made active), the
+		        entry cannot be modified - the only operation possible
+		        after this is to delete the row.
+		       
+		        Once the request completes, the management station should
+		        retrieve the values of the status objects of interest, and
+		        should then delete the entry.  In order to prevent old
+		        entries from clogging the table, entries will be aged out,
+		        but an entry will never be deleted within 5 minutes of
+		        completing."
+		    INDEX { raisecomOnlineUpgradeIndex }
+		    ::= { raisecomOnlineUpgradeTable 1 }
+
+	RaisecomOnlineUpgradeEntry ::= SEQUENCE {
+		    raisecomOnlineUpgradeIndex 			Unsigned32,
+		    raisecomOnlineUpgradeProtocol 		INTEGER,
+		    raisecomOnlineUpgradeSourceFileType INTEGER,
+		    raisecomOnlineUpgradeDestFileType 	INTEGER,
+		    raisecomOnlineUpgradeServerAddress 	IpAddress,
+		    raisecomOnlineUpgradeFileName 		DisplayString,
+		    raisecomOnlineUpgradeUserName 		OCTET STRING,
+		    raisecomOnlineUpgradeUserPassword 	OCTET STRING,
+		    raisecomOnlineUpgradeNotificationOnCompletion 	TruthValue,
+		    raisecomOnlineUpgradeState 			INTEGER,    
+		    raisecomOnlineUpgradeSizetoprocess	INTEGER,
+		    raisecomOnlineUpgradeCompletedSize  INTEGER,		
+		    raisecomOnlineUpgradeFailCause 		INTEGER,
+		    raisecomOnlineUpgradeEntryRowStatus RowStatus,
+		    raisecomOnlineUpgradeLocalFileName 	DisplayString,
+		    raisecomOnlineUpgradeReserveDevCfg  INTEGER,
+		    raisecomOnlineUpgradeIpver          InetAddressType,
+		    raisecomOnlineUpgradeServerIpv6Addr InetAddressIPv6               
+	    	    }
+
+	raisecomOnlineUpgradeIndex OBJECT-TYPE
+		    SYNTAX Unsigned32(1..2147483647)
+		    ACCESS not-accessible
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Object which specifies a unique entry in the
+		        raisecomOnlineUpgradeTable.  A management station
+		        wishing to initiate a Upgrade operation should use a
+		        random value for this object when creating
+		        or modifying an instance of a raisecomOnlineUpgradeEntry.
+		        The RowStatus semantics of the raisecomOnlineUpgradeEntryRowStatus
+		        object will prevent access conflicts."
+		    ::= { raisecomOnlineUpgradeEntry 1 }
+
+	raisecomOnlineUpgradeProtocol OBJECT-TYPE
+		    SYNTAX INTEGER {tftp(1),ftp(2)}
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "The protocol to be used for any Upgrade process.
+		        Will default to tftp if not specified.
+		       
+		        If the Upgrade operation occurs locally on the SNMP agent,
+		        this object may be ignored by the implementation."
+		    DEFVAL { tftp }
+		    ::= { raisecomOnlineUpgradeEntry 2 }
+
+	raisecomOnlineUpgradeSourceFileType OBJECT-TYPE
+		    SYNTAX INTEGER {
+	        		   image (1),
+                       startupconfig (2),
+                       runningconfig (3),
+                       others (4),
+                       bootstrap (5),
+                       fpga (6),
+                       loggingfile(7),
+                       oem(8),
+                       backupconfig(9),
+                       backupimage(10)
+	        		   }
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "specifies the type of file to upgrade from. Either the
+		        raisecomOnlineUpgradeSourceFileType or the raisecomOnlineUpgradeDestFileType
+		        must be the type of image or startupConfig/runningconfig.
+		       
+		        If the file type is image or startupConfig/runningconfig , the raisecomOnlineUpgradeServerAddress
+		        and raisecomOnlineUpgradeFileName must also be created,
+		        and these 3 objects together
+		        (raisecomOnlineUpgradeSourceFileType, raisecomOnlineUpgradeServerAddress,
+		         raisecomOnlineUpgradeFileName)
+		        will uniquely identify the source file.
+		       
+		        If the raisecomOnlineUpgradeSourceFileType is other type, the raisecomOnlineUpgradeFileName
+		        must also be created, and the 2 objects together
+		        (raisecomOnlineUpgradeSourceFileType, raisecomOnlineUpgradeFileName) will uniquely identify
+		        the source file."
+		        		       
+		    ::= { raisecomOnlineUpgradeEntry 3 }
+
+	raisecomOnlineUpgradeDestFileType OBJECT-TYPE
+		    SYNTAX INTEGER {
+	        		   image (1),
+                       startupconfig (2),
+                       runningconfig (3),
+                       others (4),
+                       bootstrap (5),
+                       fpga (6),
+                       loggingfile(7),
+                       oem(8),
+                       backupconfig(9),
+                       backupimage(10)
+	        		   }
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "specifies the type of file to upgrade to. Either the
+		        raisecomOnlineUpgradeSourceFileType or the raisecomOnlineUpgradeDestFileType
+		        must be the type of image or startupConfig/runningconfig.
+		       
+		        If the file type is image or startupConfig/runningconfig , the
+		        raisecomOnlineUpgradeServerAddress and raisecomOnlineUpgradeFileName must also be created,
+		        and these 3 objects together
+		        (raisecomOnlineUpgradeDestFileType, raisecomOnlineUpgradeServerAddress,
+		        raisecomOnlineUpgradeFileName)
+		        will uniquely identify the destination file.
+		       
+		        If the raisecomOnlineUpgradeDestFileType is other type, the raisecomOnlineUpgradeFileName
+		        must also be created, and the 2 objects together
+		        (raisecomOnlineUpgradeDestFileType, raisecomOnlineUpgradeFileName) will uniquely identify
+		        the destination file."
+		    ::= { raisecomOnlineUpgradeEntry 4 }
+
+	 raisecomOnlineUpgradeServerAddress OBJECT-TYPE
+		    SYNTAX IpAddress
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "The ip address of the tftp or ftp server from (or to) which to copy
+		        the file. This object must be created when either the raisecomOnlineUpgradeSourceFileType or
+		        raisecomOnlineUpgradeDestFileType has the value of image or startupconfig/runningconfig.
+		        Values of 0.0.0.0 or FF.FF.FF.FF
+		        for raisecomOnlineUpgradeServerAddress are not allowed."
+		    ::= { raisecomOnlineUpgradeEntry 5 }
+
+	 raisecomOnlineUpgradeFileName OBJECT-TYPE
+		    SYNTAX DisplayString
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "The file name (including the path, if applicable) of
+		        the file. This object must be created when either the
+		        raisecomOnlineUpgradeSourceFileType or raisecomOnlineUpgradeDestFileType
+		        has the value image or startupconfig/runningconfig or others."
+		    ::= {  raisecomOnlineUpgradeEntry 6 }
+
+	raisecomOnlineUpgradeUserName OBJECT-TYPE
+		    SYNTAX OCTET STRING (SIZE(1..40))
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Remote user name for copy via ftp protocol. Optional.
+		        This object must be created when the  raisecomOnlineUpgradeProtocol
+		        is ftp.
+		       
+		        The remote user-name is sent as the server user-name
+		        in an ftp command request sent by the system to a
+		        remote ftp server."
+		    ::= {  raisecomOnlineUpgradeEntry 7 }
+
+	 raisecomOnlineUpgradeUserPassword OBJECT-TYPE
+		    SYNTAX OCTET STRING (SIZE(1..40))
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Password used by ftp for copying a file to/from
+		         an ftp server. This object must be created when the
+		         raisecomOnlineUpgradeProtocol is ftp . Reading it
+		         returns a zero-length  string for security reasons."
+		    ::= {  raisecomOnlineUpgradeEntry 8 }
+
+	 raisecomOnlineUpgradeNotificationOnCompletion OBJECT-TYPE
+		    SYNTAX TruthValue
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specifies whether or not a  raisecomOnlineUpgradeCompletion
+		        notification should be issued on completion of the ftp or tftp
+		        transfer. If such a notification is desired, it is the
+		        responsibility of the management entity to ensure that the
+		        SNMP administrative model is configured in such a way as to
+		        allow the notification to be delivered."
+		    DEFVAL { false }
+		    ::= {  raisecomOnlineUpgradeEntry 9 }
+
+	 raisecomOnlineUpgradeState OBJECT-TYPE
+		    SYNTAX  INTEGER {
+				        waiting(1),
+				        getsource(2),
+				        writedest(3),
+				        completed(4)
+				     }
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specifies the state of this Upgrade request.
+		        This value of this object is instantiated only after the row
+		        has been instantiated, i.e. after the  raisecomOnlineUpgradeEntryRowStatus
+		        has been made active."
+		    ::= {  raisecomOnlineUpgradeEntry 10 }
+
+	 raisecomOnlineUpgradeSizetoprocess OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specifies the Size of  the  specific source file ."
+		    ::= {  raisecomOnlineUpgradeEntry 11 }
+
+	 raisecomOnlineUpgradeCompletedSize OBJECT-TYPE
+		    SYNTAX INTEGER
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Specifies the Size of  the  specific source file that has been processed."
+		    ::= {  raisecomOnlineUpgradeEntry 12 }
+
+	 raisecomOnlineUpgradeFailCause OBJECT-TYPE
+		    SYNTAX  INTEGER {
+		    			noerror(1),
+				        badmethod(2),
+				        badsourceaddress(3),
+				        baddestaddress(4),
+				        badport(5),
+				        badusername(6),
+				        badpassword(7),
+				        badFileName(8),
+				        fileopenfail(9),
+				        filewritefail(10),
+				        timeout(11),
+				        noMem(12),
+				        noConfig(13),
+				        filetolarge(14),
+				        unknown(15),
+				        badsourcefiletype(16),
+				        baddestfiletype(17),
+				        connectserverfail(18),
+				        filecheckfail(19),
+				        errorcommandinfile(20)				        
+				    }
+		    ACCESS read-only
+		    STATUS mandatory
+		    DESCRIPTION
+		        "The reason why the Upgrade operation failed.
+		        This object is instantiated only when the 
+		        raisecomOnlineUpgradeState for this  entry is in the failed state."
+		    ::= {  raisecomOnlineUpgradeEntry 13 }
+
+	 raisecomOnlineUpgradeEntryRowStatus OBJECT-TYPE
+		    SYNTAX RowStatus
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "The status of this table entry.  Once the entry status is
+		        set to active, the associated entry cannot be modified until
+		        the request completes ( raisecomOnlineUpgradeState transitions to
+		        successful or failed state)."
+		    ::= {  raisecomOnlineUpgradeEntry 14 }
+	
+	 raisecomOnlineUpgradeLocalFileName OBJECT-TYPE
+		    SYNTAX DisplayString
+		    ACCESS read-create
+		    STATUS mandatory
+		    DESCRIPTION
+		        "Name of file on local device to be upgraded. If upload, it's 
+		        the name of file to be uploaded, otherwise the name of file to 
+		        be saved."
+		    ::= {  raisecomOnlineUpgradeEntry 15 }
+	
+	 raisecomOnlineUpgradeReserveDevCfg OBJECT-TYPE
+		    SYNTAX INTEGER {true(1), false(2)}
+		    ACCESS read-create
+		    STATUS current
+		    DESCRIPTION
+		        "Reserve device config, including hostname, ip address, default gateway, when down load starup config."
+		    DEFVAL  { false }
+		    ::= {  raisecomOnlineUpgradeEntry 16 }
+		    
+	raisecomOnlineUpgradeIpver OBJECT-TYPE
+		    SYNTAX InetAddressType
+		    ACCESS read-create
+		    STATUS current
+		    DESCRIPTION
+		        "Ip version of upgrade used"
+		    DEFVAL { ipv4 }
+		    ::= { raisecomOnlineUpgradeEntry 17 }
+		    
+	raisecomOnlineUpgradeServerIpv6Addr OBJECT-TYPE
+		    SYNTAX InetAddressIPv6
+		    ACCESS read-create
+		    STATUS current
+		    DESCRIPTION
+		        "The IPv6 address of server"
+		    ::= { raisecomOnlineUpgradeEntry 18 }
+
+    raisecomOnlineUpgradeMemFileClean OBJECT-TYPE
+		    SYNTAX TruthValue
+		    ACCESS read-write
+		    STATUS mandatory
+		    DESCRIPTION
+		        "This object instructs the management entity to delete 
+		        current memory file. A management station wishing to download 
+		        file or upload a remote file from remote 
+		        to device as memory file should firstly set this object to delete 
+		        the current memory file."
+		    ::= { raisecomOnlineUpgradeMib 3 }
+		    
+		    
+	raisecomOnlineUpgradeCompletion NOTIFICATION-TYPE
+		    OBJECTS {
+		        raisecomOnlineUpgradeServerAddress, raisecomOnlineUpgradeFileName, raisecomOnlineUpgradeState,
+		        raisecomOnlineUpgradeSizetoprocess, raisecomOnlineUpgradeCompletedSize, raisecomOnlineUpgradeFailCause }
+		    STATUS current
+		    DESCRIPTION
+		        "A raisecomOnlineUpgradeCompletion trap is sent at the completion
+		        of a Upgrade request. The raisecomOnlineUpgradeFailCause is not
+		        instantiated, and hence not included in a trap, when the
+		        raisecomOnlineUpgradeState is success."
+		    ::= {raisecomOnlineUpgradeMibTraps 1} 
+                
+END

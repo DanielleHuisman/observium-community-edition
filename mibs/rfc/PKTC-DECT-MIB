@@ -1,0 +1,1500 @@
+PKTC-DECT-MIB DEFINITIONS ::= BEGIN
+IMPORTS 
+    MODULE-IDENTITY, 
+    OBJECT-TYPE, 
+    Unsigned32,
+    Counter32
+                       FROM SNMPv2-SMI 
+    OBJECT-GROUP, 
+    MODULE-COMPLIANCE 
+                       FROM SNMPv2-CONF 
+    SnmpAdminString 
+                       FROM SNMP-FRAMEWORK-MIB 
+    TEXTUAL-CONVENTION, 
+    TruthValue,
+    DateAndTime
+                       FROM SNMPv2-TC
+    ifIndex            FROM IF-MIB
+    pktcApplicationMibs
+                       FROM CLAB-DEF-MIB;
+
+pktcDectMib MODULE-IDENTITY
+LAST-UPDATED "200909170000Z" -- September 17, 2009
+    ORGANIZATION "Cable Television Laboratories, Inc." 
+    CONTACT-INFO 
+            "Broadband Network Services
+             Cable Television Laboratories, Inc.
+             858 Coal Creek Circle,
+             Louisville, CO 80027, USA 
+             Phone: +1 303-661-9100
+             Email: mibs@cablelabs.com
+
+             Acknowledgements:
+             Thomas Clack, Broadcom
+             Eugene Nechamkin, Broadcom
+             Josh Littlefield, Cisco
+             Jerry Mahler,  Motorola
+             Eduardo Cardona, CableLabs"
+    DESCRIPTION 
+            "This MIB module contains the PacketCable client 
+            HD Voice management requirements." 
+    REVISION "200909170000Z" -- September 17, 2009
+    DESCRIPTION
+            "Revised version includes ECN 
+            DECT-PROV-N-09.0576-7
+            and published as part of PKT-SP-DECT-PROV-I02"
+    REVISION "200902260000Z" -- February 26, 2009
+    DESCRIPTION
+            "Initial version, published as part of the CableLabs
+            DECT Provisioning Specification PKT-SP-DECT-PROV-I01-090226
+            Copyright(c) 2009 Cable Television Laboratories, Inc.
+            All rights reserved."
+    ::= { pktcApplicationMibs 4 }
+
+-- Textual Conventions
+
+PktcSpecVersion ::= TEXTUAL-CONVENTION 
+    STATUS      current 
+    DESCRIPTION 
+            "This data type represents the publication spec number of
+            the corresponding requirement being referenced.
+            PacketCable specifications have the notation 
+            PKT-SP-<SPECNAME>I<##>-YYMMDD.
+            This value corresponds to the integer representation 
+            of <##>."
+    REFERENCE 
+            "PacketCable DECT-HDV Specification."
+    SYNTAX      Unsigned32 
+
+PktcDectPPState ::= TEXTUAL-CONVENTION 
+    STATUS      current 
+    DESCRIPTION 
+            "This data type describes the DECT PP MAC later state
+            or status indication. 
+            The combination of states and status provide remote 
+            debugging capabilities by knowing the actions that 
+            determines e.g., the fallback to a specific state. 
+            Some values may have a temporary duration and not 
+            observable due their transient nature. Event logging 
+            might be defined for such cases.  
+ 
+            Below are the states definitions as defined by the DECT
+            standard
+            'activeLocked' 
+            where the PP is synchronized to at least one RFP 
+            transmission and has one or more connections in progress.
+            'idleLocked' 
+            where the PP is synchronized to at least one RFP transmission.
+            It is able to make or receive connections, but has no 
+            connections in progress.
+            'activeUnlocked'
+            where the PP is not synchronized to any RFP transmissions,
+            and is unable to make or receive connections. 
+            The PP makes occasional attempts to detect a suitable RFP
+            and enter the 'IdleLocked' state.
+            'idleUnlocked'
+            The PP is not synchronized to any RFP and does not attempt
+            to detect RFPs.
+
+            Other values. 
+            The state  'activeUnlocked' does not define any possible
+            reason why the PP has not progressed into a locked state.  
+            Below are possible values to report:
+            'noFPInRange'
+            The PP could not find any FP in range.
+            'waitingEasyPairing' 
+            The PP is waiting for easy pairing to be activated by the FP.
+            'easyPairingFailed' 
+            The FP rejects the easyPairing access rights request.  
+            'easyPINFailed' 
+            The FP rejects the easyPIN access rights."
+    REFERENCE 
+            "PacketCable DECT-HDV Specification."
+    SYNTAX  INTEGER {
+                     unknown(1),
+                     idleUnlocked(2),
+                     activeUnlocked(3),
+                     idleLocked(4),
+                     activeLocked(5),
+                     noFPInRange(6),
+                     waitingEasyPairing(7),
+                     easyPairingFailed(8),
+                     easyPINFailed(9)
+                    }
+
+-- Object Definitions
+pktcDectNotifications OBJECT IDENTIFIER ::= { pktcDectMib 0 }
+pktcDectObjects       OBJECT IDENTIFIER ::= { pktcDectMib 1 }
+pktcDectFP            OBJECT IDENTIFIER ::= { pktcDectObjects 1 }
+
+pktcDectFPMaxNumPP OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "PPs"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the maximum number of PPs
+            supported by the FP."
+    REFERENCE
+            "PacketCable DECT-HDV Specification."
+    ::= { pktcDectFP 1 }
+
+pktcDectFPMaxActivePP OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "PPs"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the maximum number of PPs that
+            can reach the state Idle_Unlocked simultaneously. The FP
+            ages out PPs as soon as the PP leaves the Idle_Unlocked 
+            state to either Active_unlocked or unknown, allowing 
+            another PP to attempt synchronization with the FP. 
+            By Default this attribute reports the MaxNumPP 
+            attribute value."
+    REFERENCE
+            "ETSI EN 300 175-3, Digital Enhanced Cordless 
+            Telecommunications (DECT);Common Interface (CI); Part 3:
+            Medium Access Control (MAC) layer"
+    ::= { pktcDectFP 2 }
+
+pktcDectFPLockListCfg    OBJECT-TYPE
+    SYNTAX      BITS {
+                       listOfSupportedLists(0),
+                       missedCallsList(1),
+                       outgoingCallsLlist(2),
+                       incomingAcceptedCallsList(3),
+                       allCallsList(4),
+                       contactList(5),
+                       internalNamesList(6),
+                       dectSsystemSettingsList(7),
+                       lineSettingsList(8),
+                       unused9(9),
+                       unused10(10),
+                       unused11(11),
+                       unused12(12),
+                       unused13(13),
+                       unused14(14),
+                       unused15(15),
+                       unused16(16),
+                       unused17(17),
+                       unused18(18),
+                       unused19(19),
+                       unused20(20),
+                       unused21(21),
+                       unused22(22),
+                       unused23(23),
+                       unused24(24),
+                       unused25(25),
+                       unused26(26),
+                       unused27(27),
+                       unused28(28),
+                       unused29(29),
+                       unused30(30),
+                       unused31(31)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates the lock state of user 
+            invocation of access list 'Edit entry', 'Save entry',
+            'Delete entry and 'Delete list' commands. 
+            
+            If a bit it set to '1' it indicates the corresponding
+            list is locked for the commands listed above.
+            
+            If a bit is set to '0' the bit associated list is not
+            locked for the modification commands listed above. 
+            
+            A bit set to a non supported list is ignored and returned
+            as '0' on a subsequent read operation of this attribute.
+            
+            Other list commands are always allowed.
+            The default value is the bit set to '1' for all lists that
+            the device supports as editable lists."
+
+    ::= { pktcDectFP 3 }
+
+pktcDectFPZeroEmissionEnabled    OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates the status of the Zero Emission
+            mode. 
+            the value 'true' indicates Zero Emission is enabled and the
+            FP will invoke the initiation of the no-emission mode if all 
+            registered PPs are no-emission capable."
+    DEFVAL      { true }
+    ::= { pktcDectFP 4 }
+
+pktcDectFPPairingType    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the control of the PP 
+            registration using PIN or easy registration procedures. 
+            Setting this attribute to values containing ascii octets 
+            not in the range [0-9] returns an error. 
+            The value '0000' indicates the easy paring procedure is 
+            used for registering new PPs. Otherwise, the PIN procedure
+            is used."
+    DEFVAL      { "0000" }
+    ::= {pktcDectFP 5 }
+
+pktcDectFPEasyPairingActivate    OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the control of easy pairing
+            invocation by the FP.
+            
+            The value 'false' indicates easy pairing is not active.
+            The value 'true' indicates the FP initiates the easy pairing
+            process. 
+            After the first PP attempts pairing or a timer expires, 
+            which ever occurs first, the easy pairing is disabled and
+            this attribute falls back to 'false'."
+    DEFVAL      { true }
+    ::= {pktcDectFP 6 }
+
+pktcDectFPName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute corresponds to the FP name."
+    ::= {pktcDectFP 7 }
+
+pktcDectFPGeneralCapabilities    OBJECT-TYPE
+    SYNTAX      BITS { none(0)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the General FP capabilities.
+            A bit set to '1' indicates support of the specific 
+            profile feature, a bit set to '0' indicates not support
+            of the profile feature. Bits are numbered left to right
+            (MSB = 0). The possible values are encoded starting from
+            bit a12 to a47. Bit a12 represents bit 0 of this 
+            enumeration, a47 is bit 35 in this attribute encoding."
+    ::= {pktcDectFP 8 }
+
+pktcDectFPExtendedCapabilities    OBJECT-TYPE
+    SYNTAX      BITS {
+                       unused0(0),
+                       unused1(1),
+                       unused2(2),
+                       unused3(3),
+                       unused4(4),
+                       unused5(5),
+                       unused6(6),
+                       unused7(7),
+                       unused8(8),
+                       unused9(9),
+                       unused10(10),
+                       unused11(11),
+                       unused12(12),
+                       unused13(13),
+                       listAccess(14),
+                       unused15(15),
+                       unused16(16),
+                       unused17(17),
+                       unused18(18),
+                       parallelCall(19),
+                       unused20(20),
+                       unused21(21),
+                       unused22(22),
+                       zeroEmission(23),
+                       unused24(24),
+                       unused25(25),
+                       multipleLines(26),
+                       multipleCalls(27),
+                       unused28(28),
+                       unused29(29),
+                       unused30(30),
+                       unused31(31)
+                     }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the FP capabilities. 
+            A bit set to '1' indicates support of the specific profile
+            feature, a bit set to '0' indicates not support of the 
+            profile feature. Bits are numbered left to right (MSB = 0). 
+            The possible values are encoded starting from bit a12 to 
+            a47. 
+            Bit a12 represents bit 0 of this enumeration, a47 is bit 35
+            in this attribute encoding (only the most relevant are
+            shown): 
+
+            'parallelCall': Common parallel call procedure support
+            'listAccess':   list Access Service support
+            'zeroEmission': support for Zero Emission
+            'multipleLines': multiple lines support
+            'multipleCalls': multiple calls support."
+    ::= {pktcDectFP 9 }
+
+pktcDectHDVoiceProfile OBJECT IDENTIFIER ::= { pktcDectObjects 2 }
+
+pktcDectHDVoiceProfileBasicService OBJECT-TYPE
+    SYNTAX      PktcSpecVersion 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the supported HD Voice
+            profile for basic service."
+    REFERENCE
+            "PacketCable DECT-HDV Specification."
+    ::= { pktcDectHDVoiceProfile 1 }
+
+pktcDectHDVoiceProfileNCS    OBJECT-TYPE
+    SYNTAX      PktcSpecVersion 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the supported HD voice 
+            profile for NCS."
+    REFERENCE
+            "PacketCable DECT-HDV Specification"
+    ::= { pktcDectHDVoiceProfile 2 }
+
+pktcDectHDVoiceProfileSIP OBJECT-TYPE
+    SYNTAX      PktcSpecVersion 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the supported HD Voice 
+            profile for SIP."
+    REFERENCE
+            "PacketCable DECT-HDV Specification"
+    ::= { pktcDectHDVoiceProfile 3 }
+
+pktcDectCodec OBJECT IDENTIFIER ::= { pktcDectObjects 3 }
+
+pktcDectCodecPrefList OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the codec selection in prefered
+            order from left to right. The codec list is comma separated
+            with no additional characters between code names.
+            When a user associated with an endpoint linked to this 
+            FP has configured its own preferred codec list this 
+            attribute is ignored."
+    REFERENCE
+            "PacketCable DECT-HDV Specification"
+    DEFVAL      { "G722,PCMU,PCMA" }
+    ::= { pktcDectCodec 1 }
+
+pktcDectDTMF OBJECT IDENTIFIER ::= { pktcDectObjects 4 }
+
+pktcDectDTMFToneDuration OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute specifies the tone duration for DTMF 
+            defined length events sent by a PP to the FP."
+    REFERENCE
+            "PacketCable DECT-HDV Specification"
+    DEFVAL      { 100 }
+    ::= { pktcDectDTMF 1 }
+
+pktcDectBargeIn OBJECT IDENTIFIER ::= { pktcDectObjects 5 }
+
+pktcDectBargeInEnabled OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates the barge-in state of this 
+            instance. The value 'true' indicates barge-in is enabled.
+            The value 'false' indicates barge-in is disabled."
+    REFERENCE
+            "PacketCable DECT-HDV Specification"
+    DEFVAL  { true }
+    ::= { pktcDectBargeIn 1 }
+
+pktcDectServiceStatus OBJECT IDENTIFIER ::= { pktcDectObjects 6 }
+
+pktcDectServiceStatusDeactivationDisplay OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates the configured text to display
+            in the PP when the PacketCable Client service is 
+            disconnected."
+    REFERENCE
+            "PacketCable DECT-HDV Specification"
+    DEFVAL      { "Service Deactivated" }
+    ::= { pktcDectServiceStatus 1 }
+
+pktcDectServiceStatusConnectivityDisplay OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates the configured text to display
+            in the PP when the PacketCable Client has no Network 
+            (Service) Connectivity."
+    REFERENCE
+            "PacketCable DECT-HDV Specification"
+    DEFVAL      { "Network Unavailable" }
+    ::= { pktcDectServiceStatus 2 }
+
+
+pktcDectAnalogAlarmCfgTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectAnalogAlarmCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object represents the configuration of an end point
+            to support the Analog Alarm Configuration."
+    REFERENCE
+        "PacketCable DECT-HDV Specification."
+    ::= {pktcDectObjects 7 }
+
+pktcDectAnalogAlarmCfgEntry    OBJECT-TYPE
+    SYNTAX      PktcDectAnalogAlarmCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectAnalogAlarmCfgTable.
+        When an endpoint instance is configured to enable the analog
+        Alarm Configuration, the largest POTS MDI identifier 
+        (PktcMdiType = 'pots'') in the endpoint takes the role of 
+        analog alarm port. Therefore, an endpoint is allowed to have
+        only one POTS configured as an analog Alarm port. 
+        
+        End points not instantiated in this object have no analog
+        Alarm configured (i.e., equivalent to 
+        analogAlarmCfg.State = 'none')."
+    INDEX {
+            ifIndex
+          }
+    ::= {pktcDectAnalogAlarmCfgTable 1 }
+
+PktcDectAnalogAlarmCfgEntry ::= SEQUENCE {
+    pktcDectAnalogAlarmCfgState
+                 INTEGER
+    
+      }
+
+pktcDectAnalogAlarmCfgState    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  none(1),
+                  preemptive(2),
+                  simultanousCalls(3)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents alarm configuration type 
+            assigned for this analog port. The possible values
+            are:
+            
+            'none' indicates the end point has no analog alarm 
+            Configuration 
+            
+            'preemptive' indicates the analog alarm is configured
+            in a preemptive mode of operation.
+
+            'SimultanousCalls' indicates the PacketCable client can
+            have a regular phone call and an alarm call simultaneously.
+
+            This type of analog alarm configuration is not applicable
+            to PacketCable clients that support NCS signaling  
+            (i.e., E-MTAs) and a set to this attribute with this value
+            is rejected."
+    ::= {pktcDectAnalogAlarmCfgEntry 1 }
+
+pktcDectPPTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectPPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object represents the list of PPs and related
+            identifiers. 
+            For debugging purposes this object lists more PPs than
+            the maximum number of PPs."
+    ::= {pktcDectObjects 8 }
+
+pktcDectPPEntry    OBJECT-TYPE
+    SYNTAX      PktcDectPPEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectPPTable."
+    INDEX {
+            pktcDectPPId
+          }
+    ::= {pktcDectPPTable 1 }
+
+PktcDectPPEntry ::= SEQUENCE {
+    pktcDectPPId
+                 Unsigned32,
+    pktcDectPPIPEI
+                 OCTET STRING,
+    pktcDectPPTerminalID
+                 Unsigned32,
+    pktcDectPPStatus 
+                 PktcDectPPState,
+    pktcDectPPRegCtrl
+                 INTEGER
+    }
+
+pktcDectPPId    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..128)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This key represents the unique identifier of the PP. 
+            The Id of PPs already registered corresponds to the 
+            interface Index associated with the PP MDI. 
+            For PPs not registered the FP selects an Id outside 
+            the range of well known Interface Index values 
+            defined for the device.
+
+            The FP lists only PPs that have previously paired or
+            attempted to pair within the FP during an FP initiated
+            pairing process. This avoid first time PPs from 
+            neighbor areas to appear on a different subscriber FP."
+    ::= {pktcDectPPEntry 1 }
+
+pktcDectPPIPEI  OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..5))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the International Portable 
+            Equipment Identifier of the device. Other than 
+            residential/default handset identifiers are not 
+            required."
+    ::= {pktcDectPPEntry 2 }
+
+pktcDectPPTerminalID    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..128)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the Terminal Identifier the FP
+            assigns to the PP. For simple operation the FP may maintain
+            the same PP Terminal Identifier from the initial Locate
+            during pairing across device initialization."
+    ::= {pktcDectPPEntry 3 }
+
+pktcDectPPStatus    OBJECT-TYPE
+    SYNTAX      PktcDectPPState 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the state of a PP as seen by
+            the FP based on last PP/FP interaction.
+
+            The FP may report only the values 'idleLocked' and 
+            activeLocked' for registered PPs. 
+            Unregistered PPs are reported as 'unknown' or the latest
+            failure occurred such as 'easyPINFailed', 
+            'easyPairingFailed'.
+
+            Note that in no-emission mode the FP may not accurately
+            report the PP state."
+    ::= {pktcDectPPEntry 4 }
+
+pktcDectPPRegCtrl    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                         register(1),
+                         deregister(2), 
+                         remove(3)
+                        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute provides control of the PP registration 
+            status.
+            
+            The value 'deregister' directs the PP to initiate the 
+            procedure to terminate PP access rights without deleting 
+            the identity of the PP in this object (e.g., for 
+            troubleshooting purposes).
+
+            The value 'register' initiates the registration process 
+            either easy pairing or PIN registration depending on the
+            FP configuration (FP.PairingType). Subsequently,  
+            the FP will register the PP for which the register 
+            action was invoked.  See the FP InitiateRegistration 
+            to invoke the pairing of any PP.  
+
+            The value 'remove' invokes the action to de-register the PP
+            (if so) and deletes the PP information of the FP."
+    ::= {pktcDectPPEntry 5 }
+
+
+pktcDectPPCapabilitiesTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectPPCapabilitiesEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object represents the PP reported capabilities."
+    ::= {pktcDectObjects 9 }
+
+pktcDectPPCapabilitiesEntry    OBJECT-TYPE
+    SYNTAX      PktcDectPPCapabilitiesEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectPPCapabilitiesTable."
+    INDEX {
+            pktcDectPPId
+          }
+    ::= {pktcDectPPCapabilitiesTable 1 }
+
+PktcDectPPCapabilitiesEntry ::= SEQUENCE {
+    pktcDectPPCapabilitiesDisplay
+                 INTEGER,
+    pktcDectPPCapabilitiesTone
+                 INTEGER,
+    pktcDectPPCapabilitiesEcho
+                 INTEGER,
+    pktcDectPPCapabilitiesAmbientNoiseRejection
+                 INTEGER,
+    pktcDectPPCapabilitiesAdaptiveVolumeCtrl
+                 INTEGER,
+    pktcDectPPCapabilitiesSlotType
+                 BITS,
+    pktcDectPPCapabilitiesStoredDisplayChars
+                 Unsigned32,
+    pktcDectPPCapabilitiesDisplayLines
+                 Unsigned32,
+    pktcDectPPCapabilitiesCharsPerDisplayLine
+                 Unsigned32,
+    pktcDectPPCapabilitiesScrollBehavior
+                 INTEGER,
+    pktcDectPPCapabilitiesProfile
+                 BITS
+   }
+
+pktcDectPPCapabilitiesDisplay    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          na(0),
+                          noDisplay(1),
+                          numeric(2),
+                          numericPlus(3),
+                          alphanumeric(4),
+                          fullDisplay(5)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP display capability. 
+            The possible values are: 
+            'na' : not applicable
+            'noDisplay': no display
+            'numeric': numeric characters (space, 0-9, *, #)
+            'numericPlus': extended numeric characters 
+                           (space, 0-9, *, #, a, b, c, d)
+            'alphanumeric': alphanumeric characters 
+                            (space, 0-9, *, #, a-z and A-Z)
+            'fullDisplay' : displayable characters up to 0x7F."
+    ::= {pktcDectPPCapabilitiesEntry 1 }
+
+pktcDectPPCapabilitiesTone    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          na(0),
+                          notone(1),
+                          dialTone(2),
+                          e182(3),
+                          dect(4)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the PP tone capability. 
+        The possible values are: 
+        'na': not applicable
+        'notone': no tone capability supported
+        'dialTone': dialtone supported
+        'e182': ITU-T E.182 tones supported
+        'dect': complete DECT tone set."
+    ::= {pktcDectPPCapabilitiesEntry 2 }
+
+pktcDectPPCapabilitiesEcho    OBJECT-TYPE
+    SYNTAX      INTEGER { 
+                          na(0),
+                          minTCL(1),
+                          fullTCL(2),
+                          voip(3)
+                        } 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP echo capability.
+            The possible values are: 
+            'na': not applicable
+            'minTCL': &gt; 34  dB
+            'fullTCL': &gt; 46 dB
+            'voip' : &gt; 55 dB."
+    ::= {pktcDectPPCapabilitiesEntry 3 }
+
+pktcDectPPCapabilitiesAmbientNoiseRejection    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          na(0),
+                          noSupport(1),
+                          support(2)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP ambient noise rejection 
+            capability. The possible values are: 
+            'na': not applicable
+            'noSupport': no noise rejection
+            'support': noise  rejection provided."
+    ::= {pktcDectPPCapabilitiesEntry 4 }
+
+pktcDectPPCapabilitiesAdaptiveVolumeCtrl    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          na(0),
+                          noSupported(1),
+                          used(2),
+                          disabled(3)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP adaptive volume
+            control capability. The possible values are:
+            'na': not applicable
+            'noSupported': no adaptive volume control
+            'used': supported and in use
+            'disabled': supported not in use."
+    ::= {pktcDectPPCapabilitiesEntry 5 }
+
+pktcDectPPCapabilitiesSlotType    OBJECT-TYPE
+    SYNTAX      BITS {
+                       unused0(0),
+                       unused1(1),
+                       unused2(2),
+                       doubleSlot(3),
+                       fullSlot(4),
+                       unused5(5),
+                       unused6(6),
+                       halfSlot(7)
+                     }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP slot type 
+            capabilities. 
+            A bit set to '1' indicates support of the 
+            slot type, 
+            A bit set to '0' indicates no support of 
+            the slot type. Bits are numbered left to 
+            right (MSB = 0). The possible values are:
+            'halfSlot': half slot, j = 0
+            'fullSlot': full slot
+            'doubleSlot': double slot"
+    ::= {pktcDectPPCapabilitiesEntry 6 }
+
+pktcDectPPCapabilitiesStoredDisplayChars    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..16363)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP number of stored 
+            display characters."
+    ::= {pktcDectPPCapabilitiesEntry 7 }
+
+pktcDectPPCapabilitiesDisplayLines    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..128)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the number of lines in the
+             PP display."
+    ::= {pktcDectPPCapabilitiesEntry 8 }
+
+pktcDectPPCapabilitiesCharsPerDisplayLine    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..128)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP number of characters
+            per line in the display."
+    ::= {pktcDectPPCapabilitiesEntry 9 }
+
+pktcDectPPCapabilitiesScrollBehavior    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                          na(0),
+                          type1(1),
+                          type(2)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP scroll behavior 
+            capability. The possible values are:
+            'na': not applicable, specified
+            'type1': type 1
+            'type2': type 2."
+    ::= {pktcDectPPCapabilitiesEntry 10 }
+
+pktcDectPPCapabilitiesProfile    OBJECT-TYPE
+    SYNTAX      BITS {
+                       unused0(0),
+                       unused1(1),
+                       unused2(2),
+                       unused3(3),
+                       unused4(4),
+                       gapSupport(5),
+                       unused6(6),
+                       unused7(7),
+                       unused8(8),
+                       unused9(9),
+                       unused10(10),
+                       unused11(11),
+                       unused12(12),
+                       unused13(13),
+                       unused14(14),
+                       unused15(15),
+                       unused16(16),
+                       unused17(17),
+                       unused18(18),
+                       unused19(19),
+                       unused20(20),
+                       unused21(21),
+                       unused22(22),
+                       unused23(23),
+                       unused24(24),
+                       unused25(25),
+                       unused26(26),
+                       unused27(27),
+                       unused28(28),
+                       unused29(29),
+                       unused30(30),
+                       unused31(31),
+                       unused32(32),
+                       unused33(33),
+                       unused34(34),
+                       unused35(35),
+                       unused36(36),
+                       unused37(37),
+                       unused38(38),
+                       unused39(39),
+                       unused40(40),
+                       zeroEmissionSupport(41),
+                       unused42(42),
+                       unused43(43),
+                       unused44(44),
+                       unused45(45),
+                       unused46(46),
+                       unused47(47),
+                       unused48(48),
+                       unused49(49),
+                       multipleLlines(50),
+                       parallelCall(51),
+                       callIdentification(52),
+                       wideband(53),
+                       part3(54),
+                       unused55(55),
+                       unused56(56),
+                       unused57(57),
+                       unused58(58),
+                       unused59(59),
+                       unused60(60),
+                       unused61(61),
+                       unused62(62),
+                       unused63(63),
+                       unused64(64)
+                     } 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the PP profile feature 
+            capabilities. 
+            A bit set to '1' indicates support of the specific 
+            profile feature, a bit set to '0' indicates not support
+            of the profile feature. Bits are numbered left to right
+            (MSB = 0).
+            The possible values are (only the most relevant are shown):
+            'gapSupport'': GAP profile support
+            'zeroEmission': Zero Emission support 
+            'multipleLlines': multiple lines
+            'parallelCall': Common parallel call procedures
+            'callIdentification': Call Identification support
+            'wideband': Wideband support
+            'part3' : Extended wideband speech services support"
+    ::= {pktcDectPPCapabilitiesEntry 11 }
+
+pktcDectListAccessTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectListAccessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object represents the list of lists stored in the FP."
+    ::= {pktcDectObjects 10 }
+
+pktcDectListAccessEntry    OBJECT-TYPE
+    SYNTAX      PktcDectListAccessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectListAccessTable."
+    INDEX {
+            pktcDectListAccessIndex
+          }
+    ::= {pktcDectListAccessTable 1 }
+
+PktcDectListAccessEntry ::= SEQUENCE {
+    pktcDectListAccessIndex
+                 Unsigned32,
+    pktcDectListAccesslistID
+                 Unsigned32,
+    pktcDectListAccessDescr
+                 SnmpAdminString
+      }
+
+pktcDectListAccessIndex    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..128) 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This Key represents the unique identifier of the list element."
+    ::= {pktcDectListAccessEntry 1 }
+
+pktcDectListAccesslistID    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..128) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute defines the ID of the supported list."
+    ::= {pktcDectListAccessEntry 2 }
+
+pktcDectListAccessDescr    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the name of the list.
+        For standard list this corresponds to the exact name as the
+        list is referred to in the specification. 
+        Vendor specific list may include name and references to 
+        documentation (e.g., URNs)."
+    ::= {pktcDectListAccessEntry 3 }
+
+pktcDectInternalNamesListTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectInternalNamesListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object represents the list of registered PPs"
+    ::= {pktcDectObjects 11 }
+
+pktcDectInternalNamesListEntry    OBJECT-TYPE
+    SYNTAX      PktcDectInternalNamesListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectInternalNamesListTable."
+    INDEX {
+            pktcDectInternalNamesListIndex
+          }
+    ::= {pktcDectInternalNamesListTable 1 }
+
+PktcDectInternalNamesListEntry ::= SEQUENCE {
+    pktcDectInternalNamesListIndex
+                 Unsigned32,
+    pktcDectInternalNamesListNumber
+                 Unsigned32,
+    pktcDectInternalNamesListName
+                 SnmpAdminString
+      }
+
+pktcDectInternalNamesListIndex    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..32767)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This Key represents the unique identifier of the list element."
+    ::= {pktcDectInternalNamesListEntry 1 }
+
+pktcDectInternalNamesListNumber    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..32767) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute  indicates the terminal identity number."
+    ::= {pktcDectInternalNamesListEntry 2 }
+
+pktcDectInternalNamesListName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute indicates the name of the internal party."
+    ::= {pktcDectInternalNamesListEntry 3 }
+
+pktcDectLineSettingsListTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectLineSettingsListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object represents Information pertaining to the list. 
+        Operator settings to this line are performed via the NSL object.
+        Primarily association of PPs to the phone line. 
+        A PacketCable device allows the user to modify any line 
+        parameter via PP access list commands with the exception of the 
+        'Dialing Prefix' field."
+ 
+    ::= {pktcDectObjects 12 }
+
+pktcDectLineSettingsListEntry    OBJECT-TYPE
+    SYNTAX      PktcDectLineSettingsListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectLineSettingsListTable."
+    INDEX {
+            pktcDectLineSettingsListIndex
+          }
+    ::= {pktcDectLineSettingsListTable 1 }
+
+PktcDectLineSettingsListEntry ::= SEQUENCE {
+    pktcDectLineSettingsListIndex
+                 Unsigned32,
+    pktcDectLineSettingsListLineId
+                 Unsigned32,
+    pktcDectLineSettingsListLineName
+                 SnmpAdminString,
+    pktcDectLineSettingsListAttachedHandsets
+                 SnmpAdminString,
+    pktcDectLineSettingsListDialingPrefix
+                 SnmpAdminString,
+    pktcDectLineSettingsListFPMelody
+                 Unsigned32,
+    pktcDectLineSettingsListFPVolume
+                 Unsigned32,
+    pktcDectLineSettingsListBlockedNB
+                 TruthValue,
+    pktcDectLineSettingsListMultipleCalls
+                 TruthValue,
+    pktcDectLineSettingsListIntrusionCall
+                 TruthValue
+      }
+
+pktcDectLineSettingsListIndex    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..127) 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This Key represents the unique identifier of the list
+             element."
+    ::= {pktcDectLineSettingsListEntry 1 }
+
+pktcDectLineSettingsListLineId    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..127)  
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the line identifier."
+    ::= {pktcDectLineSettingsListEntry 2 }
+
+pktcDectLineSettingsListLineName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the name of the line."
+    ::= {pktcDectLineSettingsListEntry 3 }
+
+pktcDectLineSettingsListAttachedHandsets    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the list of registered handsets
+             which are attached to the line.
+             This attribute is formatted as a string where each octet 
+             represents the 'Terminal Identifier' of the handset.
+             Note that the over the air 'Line settings list' defines
+             the 'Attached handsets' as a sequence of bits, each 
+             representing a 'Terminal Id' handset." 
+    ::= {pktcDectLineSettingsListEntry 4 }
+
+pktcDectLineSettingsListDialingPrefix    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents a prefix to add to called 
+            party numbers for calls placed on the line."
+    ::= {pktcDectLineSettingsListEntry 5 }
+
+pktcDectLineSettingsListFPMelody    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..128)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the melody of the FP linked to 
+             this line."
+    ::= {pktcDectLineSettingsListEntry 6 }
+
+pktcDectLineSettingsListFPVolume    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..128)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the melody volume of the FP 
+             linked to this line."
+    ::= {pktcDectLineSettingsListEntry 7 }
+
+pktcDectLineSettingsListBlockedNB    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents forbidden called party numbers 
+             on the line."
+    ::= {pktcDectLineSettingsListEntry 8 }
+
+pktcDectLineSettingsListMultipleCalls    OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the current mode of the line: 
+            The value 'true' indicates support for multiple call mode
+            The value 'false' indicates support for single call mode. 
+            For PacketCable Client devices supporting only single call
+             mode this value always use the value  'false'."
+    ::= {pktcDectLineSettingsListEntry 9 }
+
+pktcDectLineSettingsListIntrusionCall    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the call intrusion mode for 
+            the line. 
+            The value 'true' indicates the line has 'call intrusion' 
+            enabled. Otherwise the value 'false' is reported.
+
+            The PacketCable Client device should always use the 
+            configured BargedIn.Enabled attribute value as the highest 
+            possible value. It means if BargeIn.Enabled is set to 'false', 
+            the user can't modify the call intrusion to 'true' via list 
+            access commands. In the contrary, if BargeIn.Enabled is set to
+            'true' the user could set this attribute to 'false' via 'line 
+            settings list' commands."
+    ::= {pktcDectLineSettingsListEntry 10 }
+
+pktcDectPerformanceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectPerformanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object represents the performance statistics of each PP. 
+        When Zero Emission is enabled this object store statistics on 
+        a per call basis. 
+        When Zero Emission is disabled, this object may contains a 
+        single instance per PP (Terminal ID)
+        referent to all the messages activity in the upstream direction 
+        (PP to FP) or maintain per call statistics."
+    ::= {pktcDectObjects 13 }
+
+pktcDectPerformanceEntry    OBJECT-TYPE
+    SYNTAX      PktcDectPerformanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectPerformanceTable."
+    INDEX {
+            ifIndex
+          }
+    ::= {pktcDectPerformanceTable 1 }
+
+PktcDectPerformanceEntry ::= SEQUENCE {
+    pktcDectPerformanceRecordNum
+                 Unsigned32,
+    pktcDectPerformanceHandovers
+                 Counter32,
+    pktcDectPerformanceRTDelay
+                 Unsigned32,
+    pktcDectPerformanceSyncFailures
+                 Counter32,
+    pktcDectPerformanceControlFieldErrs
+                 Counter32,
+    pktcDectPerformancePayloadErrs
+                 Counter32,
+    pktcDectPerformanceSlidingCollisions
+                 Counter32,
+    pktcDectPerformanceLinkErrsQbit
+                 Counter32
+      }
+
+pktcDectPerformanceRecordNum    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This key represents the identifier of the logged
+            statistics of a previous call. When Zero Emission is enabled
+            the FP maintains an incrementing log information and 
+            deletes the oldest log instance when reaching the maximum 
+            number of entries.
+            When Zero Emission is disabled this object creates a single
+            instance with RecordNum = 0  and collects continuously the 
+            data associated with the object attributes."
+    ::= {pktcDectPerformanceEntry 1 }
+
+pktcDectPerformanceHandovers    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates how many channel handovers the PP
+            has realized since the first activity related to this 
+            logged call."
+    ::= {pktcDectPerformanceEntry 2 }
+
+pktcDectPerformanceRTDelay    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates the round trip delay calculated
+            by the FP. 
+            The FP measures the RoundTrip Delay at the beginning of
+            the call."
+    ::= {pktcDectPerformanceEntry 3 }
+
+pktcDectPerformanceSyncFailures    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute indicates the number of synchronization
+            failures that have occurred during the current call."
+    ::= {pktcDectPerformanceEntry 4 }
+
+pktcDectPerformanceControlFieldErrs    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute indicates the number of Control field errors
+         encountered during this time period"
+    ::= {pktcDectPerformanceEntry 5 }
+
+pktcDectPerformancePayloadErrs    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute indicates the number of CRC errors
+         accumulated during this period of time."
+    ::= {pktcDectPerformanceEntry 6 }
+
+pktcDectPerformanceSlidingCollisions    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute indicates the number of sliding collisions
+        detected during this period of time."
+    ::= {pktcDectPerformanceEntry 7 }
+
+pktcDectPerformanceLinkErrsQbit    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "this attribute indicates the number of link errors being
+        signaled with the Q-bit during this period of time."
+    ::= {pktcDectPerformanceEntry 8 }
+
+pktcDectStatusTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcDectStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object represents the PP status and related 
+        connectivity information"
+    ::= {pktcDectObjects 14 }
+
+pktcDectStatusEntry    OBJECT-TYPE
+    SYNTAX      PktcDectStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcDectStatusTable."
+    INDEX {
+            ifIndex
+          }
+    ::= {pktcDectStatusTable 1 }
+
+PktcDectStatusEntry ::= SEQUENCE {
+    pktcDectStatusLastLocate
+                 DateAndTime,
+    pktcDectStatusNumLocateMsgs
+                 Counter32,
+    pktcDectStatusNumConnectionFailures
+                 Counter32,
+    pktcDectStatusNumActivitySuccess
+                 Counter32,
+    pktcDectStatusLastActivityFailure
+                 DateAndTime,
+    pktcDectStatusRSSI
+                 Unsigned32
+      }
+
+pktcDectStatusLastLocate    OBJECT-TYPE
+    SYNTAX      DateAndTime 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the time when the last Locate 
+            message was sent by the PP to the FP."
+    ::= {pktcDectStatusEntry 1 }
+
+pktcDectStatusNumLocateMsgs    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This attribute represents the number of times the PP
+            has subscribed since last FP reboot."
+    ::= {pktcDectStatusEntry 2 }
+
+pktcDectStatusNumConnectionFailures    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the number of times the PP 
+        has failed connections with the FP since last FP 
+        reinitialization."
+    ::= {pktcDectStatusEntry 3 }
+
+pktcDectStatusNumActivitySuccess    OBJECT-TYPE
+    SYNTAX      Counter32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute indicates the number of times the PP
+        has initiated any activity successfully since 
+        last time the FP reinitializes."
+    ::= {pktcDectStatusEntry 4 }
+
+pktcDectStatusLastActivityFailure    OBJECT-TYPE
+    SYNTAX      DateAndTime 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute indicates the time where the last PP
+        initiated activity and being rejected by the FP."
+    ::= {pktcDectStatusEntry 5 }
+
+pktcDectStatusRSSI    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the instantaneous 
+        Received Signal Strength from the PP."
+    ::= {pktcDectStatusEntry 6 }
+
+
+-- Conformance Definitions
+pktcDectMibConformance OBJECT IDENTIFIER ::= { pktcDectMib 2 }
+pktcDectMibCompliances OBJECT IDENTIFIER ::= { pktcDectMibConformance 1 }
+pktcDectMibGroups      OBJECT IDENTIFIER ::= { pktcDectMibConformance 2 }
+
+pktcDectCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+            "The compliance statement for the HD Voice PacketCable 
+            Client device."
+    MODULE -- this MODULE
+    MANDATORY-GROUPS {
+            pktcDectGroup
+            }
+    ::= { pktcDectMibCompliances 1 }
+
+            pktcDectGroup OBJECT-GROUP
+    OBJECTS {
+              pktcDectFPMaxNumPP,
+              pktcDectFPMaxActivePP,
+              pktcDectFPLockListCfg,
+              pktcDectFPZeroEmissionEnabled,
+              pktcDectFPPairingType,
+              pktcDectFPEasyPairingActivate,
+              pktcDectFPName,
+              pktcDectFPGeneralCapabilities,
+              pktcDectFPExtendedCapabilities,
+              pktcDectHDVoiceProfileBasicService,
+              pktcDectHDVoiceProfileNCS,
+              pktcDectHDVoiceProfileSIP,
+              pktcDectCodecPrefList,
+              pktcDectDTMFToneDuration,
+              pktcDectBargeInEnabled,
+              pktcDectServiceStatusDeactivationDisplay,
+              pktcDectServiceStatusConnectivityDisplay,
+              pktcDectAnalogAlarmCfgState,
+              pktcDectListAccesslistID,
+              pktcDectListAccessDescr,
+              pktcDectInternalNamesListNumber,
+              pktcDectInternalNamesListName,
+              pktcDectLineSettingsListLineId,
+              pktcDectLineSettingsListLineName,
+              pktcDectLineSettingsListAttachedHandsets,
+              pktcDectLineSettingsListDialingPrefix,
+              pktcDectLineSettingsListFPMelody,
+              pktcDectLineSettingsListFPVolume,
+              pktcDectLineSettingsListBlockedNB,
+              pktcDectLineSettingsListMultipleCalls,
+              pktcDectLineSettingsListIntrusionCall,
+              pktcDectPerformanceRecordNum,
+              pktcDectPerformanceHandovers,
+              pktcDectPerformanceRTDelay,
+              pktcDectPerformanceSyncFailures,
+              pktcDectPerformanceControlFieldErrs,
+              pktcDectPerformancePayloadErrs,
+              pktcDectPerformanceSlidingCollisions,
+              pktcDectPerformanceLinkErrsQbit,
+              pktcDectStatusLastLocate,
+              pktcDectStatusNumLocateMsgs,
+              pktcDectStatusNumConnectionFailures,
+              pktcDectStatusNumActivitySuccess,
+              pktcDectStatusLastActivityFailure,
+              pktcDectStatusRSSI,
+              pktcDectPPIPEI,
+              pktcDectPPTerminalID,
+              pktcDectPPStatus,
+              pktcDectPPRegCtrl,
+              pktcDectPPCapabilitiesDisplay,
+              pktcDectPPCapabilitiesTone,
+              pktcDectPPCapabilitiesEcho,
+              pktcDectPPCapabilitiesAmbientNoiseRejection,
+              pktcDectPPCapabilitiesAdaptiveVolumeCtrl,
+              pktcDectPPCapabilitiesSlotType,
+              pktcDectPPCapabilitiesStoredDisplayChars,
+              pktcDectPPCapabilitiesDisplayLines,
+              pktcDectPPCapabilitiesCharsPerDisplayLine,
+              pktcDectPPCapabilitiesScrollBehavior,
+              pktcDectPPCapabilitiesProfile
+    }
+    STATUS      current
+    DESCRIPTION
+            "Group of objects implemented in the HD Voice PacketCable
+            Client device."
+    ::= { pktcDectMibGroups 1 }
+END
+

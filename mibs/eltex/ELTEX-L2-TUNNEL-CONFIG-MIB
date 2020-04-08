@@ -1,0 +1,313 @@
+ELTEX-L2-TUNNEL-CONFIG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    eltexLtd
+        FROM ELTEX-SMI-ACTUAL
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Unsigned32,
+    Counter32
+        FROM SNMPv2-SMI
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
+    TruthValue,
+    MacAddress
+        FROM SNMPv2-TC
+    ifIndex
+        FROM IF-MIB
+    QosLayer2Cos
+        FROM CISCO-QOS-PIB-MIB;
+
+eltexL2TunnelConfig MODULE-IDENTITY
+    LAST-UPDATED    "201509080000Z"
+    ORGANIZATION "Eltex Enterprise Co, Ltd."
+    CONTACT-INFO "www.eltex.nsk.ru"
+    DESCRIPTION
+        "This MIB module is for layer 2 tunneling related configurations
+        on a device.
+
+        Tunneling allows separate local networks to be considered as
+        a single VLAN. These separate networks are connected via an
+        ISP, which will tunnel the packets from one network to another,
+        making it appear as if the two networks are actually just one."
+          ::= { eltexLtd 37 }
+
+eltexLtcMIBObjects     OBJECT IDENTIFIER ::= { eltexL2TunnelConfig 1 }
+
+eltexLtcGlobal            OBJECT IDENTIFIER ::= { eltexLtcMIBObjects 1 }
+eltexLtcTunneledProtocol  OBJECT IDENTIFIER ::= { eltexLtcMIBObjects 2 }
+eltexLtcTunnelThreshold   OBJECT IDENTIFIER ::= { eltexLtcMIBObjects 3 }
+eltexLtcTunnelStatistics  OBJECT IDENTIFIER ::= { eltexLtcMIBObjects 4 }
+
+-- -------------------- --
+-- Textual Conventions  --
+-- -------------------- --
+
+EltexLtcTunneledProtocolIndex ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "A tunneled protocol of an interface.
+                    Supported value is stp(1)."
+    SYNTAX          INTEGER {
+                        stp(1)
+                    }
+
+-- ------------------------ --
+-- eltexLtcNotificationEnable --
+-- ------------------------ --
+
+eltexLtcNotificationEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This object indicates whether the system will
+        generate the eltexLtcTunnelDropThresholdExceeded and
+        eltexLtcTunnelShutdownThresholdExceeded notifications."
+    ::= { eltexLtcGlobal 1 }
+
+-- ---------------- --
+-- eltexLtcMacAddress --
+-- ---------------- --
+
+eltexLtcTunnelMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The destination MAC address that replaces the original destination
+	MAC address of tunneled frames."
+    DEFVAL { '0100EEEE0000'H }
+    ::= { eltexLtcGlobal 2 }
+
+-- ---------------------------- --
+-- eltexLtcTunneledProtocolTable  --
+-- ---------------------------- --
+
+eltexLtcTunneledProtocolTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexLtcTunneledProtocolEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table contains information about the protocols being
+        tunneled. Only tunneled protocol filtering capable interfaces
+        are shown."
+    ::= { eltexLtcTunneledProtocol 1 }
+
+eltexLtcTunneledProtocolEntry OBJECT-TYPE
+    SYNTAX          EltexLtcTunneledProtocolEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Information about the protocols being tunneled. Only tunneled
+        protocol filtering capable interfaces are shown."
+    INDEX           { ifIndex }
+    ::= { eltexLtcTunneledProtocolTable 1 }
+
+EltexLtcTunneledProtocolEntry ::= SEQUENCE {
+        eltexLtcTunneledProtocolType BITS,
+        eltexLtcTunnelCos            QosLayer2Cos
+}
+
+eltexLtcTunneledProtocolType OBJECT-TYPE
+    SYNTAX          BITS {
+                        stp(0)
+                        ,workaround(1) -- workaround to Bug #50007
+                    }
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Indicates tunneled protocol of the interface.
+
+        If a BIT is set, then the value of the corresponding
+        protocol is tunneled. Specifically, if the 'stp(0)' BIT
+        is set, then the Spanning Tree Protocol PDU is tunneled.
+        At this moment, there are no other supported protocols.
+
+        If the bit for a given protocol is set for an interface, then
+        the statistics for that interface and protocol will start to be
+        monitored."
+    ::= { eltexLtcTunneledProtocolEntry 1 }
+
+eltexLtcTunnelCos OBJECT-TYPE
+    SYNTAX          QosLayer2Cos
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "Specifies the user priority of the tunneled PDUs for the
+        interface."
+    ::= { eltexLtcTunneledProtocolEntry 2 }
+
+-- -------------------------- --
+-- eltexLtcTunnelThresholdTable --
+-- -------------------------- --
+
+eltexLtcTunnelThresholdTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexLtcTunnelThresholdEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table contains information about the thresholds for
+        protocol tunneling. Only tunneled protocol filtering capable
+        interfaces are shown. The objects will be on a per interface,
+        per protocol basis."
+    ::= { eltexLtcTunnelThreshold 1 }
+
+eltexLtcTunnelThresholdEntry OBJECT-TYPE
+    SYNTAX          EltexLtcTunnelThresholdEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Information about the thresholds for protocol tunneling. Only
+        tunneled protocol filtering capable interfaces are shown. The
+        entries will be on a per interface, per protocol basis"
+    INDEX           {
+                        ifIndex,
+                        eltexLtcTunnelThresholdProtocolIndex
+                    }
+    ::= { eltexLtcTunnelThresholdTable 1 }
+
+EltexLtcTunnelThresholdEntry ::= SEQUENCE {
+        eltexLtcTunnelThresholdProtocolIndex EltexLtcTunneledProtocolIndex,
+        eltexLtcTunnelDropThreshold          Unsigned32,
+        eltexLtcTunnelShutdownThreshold      Unsigned32
+}
+
+eltexLtcTunnelThresholdProtocolIndex OBJECT-TYPE
+    SYNTAX          EltexLtcTunneledProtocolIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "A tunneled protocol of an interface."
+    ::= { eltexLtcTunnelThresholdEntry 1 }
+
+eltexLtcTunnelDropThreshold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "PDUs/sec"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The drop threshold on an interface for a given protocol. After
+        reaching this drop threshold, the interface will start dropping
+        PDUs for the given protocol. This value cannot be greater than
+        the value of eltexLtcTunnelShutdownThreshold.  A value of 0
+        indicates that no limit is set."
+    DEFVAL          { 0 }
+    ::= { eltexLtcTunnelThresholdEntry 2 }
+
+eltexLtcTunnelShutdownThreshold OBJECT-TYPE
+    SYNTAX          Unsigned32
+    UNITS           "PDUs/sec"
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The shutdown threshold on an interface for a given protocol.
+        After reaching the shutdown threshold, the interface will
+        shutdown for the given protocol.  This value cannot be less
+        than the value of eltexLtcTunnelDropThreshold. A value of 0
+        indicates that no limit is set."
+    DEFVAL          { 0 }
+    ::= { eltexLtcTunnelThresholdEntry 3 }
+
+
+-- ---------------------------- --
+-- eltexLtcTunnelStatisticsTable  --
+-- ---------------------------- --
+
+eltexLtcTunnelStatisticsTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexLtcTunnelStatisticsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table contains protocol tunneling statistics on the
+        interface."
+    ::= { eltexLtcTunnelStatistics 1 }
+
+eltexLtcTunnelStatisticsEntry OBJECT-TYPE
+    SYNTAX          EltexLtcTunnelStatisticsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Protocol tunneling statistics on the interface."
+    INDEX           {
+                        ifIndex,
+                        eltexLtcTunneledProtocolIndex
+                    }
+    ::= { eltexLtcTunnelStatisticsTable 1 }
+
+EltexLtcTunnelStatisticsEntry ::= SEQUENCE {
+        eltexLtcTunneledProtocolIndex EltexLtcTunneledProtocolIndex,
+        eltexLtcTunnelEncapStats      Counter32,
+        eltexLtcTunnelDecapStats      Counter32,
+        eltexLtcTunnelDropStats       Counter32
+}
+
+eltexLtcTunneledProtocolIndex OBJECT-TYPE
+    SYNTAX          EltexLtcTunneledProtocolIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "A tunneled protocol of an interface."
+    ::= { eltexLtcTunnelStatisticsEntry 1 }
+
+eltexLtcTunnelEncapStats OBJECT-TYPE
+    SYNTAX          Counter32
+    UNITS           "encapsulated PDUs"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The tunneled PDU encapsulation statistics of an interface.
+        These statistics cover the number of tunneled ingress
+        PDUs."
+    ::= { eltexLtcTunnelStatisticsEntry 2 }
+
+eltexLtcTunnelDecapStats OBJECT-TYPE
+    SYNTAX          Counter32
+    UNITS           "de-encapsulated PDUs"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The tunneled PDU de-encapsulation statistics of an interface.
+        These statistics cover the number of tunneled egress PDUs."
+    ::= { eltexLtcTunnelStatisticsEntry 3 }
+
+eltexLtcTunnelDropStats OBJECT-TYPE
+    SYNTAX          Counter32
+    UNITS           "PDUs"
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of PDUs dropped on an interface for a given
+        protocol. The PDUs will be dropped when the
+        eltexLtcTunnelDropThreshold is reached."
+    ::= { eltexLtcTunnelStatisticsEntry 4 }
+
+-- ------------- --
+-- Notifications --
+-- ------------- --
+
+eltexLtcMIBNotifications  OBJECT IDENTIFIER
+    ::= { eltexL2TunnelConfig 2 }
+
+eltexLtcMIBNotificationsPrefix  OBJECT IDENTIFIER
+    ::= { eltexLtcMIBNotifications 0 }
+
+
+
+eltexLtcTunnelDropThresholdExceeded NOTIFICATION-TYPE
+    OBJECTS         { eltexLtcTunnelDropThreshold }
+    STATUS          current
+    DESCRIPTION
+        "This notification is generated when the
+        eltexLtcTunnelDropThreshold has been exceeded."
+   ::= { eltexLtcMIBNotificationsPrefix 1 }
+
+
+eltexLtcTunnelShutdownThresholdExceeded NOTIFICATION-TYPE
+    OBJECTS         { eltexLtcTunnelShutdownThreshold }
+    STATUS          current
+    DESCRIPTION
+        "This notification is generated when the
+        eltexLtcTunnelShutdownThreshold has been exceeded."
+   ::= { eltexLtcMIBNotificationsPrefix 2 }
+
+END

@@ -1,0 +1,1750 @@
+--  Protocol private MIB Definitions
+--  if compiles this mib with mg-soft, there must be mpls-vpn.mib and zxr10.mib files and rfc1213.mib in
+--  the same director.
+         
+         
+    ZXR10-QOS-MIB DEFINITIONS ::= BEGIN
+    
+    IMPORTS
+
+        MODULE-IDENTITY, OBJECT-TYPE, enterprises, TimeTicks         FROM SNMPv2-SMI
+   
+        ifIndex                        FROM RFC1213-MIB
+   
+        Gauge                          FROM RFC1155-SMI
+        
+        TEXTUAL-CONVENTION             FROM SNMPv2-TC; 
+        
+    zte OBJECT IDENTIFIER ::= { enterprises 3902 }
+    zxr10 OBJECT IDENTIFIER ::= { zte 3}
+    zxr10protocol OBJECT IDENTIFIER ::= { zxr10 101} 
+
+    zxr10qos MODULE-IDENTITY
+        LAST-UPDATED "0610101111Z"  -- 10 Oct 2006 11:11:00 GMT
+        ORGANIZATION "ZXR10 ROS OAM group"
+        CONTACT-INFO
+            "          Nanjing Institute of ZTE Corporation
+              Postal:  No.68 Zijinghua Rd. Yuhuatai District,
+                       Nanjing,
+                       China
+              Tel:     +86 25 52871647 
+              E-mail:  yu.yue1@zte.com.cn"
+
+        DESCRIPTION
+            "This MIB Module provides Textual Conventions 
+             and OBJECT-ID Objects to be used by zxros qos module."
+        ::= { zxr10protocol 6 }
+
+-- object groups
+    qosPQconfig    OBJECT IDENTIFIER ::= { zxr10qos  2}
+    qosCQconfig    OBJECT IDENTIFIER ::= { zxr10qos  3}
+    qosCBQconfig   OBJECT IDENTIFIER ::= { zxr10qos  4}
+    qosWREDconfig  OBJECT IDENTIFIER ::= { zxr10qos  5}
+    qosWFQconfig   OBJECT IDENTIFIER ::= { zxr10qos  6}
+    qosCARconfig   OBJECT IDENTIFIER ::= { zxr10qos  7}
+    qosIntfCarStat OBJECT IDENTIFIER ::= { zxr10qos  8}
+-- end for  object groups
+
+--The follow part defined some data types which will be used in this qos mib file later
+
+    DisplayString ::= OCTET STRING
+        --  This data type is used to model textual information taken
+        --  from the NVT ASCII character set.  By convention, objects
+        --  with this syntax are declared as having
+        --
+        --       SIZE (0..255)
+    QosCirMatchType ::= INTEGER
+                        {
+                            match-localport(3),
+                            match-acl(4),
+                            match-precedence(5),
+                            match-dscp(6),
+                            match-mpls-exp(7),
+                            match-802dot1p(8),
+                            match-vlanId(9),
+                            match-qos-group(36),
+                            match-address-MAc(37)  
+                        }
+
+    QosCirAction ::= INTEGER
+                        {
+                            drop(0),
+                            continue(1),
+                            transmit(2),
+                            set-prec-continue(3),
+                            set-prec-transmit(4),
+                            set-dscp-continue(5),
+                            set-dscp-transmit(6),
+                            set-exp-continue(9),
+                            set-exp-transmit(10)
+                        }  
+                        
+    QosCBQCarAction ::= INTEGER
+                        {
+                            drop(0),
+                            transmit(2),
+                            set-prec-transmit(4),
+                            set-dscp-transmit(6),
+                            set-exp-transmit(10)
+                        }
+
+    QosPQMatchType ::= INTEGER
+                        {
+                            match-default(1),
+                            match-interface(3),
+                            match-acl(4),
+                            match-precedence(5),
+                            match-dscp(6),
+                            match-mpls-exp(7),
+                            match-802dot1p(8),
+                            match-vlanId(9),
+                            match-address-MAc(37),
+                            match-qos-group(36)
+                        }
+
+    QosPQQueueType ::= INTEGER
+                        {
+                            high(0),
+                            medium(1),
+                            normal(2),
+                            low(3)
+                        }
+
+    QosCMAPMatchType ::= INTEGER
+                        {
+                            match-not(1),
+                            match-acl(4),
+                            match-precedence(5),
+                            match-dscp(6),
+                            match-mpls-exp(7),
+                            match-802dot1p(8),
+                            match-vlanId(9),
+                            match-address-MAc(37),
+                            match-any(19),
+                            match-classmap(21),
+                            match-qos-group(36)
+                        }
+    
+    TrafficDirection ::= INTEGER 
+                        {
+                            output(2)
+                        }
+
+    QueueingBandwidthUnits ::= INTEGER 
+                        { 
+                           percentage(1),
+                           kbps(2)
+                        }
+
+    EntryStatus ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION
+            "The row status value of qos configration" 
+        SYNTAX INTEGER {
+                valid(1),
+                createRequest(2),
+                underCreation(3),
+                invalid(4)
+            }
+   
+
+
+-- end for data type definition
+
+
+-- The follow part defined some objects which will be used in this qos mib file later
+
+-- rate-limit (CIR) interface mib define
+
+    qosModuleStart OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "This object indicates if the qos module start or not. 1 start,0 not start."
+        ::= { zxr10qos 1 }
+
+    qosFreeCirIndex OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The first free cir item index.When a new cir item is created it is used to find a space to save the
+             cir item configration;When deleted its value equals to the index of the cir item deleted,
+             so when a new cir item is created the space can be used again."
+        ::= { qosCARconfig 1 }
+
+-- for the car config property, (the car CLI command only support create, delete),
+-- the table only support create, delete, no change supported 
+
+    qosInputCirIfTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QosInputCirIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The description of zxr10 qos interface input rate-limit configuration.
+             It is a list of qos interface cir entries."
+        ::= { qosCARconfig 2 }
+
+    qosInputCirIfEntry  OBJECT-TYPE
+        SYNTAX  QosInputCirIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "A qos cir interface entry containing objects that
+             qos cir interface infomation,such as:
+             rate-limit match type, commit rate, burst rate, confirm action etc."
+        INDEX  {ifIndex,qosInputCirIndex }
+        ::= { qosInputCirIfTable 1 }
+
+    QosInputCirIfEntry ::=
+        SEQUENCE {
+            qosInputCirIndex
+                INTEGER,
+            qosInputCirMatchType
+                QosCirMatchType,
+            qosInputCirMatchValue
+                DisplayString, -- for mac address
+            qosInputCirCir
+                Gauge,
+            qosInputCirNormalBurstRate
+                Gauge,    
+            qosInputCirPir
+                Gauge,
+            qosInputCirMaxBurstRate
+                Gauge,
+            qosInputCirConformAction
+                QosCirAction,
+            qosInputCirConformValue
+                Gauge,
+            qosInputCirExceedAction
+                QosCirAction,
+            qosInputCirExceedValue
+                Gauge, 
+            qosInputCirViolateAction
+                QosCirAction,
+            qosInputCirViolateValue
+                Gauge,
+            qosInputCirRowStatus
+                EntryStatus,
+            qosInputCirDescription
+                DisplayString
+            }
+
+    qosInputCirIndex  OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-only --not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir config index."
+        ::= { qosInputCirIfEntry 1 }
+
+    qosInputCirMatchType  OBJECT-TYPE
+        SYNTAX  QosCirMatchType
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir match type."
+        ::= { qosInputCirIfEntry 2 }
+
+    qosInputCirMatchValue  OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir match value, for localport, it is 0."
+        ::= { qosInputCirIfEntry 3 }
+
+    qosInputCirCir OBJECT-TYPE
+        SYNTAX  Gauge(8..2000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface commit rate."
+        ::= { qosInputCirIfEntry 4 }
+
+    qosInputCirNormalBurstRate OBJECT-TYPE
+        SYNTAX  Gauge(2000..512000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir normal burst rate."
+        ::= { qosInputCirIfEntry 5 }  
+        
+     qosInputCirPir OBJECT-TYPE
+        SYNTAX  Gauge(8..2000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface peek rate."
+        ::= { qosInputCirIfEntry 6 }
+
+    qosInputCirMaxBurstRate OBJECT-TYPE
+        SYNTAX  Gauge(2000..512000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir max burst rate."
+        ::= { qosInputCirIfEntry 7 }
+
+    qosInputCirConformAction OBJECT-TYPE
+        SYNTAX  QosCirAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir confirm action."
+        ::= { qosInputCirIfEntry 8 }
+
+    qosInputCirConformValue OBJECT-TYPE
+        SYNTAX  Gauge
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             conforms to the configured commit rate."
+        ::= { qosInputCirIfEntry 9 }
+
+    qosInputCirExceedAction OBJECT-TYPE
+        SYNTAX  QosCirAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir exceed action."
+        ::= { qosInputCirIfEntry 10 }
+
+    qosInputCirExceedValue OBJECT-TYPE
+        SYNTAX  Gauge
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             exceeds to the configured commit rate."
+        ::= { qosInputCirIfEntry 11 } 
+        
+    qosInputCirViolateAction OBJECT-TYPE
+        SYNTAX  QosCirAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir violate action."
+        ::= { qosInputCirIfEntry 12 }
+
+    qosInputCirViolateValue OBJECT-TYPE
+        SYNTAX  Gauge
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             exceeds to the configured exceed rate."
+        ::= { qosInputCirIfEntry 13 }
+
+    qosInputCirRowStatus OBJECT-TYPE
+        SYNTAX  EntryStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir item row status. if it is in valid status, it only 
+             can change to invalid status, no other status."
+    ::= { qosInputCirIfEntry 14 }
+
+    qosInputCirDescription OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir description."
+        ::= { qosInputCirIfEntry 15 }
+
+-- qos interface input cir table last change time
+
+    qosInputCirIfTableLastchange OBJECT-TYPE
+        SYNTAX  TimeTicks
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The last time of the qos interface input cir table changed."
+        ::= { qosCARconfig 3 }
+
+-- qos interface output cir config table
+-- for the car config property, (the car CLI command only support create, delete),
+-- the table only support create, delete, no change supported 
+
+    qosOutputCirIfTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QosOutputCirIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The description of zxr10 qos interface output rate-limit configuration.
+             It is a list of qos interface cir entries."
+        ::= { qosCARconfig 4 }
+
+    qosOutputCirIfEntry  OBJECT-TYPE
+        SYNTAX  QosOutputCirIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "A qos cir interface entry containing objects that
+             qos cir interface infomation,such as:
+             rate-limit match type, commit rate, burst rate, confirm action etc."
+        INDEX  { ifIndex,qosOutputCirIndex }
+        ::= { qosOutputCirIfTable 1 }
+
+    QosOutputCirIfEntry ::=
+        SEQUENCE {
+            qosOutputCirIndex
+                INTEGER,
+            qosOutputCirMatchType
+                QosCirMatchType,
+            qosOutputCirMatchValue
+                DisplayString, -- for mac address
+            qosOutputCirCir
+                Gauge,
+            qosOutputCirNormalBurstRate
+                Gauge,   
+            qosOutputCirPir
+                Gauge,
+            qosOutputCirMaxBurstRate
+                Gauge,
+            qosOutputCirConformAction
+                QosCirAction,
+            qosOutputCirConformValue
+                Gauge,
+            qosOutputCirExceedAction
+                QosCirAction,
+            qosOutputCirExceedValue
+                Gauge,           
+            qosOutputCirViolateAction
+                QosCirAction,
+            qosOutputCirViolateValue
+                Gauge,
+            qosOutputCirRowStatus
+                EntryStatus,
+            qosOutputCirDescription
+                DisplayString
+            }
+
+    qosOutputCirIndex  OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-only --not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir config index."
+        ::= { qosOutputCirIfEntry 1 }
+
+    qosOutputCirMatchType  OBJECT-TYPE
+        SYNTAX  QosCirMatchType
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir match type."
+        ::= { qosOutputCirIfEntry 2 }
+
+    qosOutputCirMatchValue  OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir match value, for localport, it is 0."
+        ::= { qosOutputCirIfEntry 3 }
+
+    qosOutputCirCir OBJECT-TYPE
+        SYNTAX  Gauge(8..2000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface commit rate."
+        ::= { qosOutputCirIfEntry 4 }
+
+    qosOutputCirNormalBurstRate OBJECT-TYPE
+        SYNTAX  Gauge(2000..512000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir normal burst rate."
+        ::= { qosOutputCirIfEntry 5 }   
+        
+    qosOutputCirPir OBJECT-TYPE
+        SYNTAX  Gauge(8..2000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface peek rate."
+        ::= { qosOutputCirIfEntry 6 }
+
+    qosOutputCirMaxBurstRate OBJECT-TYPE
+        SYNTAX  Gauge(2000..512000000)
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir max burst rate, it must not be lower than normal burst rate."
+        ::= { qosOutputCirIfEntry 7 }
+
+    qosOutputCirConformAction OBJECT-TYPE
+        SYNTAX  QosCirAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir conform action."
+        ::= { qosOutputCirIfEntry 8 }
+
+    qosOutputCirConformValue OBJECT-TYPE
+        SYNTAX  Gauge
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             conforms to the configured commit rate."
+        ::= { qosOutputCirIfEntry 9 }
+
+    qosOutputCirExceedAction OBJECT-TYPE
+        SYNTAX  QosCirAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir exceed action."
+        ::= { qosOutputCirIfEntry 10 }
+
+    qosOutputCirExceedValue OBJECT-TYPE
+        SYNTAX  Gauge
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             exceeds to the configured commit rate."
+        ::= { qosOutputCirIfEntry 11 }        
+        
+    qosOutputCirViolateAction OBJECT-TYPE
+        SYNTAX  QosCirAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir exceed action."
+        ::= { qosOutputCirIfEntry 12 }
+
+    qosOutputCirViolateValue OBJECT-TYPE
+        SYNTAX  Gauge
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             exceeds to the configured commit rate."
+        ::= { qosOutputCirIfEntry 13 }
+
+    qosOutputCirRowStatus OBJECT-TYPE
+        SYNTAX  EntryStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir item row status. if it is in valid status, it only 
+             can change to invalid status, no other status."
+        ::= { qosOutputCirIfEntry 14 }
+
+    qosOutputCirDescription OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos interface cir description."
+        ::= { qosOutputCirIfEntry 15 }
+
+-- qos interface Output cir table last change time
+
+    qosOutputCirIfTableLastchange OBJECT-TYPE
+        SYNTAX  TimeTicks
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The last time of the qos interface Output cir table changed."
+        ::= {qosCARconfig 5 }
+
+
+
+-- qos priority config table
+
+    qosPriorityQueueCfgTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QosPriorityQueueCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The description of zxr10 qos priority queue configuration.
+             It is a list of qos priority queue entries."
+        ::= { qosPQconfig 1 }
+
+    qosPriorityQueueCfgEntry  OBJECT-TYPE
+        SYNTAX  QosPriorityQueueCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "A qos priority queue entry containing objects that
+             qos priority queue configuration,such as:
+             queue item num, queue limit etc."
+        INDEX  { qosPriorityQueueIndex}
+        ::= { qosPriorityQueueCfgTable 1 }
+
+    QosPriorityQueueCfgEntry ::=
+        SEQUENCE {
+            qosPriorityQueueIndex
+                INTEGER,
+            qosPriorityQueueItemTotal
+                INTEGER,
+            qosPriorityQueueDefault
+                QosPQQueueType,
+            qosPriorityQueueLimitHigh
+                INTEGER,
+            qosPriorityQueueLimitMedium
+                INTEGER, 
+            qosPriorityQueueLimitNormal
+                INTEGER,
+            qosPriorityQueueLimitLow
+                INTEGER,
+            qosPriorityQueueRowStatus
+                EntryStatus
+            }
+
+    qosPriorityQueueIndex  OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue index."
+        ::= { qosPriorityQueueCfgEntry 1 }
+
+    qosPriorityQueueItemTotal  OBJECT-TYPE
+        SYNTAX  INTEGER(0..255)
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The configurated qos priority queue item total,the max number is 255."
+        ::= { qosPriorityQueueCfgEntry 2 }
+
+    qosPriorityQueueDefault  OBJECT-TYPE
+        SYNTAX  QosPQQueueType
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "The qos priority default queue number."
+        ::= { qosPriorityQueueCfgEntry 3 }
+
+    qosPriorityQueueLimitHigh  OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue limit high value."
+        ::= { qosPriorityQueueCfgEntry 4 }
+
+    qosPriorityQueueLimitMedium OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue limit medium value."
+        ::= { qosPriorityQueueCfgEntry 5 }
+
+    qosPriorityQueueLimitNormal OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue limit normal value."
+        ::= { qosPriorityQueueCfgEntry 6 }
+
+    qosPriorityQueueLimitLow OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue limit low value."
+        ::= { qosPriorityQueueCfgEntry 7 }
+
+    qosPriorityQueueRowStatus OBJECT-TYPE
+            SYNTAX  EntryStatus
+            MAX-ACCESS  read-write
+            STATUS  current
+            DESCRIPTION
+                "The qos priority queue status. "
+            ::= { qosPriorityQueueCfgEntry 8 }
+
+
+-- qos priority queue table last change time
+
+    qosPriorityQueueCfgTableLastchange OBJECT-TYPE
+        SYNTAX  TimeTicks
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The last time of the qos priority queue table changed."
+        ::= { qosPQconfig 2 }
+
+-- qos priority queue config information table
+
+    qosPriorityQueueItemTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QosPriorityQueueItemEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "The description of zxr10 qos priority queue configuration.
+             It is a list of qos priority queue entries."
+        ::= { qosPQconfig 3 }
+
+    qosPriorityQueueItemEntry  OBJECT-TYPE
+        SYNTAX  QosPriorityQueueItemEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "A qos priority queue entry containing objects that
+             qos priority queue configuration,such as:
+             set type, queue num, default queue limit etc."
+        INDEX  { qosPriorityQueueIndex,
+                 qosPriorityQueueItemIndex }
+        ::= { qosPriorityQueueItemTable 1 }
+
+    QosPriorityQueueItemEntry ::=
+        SEQUENCE {
+            qosPriorityQueueItemIndex
+                INTEGER,
+            qosPriorityQueueItemMatchType
+                QosPQMatchType,
+            qosPriorityQueueItemMatchValue
+                DisplayString, 
+            qosPriorityQueueItemQueueNum
+                QosPQQueueType,
+            qosPriorityQueueItemRowStatus
+                EntryStatus,
+            qosPriorityQueueItemDescription
+                DisplayString
+            }
+
+    qosPriorityQueueItemIndex  OBJECT-TYPE
+        SYNTAX  INTEGER
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue item index."
+        ::= { qosPriorityQueueItemEntry 1 }
+
+    qosPriorityQueueItemMatchType  OBJECT-TYPE
+        SYNTAX  QosPQMatchType
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue match type such as mpls-exp,interface etc."
+        ::= { qosPriorityQueueItemEntry 2 }
+
+    qosPriorityQueueItemMatchValue OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue match value."
+        ::= { qosPriorityQueueItemEntry 3 }
+
+    qosPriorityQueueItemQueueNum OBJECT-TYPE
+        SYNTAX  QosPQQueueType
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue num."
+        ::= { qosPriorityQueueItemEntry 4 }
+
+    qosPriorityQueueItemRowStatus OBJECT-TYPE
+        SYNTAX  EntryStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos priority queue item row status. "
+        ::= { qosPriorityQueueItemEntry 5 }
+
+    qosPriorityQueueItemDescription OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The qos priority description."
+        ::= { qosPriorityQueueItemEntry 6 }
+
+-- interface pq config
+    qosPriorityGroupTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QosPriorityGroupEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION 
+            "This table describes the interface and 
+             the PriorityQueue that are attached to it"
+        ::= {qosPQconfig 4}
+
+     qosPriorityGroupEntry OBJECT-TYPE
+        SYNTAX QosPriorityGroupEntry
+        MAX-ACCESS not-accessible
+        STATUS current 
+        DESCRIPTION 
+            "Each entry in this table describes to which a 
+             interface a given PriorityQueue is attached"
+        INDEX {ifIndex}
+        ::= { qosPriorityGroupTable 1}
+
+     QosPriorityGroupEntry ::=
+        SEQUENCE {
+            qosPriorityGroupifname
+                DisplayString,
+            qosPriorityGroupNum        
+                INTEGER,
+            qosPriorityGroupRowStatus
+                EntryStatus
+            }
+
+     qosPriorityGroupifname  OBJECT-TYPE
+        SYNTAX DisplayString
+        MAX-ACCESS read-only
+        STATUS current 
+        DESCRIPTION 
+            "The name of the interface which the priority queue attached."
+        ::= {qosPriorityGroupEntry 1}
+
+
+     qosPriorityGroupNum  OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS read-create
+        STATUS current 
+        DESCRIPTION 
+            "The Num of the priority-group which is attached to the interface"
+        ::= {qosPriorityGroupEntry 2}
+
+    qosPriorityGroupRowStatus  OBJECT-TYPE
+        SYNTAX EntryStatus
+        MAX-ACCESS read-create
+        STATUS current 
+        DESCRIPTION 
+            "The row status of the priority group attached to the interface"
+        ::= { qosPriorityGroupEntry 3}
+
+-- The Qos Service Policy information 
+    qosCBQosServicePolicyTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QosCbQosServicePolicyEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION 
+            "This table describes the interface and 
+             the policymap that are attached to it"
+        ::= {qosCBQconfig 1}
+ 
+    qosCBQosServicePolicyEntry OBJECT-TYPE
+        SYNTAX QosCbQosServicePolicyEntry
+        MAX-ACCESS not-accessible
+        STATUS current 
+        DESCRIPTION 
+            "Each entry in this table describes to which a 
+             interface a given policymap is attached"
+        INDEX {ifIndex}
+        ::= {qosCBQosServicePolicyTable 1 }
+
+    QosCbQosServicePolicyEntry ::= 
+        SEQUENCE {
+            qosCbQosPolicyifname
+                DisplayString,
+            qosCbQosPolicyDirection    
+                TrafficDirection,
+            qosCbQosServicePolicyName            
+                DisplayString,
+            qosCbQosServicePolicyRowStatus
+                EntryStatus
+            }
+
+    qosCbQosPolicyifname OBJECT-TYPE
+        SYNTAX DisplayString
+        MAX-ACCESS read-only
+        STATUS current 
+        DESCRIPTION  
+            "The name of the interface which the service policy attached" 
+        ::= {qosCBQosServicePolicyEntry 1}
+
+    qosCbQosPolicyDirection OBJECT-TYPE
+        SYNTAX TrafficDirection
+        MAX-ACCESS read-create
+        STATUS current 
+        DESCRIPTION  
+            "This indicates the direction of traffic 
+             for which this service policy is applied" 
+        ::= {qosCBQosServicePolicyEntry 2}
+
+    qosCbQosServicePolicyName OBJECT-TYPE
+        SYNTAX DisplayString
+        MAX-ACCESS read-create
+        STATUS current 
+        DESCRIPTION  
+            "Name of the service policy which is attached to the interface." 
+        ::= {qosCBQosServicePolicyEntry 3}
+
+     qosCbQosServicePolicyRowStatus OBJECT-TYPE
+        SYNTAX EntryStatus
+        MAX-ACCESS read-create
+        STATUS current 
+        DESCRIPTION  
+            "The qos service policy row status." 
+        ::= {qosCBQosServicePolicyEntry 4}
+    
+-- End the Qos Service Policy information
+
+-- The Qos Policy map information
+    qosCbQosPolicyMapCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosCbQosPolicyMapCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies Policymap configuration information"
+        ::= { qosCBQconfig 2 }
+
+    qosCbQosPolicyMapCfgEntry OBJECT-TYPE
+	SYNTAX      QosCbQosPolicyMapCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes configuration 
+             information about a policymap. "
+        INDEX { qoscbQosPMapIndex }
+        ::= { qosCbQosPolicyMapCfgTable 1 }
+
+    QosCbQosPolicyMapCfgEntry ::= 
+        SEQUENCE {
+            qoscbQosPMapIndex        
+                INTEGER,
+            qoscbQosPolicyMapName       
+                DisplayString,
+            qosCbQosPolicyMapRowStatus
+                EntryStatus,
+            qoscbQosPolicyMapDescription
+                DisplayString
+            }
+ 
+    qoscbQosPMapIndex OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "An index assigned by system for each policy map."
+        ::= { qosCbQosPolicyMapCfgEntry 1 }
+
+    qoscbQosPolicyMapName OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Name of the policymap."
+        ::= { qosCbQosPolicyMapCfgEntry 2 }
+
+    qosCbQosPolicyMapRowStatus OBJECT-TYPE
+        SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The policymap row status."
+        ::= { qosCbQosPolicyMapCfgEntry 3 }
+
+    qoscbQosPolicyMapDescription OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Description of the policymap. "
+        ::= { qosCbQosPolicyMapCfgEntry 4 }
+
+-- End the Qos Policy map information
+
+-- The Qos Class map information
+    qosCbQosClassMapCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosCbQosClassMapCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies ClassMap configuration information"
+        ::= {qosCBQconfig 3}
+
+    qosCbQosClassMapCfgEntry OBJECT-TYPE
+        SYNTAX      QosCbQosClassMapCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes configuration 
+             information about a classmap"
+        INDEX { qoscbQosCMapIndex }
+        ::= {qosCbQosClassMapCfgTable 1 }
+
+    QosCbQosClassMapCfgEntry ::=
+        SEQUENCE {
+            qoscbQosCMapIndex        
+                INTEGER,
+            qosCbQosClassMapName 
+                DisplayString,
+            qosCbQosClassMapRowStatus
+                EntryStatus,
+            qoscbQosClassMapDescription
+                DisplayString
+            }
+   
+    qoscbQosCMapIndex OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "An index assigned by system for each class map"
+        ::= {qosCbQosClassMapCfgEntry 1 }
+
+    qosCbQosClassMapName OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Name of the Classmap."
+        ::= {qosCbQosClassMapCfgEntry 2 }
+
+     qosCbQosClassMapRowStatus OBJECT-TYPE
+        SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The classMap row status."
+        ::= {qosCbQosClassMapCfgEntry 3 }
+
+    qoscbQosClassMapDescription OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Description of the Classmap."
+        ::= {qosCbQosClassMapCfgEntry 4 }
+   
+-- End the Class map information
+
+-- The Class map match information
+    qosCbQosCMAPMatchCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosCbQosCMAPMatchCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies ClassMap configuration information "
+        ::= {qosCBQconfig 4}   
+
+    qosCbQosCMAPMatchCfgEntry OBJECT-TYPE
+        SYNTAX      QosCbQosCMAPMatchCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes configuration information
+             about a Match Statement"
+        INDEX {qoscbQosCMapIndex,qosCbQosCMAPMatchIndex}
+        ::= { qosCbQosCMAPMatchCfgTable 1 }   
+
+    QosCbQosCMAPMatchCfgEntry ::=
+        SEQUENCE {
+            qosCbQosCMAPMatchIndex
+                INTEGER,
+            qosCbQosCMAPMatchType 
+                QosCMAPMatchType,
+            qosCbQosCMAPMatchValue
+                DisplayString, -- for match classmap etc.
+            qosCbQosCMAPMatchRowStatus
+                EntryStatus 
+            }
+    
+    qosCbQosCMAPMatchIndex OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "An index assigned by system for each Match Statement"
+        ::= { qosCbQosCMAPMatchCfgEntry 1 } 
+
+    qosCbQosCMAPMatchType OBJECT-TYPE
+        SYNTAX      QosCMAPMatchType
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Name of the Match Statement"
+        ::= { qosCbQosCMAPMatchCfgEntry 2 } 
+
+    qosCbQosCMAPMatchValue OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Name of the Match Statement"
+        ::= { qosCbQosCMAPMatchCfgEntry 3 }  
+
+     qosCbQosCMAPMatchRowStatus OBJECT-TYPE
+        SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The qos classMap match statment row status"
+        ::= { qosCbQosCMAPMatchCfgEntry 4 }    
+
+-- End the Class map match information
+
+ -- The policy class information
+    qosCbQosPolicyClassCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosCbQosPolicyClassCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies policy class information "
+        ::= {qosCBQconfig 5} 
+        
+    qosCbQosPolicyClassCfgEntry OBJECT-TYPE
+        SYNTAX      QosCbQosPolicyClassCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes a policy class"
+        INDEX {qoscbQosPMapIndex,qoscbQosCMapIndex}
+        ::= { qosCbQosPolicyClassCfgTable 1 }   
+   
+     QosCbQosPolicyClassCfgEntry ::=
+        SEQUENCE {
+            qosCbQosPolicyClassName 
+                DisplayString,
+            qosCbQosPolicyClassRowStatus
+                EntryStatus
+            }  
+           
+     qosCbQosPolicyClassName OBJECT-TYPE
+        SYNTAX      DisplayString
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Name of the policy class."
+        ::= {qosCbQosPolicyClassCfgEntry 1 }
+
+     qosCbQosPolicyClassRowStatus OBJECT-TYPE
+        SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The policy class row status."
+        ::= {qosCbQosPolicyClassCfgEntry 2 }
+
+-- End the policy class information
+ 
+-- Policy-class queue config information
+    qosCbQosqueueCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosCbQosqueueCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies policy-class queue 
+             configuration information"
+        ::= { qosCBQconfig 6 } 
+
+    qosCbQosqueueCfgEntry OBJECT-TYPE
+        SYNTAX      QosCbQosqueueCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes configuration 
+             information about a policy-map queue."
+        INDEX {qoscbQosPMapIndex,qoscbQosCMapIndex}
+        ::= { qosCbQosqueueCfgTable 1 } 
+
+    QosCbQosqueueCfgEntry ::=
+        SEQUENCE {
+            qosCbQosQueueingCfgPriorityQueueNo
+                QosPQQueueType,
+            qosCbQosqueueRowStatus
+                EntryStatus 
+            }
+    
+    qosCbQosQueueingCfgPriorityQueueNo OBJECT-TYPE
+        SYNTAX      QosPQQueueType
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "If the traffic is specified to LLQ,the value is the queue number,
+             else is NULL"
+        ::= { qosCbQosqueueCfgEntry 1 }
+
+
+     qosCbQosqueueRowStatus OBJECT-TYPE
+        SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The qos cbwfq action row status."
+        ::= {qosCbQosqueueCfgEntry 2 }  
+                           
+  -- End policy-class queue config information
+ 
+  -- Policy-class bandwidth config information
+                        
+     qosCbQosbandwidthCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosCbQosbandwidthCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies policy-class bandwidth 
+             configuration information"
+        ::= { qosCBQconfig 7 } 
+
+    qosCbQosbindwidthCfgEntry OBJECT-TYPE
+        SYNTAX      QosCbQosbandwidthCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes configuration 
+             information about a policy-map bandwidth."
+        INDEX {qoscbQosPMapIndex,qoscbQosCMapIndex}
+        ::= { qosCbQosbandwidthCfgTable 1 } 
+
+    QosCbQosbandwidthCfgEntry ::=
+        SEQUENCE {
+            qosCbQosQueueingCfgBandwidth        
+                INTEGER,
+            qosCbQosQueueingCfgBandwidthUnits   
+                QueueingBandwidthUnits,
+            qosCbQosActionRowStatus
+                EntryStatus 
+            }
+    
+     qosCbQosQueueingCfgBandwidth OBJECT-TYPE
+        SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The configured bandwidth allocated to 
+             this traffic class."
+        ::= { qosCbQosbindwidthCfgEntry 1 } 
+
+    qosCbQosQueueingCfgBandwidthUnits OBJECT-TYPE
+        SYNTAX      QueueingBandwidthUnits
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Units of the accompanying bandwidth parameter"
+        ::= {qosCbQosbindwidthCfgEntry 2 }
+
+     qosCbQosActionRowStatus OBJECT-TYPE
+        SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "The qos cbwfq action row status."
+        ::= {qosCbQosbindwidthCfgEntry 3 }  
+
+                           
+                           
+-- End policy-class action information
+
+-- Policy-class police information
+    qosCbQosPoliceCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosCbQosPoliceCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies Police Action configuration 
+             information."
+        ::= {qosCBQconfig 8 }
+
+    qosCbQosPoliceCfgEntry OBJECT-TYPE
+        SYNTAX      QosCbQosPoliceCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes configuration information
+             about a Police Action.  The table holds Policy 
+             configuration parameters, such as rate, burst size, and 
+             actions based on traffic rates "
+        INDEX {qoscbQosPMapIndex,qoscbQosCMapIndex}
+        ::= { qosCbQosPoliceCfgTable 1 }  
+
+    QosCbQosPoliceCfgEntry ::= 
+        SEQUENCE {
+            qosCbQosPoliceCfgCir               
+                INTEGER,
+            qosCbQosPoliceCfgBurstSize          
+                INTEGER, 
+            qosCbQosPoliceCfgPir               
+                INTEGER,
+            qosCbQosPoliceCfgExtBurstSize       
+                INTEGER,
+            qosCbQosPoliceCfgConformAction      
+                QosCBQCarAction,
+            qosCbQosPoliceCfgConformSetValue    
+                Gauge,
+            qosCbQosPoliceCfgExceedAction       
+                QosCBQCarAction,
+            qosCbQosPoliceCfgExceedSetValue     
+                Gauge,          
+            qosCbQosPoliceCfgViolateAction       
+                QosCBQCarAction,
+            qosCbQosPoliceCfgViolateSetValue     
+                Gauge,
+            qosCbQosPoliceCfgRowStatus
+                EntryStatus
+            }
+
+
+    qosCbQosPoliceCfgCir OBJECT-TYPE
+        SYNTAX  INTEGER (8..2000000)
+        UNITS   "Kilobits/second"
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The committed policing cir. This is the sustained
+             rate permitted by policing."
+        ::= { qosCbQosPoliceCfgEntry 1 }
+
+    qosCbQosPoliceCfgBurstSize OBJECT-TYPE
+        SYNTAX  INTEGER (2000..512000000)
+        UNITS   "bytes"
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+                "The burst size ,in bytes,of a traffic."
+        ::= { qosCbQosPoliceCfgEntry 2 }    
+        
+    qosCbQosPoliceCfgPir OBJECT-TYPE
+        SYNTAX  INTEGER (8..2000000)
+        UNITS   "Kilobits/second"
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The committed policing cir. This is the peek
+             rate permitted by policing."
+        ::= { qosCbQosPoliceCfgEntry 3 }
+
+    qosCbQosPoliceCfgExtBurstSize OBJECT-TYPE
+        SYNTAX  INTEGER (2000..512000000)
+        UNITS   "bytes"
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The Max burst size ,in bytes,of a traffic."
+        ::= { qosCbQosPoliceCfgEntry 4 }
+
+    qosCbQosPoliceCfgConformAction OBJECT-TYPE
+        SYNTAX  QosCBQCarAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "Action to be taken when the traffic is within the
+             configured rate, that is, the traffic rate is conforming."
+        ::= { qosCbQosPoliceCfgEntry 5 }
+
+    qosCbQosPoliceCfgConformSetValue OBJECT-TYPE
+        SYNTAX  Gauge 
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             conforms to the configured Police rate."
+        ::= { qosCbQosPoliceCfgEntry 6 }
+
+    qosCbQosPoliceCfgExceedAction OBJECT-TYPE
+        SYNTAX  QosCBQCarAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "Action to be taken when the traffic is exceeds the
+             configured rate, that is, the traffic rate is non-conforming."
+        ::= { qosCbQosPoliceCfgEntry 7 }
+
+    qosCbQosPoliceCfgExceedSetValue OBJECT-TYPE
+        SYNTAX  Gauge 
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             conforms to the configured Police rate."
+        ::= {qosCbQosPoliceCfgEntry 8 }        
+        
+     qosCbQosPoliceCfgViolateAction OBJECT-TYPE
+        SYNTAX  QosCBQCarAction
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "Action to be taken when the traffic is exceeds the
+             peek rate, that is, the traffic rate is non-conforming."
+        ::= { qosCbQosPoliceCfgEntry 9 }
+
+    qosCbQosPoliceCfgViolateSetValue OBJECT-TYPE
+        SYNTAX  Gauge 
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "New packet attribute values for each packets that 
+             conforms to the peek Police rate."
+        ::= {qosCbQosPoliceCfgEntry 10 }
+
+     qosCbQosPoliceCfgRowStatus OBJECT-TYPE
+        SYNTAX  EntryStatus 
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            "The row status qos cbwfq police configration."
+        ::= {qosCbQosPoliceCfgEntry 11 } 
+        
+-- End policy-class police information
+
+--  qos WRED config information
+    qosWREDprecedenceCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosWREDprecedenceCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies wred precedence configuration 
+             information."
+        ::= { qosWREDconfig 1 }
+ 
+    qosWREDprecedenceCfgEntry  OBJECT-TYPE
+	SYNTAX      QosWREDprecedenceCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	    "Each entry in this table describes configuration 
+             information about a wred policy."
+        INDEX {ifIndex,qosREDCfgPreValue}
+        ::= {qosWREDprecedenceCfgTable 1}
+    
+    QosWREDprecedenceCfgEntry ::=
+        SEQUENCE {
+            qosREDCfgPreValue               
+                INTEGER,  
+            qosREDprecedenceCfgMinThreshold               
+                INTEGER,
+            qosREDprecedenceCfgMaxThreshold          
+                INTEGER,
+            qosREDprecedenceCfgPktDropProb       
+                INTEGER,
+            qosREDCfgprecedenceRowStatus      
+                EntryStatus
+            }
+   
+   
+    qosREDCfgPreValue  OBJECT-TYPE
+	SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "The IP precedence of this entry."
+        ::= {qosWREDprecedenceCfgEntry 1} 
+
+    qosREDprecedenceCfgMinThreshold  OBJECT-TYPE
+	SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "Minimum threshold in number of packets. When the 
+             average queue length reaches this number, WRED begins 
+             to drop packets with the specified IP precedence."
+        ::= {qosWREDprecedenceCfgEntry 2} 
+
+    qosREDprecedenceCfgMaxThreshold  OBJECT-TYPE
+	SYNTAX      INTEGER
+        MAX-ACCESS  read-create  
+        STATUS      current
+        DESCRIPTION
+	    "Maximum threshold in number of packets. When the 
+             average queue length exceeds this number, WRED drops 
+             all packets with the specified IP precedence."
+        ::= {qosWREDprecedenceCfgEntry 3} 
+
+    qosREDprecedenceCfgPktDropProb  OBJECT-TYPE
+	SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "Denominator for the fraction of packets dropped when 
+             the average queue depth is MaxDepthThreshold. For 
+             example, if the denominator is 10, one out of every 10
+             packets is dropped when the average queue is at the 
+             MaxDepthThreshold."
+        ::= {qosWREDprecedenceCfgEntry 4} 
+
+     qosREDCfgprecedenceRowStatus  OBJECT-TYPE
+	    SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "The row status of qos wred configration."
+        ::= {qosWREDprecedenceCfgEntry 5} 
+       
+       
+     qosWREDweightCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosWREDweightCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies wred weight configuration 
+             information."
+        ::= { qosWREDconfig 2 }
+  
+      qosWREDweightCfgEntry  OBJECT-TYPE
+	    SYNTAX      QosWREDweightCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	    "Each entry in this table describes configuration 
+             information about a wred weight policy."
+        INDEX {ifIndex}
+        ::= {qosWREDweightCfgTable 1}   
+        
+        
+       QosWREDweightCfgEntry ::=
+         SEQUENCE {
+            qosREDCfgweightValue               
+                INTEGER,  
+            qosREDCfgweightRowStatus      
+                EntryStatus
+            }
+
+      qosREDCfgweightValue OBJECT-TYPE
+	    SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "The decay factor for the queue average calculation.
+             The decay factor is equal to raising 2 to the power 
+             of N, where N could be up to 16. 
+             The smaller the number, the faster it decays."
+        ::= {qosWREDweightCfgEntry 1} 
+                   
+       qosREDCfgweightRowStatus  OBJECT-TYPE
+	    SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "The row status of qos wred weight configration."
+        ::= {qosWREDweightCfgEntry 2} 
+    
+                   
+               
+--  qos WFQ config information
+
+     qosWFQCfgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF QosWFQCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table specifies WFQ configuration 
+             information."
+        ::= {qosWFQconfig 1 }
+
+    qosWFQCfgEntry OBJECT-TYPE
+        SYNTAX      QosWFQCfgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry in this table describes configuration 
+             information about a wfq policy."  
+        INDEX {ifIndex}
+        ::= {qosWFQCfgTable 1 }
+
+    QosWFQCfgEntry ::=
+        SEQUENCE {
+            qosWFQCfgTotalQueueNum               
+                INTEGER,
+            qosWFQCfgQueueLimit   
+                INTEGER,
+            qosWFQCfgRowStatus   
+                EntryStatus
+            }
+
+    qosWFQCfgTotalQueueNum  OBJECT-TYPE
+	    SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "Total queue number used for wfq in the interface."
+        ::= {qosWFQCfgEntry 1} 
+
+    qosWFQCfgQueueLimit  OBJECT-TYPE
+	SYNTAX      INTEGER
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "The discard threshold for each queue."
+        ::= {qosWFQCfgEntry 2} 
+
+    qosWFQCfgRowStatus  OBJECT-TYPE
+	SYNTAX      EntryStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	    "The row status of qos wfq configration."
+        ::= {qosWFQCfgEntry 3} 
+
+ --  intf traffic statistics info
+    
+    qosIfTraffStatInfoTable  OBJECT-TYPE
+        SYNTAX  SEQUENCE OF QosIfTraffStatInfoEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Display the traffic  and the utilization of the interface after rate-limit policy.
+             It is a list of qos interface car stat entries."
+        ::= { qosIntfCarStat 1 }
+
+    qosIfTraffStatInfoEntry  OBJECT-TYPE
+        SYNTAX  QosIfTraffStatInfoEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+            "Display the traffic  and the utilization of the interface after rate-limit policy."
+        INDEX  {ifIndex}
+        ::= { qosIfTraffStatInfoTable 1 }
+
+    QosIfTraffStatInfoEntry ::=
+        SEQUENCE {
+            qosIntfName
+                DisplayString,
+            qosIntfInUtilization
+                DisplayString,
+            qosIntfInCarTotalPackets
+                DisplayString,
+            qosIntfInCarTranPackets
+                DisplayString,
+            qosIntfInCarDropPackets
+                DisplayString, 
+            qosIntfInCarTotalBytes
+                DisplayString,
+            qosIntfInCarTranBytes
+                DisplayString,
+            qosIntfInCarDropBytes
+                DisplayString,
+            qosIntfOutUtilization
+                DisplayString,
+            qosIntfOutCarTotalPackets
+                DisplayString,
+            qosIntfOutCarTranPackets
+                DisplayString,
+            qosIntfOutCarDropPackets
+                DisplayString, 
+            qosIntfOutCarTotalBytes
+                DisplayString,
+            qosIntfOutCarTranBytes
+                DisplayString,
+            qosIntfOutCarDropBytes
+                DisplayString
+            }
+
+    qosIntfName  OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The name of the interface."
+        ::= { qosIfTraffStatInfoEntry 1 }
+
+    qosIntfInUtilization  OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The utilization of the in interface."
+        ::= { qosIfTraffStatInfoEntry 2 }
+
+    qosIntfInCarTotalPackets  OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The total packets of the in interface."
+        ::= { qosIfTraffStatInfoEntry 3 }
+
+    qosIntfInCarTranPackets OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The transmit packets of the in interface."
+        ::= { qosIfTraffStatInfoEntry 4 }
+
+    qosIntfInCarDropPackets OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The drop packets of the in interface."
+        ::= { qosIfTraffStatInfoEntry 5 }
+
+    qosIntfInCarTotalBytes OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The total bytes of the in interface."
+        ::= { qosIfTraffStatInfoEntry 6 }
+
+    qosIntfInCarTranBytes OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The transmit bytes of the in interface."
+        ::= { qosIfTraffStatInfoEntry 7 }
+
+    qosIntfInCarDropBytes OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The drop bytes of the in interface."
+        ::= { qosIfTraffStatInfoEntry 8 } 
+
+    qosIntfOutUtilization  OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The utilization of the out interface."
+        ::= { qosIfTraffStatInfoEntry 9 }
+
+    qosIntfOutCarTotalPackets  OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The total packets of the out interface."
+        ::= { qosIfTraffStatInfoEntry 10 }
+
+    qosIntfOutCarTranPackets OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The transmit packets of the out interface."
+        ::= { qosIfTraffStatInfoEntry 11 }
+
+    qosIntfOutCarDropPackets OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The drop packets of the out interface."
+        ::= { qosIfTraffStatInfoEntry 12 }
+
+    qosIntfOutCarTotalBytes OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The total bytes of the out interface."
+        ::= { qosIfTraffStatInfoEntry 13 }
+
+    qosIntfOutCarTranBytes OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The transmit bytes of the out interface."
+        ::= { qosIfTraffStatInfoEntry 14 }
+
+    qosIntfOutCarDropBytes OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+            "The drop bytes of the out interface."
+        ::= { qosIfTraffStatInfoEntry 15 }
+                
+ --  intf traffic statistics info   
+  
+     END

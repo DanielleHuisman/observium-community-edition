@@ -1,0 +1,1409 @@
+--****************************************************************************
+--
+-- Copyright (c) 2003-2009 Broadcom Corporation
+--
+-- This program is the proprietary software of Broadcom Corporation and/or
+-- its licensors, and may only be used, duplicated, modified or distributed
+-- pursuant to the terms and conditions of a separate, written license
+-- agreement executed between you and Broadcom (an "Authorized License").
+-- Except as set forth in an Authorized License, Broadcom grants no license
+-- (express or implied), right to use, or waiver of any kind with respect to
+-- the Software, and Broadcom expressly reserves all rights in and to the
+-- Software and all intellectual property rights therein.  IF YOU HAVE NO
+-- AUTHORIZED LICENSE, THEN YOU HAVE NO RIGHT TO USE THIS SOFTWARE IN ANY WAY,
+-- AND SHOULD IMMEDIATELY NOTIFY BROADCOM AND DISCONTINUE ALL USE OF THE
+-- SOFTWARE.  
+--
+-- Except as expressly set forth in the Authorized License,
+--
+-- 1.     This program, including its structure, sequence and organization,
+-- constitutes the valuable trade secrets of Broadcom, and you shall use all
+-- reasonable efforts to protect the confidentiality thereof, and to use this
+-- information only in connection with your use of Broadcom integrated circuit
+-- products.
+--
+-- 2.     TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SOFTWARE IS PROVIDED
+-- "AS IS" AND WITH ALL FAULTS AND BROADCOM MAKES NO PROMISES, REPRESENTATIONS
+-- OR WARRANTIES, EITHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, WITH
+-- RESPECT TO THE SOFTWARE.  BROADCOM SPECIFICALLY DISCLAIMS ANY AND ALL
+-- IMPLIED WARRANTIES OF TITLE, MERCHANTABILITY, NONINFRINGEMENT, FITNESS FOR
+-- A PARTICULAR PURPOSE, LACK OF VIRUSES, ACCURACY OR COMPLETENESS, QUIET
+-- ENJOYMENT, QUIET POSSESSION OR CORRESPONDENCE TO DESCRIPTION. YOU ASSUME
+-- THE ENTIRE RISK ARISING OUT OF USE OR PERFORMANCE OF THE SOFTWARE.
+--
+-- 3.     TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL BROADCOM
+-- OR ITS LICENSORS BE LIABLE FOR (i) CONSEQUENTIAL, INCIDENTAL, SPECIAL,
+-- INDIRECT, OR EXEMPLARY DAMAGES WHATSOEVER ARISING OUT OF OR IN ANY WAY
+-- RELATING TO YOUR USE OF OR INABILITY TO USE THE SOFTWARE EVEN IF BROADCOM
+-- HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES; OR (ii) ANY AMOUNT IN
+-- EXCESS OF THE AMOUNT ACTUALLY PAID FOR THE SOFTWARE ITSELF OR U.S. $1,
+-- WHICHEVER IS GREATER. THESE LIMITATIONS SHALL APPLY NOTWITHSTANDING ANY
+-- FAILURE OF ESSENTIAL PURPOSE OF ANY LIMITED REMEDY.
+--
+--****************************************************************************
+--    Filename: brcm-80211-mgmt.mib
+--    Author:   Kevin O'Neal
+--    Creation Date: 6-march-2003
+--
+--**************************************************************************
+--    Description:
+--
+--		private MIB for runtime (not factory) management of 802.11 (Wi-Fi)
+--      settings.
+--		
+--**************************************************************************
+--    Revision History:
+--
+--**************************************************************************
+
+BRCM-80211-MGMT-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32,
+    Unsigned32,
+    IpAddress
+        FROM SNMPv2-SMI
+    TruthValue,
+    DisplayString,
+    MacAddress,
+    PhysAddress,
+    RowStatus
+        FROM SNMPv2-TC
+    InetAddressType,
+    InetAddress
+        FROM INET-ADDRESS-MIB
+    ifIndex
+        FROM IF-MIB
+    cableDataMgmtMIBObjects
+        FROM BRCM-CABLEDATA-MGMT-MIB;
+
+ieee802dot11Mgmt MODULE-IDENTITY
+    LAST-UPDATED "200901120000Z"
+    ORGANIZATION "Broadcom Corporation"
+    CONTACT-INFO
+        "	BANANA-CABLEDATA
+                (cableData branch of the
+                Broadcom Assigned Numbers and Naming Authority)
+                Broadcom Corporation
+
+        Postal: 4385 River Green Parkway
+                Duluth, GA  30096
+                USA
+
+           Tel: +1 770 232-0018
+
+        E-mail: banana-cabledata@broadcom.com"
+    DESCRIPTION
+            "Broadcom proprietary MIB for runtime management and configuration
+             of objects related to the wi-fi network interface."
+    REVISION      "200901120000Z"
+    DESCRIPTION
+            "Updated the description of dot11ApplySettings."
+    REVISION      "200806270000Z"
+    DESCRIPTION
+            "Added 802.11N items and redefined dot11CurrentChannel to allow
+	     N control channel to be set."
+    REVISION      "200709100000Z"
+    DESCRIPTION
+            "Updated dot11CurrentChannel to allow auto mode to be set."
+    REVISION      "200709100000Z"
+    DESCRIPTION
+            "Updated dot1154gNetMode values and added dot11BasicRateSet to be
+	     consistent with the controls on the GUI."
+    REVISION      "200707290000Z"
+    DESCRIPTION
+            "Updated the description of dot11ApplySettings."
+    REVISION      "200703010000Z"
+    DESCRIPTION
+            "Re-worked MIB to support multiple basic service sets.
+             - Obsoleted the dot11MgmtPrivacy and dot11MgmtAccess groups.
+             - Introduced new group dot11MgmtMbss which contains sub-groups
+               dot11MbssBase, dot11MbssSecurity, and dot11MbssAccess.  These
+               groups contain tables which allow configuration of settings
+               per service set."
+    REVISION      "200702050000Z"
+    DESCRIPTION
+            "Module description was updated. 
+             Compilability issues were cleaned up: 
+             - Chronological order of revision history was corrected.
+             - Range restriction was added to object dot11AccessIndex."
+    REVISION      "200408110000Z"
+    DESCRIPTION
+            "Fixed an error in the size of objects dot1164BitKeyValue and
+             dot11128BitKeyValue."    
+    REVISION      "200311200000Z"
+    DESCRIPTION
+            "Updates to objects dot1154gNetMode, dot11EncryptionMode, 
+             dot11AuthenticationMode, and dot11AccessMode."
+    REVISION      "200308200000Z"
+    DESCRIPTION
+            "Added dot11ApplySettings object for on-the-fly configuration."         
+    REVISION      "200308050000Z"
+    DESCRIPTION
+            "Added some new objects primarily related to WPA and 54g."
+    REVISION      "200304160000Z"
+    DESCRIPTION
+            "Changed a few object names to avoid conflicting with the same
+             names in the IEEE802dot11-MIB."        
+    REVISION      "200303060000Z"
+    DESCRIPTION
+            "Initial version of this MIB module."
+    ::= { cableDataMgmtMIBObjects 5 }
+
+
+-- dot11MgmtBase group has the settings from the Enable, Basic, and Advanced
+-- web pages.
+
+dot11MgmtBase OBJECT IDENTIFIER ::= { ieee802dot11Mgmt 1 }
+
+-- 'Enable' web page objects
+
+dot11OperMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                notAvailable(0),
+                off(1),
+                remote(2),
+                local(3)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Used to control the 802.11 operational mode.  If set to 
+         notAvailable(0), then the wireless interface will be disabled, with
+         the radio off, and no wireless settings web pages will be available to 
+         the user.  
+         
+         If set to off(1) then the wireless interface will be disabled, but 
+         there may be a web page present which indicates that wireless service 
+         is available and that the MSO should be contacted to enable it.  
+         
+         If set to remote(2), then the wireless interface will be enabled, but 
+         the configuration web pages are read-only so that the user may not 
+         change the settings. 
+         
+         If set to local(3), then the wireless interface will be enabled, and 
+         the web pages will be read-write so that the user has full control over 
+         the settings."
+    ::= { dot11MgmtBase 1 }
+
+-- 'Basic' web page objects
+
+dot11SSID OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..32))
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Controls and reflects the service set identifier."
+    ::= { dot11MgmtBase 2 }
+
+dot11CurrentChannel OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..216)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the current channel number (802.11g) or
+	 control channel (802.11n).
+
+         If set to (0), the AP will be put in auto-channel mode where
+	 it automatically scans for the least-crowded channel.
+
+         For 802.11g cards, available channels are 1-14.
+	 For 802.11n cards, available channels are 34-216.
+
+         Channel selection is also subject to restrictions based on the selected
+	 country code."
+    ::= { dot11MgmtBase 3 }
+
+-- 'Advanced' web page objects
+
+dot11BeaconInterval OBJECT-TYPE
+    SYNTAX      Unsigned32  (0..65535)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the beacon interval for the device."
+    ::= { dot11MgmtBase 4 }
+
+dot11DTIMInterval OBJECT-TYPE
+    SYNTAX      Unsigned32  (1..255)
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the DTIM interval for the device."
+    ::= { dot11MgmtBase 5 }
+
+-- Renamed from dot11FragmentationThreshold to avoid conflict w/ IEEE 802.11 MIB
+dot11FragThresh OBJECT-TYPE
+    SYNTAX      Unsigned32  (256..2346)
+    UNITS       "bytes"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the fragmentation threshold for the device."
+    ::= { dot11MgmtBase 6 }
+
+-- Renamed from dot11RTSThreshold to avoid conflict w/ IEEE 802.11 MIB
+dot11RTSThresh OBJECT-TYPE
+    SYNTAX      Unsigned32  (0..2347)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the RTS threshold for the device."
+    ::= { dot11MgmtBase 7 }
+
+-- Short and Long Retry Limit not on the web page, but presented here.    
+
+-- Renamed from dot11ShortRetryLimit to avoid conflict w/ IEEE 802.11 MIB
+dot11SRL OBJECT-TYPE
+    SYNTAX      Unsigned32  (1..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the short retry limit for the device."
+    ::= { dot11MgmtBase 8 }
+    
+-- Renamed from dot11LongRetryLimit to avoid conflict w/ IEEE 802.11 MIB
+dot11LRL OBJECT-TYPE
+    SYNTAX      Unsigned32  (1..255)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the long retry limit for the device."
+    ::= { dot11MgmtBase 9 }
+    
+dot1154gNetMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+		mode54g11bOnly(0),
+		mode54gAuto(1),
+		mode54gPerformance(4),
+		mode54gLRS(5)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the behavior of the device with regards to which
+         flavor of 802.11 is used.  If set to mode54gLRS(5), the device
+         will interoperate with the widest variety of 54g and 802.11b clients.
+         If set to mode54gPerformance(4), the highest throughout will be provided 
+         and only 54g clients will be accepted, however nearby 802.11b networks 
+         may suffer degraded performance.  If set to mode54g11bOnly(0), only 802.11b clients
+	 will be accepted.  If set to mode54gAuto(1) the device will attempt to operate
+	 at 54g rates unless an 802.11b client is detected."
+    DEFVAL { mode54gAuto }
+    ::= { dot11MgmtBase 10 }
+    
+dot1154gProtectionEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the state of 54g protection.  If set to true(1),
+         the AP will use RTS/CTS to improve 802.11g performance in mixed 
+         802.11g/802.11b networks.  Set to false(2) to maximize 802.11g 
+         throughput under most conditions."
+    DEFVAL { false }
+    ::= { dot11MgmtBase 11 }
+
+dot11Rate OBJECT-TYPE
+    SYNTAX      INTEGER {
+                auto(0),
+                mbits1(1),
+                mbits2(2),
+                mbits5-5(5),
+                mbits6(6),
+                mbits9(9),
+                mbits11(11),
+                mbits12(12),
+                mbits18(18),
+                mbits24(24),
+                mbits36(36),
+                mbits48(48),
+                mbits54(54)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Forces the transmission rate for the AP to a particular speed."
+    DEFVAL { auto }
+    ::= { dot11MgmtBase 12 }
+
+dot11OutputPower OBJECT-TYPE
+    SYNTAX      INTEGER {
+                percent25(25),
+                percent50(50),
+                percent75(75),
+                percent100(100)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Sets the output power relative to the hardware's maximum capability."
+    DEFVAL { percent100 }
+    ::= { dot11MgmtBase 13 }
+    
+
+dot11MbssUserControl OBJECT-TYPE
+    SYNTAX      INTEGER 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Sets the number of user controlled Wifi networks.
+		    0 <--- The user has no control over wireless. No 802.11 web pages will be displayed. 
+			       For now, we don't need to support this. An attempt to set it to zero can just 
+				   return an error.
+			1 <--- The user has control over the primary wireless network only. No guest network 
+			       page is displayed.
+			2 <--- The user has control over the primary wireless network and one guest network. 
+			       No drop down menu (or only 1 item in the menu) for additional guest network 
+				   configuration.
+			3 <--- Same as above with 2 guest networks
+			4 <--- Same as above with 3 guest networks (Our current implementation)."
+    DEFVAL { 100 }
+    ::= { dot11MgmtBase 14 }
+    
+dot11BasicRateSet OBJECT-TYPE
+    SYNTAX      INTEGER {
+		default(1),
+		all(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Determines which rates are advertised as BASIC rates in the beacon.
+	 If set to default, the driver defaults for the selected 54gMode will
+	 be used.  If set to all, all available rates will be advertised as
+	 BASIC rates regardless of the 54gMode setting."
+    DEFVAL { default }
+    ::= { dot11MgmtBase 15 }
+
+dot11NMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+		auto(1),
+		off(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Determines which Mode the N card will run in. Auto Mode will detect which
+		stations are out there and run in the proper mode, Off Mode will make it such
+		the card will not run in N mode but will operate in the mode specified by
+		dot1154gNetMode.
+		Note: This is for N cards only, and this also affect other MIB selections."
+    ::= { dot11MgmtBase 16 }
+   
+dot11NPhyRate OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  auto(0),
+                  legacy(1),
+                  mbits6-5or13-5(2),
+                  mbits13or27(3),
+                  mbits19-5or40-5(4),
+                  mbits26or54(5),
+                  mbits39or81(6),
+                  mbits52or108(7),
+                  mbits58-5or121-5(8),
+                  mbits65or135(9),
+                  mbits13or27(10),
+                  mbits26or54(11),
+                  mbits39or81(12),
+                  mbits52or108(13),
+                  mbits78or162(14),
+                  mbits104or216(15),
+                  mbits117or243(16),
+                  mbits130or270(17)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Forces the N Phy transmission rate for the AP to a particular speed.  Each pair of rates
+         corresponds to a 20 MHz or 40 MHz channel configuration."
+    DEFVAL { auto }
+    ::= { dot11MgmtBase 17 }
+ 
+
+dot11NBand OBJECT-TYPE
+    SYNTAX      INTEGER {
+		band-2-4G(1),
+		band-5G(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Determines which Band that we will be operating in. Either the 2.4G or the 5G Hz.
+		Note: This is for N cards only."
+    ::= { dot11MgmtBase 18 }
+
+dot11NBandWidth OBJECT-TYPE
+    SYNTAX      INTEGER {
+		width-20MHz(1),
+		width-40MHz(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Determines which Band Width that we will be operating in. Either the 20MHz or the 40MHz.
+		Note: This is for N cards only, and this also affect other MIB selections such as dot11NSideBand."
+    ::= { dot11MgmtBase 19 }
+
+dot11NSideBand OBJECT-TYPE
+    SYNTAX      INTEGER {
+		upper(1),
+		lower(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Determines which side Band the channel will operate in.
+		Note: This is for N cards only, this mib is dependent of what dot11NBandWidth is selected and only
+		applies when 40MHz is selected."
+    ::= { dot11MgmtBase 20 }
+
+dot11NProtection OBJECT-TYPE
+    SYNTAX      INTEGER {
+		auto(1),
+		off(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Determines if protection will be turned on or off for N mode.
+		Note: This is for N cards only."
+    ::= { dot11MgmtBase 21 }
+
+
+
+-- dot11MgmtPrivacy contains objects from the 'Privacy' web page
+-- This group has been obsoleted in favor of the dot11MbssSecurity group.
+
+dot11MgmtPrivacy OBJECT IDENTIFIER ::= { ieee802dot11Mgmt 2 }
+
+dot11EncryptionMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                none(0),
+                wep64(1),
+                wep128(2),
+                tkip(3),
+                aes(4),
+                tkipPlusAes(5)
+    }
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Controls and reflects the encryption mode used by the device.  If set
+         to none(0), then encryption is disabled and all traffic will be sent
+         in the clear.  If set to wep64(1), then 64 bit WEP encryption will be
+         used with the keys from the dot1164BitKeyTable.  If set to 
+         wep128(2), then 128 bit WEP encryption will be used with keys from 
+         the dot11128BitKeyTable.  Modes tkip(3), aes(4), and tkipPlusAes(5)
+         generate their own keys automatically."
+    ::= { dot11MgmtPrivacy 1 }
+
+dot11WepPassPhrase OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Controls and reflects the WEP pass phrase."
+    ::= { dot11MgmtPrivacy 2 }
+
+dot11DefaultKey OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4)
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Controls and reflects the default key which will be used when 64 or
+         128 bit encryption is enabled.  Indicates the entry from the 
+         dot1164BitKeyTable if dot11EncryptionMode is set to wep64(1), or
+         the entry from the dot11128BitKeyTable if dot11EncryptionMode is set 
+         to wep128(2)."
+    ::= { dot11MgmtPrivacy 3 }
+
+dot1164BitKeyTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1164BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "A table of 40 bit key values used when dot11EncryptionMode is set to 
+         wep64(1)."
+    ::= { dot11MgmtPrivacy 4 }
+    
+dot1164BitKeyEntry OBJECT-TYPE
+    SYNTAX      Dot1164BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "A row in the table which represents a single 64 bit key."
+    INDEX   { dot1164BitKeyIndex }
+    ::= { dot1164BitKeyTable 1 }
+    
+Dot1164BitKeyEntry ::= 
+    SEQUENCE    {
+                dot1164BitKeyIndex       Integer32,
+                dot1164BitKeyValue       OCTET STRING
+    }
+    
+dot1164BitKeyIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "Identifies the instance of this table row."
+    ::= { dot1164BitKeyEntry 1 }
+    
+dot1164BitKeyValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(5))
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "A 40 bit key to be used when dot11EncryptionMode is set to wep64(1)."
+    ::= { dot1164BitKeyEntry 2 }
+
+dot11128BitKeyTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11128BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "A table of 104 bit key values used when dot11EncryptionMode is set to 
+         wep128(2)."
+    ::= { dot11MgmtPrivacy 5 }
+    
+dot11128BitKeyEntry OBJECT-TYPE
+    SYNTAX      Dot11128BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "A row in the table which represents a single 128 bit key."
+    INDEX   { dot11128BitKeyIndex }
+    ::= { dot11128BitKeyTable 1 }
+    
+Dot11128BitKeyEntry ::= 
+    SEQUENCE    {
+                dot11128BitKeyIndex       Integer32,
+                dot11128BitKeyValue       OCTET STRING
+    }
+    
+dot11128BitKeyIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "Identifies the instance of this table row."
+    ::= { dot11128BitKeyEntry 1 }
+    
+dot11128BitKeyValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(13))
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "A 104 bit key to be used when dot11EncryptionMode is set to 
+         wep128(2)."
+    ::= { dot11128BitKeyEntry 2 }
+    
+dot11NetAuthMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                disabled(0),
+                ieee802dot1X(1),
+                wpa(2),
+                wpa-psk(3)
+    }
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Sets the network authentication method. 802.1X and WPA require that 
+         valid RADIUS parameters be set. WPA-PSK requires a valid WPA 
+         Pre-Shared Key to be set."
+    ::= { dot11MgmtPrivacy 6 }
+    
+dot11WpaPreSharedKey OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(8..64))
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Sets the WPA Pre-Shared Key (PSK).  This value MUST be either a 
+         64-digit hexadecimal number, OR a 8 to 63 character ASCII string."
+    ::= { dot11MgmtPrivacy 7 }
+    
+dot11WpaGroupRekeyInterval OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Sets the WPA Group Rekey Interval in seconds. Set to zero to disable 
+         periodic rekeying."
+    ::= { dot11MgmtPrivacy 8 }
+    
+dot11RadiusIp OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Sets RADIUS server IP address."
+    ::= { dot11MgmtPrivacy 9 }
+    
+dot11RadiusPort OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Sets the UDP port used to communicate with the RADIUS server."
+    ::= { dot11MgmtPrivacy 10 }
+    
+dot11RadiusKey OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Sets or displays the RADIUS key."
+    ::= { dot11MgmtPrivacy 11 }
+    
+-- dot11MgmtAccess group contains objects from the 'Access Control' web page
+-- This group has been deprecatedd in favor of the dot11MgmtMbssAccess group
+
+dot11MgmtAccess OBJECT IDENTIFIER ::= { ieee802dot11Mgmt 3 }
+
+dot11AuthenticationMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                sharedKeyOnly(1),
+                openSystemOrSharedKey(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Controls the mode of authentication which will be accepted by the
+         device.  If set to sharedKeyOnly(1), then only stations
+         which satisfy the shared key authentication system will be allowed
+         to connect.  If set to openSystemOrSharedKey(2), then shared key
+         stations will be allowed to connect, or stations with no 
+         authentication."
+    ::= { dot11MgmtAccess 1 }
+
+dot11ClosedNetwork OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Controls whether the device will operate in closed network mode.  If
+         set to true(1), then the network mode is closed and the SSID will not
+         be broadcast in beacon packets.  If set to false(2), then the network
+         mode is open and the SSID will be broadcast in beacon packets."
+    ::= { dot11MgmtAccess 2 }
+
+dot11AccessMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                allowAny(0),
+                allowList(1),
+                denyList(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Controls what stations will be given access to the device.  If set to
+         unrestricted(0), then any station will be allowed to connect.  If set
+         to restrictToList(1), then only stations whose MAC address appears in
+         the dot11AccessTable will be allowed to connect."
+    ::= { dot11MgmtAccess 3 }
+
+dot11AccessTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11AccessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "A table of MAC addresses which represents stations that will be allowed
+         to connect to the device if dot11AccessMode is set to 
+         restrictToList(1)."
+    ::= { dot11MgmtAccess 5 }
+    
+dot11AccessEntry OBJECT-TYPE
+    SYNTAX      Dot11AccessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "A row in the table that specifies a single station MAC address."
+    INDEX   { dot11AccessIndex }
+    ::= { dot11AccessTable 1 }
+    
+Dot11AccessEntry ::= 
+    SEQUENCE    {
+                dot11AccessIndex       Integer32,
+                dot11AccessStation     MacAddress
+    }
+    
+dot11AccessIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..8)
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+        "Indicates the instance of this table row."
+    ::= { dot11AccessEntry 1 }
+    
+dot11AccessStation OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      deprecated
+    DESCRIPTION
+        "A MAC address of a station which will be allowed to connect to the 
+         device if dot11AccessMode is set to restrictToList(1)."
+    ::= { dot11AccessEntry 2 }
+    
+--
+-- dot11MgmtMbss contains objects used for managing configuration of all
+-- basic service sets in an access point which may have multiple BSS's.
+-- Note that if a system is not MBSS capable, the same objects are still used 
+-- but the tables will have a single entry rather than several.
+--
+
+dot11MgmtMbss OBJECT IDENTIFIER ::= { ieee802dot11Mgmt 4 }
+
+--
+-- dot11MbssBase contains objects used to configure basic operation
+-- of each service set.
+--
+
+dot11MbssBase OBJECT IDENTIFIER ::= { dot11MgmtMbss 1 }
+
+dot11BssTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11BssEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of entries in an MBSS system."
+    ::= { dot11MbssBase 14 }
+    
+dot11BssEntry OBJECT-TYPE
+    SYNTAX      Dot11BssEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry describing the characteristics of an individual BSS.  An
+         entry exists in this table for each entry of type ieee80211 (71) in
+         the ifTable."
+    INDEX   { ifIndex }
+    ::= { dot11BssTable 1 }
+
+Dot11BssEntry ::= 
+    SEQUENCE    {
+                dot11BssId                      PhysAddress,
+                dot11BssEnable                  TruthValue,
+                dot11BssSsid                    OCTET STRING,
+                dot11BssNetworkBridge           INTEGER,
+                dot11BssSecurityMode            INTEGER,
+                dot11BssClosedNetwork           TruthValue,
+                dot11BssAccessMode              INTEGER
+    }
+    
+dot11BssId OBJECT-TYPE
+    SYNTAX      PhysAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The physical address associated with this service set."
+    ::= { dot11BssEntry 1 }
+    
+dot11BssEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enables or disables this service set."
+    ::= { dot11BssEntry 2 }
+    
+dot11BssSsid OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the service set identifier for this BSS."
+    ::= { dot11BssEntry 3 }
+    
+dot11BssNetworkBridge OBJECT-TYPE
+    SYNTAX      INTEGER {
+                lan(1),
+                guest(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "If set to lan(1), this service set will be authorized as a member of
+         the local area network.  If set to guest(2), this service set will
+         have access to the wide area internet, but will have restricted access
+         to the local area network."
+    ::= { dot11BssEntry 4 }
+    
+dot11BssSecurityMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                disabled(0),
+                wep(1),
+                wpaPsk(2),
+                wpa2Psk(3),
+                wpaEnterprise(4),
+                wpa2Enterprise(5),
+                radiusWep(6)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Security mode may be chosen from Disable, WEP, WPA-PSK, WPA2-PSK,
+         WPA-Enterprise, WPA2-Enterprise or RADIUS-WEP.  All devices on the 
+         network must use the same security mode in order to communicate.
+
+         If set to disabled(0):
+            Open system. No authentication or encryption.
+
+         If set to wep(1) then the following parameters must be set:
+            Default Transmit Key (dot11BssWepDefaultKey):
+                Choose which Key to use.
+            WEP Key Bit (dot11BssWepEncryptionMode):
+                May select from 64-Bit or 128-Bit encryption.
+            Passphrase (dot11BssWepPassPhrase):
+                Enter a passphrase consisting of any keyboard character
+                to be used to generate a hex WEP key.
+            Key 1-4 (dot11BssWep64BitKeyTable or dot11BssWep128BitKeyTable):
+                Enter a WEP key manually. Must use only hex character (0-9 and A-F).
+                64-bit WEP requires 10 hex characters, 128-Bit WEP requires the use of
+                26 hex characters.
+                
+         If set to wpaPsk(2) then the following parameters must be set:
+            WPA Algorithm (dot11BssWpaAlgorithm):
+                TKIP or AES.
+            WPA Pre-Shared Key (dot11BssWpaPreSharedKey):
+                Choose a unique key to authenticate with other devices on the network.
+                The Pre-Shared Key must be between 8 and 63 characters in length.
+            Group Key Renewal (dot11BssWpaGroupRekeyInterval):
+                This settingss determines how often the group key changes.
+
+         If set to wpa2Psk(3) then the following parameters must be set:
+            WPA2 Algorithm (dot11BssWpaAlgorithm):
+                AES or TKIP+AES.
+            WPA2 Pre-Shared Key (dot11BssWpaPreSharedKey):
+                Choose a unique key to authenticate with other devices on the network.
+                The Pre-Shared Key must be between 8 and 63 characters in length.
+            Group Key Renewal (dot11BssWpaGroupRekeyInterval):
+                This settingss determines how often the group key changes.
+                
+         If set to wpaEnterprise(4) then the following parameters must be set:
+            WPA Algorithm (dot11BssWpaAlgorithm):
+                TKIP or AES.
+            RADIUS Server Address (dot11BssRadiusAddress):
+                The IP address of the RADIUS server.
+            RADIUS Server Port (dot11BssRadiusPort):
+                The port the RADIUS server uses.
+            RADIUS Shared Secret (dot11BssRadiusKey):
+                The shared secret set on the RADIUS server.
+            Key Renewal Timeout (dot11BssRadiusReAuthInterval):
+                Determines how often the keys should be renened.
+                
+         If set to wpa2Enterprise(5) then the following parameters must be set:
+            WPA2 Algorithm (dot11BssWpaAlgorithm):
+                AES or TKIP+AES.
+            RADIUS Server Address (dot11BssRadiusAddress):
+                The IP address of the RADIUS server.
+            RADIUS Server Port (dot11BssRadiusPort):
+                The port the RADIUS server uses.
+            RADIUS Shared Secret (dot11BssRadiusKey):
+                The shared secret set on the RADIUS server.
+            Key Renewal Timeout (dot11BssRadiusReAuthInterval):
+                Determines how often the keys should be renened.
+                
+         If set to radiusWep(6) then the following parameters must be set:
+            RADIUS Server Address (dot11BssRadiusAddressType / dot11BssRadiusAddress):
+                The IP address of the RADIUS server.
+            RADIUS Server Port (dot11BssRadiusPort):
+                The port the RADIUS server uses.
+            RADIUS Shared Secret (dot11BssRadiusKey):
+                The shared secret set on the RADIUS server.
+            Default Transmit Key (dot11BssWepDefaultKey):
+                Choose which Key to use.
+            WEP Key Bit (dot11BssWepEncryptionMode):
+                May select from 64-Bit or 128-Bit encryption.
+            Passphrase (dot11BssWepPassPhrase):
+                Enter a passphrase consisting of any keyboard character
+                to be used to generate a hex WEP key.
+            Key 1-4 (dot11BssWep64BitKeyTable or dot11BssWep128BitKeyTable):
+                Enter a WEP key manually. Must use only hex character (0-9 and A-F).
+                64-bit WEP requires 10 hex characters, 128-Bit WEP requires the use of
+                26 hex characters."
+    ::= { dot11BssEntry 5 }
+    
+dot11BssClosedNetwork OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls whether the device will operate in closed network mode.  If
+         set to true(1), then the network mode is closed and the SSID will not
+         be broadcast in beacon packets.  If set to false(2), then the network
+         mode is open and the SSID will be broadcast in beacon packets."
+    ::= { dot11BssEntry 6 }
+
+dot11BssAccessMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                allowAny(1),
+                allowList(2),
+                denyList(3)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls what stations will be given access to the device.  If set to
+         allowAny(1), then any station will be allowed to connect.  If set
+         to restrictToList(2), then only stations whose MAC address appears in
+         the dot11BssAccessTable will be allowed to connect.  If set to 
+         denyList(3), any station will be allowed to connect except those in 
+         the dot11BssAccessTable."
+    ::= { dot11BssEntry 7 }
+    
+--
+-- dot11MbssSecurity contains objects used to configure security options
+-- of each service set.
+--    
+    
+dot11MbssSecurity OBJECT IDENTIFIER ::= { dot11MgmtMbss 2 }
+
+-- Objects used to control WEP based security modes
+
+dot11BssWepTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11BssWepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table used to configure settings related to the WEP security modes."
+    ::= { dot11MbssSecurity 1 }
+    
+dot11BssWepEntry OBJECT-TYPE
+    SYNTAX      Dot11BssWepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry defining the WPA characteristics of an individual service set.
+         A row exists in this table for each row in the dot11BssTable for which
+         dot11BssSecurityMode is set to wep(1) or radiusWep(6)."
+    INDEX   { ifIndex }
+    ::= { dot11BssWepTable 1 }
+    
+Dot11BssWepEntry ::= 
+    SEQUENCE    {
+                dot11BssWepDefaultKey           Unsigned32,
+                dot11BssWepEncryptionMode       INTEGER,
+                dot11BssWepPassPhrase           DisplayString
+    }
+    
+dot11BssWepDefaultKey OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the default key which will be used when 64 or
+         128 bit encryption is enabled.  Indicates the entry from the 
+         dot11BssWep64BitKeyTable if dot11EncryptionMode is set to wep64(1), or
+         the entry from the dot11BssWep128BitKeyTable if dot11BssSecurityMode 
+         is set to wep128(2).
+         
+         This object may only be set to indicate an active row in the 
+         dot11BssWep64BitKeyTable or dot11BssWep128BitKeyTable.  If the value 
+         corresponds to a row which does not exist or a row which is not
+         active, the set will be rejected with an inconsistentValue error."
+    ::= { dot11BssWepEntry 1 }
+    
+dot11BssWepEncryptionMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                wep64(1),
+                wep128(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Selects the WEP encryption method used by this service set.
+         If set to wep64(1), then 64 bit WEP encryption will be
+         used with the keys from the dot11BssWep64BitKeyTable.  If set to 
+         wep128(2), then 128 bit WEP encryption will be used with keys from 
+         the dot11BssWep128BitKeyTable."
+    ::= { dot11BssWepEntry 2 }
+    
+dot11BssWepPassPhrase OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The passphrase used for WEP security."
+    ::= { dot11BssWepEntry 3 }
+    
+    
+dot11BssWep64BitKeyTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11BssWep64BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of 40 bit key values used when operating in WEP 64 mode."
+    ::= { dot11MbssSecurity 2 }
+    
+dot11BssWep64BitKeyEntry OBJECT-TYPE
+    SYNTAX      Dot11BssWep64BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A key to be used by the row in the dot11BssTable identified by the 
+         value of ifIndex in the row index."
+    INDEX   { ifIndex, dot11BssWep64BitKeyIndex }
+    ::= { dot11BssWep64BitKeyTable 1 }
+    
+Dot11BssWep64BitKeyEntry ::= 
+    SEQUENCE    {
+                dot11BssWep64BitKeyIndex           Integer32,
+                dot11BssWep64BitKeyValue           OCTET STRING,
+                dot11BssWep64BitKeyStatus          RowStatus
+    }
+    
+dot11BssWep64BitKeyIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Identifies an instance of a key among those used by the service set 
+         identified by the value of ifIndex in the row index."
+    ::= { dot11BssWep64BitKeyEntry 1 }
+    
+dot11BssWep64BitKeyValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(5))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A 40 bit key to be used when the corresponding instance of
+         dot11BssSecurityMode is set to wep(1) and the corresponding instance
+         of dot11BssWepEncryptionMode is set to wep64(1)."
+    ::= { dot11BssWep64BitKeyEntry 2 }
+    
+dot11BssWep64BitKeyStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this conceptual row.
+
+         To create a row in this table, a manager must set this object to 
+         either createAndGo(4) or createAndWait(5).
+
+         Until instances of all corresponding columns are appropriately 
+         configured, the value of the corresponding instance of the 
+         dot11BssAccessStatus column is 'notReady'.
+
+         In particular, a newly created row cannot be made active until the 
+         corresponding instance of dot11BssWep64BitKeyValue has been set.
+         
+         Only rows with a status of active(1) will be applied.
+         
+         This object may not be set to a value of notInService(2) or destroy(6)
+         if the corresponding instance of dot11BssWepDefaultKey identifies
+         this row as they current key in use.  Such an attempt will be rejected
+         with an inconsistentValue error."
+    ::= { dot11BssWep64BitKeyEntry 3 }
+    
+    
+dot11BssWep128BitKeyTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11BssWep128BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of 104 bit key values used when operating in WEP 128 mode."
+    ::= { dot11MbssSecurity 3 }
+    
+dot11BssWep128BitKeyEntry OBJECT-TYPE
+    SYNTAX      Dot11BssWep128BitKeyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A key to be used by the row in the dot11BssTable identified by the 
+         value of ifIndex in the row index."
+    INDEX   { ifIndex, dot11BssWep128BitKeyIndex }
+    ::= { dot11BssWep128BitKeyTable 1 }
+    
+Dot11BssWep128BitKeyEntry ::= 
+    SEQUENCE    {
+                dot11BssWep128BitKeyIndex           Integer32,
+                dot11BssWep128BitKeyValue           OCTET STRING,
+                dot11BssWep128BitKeyStatus          RowStatus
+    }
+    
+dot11BssWep128BitKeyIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Identifies an instance of a key among those used by the service set 
+         identified by the value of ifIndex in the row index."
+    ::= { dot11BssWep128BitKeyEntry 1 }
+    
+dot11BssWep128BitKeyValue OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(13))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A 104 bit key to be used when the corresponding instance of
+         dot11BssSecurityMode is set to wep(1) and the corresponding instance
+         of dot11BssWepEncryptionMode is set to wep128(128)."
+    ::= { dot11BssWep128BitKeyEntry 2 }
+    
+dot11BssWep128BitKeyStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this conceptual row.
+
+         To create a row in this table, a manager must set this object to 
+         either createAndGo(4) or createAndWait(5).
+
+         Until instances of all corresponding columns are appropriately 
+         configured, the value of the corresponding instance of the 
+         dot11BssAccessStatus column is 'notReady'.
+
+         In particular, a newly created row cannot be made active until the 
+         corresponding instance of dot11BssWep128BitKeyValue has been set.
+         
+         Only rows with a status of active(1) will be applied.
+         
+         This object may not be set to a value of notInService(2) or destroy(6)
+         if the corresponding instance of dot11BssWepDefaultKey identifies
+         this row as they current key in use.  Such an attempt will be rejected
+         with an inconsistentValue error."
+    ::= { dot11BssWep128BitKeyEntry 3 }
+
+-- Objects used to control WPA based security modes
+    
+dot11BssWpaTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11BssWpaEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table used to configure settings related to the WPA security modes."
+    ::= { dot11MbssSecurity 4 }
+    
+dot11BssWpaEntry OBJECT-TYPE
+    SYNTAX      Dot11BssWpaEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry defining the WPA characteristics of an individual service set.
+         A row exists in this table for each row in the dot11BssTable for which
+         dot11BssSecurityMode is set to wpaPsk(2), wpa2Psk(3), wpaEnterprise(4), 
+         or wpa2Enterprise(5)."
+    INDEX   { ifIndex }
+    ::= { dot11BssWpaTable 1 }
+    
+Dot11BssWpaEntry ::=
+    SEQUENCE    {
+                dot11BssWpaAlgorithm            INTEGER,
+                dot11BssWpaPreSharedKey         OCTET STRING,
+                dot11BssWpaGroupRekeyInterval   Unsigned32
+    }
+    
+dot11BssWpaAlgorithm OBJECT-TYPE
+    SYNTAX      INTEGER {
+                tkip(1),
+                aes(2),
+                tkipPlusAes(3)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the WPA encryption mode used by the service set.  
+         The WPA algorithm for WPA-PSK and WPA-Enterprise security mode is either
+         tkip(1) or aes(2).
+        
+         The WPA algorithm for WPA2-PSK and WPA2-Enterprise security mode is either
+         aes(2) or tkipPlusAes(3)."
+    ::= { dot11BssWpaEntry 1 }
+    
+dot11BssWpaPreSharedKey OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (8..64))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Sets the WPA Pre-Shared Key (PSK) used by this service set.  This 
+         value MUST be either a 64 byte hexadecimal number, OR an 8 to 63 
+         character ASCII string."
+    ::= { dot11BssWpaEntry 2 }
+    
+dot11BssWpaGroupRekeyInterval OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Sets the WPA Group Rekey Interval for this service set. If set to zero, 
+         periodic rekeying is disabled for this service set."
+    ::= { dot11BssWpaEntry 3 }
+    
+-- Objects used to control RADIUS based security modes
+
+dot11BssRadiusTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11BssRadiusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table used to configure settings related to the RADIUS security 
+         modes, including WPA-Enterprise, WPA2-Enterprise and RADIUS-WEP."
+    ::= { dot11MbssSecurity 5 }
+    
+dot11BssRadiusEntry OBJECT-TYPE
+    SYNTAX      Dot11BssRadiusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "An entry defining the RADIUS characteristics of an individual service 
+          set.  A row exists in this table for each row in the dot11BssTable 
+          for which dot11BssSecurityMode is set to wpaEnterprise(4), 
+          wpa2Enterprise(5), or radiusWep(6)."
+    INDEX   { ifIndex }
+    ::= { dot11BssRadiusTable 1 }
+    
+Dot11BssRadiusEntry ::= 
+    SEQUENCE    {
+                dot11BssRadiusAddressType       InetAddressType,
+                dot11BssRadiusAddress           InetAddress,
+                dot11BssRadiusPort              Unsigned32,
+                dot11BssRadiusKey               DisplayString,
+                dot11BssRadiusReAuthInterval    Unsigned32
+    }
+    
+dot11BssRadiusAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The type of internet address used for dot11BssRadiusAddress."
+    ::= { dot11BssRadiusEntry 1 }
+    
+dot11BssRadiusAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The internet address of the RADIUS server for this service set."
+    ::= { dot11BssRadiusEntry 2 }
+    
+dot11BssRadiusPort OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The UDP port used to communicate with the RADIUS server for this 
+         service set."
+    ::= { dot11BssRadiusEntry 3 }
+    
+dot11BssRadiusKey OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The RADIUS key."
+    ::= { dot11BssRadiusEntry 4 }
+    
+dot11BssRadiusReAuthInterval OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The network re-authentication interval.  If set to zero, no
+         re-authentication will be performed."
+    ::= { dot11BssRadiusEntry 5 }
+    
+--
+-- dot11MbssAccess contains objects used to configure access restrictions
+-- of each service set.
+--
+    
+dot11MbssAccess OBJECT IDENTIFIER ::= { dot11MgmtMbss 3 }
+
+dot11BssAccessTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot11BssAccessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of MAC addresses which defines the MAC address based access 
+         restrictions for the system."
+    ::= { dot11MbssAccess 1 }
+    
+dot11BssAccessEntry OBJECT-TYPE
+    SYNTAX      Dot11BssAccessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A row in the table which specifies a single MAC address for a given
+         service set."
+    INDEX   { ifIndex, dot11BssAccessIndex }
+    ::= { dot11BssAccessTable 1 }
+    
+Dot11BssAccessEntry ::= 
+    SEQUENCE    {
+                dot11BssAccessIndex       Integer32,
+                dot11BssAccessStation     PhysAddress,
+                dot11BssAccessStatus      RowStatus
+    }
+    
+dot11BssAccessIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..16)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Indicates the instance of this table row."
+    ::= { dot11BssAccessEntry 1 }
+    
+dot11BssAccessStation OBJECT-TYPE
+    SYNTAX      PhysAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A MAC address of a station which will be allowed to connect to the 
+         service set if dot11BssAccessMode is set to restrictToList(2), or
+         forbidden if dot11BssAccessMode is set to denyList(3)."
+    ::= { dot11BssAccessEntry 2 }
+    
+dot11BssAccessStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this conceptual row.
+
+         To create a row in this table, a manager must set this object to 
+         either createAndGo(4) or createAndWait(5).
+
+         Until instances of all corresponding columns are appropriately 
+         configured, the value of the corresponding instance of the 
+         dot11BssAccessStatus column is 'notReady'.
+
+         In particular, a newly created row cannot be made active until the 
+         corresponding instance of dot11BssAccessStation has been set.
+         
+         Only rows with a status of active(1) will be applied."
+    ::= { dot11BssAccessEntry 3 }
+    
+-- dot11ApplySettings: do 'on the fly' config with settings from above.
+-- This scalar object was placed by itself at ieee802dot11Mgmt 100 because
+-- it applies all settings from all current and possibly future 802.11
+-- groups.  Wanted to leave plenty of room to add new groups in the future.
+
+dot11ApplySettings OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If set to true(1), the current configuration set in this MIB 
+	 will be flushed to non-volatile storage, and the wi-fi driver will
+	 be restarted using this configuration.  This object may be used to invoke
+	 an immediate reconfiguration of the wi-fi system without requiring a
+	 full reboot.  
+
+         Unless this object is explicitly set to true(1), any settings made via 
+         other objects in this MIB will be lost if a reboot occurs.  
+
+         Always returns false(2) when read."
+    ::= { ieee802dot11Mgmt 100 }
+    
+END

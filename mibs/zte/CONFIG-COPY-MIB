@@ -1,0 +1,430 @@
+-- *****************************************************************
+-- configcopy.mib MIB for copying a ZTE router's  config
+--
+-- 2007-02-1 ninggang ZTE corp. 
+--
+-- Copyright (c) 2007 by ZTE corporation. 
+-- All rights reserved.
+-- *****************************************************************
+--
+
+
+CONFIG-COPY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+        IpAddress, Unsigned32
+                FROM SNMPv2-SMI
+        TEXTUAL-CONVENTION, DisplayString, TimeStamp, RowStatus,
+        TruthValue
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        mgmt
+                FROM ZXR10-SMI;
+
+configCopyMIB  MODULE-IDENTITY
+        LAST-UPDATED    "200702010000Z"
+        ORGANIZATION        "ZTE Corp."
+        CONTACT-INFO
+                " ZTE Corp."
+        DESCRIPTION               
+               "This MIB facilitates writing of configuration files
+                of an SNMP Agent running ZTE's ROS in the following 
+                ways: to and from the net, copying running 
+                configurations to startup configurations and 
+                vice-versa, and copying a configuration
+                (running or startup) to and from the local file system."
+                
+        REVISION "200702010000Z"
+        DESCRIPTION
+                " Initial created
+                " 
+       ::= { mgmt 1 }
+
+-- A config-copy operation is a request to copy a configuration 
+-- file of an SNMP Agent running ZTE's ROS in the following ways:
+--      1. to or from the net (via a protocol like tftp, ftp) 
+--      2. copying running configurations to startup
+--      configurations and vice-versa.
+--      3. copy a running or startup config to a file
+--      to the local file system."
+--
+-- The term "agent-config" will be used in this MIB to refer to 
+-- either the running config or the startup config. It will be 
+-- used as a short way of saying "either running config or the 
+-- startup config".
+
+
+ConfigCopyProtocol ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION                "The protocol file transfer protocol that should be used
+                to copy the configuration file over the network. If the
+                config file transfer is to occur locally on the SNMP
+                agent, the method of transfer is left upto the 
+                implementation, and is not restricted to the 
+                protocols below."
+        SYNTAX INTEGER {
+                tftp(1),
+                ftp(2)
+        }
+
+ConfigCopyState ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION                "The state of a ftp/tftp config-copy operation. 
+                 The description of each state is given below:
+
+                 waiting:     only one config-copy request can run 
+                              at any time. A newly activated 
+                              config-copy request is placed in this 
+                              state if another request has already 
+                              been activated.
+
+                 running:     this state signifies that the config-copy
+                              request is running.
+
+                 successsful: the state when a config-copy request is
+                              successfully completed.
+
+                 failed:      the config-copy request was unsuccesful.
+                "
+        SYNTAX        INTEGER {
+                waiting(1),
+                running(2),
+                successful(3),
+                failed(4)
+        }
+
+ConfigCopyFailCause ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION                "The reason a config-copy request failed."
+        SYNTAX INTEGER {
+                unknown(1),     -- very descriptive
+                badFileName(2), -- check your file name/path/permissions
+                timeout(3),     -- the network may be overloaded, or the
+                                -- remote file server may not be 
+                                -- responding.
+                noMem(4),       -- the Agent wasn't able to allocate 
+                                -- memory for the config-copy operation
+                noConfig(5),    -- the agent-config selected as the 
+                                -- source was non-existant.
+                unsupportedProtocol(6),-- The protocol is not supported
+                                       -- by the agent.
+                someConfigApplyFailed(7) -- applying of some of the 
+                                         -- configuration commands 
+                                         -- failed. 
+        }
+
+ConfigFileType ::= TEXTUAL-CONVENTION
+        STATUS current
+        DESCRIPTION                "The various types of files on which a config-copy
+                operation can be performed."
+        SYNTAX INTEGER {
+                networkFile(1), -- file on another network device, e.g.
+                                -- a file-server on the net
+                localFile(2),     -- a file on the local agent, other than
+                                -- startup or running config
+                startupConfig(3),
+                runningConfig(4)
+        }
+
+configCopyMIBObjects OBJECT IDENTIFIER ::= { configCopyMIB 1 }
+
+copy        OBJECT IDENTIFIER ::= { configCopyMIBObjects 1 }
+
+copyTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF CopyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION                "A table of config-copy requests."
+        ::= { copy 1 }
+
+copyEntry OBJECT-TYPE
+        SYNTAX CopyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION                "A config-copy request.
+
+                A management station wishing to create an entry should
+                first generate a random serial number to be used
+                as the index to this sparse table.  The station should
+                then create the associated instance of the row status
+                and row index objects.  It __MUST__ in the same PDUs, 
+                create an instance of copySourceFileType and copyDestFileType.
+                At least one of the FileTypes must be an agent-config
+                file type (i.e.        startupConfig or runningConfig).
+                If one of the file types is a networkFile, a valid
+                copyServerAddress and copyFileName must be
+                created as well. For a file type of localFile, only
+                a valid fileName needs to be created as an extra 
+                parameter.
+
+                It should also modify the default values for the other
+                configuration objects if the defaults are not 
+                appropriate.
+                
+                Once the appropriate instance of all the configuration
+                objects have been created, the row status will automatically 
+                be set to active to initiate the request. Note that this entire
+                procedure __MUST__ be initiated via a single set request 
+                which specifies a row status of createAndGo as well as
+                specifies valid values for the non-defaulted 
+                configuration objects.
+
+                Once the config-copy request has been created (i.e. the
+                copyEntryRowStatus has been made active), the entry
+                cannot be modified - the only operation possible
+                after this is to delete the row.
+
+                Once the request completes, the management station 
+                should retrieve the values of the status objects of 
+                interest, and should then delete the entry.  In order 
+                to prevent old entries from clogging the table, 
+                entries will be aged out, but an entry will never be 
+                deleted within 5 minutes of completing."
+        INDEX { copyIndex }
+        ::= { copyTable 1 }
+
+CopyEntry ::=
+        SEQUENCE {
+                copyIndex                       Unsigned32,
+                -- configuration items
+                copyProtocol                    ConfigCopyProtocol,
+                copySourceFileType              ConfigFileType,
+                copyDestFileType                ConfigFileType,
+                copyServerAddress               IpAddress,
+                copySrcFileName                 DisplayString, 
+                copyDstFileName                 DisplayString,
+                copyUserName                    DisplayString,
+                copyUserPassword                DisplayString,
+                copyNotificationOnCompletion    TruthValue,
+                -- status items
+                copyState                       ConfigCopyState,
+                copyTimeStarted                 TimeStamp,
+                copyTimeCompleted               TimeStamp,
+                copyFailCause                   ConfigCopyFailCause,
+                copyEntryRowStatus              RowStatus
+        }
+
+copyIndex OBJECT-TYPE
+        SYNTAX           Unsigned32(1..2147483647)
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION                "Object which specifies a unique entry in the
+                copyTable.  A management station wishing
+                to initiate a config-copy operation should use a
+                random value for this object when creating
+                or modifying an instance of a copyEntry.
+                The RowStatus semantics of the copyEntryRowStatus
+                object will prevent access conflicts."
+        ::= { copyEntry 1 }
+
+copyProtocol        OBJECT-TYPE
+        SYNTAX           ConfigCopyProtocol
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "The protocol to be used for any copy. 
+                Will default to ftp if not specified.
+
+                If the copy operation occurs locally on the SNMP agent
+                (e.g. runningConfigToStartupConfig), this object may
+                be ignored by the implementation."
+        DEFVAL        { ftp }
+        ::= { copyEntry 2 }
+
+copySourceFileType OBJECT-TYPE
+        SYNTAX     ConfigFileType
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "specifies the type of file to copy from. Either the
+                copySourceFileType or the copyDestFileType (or both)
+                must be of type runningConfig or startupConfig. Also,
+                the copySourceFileType must be different from the
+                copyDestFileType.
+        
+                If the copySourceFileType has the value of 
+                networkFile, the copyServerAddress and
+                copyFileName must also be created, and these 3 
+                objects together (copySourceFileType, 
+                copyServerAddress, copyFileName) will uniquely 
+                identify the source file.
+
+                If the copySourceFileType is localFile, the 
+                copyFileName must also be created, and the 
+                2 objects together (copySourceFileType,
+                copyFileName) will uniquely identify the source 
+                file.
+                "
+        ::= { copyEntry 3 }
+
+copyDestFileType OBJECT-TYPE
+        SYNTAX     ConfigFileType
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "specifies the type of file to copy to. Either the
+                copySourceFileType or the copyDestFileType (or both)
+                must be of type runningConfig or startupConfig. Also,
+                the copySourceFileType must be different from the
+                copyDestFileType.
+        
+                If the copyDestFileType has the value of 
+                networkFile, the copyServerAddress and 
+                copyFileName must also be created, and these 
+                3 objects together
+                (copyDestFileType, copyServerAddress, 
+                copyFileName) will uniquely identify the 
+                destination file.
+
+                If the copyDestFileType is localFile, the copyFileName
+                must also be created, and the 2 objects together
+                (copyDestFileType, copyFileName) will uniquely 
+                identify the destination file."
+        ::= { copyEntry 4 }
+
+copyServerAddress OBJECT-TYPE
+        SYNTAX     IpAddress
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "The ip address of the tftp server from (or to) 
+                which to copy the configuration file. This object must
+                be created when either the copySourceFileType 
+                or copyDestFileType has the value networkFile. 
+                Values of 0.0.0.0 or FF.FF.FF.FF for
+                copyServerAddress are not allowed."
+        ::= { copyEntry 5 }
+
+copySrcFileName OBJECT-TYPE
+        SYNTAX     DisplayString(SIZE (1..80))
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "The source file name (including the path, if applicable) of
+                the file. This object must be created when either the
+                copySourceFileType or copyDestFileType has the value
+                networkFile or localFile."
+        ::= { copyEntry 6 }   
+        
+copyDstFileName OBJECT-TYPE
+        SYNTAX     DisplayString(SIZE (1..80))
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "The destination file name (including the path, if applicable) of
+                the file. This object must be created when either the
+                copySourceFileType or copyDestFileType has the value
+                networkFile or localFile."
+        ::= { copyEntry 7 }
+        
+
+copyUserName OBJECT-TYPE
+        SYNTAX     DisplayString(SIZE (1..40))
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "Remote user name for copy via ftp, rcp, sftp or 
+                scp protocol.
+                This object must be created when the copyProtocol
+                is rcp, scp, ftp or sftp.
+                If the protocol is rcp, it will override the remote 
+                user-name configured through the 
+                        rcmd remote-username <username>
+                configuration command. 
+                The remote user-name is sent as the server user-name 
+                in an rcp command request sent by the system to a
+                remote rcp server."
+        ::= { copyEntry 8 }
+
+copyUserPassword OBJECT-TYPE
+        SYNTAX     DisplayString(SIZE (1..40))
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "Password used by ftp, sftp or scp for copying a 
+                file to/from an ftp/sftp/scp server. This object must 
+                be created when the copyProtocol is ftp or scp. 
+                Reading it returns a zero-length string for security 
+                reasons."
+        ::= { copyEntry 9 }
+
+copyNotificationOnCompletion OBJECT-TYPE
+        SYNTAX     TruthValue
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "Specifies whether or not a copyCompletion
+                notification should be issued on completion of the tftp
+                transfer. If such a notification is desired, it is the
+                responsibility of the management entity to ensure 
+                that the SNMP administrative model is configured in 
+                such a way as to allow the notification to be 
+                delivered."
+        DEFVAL { false }
+        ::= { copyEntry 10 }
+
+copyState OBJECT-TYPE
+        SYNTAX     ConfigCopyState
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION                "Specifies the state of this config-copy request.
+                This value of this object is instantiated only after 
+                the row has been instantiated, i.e. after the 
+                copyEntryRowStatus has been made active."
+        ::= { copyEntry 11 }
+
+copyTimeStarted OBJECT-TYPE
+        SYNTAX     TimeStamp
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION                "Specifies the time the copyState last transitioned
+                to running, or 0 if the state has never transitioned to
+                running        (for e.g., stuck in waiting state).
+                This object is instantiated only after the row has been
+                instantiated."
+        ::= { copyEntry 12 }
+
+copyTimeCompleted OBJECT-TYPE
+        SYNTAX     TimeStamp
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION                "Specifies the time the copyState last transitioned
+                from running to successful or failed states. This
+                object is instantiated only after the row has been 
+                instantiated.
+                Its value will remain 0 until he request has completed."
+        ::= { copyEntry 13 }
+
+copyFailCause OBJECT-TYPE
+        SYNTAX     ConfigCopyFailCause
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION                "The reason why the config-copy operation failed.
+                This object is instantiated only when the copyState 
+                for this entry is in the failed state."
+        ::= { copyEntry 14 }
+
+copyEntryRowStatus OBJECT-TYPE
+        SYNTAX     RowStatus
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION                "The status of this table entry.  Once the entry 
+                status is set to active, the associated entry cannot 
+                be modified until the request completes (copyState 
+                transitions to successful or failed state)."
+        ::= { copyEntry 15 }
+
+configCopyMIBTrapPrefix OBJECT IDENTIFIER 
+                              ::= { configCopyMIB 2 }
+copyMIBTraps OBJECT IDENTIFIER 
+                              ::= { configCopyMIBTrapPrefix 1 }
+
+copyCompletion NOTIFICATION-TYPE
+        OBJECTS           {        copyServerAddress,
+                        copySrcFileName,
+                        copyState,
+                        copyTimeStarted,
+                        copyTimeCompleted,
+                        copyFailCause
+                   }
+        STATUS           current
+        DESCRIPTION                "A copyCompletion trap is sent at the completion
+                of a config-copy request. The copyFailCause is not
+                instantiated, and hence not included in a trap, when 
+                the copyState is success."
+        ::= { copyMIBTraps 1 }
+END
+

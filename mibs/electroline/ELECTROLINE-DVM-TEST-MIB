@@ -1,0 +1,410 @@
+--*****************************************************************************
+--                                                                          
+--    Copyright 2011 Electroline Equipment Inc                                   
+--    All Rights Reserved       
+--                                                                          
+--                                                                          
+--                                                                          
+--*****************************************************************************
+--    Filename: dvmTest.mib
+--    Author:   Alain Leclerc
+--    Creation Date: 2011.05.02
+--*****************************************************************************
+--    Description:
+--
+--	This file contains the SNMPv2 MIB definition of the Configuration branch 
+--      for the DVM products.
+--		
+--*****************************************************************************
+--   Revision History:
+--   2011.05.02	Alain Leclerc			First Draft   
+--*****************************************************************************
+
+ELECTROLINE-DVM-TEST-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32
+        FROM SNMPv2-SMI
+    RowStatus, TruthValue, DateAndTime
+        FROM SNMPv2-TC        
+    dvmPrivate
+        FROM ELECTROLINE-DVM-ROOT-MIB
+    DisplayString
+    	FROM RFC1213-MIB
+    SnmpAdminString
+        FROM SNMP-FRAMEWORK-MIB;   -- RFC 3411
+
+
+dvmSwMode OBJECT-TYPE
+    SYNTAX   	INTEGER {normal(0), testOnly(1), cmOnly(2), ScanFeatureInDiagnosticMode(30)}   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This MIB can be used to control the software activity of the DVM
+        - In Normal mode, the DVM performs as programmed.
+        - In testOnly mode, the DVM stops all monitoring activity and 
+          populates only the test and calibration MIBS.
+        - In cmOnly mode, the DVM performs as a plain cable modem. All
+          other features are disabled.
+          
+        The value of this MIB is stored in non-volatile memory.
+        
+        Note that the MODE jumper previously used to access testOnly 
+        mode, now is used as an override for the dvmSwMode.
+        To have access to set this mode, the brcm factory mib must be enable.
+        Otherwise, read only"
+    ::= { dvmPrivate 1 }
+
+
+-- ****************************************************************************
+-- * Definition of dvmTest Sub-groups
+-- ****************************************************************************
+dvmTest OBJECT IDENTIFIER
+	--STATUS current
+	--DESCRIPTION "Group of configuration objects related to all DVM models"
+	::= { dvmPrivate 2 } 
+
+configuration    	OBJECT IDENTIFIER ::= { dvmTest 3 }
+microControllers 	OBJECT IDENTIFIER ::= { dvmTest 4 }       
+leds 				OBJECT IDENTIFIER ::= { dvmTest 5 }
+
+-- ****************************************************************************
+-- * Definition of FPGA Sub-groups
+-- ****************************************************************************
+dvmTestFpga OBJECT IDENTIFIER
+	--STATUS current
+	--DESCRIPTION "Group of configuration objects related to all DVM models"
+	::= { dvmTest 1 }
+
+-- ****************************************************************************
+-- * Definition of FPGA Software Sub-groups
+-- ****************************************************************************
+dvmTestFpgaSoftwareControl OBJECT IDENTIFIER
+	--STATUS current
+	--DESCRIPTION 
+	--	"This sub-tree contains control to perform a software update on the FPGA chipset."
+	::= { dvmTestFpga 1 }
+
+dvmTestFpgaSwImageNumber OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates the image from the v2ImageTable which will be controlled by
+         operations from this group.  Must be set to a valid value of 
+         v2FwIndex."
+    ::= { dvmTestFpgaSoftwareControl 1 }
+    
+dvmTestFpgaSwDloadTftpServer OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the IP address of a TFTP server from which the
+         image specified in dvmTestFpgaSwImageNumber will be downloaded if 
+         dvmTestFpgaSwDloadNow is set to true(1)."
+    ::= { dvmTestFpgaSoftwareControl 2 }
+    
+dvmTestFpgaSwDloadTftpPath OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls and reflects the path to a file on the server specified by
+         dvmTestFpgaSwDloadTftpServer which will be downloaded to the image specified
+         by dvmTestFpgaSwImageNumber if dvmTestFpgaSwDloadNow is set to true(1)."
+    ::= { dvmTestFpgaSoftwareControl 3 }    
+
+dvmTestFpgaSwDloadNow OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If set to true, a TFTP download will begin which will load the image
+         from the TFTP server specified in dvmTestFpgaSwDloadTftpServer using the file
+         specified in dvmTestFpgaSwDloadTftpPath to the image specified in 
+         dvmTestFpgaSwImageNumber.  When read, always returns false(2)."
+    ::= { dvmTestFpgaSoftwareControl 4 }
+    
+dvmTestFpgaSwDloadStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                failure(0),
+                success(1),
+                inProgress(2),
+                other(3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the status of the last (or current) FPGA firmware image download 
+         attempt."
+    ::= { dvmTestFpgaSoftwareControl 5 }
+
+dvmTestFpgaSwCopyImageFrom OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If this object is set, the image specified by dvmTestFpgaSwImageNumber
+         will be overwritten by the image specified by this object."
+    ::= { dvmTestFpgaSoftwareControl 6 }
+    
+dvmTestFpgaSwCopyStatus  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                failure(0),
+                success(1),
+                inProgress(2),
+                other(3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the status of the last FPGA firmware copy attempt."
+    ::= { dvmTestFpgaSoftwareControl 7 }
+    
+dvmTestFpgaSwSendImageFrom OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This mib will trigger the FPGA reprogrammation from the specified image."
+    ::= { dvmTestFpgaSoftwareControl 8 }
+
+dvmTestFpgaSwSendImageStatus  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                failure(0),
+                success(1),
+                inProgress(2),
+                other(3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the status of the last FPGA firmware send attempt."
+    ::= { dvmTestFpgaSoftwareControl 9 }
+
+
+dvmTestFpgaSotwareTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DvmTestFpgaSotwareEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table display the FPGA firware Header of each image" 
+    ::= { dvmTestFpga 2 }
+
+dvmTestFpgaSotwareEntry OBJECT-TYPE
+     SYNTAX DvmTestFpgaSotwareEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"dvmTestFpgaSotwareTable definition"     
+     INDEX { dvmFpgaSoftwareTableIndex }
+     ::= { dvmTestFpgaSotwareTable 1 }
+
+DvmTestFpgaSotwareEntry ::=
+     SEQUENCE
+     {
+          dvmFpgaSoftwareTableIndex				Integer32,
+          dvmFpgaProcessorId					Unsigned32,
+          dvmFpgaSoftwareMajorRevision		    Unsigned32,
+          dvmFpgaSoftwareMinorRevision		    Unsigned32,
+          dvmFpgaBuildTime						DateAndTime,
+          dvmFpgaFileLength						Unsigned32,
+          dvmFpgaFileName						DisplayString,
+          dvmFpgaHeaderHCS						Unsigned32,
+          dvmFpgaSoftwareCRC					Unsigned32
+     }
+
+dvmFpgaSoftwareTableIndex OBJECT-TYPE
+     SYNTAX Integer32(1..2)
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the dvmTestFpgaSotwareTable"
+     ::= { dvmTestFpgaSotwareEntry 1 }
+     
+dvmFpgaProcessorId OBJECT-TYPE
+     SYNTAX Unsigned32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "This is a unique identifier to make sure that the software is suitable for this FPGA"
+     ::= { dvmTestFpgaSotwareEntry 2 }
+
+dvmFpgaSoftwareMajorRevision OBJECT-TYPE
+     SYNTAX Unsigned32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "software major revision"
+     ::= { dvmTestFpgaSotwareEntry 3 }
+
+dvmFpgaSoftwareMinorRevision OBJECT-TYPE
+     SYNTAX Unsigned32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "software minor revision"
+     ::= { dvmTestFpgaSotwareEntry 4 }
+     
+dvmFpgaBuildTime OBJECT-TYPE
+     SYNTAX DateAndTime
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Date and time where the software has been signed"
+     ::= { dvmTestFpgaSotwareEntry 5 }
+        
+dvmFpgaFileLength OBJECT-TYPE
+     SYNTAX Unsigned32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "software length in bytes"
+     ::= { dvmTestFpgaSotwareEntry 6 }
+
+dvmFpgaFileName OBJECT-TYPE
+     SYNTAX DisplayString
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "The name of the file from which this image was produce.  
+          Note that the file name is extracted from the program store header, 
+          so it is possible that this object will not match the actual filemane
+          of the downloaded file if the file is renamed prior to the download."
+     ::= { dvmTestFpgaSotwareEntry 7 }
+     
+dvmFpgaHeaderHCS OBJECT-TYPE
+     SYNTAX Unsigned32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "The header chechsum used by the download manager when validating this image."
+     ::= { dvmTestFpgaSotwareEntry 8 }
+
+dvmFpgaSoftwareCRC OBJECT-TYPE
+     SYNTAX Unsigned32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "The cyclic redundancy code used by the program manager when validating this image."
+     ::= { dvmTestFpgaSotwareEntry 9 }
+
+dvmTestFpgaIOtest OBJECT IDENTIFIER
+	--STATUS current
+	--DESCRIPTION 
+	--	"This sub-tree contains control to perform an test routine on the FPGA I/Os."
+	::= { dvmTestFpga 3 }
+
+dvmTestFpgaIoTestRunNow OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If set to true, a test routine of the FPGA's I/Os is performed.
+        When read, always returns false(2)."
+    ::= { dvmTestFpgaIOtest 1 }
+
+dvmTestFpgaIoTestStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                unknown(0),
+                inProgress(1),
+                success(2),
+                fail(3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicate the status of the last test perform.  If status is fail, read the resultTable."
+    ::= { dvmTestFpgaIOtest 2 }
+
+dvmTestFpgaIoTestResultTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DvmTestFpgaIoTestResultEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table display the FPGA I/Os test result" 
+    ::= { dvmTestFpgaIOtest 3 }
+
+dvmTestFpgaIoTestResultEntry OBJECT-TYPE
+     SYNTAX DvmTestFpgaIoTestResultEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"dvmTestFpgaIoTestResultTable definition"     
+     INDEX { dvmFpgaIoTestResultIndex }
+     ::= { dvmTestFpgaIoTestResultTable 1 }
+
+DvmTestFpgaIoTestResultEntry ::=
+     SEQUENCE
+     {
+          dvmFpgaIoTestResultIndex			Integer32,
+          dvmFpgaIoTestResultInfo			DisplayString,
+          dvmFpgaIoTestResultStatus			INTEGER
+     }
+
+dvmFpgaIoTestResultIndex OBJECT-TYPE
+     SYNTAX Integer32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the dvmTestFpgaSotwareTable"
+     ::= { dvmTestFpgaIoTestResultEntry 1 }
+
+
+dvmFpgaIoTestResultInfo OBJECT-TYPE
+     SYNTAX DisplayString
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "identity information on the I/Os"
+     ::= { dvmTestFpgaIoTestResultEntry 2 }
+
+dvmFpgaIoTestResultStatus OBJECT-TYPE
+     SYNTAX      INTEGER {
+                unknown(0),
+                success(1),
+                fail(2)
+    }
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Test result for this specific I/Os"
+     ::= { dvmTestFpgaIoTestResultEntry 3 }
+
+     
+-- ****************************************************************************
+-- * Definition of Configuration Sub-groups
+-- ****************************************************************************
+formatFlash OBJECT-TYPE
+	SYNTAX INTEGER  {format(1)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This mib triggers the formating of the last blocks of the two 
+		flash banks.  These section contains the dht logs"
+	::= {configuration 1}      
+
+
+
+-- ****************************************************************************
+-- * Definition of Microcontroller Sub-groups
+-- ****************************************************************************
+renesassFirmwareVersion OBJECT-TYPE
+     SYNTAX OCTET STRING
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "ID & version of the renesass micro-controller.
+          The MSB byte represents the firmware ID and the LSB byte the revision number.
+          Unavailable indicates a communication problem with the micro-controller"
+	::= {microControllers 1}
+
+-- ****************************************************************************
+-- * Definition of LEDS Sub-groups
+-- ****************************************************************************
+
+    
+END

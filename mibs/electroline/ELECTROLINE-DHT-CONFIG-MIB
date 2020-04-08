@@ -1,0 +1,813 @@
+--*****************************************************************************
+--                                                                          
+--    Copyright 2013 Electroline Equipment Inc                                   
+--    All Rights Reserved       
+--                                                                          
+--                                                                          
+--                                                                          
+--*****************************************************************************
+--    Filename: ELECTROLINE-DHT-CONFIG.mib
+--    Author:   Eric Alarie
+--    Creation Date: 2003.03.20
+--*****************************************************************************
+--    Description:
+--
+--	This file contains the SNMPv2 MIB definition of the Configuration branch 
+--      for the DHT products.
+--		
+--*****************************************************************************
+--   Revision History:
+--   2003.03.20	Eric Alarie			First Draft
+--   2003.03.21	Carlene Gardner		Linguistic revision
+--   2003.05.13 Eric Alarie         Updated for release 1.0.x of the DHT
+--   2003.05.21	Carlene Gardner		Linguistic revision 
+--   2003.05.27	Eric Alarie			Added Battery save on/off and some
+--									storage for the EMS.
+--   2003.07.07	Carlene Gardner		Linguistic revision
+--   2004.01.26	Carlene Gardner		Added cfgHmsEmsAlarmTrapAssurance
+--	 2004.07.1	Nath Mercure		Added cfgPsNominalInputVoltage Mib (120V or 240V)
+--   2004.07.14 Eric Alarie			Added SnmpTimeout MIB
+--   2004.10.01 Eric Alarie			Changed the default value comment for
+--									cfgEmsTimeout and cfgSnmpTimeout.
+--   2004.12.17 Eric Alarie         Added ps temperature calibration MIB for NA01
+--   2005.06.20 Eric Alarie			Added cfgDhtSnmpAgent MIB branch
+--   2005.06.22 Eric Alarie         Added Dual IP MIBs 
+--   2006.02.07 Alain Leclerc       changed displayString for octetstring size (0..127)
+--   2006.02.07 Alain Leclerc       autostoptimer must not support a value of 0
+--   2006.03.20 Louis Roy			Added cfgOutputCurrent & modified cfgBatterySaveEnable									
+--   2006.04.25 Eric Alarie         cfgEmsCompatibilityMode is obsolete
+--   2006.08.15 Eric Alarie         Added the configuration of the trap port number 
+--   2007.02.21 Louis Roy         	Added the configuration for the battery Lithium-Ion
+--   2007.03.02 Louis Roy         	Added the configuration for the battery type
+--   2007.03.22 Louis Roy         	Commented the add for the battery type and Lithium-Ion 
+--   2009.01.08	Alain Leclerc      	Added support for manual setting in usmUnifed Power supply
+--   2011.10.13	Louis Roy	      	Added support to manually allow the creation of the Generic Analog Power supply
+--   2012.03.27 Paul Zheng			Added IMPORTS from RFC 4001, the TEXTUAL-CONVENTION for InetAddress and InetAddressType; 
+--   								added 2 objects cfgHmsEmsAddressTypeInet, cfgHmsEmsAddressInet to support IPv6 address;
+--									deprecate cfgHmsEmsAddressIP;  
+--   2012.03.27 Louis Roy			Added a MIB to allow the user to select the source of measurement perform by the DHT 
+--									between the communication port or the analog port (cfgPsMeasurementSource) 
+--   2012.06.18 Louis Roy			Added a table that allow the provisionning of the Dual IP HMS SNMP access through IP filter  
+-- 	 2013.06.12 Eric Lariviere		Added a MIB to allow commonVendorInfo override.         
+--   2013.07.24 Eric Lariviere		Added a MIB to control how HMS Mibs represent time. 
+--	 2014-01-14 Alain Leclerc		Some mibs are depricated
+--		
+--*****************************************************************************
+
+ELECTROLINE-DHT-CONFIG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32
+        FROM SNMPv2-SMI
+    RowStatus, TruthValue
+        FROM SNMPv2-TC        
+    dhtConfiguration
+        FROM ELECTROLINE-DHT-ROOT-MIB
+    DisplayString
+    	FROM RFC1213-MIB
+    NetworkAddress
+    	FROM RFC1155-SMI
+    InetAddress,
+    InetAddressType
+    	FROM INET-ADDRESS-MIB;     -- RFC 4001
+-- ****************************************************************************
+-- * Definition of Configuration Sub-groups
+-- ****************************************************************************
+dhtCfgGlobal OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Group of configuration objects related to all DHT models"
+	::= { dhtConfiguration 1 }
+
+dhtCfgPowerSupply OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Group of configuration objects related to the DHT-PS-NA-01 model only"
+	::= { dhtConfiguration 2 }
+
+
+-- ****************************************************************************
+-- * EMS CONFIGURATION DATA
+-- *
+-- * The following MIB objects control communication (Traps) with external Element 
+-- * / Network Management Systems.  It includes the EMS Address Table that is used to
+-- * indicate to the DHT the IP addresses of the EMS / NMS and related parameters.
+-- * The HmsCold / Warm start trap assurance mechanism is an Electroline enhancement
+-- * that is required for the EEMS.  See ELECTROLINE-DHT-STATUS.mib for further 
+-- * details.
+-- ****************************************************************************
+dhtCfgHmsEms OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This sub-tree contains configuration information for trap management."
+	::= { dhtCfgGlobal 1 }
+
+cfgHmsEmsAddressTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgHmsEmsAddressEntry
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This is the list of network addresses of the Element Management System(s)
+        to which the DHT will send its HmsColdStart, HmsWarmStart and HmsAlarmEvent traps.
+
+	   The entries in this table are stored in non-volatile memory.
+	   A maximum of 10 entries is supported.
+        " 
+    ::= { dhtCfgHmsEms 1 }
+
+cfgHmsEmsAddressEntry OBJECT-TYPE
+     SYNTAX CfgHmsEmsAddressEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"HMS EMS entry definition"     
+     INDEX { cfgHmsEmsAddressIndex }
+     ::= { cfgHmsEmsAddressTable 1 }
+
+CfgHmsEmsAddressEntry ::=
+     SEQUENCE
+     {
+          cfgHmsEmsAddressIndex					INTEGER,
+          cfgHmsEmsAddressIP					IpAddress,
+          cfgHmsEmsAddressStartTrapAssurance	TruthValue,
+          cfgHmsEmsAddressAlarmTrapAssurance	TruthValue,
+	  
+          cfgHmsEmsAddressTrapPortNumber		INTEGER,
+          cfgHmsEmsAddressTypeInet				InetAddressType,
+          cfgHmsEmsAddressInet					InetAddress,
+
+     }
+
+cfgHmsEmsAddressIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the EMS address table"
+     ::= { cfgHmsEmsAddressEntry 1 }                                      
+
+cfgHmsEmsAddressIP OBJECT-TYPE
+     SYNTAX IpAddress
+     MAX-ACCESS read-write
+     STATUS deprecated
+     DESCRIPTION
+          "IPv4 address of the destination EMS that will receive HMS traps. 
+          If the EMS server address is unknown or is not an IPv4 address, return 0.0.0.0.. 
+	  	 Valide IPv4 address set will update also cfgHmsEmsAddressInet and cfgHmsEmsAddressTypeInet.
+	  	 This object is deprecated and is replaced by cfgHmsEmsAddressInet."
+     ::= { cfgHmsEmsAddressEntry 2 }
+
+cfgHmsEmsAddressStartTrapAssurance OBJECT-TYPE
+     SYNTAX TruthValue
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "When this MIB is set to one, additional binding is appended to 
+           the cold or warm start Trap (HMS).  The EMS must set the bound OID 
+           to 1 to acknowledge receipt of the trap.  The DHT then uses the
+           cfgEmsTimeout & cfgEmsRetry to resend the trap if necessary."
+     ::= { cfgHmsEmsAddressEntry 3 }
+
+cfgHmsEmsAddressAlarmTrapAssurance OBJECT-TYPE
+     SYNTAX TruthValue
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "When this MIB is set to true, additional binding is appended to all  
+           the Alarm Traps (HMS).  The EMS must set the bound OID 
+           to x to acknowledge receipt of the trap (where x is the total number of traps received).
+		   The DHT then uses the cfgEmsTimeout & cfgEmsRetry to send an AlarmAssurance trap 
+		   if necessary."
+     ::= { cfgHmsEmsAddressEntry 4 }
+
+cfgHmsEmsAddressTrapPortNumber OBJECT-TYPE
+     SYNTAX INTEGER (0..65535)
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "This represents the Ems's port number to which the trap will be sent to.
+           The default value is the common SNMP trap port (162)."
+     ::= { cfgHmsEmsAddressEntry 5 }
+
+cfgHmsEmsAddressTypeInet OBJECT-TYPE
+        SYNTAX      InetAddressType
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The address type of the EMS server.
+             Values: unknown(0), ipv4(1), ipv6(2), ipv4z(3), ipv6z(4), dns(16)
+	     	The update of this object is coherent to cfgHmsEmsAddressIP object."
+        ::= { cfgHmsEmsAddressEntry 6 }
+
+cfgHmsEmsAddressInet OBJECT-TYPE
+        SYNTAX      InetAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "IPv4 or IPv6 address of the destination EMS that will receive traps.
+             If the message server is unknown, return the zero-length address string.
+	     	The update of this object is coherent to cfgHmsEmsAddressIP object."
+        ::= { cfgHmsEmsAddressEntry 7}
+     
+
+cfgEmsTimeout OBJECT-TYPE
+    SYNTAX INTEGER (1..86400)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This is the period of time (in seconds) during which the DHT expects to receive 
+        an acknowlege trap from an EMS that has enabled trap assurance.  If no acknowledge message
+        is received after the period has elapsed, the DHT then resends the trap. This process is 
+        repeated until either the command is successful or the number of retries defined in cfgEmsRetry
+        has been reached.
+       	The same timeout value is used for all destination EMS entries.
+		The default value for this MIB is 300 seconds
+	   	The value of this MIB is stored in non-volatile memory.
+        " 
+    ::= { dhtCfgHmsEms 2 }
+
+cfgEmsRetry OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This is the number of times that the DHT resends a trap to an EMS that has
+       	enabled the trap assurance, if no acknowledge message is received.  
+       	The default value is zero, meaning that the traps are never resent; a value 
+       	of -1 means that there is no limit on the number of retries.
+       	The same retry count value is used for all EMS entries.
+	   	The value of this MIB is stored in non-volatile memory.
+       " 
+    ::= { dhtCfgHmsEms 3 }
+
+ 
+cfgEmsDefaultHmsProperties OBJECT-TYPE
+    SYNTAX INTEGER {setToDefault(1)}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This MIB can be used to reset all HMS properties (both analog and 
+       discrete table entries) to their factory default values." 
+    ::= { dhtCfgHmsEms 4 } 
+
+cfgEmsCompatibilityMode OBJECT-TYPE
+	SYNTAX INTEGER {hmsMode(0), dhtMode(1)}
+	MAX-ACCESS read-write
+	STATUS obsolete
+	DESCRIPTION
+		"This MIB is not currently supported by the DHT "
+	::= { dhtCfgHmsEms 5 }
+
+cfgEmsXpdrName OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..127))
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB is used by the EEMS software. Its value has no impact on the DHT's 
+		operation, but is stored in its non-volatile memory"
+	::= { dhtCfgHmsEms 6 }
+	
+cfgEmsXpdrLocation OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..127))
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB is used by the EEMS software. Its value has no impact on the DHT's 
+		operation, but is stored in its non-volatile memory"
+	::= { dhtCfgHmsEms 7 }
+
+cfgEmsXpdrDescription OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..127))
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB is used by the EEMS software. Its value has no impact on the DHT's 
+		operation, but is stored in its non-volatile memory"
+	::= { dhtCfgHmsEms 8 }
+	
+cfgEmsXpdrGroupPath OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..127))
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB is used by the EEMS software to indicate the logical group to 
+		which this DHT belongs.  This value has no impact on the DHT's operation, but is stored in 
+		its non-volatile memory"
+	::= { dhtCfgHmsEms 9 }
+
+cfgEmsXpdrCustomField1 OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..127))
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB is used by the EEMS software to store user-defined data on 
+		this DHT.  This value has no impact on the DHT's operation, but is stored in 
+		its non-volatile memory"
+	::= { dhtCfgHmsEms 10 }
+
+cfgEmsXpdrCustomField2 OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..127))
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB is used by the EEMS software to store user-defined data on 
+		this DHT.  This value has no impact on the DHT's operation, but is stored in 
+		its non-volatile memory"
+	::= { dhtCfgHmsEms 11 }
+
+cfgEmsXpdrCustomField3 OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..127))
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB is used by the EEMS software to store user-defined data on 
+		this DHT.   This value has no impact on the DHT's operation, but is stored in 
+		its non-volatile memory"
+	::= { dhtCfgHmsEms 12 }
+				
+-- ****************************************************************************
+-- * GLOBAL CONFIGURATION DATA
+-- * 
+-- * These MIB objects control some functions of the DHT that cannot be set 
+-- * through HMS or DOCSIS MIBs.
+-- ****************************************************************************
+dhtCfgResetToFactory OBJECT-TYPE
+	SYNTAX INTEGER {reset(1)}
+	MAX-ACCESS read-write
+	STATUS deprecated
+	DESCRIPTION
+		"This MIB can be used to remotely restore the factory default values, thus overwriting
+		any other setup values (HMS and internal transponder settings) that were stored 
+          in the DHT's non-volatile memory. The transponder must be reset following this 
+         command (commonReset or other reset function).
+         Deprecated.  Has been move into electrolineCommon branch."
+		
+	::= { dhtCfgGlobal 2 }
+
+dhtCfgUsbMode OBJECT-TYPE
+	SYNTAX INTEGER {disable(0), cpe(1), craft(2)}
+	MAX-ACCESS read-write
+	STATUS deprecated
+	DESCRIPTION
+		"This MIB controls the behavior of the USB port.  In craft mode, the USB port
+		 has a default MAC address which enables a PC to be connected locally to 
+		 any DHT with the same driver and network adapter settings.  
+		 In craft mode, read access to the DOCSIS MIBS and read/write access to the HMS is allowed. 
+		 In CPE mode, the USB port behaves like a normal cable modem USB port, 
+		 allowing access to the network if this access has been provisioned by the CMTS. 
+		 In CPE mode, access to the MIBs is as per DOCSIS specifications. As well, read-write 
+         access to the Electroline MIBs is permitted.
+         The transponder must be reset following this command (commonReset or other 
+         reset function) in order for the change to take effect.
+		 The value of this MIB is stored in non-volatile memory.
+		 Deprecated.  Has been move into electrolineCommon branch.
+		 See cfgLocalInterfaceMode"		
+	::= { dhtCfgGlobal 3 }
+
+-- ****************************************************************************
+-- * TIMING RELATED CONFIGURATION DATA
+-- *
+-- * This branch of the Electroline MIB allows configuration of certain timings
+-- * in the DHT's operation
+-- ****************************************************************************			
+dhtCfgTimers OBJECT-IDENTITY
+	STATUS deprecated
+	DESCRIPTION "Group of configuration objects related to DHT timing.
+				Deprecated.  Has been move into electrolineCommon branch"
+	::= { dhtCfgGlobal 4 }
+
+cfgSnmpTimeout OBJECT-TYPE
+	SYNTAX INTEGER (0..10080)
+	MAX-ACCESS read-write
+	STATUS deprecated
+	DESCRIPTION
+		"This MIB controls the SNMP activity watchdog period. The value is in minutes.
+		A value of zero deactivates the feature.  When the feature is active, if the DHT
+		does NOT receive any SNMP packets during the period, the DHT will reset.
+		The value of this MIB is stored in non-volatile memory. Default value is 0 (off).
+		Deprecated.  Has been move into electrolineCommon branch."		
+	::= { dhtCfgTimers 1 }
+
+-- ****************************************************************************
+-- * Dual IP RELATED CONFIGURATION
+-- *
+-- * This branch of the Electroline MIB should be used to control the IP behavior
+-- * of the DHT, it controls if the monitoring part of the DHT will be accessible
+-- * from the DOCSIS SNMP agent or through a separate SNMP agent.
+-- ****************************************************************************
+dhtCfgIpInterfaces OBJECT-IDENTITY
+	STATUS deprecated
+	 DESCRIPTION 
+		"This sections specifies IP behavior for the DHT monitoring interface.
+		This section has been move to the electroline Common branch"
+	::= { dhtCfgGlobal 5 }
+
+	
+cfgDhtIpMode OBJECT-TYPE
+	SYNTAX INTEGER {singleIp(1), dualIp(2)}
+	MAX-ACCESS read-write
+	STATUS deprecated	
+	DESCRIPTION 
+		"This object controls the IP interface behavior of the DHT 
+ 		
+ 		Set it to singleIp(1) to access HMS MIB objects through the DOCSIS management interface.
+ 	
+ 		Set it to dualIp(2) to instruct the DHT to manage a virtual CPE with a separate IP address
+ 		and a separate SNMP agent to access the HMS MIBs.
+ 	
+ 		The default value for this MIB is singleIp(1).
+ 	
+ 		A transponder reset after setting this MIB is necessary in order for the change to take effect.
+ 	
+ 		The value of this MIB is stored in non-volatile memory.
+ 		Deprecated.  Has been move into electrolineCommon branch."
+
+	::= { dhtCfgIpInterfaces 1 }
+
+cfgHmsSnmpAgent OBJECT-IDENTITY
+	STATUS deprecated
+	 DESCRIPTION 
+		"This sections specifies controls for the agents.
+		This section has been move to electrolineCommon branch" 
+	::= { dhtCfgIpInterfaces 50 }
+			
+hmsSnmpManagerCommunity OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-write
+	STATUS deprecated	
+	DESCRIPTION 
+		 "This MIB is used to specify the SNMP community string
+		 used for write access to the SNMP agent in Dual IP mode.
+		 
+		 The default value for this MIB is DhtHmsWriteSecret.
+		 
+		 The value of this MIB is stored in non-volatile memory.
+		 Deprecated.  Has been move into electrolineCommon branch."
+	::= { cfgHmsSnmpAgent 1 }
+
+hmsSnmpMonitorCommunity OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-write
+	STATUS deprecated	
+	DESCRIPTION 
+		 "This MIB is used to specify the SNMP Read-only community string
+		 used to access the SNMP agent in Dual IP mode.
+		 
+		 The default value for this MIB is DhtHmsReadSecret.
+		 
+		 The value of this MIB is stored in non-volatile memory.
+		 Deprecated.  Has been move into electrolineCommon branch."
+	::= { cfgHmsSnmpAgent 2 }
+
+cfgHmsSnmpAccess OBJECT-IDENTITY
+	STATUS deprecated
+	DESCRIPTION 
+		"This sub-tree contains configuration information for HMS SNMP access management.
+		Deprecated.  Has been move into electrolineCommon branch."
+	::= { cfgHmsSnmpAgent 3 }
+
+cfgHmsSnmpAccessTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgHmsSnmpAccessEntry
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+       "This table allow access to SNMP objects by network management stations.  If the table
+        is empty, access to SNMP objects is unrestricted.
+        Deprecated.  Has been move into electrolineCommon branch." 
+    ::= { cfgHmsSnmpAccess 1 }
+
+cfgHmsSnmpAccessEntry OBJECT-TYPE
+     SYNTAX CfgHmsSnmpAccessEntry
+     MAX-ACCESS not-accessible
+     STATUS deprecated
+     DESCRIPTION
+     	"HMS SNMP Access entry definition
+     	Deprecated.  Has been move into electrolineCommon branch."     
+     INDEX { cfgHmsSnmpAccessIndex }
+     ::= { cfgHmsSnmpAccessTable 1 }
+
+CfgHmsSnmpAccessEntry ::=
+     SEQUENCE
+     {
+          cfgHmsSnmpAccessIndex					INTEGER,
+          cfgHmsSnmpAccessIP					IpAddress,
+          cfgHmsSnmpAccessIPMask				IpAddress,
+     }
+
+cfgHmsSnmpAccessIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS deprecated
+     DESCRIPTION
+          "Index into the HMS SNMP access table.
+          Deprecated.  Has been move into electrolineCommon branch."
+     ::= { cfgHmsSnmpAccessEntry 1 }                                      
+
+cfgHmsSnmpAccessIP OBJECT-TYPE
+     SYNTAX IpAddress
+     MAX-ACCESS read-write
+     STATUS deprecated
+     DESCRIPTION
+          "IPv4 address of the network management station.
+          Deprecated.  Has been move into electrolineCommon branch."
+     ::= { cfgHmsSnmpAccessEntry 2 }
+
+cfgHmsSnmpAccessIPMask OBJECT-TYPE
+     SYNTAX IpAddress
+     MAX-ACCESS read-write
+     STATUS deprecated
+     DESCRIPTION
+          "IPv4 subnet mask of the network management station"
+     ::= { cfgHmsSnmpAccessEntry 3 }     
+     
+-- ****************************************************************************
+-- * GLOBAL CONFIGURATION DATA
+-- * 
+-- * These MIB objects control some functions of the DHT that cannot be set 
+-- * through HMS or DOCSIS MIBs.
+-- ****************************************************************************
+dhtCfgVendorInfo OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..255))
+	ACCESS read-write
+	STATUS deprecated
+	DESCRIPTION
+          "Vendor-specific information in human-readable format. When set, it mirrors and 
+          overrides the mib commonVendorInfo from the SCTE tree.
+          Deprecated.  Has been move into electrolineCommon branch."
+	::= { dhtCfgGlobal 6 }
+    
+dhtCfgHmsTimeReference OBJECT-TYPE
+	SYNTAX INTEGER {local(1), utc(2)}
+	MAX-ACCESS read-write
+	STATUS deprecated
+	DESCRIPTION
+		"This MIB controls the time reference that is applied in the SCTE HMS
+		tree. It affects how commonTime and alarmLogInformation time reference
+		are represented.
+		
+		Set local(1) to represent these values as the number of seconds since
+		Epoch (00:00:00 UTC, January 1, 1970) adjusted with local time offset. 
+		
+		Set utc(2) to represent these values as the number of seconds since
+		Epoch (00:00:00 UTC, January 1, 1970).
+		Deprecated.  Has been move into electrolineCommon branch."		
+	::= { dhtCfgGlobal 7 }
+				
+-- ****************************************************************************
+-- * POWER-SUPPLY RELATED CONFIGURATION DATA
+-- *
+-- * This branch of the Electroline MIB is available with DHT-PS-NA-01 models in 
+-- * order to allow configuration of certain legacy application-specific parameters.
+-- ****************************************************************************
+dhtCfgBatterySave OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This Sub-tree contains the configuration parameters for the DHT's battery
+		 saving mode.  This feature allows the DHT to enter sleep mode
+		 when any of the batteries reaches a provisioned critical low voltage.  
+		 The DHT will then restart automatically when the battery voltage reaches 
+		 the provisioned wakeUp voltage"
+	::= { dhtCfgPowerSupply 1 }
+
+cfgSleepVoltage OBJECT-TYPE
+    SYNTAX   	INTEGER (0..1500)   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Represents the battery voltage in 1/100 of volts at which the DHT enters 
+        sleep mode." 
+    ::= { dhtCfgBatterySave 1 }
+    
+cfgWakeUpDeltaVoltage OBJECT-TYPE
+    SYNTAX   	INTEGER (0..500)   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "This MIB displays the voltage offset at which the DHT will wake up from sleep mode
+        wake up voltage = sleep voltage + Delta."
+    ::= { dhtCfgBatterySave 2 }
+
+cfgBatterySaveEnable OBJECT-TYPE
+	SYNTAX		INTEGER {enable(1), disable(2), unavailable(3)}
+	MAX-ACCESS  read-write
+	STATUS		current
+	DESCRIPTION
+		"This MIB controls the DHT's battery conservation mode.  When set to enable, the DHT 
+		automatically enters sleep mode when the voltage of a battery falls below the value
+		of cfgSleepVoltage.
+		The default value is enable.
+		The value of this MIB is stored in non-volatile memory."
+	::= { dhtCfgBatterySave 3 }
+  
+--  
+-- *** To uncomment if the support of batterie Lithium-Ion is activated ***  
+--
+--cfgSleepVoltage11x OBJECT-TYPE
+--    SYNTAX   	INTEGER (0..1300)   
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "Represents the Lithium-Ion 11x battery voltage in 1/100 of volts at which the DHT
+--        enters sleep mode." 
+--    ::= { dhtCfgBatterySave 4 }
+--    
+--cfgWakeUpDeltaVoltage11x OBJECT-TYPE
+--    SYNTAX   	INTEGER (0..500)   
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "This MIB displays the Lithium-Ion 11x battery voltage offset at which the DHT will
+--        wake up from sleep mode wake up voltage = sleep voltage + Delta."
+--    ::= { dhtCfgBatterySave 5 }
+--
+--cfgSleepVoltage14x OBJECT-TYPE
+--    SYNTAX   	INTEGER (0..1750)   
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "Represents the Lithium-Ion 14x battery voltage in 1/100 of volts at which the DHT
+--        enters sleep mode." 
+--    ::= { dhtCfgBatterySave 6 }
+--    
+--cfgWakeUpDeltaVoltage14x OBJECT-TYPE
+--    SYNTAX   	INTEGER (0..500)   
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--       "This MIB displays the Lithium-Ion 14x battery voltage offset at which the DHT will
+--        wake up from sleep mode wake up voltage = sleep voltage + Delta."
+--    ::= { dhtCfgBatterySave 7 }
+
+dhtCfgPsInverterTest OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This Sub-tree contains the DHT-specific configuration parameters for 
+		inverter test mode.  "
+	::= { dhtCfgPowerSupply 2 }
+
+
+cfgPsInvTestAutoStopTimer OBJECT-TYPE
+	SYNTAX INTEGER (1..300)
+	MAX-ACCESS read-write
+	STATUS current	
+	DESCRIPTION 
+		"This MIB defines the maximum duration of a remote inverter test, in minutes. 
+         The transponder uses a default 15-minute period. 
+		 When the timer reaches the end of the set period, the test stops automatically.
+         
+		 Note that the internal Power Supply settings may stop the inverter test 
+		 before this timer has expired.
+		
+		 The DHT will also stop the Inverter test if the voltage of any battery drops below
+		 10.875V.
+	
+		 The value of this MIB is stored in non-volatile memory."
+	::= { dhtCfgPsInverterTest 1 }
+
+-- ****************************************************************************
+-- * POWER-SUPPLY SPECIAL SETTINGS
+-- *
+-- * This branch of the Electroline MIB is available with DHT-PS-NA-01 models in 
+-- * order to allow configuration of certain parameters that cannot be adjusted
+-- * automatically
+-- ****************************************************************************	
+dhtCfgPsSetting OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This Sub-tree contains the PowerSupply specific configuration settings."
+	::= { dhtCfgPowerSupply 3 }
+	
+	
+cfgPsNominalInputVoltage OBJECT-TYPE
+	SYNTAX INTEGER {oneHundredTwenty(1), twoHundredFourty(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB object indicates if the power line input voltage is 120V or 240V.  
+		By default, it is set to 120V.
+		This object affects all input Voltage reporting (for example psInputVoltage)."		
+	::= { dhtCfgPsSetting 1 }
+
+cfgPsTemperatureCalibrationOffset OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB object can be used to increase the accuracy of the psTemperature probe.
+		The value of this MIB (in 1/10 of degrees Celsius) will be added to the hardware 
+		temperature reading to obtain the value that will be returned in psTemperature.1.1 MIB.
+
+		The value of this MIB will be stored in non-volatile memory."		
+	::= { dhtCfgPsSetting 2 }
+	
+cfgPsOutputCurrent OBJECT-TYPE
+	SYNTAX INTEGER {normal(1), high(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB object can be used when a XM2 power supply is set in high output current mode.
+		To follow the power supply mode, you must set this MIB object to high if the power supply is set to
+		more than 20A.  If less than 20A, set it to normal.
+		Default value is normal.
+
+		The value of this MIB will be stored in non-volatile memory."		
+	::= { dhtCfgPsSetting 3 } 
+	
+dhtCfgUsmUnified OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This Sub-tree contains usm unifed specific configuration settings."
+	::= { dhtCfgPsSetting 4 }
+
+cfgUsmUnifiedMode OBJECT-TYPE
+	SYNTAX INTEGER {auto(1), usm(2), usm2(3), usm25(4), apcSm7WithInputCurrent(5), apcSm7WithoutInputCurrent(6)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This mib can be used to force a specific usm card when the unified cable is in used.
+		auto mode means the dht will perform a discovery at boot up.
+		You must reboot the transponder after setting this mib.
+		Default value is auto.
+
+		The value of this MIB will be stored in non-volatile memory."		
+	::= { dhtCfgUsmUnified 1 }
+		
+
+cfgPsGenericCreation OBJECT-TYPE
+     SYNTAX TruthValue
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "This MIB object can be used to force the generic power supply creation.
+          Default value is false.
+          
+          The value of this MIB will be stored in non-volatile memory."
+	::= { dhtCfgPsSetting 5 } 
+
+cfgPsMeasurementSource OBJECT-TYPE
+	SYNTAX INTEGER {analogPort(1), communicationPort(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB object allow the user to select the source for the internal measurement
+		on an XM2 power supply.  The choice is either to derive the measurement data from
+		the transponder's analog port (analogPort(1)) or from the transponder's digital 
+		interface bus (communicationPort(2)).  Default value analogPort(1).
+
+		The value of this MIB will be stored in non-volatile memory."		
+	::= { dhtCfgPsSetting 6 } 
+ 
+	
+--  
+-- *** To uncomment if the support of batterie Lithium-Ion is activated ***  
+--
+--cfgPsBatteryType OBJECT-TYPE
+--	SYNTAX INTEGER {noBatteryDetected(0), gelBattery6v(1), gelBattery12v(2), lithiumIonBattery(3)}
+--	MAX-ACCESS read-only
+--	STATUS current
+--	DESCRIPTION
+--		"This MIB object represents the type of battery detected by the transponder.  The detection is
+--		 done in the boot-up sequence of the transponder."		
+--	::= { dhtCfgPsSetting 4 }
+		
+	
+-- ****************************************************************************
+-- * HMS-022 RELATED CONFIGURATION
+-- *
+-- * This branch of the Electroline MIB defines some working parameters for the  
+-- * HMS-022 protocol. (Address range...)
+-- ****************************************************************************
+dhtCfgHMS022 OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This sections specifies HMS022 specific configuration, it enables the user 
+	   to enable select the range of HMS022 address supported."
+	::= { dhtConfiguration 3 }
+
+	
+cfgStartAddress OBJECT-TYPE
+	SYNTAX INTEGER (1..31)
+	MAX-ACCESS read-write
+	STATUS current	
+	DESCRIPTION 
+		"This Mib indecates the starting address of device on the TIB.
+		 
+		 If startAdress and EndAddress are equal, only on device will be monitored
+	
+		The value of this MIB is stored in non-volatile memory."
+	::= { dhtCfgHMS022 1 }
+	
+cfgEndAddress OBJECT-TYPE
+	SYNTAX INTEGER (1..31)
+	MAX-ACCESS read-write
+	STATUS current	
+	DESCRIPTION 
+		"This Mib indecates the End address of devices on the TIB.
+		 
+		 if startAdress and EndAddress are equal, only on device will be monitored
+	
+		The value of this MIB is stored in non-volatile memory."
+	::= { dhtCfgHMS022 2 }
+
+
+END

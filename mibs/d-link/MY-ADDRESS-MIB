@@ -1,0 +1,471 @@
+-- *****************************************************************
+-- MY-ADDRESS-MIB.mib:  My Address MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+MY-ADDRESS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32,
+        Unsigned32,
+        IpAddress
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        TimeStamp,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus,
+        IfIndex
+                FROM MY-TC
+        EnabledStatus 
+                FROM P-BRIDGE-MIB
+        myMgmt
+                FROM MY-SMI;
+
+myAddressMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "D-Link Crop."
+        CONTACT-INFO
+                " 
+                http://support.dlink.com"
+        DESCRIPTION
+                "This module defines my address mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 22}
+
+myAddressMIBObjects OBJECT IDENTIFIER ::= { myAddressMIB 1 }
+
+myAddressManagementObjects OBJECT IDENTIFIER ::= { myAddressMIBObjects 1 }
+
+myAddressNotificationObjects OBJECT IDENTIFIER ::= { myAddressMIBObjects 2 }
+
+ 
+--
+-- my Address Filter 
+--
+myDynamicAddressCurrentNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "The currunt number of dynamic MAC address ."
+    ::= { myAddressManagementObjects 1 } 
+    
+myStaticAddressCurrentNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "The currunt number of static MAC address ."
+    ::= { myAddressManagementObjects 2 }
+
+myFilterAddressCurrentNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "Current number of the filtering MAC address."
+    ::= { myAddressManagementObjects 3 }
+
+myAddressAvailableNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+              "Total Mac Address Space Available."
+    ::= { myAddressManagementObjects 4 }
+
+myMacAddressTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF MyMacAddressEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "The table of address MAC address include dynamic mac address,
+               static mac address and filter mac address."
+    ::= { myAddressManagementObjects 5 }
+
+myMacAddressEntry OBJECT-TYPE
+        SYNTAX  MyMacAddressEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "The entry of MAC address table."
+        INDEX   { myMacAddressFdbId,myMacAddress}
+    ::= { myMacAddressTable 1 }
+
+ MyMacAddressEntry ::=
+     SEQUENCE {
+             myMacAddressFdbId Unsigned32,
+             myMacAddress MacAddress,
+             myMacAddressPort IfIndex,
+             myMacAddressType INTEGER,      
+             myMacAddressStatus RowStatus                    
+   }
+
+myMacAddressFdbId OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION
+            "The VID of vlan which the Address address blongs to."
+    ::= { myMacAddressEntry 1 }
+    
+myMacAddress OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "The MAC address which will be address static address."
+    ::= { myMacAddressEntry 2 }
+
+myMacAddressPort OBJECT-TYPE
+        SYNTAX       IfIndex
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            "Interface(port or trunk) number of the port from which a frame must
+             be received in order  for this entry's filtering information to apply."
+    ::= { myMacAddressEntry 3 }
+    
+myMacAddressType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                  dynamic(1),
+                  static(2),
+                  filter(3)                   
+              }
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+              "Only 'static' and 'filter' allow to be set to this object."
+    ::= { myMacAddressEntry 4 }
+        
+myMacAddressStatus OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "entry status of this entry. and the means in this enviraments can
+            reffer to the text-convention definition of the RowStatus."
+    ::= { myMacAddressEntry 5 }
+
+
+--Address Notification
+myMacNotiGlobalEnabled  OBJECT-TYPE
+    SYNTAX        EnabledStatus
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether the MAC notification feature is currently 
+         running in the device.
+
+        Setting this object to disabled(2) disables the MAC notification
+        feature globally thus disabling the feature at each interface.
+
+        Setting this object to enabled(1) will start the MAC notification
+        feature running in the device. If the feature is already
+        running, setting to enabled(1) has no effect. Once the MAC
+        notification is enabled, whether the feature is running at each
+        interface is controlled by the myMacNotiIfCfgTable."   
+        
+    ::= { myAddressNotificationObjects 1 }
+
+myMacNotificationInterval  OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..3600)
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object specifies the maximum interval of time in units of seconds
+         between MacChangedNotifications being generated by the device.
+        
+        If the value of myMacNotiGlobalEnabled is eanbled(1), the
+        device will send out the generated MacChangedNotifications
+        and archive the MAC change notification events in the
+        MyMacNotiHisTable.  
+        
+        If the value of this object is equal to 0, the device will 
+        generate MacChangedNotifications and archive the MAC 
+        change notification events in the MyMacNotiHisTable as soon as
+        there is MAC address learnt or removed by the device.
+
+        If the value of this object is greater than 0, the device will
+        wait for a period of time equal to the value of this object
+        before generate the MacChangedNotifications and archive
+        the MAC change notification events in the MyMacNotiHisTable."
+    DEFVAL { 1 }
+    ::= { myAddressNotificationObjects 2 }
+
+myMacNotiHisTableMaxLength OBJECT-TYPE
+    SYNTAX          Unsigned32 (0..200)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "The upper limit on the number of entries that the
+        MyMacNotiHisTable may contain.  A value of 0 will
+        prevent any history from being retained. When this
+        table is full, the oldest entry will be deleted and
+        a new one will be created."
+    DEFVAL  { 50 }
+    ::= { myAddressNotificationObjects 3 }
+    
+myMacNotiHisTableCurrentLength OBJECT-TYPE
+    SYNTAX          Unsigned32   
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of entries that the MyMacNotiHisTable contain currently."
+    ::= { myAddressNotificationObjects 4 }    
+
+myMacNotiHisTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF MyMacNotiHisEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table will archive the dynamic MAC change notification events 
+        generated by this device."
+    ::= { myAddressNotificationObjects 5 }
+
+myMacNotiHisEntry OBJECT-TYPE
+    SYNTAX     MyMacNotiHisEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A dynamic MAC change notification message that was previously
+        generated by this device.  Each entry is indexed by a message
+        index."
+    INDEX   { myMacNotiHisIndex }
+    ::= { myMacNotiHisTable 1 }
+
+MyMacNotiHisEntry ::=
+    SEQUENCE {
+        myMacNotiHisIndex
+                Unsigned32,
+        myMacNotiHisMacChangedMsg
+                OCTET STRING,
+        myMacNotiHisTimestamp
+                TimeStamp
+    }
+
+myMacNotiHisIndex OBJECT-TYPE
+    SYNTAX          Unsigned32 (1..4294967295)
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "An index that uniquely identifies a MAC change notification
+        event previously generated by the device. This index mys at
+        1 and increases by one when a MAC change notification is 
+        generated.  When it reaches the maximum value, the agent wraps
+        the value back to 1."
+    ::= { myMacNotiHisEntry 1 }
+
+myMacNotiHisMacChangedMsg OBJECT-TYPE
+    SYNTAX        OCTET STRING (SIZE(1..254))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This object contains the information of a MAC change
+        notification event. It consists of several sections packed
+        together in the format of '<section1><section2>...'.
+        
+        Each tuple consist of 11 octets in the format of
+        '<operation><VLAN><MAC><Interface>' where 
+
+        <operation> is of size 1 octet and supports the following values
+          0 - End of MIB object.
+          1 - MAC learnt.
+          2 - MAC removed.
+
+        <VLAN> is vlan number of the VLAN which the MAC address is
+        belonged to and has size of 2 octet.
+
+        <MAC> is the Layer2 Mac Address and has size of 6 octets.
+
+        <Interface> is the value for the interface from which the MAC 
+        address is learnt and has size of 2 octets."
+    ::= { myMacNotiHisEntry 2 }
+
+myMacNotiHisTimestamp  OBJECT-TYPE
+    SYNTAX          TimeStamp
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The value of sysUpTime when the MacChangedNotification
+        containing the information denoted by the myMacNotiHisMacChangedMsg
+        object in this entry was generated."
+    ::= { myMacNotiHisEntry 3 }
+
+
+-- My Mac Notification Interface Config Table
+
+myMacNotiIfCfgTable  OBJECT-TYPE
+    SYNTAX        SEQUENCE OF MyMacNotiIfCfgEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table enables or disables the generation of notification
+        at each interface when MAC address is learnt or removed." 
+    ::= { myAddressNotificationObjects 6 }
+
+myMacNotiIfCfgEntry  OBJECT-TYPE
+    SYNTAX        MyMacNotiIfCfgEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "Each entry contains the configuration for enabling the
+        MAC notification at each interface that supports this
+        feature." 
+    INDEX { myMacNotiIfIndex }
+    ::= { myMacNotiIfCfgTable 1 }
+
+MyMacNotiIfCfgEntry  ::= SEQUENCE {
+    myMacNotiIfIndex IfIndex,
+    myIfMacAddrLearntEnable    EnabledStatus, 
+    myIfMacAddrRemovedEnable   EnabledStatus 
+}
+
+myMacNotiIfIndex OBJECT-TYPE
+     SYNTAX   IfIndex
+     MAX-ACCESS   read-only
+     STATUS   current
+     DESCRIPTION
+            "IfIndex vale of interface."
+    ::= { myMacNotiIfCfgEntry 1 }
+       
+myIfMacAddrLearntEnable OBJECT-TYPE
+    SYNTAX        EnabledStatus 
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether this interface is enabled to send 
+        MacChangedNotification when it learns a new MAC address. This
+        variable has no effect when the value of myMacNotiGlobalEnabled
+        object is disabled(2).
+
+        Setting this object to enabled(1) enables the sending of
+        MacChangedNotification when this interface learns a 
+        new MAC address.
+
+        Setting this object to disabled(2) disables the sending
+        of MacChangedNotification when this interface learns
+        a new MAC address."      
+    DEFVAL { disabled }
+    ::= { myMacNotiIfCfgEntry 2 }
+
+myIfMacAddrRemovedEnable OBJECT-TYPE
+    SYNTAX        EnabledStatus 
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether this interface is enabled to send 
+        MacChangedNotification when a MAC address which it learnt
+        previously is removed from the forwarding table. This variable
+        has no effect when the value of myMacNotiGlobalEnabled object
+        is disabled(2). 
+
+        Setting this object to enabled(1) enables the sending of
+        MacChangedNotification when a MAC address which this
+        interface learnt previously is removed from the forwarding
+        table.
+
+        Setting this object to disabled(2) disables the sending of
+        MacChangedNotification when a MAC address which this
+        interface learnt previously is removed from the forwarding
+        table."
+    DEFVAL { disabled }
+    ::= { myMacNotiIfCfgEntry 3 }
+
+--
+-- Notification 
+--
+
+myAddressTraps      OBJECT IDENTIFIER ::= { myAddressMIB 2 }
+
+macChangedNotification NOTIFICATION-TYPE
+    OBJECTS { myMacNotiHisMacChangedMsg} 
+    STATUS  current
+    DESCRIPTION
+        "This notification is generated when there is enough MAC
+        address information to fully occupy a maximum size SNMP trap
+        message. This notification is also generated when there
+        is at least one MAC address changed or removed and the amount
+        of time elapsed from the previous notification is greater
+        than the maximum wait time denoted by myMacNotificationInterval object. 
+
+        If there are more MAC addresses information than can fit into
+        one myMacNotiHisMacChangedMsg object, then multiple notifications
+        will be generated." 
+    ::= { myAddressTraps 1 } 
+    
+    
+myAddressMIBConformance OBJECT IDENTIFIER ::= { myAddressMIB 3 }
+myAddressMIBCompliances OBJECT IDENTIFIER ::= { myAddressMIBConformance 1 }
+myAddressMIBGroups      OBJECT IDENTIFIER ::= { myAddressMIBConformance 2 }
+
+
+-- compliance statements
+
+myAddressMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My MAC Address MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { myMacAddressMIBGroup,
+                                   myAddressNotificationMIBGroup
+                 }
+        ::= { myAddressMIBCompliances 1 }
+                
+-- units of conformance
+       
+myMacAddressMIBGroup OBJECT-GROUP
+        OBJECTS {
+                myDynamicAddressCurrentNum,
+                myStaticAddressCurrentNum,
+                myFilterAddressCurrentNum,
+                myAddressAvailableNum,       
+                myMacAddressFdbId,
+                myMacAddress,
+                myMacAddressPort,
+                myMacAddressType,      
+                myMacAddressStatus
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing address address to a
+                My agent."
+        ::= { myAddressMIBGroups 1 }                         
+        
+myAddressNotificationMIBGroup OBJECT-GROUP
+        OBJECTS {
+                myMacNotiGlobalEnabled,
+                myMacNotificationInterval,
+                myMacNotiHisTableMaxLength,
+                myMacNotiHisTableCurrentLength,
+                myMacNotiHisIndex,
+                myMacNotiHisMacChangedMsg,
+                myMacNotiHisTimestamp,
+                myMacNotiIfIndex,
+                myIfMacAddrLearntEnable, 
+                myIfMacAddrRemovedEnable
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing port address to a
+                My agent."
+        ::= { myAddressMIBGroups 2 }                                         
+        
+END

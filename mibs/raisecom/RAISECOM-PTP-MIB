@@ -1,0 +1,1401 @@
+-- *****************************************************************
+-- RAISECOM-PTP-MIB.mib:  PTP MIB
+--
+-- July 2009, cuiwei
+--
+-- Copyright (c) 1996-2009 by Raisecom Technology Co., Ltd.
+-- All rights reserved.
+--
+-- *****************************************************************
+--
+
+RAISECOM-PTP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Integer32 	FROM SNMPv2-SMI
+        TEXTUAL-CONVENTION, MacAddress, RowStatus	FROM SNMPv2-TC
+        EnableVar	  								FROM SWITCH-TC
+        rcPortIndex							        FROM SWITCH-SYSTEM-MIB
+        raisecomAgent                           	FROM RAISECOM-BASE-MIB;
+
+raisecomPtp   MODULE-IDENTITY
+        LAST-UPDATED    "201010290000Z"
+        ORGANIZATION    "Raisecom Technology Co., Ltd."
+        CONTACT-INFO
+		                "Raisecom Science & Technology Co., ltd.
+		                 E-mail: support@raisecom.com"
+        DESCRIPTION
+		        		"This MIB module defines a MIB which provides
+		                mechanisms to monitor an PTP clock.
+
+		   			 	Management Information Base module for PTP configuration,
+		                default dataset, current dataset, parent dataset, time proporties
+		                dataset, foreign dataset and port configuration dataset components.
+
+		                The MIB module realizes IEEE 1588 v2 protocol and contains
+		                Ordinary Clock, Boundary Clock and Transparent Clock."
+
+        REVISION     	"201010290000Z"
+        DESCRIPTION
+            		 	"version 1.0"
+
+        ::= { raisecomAgent 26 }
+
+--
+-- Textual Conventions
+--
+
+PTPTimeStamp ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "6d.4d"
+        STATUS       current
+        DESCRIPTION
+	        		"PTP timestamps are represented as a 96-bit
+	                unsigned fixed-point number, in seconds relative to
+	                00:00 on 1 January 1970.  The integer part which means
+	                how many seconds is in the first 64 bits and the fraction
+	                part which means how many nanoseconds is in the last 32 bits."
+        REFERENCE
+	                "IEEE std 1588-2008, Precision Time Protocol (Version 2)"
+        SYNTAX       OCTET STRING (SIZE (10))
+
+PTPTimeInterval ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "8d.4d"
+        STATUS       current
+        DESCRIPTION
+	        		"PTP timeinterval are represented as a 96-bit
+	                signed fixed-point number, in nanoseconds. The first 64 bits
+	                means how many nanoseconds, the last 32 bits reserve to zero."
+        REFERENCE
+	                "IEEE std 1588-2008, Precision Time Protocol (Version 2)"
+        SYNTAX       OCTET STRING (SIZE (12))
+
+PTPClockIdentity ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "1h:1h:1h:1h:1h:1h:1h:1h"
+        STATUS       current
+        DESCRIPTION
+	        		"Indicates the identity of the clock device, has 64 bits.
+					In the PTP system, each clock device has only identity
+					and every identity is not same."
+        REFERENCE
+	                "IEEE std 1588-2008, Precision Time Protocol (Version 2)"
+        SYNTAX       OCTET STRING (SIZE (8))
+
+PTPPortIdentity ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "1h:1h:1h:1h:1h:1h:1h:1h.2d"
+        STATUS       current
+        DESCRIPTION
+	        		"Indicates the identity of the port in clock device,
+	        		has 80 bits. The first 64 bits means the clock identity
+	        		which contains this port. The last 16 bits are represented
+	        		as a unsigned short number, which means physical port number."
+        REFERENCE
+	                "IEEE std 1588-2008, Precision Time Protocol (Version 2)"
+        SYNTAX       OCTET STRING (SIZE (10))
+                                                                                       
+ 
+--
+-- The various groups defined within this MIB definition:
+--           
+raisecomPtpGlobal         		OBJECT IDENTIFIER ::= { raisecomPtp 1 }
+raisecomPtpClock          		OBJECT IDENTIFIER ::= { raisecomPtp 2 }
+raisecomPtpCurrent        		OBJECT IDENTIFIER ::= { raisecomPtp 3 }
+raisecomPtpParent					OBJECT IDENTIFIER ::= { raisecomPtp 4 }
+raisecomPtpTimeProperty   		OBJECT IDENTIFIER ::= { raisecomPtp 5 }
+raisecomPtpPorts					OBJECT IDENTIFIER ::= { raisecomPtp 6 }
+raisecomPtpForeignRecords		    OBJECT IDENTIFIER ::= { raisecomPtp 7 }
+raisecomPtpMessageStat 		    OBJECT IDENTIFIER ::= { raisecomPtp 8 }
+raisecomPtpUnicastAddr		    OBJECT IDENTIFIER ::= { raisecomPtp 9 }  
+raisecomPtpTClock                 OBJECT IDENTIFIER ::= { raisecomPtp 10 }  
+raisecomPtpTCPorts                OBJECT IDENTIFIER ::= { raisecomPtp 11 } 
+raisecomPtpTraps                  OBJECT IDENTIFIER ::= { raisecomPtp 12 } 
+ 
+
+--
+-- Global Group
+--     
+raisecomPtpEnable 		OBJECT-TYPE
+        SYNTAX      INTEGER{ disable(0), enable(1) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates whether PTP is enabled."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpGlobal 1 }      
+                
+raisecomPtpClockMode 		OBJECT-TYPE
+        SYNTAX      INTEGER{ordinary(1), boundary(2), e2e-transparent(3), p2p-transparent(4) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the device clock mode.
+                    The default mode is disable which means that the device pass 
+                    through PTP packet with nothing to do."
+        DEFVAL 		{ 1 }
+        ::= { raisecomPtpGlobal 2 }
+        
+raisecomPtpClockUnicastFlag  OBJECT-TYPE
+        SYNTAX      INTEGER{ unicast(1), multicast(0) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the current method of transmiting PTP 
+	        		packets in multicast or unicast."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpGlobal 3 }         
+        
+raisecomPtpClockStepFlag 	OBJECT-TYPE
+        SYNTAX      INTEGER{ onestep(1), twostep(2) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the current step mode of the master port
+	        		in the clock device. When the flag is twoStep mode,
+	        		master port will send Follow Up message."
+        DEFVAL 		{ 1 }
+        ::= { raisecomPtpGlobal 4 }
+
+
+raisecomPtpClockStatisticClear  OBJECT-TYPE
+        SYNTAX      INTEGER{ invalid(0),clear(1) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"When this object is set to 1, all of the statistic information
+	        		 of PTP packets are clean."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpGlobal 5 }      
+ 
+--
+-- raisecomPtpPortEntry 
+--       
+ 
+raisecomPtpGlobalPortTable 	OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpGlobalPortEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides universal information of PTP clock."
+        ::= { raisecomPtpGlobal 6 }
+ 
+raisecomPtpGlobalPortEntry 	OBJECT-TYPE
+        SYNTAX      RaisecomPtpGlobalPortEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Each port entry provides PTP port information. Entries
+	                are automatically created when the system running."
+        INDEX   	{ rcPortIndex }
+        ::= { raisecomPtpGlobalPortTable 1 }
+
+RaisecomPtpGlobalPortEntry ::= SEQUENCE {    
+        raisecomPtpPortEnable			                INTEGER,
+        raisecomPtpPortTransmitProtocol         		INTEGER,  
+        raisecomPtpPortVlan                        	Integer32,    
+        raisecomPtpPortAsymmetryDelay					Integer32
+        }
+  
+raisecomPtpPortEnable 	OBJECT-TYPE
+        SYNTAX      INTEGER { enable(1),disable(0) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates whether port enable PTP function or not.When the
+	        		port is disable, all packets pass through from this port."
+        ::= { raisecomPtpGlobalPortEntry 1 }
+        
+raisecomPtpPortTransmitProtocol  OBJECT-TYPE    
+        SYNTAX      INTEGER{ ethernet(3), udp(1) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the current method of transmiting PTP packets
+	        		in layer2 based Ethernet or layer3 based UDP."
+        DEFVAL 		{ 1 }
+        ::= { raisecomPtpGlobalPortEntry 2 }  
+        
+raisecomPtpPortVlan  OBJECT-TYPE
+        SYNTAX      Integer32 (0..4094)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the encapsulation vlan of ptp packet,
+	        		0 means no vlan tag is encapsulated."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpGlobalPortEntry 3 }     
+        
+raisecomPtpPortAsymmetryDelay OBJECT-TYPE
+        SYNTAX      Integer32
+        UNITS       "nanseconds"
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates two net path asymmetry delay in nanoseconds.
+	        		The 32 bits value is positive or negative."
+        ::= { raisecomPtpGlobalPortEntry 4 }           
+
+--
+-- Clock Group, reference defaultDS
+--
+raisecomPtpClockIdentity  OBJECT-TYPE
+        SYNTAX      PTPClockIdentity
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the identity of the port in clock device,
+					In the PTP system, each clock device has only identity
+					and every identity is not same."
+        ::= { raisecomPtpClock 1 }
+
+raisecomPtpClockDomain    OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the domain number of the clock device,
+					reference Table-2 in PTP v2 Protocol."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpClock 2 }
+
+raisecomPtpClockPriority1 OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the priority1 value of the clock device.
+	        		The value is useful in BMC algorithm, and when the
+	        		value is lower, the priority of device is better."
+        DEFVAL 		{ 128 }
+        ::= { raisecomPtpClock 3 }
+
+raisecomPtpClockPriority2 OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the priority2 value of the clock device.
+	        		The value is useful in BMC algorithm, and when the
+	        		value is lower, the priority of device is better."
+        DEFVAL 		{ 128 }
+        ::= { raisecomPtpClock 4 }
+
+raisecomPtpClockClass		OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the clock class of the clock device,
+					reference Table-5 in PTP v2 Protocol."
+        ::= { raisecomPtpClock 5 }
+
+raisecomPtpClockAccuracy  OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the clock accuracy of the clock device,
+					reference Table-6 in PTP v2 Protocol."
+        ::= { raisecomPtpClock 6 }
+
+raisecomPtpClockOffsetScaledLogVariance OBJECT-TYPE
+        SYNTAX      Integer32(0..65535)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the estimate log2 value of the local clock
+	        		variance."
+        ::= { raisecomPtpClock 7 }    
+        
+raisecomPtpClockNumberPorts 	OBJECT-TYPE
+        SYNTAX      Integer32(0..65535)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the PTP ports number."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpClock 8 }
+
+raisecomPtpClockSlaveOnly 	OBJECT-TYPE
+        SYNTAX      INTEGER{ non-slave-only(0), slave-only(1) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the whether the ordinary clock 
+	        		is in slave only mode."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpClock 9 }
+
+--
+-- Current Group, reference currentDS
+--
+
+raisecomPtpCurrentEndMeanPathDelay OBJECT-TYPE
+        SYNTAX 		PTPTimeInterval
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the mean path delay as slave port
+	        		in request and response mechanism(E2E)."
+        ::= { raisecomPtpCurrent 1 }
+
+raisecomPtpCurrentOffsetFromParent OBJECT-TYPE
+        SYNTAX 		PTPTimeInterval
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the offset from parent clock as slave port
+	        		in request and response mechanism(E2E) and peer delay
+	        		mechanism(P2P)."
+        ::= { raisecomPtpCurrent 2 }
+
+raisecomPtpCurrentStepsRemoved OBJECT-TYPE
+        SYNTAX      Integer32(0..256)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the passing device number from clock port
+	        		which sends the message."
+        ::= { raisecomPtpCurrent 3 }
+
+--
+-- Parent Group, reference parentDS
+--
+
+raisecomPtpParentPortIdentity OBJECT-TYPE
+        SYNTAX 		PTPPortIdentity
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the identity of the parent clock as the
+	        		slave port. The value will be updated by BMC algorithm."
+        ::= { raisecomPtpParent 1 }
+
+raisecomPtpParentSatisticsFlag OBJECT-TYPE
+        SYNTAX 		INTEGER{ nosatistics(0), satistics(1) }
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the whether parent satistics enable or disable.
+	        		When the flag is disable, the two parent satistics vlaue
+	        		is invalidation."
+        ::= { raisecomPtpParent 2 }
+
+raisecomPtpParentOffsetScaledLogVariance OBJECT-TYPE
+        SYNTAX      Integer32(0..65535)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the estimate log2 value of the parent clock
+	        		variance as observed by the slave clock."
+        ::= { raisecomPtpParent 3 }
+
+raisecomPtpParentPhaseChangeRate OBJECT-TYPE
+        SYNTAX 		Integer32
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the estimate value of the parent clock phase 
+	        		change rate as observed by the slave clock."
+        ::= { raisecomPtpParent 4 }
+
+raisecomPtpGrandmasterIdentity OBJECT-TYPE
+        SYNTAX 		PTPClockIdentity
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the identity of the grandmaster clock as the
+	        		slave port. The value will be updated by BMC algorithm."
+        ::= { raisecomPtpParent 5 }
+
+raisecomPtpGrandmasterPriority1 OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the priority1 value of the grandmaster clock.
+	        		The value is useful in BMC algorithm."
+        ::= { raisecomPtpParent 6 }
+
+raisecomPtpGrandmasterPriority2 OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the priority2 value of the grandmaster clock.
+	        		The value is useful in BMC algorithm."
+        ::= { raisecomPtpParent 7 }
+
+raisecomPtpGrandmasterClockClass		OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the clock class of the grandmaster clock,
+					reference Table-5 in PTP v2 Protocol."
+        ::= { raisecomPtpParent 8 }
+
+raisecomPtpGrandmasterClockAccuracy  OBJECT-TYPE
+        SYNTAX      Integer32(0..255)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the clock accuracy of the grandmaster clock,
+					reference Table-6 in PTP v2 Protocol."
+        ::= { raisecomPtpParent 9 }
+
+raisecomPtpGrandmasterOffsetScaledLogVariance OBJECT-TYPE
+        SYNTAX      Integer32(0..65535)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the estimate log2 value of the grandmaster
+	        		clock variance as observed by the slave clock."
+        ::= { raisecomPtpParent 10 }
+
+--
+-- TimeProperty Group, reference timePropertiesDS
+--
+
+raisecomPtpTimeProCurrentUtcOffset OBJECT-TYPE
+        SYNTAX 		Integer32(0..65535)
+        UNITS       "seconds"
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the offset seconds between TAI and UTC time."
+        ::= { raisecomPtpTimeProperty 1 }
+
+raisecomPtpTimeProCurrentUtcOffsetValid OBJECT-TYPE
+        SYNTAX 		INTEGER{ novalid(0), valid(1) }
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates whether the offset seconds between TAI and UTC
+	        		time is valid or not."
+        ::= { raisecomPtpTimeProperty 2 }
+
+raisecomPtpTimeProLeap	OBJECT-TYPE
+        SYNTAX 		INTEGER{ noleap(0), leap61(1), leap59(2) }
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates the leap second to be inserted in the UTC time,
+	        		which is the time leap59 and leap61 flag."
+        ::= { raisecomPtpTimeProperty 3 }
+
+raisecomPtpTimeProTimeFrequencyTraceable OBJECT-TYPE
+        SYNTAX      INTEGER{ none(0), time(1), frequency(2), both(3) }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates whether time and frequency traceable to primary 
+	        		reference or not, which is the time traceable and frequency
+	        		traceable flag."
+        ::= { raisecomPtpTimeProperty 4 }
+
+raisecomPtpTimeProMatchTimescale OBJECT-TYPE
+        SYNTAX 		INTEGER{ noptptime(0), ptptime(1) }
+        MAX-ACCESS 	read-only
+        STATUS 		current
+        DESCRIPTION
+	        		"Indicates whether math PTP time or ARB time, which is the 
+	        		PTP time flag."
+        ::= { raisecomPtpTimeProperty 5 }
+
+raisecomPtpTimeProTimeSource OBJECT-TYPE
+        SYNTAX      Integer32(0..255)     
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the administrative time source of the system clock,
+					reference Table-7 in PTP v2 Protocol.
+					atomic clock(0x10)
+					gps(0x20)
+					terrestrial radio(0x30)
+					ptp(0x40)
+					ntp(0x50)
+					handset(0x60)
+					internal oscillator(0xa0)"
+        ::= { raisecomPtpTimeProperty 6 }    
+        
+raisecomPtpTimeProTimeSourceOper OBJECT-TYPE
+        SYNTAX      Integer32(0..255)     
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the current time source of the system clock,
+					reference Table-7 in PTP v2 Protocol.
+					atomic clock(0x10)
+					gps(0x20)
+					terrestrial radio(0x30)
+					ptp(0x40)
+					ntp(0x50)
+					handset(0x60)
+					internal oscillator(0xa0)"
+        ::= { raisecomPtpTimeProperty 7 }
+
+--
+-- Ports Group, Port state table, reference portDS
+--
+
+raisecomPtpPortTable 	OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpPortEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides information in each port which
+	        		contains port state, property and setting."
+        ::= { raisecomPtpPorts 1 }
+
+raisecomPtpPortEntry 		OBJECT-TYPE
+        SYNTAX      RaisecomPtpPortEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Each port entry provides PTP port information. Entries
+	                are automatically created when the system running."
+        INDEX   	{ rcPortIndex }
+        ::= { raisecomPtpPortTable 1 }
+
+RaisecomPtpPortEntry ::= SEQUENCE {    
+        raisecomPtpPortIdentity			            OCTET STRING,
+        raisecomPtpPortState         					INTEGER,  
+        raisecomPtpPortStateForce         			INTEGER,
+        raisecomPtpPortDelayMechanism    				INTEGER,
+        raisecomPtpPortPeerMeanPathDelay         		PTPTimeInterval,
+        raisecomPtpPortLogSyncInterval        		Integer32,
+        raisecomPtpPortLogAnnounceInterval       		Integer32,
+        raisecomPtpPortLogMinDelayRequestInterval   	Integer32,
+        raisecomPtpPortAnnounceReceiptTimeout 		Integer32,
+        raisecomPtpPortLogMinPDelayRequestInterval	Integer32,
+        raisecomPtpPortVersionNumber                 	INTEGER,    
+        raisecomPtpPortUnicastMasterMaxIndex			Integer32,
+        raisecomPtpPortUnicastPeerMaxIndex			Integer32  
+}
+   
+raisecomPtpPortIdentity 		OBJECT-TYPE
+        SYNTAX      OCTET STRING
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates port identity of ptp clock."
+        ::= { raisecomPtpPortEntry 1 }
+
+   
+raisecomPtpPortState 		OBJECT-TYPE
+        SYNTAX      INTEGER{ invalid(0), initializing(1), faulty(2), disabled(3),
+        					 listening(4), premaster(5), master(6), passive(7),
+        					 uncalibrated(8), slave(9) }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the port state of the ordinary clock and boundary
+	        		clock, reference Table-8 in PTP v2 Protocol.
+	        		As transparent clock, the value 0 means this port is invalid,
+	        		and other values mean this port is valid."
+        DEFVAL 		{ invalid }
+        ::= { raisecomPtpPortEntry 2 }
+   
+raisecomPtpPortStateForce OBJECT-TYPE
+        SYNTAX      INTEGER{ noforce(0), master(6), passive(7), slave(9) }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates whether port force PTP state or not. When the port
+	        		is force state, this port will do not update state using BMC."
+        DEFVAL 		{ noforce }
+        ::= { raisecomPtpPortEntry 3 }
+
+raisecomPtpPortDelayMechanism  OBJECT-TYPE
+        SYNTAX      INTEGER{ end-to-end(1), peer-to-peer(2)}
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the port delay mechanism of the clock device."
+        DEFVAL 		{ 1 }
+        ::= { raisecomPtpPortEntry 4 }
+
+raisecomPtpPortPeerMeanPathDelay	OBJECT-TYPE
+        SYNTAX      PTPTimeInterval
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the port mean path delay of the boundary clock
+	        		using peer delay mechanism and p2ptransparent clock."
+        ::= { raisecomPtpPortEntry 5 }
+
+raisecomPtpPortLogSyncInterval  OBJECT-TYPE
+        SYNTAX      Integer32(-6..-1)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the setting log2 value of the master port sending
+	        		Sync message interval. So the interval time is 2^n seconds."
+        ::= { raisecomPtpPortEntry 6 }
+
+raisecomPtpPortLogAnnounceInterval OBJECT-TYPE
+        SYNTAX      Integer32(-1..4)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the setting log2 value of the master port sending
+	        		Announce message interval. So the interval time is 2^n seconds."
+        ::= { raisecomPtpPortEntry 7 }
+
+raisecomPtpPortLogMinDelayRequestInterval OBJECT-TYPE
+        SYNTAX      Integer32(-6..-1)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the setting min log2 value of the master port sending
+	        		Delay_Req message interval in boundary clock and peer port
+	        		sending Pdelay_Req message interval in p2ptransparent clock.
+	        		So the interval time is 2^n seconds."
+        ::= { raisecomPtpPortEntry 8 }
+
+raisecomPtpPortAnnounceReceiptTimeout  OBJECT-TYPE
+        SYNTAX      Integer32(3..16)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the integral multiple of announce interval for the port
+	        		receipting Announce massage timeout in the boundary clock.
+	        		So the timeout time is n*(2^port.logAnnounce-interval) seconds."
+        ::= { raisecomPtpPortEntry 9 }
+      
+raisecomPtpPortLogMinPDelayRequestInterval OBJECT-TYPE
+        SYNTAX      Integer32(-6..-1)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the setting min log2 value of the
+	        		master port sending Delay_Req message interval in boundary 
+	        		clock and peer port sending Pdelay_Req message interval 
+	        		in p2ptransparent clock. The interval time is 2^n seconds."
+        ::= { raisecomPtpPortEntry 10 }                
+        
+raisecomPtpPortVersionNumber  OBJECT-TYPE
+        SYNTAX      INTEGER {v1(1),v2(2)}
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the PTP version in use on the port."
+        DEFVAL 		{ 2 }
+        ::= { raisecomPtpPortEntry 11 }            
+
+raisecomPtpPortUnicastMasterMaxIndex	OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the current max index for setting master address."
+        ::= { raisecomPtpPortEntry 12 }
+
+raisecomPtpPortUnicastPeerMaxIndex	OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the current max index for setting peer address."
+        ::= { raisecomPtpPortEntry 13 }
+  
+
+--
+-- ForeignMasterRecord Group, Record information table, reference foreignmasterDS
+--
+
+raisecomPtpForeignRecordTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpForeignRecordEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides information of each foreign master record."
+        ::= { raisecomPtpForeignRecords 1 }
+
+raisecomPtpForeignRecordEntry	OBJECT-TYPE
+        SYNTAX      RaisecomPtpForeignRecordEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the foreign master record information coming from port
+	        		receipting Announce message. The table size is fixed to five items.
+	        		The information is useful in BMC algorithm."
+        INDEX   	{ rcPortIndex, raisecomPtpForeignRecordIndex }
+        ::= { raisecomPtpForeignRecordTable 1 }
+
+RaisecomPtpForeignRecordEntry ::= SEQUENCE {
+		raisecomPtpForeignRecordIndex				Integer32,
+        raisecomPtpForeignRecordValid				INTEGER,
+        raisecomPtpForeignRecordPortIdentity    	PTPPortIdentity,
+        raisecomPtpForeignRecordAnnounceNum    	Integer32
+}
+
+raisecomPtpForeignRecordIndex   OBJECT-TYPE
+        SYNTAX      Integer32(0..4)
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+					"An integer value in the specified range that is used to
+	                index into the table. Entries are added starting at index 0.
+	                The index wraps back to 0 when it reaches 4."
+        ::= { raisecomPtpForeignRecordEntry 1 }
+
+raisecomPtpForeignRecordValid  OBJECT-TYPE
+        SYNTAX      INTEGER{ novalid(0), valid(1) }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates whether this foreign master record valid or not.
+	        		Valid record will be used in BMC for Boundary clock."
+        ::= { raisecomPtpForeignRecordEntry 2 }
+
+raisecomPtpForeignRecordPortIdentity  OBJECT-TYPE
+        SYNTAX      PTPPortIdentity
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the foreign master record port identity."
+        ::= { raisecomPtpForeignRecordEntry 3 }
+
+raisecomPtpForeignRecordAnnounceNum  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of receipting Announce message in the
+	        		fixed time interval."
+        ::= { raisecomPtpForeignRecordEntry 4 }
+
+--
+-- MessageStat Group, Message statistic table, user definition
+--
+
+raisecomPtpMessageStatTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpMessageStatEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides statistic information about the number
+	        		of packets which each port sends and receives PTPv2 message."
+        ::= { raisecomPtpMessageStat 1 }
+
+raisecomPtpMessageStatEntry OBJECT-TYPE
+        SYNTAX      RaisecomPtpMessageStatEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Each port entry provides PTP port message statistic information.
+	        		Entries are automatically created when the system running.
+	        		When ptp is disabled on one port,the statistic information of that 
+	        		port are cleared."
+        INDEX   	{ rcPortIndex }
+        ::= { raisecomPtpMessageStatTable 1 }
+
+RaisecomPtpMessageStatEntry ::= SEQUENCE {
+        raisecomPtpMsgStatSendSync         			Integer32, 
+        raisecomPtpMsgStatReceiveSync         		Integer32,
+        raisecomPtpMsgStatSendAnnounce         		Integer32,
+        raisecomPtpMsgStatReceiveAnnounce         	Integer32,
+        raisecomPtpMsgStatSendFollowUp				Integer32,
+        raisecomPtpMsgStatReceiveFollowUp				Integer32,
+        raisecomPtpMsgStatSendDelayReq         		Integer32,
+        raisecomPtpMsgStatReceiveDelayReq         	Integer32,
+        raisecomPtpMsgStatSendDelayResp         		Integer32,
+        raisecomPtpMsgStatReceiveDelayResp         	Integer32,
+        raisecomPtpMsgStatSendPdelayReq    			Integer32,  
+        raisecomPtpMsgStatReceivePdelayReq    		Integer32,
+        raisecomPtpMsgStatSendPdelayResp        		Integer32, 
+        raisecomPtpMsgStatReceivePdelayResp        	Integer32,
+        raisecomPtpMsgStatSendPdelayRespFUp           Integer32,
+        raisecomPtpMsgStatReceivePdelayRespFUp        Integer32,
+        raisecomPtpMsgStatSendSignaling			   	Integer32,
+        raisecomPtpMsgStatReceiveSignaling			Integer32,
+        raisecomPtpMsgStatSendManagement		 		Integer32,
+        raisecomPtpMsgStatReceiveManagement		 	Integer32,
+        raisecomPtpMsgStatSendError              		Integer32,
+        raisecomPtpMsgStatReceiveUnknown             	Integer32,
+        raisecomPtpMsgStatSendTotalNum				Integer32, 
+        raisecomPtpMsgStatReceiveTotalNum				Integer32
+}
+
+raisecomPtpMsgStatSendSync OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Sync message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 1 } 
+        
+raisecomPtpMsgStatReceiveSync OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Sync message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 2 }        
+
+raisecomPtpMsgStatSendAnnounce OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Announce message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 3 } 
+
+raisecomPtpMsgStatReceiveAnnounce OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Announce message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 4 }        
+
+raisecomPtpMsgStatSendFollowUp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 FollowUp message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 5 }
+        
+raisecomPtpMsgStatReceiveFollowUp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 FollowUp message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 6 }
+        
+raisecomPtpMsgStatSendDelayReq OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 DelayReq message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 7 } 
+        
+raisecomPtpMsgStatReceiveDelayReq OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 DelayReq message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 8 } 
+
+raisecomPtpMsgStatSendDelayResp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 DelayResp message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 9 } 
+        
+raisecomPtpMsgStatReceiveDelayResp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 DelayResp message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 10 }
+
+raisecomPtpMsgStatSendPdelayReq OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 PdelayReq message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 11 } 
+        
+raisecomPtpMsgStatReceivePdelayReq OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 PdelayReq message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 12 }   
+        
+raisecomPtpMsgStatSendPdelayResp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 PdelayResp message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 13 }
+                                        
+raisecomPtpMsgStatReceivePdelayResp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 PdelayResp message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 14 }
+                                           
+raisecomPtpMsgStatSendPdelayRespFUp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 PdelayRespFollowUp message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 15 } 
+        
+raisecomPtpMsgStatReceivePdelayRespFUp OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 PdelayRespFollowUp message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 16 }  
+                
+raisecomPtpMsgStatSendSignaling OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Signaling message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 17 }
+
+raisecomPtpMsgStatReceiveSignaling OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Signaling message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 18 }
+        
+raisecomPtpMsgStatSendManagement OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Management message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 19 } 
+        
+raisecomPtpMsgStatReceiveManagement OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of PTPv2 Management message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 20 } 
+
+raisecomPtpMsgStatSendError OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of the port sending error since its
+	        		initialization."
+        ::= { raisecomPtpMessageStatEntry 21 }
+
+raisecomPtpMsgStatReceiveUnknown OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of the port receiving error PTPv2 
+	        		message since its initialization."
+        ::= { raisecomPtpMessageStatEntry 22 }
+
+raisecomPtpMsgStatSendTotalNum OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of all PTPv2 message which 
+	        		the port sends since its initialization."
+        ::= { raisecomPtpMessageStatEntry 23 } 
+        
+raisecomPtpMsgStatReceiveTotalNum OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the number of all PTPv2 message which 
+	        		the port receives since its initialization."
+        ::= { raisecomPtpMessageStatEntry 24 }
+
+--
+-- Unicast Address, Master and slave unicast address pool, user definition
+--
+
+raisecomPtpUnicastMasterPoolTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpUnicastMasterPoolEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides setting information about the unicast
+	        		address list of the grandmaster or boundary clock."
+        ::= { raisecomPtpUnicastAddr 1 }
+
+raisecomPtpUnicastMasterPoolEntry OBJECT-TYPE
+        SYNTAX      RaisecomPtpUnicastMasterPoolEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"User set the master unicast address for the slave port. Entries 
+	        		are automatically created when user setting the master address.
+	        		IP address 0.0.0.0 indicates that this row is created through MAC,
+	        		otherwise,created through IP."
+        INDEX   	{ rcPortIndex, raisecomPtpUnicastMasterPoolIndex }
+        ::= { raisecomPtpUnicastMasterPoolTable 1 }
+
+RaisecomPtpUnicastMasterPoolEntry ::= SEQUENCE {
+        raisecomPtpUnicastMasterPoolIndex       	Integer32,
+        raisecomPtpUnicastMasterPoolMac         	MacAddress,
+        raisecomPtpUnicastMasterPoolVlan			Integer32,
+        raisecomPtpUnicastMasterPoolIp         	IpAddress,
+        raisecomPtpUnicastMasterPoolRowStatus		RowStatus,
+        raisecomPtpUnicastMasterPoolFlag         	INTEGER
+}
+
+raisecomPtpUnicastMasterPoolIndex  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the index number of master unicast address table."
+        ::= { raisecomPtpUnicastMasterPoolEntry 1 }
+
+raisecomPtpUnicastMasterPoolMac  OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the MAC address of setting master unicast address."
+        ::= { raisecomPtpUnicastMasterPoolEntry 2 }
+
+raisecomPtpUnicastMasterPoolVlan  OBJECT-TYPE
+        SYNTAX      Integer32(1..4094)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the vlan value of setting master unicast address."
+        ::= { raisecomPtpUnicastMasterPoolEntry 3 }
+
+raisecomPtpUnicastMasterPoolIp    OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the IP address of setting master unicast address.
+	        		IP address 0.0.0.0 indicates that this row is created through MAC,
+	        		otherwise,created through IP."
+        ::= { raisecomPtpUnicastMasterPoolEntry 4 }
+
+raisecomPtpUnicastMasterPoolRowStatus  OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the row status of setting master unicast address
+	        		 in this entry."
+        ::= { raisecomPtpUnicastMasterPoolEntry 5 }
+
+raisecomPtpUnicastMasterPoolFlag  OBJECT-TYPE
+        SYNTAX      INTEGER{ invalid(0), announce(1), sync(2), delay(3), pdelay(4) }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the unicast flag of setting master unicast address."
+        ::= { raisecomPtpUnicastMasterPoolEntry 6 }
+
+raisecomPtpUnicastSlavePoolTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpUnicastSlavePoolEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides slave clock address list information from
+	        		unicast negotiation."
+        ::= { raisecomPtpUnicastAddr 2 }
+
+raisecomPtpUnicastSlavePoolEntry OBJECT-TYPE
+        SYNTAX      RaisecomPtpUnicastSlavePoolEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Entries are automatically created when the new address unicast
+	        		negotiation."
+        INDEX   	{ rcPortIndex, raisecomPtpUnicastSlavePoolIndex }
+        ::= { raisecomPtpUnicastSlavePoolTable 1 }
+
+RaisecomPtpUnicastSlavePoolEntry ::= SEQUENCE {
+        raisecomPtpUnicastSlavePoolIndex       		Integer32,
+        raisecomPtpUnicastSlavePoolMac         		MacAddress,
+        raisecomPtpUnicastSlavePoolVlan				Integer32,
+        raisecomPtpUnicastSlavePoolIp         		IpAddress,
+        raisecomPtpUnicastSlavePoolFlag				INTEGER
+}
+
+raisecomPtpUnicastSlavePoolIndex OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the index number of slave unicast address table."
+        ::= { raisecomPtpUnicastSlavePoolEntry 1 }
+
+raisecomPtpUnicastSlavePoolMac   OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the MAC address of getting slave unicast address."
+        ::= { raisecomPtpUnicastSlavePoolEntry 2 }
+
+raisecomPtpUnicastSlavePoolVlan  OBJECT-TYPE
+        SYNTAX      Integer32(1..4094)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the vlan value of getting slave unicast address."
+        ::= { raisecomPtpUnicastSlavePoolEntry 3 }
+
+raisecomPtpUnicastSlavePoolIp    OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the IP address of getting slave unicast address."
+        ::= { raisecomPtpUnicastSlavePoolEntry 4 }
+
+raisecomPtpUnicastSlavePoolFlag  OBJECT-TYPE
+        SYNTAX      INTEGER{ invalid(0), announce(1), sync(2), delay(3), pdelay(4) }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the unicast flag of getting slave unicast address."
+        ::= { raisecomPtpUnicastSlavePoolEntry 5 }
+
+raisecomPtpUnicastPeerPoolTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpUnicastPeerPoolEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides setting information about the unicast
+	        		address list of the slaveonly, peer transparent or boundary clock."
+        ::= { raisecomPtpUnicastAddr 3 }
+
+raisecomPtpUnicastPeerPoolEntry OBJECT-TYPE
+        SYNTAX      RaisecomPtpUnicastPeerPoolEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"User set the peer unicast address for peer delay port. Entries 
+	        		are automatically created when user setting the peer address.
+	        		IP address 0.0.0.0 indicates that this row is created through MAC,
+	        		otherwise,created through IP."
+        INDEX   	{ rcPortIndex, raisecomPtpUnicastPeerPoolIndex }
+        ::= { raisecomPtpUnicastPeerPoolTable 1 }
+
+RaisecomPtpUnicastPeerPoolEntry ::= SEQUENCE {
+        raisecomPtpUnicastPeerPoolIndex       	Integer32,
+        raisecomPtpUnicastPeerPoolMac         	MacAddress,
+        raisecomPtpUnicastPeerPoolVlan			Integer32,
+        raisecomPtpUnicastPeerPoolIp         		IpAddress,
+        raisecomPtpUnicastPeerPoolRowStatus		RowStatus,
+        raisecomPtpUnicastPeerPoolFlag         	INTEGER
+}
+
+raisecomPtpUnicastPeerPoolIndex  OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the index number of peer unicast address table."
+        ::= { raisecomPtpUnicastPeerPoolEntry 1 }
+
+raisecomPtpUnicastPeerPoolMac  OBJECT-TYPE
+        SYNTAX      MacAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the MAC address of setting peer unicast address."
+        ::= { raisecomPtpUnicastPeerPoolEntry 2 }
+
+raisecomPtpUnicastPeerPoolVlan  OBJECT-TYPE
+        SYNTAX      Integer32(1..4094)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the vlan value of setting peer unicast address."
+        ::= { raisecomPtpUnicastPeerPoolEntry 3 }
+
+raisecomPtpUnicastPeerPoolIp    OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the IP address of setting peer unicast address.	
+	        		IP address 0.0.0.0 indicates that this row is created through MAC,
+	        		otherwise,created through IP."
+        ::= { raisecomPtpUnicastPeerPoolEntry 4 }
+
+raisecomPtpUnicastPeerPoolRowStatus  OBJECT-TYPE
+        SYNTAX      RowStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the row status of setting peer unicast address
+	        		 in this entry."
+        ::= { raisecomPtpUnicastPeerPoolEntry 5 }
+
+raisecomPtpUnicastPeerPoolFlag  OBJECT-TYPE
+        SYNTAX      INTEGER{ invalid(0), announce(1), sync(2), delay(3), pdelay(4) }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"Indicates the unicast flag of setting peer unicast address."
+        ::= { raisecomPtpUnicastPeerPoolEntry 6 }
+
+--
+-- raisecomPtpTClock definition
+--
+raisecomPtpTClockIdentity 	OBJECT-TYPE
+        SYNTAX      PTPClockIdentity
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the transparent clock identity.
+                    In the PTP system, each clock device has only identity and 
+                    every identity is not same."
+        ::= { raisecomPtpTClock 1 }
+
+raisecomPtpTClockNumberPorts 	OBJECT-TYPE
+        SYNTAX      Integer32(0..65535)
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the PTP ports number."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpTClock 2 }
+
+raisecomPtpTClockDelayMechanism  OBJECT-TYPE
+        SYNTAX      INTEGER{ end-to-end(1), peer-to-peer(2)}
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the port delay mechanism of the 
+	        		transparent clock device."
+        DEFVAL 		{ 1 }
+        ::= { raisecomPtpTClock 3 }
+
+raisecomPtpTClockPrimaryDomain  OBJECT-TYPE
+        SYNTAX      INTEGER{ default(0), alternate-domain1(1), 
+                             alternate-domain2(2),alternate-domain3(3)}
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the transparent clock domain number,
+                    reference table-2 in PTP v2 protocol."
+        DEFVAL 		{ 0 }
+        ::= { raisecomPtpTClock 4 }   
+        
+--
+-- raisecomPtpTCPorts definition
+--
+    
+raisecomPtpTCPortTable 	OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RaisecomPtpTCPortEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"This table provides information in each port which
+	        		contains port state, property and setting."
+        ::= { raisecomPtpTCPorts 1 }
+
+raisecomPtpTCPortEntry 	OBJECT-TYPE
+        SYNTAX      RaisecomPtpTCPortEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+	        		"Each port entry provides PTP port information. Entries
+	                are automatically created when the system running."
+        INDEX   	{ rcPortIndex }
+        ::= { raisecomPtpTCPortTable 1 }
+
+RaisecomPtpTCPortEntry ::= SEQUENCE {    
+        raisecomPtpTCPortIdentity			            OCTET STRING,
+        raisecomPtpTCPortEnable         				EnableVar,
+        raisecomPtpTCPortLogMinPdelayReqInterval      Integer32,  
+        raisecomPtpTCPortFaultyFlag         			INTEGER,
+        raisecomPtpTCPortPeerMeanPathDelay    		PTPTimeInterval
+}
+   
+raisecomPtpTCPortIdentity OBJECT-TYPE
+        SYNTAX      OCTET STRING
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates port identity of ptp transparent clock."
+        ::= { raisecomPtpTCPortEntry 1 }
+
+raisecomPtpTCPortLogMinPdelayReqInterval OBJECT-TYPE
+        SYNTAX      Integer32(-6..-1)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the setting min log2 value of the master 
+	        		port sending Delay_Req message interval in boundary clock and 
+	        		peer port sending Pdelay_Req message interval in p2ptransparent 
+	        		clock. The interval time is 2^n seconds."
+        ::= { raisecomPtpTCPortEntry 2 } 
+        
+raisecomPtpTCPortFaultyFlag OBJECT-TYPE
+        SYNTAX      INTEGER {normal(0), faulty(1)}
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates wether the ptp port is operating normally."
+	    DEFVAL      { 0 }
+        ::= { raisecomPtpTCPortEntry 3 }       
+        
+raisecomPtpTCPortPeerMeanPathDelay OBJECT-TYPE
+        SYNTAX      PTPTimeInterval
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+	        		"This object indicates the port mean path delay of the 
+	        		p2ptransparent clock."
+        ::= { raisecomPtpTCPortEntry 4 }    
+
+
+--
+-- raisecomPtpSyncTrap definition
+--
+
+raisecomPtpSyncTrap 		NOTIFICATION-TYPE
+        OBJECTS     {
+                    raisecomPtpPortState,
+                    raisecomPtpPortIdentity
+                    }        
+        STATUS      current
+        DESCRIPTION
+	        		"This trap indicates that that there has been a change in the ptp 
+	        		clock synchronization state."
+        ::= { raisecomPtpTraps 15 }
+         
+--
+-- END of RAISECOM-PTP-MIB
+--
+
+END
+

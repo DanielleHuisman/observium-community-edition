@@ -1,0 +1,218 @@
+ELTEX-TUNNEL-MIB DEFINITIONS ::= BEGIN
+
+-- Title:      ELTEX TUNNEL MIB
+-- Version:    1.1
+-- Date:       15 Jan 2016
+
+IMPORTS
+    eltexLtd                FROM ELTEX-SMI-ACTUAL
+
+    MODULE-IDENTITY, OBJECT-TYPE, transmission,
+    Integer32               FROM SNMPv2-SMI          -- [RFC2578]
+
+    RowStatus, TruthValue   FROM SNMPv2-TC           -- [RFC2579]
+
+    ifIndex,
+    InterfaceIndexOrZero    FROM IF-MIB              -- [RFC2863]
+
+    InetAddressType,
+    InetAddress             FROM INET-ADDRESS-MIB    -- [RFC4001]
+
+    IANAtunnelType          FROM IANAifType-MIB;     -- [IFTYPE]
+    
+eltexTunnelMIB MODULE-IDENTITY
+    LAST-UPDATED "201512290000Z"
+    ORGANIZATION "Eltex"
+    CONTACT-INFO
+            "EMail: eltex@eltex.nsk.ru"
+    DESCRIPTION
+            "The MIB module for management of WiFi Tunnels,
+            independent of the specific encapsulation scheme in
+            use."
+
+    REVISION     "201512290000Z"
+    DESCRIPTION
+            "First revision of ELTEX-TUNNEL-MIB"
+    ::= { eltexLtd 21 }
+
+tunnelWiFiConfigTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF TunnelWiFiConfigEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The (conceptual) table containing information on
+               configured Wi-Fi tunnels.  This table can be used to map a
+               set of WiFi tunnel endpoints to the associated ifIndex
+               value.  It can also be used for row creation.  Note
+               that every row in the tunnelIfTable with a fixed IPv4
+               destination address should have a corresponding row in
+               the tunnelWiFiConfigTable, regardless of whether it was
+               created via SNMP.
+               This table does not support IPv6."
+       ::= { eltexTunnelMIB 1 }
+
+tunnelWiFiConfigEntry OBJECT-TYPE
+       SYNTAX     TunnelWiFiConfigEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "An entry (conceptual row) containing the information
+               on a particular configured tunnel."
+       INDEX      { tunnelWiFiConfigLocalAddressType,
+                    tunnelWiFiConfigLocalAddress,
+                    tunnelWiFiConfigRemoteAddressType,
+                    tunnelWiFiConfigRemoteAddress,
+                    tunnelWiFiConfigEncapsMethod,
+                    tunnelWiFiConfigID }
+       ::= { tunnelWiFiConfigTable 1 }
+
+TunnelWiFiConfigEntry ::= SEQUENCE {
+       tunnelWiFiConfigLocalAddressType        InetAddressType,
+       tunnelWiFiConfigLocalAddress            InetAddress,
+       tunnelWiFiConfigRemoteAddressType       InetAddressType,
+       tunnelWiFiConfigRemoteAddress           InetAddress,
+       tunnelWiFiConfigEncapsMethod            IANAtunnelType,
+       tunnelWiFiConfigID                      Integer32,
+       tunnelWiFiConfigIfIndex                 InterfaceIndexOrZero,
+       tunnelWiFiConfigStatus                  RowStatus,
+       tunnelWiFiConfigMode                    INTEGER,
+       tunnelWiFiConfigDefaultProfile          TruthValue
+   }
+
+tunnelWiFiConfigLocalAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The type of address in the corresponding
+                tunnelWiFiConfigLocalAddress."
+       ::= { tunnelWiFiConfigEntry 1 }
+
+tunnelWiFiConfigLocalAddress OBJECT-TYPE
+       SYNTAX     InetAddress
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The address of the local endpoint of the Wi-Fi tunnel, or
+               0.0.0.0 if the device is free to choose any of its
+               addresses at Wi-Fi tunnel establishment time."
+       ::= { tunnelWiFiConfigEntry 2 }
+
+tunnelWiFiConfigRemoteAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The type of address in the corresponding
+                tunnelWiFiConfigRemoteAddress."
+       ::= { tunnelWiFiConfigEntry 3 }
+
+tunnelWiFiConfigRemoteAddress OBJECT-TYPE
+       SYNTAX     InetAddress
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The address of the remote endpoint of the Wi-Fi tunnel."
+       ::= { tunnelWiFiConfigEntry 4 }
+
+tunnelWiFiConfigEncapsMethod OBJECT-TYPE
+       SYNTAX     IANAtunnelType
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "The encapsulation method used by the Wi-Fi tunnel."
+       ::= { tunnelWiFiConfigEntry 5 }
+
+tunnelWiFiConfigID OBJECT-TYPE
+       SYNTAX     Integer32 (1..2147483647)
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+               "An identifier used to distinguish between multiple
+               Wi-Fi tunnels of the same encapsulation method, with the
+               same endpoints.  If the encapsulation protocol only
+               allows one tunnel per set of endpoint addresses (such
+               as for GRE or IP-in-IP), the value of this object is
+               1.  For encapsulation methods (such as L2F) which
+               allow multiple parallel tunnels, the manager is
+               responsible for choosing any ID which does not
+               conflict with an existing row, such as choosing a
+               random number."
+       ::= { tunnelWiFiConfigEntry 6 }
+
+tunnelWiFiConfigIfIndex OBJECT-TYPE
+       SYNTAX     InterfaceIndexOrZero
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+               "If the value of tunnelWiFiConfigStatus for this row is
+               active, then this object contains the value of ifIndex
+               corresponding to the Wi-Fi tunnel interface.  A value of 0
+               is not legal in the active state, and means that the
+               interface index has not yet been assigned."
+       ::= { tunnelWiFiConfigEntry 7 }
+
+tunnelWiFiConfigStatus OBJECT-TYPE
+       SYNTAX     RowStatus
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+               "The status of this row, by which new entries may be
+               created, or old entries deleted from this table.  The
+               agent need not support setting this object to
+               createAndWait or notInService since there are no other
+               writable objects in this table, and writable objects
+               in rows of corresponding tables such as the
+               tunnelIfTable may be modified while this row is
+               active.
+
+               To create a row in this table for an encapsulation
+               method which does not support multiple parallel
+               tunnels with the same endpoints, the management
+               station should simply use a tunnelWiFiConfigID of 1, and
+               set tunnelWiFiConfigStatus to createAndGo.  For
+               encapsulation methods such as L2F which allow multiple
+               parallel tunnels, the management station may select a
+               pseudo-random number to use as the tunnelConfigID and
+               set tunnelConfigStatus to createAndGo.  In the event
+               that this ID is already in use and an
+               inconsistentValue is returned in response to the set
+               operation, the management station should simply select
+               a new pseudo-random number and retry the operation.
+
+               Creating a row in this table will cause an interface
+               index to be assigned by the agent in an
+               implementation-dependent manner, and corresponding
+               rows will be instantiated in the ifTable and the
+               tunnelIfTable.  The status of this row will become
+               active as soon as the agent assigns the interface
+               index, regardless of whether the interface is
+               operationally up.
+
+               Deleting a row in this table will likewise delete the
+               corresponding row in the ifTable and in the
+               tunnelIfTable."
+       ::= { tunnelWiFiConfigEntry 8 }
+
+tunnelWiFiConfigMode OBJECT-TYPE
+       SYNTAX     INTEGER {
+                    notConfigured(0),
+                    management(1),
+                    data(2)
+                  }
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+               "Type of Wi-Fi tunnel: notConfigured(0), management(1), data(2)."
+       ::= { tunnelWiFiConfigEntry 9 }
+
+tunnelWiFiConfigDefaultProfile OBJECT-TYPE
+       SYNTAX     TruthValue
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+               "If an instance of this object has the value true,
+               this tunnel is a template for create other tunnels
+               and has ip address 0.0.0.0"
+       ::= { tunnelWiFiConfigEntry 10 }
+END

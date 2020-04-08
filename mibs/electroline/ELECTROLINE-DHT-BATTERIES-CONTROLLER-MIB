@@ -1,0 +1,1328 @@
+--**************************************************************************
+--                                                                          
+--    Copyright 2014 Electroline Equipment Inc                                   
+--    All Rights Reserved                                                                                                                                                    
+--                                                                          
+--                                                                          
+--**************************************************************************
+--    Filename      :   ELECTROLINE-DHT-BATTERY-MANAGER.mib
+--    Author        :   Anass El bahri
+--    Creation Date :   2014.05.26
+--
+--**************************************************************************
+--    Description:
+--
+--      This MIB contains all battery manager extension
+--
+--**************************************************************************
+--    Revision History:
+--    2014.05.26    Anass El bahri      First Draft
+--    2015.03.19    Emilian Bajenaru    Added support for the new coordinator fields 
+--                                        and new environmental data command
+--    2015.04.20    Alain Leclerc       Modification following code review
+--    2015.05.28    Hugues Bielinski    Changed hyphens   ( - ) lines that may be illegals
+--                  in ASN1 for stars ( * ) lines
+--    2015.08.18    Emilian Bajenaru    Added Electroline Identity to Cyberpower; added log
+--
+--**************************************************************************
+
+ELECTROLINE-DHT-BATTERIES-CONTROLLER-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32, Counter32
+        FROM SNMPv2-SMI   
+    DisplayString
+        FROM RFC1213-MIB    
+    TruthValue, DateAndTime
+        FROM SNMPv2-TC          
+    dhtExtensionsMibObjects       
+        FROM ELECTROLINE-DHT-EXTENSIONS-MIB;
+
+-- Textual Conventions
+HundredthmOhm ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d-2"
+        STATUS       current
+        DESCRIPTION
+            "This data type represents impedance values that are normally
+             expressed in mOhms. Units are in hundredths of a mOhm;
+             for example, 5.12 mOhms will be represented as 512."
+        SYNTAX       Integer32
+
+HundredthkS ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d-2"
+        STATUS       current
+        DESCRIPTION
+            "This data type represents conductance values that are normally
+             expressed in kiloSiemens. Units are in hundredths of a kS;
+             for example, 1.23 kS will be represented as 123."
+        SYNTAX       Integer32
+
+battManIdentMIB MODULE-IDENTITY
+    LAST-UPDATED "201508200000Z"
+    ORGANIZATION "Electroline Equipment Inc"
+    CONTACT-INFO
+        "Electroline Equipment Inc.
+         E-mail: support@electroline.com
+         Telephone:
+            (514) 374-6335 
+            (800)-461-3344 (Toll-free - North America)
+        "
+    DESCRIPTION
+        "This set of objects monitor and control vendors battery manager that may be present and connected to the DHT.
+         This file includes control objects and status objects.
+        "
+    REVISION      "201503190000Z"
+    DESCRIPTION
+            "Improved Env. support version of this MIB module." 
+    REVISION      "201504200000Z"
+    DESCRIPTION
+            "Added control table"
+    REVISION      "201508200000Z"
+    DESCRIPTION
+            "Added Log table"
+
+    ::= { dhtExtensionsMibObjects 16 } 
+
+--******************************
+-- battery manager objects
+--******************************
+
+battManIdentObjects    OBJECT IDENTIFIER ::= { battManIdentMIB 1 } 
+
+-- batteries managers monitored
+
+battManMonitored OBJECT-TYPE
+     SYNTAX INTEGER 
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Number of battery managers connected to this NE."
+     ::= { battManIdentObjects 1 } 
+ 
+--****************************** 
+-- battery managers device table
+--******************************
+
+-- battery managers table 
+
+battManDeviceTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManDeviceEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing information about the individual
+           battery manager being monitored."
+     ::= { battManIdentObjects 2 }   
+
+-- battery managers table entry
+
+battManDeviceEntry OBJECT-TYPE
+     SYNTAX BattManDeviceEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of information about each battery manager being monitored."
+     INDEX { battManDeviceAddress }
+     ::= { battManDeviceTable 1 }
+
+-- battery managers entry sequence
+
+BattManDeviceEntry ::=
+     SEQUENCE
+     {
+          battManDeviceAddress
+               INTEGER,
+
+          battManProtocolVersion
+               INTEGER,
+
+          battManSoftwareVersion
+               OCTET STRING,
+
+           	battManDeviceId
+             OCTET STRING,
+
+          battManVendorIdentity
+             OCTET STRING,
+
+          battManStringVoltage
+               INTEGER,   
+
+           	battManBatteries
+               INTEGER, 
+
+          battManBatteryStrings
+               INTEGER,
+
+       	battManBatteriesPerStrings
+               INTEGER,  
+
+          battManVoltageSupport
+               INTEGER,
+
+        battManTemperatureSupport
+               INTEGER,
+
+         battManImpedanceSupport
+               INTEGER,
+
+        battManEqualPercentSupport
+               INTEGER,
+
+        battManBatteryStatusSupport
+               INTEGER,
+
+        battManDiagSupport
+               INTEGER,
+
+        battManEnvDataSupport
+            INTEGER,
+
+        battManManualMeasurementSupport
+            INTEGER
+
+    }
+
+-- battery Manager device address
+
+battManDeviceAddress OBJECT-TYPE
+     SYNTAX INTEGER ( 17..127 )
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManDeviceTable.Address of this device on the RS-485 path"
+     ::= { battManDeviceEntry 1 }    
+
+-- battery Manager protocol version
+
+battManProtocolVersion OBJECT-TYPE
+     SYNTAX INTEGER ( 1..254 )
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Version of the protocol implemented in the monitored equipment."
+
+     ::= { battManDeviceEntry 2 }
+
+-- battery Manager software version
+
+battManSoftwareVersion OBJECT-TYPE
+     SYNTAX OCTET STRING (SIZE(8))
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The content of this field is vendor specific. The intent is to provide
+           a text representation of the monitored device system software 
+           version. Any printable ASCII characters can be included in this field. 
+           NULL (0x00) characters are non-printable and are used to fill any unused
+           locations following the text data"
+           
+     ::= { battManDeviceEntry 3 }
+
+-- battery Manager ID
+
+battManDeviceId OBJECT-TYPE
+     SYNTAX OCTET STRING (SIZE(32))
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The content of this field is vendor specific. The intent is to provide 
+          manufacturer and/or product specific ASCII text information."
+     ::= { battManDeviceEntry 4 }
+
+-- battery Manager vendor identity
+
+battManVendorIdentity OBJECT-TYPE
+     SYNTAX DisplayString (SIZE(10))
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The content of this field is vendor specific. The intent is to provide
+           a text representation of the battery manager vendor identity. Any 
+           printable ASCII characters can be included in this field. NULL (0x00)
+           characters are non-printable and are used to fill any unused locations
+           following the text data."
+
+     ::= { battManDeviceEntry 5 } 
+
+
+-- battery Manager string voltage    
+
+battManStringVoltage OBJECT-TYPE
+     SYNTAX INTEGER 
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Current string voltage configuration."
+     ::= { battManDeviceEntry 6 }        
+
+-- battery Manager number of batteries    
+
+battManBatteries OBJECT-TYPE
+     SYNTAX INTEGER 
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Current number of batteries."
+     ::= { battManDeviceEntry 7 }   
+
+-- battery Manager number of strings
+
+battManBatteryStrings OBJECT-TYPE
+     SYNTAX INTEGER 
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Current number of strings."
+     ::= { battManDeviceEntry 8 } 
+
+-- battery Manager number of batteries per string     
+
+battManBatteriesPerStrings OBJECT-TYPE
+     SYNTAX INTEGER 
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Current number of batteries per string."
+     ::= { battManDeviceEntry 9 }    
+
+-- battery Manager voltage support   
+
+battManVoltageSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2)}
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the voltage measurement is supported
+           1 = No support.  
+           2 = Field is supported in this installation."
+     ::= { battManDeviceEntry 10 }   
+
+-- battery Manager temperature support   
+
+battManTemperatureSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2)}
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the temperature measurement is supported
+           1 = No support.  
+           2 = Field is supported in this installation."
+     ::= { battManDeviceEntry 11 }   
+
+-- battery Manager impedance support   
+
+battManImpedanceSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2)}
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the impedance measurement is supported
+           1 = No support.  
+           2 = Field is supported in this installation."
+     ::= { battManDeviceEntry 12 }   
+
+-- battery Manager equalization percent support   
+
+battManEqualPercentSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2)}
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the equlization percent measurement is supported
+           1 = No support.  
+           2 = Field is supported in this installation."
+     ::= { battManDeviceEntry 13 }   
+              
+-- battery Manager status support   
+
+battManBatteryStatusSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2)}
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the battery status monitoring is supported
+           1 = No support.  
+           2 = Field is supported in this installation."
+     ::= { battManDeviceEntry 14 }
+
+-- battery manager modules diagnostics support
+
+battManDiagSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2)}
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the battery manager modules diagnostics monitoring is supported
+           1 = No support.  
+           2 = Field is supported in this installation."
+     ::= { battManDeviceEntry 15 }
+
+-- battery manager environment data feature
+
+battManEnvDataSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2) }
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the battery manager environment data is supported
+           1 = No support.  
+           2 = The Environment Data table is supported in this installation."
+     ::= { battManDeviceEntry 16 }
+
+-- battery manager manual measurement feature
+
+battManManualMeasurementSupport OBJECT-TYPE
+     SYNTAX INTEGER { none(1), supported(2) }
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Defines if the battery manager manualy triggered measurement is supported
+           1 = No support.  
+           2 = The Manual Measurement table is supported in this installation."
+     ::= { battManDeviceEntry 17 }
+
+--******************************
+-- string table 
+--******************************
+
+-- string table 
+
+battManStringTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManStringEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing strings data"
+     ::= { battManIdentObjects 3 }   
+
+-- string table entry
+     
+battManStringEntry OBJECT-TYPE
+     SYNTAX BattManStringEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of information about each string. Indexed by string number"
+     INDEX { battManStringDeviceAddress, battManString }
+     ::= { battManStringTable 1 }
+
+-- string table entry sequence
+
+BattManStringEntry ::=
+     SEQUENCE
+     {    
+        battManStringDeviceAddress
+               INTEGER,
+
+          	battManString
+               INTEGER,
+
+         battManStringBatteries
+               INTEGER,   
+               
+        battManStringTotalVoltage
+               INTEGER
+     } 
+
+-- string device address
+
+battManStringDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManStringTable. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManStringEntry 1 }
+
+-- string index
+
+battManString  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManStringTable."
+     ::= { battManStringEntry 2 }
+
+-- string number of batteries 
+
+battManStringBatteries  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "number of batteries."
+     ::= { battManStringEntry 3 }   
+
+-- total string voltage
+     
+battManStringTotalVoltage  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of an individual string total voltage in 1/100 Volts
+
+           This item requires an entry in the properties MIB."
+     ::= { battManStringEntry 4 }    
+
+--******************************   
+-- battery table 
+--******************************
+
+-- battery table 
+
+battManBatteryTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManBatteryEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing batteries data"
+     ::= { battManIdentObjects 4 }         
+     
+-- battery table entry     
+     
+battManBatteryEntry OBJECT-TYPE
+     SYNTAX BattManBatteryEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of information about each battery. Indexed by battery number"
+     INDEX { battManBatteryDeviceAddress,battManBatteryStringID, battManBattery }
+     ::= { battManBatteryTable 1 }
+     
+-- battery table sequence
+     
+BattManBatteryEntry ::=
+     SEQUENCE
+     {       
+          battManBatteryDeviceAddress
+               INTEGER,
+     
+          battManBattery
+               INTEGER,
+
+          battManBatteryStringID
+               INTEGER,           
+               
+          battManBatteryVersion
+               INTEGER,
+               
+          battManBatteryHwVersion
+               OCTET STRING,
+
+          battManBatterySwVersion
+               OCTET STRING,
+
+          battManBatteryVoltage
+               INTEGER,
+
+          battManBatteryTemperature
+               INTEGER,
+
+          battManBatteryImpedance
+               INTEGER,
+
+          battManBatteryEqualizationPercent
+               INTEGER,
+
+          battManBatteryStatus
+               INTEGER,
+
+          battManBatteryDatasetID
+               Unsigned32
+     }   
+
+-- battery string index
+
+battManBatteryDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManBatteryTable. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManBatteryEntry 1 }
+
+-- battery index 
+ 
+battManBattery OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManBatteryTable."
+     ::= { battManBatteryEntry 2 }
+
+-- battery string id
+
+battManBatteryStringID OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "id of the string that this battery belongs to."
+     ::= { battManBatteryEntry 3 }
+
+-- battery version
+
+battManBatteryVersion OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "battery module version."
+     ::= { battManBatteryEntry 4 }
+
+-- battery hardware version
+
+battManBatteryHwVersion OBJECT-TYPE
+     SYNTAX OCTET STRING
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The content of this field is vendor specific. The intent is to provide
+           a text representation of the battery system hardware version. Any printable 
+           ASCII characters can be included in this field. NULL (0x00) characters 
+           are non-printable and are used to fill any unused locations following the text data."
+     ::= { battManBatteryEntry 5 }
+
+-- battery software version
+
+battManBatterySwVersion OBJECT-TYPE
+     SYNTAX OCTET STRING
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The content of this field is vendor specific. The intent is to provide
+           a text representation of the battery system software version. Any printable 
+           ASCII characters can be included in this field. NULL (0x00) characters 
+           are non-printable and are used to fill any unused locations following the text data."
+     ::= { battManBatteryEntry 6 }
+
+-- battery voltage
+
+battManBatteryVoltage OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of an individual battery voltage in 1/100 Volts
+           with a range of 0 to 16.000 volts
+
+           This item requires an entry in the properties MIB."
+     ::= { battManBatteryEntry 7 }
+
+-- battery temperature
+
+battManBatteryTemperature OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of temperature in degrees C 
+           with a range of -40 to + 80 degrees C.
+          
+          This item requires an entry in the properties MIB."
+     ::= { battManBatteryEntry 8 }
+
+-- battery impedance 
+
+battManBatteryImpedance OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of an individual battery impedance in 1/100 mOhm 
+           with a range of 0 to 99.99 mOhm.
+                                  
+           This item requires an entry in the properties MIB."
+     ::= { battManBatteryEntry 9 }
+
+-- battery equalization percent
+
+battManBatteryEqualizationPercent OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Reports the battery equalization percent with a range of 0 to 100%.
+
+           This item requires an entry in the properties MIB."
+     ::= { battManBatteryEntry 10 }
+
+-- battery status
+
+battManBatteryStatus OBJECT-TYPE
+     SYNTAX INTEGER { ok(1), alarm(2)}
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Reports the status of the battery
+
+           1. ok 
+           2. alarm 
+
+           This item requires an entry in the discrete properties MIB."
+     ::= { battManBatteryEntry 11 }
+
+-- battery DatasetID
+
+battManBatteryDatasetID OBJECT-TYPE
+     SYNTAX Unsigned32
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The DatasetID of the measurement done for this battery."
+     ::= { battManBatteryEntry 12 }
+
+--******************************   
+-- battery diagnostics table 
+--******************************
+
+-- battery diagnostics table 
+
+battManBatteryDiagTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManBatteryDiagEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing battery diagnostic data"
+     ::= { battManIdentObjects 5 }         
+     
+-- battery diagnostics table entry     
+
+battManBatteryDiagEntry OBJECT-TYPE
+     SYNTAX BattManBatteryDiagEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of diagnostic information about each battery. Indexed by battery number"
+     INDEX { battManBatteryDiagDeviceAddress, battManBatteryDiagModuleID }
+     ::= { battManBatteryDiagTable 1 }
+
+-- battery diagnostics table sequence     
+
+BattManBatteryDiagEntry ::=
+     SEQUENCE
+     {         
+          battManBatteryDiagDeviceAddress
+               INTEGER,
+
+          battManBatteryDiagModuleID
+               INTEGER,
+
+          battManBatteryDiagPageNumber
+               INTEGER,
+
+          battManBatteryDiagPageData
+               OCTET STRING
+     } 
+
+-- battery diagnostics device address
+
+battManBatteryDiagDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManBatteryDiagTable. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManBatteryDiagEntry 1 }
+
+-- battery module ID
+
+battManBatteryDiagModuleID  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManBatteryDiagTable."
+     ::= { battManBatteryDiagEntry 2 }
+
+-- battery diagnostics page number
+
+battManBatteryDiagPageNumber  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-write
+     STATUS mandatory
+     DESCRIPTION
+          "the data page number."
+     ::= { battManBatteryDiagEntry 3 }
+
+-- battery diagnostics data
+
+battManBatteryDiagPageData  OBJECT-TYPE
+     SYNTAX OCTET STRING  (SIZE(20))
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The content of this field is vendor specific. The intent is to provide
+           a text representation of the particular information of the identified module. 
+           when an invalid page number is requested, this field will be returned with a length of 0."
+     ::= { battManBatteryDiagEntry 4 }
+
+
+--******************************
+-- battery manager control/config table 
+--******************************
+
+-- battery manager control/config table
+
+battManControlTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManControlEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing battery managers control settings."
+     ::= { battManIdentObjects 6 } 
+
+-- battery manager control/configuration entry
+     
+battManControlEntry OBJECT-TYPE
+     SYNTAX BattManControlEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of controls about each battery manager. Indexed by battManControlDeviceAddress"
+     INDEX { battManControlDeviceAddress }
+     ::= { battManControlTable 1 }
+
+-- battery manager control/config sequence
+
+BattManControlEntry ::=
+     SEQUENCE
+     {
+         battManControlDeviceAddress
+               INTEGER,
+
+         battManControlEqualizationSetting
+               INTEGER,
+
+         battManControlAutoInterval
+               INTEGER,
+
+         battManControlSensorsRestart
+               INTEGER
+     } 
+
+-- battery manager control/config device address
+
+battManControlDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManControlStatusTable. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManControlEntry 1 }
+
+-- battery manager equalization
+
+battManControlEqualizationSetting  OBJECT-TYPE
+     SYNTAX INTEGER { activated(1), deactivated(2)}
+     ACCESS read-write
+     STATUS mandatory
+     DESCRIPTION
+          "Represents the equalization status. 
+           
+           1 means equalization activated
+           2 means equalization deactivated
+           "           
+     ::= { battManControlEntry 2 }
+
+-- battery manager status automeasurement interval
+
+battManControlAutoInterval  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-write
+     STATUS mandatory
+     DESCRIPTION
+          "Represents the period (in hours) used to take automated measurements
+          The value 0 deactivates the automated measurements"           
+     ::= { battManControlEntry 3 }
+
+-- battery manager status sensors restart
+
+battManControlSensorsRestart OBJECT-TYPE
+     SYNTAX INTEGER { true(1), false(2) }
+     ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "Restart the sensors. Reading the object returns false(2), and has no effect on the unit."
+     ::= { battManControlEntry 4 }
+
+
+
+--------------------------------------
+-- battery manager status table 
+--------------------------------------
+
+-- battery manager status table
+
+battManStatusTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManStatusEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing battery managers status data."
+     ::= { battManIdentObjects 7 } 
+
+-- battery manager status entry
+     
+battManStatusEntry OBJECT-TYPE
+     SYNTAX BattManStatusEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of status information about each battery manager. Indexed by battManEnvDeviceAddress"
+     INDEX { battManStatusDeviceAddress }
+     ::= { battManStatusTable 1 }
+
+-- battery manager status sequence
+
+BattManStatusEntry ::=
+     SEQUENCE
+     {
+          battManStatusDeviceAddress
+               INTEGER,
+
+         battManStatusTimeToMeasurement
+               Unsigned32
+     } 
+
+-- battery manager status device address
+
+battManStatusDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManStatusTable. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManStatusEntry 1 }
+
+-- battery manager status equalization
+
+-- battery manager status time before next measurement
+battManStatusTimeToMeasurement  OBJECT-TYPE
+     SYNTAX Unsigned32
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Indicates the remaining time (in seconds) before next automated measurement.
+          If the automated measurement is deactivated, then the return value is always 0."
+     ::= { battManStatusEntry 2 }
+
+--***********************************************
+-- battery manager EnvironmentalStatus table 
+--***********************************************
+
+-- battery manager EnvironmentalStatus table
+
+battManEnvStatusTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManEnvStatusEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing battery manager's Environmental Status data."
+     ::= { battManIdentObjects 8 } 
+
+-- battery manager status entry   
+     
+battManEnvStatusEntry OBJECT-TYPE
+     SYNTAX BattManEnvStatusEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of Environmental Status information about each battery manager. Indexed by battManEnvDeviceAddress"
+     INDEX { battManEnvStatusDeviceAddress }
+     ::= { battManEnvStatusTable 1 }
+
+-- battery manager EnvironmentalStatus sequence
+
+BattManEnvStatusEntry ::=
+     SEQUENCE
+     {         
+          battManEnvStatusDeviceAddress
+               INTEGER,
+
+          battManEnvStatusTemperature
+               INTEGER,
+
+          battManEnvStatusHumidity
+               INTEGER,
+               
+          battManEnvStatusDryContact
+               INTEGER
+     } 
+     
+-- battery manager EnvironmentalStatus device address
+
+battManEnvStatusDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManEnvStatusTable. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManEnvStatusEntry 1 }
+
+-- battery manager EnvironmentalStatus temperature
+
+battManEnvStatusTemperature  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION       
+          "Scaled representation of battery manager temperature in degrees C 
+                    
+           This item requires an entry in the properties MIB."
+     ::= { battManEnvStatusEntry 2 }
+
+-- battery manager EnvironmentalStatus humidity
+
+battManEnvStatusHumidity  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of battery manager humidity percent. "
+     ::= { battManEnvStatusEntry 3 }
+
+-- battery manager status dry contact
+
+battManEnvStatusDryContact  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "bit map that indicates the state of the dry contacts. bit set means the corresponding dry contact is closed
+           Bits  Dry Contact
+           0     dry contact1
+           1     dry contact2
+           2     dry contact3
+           3     dry contact4
+           "           
+     ::= { battManEnvStatusEntry 4 }
+
+--*******************************************
+-- battery manager ManualMeasurement table 
+--*******************************************
+
+-- battery manager ManualMeasurement table
+
+battManManualMeasTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManManualMeasEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing battery manager's Manual Measurement trigger command and response data."
+     ::= { battManIdentObjects 9 } 
+
+-- battery manager ManualMeasurement status entry   
+     
+battManManualMeasEntry OBJECT-TYPE
+     SYNTAX BattManManualMeasEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of ManualMeasurement Status information about each battery manager. Indexed by battManEnvDeviceAddress"
+     INDEX { battManManualMeasDeviceAddress }
+     ::= { battManManualMeasTable 1 }
+
+-- battery manager ManualMeasurementStatus sequence
+
+BattManManualMeasEntry ::=
+     SEQUENCE
+     {         
+           battManManualMeasDeviceAddress
+               INTEGER,
+
+          battManManualMeasStatusText
+               OCTET STRING,
+
+          battManManualMeasStatusCode
+               Unsigned32,
+
+          battManManualMeasDatasetID
+               Unsigned32,
+
+          battManManualMeasTimeToMeasurement
+               Unsigned32,
+
+          battManManualMeasurementTrigger
+               INTEGER
+     } 
+     
+-- battery manager ManualMeasurement device address
+
+battManManualMeasDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManManualMeasStatusTable. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManManualMeasEntry 1 }
+
+-- battery manager ManualMeasurement Human Readable Status Code
+
+battManManualMeasStatusText  OBJECT-TYPE
+     SYNTAX OCTET STRING (SIZE(80))
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Short phrase describing the manual measurement status."
+     ::= { battManManualMeasEntry 2 }
+
+-- battery manager ManualMeasurement Status Code
+
+battManManualMeasStatusCode  OBJECT-TYPE
+     SYNTAX Unsigned32
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "0: Taking measurement now.
+           1: Equalizer on, the measurement will be ready in 5 minutes.
+           2: NACK, cannot take measurement now.
+           3: Waiting for controller information
+          "
+     ::= { battManManualMeasEntry 3 }
+
+-- battery manager ManualMeasurement DatasetID
+
+battManManualMeasDatasetID  OBJECT-TYPE
+     SYNTAX Unsigned32
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Dataset ID of this measurement (When Status code 0 and 1 was returned by the trigger command). Reset to negative value when not applicable."
+     ::= { battManManualMeasEntry 4 }
+
+-- battery manager ManualMeasurement Time Before Allowed to do a Manual Measurement
+
+battManManualMeasTimeToMeasurement  OBJECT-TYPE
+     SYNTAX Unsigned32
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "(When Status code 2 was returned by the trigger command): remaining time in seconds before a measurement can be done. Reset to negative value when not applicable."
+     ::= { battManManualMeasEntry 5 }
+
+
+-- battery manager ManualMeasurement Trigger Command
+
+battManManualMeasurementTrigger OBJECT-TYPE
+     SYNTAX INTEGER { true(1), false(2) }
+     ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "Measurement manual trigger command. Then check the battManManualMeasTimeToMeasurement. When read always returns false(2)."
+     ::= { battManManualMeasEntry 6 }
+
+
+--***************************
+-- battery manger settings
+--***************************
+
+battManDeviceSettings   OBJECT IDENTIFIER ::= { battManIdentObjects 10 } 
+
+-- battery Manager string voltage settings 
+
+battManDevStringVoltsSetting  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-write
+     STATUS mandatory
+     DESCRIPTION
+          "typical string voltage setting : 12,24,36,48.
+           both of battManStringCountSetting & battManStringVoltsSetting
+           are sent the battery manager. this object is maintained in non-volatile memory.
+
+           IMPORTANT : The system needs to reboot after each new setting. "
+     ::= { battManDeviceSettings 1 }
+
+-- battery Manager string count settings
+
+battManDevStringCountSetting  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-write
+     STATUS mandatory
+     DESCRIPTION
+          "the number of strings setting. both of battManStringCountSetting & battManStringVoltsSetting
+           are sent the battery manager. this object is maintained in non-volatile memory.
+
+           IMPORTANT : The system needs to reboot after each new setting. "
+     ::= { battManDeviceSettings 2 }
+  
+-- modules diagnostics enable
+
+battManDevDiagnoscticsSetting  OBJECT-TYPE
+     SYNTAX INTEGER   { true(1), false(2)}
+     ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "enable or disable modules data diagnostics process. "
+     ::= { battManDeviceSettings 3 }
+
+--*******************************************
+-- battery manager BatteryLog table 
+--*******************************************
+
+-- battery log table 
+
+battManBatteryLogTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF BattManBatteryLogEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "Table containing batteries data"
+     ::= { battManIdentObjects 11 }         
+     
+-- battery log entry     
+     
+battManBatteryLogEntry OBJECT-TYPE
+     SYNTAX BattManBatteryLogEntry
+     ACCESS not-accessible
+     STATUS mandatory
+     DESCRIPTION
+          "List of information about each battery. Indexed by battery number"
+     INDEX { battManBattLogDeviceAddress, battManBattLogDatasetID, battManBattLogStringID, battManBattLogBatteryID }
+     ::= { battManBatteryLogTable 1 }
+     
+-- battery log sequence
+     
+BattManBatteryLogEntry ::=
+     SEQUENCE
+     {       
+          battManBattLogDeviceAddress
+               INTEGER,
+
+          battManBattLogDatasetID
+               Unsigned32,
+
+          battManBattLogBatteryID
+               INTEGER,
+
+          battManBattLogStringID
+               INTEGER,           
+
+          battManBattLogVoltage
+               INTEGER,
+
+          battManBattLogTemperature
+               INTEGER,
+
+          battManBattLogImpedance
+               HundredthmOhm,
+
+          battManBattLogConductance
+               HundredthkS,
+
+          battManBattLogTimestamp
+               DateAndTime
+     }   
+
+-- battery string index
+
+battManBattLogDeviceAddress  OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManBatteryLog. Corresponds to battManDeviceAddress in battManDeviceTable "
+     ::= { battManBatteryLogEntry 1 }
+
+-- battery DatasetID
+
+battManBattLogDatasetID OBJECT-TYPE
+     SYNTAX Unsigned32
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "The DatasetID of the measurement done for this battery."
+     ::= { battManBatteryLogEntry 2 }
+
+-- battery index 
+ 
+battManBattLogBatteryID OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Index into the battManBatteryLog."
+     ::= { battManBatteryLogEntry 3 }
+
+-- battery string id
+
+battManBattLogStringID OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "id of the string that this battery belongs to."
+     ::= { battManBatteryLogEntry 4 }
+
+-- battery voltage
+
+battManBattLogVoltage OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of an individual battery voltage in 1/100 Volts
+           with a range of 0 to 16.000 volts
+
+           This item requires an entry in the properties MIB."
+     ::= { battManBatteryLogEntry 5 }
+
+-- battery temperature
+
+battManBattLogTemperature OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of temperature in degrees C 
+           with a range of -40 to + 80 degrees C.
+          
+          This item requires an entry in the properties MIB."
+     ::= { battManBatteryLogEntry 6 }
+
+-- battery impedance 
+
+battManBattLogImpedance OBJECT-TYPE
+     SYNTAX HundredthmOhm
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of an individual battery impedance in 1/100 mOhm 
+           with a range of 0 to 99.99 mOhm.
+                                  
+           This item requires an entry in the properties MIB."
+     ::= { battManBatteryLogEntry 7 }
+
+-- battery conductance
+
+battManBattLogConductance OBJECT-TYPE
+     SYNTAX HundredthkS
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Scaled representation of an individual battery cell conductance in in 1/100 of Siemens
+           with a range of 6000 to 60000 Siemens (tbd)
+
+           This item requires an entry in the properties MIB."
+     ::= { battManBatteryLogEntry 8 }
+
+-- battery timestamp
+
+battManBattLogTimestamp OBJECT-TYPE
+     SYNTAX DateAndTime
+     ACCESS read-only
+     STATUS mandatory
+     DESCRIPTION
+          "Date and time when the measurement was taken.
+
+           This item requires an entry in the discrete properties MIB."
+     ::= { battManBatteryLogEntry 9 }
+
+END
+  

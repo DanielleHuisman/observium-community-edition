@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+import json
+from collections import OrderedDict
+
+from dhcpkit.ipv6.server.dhcpctl import DHCPKitControlClient
+from typing import Any, Dict
+
+# Change this if you change the default
+socket_path = '/var/run/ipv6-dhcpd.sock'
+
+
+# Output a section
+def print_section(data: Dict[str, Any], prefix: str = ''):
+    """
+    Output the data in Observium app format
+
+    :param data: A dictionary with data
+    :param prefix: The current prefix up to this point
+    """
+    # First see if this item has its own data
+    own_data = False
+    if prefix:
+        # We don't support own data in the root, so only check when there is a prefix
+        for value in data.values():
+            if not isinstance(value, dict):
+                own_data = True
+                break
+
+    if own_data:
+        # Print this item
+        print("<<<app-dhcpkit-{}>>>".format(prefix))
+        for key, value in data.items():
+            print_values(key, value)
+
+    else:
+        # Print sub-items
+        for key, value in data.items():
+            if isinstance(value, dict):
+                print_section(value, prefix="{}-{}".format(prefix, key).strip('-'))
+
+
+# Output key/value pairs
+def print_values(key: str, value: Any):
+    """
+    Output key/value pairs
+
+    :param key: The key
+    :param value: The value(s)
+    """
+    if isinstance(value, dict):
+        # The value is a dictionary, recurse
+        for sub_key, sub_value in value.items():
+            print_values("{}.{}".format(key, sub_key), sub_value)
+    else:
+        print("{}:{}".format(key, value))
+
+
+# Open connection
+conn = DHCPKitControlClient(socket_path)
+output = conn.execute_command('stats-json')
+
+# Decode json
+json_data = '\n'.join(output)
+data = json.loads(json_data, object_pairs_hook=OrderedDict)
+
+# Done: disconnect (and process output to empty the buffers)
+output = conn.execute_command('quit')
+list(output)
+
+# Show the stats
+print_section(data)

@@ -1,0 +1,449 @@
+-- MibName=rcL2cp
+-- *****************************************************************
+-- RAISECOM-L2CP-MIB.MIB:	 Raisecom L2cp MIB file
+--
+-- May 2012, kangyingyong
+--
+-- Copyright (c) 1994-2004,	2001 by	Raisecom, Inc.
+-- All rights reserved.
+-- 
+-- 20131122, kangyingyong, REAP1.2.500项目L2CP支持慢协议子类型和转发统计,并支持指定cos优先级
+-- 2012.12.20, kangyingyong, REAP1.1增强   
+-- *****************************************************************
+
+RAISECOM-L2CP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Counter32,
+        Gauge32
+                FROM SNMPv2-SMI
+		MacAddress,
+		RowStatus
+				FROM SNMPv2-TC
+		InterfaceIndex   	  
+		        FROM IF-MIB
+		iscomSwitch
+				FROM RAISECOM-BASE-MIB
+        EnableVar
+                FROM SWITCH-TC;
+
+rcL2cp  MODULE-IDENTITY
+		LAST-UPDATED	"201205250000Z"
+		ORGANIZATION	"Raisecom, Inc."
+		CONTACT-INFO
+				"		Raise Systems
+
+				Postal:	Beijing, China
+
+				   Tel:	86-010-82884499
+
+				E-mail:	support@raisecom.com"
+		DESCRIPTION
+				"This MIB module defines objects to L2CP."
+                REVISION   "201205250000Z"
+                DESCRIPTION
+                    "The initial revision of this MIB."
+                ::={ iscomSwitch 71 }
+
+-- ---------------------------------------------------------------------- --
+-- rcL2cpGrobal
+-- ---------------------------------------------------------------------- --   
+rcL2cpGrobal  OBJECT IDENTIFIER
+    ::= { rcL2cp 1 }
+    
+rcL2cpEnable OBJECT-TYPE
+    SYNTAX          EnableVar
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Specifies the status of L2CP.1:enable,2:disable" 
+    DEFVAL          { disable }
+    ::= { rcL2cpGrobal 1 } 
+
+rcL2cpMacAddress OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Specifies the destination MAC address of the tunneled PDUs 
+            and applies to all ingress tunneling interfaces." 
+    ::= { rcL2cpGrobal 2 }
+    
+-- ---------------------------------------------------------------------------------- -- 
+-- rcL2cpProfileTable
+-- ---------------------------------------------------------------------------------- --
+
+rcL2cpProfileTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF RcL2cpProfileEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "This table contains information about the profile. "
+    ::= { rcL2cp 2 }                          
+
+rcL2cpProfileEntry OBJECT-TYPE
+    SYNTAX          RcL2cpProfileEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "Information about the profile. This table will create
+            a profile which only contains its description, the 
+            actions of each protocol is defined in the associated 
+            table rcL2cpProfileActionTable."
+    INDEX           { rcL2cpProfileNumber } 
+    ::= { rcL2cpProfileTable 1 }
+
+RcL2cpProfileEntry ::= SEQUENCE {
+        rcL2cpProfileNumber             INTEGER	(1..19),
+        rcL2cpProfileDescription        OCTET STRING (SIZE(0..32)),
+        rcL2cpProfileRef                Gauge32,
+        rcL2cpProfileStatus             RowStatus
+}
+
+rcL2cpProfileNumber OBJECT-TYPE
+    SYNTAX          INTEGER	(1..19)          
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "An index that uniquely identifies an entry in the l2cp
+             profile table." 
+    ::= { rcL2cpProfileEntry 1 }
+ 
+rcL2cpProfileDescription OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE(0..32))
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+            "Specifies description of profile." 
+    ::= { rcL2cpProfileEntry 2 }
+
+rcL2cpProfileRef OBJECT-TYPE
+    SYNTAX          Gauge32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The value descrides how many times the profile is in use." 
+    ::= { rcL2cpProfileEntry 3 }
+
+rcL2cpProfileStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+            "The status of this entry." 
+    ::= { rcL2cpProfileEntry 4 }
+
+-- ---------------------------------------------------------------------------------- -- 
+-- rcL2cpProfileActionTable
+-- ---------------------------------------------------------------------------------- --
+
+rcL2cpProfileActionTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF RcL2cpProfileActionEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "This table contains information about types of disposal of given
+             protocols, this table supplies supplementary specification to 
+             the table rcL2cpProfileTable.Action 'tunnel' is not support when 
+             packets' da mac is one of 0180.c200.0004-06,08-0c,0f or 20to2f."
+    ::= { rcL2cp 3 }
+
+rcL2cpProfileActionEntry OBJECT-TYPE
+    SYNTAX          RcL2cpProfileActionEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "Information about types of disposal of given protocols. The
+            entries will be on a per profile, per protocol basis."
+    INDEX           {
+                        rcL2cpProfileActionProfileIndex,
+                        rcL2cpProfileActionProtocolIndex
+                    } 
+    ::= { rcL2cpProfileActionTable 1 }
+
+RcL2cpProfileActionEntry ::= SEQUENCE {
+        rcL2cpProfileActionProfileIndex       INTEGER (1..19),
+        rcL2cpProfileActionProtocolIndex      INTEGER,
+        rcL2cpProfileActionProtocolAction     INTEGER,
+        rcL2cpProfileActionProtocolCos        INTEGER
+}
+
+rcL2cpProfileActionProfileIndex OBJECT-TYPE
+    SYNTAX          INTEGER (1..19)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The profile index that identifies an entry in the 
+            profile action table." 
+    ::= { rcL2cpProfileActionEntry 1 }
+
+rcL2cpProfileActionProtocolIndex OBJECT-TYPE
+    SYNTAX          INTEGER   {
+                        stp(1),
+                        slow-protocol(2),
+                        dot1x(3),
+                        elmi(4),
+                        lldp(5),      
+                        sisco(6),
+                        daMac0180-C200-0004(7),
+                        daMac0180-C200-0005(8),
+                        daMac0180-C200-0006(9),
+                        daMac0180-C200-0008(10),
+                        daMac0180-C200-0009(11),
+                        daMac0180-C200-000a(12),
+                        daMac0180-C200-000b(13),
+                        daMac0180-C200-000c(14),
+                        daMac0180-C200-000d(15),
+                        daMac0180-C200-000f(16),
+                        daMac0180-C200-0020to2f(17),
+                        lacp(18),
+                        lamp(19),
+                        link-oam(20),
+                        esmc(21)
+                        }
+                    
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The protocol index that identifies an entry in the 
+            profile action table."
+    ::= { rcL2cpProfileActionEntry 2 }
+
+rcL2cpProfileActionProtocolAction OBJECT-TYPE
+    SYNTAX          INTEGER  {
+                        forward(0),
+                        peer(1),
+                        discard(2),
+                        tunnel(3),
+                        forward-statistics(4)
+                        }
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Specified types of disposal of received BPDU packets by the port in the
+             ingress direction. Action 'tunnel' is not support when packets' da mac is
+             one of 0180.c200.0004-06,08-0c,0f or 20to2f."
+    DEFVAL          { forward } 
+    ::= { rcL2cpProfileActionEntry 3 }  
+    
+rcL2cpProfileActionProtocolCos OBJECT-TYPE
+    SYNTAX          INTEGER (-1..7)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Specified cos priority of received BPDU packets by the port in the ingress
+             direction, value -1 indicates no cos priority is assigned."
+    DEFVAL          { -1 } 
+    ::= { rcL2cpProfileActionEntry 4 }
+
+-- ---------------------------------------------------------------------------------- -- 
+-- rcL2cpPortCfgTable
+-- ---------------------------------------------------------------------------------- --
+
+rcL2cpPortCfgTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF RcL2cpPortCfgEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "This table contains information about the index of profile 
+            applied by one port and the status of bpdu tunnel terminal
+            of this port and statistics-clearing status of Bpdu packet 
+            through this port."
+    ::= { rcL2cp 4 }
+
+rcL2cpPortCfgEntry OBJECT-TYPE
+    SYNTAX          RcL2cpPortCfgEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "Information about about the index of profile applied by one
+             port and the status of bpdu tunnel terminal of this port
+             and statistics-clearing status of Bpdu packet through this 
+             port. The entries will be on a per port basis."
+    INDEX           {
+                        rcL2cpPortIndex
+                    } 
+    ::= { rcL2cpPortCfgTable 1 }
+
+RcL2cpPortCfgEntry ::= SEQUENCE {
+        rcL2cpPortIndex                    InterfaceIndex,
+        rcL2cpPortProfileID                INTEGER (0..19),
+        rcL2cpPortTerminal                 EnableVar,
+        rcL2cpPortClearStats               EnableVar
+}
+
+rcL2cpPortIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The port index that identifies an entry in the 
+            port process table." 
+    ::= { rcL2cpPortCfgEntry 1 }
+
+rcL2cpPortProfileID OBJECT-TYPE
+    SYNTAX          INTEGER (0..19)                    
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The profile ID applied by this port, value zero(0) specifies
+            that no profile is applied." 
+    DEFVAL          { 0 }
+    ::= { rcL2cpPortCfgEntry 2 }
+
+rcL2cpPortTerminal OBJECT-TYPE
+    SYNTAX          EnableVar
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Specified the status of bpdu tunnel terminal.1:enable,2:disable" 
+    DEFVAL          { disable }
+    ::= { rcL2cpPortCfgEntry 3 } 
+    
+rcL2cpPortClearStats OBJECT-TYPE
+    SYNTAX           EnableVar
+    MAX-ACCESS       read-write
+    STATUS           current
+    DESCRIPTION
+            "Clear the statistics of bpdu packets through this port.1:enable,2:disable" 
+    DEFVAL          { disable }
+    ::= { rcL2cpPortCfgEntry 4 }
+
+-- ---------------------------------------------------------------------------------- -- 
+-- rcL2cpStatsTable
+-- ---------------------------------------------------------------------------------- --
+
+rcL2cpStatsTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF RcL2cpStatsEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "This table contains protocol statistics on the interface."
+    ::= { rcL2cp 5 }
+
+rcL2cpStatsEntry OBJECT-TYPE
+    SYNTAX          RcL2cpStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Protocol statistics on the interface."
+    INDEX           {
+                        rcL2cpStatsPortIndex,
+                        rcL2cpStatsProtocolIndex
+                    } 
+    ::= { rcL2cpStatsTable 1 }
+
+RcL2cpStatsEntry ::= SEQUENCE {
+        rcL2cpStatsPortIndex         InterfaceIndex ,
+        rcL2cpStatsProtocolIndex     INTEGER,
+        rcL2cpStatsProtocolStats     Counter32
+}
+
+rcL2cpStatsPortIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The port index that identifies an entry in the 
+            protocol statistics table." 
+    ::= { rcL2cpStatsEntry 1 }
+
+rcL2cpStatsProtocolIndex OBJECT-TYPE
+    SYNTAX          INTEGER  {
+                        stp(1),
+                        slow-protocol(2),
+                        dot1x(3),
+                        elmi(4),
+                        lldp(5),      
+                        sisco(6),
+                        daMac0180-C200-0004(7),
+                        daMac0180-C200-0005(8),
+                        daMac0180-C200-0006(9),
+                        daMac0180-C200-0008(10),
+                        daMac0180-C200-0009(11),
+                        daMac0180-C200-000a(12),
+                        daMac0180-C200-000b(13),
+                        daMac0180-C200-000c(14),
+                        daMac0180-C200-000d(15),
+                        daMac0180-C200-000f(16),
+                        daMac0180-C200-0020to2f(17)
+                            }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Protocol index that identifies an entry in the 
+                     protocol statistics table." 
+    ::= { rcL2cpStatsEntry 2 }
+
+rcL2cpStatsProtocolStats OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The PDU statistics of an interface. These statistics cover
+             the number of ingress PDUs." 
+    ::= { rcL2cpStatsEntry 3 }  
+    
+-- ---------------------------------------------------------------------------------- -- 
+-- rcL2cpPortVlanCfgTable
+-- ---------------------------------------------------------------------------------- --
+
+rcL2cpPortVlanCfgTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF RcL2cpPortVlanCfgEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "This table contains information about disposal of vlan tagged l2cp pkt 
+            received by a port."
+    ::= { rcL2cp 6 }
+
+rcL2cpPortVlanCfgEntry OBJECT-TYPE
+    SYNTAX          RcL2cpPortVlanCfgEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Protocol statistics on the interface."
+    INDEX           {
+                        rcL2cpPortVlanCfgPortIndex,
+                        rcL2cpPortVlanCfgVlanIndex
+                    } 
+    ::= { rcL2cpPortVlanCfgTable 1 }
+
+RcL2cpPortVlanCfgEntry ::= SEQUENCE {
+        rcL2cpPortVlanCfgPortIndex         InterfaceIndex ,
+        rcL2cpPortVlanCfgVlanIndex         INTEGER,
+        rcL2cpPortVlanCfgL2cpProcess       INTEGER
+}
+
+rcL2cpPortVlanCfgPortIndex OBJECT-TYPE
+    SYNTAX          InterfaceIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The first index that uniquely identifies an entry
+             in the Port Vlan L2CP Config table." 
+    ::= { rcL2cpPortVlanCfgEntry 1 }
+
+rcL2cpPortVlanCfgVlanIndex OBJECT-TYPE
+    SYNTAX          INTEGER  (1..4094)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "The second index that uniquely identifies an 
+                     entry in the Port Vlan L2CP Config table." 
+    ::= { rcL2cpPortVlanCfgEntry 2 }
+
+rcL2cpPortVlanCfgL2cpProcess OBJECT-TYPE
+    SYNTAX          INTEGER  {
+                        forward(0),
+                        peer(1) 
+                    }
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Specified types of disposal of received BPDU packets with
+             specified vlan tag by the port in the ingress direction." 
+    DEFVAL          { forward }
+    ::= { rcL2cpPortVlanCfgEntry 3 }
+
+END
+

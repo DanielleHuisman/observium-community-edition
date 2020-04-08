@@ -1,0 +1,891 @@
+QTECH-VPLS-GENERIC-MIB DEFINITIONS ::= BEGIN
+      IMPORTS
+      NOTIFICATION-TYPE, MODULE-IDENTITY, OBJECT-TYPE,
+      Unsigned32, Counter32, transmission
+         FROM SNMPv2-SMI                    -- RFC2578
+
+      MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+         FROM SNMPv2-CONF                   -- RFC2580
+
+      TruthValue, RowStatus, StorageType
+         FROM SNMPv2-TC                     -- RFC2579
+
+      SnmpAdminString
+         FROM SNMP-FRAMEWORK-MIB            -- RFC3411
+
+      PwIndexType
+         FROM PW-TC-STD-MIB
+
+--  We need to add this for vpls instance
+			InterfaceIndexOrZero
+        FROM IF-MIB                        -- [RFC2863]
+
+      VPNIdOrZero
+         FROM VPN-TC-STD-MIB                -- RFC4265
+
+      qtechMgmt
+         FROM QTECH-SMI
+      ;
+
+    -- Vpls BGP Autodiscovery specific Textual Convention
+    QtechVplsBgpRouteDistinguisher ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+          "Syntax for a route distinguisher. For a complete
+           definition of a route distinguisher, see [RFC4364].
+           For more details on use of a route distinguisher
+           for a VPLS service, see [RFC4761]"
+      REFERENCE
+          "[RFC4364]"
+      SYNTAX  OCTET STRING(SIZE (0..256))
+
+    QtechVplsBgpRouteTarget ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+          "Syntax for a route target. For a complete
+           definition of a route target, see [RFC4364]."
+      REFERENCE
+          "[RFC4364]"
+      SYNTAX  OCTET STRING(SIZE (0..256))
+
+    QtechVplsBgpRouteTargetType ::= TEXTUAL-CONVENTION
+      STATUS        current
+      DESCRIPTION
+       "Used to define the type of a route target usage.
+        Route targets can be specified to be imported,
+        exported, or both.  For a complete definition of a
+        route target, see [RFC4364]."
+      REFERENCE
+        "[RFC4364]"
+      SYNTAX INTEGER { import(1), export(2), both(3) }
+
+   qtechvplsGenericDraft01MIB MODULE-IDENTITY
+      LAST-UPDATED "201004281200Z"  -- 28 April 2010 12:00:00 GMT
+      ORGANIZATION "Qtech Networks Co.,Ltd."
+      CONTACT-INFO
+                "
+                Tel: 4008-111-000
+
+                E-mail: service@qtech.com.cn"
+
+      DESCRIPTION
+          "Copyright (C) Qtech Networks.
+           This MIB module contains generic managed object definitions
+           for Virtual Private LAN Services as in [RFC4762] and
+           [RFC4761]
+
+           This MIB module enables the use of any underlying PseudoWire
+           network."
+      -- Revision history.
+      REVISION
+          "201004281200Z"  -- 28 April 2010 12:00:00 GMT
+      DESCRIPTION
+          "Changes from previous version:
+           1) Moved LDP Specific information to VPLS-LDP-MIB
+           2) Created the qtechvplsStatusTable to store status information.
+          "
+      REVISION
+          "201006041200Z"  -- 4 June 2010 12:00:00 GMT
+
+
+      DESCRIPTION "Initial version"
+           ::= { qtechMgmt 77 }
+
+   -- Top-level components of this MIB.
+
+   -- Notifications
+   qtechvplsNotifications OBJECT IDENTIFIER
+                                 ::= { qtechvplsGenericDraft01MIB 0 }
+   -- Tables, Scalars
+   qtechvplsObjects       OBJECT IDENTIFIER
+                                 ::= { qtechvplsGenericDraft01MIB 1 }
+   -- Conformance
+   qtechvplsConformance   OBJECT IDENTIFIER
+                                 ::= { qtechvplsGenericDraft01MIB 2 }
+
+   -- PW Virtual Connection Table
+
+   qtechvplsConfigIndexNext OBJECT-TYPE
+      SYNTAX            Unsigned32
+      MAX-ACCESS        read-only
+      STATUS            current
+      DESCRIPTION
+          "This object contains an appropriate value to be used
+           for qtechvplsConfigIndex when creating entries in the
+           qtechvplsConfigTable. The value 0 indicates that no
+           unassigned entries are available.  To obtain the
+           value of qtechvplsConfigIndex for a new entry in the
+           qtechvplsConfigTable, the manager issues a management
+           protocol retrieval operation to obtain the current
+           value of qtechvplsConfigIndex.  After each retrieval
+           operation, the agent should modify the value to
+           reflect the next unassigned index.  After a manager
+           retrieves a value the agent will determine through
+           its local policy when this index value will be made
+           available for reuse."
+      ::= { qtechvplsObjects 1 }
+
+      qtechvplsConfigTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF QtechVplsConfigEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table specifies information for configuring
+                and monitoring Virtual Private Lan Services(VPLS).
+                "
+          ::= { qtechvplsObjects 2 }
+
+      qtechvplsConfigEntry OBJECT-TYPE
+          SYNTAX          QtechVplsConfigEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+           "A row in this table represents a Virtual Private Lan
+            Service(VPLS) in a packet network. It is indexed by
+            qtechvplsConfigIndex, which uniquely identifies a single VPLS.
+
+            A row is created by the operator or by the agent if a
+            VPLS service is created by non-SNMP application or
+            due to autodiscovery process.
+
+            None of the read-create objects values can be
+            changed when qtechvplsConfigRowStatus is in the active(1)
+            state. Changes are allowed when the qtechvplsConfigRowStatus
+            is in notInService(2) or notReady(3) states only.
+            If the operator need to change one of the values
+            for an active row the qtechvplsConfigRowStatus should be
+            first changed to notInService(2), the objects may
+            be changed now, and later to active(1) in order to
+            re-initiate the signaling process with the new
+            values in effect.
+            "
+          INDEX           { qtechvplsConfigIndex }
+          ::= { qtechvplsConfigTable 1 }
+
+     QtechVplsConfigEntry ::=
+        SEQUENCE {
+         qtechvplsConfigIndex                                Unsigned32,
+         qtechvplsConfigName                                 SnmpAdminString,
+         qtechvplsConfigDescr                                SnmpAdminString,
+         qtechvplsConfigAdminStatus                          INTEGER,
+         qtechvplsConfigMacLearning                          TruthValue,
+         qtechvplsConfigDiscardUnknownDest                   TruthValue,
+         qtechvplsConfigMacAging                             TruthValue,
+         qtechvplsConfigFwdFullHighWatermark                 Unsigned32,
+         qtechvplsConfigFwdFullLowWatermark                  Unsigned32,
+         qtechvplsConfigRowStatus                            RowStatus,
+         qtechvplsConfigMtu                                  Unsigned32,
+         qtechvplsConfigVpnId                                VPNIdOrZero,
+         qtechvplsConfigServiceType                          INTEGER,
+         qtechvplsConfigServiceSignal                        INTEGER
+          }
+
+      qtechvplsConfigIndex  OBJECT-TYPE
+          SYNTAX          Unsigned32  (1..2147483647)
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Unique index for the conceptual row identifying
+                a VPLS service."
+          ::= { qtechvplsConfigEntry 1 }
+
+      qtechvplsConfigName  OBJECT-TYPE
+          SYNTAX          SnmpAdminString
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "A textual name of the VPLS.
+                If there is no local name, or this object is
+                otherwise not applicable, then this object MUST
+                contain a zero-length octet string."
+          DEFVAL           { "" }
+          ::= { qtechvplsConfigEntry 2 }
+
+      qtechvplsConfigDescr  OBJECT-TYPE
+          SYNTAX          SnmpAdminString
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "A textual string containing information about the
+               VPLS service. If there is no information for this VPLS
+               service, then this object MUST contain a zero-length
+               octet string."
+          DEFVAL           { "" }
+          ::= { qtechvplsConfigEntry 3 }
+
+      qtechvplsConfigAdminStatus OBJECT-TYPE
+          SYNTAX          INTEGER {
+                              up(1),
+                              down(2),
+                              testing(3)   -- in some test mode
+
+                          }
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "The desired administrative state of the VPLS
+                service. If the administrative status of the
+                Vpls service is changed to enable then this
+                service is able to utilize the pseudo wire to
+                perform the tasks of a VPLS service.
+                The testing(3) state indicates that no operational
+                packets can be passed. "
+          DEFVAL           { up }
+          ::= { qtechvplsConfigEntry 4 }
+
+      qtechvplsConfigMacLearning OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies if MAC Learning is enabled
+                in this service. If this object is true then Mac
+                Learning is enabled. If false, then Mac Learning is
+                disabled."
+          DEFVAL          { true }
+          ::= { qtechvplsConfigEntry 5 }
+
+      qtechvplsConfigDiscardUnknownDest OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "If the value of this object is 'true', then frames
+                received with an unknown destination MAC are discarded
+                in this VPLS. If 'false', then the packets are
+                processed."
+          DEFVAL          { false }
+          ::= { qtechvplsConfigEntry 6 }
+
+      qtechvplsConfigMacAging OBJECT-TYPE
+          SYNTAX          TruthValue
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "If the value of this object is 'true'
+                then the MAC aging process is enabled in
+                this VPLS. If 'false', then the MAC aging process
+                is disabled"
+          DEFVAL          { true }
+          ::= { qtechvplsConfigEntry 7 }
+
+      qtechvplsConfigFwdFullHighWatermark OBJECT-TYPE
+          SYNTAX          Unsigned32 (0..100)
+          UNITS           "percentage"
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies the utilization of the
+                forwarding database for this VPLS instance at
+                which the qtechvplsFwdFullAlarmRaised notification
+                will be sent."
+          DEFVAL          { 100 }
+          ::= { qtechvplsConfigEntry 8 }
+
+      qtechvplsConfigFwdFullLowWatermark OBJECT-TYPE
+          SYNTAX          Unsigned32 (0..100)
+          UNITS           "percentage"
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This object specifies the utilization of the
+                forwarding database for this VPLS instance
+                at which the qtechvplsFwdFullAlarmCleared
+                notification will be sent."
+          DEFVAL          { 80 }
+          ::= { qtechvplsConfigEntry 9 }
+
+      qtechvplsConfigRowStatus OBJECT-TYPE
+          SYNTAX          RowStatus
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "For creating, modifying, and deleting this row.
+                None of the read-create objects in the
+                conceptual rows may be changed when this
+                object is in the active(1) state."
+          ::= { qtechvplsConfigEntry 10 }
+
+      qtechvplsConfigMtu OBJECT-TYPE
+          SYNTAX          Unsigned32 (46..1530)
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "The value of this object specifies the MTU of this
+                vpls instance."
+          DEFVAL          { 1500 }
+          ::= { qtechvplsConfigEntry 11 }
+
+      qtechvplsConfigVpnId OBJECT-TYPE
+          SYNTAX          VPNIdOrZero
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "This objects indicates the IEEE 802-1990
+                VPN ID of the associated VPLS service."
+-- Ed note: Should we import the VPNIdOrZero TC or
+--              define a new TC?
+          ::= { qtechvplsConfigEntry 12 }
+
+      qtechvplsConfigServiceType OBJECT-TYPE
+          SYNTAX          INTEGER {
+                           vlan     (1),
+                           ethernet (2)
+                          }
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "The value of this object specifies the type of
+                service emulated by this vpls instance. Invalid for RFC 4762"
+          DEFVAL          { vlan }
+          ::= { qtechvplsConfigEntry 13 }
+
+      qtechvplsConfigServiceSignal   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   manual        (1),
+                                   autodiscovery (2)
+                           }
+           MAX-ACCESS      read-create
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 vpls is created with LDP or BGP signalling.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { qtechvplsConfigEntry 14}
+
+
+-- VPLS Status table
+
+      qtechvplsStatusTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF QtechVplsStatusEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+                "This table provides information for monitoring
+                Virtual Private Lan Services(VPLS).
+                "
+          ::= { qtechvplsObjects 3 }
+
+      qtechvplsStatusEntry OBJECT-TYPE
+          SYNTAX          QtechVplsStatusEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+
+          DESCRIPTION
+           "A row in this table represents a Virtual Private Lan
+            Service(VPLS) in a packet network. It is indexed by
+            qtechvplsConfigIndex, which uniquely identifies a single VPLS.
+
+            A row in this table is automatically created by the agent
+            when a VPLS service is configured.
+            "
+          INDEX           { qtechvplsConfigIndex }
+          ::= { qtechvplsStatusTable 1 }
+
+     QtechVplsStatusEntry ::=
+        SEQUENCE {
+         qtechvplsStatusOperStatus                        INTEGER,
+         qtechvplsStatusPeerCount                         Counter32
+          }
+
+      qtechvplsStatusOperStatus OBJECT-TYPE
+          SYNTAX          INTEGER {
+                              up(1),
+                              down(2)
+                          }
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "The current operational state of this VPLS Service."
+          ::= { qtechvplsStatusEntry 1 }
+
+      qtechvplsStatusPeerCount OBJECT-TYPE
+          SYNTAX          Counter32
+          MAX-ACCESS      read-only
+          STATUS          current
+          DESCRIPTION
+               "This objects specifies the number of peers
+                present in this vpls instance."
+          ::= { qtechvplsStatusEntry 2 }
+
+
+      -- VPLS PW Binding Table
+
+      qtechvplsPwBindTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF QtechVplsPwBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table provides an association between a
+                VPLS service and the corresponding Pseudo
+                Wires. A service can have more than one Pseudo
+                Wire association. Pseudo Wires are defined in
+                the pwTable"
+          ::= { qtechvplsObjects 4 }
+
+      qtechvplsPwBindEntry OBJECT-TYPE
+          SYNTAX          QtechVplsPwBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Each row represents an association between a
+                VPLS instance and one or more Pseudo Wires
+                defined in the pwTable. Each index is unique
+                in describing an entry in this table. However
+                both indexes are required to define the one
+                to many association of service to
+                pseudowire."
+          INDEX  { qtechvplsConfigIndex,qtechvplsPwBindIndex }
+          ::= { qtechvplsPwBindTable 1 }
+
+      QtechVplsPwBindEntry ::=
+          SEQUENCE {
+							qtechvplsPwBindIndex            Unsigned32,
+              qtechvplsPwBindConfigType       INTEGER,
+              qtechvplsPwBindType             INTEGER
+          }
+
+     qtechvplsPwBindIndex  OBJECT-TYPE
+          SYNTAX          Unsigned32
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Unique index for PW bind in vpls instance."
+          ::= { qtechvplsPwBindEntry 1 }
+
+-- qtechvplsPwBindConfigType depends on vpls implementation type.
+      qtechvplsPwBindConfigType   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   manual        (1),
+                                   autodiscovery (2)
+                           }
+           MAX-ACCESS      read-only
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 whether the Pseudo Wire binding was created
+                 manually or via autodiscovery.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { qtechvplsPwBindEntry 2}
+
+--  This is hub pw or spoke pw
+      qtechvplsPwBindType   OBJECT-TYPE
+           SYNTAX          INTEGER {
+                                   mesh  (1),
+                                   spoke (2)
+                           }
+           MAX-ACCESS      read-only
+           STATUS          current
+           DESCRIPTION
+                "The value of this object indicates
+                 whether the Pseudo Wire binding is of
+                 type mesh or spoke.
+
+                 The value of this object must be
+                 specifed when the row is created and cannot
+                 be changed while the row status is active(1)"
+          ::= { qtechvplsPwBindEntry 3 }
+
+
+-- qtechvplsBgpADConfigTable
+
+      qtechvplsBgpADConfigTable OBJECT-TYPE
+            SYNTAX          SEQUENCE OF QtechVplsBgpADConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "This table specifies information for configuring
+             BGP Auto-discovery parameters for a given Vpls service.
+            "
+            ::= { qtechvplsObjects 5 }
+
+      qtechvplsBgpADConfigEntry OBJECT-TYPE
+            SYNTAX          QtechVplsBgpADConfigEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "A row in this table represents BGP based autodiscovery
+             is in use for this instance of Vpls.
+             A row in this table is indexed by qtechvplsConfigIndex, which
+             uniquely identifies a single VPLS.
+             None of the read-create objects can be changed when
+             vplsBGPADConfigRowStatus is in active(1) state. Changes
+             are allowed when the vplsBGPADConfigRowStatus is in
+             notInService(2) or notReady(3) states only.
+             If the operator need to change one of the values
+             for an active row the qtechvplsConfigRowStatus should be
+             first changed to notInService(2), the objects may
+             be changed now, and later to active(1) in order to
+             re-initiate the signaling process with the new
+             values in effect.
+            "
+            INDEX      { qtechvplsConfigIndex }
+            ::= { qtechvplsBgpADConfigTable 1 }
+
+      QtechVplsBgpADConfigEntry ::=
+         SEQUENCE {
+          qtechvplsBgpADConfigRouteDistinguisher   QtechVplsBgpRouteDistinguisher,
+          qtechvplsBgpADConfigRowStatus            RowStatus
+         }
+
+      qtechvplsBgpADConfigRouteDistinguisher OBJECT-TYPE
+            SYNTAX          QtechVplsBgpRouteDistinguisher
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " The route distinguisher for this VPLS. See [RFC4364]
+            for a complete definition of a route distinguisher.
+            for more details on use of a route distinguisher
+            for a VPLS service, see [RFC4761]
+            "
+            ::= { qtechvplsBgpADConfigEntry 1 }
+
+      qtechvplsBgpADConfigRowStatus OBJECT-TYPE
+            SYNTAX          RowStatus
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " For creating, modifying, and deleting this row.
+            None of the read-create objects in the
+            conceptual rows may be changed when this
+            object is in the active(1) state.
+            "
+            ::= { qtechvplsBgpADConfigEntry 2 }
+
+
+    -- qtechvplsBgpRteTargetTable
+
+      qtechvplsBgpRteTargetTable   OBJECT-TYPE
+            SYNTAX          SEQUENCE OF QtechVplsBgpRteTargetEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            " This table specifies the list of Route Targets
+              imported or exported by BGP during auto-discovery of VPLS.
+            "
+            ::= { qtechvplsObjects 6 }
+
+      qtechvplsBgpRteTargetEntry   OBJECT-TYPE
+            SYNTAX          QtechVplsBgpRteTargetEntry
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+              "An entry in this table specifies the value of the
+               Route Target being used by BGP. Depending on the value
+               of vplsBgpRteTargetType an RT might be exported or
+               imported or both. Every VPLS which
+              uses auto-discovery for finding peer nodes can import and
+              export multiple Route Targets. This representation allows
+              support for hierarchical VPLS.
+            "
+            INDEX     { qtechvplsConfigIndex, qtechvplsBgpRteTargetIndex }
+            ::= { qtechvplsBgpRteTargetTable 1 }
+
+      QtechVplsBgpRteTargetEntry ::=
+         SEQUENCE {
+          qtechvplsBgpRteTargetIndex          Unsigned32,
+          qtechvplsBgpRteTargetRTType         QtechVplsBgpRouteTargetType,
+          qtechvplsBgpRteTargetRT             QtechVplsBgpRouteTarget,
+          qtechvplsBgpRteTargetRTRowStatus    RowStatus
+         }
+
+      qtechvplsBgpRteTargetIndex   OBJECT-TYPE
+            SYNTAX          Unsigned32
+            MAX-ACCESS      not-accessible
+            STATUS          current
+            DESCRIPTION
+            "This index along with qtechvplsConfigIndex,identifies one entry
+             in the qtechvplsBgpRteTargetTable. By keeping qtechvplsConfigIndex
+             constant and using new value of qtechvplsBgpRteTargetIndex user
+              can configure multiple Route Targets for the same Vpls.
+            "
+            ::= {qtechvplsBgpRteTargetEntry  1 }
+
+      qtechvplsBgpRteTargetRTType  OBJECT-TYPE
+            SYNTAX          QtechVplsBgpRouteTargetType
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " Used to define the type of a route target usage.
+              Route targets can be specified to be imported,
+              exported, or both.  For a complete definition of a
+              route target, see [RFC4364]."
+            ::= { qtechvplsBgpRteTargetEntry 2 }
+
+      qtechvplsBgpRteTargetRT     OBJECT-TYPE
+            SYNTAX          QtechVplsBgpRouteTarget
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            " The route target associated with the VPLS service.
+              For more details on use of route targets
+              for a VPLS service, see [RFC4761] "
+            ::= { qtechvplsBgpRteTargetEntry 3 }
+
+      qtechvplsBgpRteTargetRTRowStatus     OBJECT-TYPE
+            SYNTAX          RowStatus
+            MAX-ACCESS      read-create
+            STATUS          current
+            DESCRIPTION
+            "This variable is used to create, modify, and/or
+             delete a row in this table.  When a row in this
+             table is in active(1) state, no objects in that row
+             can be modified "
+            ::= { qtechvplsBgpRteTargetEntry 4 }
+
+--  qtechvplsIfBindTable
+
+          qtechvplsIfBindTable OBJECT-TYPE
+          SYNTAX          SEQUENCE OF QtechVplsIfBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "This table provides an association between a
+                VPLS service and interface. A service can bind
+                more than one interface. "
+          ::= { qtechvplsObjects 7 }
+
+      qtechVplsIfBindEntry OBJECT-TYPE
+          SYNTAX          QtechVplsIfBindEntry
+          MAX-ACCESS      not-accessible
+          STATUS          current
+          DESCRIPTION
+               "Each row represents an association between a
+                VPLS instance and one or more interface. Each
+                index is unique in describing an entry in this table. "
+          INDEX  { qtechvplsConfigIndex,qtechvplsIfBindIndex}
+          ::= { qtechvplsIfBindTable 1 }
+
+      QtechVplsIfBindEntry ::=
+          SEQUENCE {
+			        qtechvplsIfBindIndex           InterfaceIndexOrZero,
+							qtechvplsSiteId                Unsigned32,
+							qtechvplsIfRowStatus           RowStatus
+          }
+
+     qtechvplsIfBindIndex  OBJECT-TYPE
+          SYNTAX          InterfaceIndexOrZero
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "Interface index for vpls instance.
+               "
+          ::= { qtechVplsIfBindEntry 1 }
+
+     qtechvplsSiteId  OBJECT-TYPE
+          SYNTAX          Unsigned32
+          MAX-ACCESS      read-create
+          STATUS          current
+          DESCRIPTION
+               "VE id associated with the VPLS service.
+               "
+          ::= { qtechVplsIfBindEntry 2 }
+
+		qtechvplsIfRowStatus OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-create
+        STATUS        current
+        DESCRIPTION
+            "This variable is used to create, modify, and/or
+             delete a row in this table.  When a row in this
+             table is in active(1) state, no objects in that row
+             can be modified except vplsBgpSiteRowStatus."
+        ::= { qtechVplsIfBindEntry 3 }
+
+
+      -- VPLS Service Notifications
+
+      qtechvplsFwdFullAlarmRaised NOTIFICATION-TYPE
+          OBJECTS {
+              qtechvplsConfigVpnId,
+              qtechvplsConfigFwdFullHighWatermark,
+              qtechvplsConfigFwdFullLowWatermark
+          }
+          STATUS          current
+          DESCRIPTION
+               "The qtechvplsFwdFullAlarmRaised notification is
+                generated when the utilization of the Forwarding
+                database is above the value specified by
+                qtechvplsConfigFwdFullHighWatermark."
+          ::= { qtechvplsNotifications 1 }
+
+      qtechvplsFwdFullAlarmCleared NOTIFICATION-TYPE
+          OBJECTS {
+              qtechvplsConfigVpnId,
+              qtechvplsConfigFwdFullHighWatermark,
+              qtechvplsConfigFwdFullLowWatermark
+          }
+          STATUS          current
+          DESCRIPTION
+               "The qtechvplsFwdFullAlarmCleared notification is
+                generated when the utilization of the Forwarding
+                database is below the value specified by
+                qtechvplsConfigFwdFullLowWatermark."
+          ::= { qtechvplsNotifications 2 }
+
+   -- Compliance requirement for read-only implementations.
+
+   qtechvplsCompliances
+     OBJECT IDENTIFIER ::= { qtechvplsConformance 1 }
+   qtechvplsModuleFullCompliance MODULE-COMPLIANCE
+      STATUS current
+      DESCRIPTION
+           "Compliance requirement for implementations that
+            provide full support for VPLS-GENERIC-DRAFT-01-MIB.
+            Such devices can then be monitored and configured using
+            this MIB module."
+      MODULE -- this module
+
+          MANDATORY-GROUPS {
+               qtechvplsGroup,
+               qtechvplsPwBindGroup,
+               qtechvplsNotificationGroup
+           }
+
+      ::= { qtechvplsCompliances 1 }
+
+
+   qtechvplsModuleReadOnlyCompliance MODULE-COMPLIANCE
+      STATUS current
+      DESCRIPTION
+           "Compliance requirement for implementations that only
+            provide read-only support for VPLS-GENERIC-DRAFT-01-MIB.
+            Such devices can then be monitored but cannot be
+            configured using this MIB modules."
+
+      MODULE -- this module
+
+          MANDATORY-GROUPS {
+               qtechvplsGroup,
+               qtechvplsPwBindGroup,
+               qtechvplsNotificationGroup
+           }
+
+           OBJECT          qtechvplsConfigName
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+
+           OBJECT          qtechvplsConfigDescr
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigAdminStatus
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigMacLearning
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigDiscardUnknownDest
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigMacAging
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigFwdFullHighWatermark
+           MIN-ACCESS      read-only
+           DESCRIPTION
+
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigFwdFullLowWatermark
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigRowStatus
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigMtu
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsConfigServiceType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+           OBJECT          qtechvplsPwBindConfigType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+           OBJECT          qtechvplsPwBindType
+           MIN-ACCESS      read-only
+           DESCRIPTION
+               "Write access is not required."
+
+      ::= { qtechvplsCompliances 2 }
+
+-- Units of conformance.
+
+      qtechvplsGroups
+        OBJECT IDENTIFIER ::= { qtechvplsConformance 2 }
+
+
+      qtechvplsGroup OBJECT-GROUP
+          OBJECTS {
+              qtechvplsConfigName,
+              qtechvplsConfigDescr,
+              qtechvplsConfigAdminStatus,
+              qtechvplsConfigMacLearning,
+              qtechvplsConfigDiscardUnknownDest,
+              qtechvplsConfigMacAging,
+              qtechvplsConfigVpnId,
+              qtechvplsConfigFwdFullHighWatermark,
+              qtechvplsConfigFwdFullLowWatermark,
+              qtechvplsConfigRowStatus,
+              qtechvplsConfigIndexNext,
+              qtechvplsConfigMtu,
+              qtechvplsConfigServiceType,
+              qtechvplsStatusOperStatus,
+              qtechvplsStatusPeerCount
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of objects supporting
+                management of L2VPN VPLS services"
+          ::= { qtechvplsGroups 1 }
+
+      qtechvplsPwBindGroup OBJECT-GROUP
+          OBJECTS {
+              qtechvplsPwBindConfigType,
+              qtechvplsPwBindType
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of objects supporting
+                management of
+                Pseudo Wire (PW) Binding to VPLS."
+          ::= { qtechvplsGroups 2 }
+
+      qtechvplsNotificationGroup NOTIFICATION-GROUP
+          NOTIFICATIONS   {
+              qtechvplsFwdFullAlarmRaised,
+              qtechvplsFwdFullAlarmCleared
+          }
+          STATUS          current
+          DESCRIPTION
+               "The group of notifications supporting
+                the  Notifications generated for
+                VPLS Services"
+          ::= { qtechvplsGroups 3 }
+END

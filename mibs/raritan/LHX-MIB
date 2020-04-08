@@ -1,0 +1,1324 @@
+LHX-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+    enterprises, Integer32, Unsigned32	    	    	FROM SNMPv2-SMI
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP FROM SNMPv2-CONF
+    TEXTUAL-CONVENTION, DisplayString, TruthValue   	FROM SNMPv2-TC
+    InetAddressType, InetAddress, InetPortNumber    	FROM INET-ADDRESS-MIB
+    sysContact, sysName, sysLocation                    FROM RFC1213-MIB;
+
+raritan MODULE-IDENTITY
+    LAST-UPDATED "201701270000Z"      -- January 27, 2017
+    ORGANIZATION "Raritan"
+    CONTACT-INFO "
+                  Author:       Raritan Americas, Inc.
+                  postal:       Raritan Americas, Inc.
+                                400 Cottontail Lane
+                                Somerset, NJ 08873
+                  email:        tech@raritan.com
+                  phone:        +1 732 764 8886
+                 "
+    DESCRIPTION  "This MIB describes the SNMP functions of the
+                  Schroff Varistar LHX heat exchanger
+		  supported by Raritan devices."
+
+    REVISION	 "201701270000Z"      -- January 27, 2017
+    
+    DESCRIPTION  "1) Added deviceSerialNumber under trapInformation
+                  2) Added deviceSerialNumber to the OBJECTS clause of all traps
+                 "
+
+
+
+    REVISION	 "201501050000Z"      -- January 5, 2015
+    
+    DESCRIPTION  "1) Added agentInetPortNumber under trapInformation
+                  2) Added agentInetPortNumber as a varbind to all traps
+                 "
+
+
+
+    REVISION	 "201307240000Z"      -- July 24, 2013
+    
+    DESCRIPTION  "SHX 30 support:
+		  - add lhxVoltageLow, lhxBaseElectronicsFailure and
+		    lhxCondenserPumpFailure traps
+		  - add model and fwVersion to lhxConfigurationTable
+		  - add sensorName to sensorConfigurationTable
+		  - support valvePosition sensor type
+		  - add sysContact, sysName, sysLocation to all traps"
+
+    
+    REVISION	 "201208130000Z"      -- August 13, 2012
+
+    DESCRIPTION  "Extend LHX MIB:
+    	    	  - add maximumCoolingState
+		  - add alertState
+		  - add defaultFanSpeed
+		  - make defaultFanSpeed read-writable"
+
+    REVISION	 "201105030000Z"      -- May 3, 2011
+
+    DESCRIPTION  "The first version of the MIB."
+
+		 ::= { enterprises 13742 }
+
+
+lhxgw		OBJECT IDENTIFIER ::= { raritan 9 }
+
+traps           OBJECT IDENTIFIER ::= { lhxgw 0 }
+configuration   OBJECT IDENTIFIER ::= { lhxgw 1 }
+measurements	OBJECT IDENTIFIER ::= { lhxgw 2 }
+conformance     OBJECT IDENTIFIER ::= { lhxgw 3 }
+
+lhx  	    	OBJECT IDENTIFIER ::= { configuration 3 }
+gwSensors     	OBJECT IDENTIFIER ::= { configuration 4 }
+
+trapInformation OBJECT IDENTIFIER ::= { traps 0 }
+
+compliances     OBJECT IDENTIFIER ::= { conformance 1 }
+groups          OBJECT IDENTIFIER ::= { conformance 2 }
+
+
+-- Textual Conventions
+
+OperationalStateEnumeration
+	::= TEXTUAL-CONVENTION
+	STATUS		current
+	DESCRIPTION
+	    "The operational states of an lhx controller."
+	SYNTAX INTEGER {
+		disconnected(0),
+		offline(1),
+		online(2)
+	}
+
+GwSensorTypeEnumeration
+	::= TEXTUAL-CONVENTION
+	STATUS		current
+	DESCRIPTION
+	    "The types an lhx sensor can be."
+	SYNTAX INTEGER {
+		airTemperature(0),
+		waterTemperature(1),
+		fanSpeed(2),
+		doorContact(3),
+		valvePosition(4)
+	}
+
+SensorUnitsEnumeration
+	::= TEXTUAL-CONVENTION
+	STATUS		current
+	DESCRIPTION
+	    "The units an lhx sensor can be."
+	SYNTAX INTEGER {
+		none(-1),
+                other(0),
+                volt(1),
+                amp(2),
+                watt(3),
+                voltamp(4),
+                wattHour(5),
+                voltampHour(6),
+                degreeC(7),
+                hertz(8),
+                percent(9),
+                meterpersec(10),
+                pascal(11),
+                psi(12),
+                g(13),
+                degreeF(14),
+                feet(15),
+                inches(16),
+                cm(17),
+                meters(18),
+		rpm(19)
+	}
+						
+SensorStateEnumeration
+	::= TEXTUAL-CONVENTION
+	STATUS		current
+	DESCRIPTION
+	    "The states a sensor can be in."
+	SYNTAX INTEGER {
+                unavailable(-1),
+                open(0),
+                closed(1),
+                belowLowerCritical(2),
+                belowLowerWarning(3),
+                normal(4),
+                aboveUpperWarning(5),
+                aboveUpperCritical(6),
+                on(7),
+                off(8),
+                detected(9),
+                notDetected(10),
+                alarmed(11)
+	}
+
+-- the traps
+
+lhxSensorFailure
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+    	    	probeId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "A sensor failure (broken or short circuit) occurred."
+    	::= { traps 1 }
+
+lhxFanFailure
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+    	    	fanId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "A fan motor failure occurred."
+    	::= { traps 2 }
+
+lhxPowerSupplyFailure
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+    	    	powerSupplyId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "A power supply failure occurred."
+    	::= { traps 3 }
+
+lhxThresholdAirOutlet
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The air outlet temperature threshold was crossed."
+    	::= { traps 4 }
+
+lhxThresholdAirInlet
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The air inlet temperature threshold was crossed."
+    	::= { traps 5 }
+
+lhxThresholdWaterInlet
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The water inlet temperature threshold was crossed."
+    	::= { traps 6 }
+
+lhxDoorOpened
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The door was opened."
+    	::= { traps 7 }
+
+lhxMaximumCoolingRequest
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "Maximum cooling was requested."
+    	::= { traps 8 }
+
+lhxEmergencyCooling
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "Emergency cooling was activated."
+    	::= { traps 9 }
+
+lhxWaterLeak
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "Water leakage was detected."
+    	::= { traps 10 }
+
+lhxThresholdHumidity
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The humidity threshold was crossed."
+    	::= { traps 11 }
+
+lhxExternalWaterCoolingFailure
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "An external water cooling failure occurred."
+    	::= { traps 12 }
+
+lhxThresholdWaterOutlet
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The water outlet temperature threshold was crossed."
+    	::= { traps 13 }
+
+lhxParameterDataLoss
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "Data loss in parameter memory was detected."
+    	::= { traps 14 }
+
+lhxStBusError
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "An ST-Bus communication error was detected."
+    	::= { traps 15 }
+	
+lhxCollectiveFault
+    	NOTIFICATION-TYPE
+    	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+           agentInetPortNumber,
+	    	lhxErrorCode,
+    	    	portId,
+           deviceSerialNumber
+    	}
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "An error was detected."
+    	::= { traps 16 }
+
+gwSensorStateChange
+    	NOTIFICATION-TYPE
+        OBJECTS {
+	    	deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+                deviceInetAddressType,
+                deviceInetIPAddress,
+                agentInetPortNumber,
+		portId,
+		sensorTypeId,
+		sensorId,
+    	    	probeId,
+                measurementsSensorTimeStamp,
+                measurementsSensorValue,
+                measurementsSensorState,
+                oldSensorState,
+                deviceSerialNumber
+	}
+        STATUS	    	current
+        DESCRIPTION
+            "Sensor State Change."
+        ::= { traps 17 }
+
+gwLhxOperationalStateChange
+    	NOTIFICATION-TYPE
+        OBJECTS {
+	    	deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+                deviceInetAddressType,
+                deviceInetIPAddress,
+                agentInetPortNumber,
+		portId,
+		operationalState,
+                oldOperationalState,
+           deviceSerialNumber
+	}
+        STATUS	    	current
+        DESCRIPTION
+            "Operational State Change."
+        ::= { traps 18 }
+
+lhxVoltageLow
+	NOTIFICATION-TYPE
+	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+		deviceInetAddressType,
+		deviceInetIPAddress,
+           agentInetPortNumber,
+		lhxErrorCode,
+		portId,
+           deviceSerialNumber
+	}
+	STATUS		current
+	DESCRIPTION
+	    "The supply voltage of an LHX became low."
+	::= { traps 19 }
+
+lhxBaseElectronicsFailure
+	NOTIFICATION-TYPE
+	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+		deviceInetAddressType,
+		deviceInetIPAddress,
+           agentInetPortNumber,
+		lhxErrorCode,
+		portId,
+           deviceSerialNumber
+	}
+	STATUS		current
+	DESCRIPTION
+	    "The base electronics of an LHX controller failed."
+	::= { traps 20 }
+
+lhxCondenserPumpFailure
+	NOTIFICATION-TYPE
+	OBJECTS {
+		deviceName,
+                sysContact,
+                sysName,
+                sysLocation,
+		deviceInetAddressType,
+		deviceInetIPAddress,
+		lhxErrorCode,
+           agentInetPortNumber,
+		portId,
+           deviceSerialNumber
+	}
+	STATUS		current
+	DESCRIPTION
+	    "An LHX condenser pump failed."
+	::= { traps 21 }
+
+-- the TrapInformation
+
+deviceName
+    	OBJECT-TYPE
+    	SYNTAX	    	DisplayString
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The user-defined name for the Device."
+    	::= { trapInformation 1 }
+
+deviceInetAddressType
+    	OBJECT-TYPE
+    	SYNTAX	    	InetAddressType
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The type of address format"
+    	::= { trapInformation 2 }
+
+deviceInetIPAddress
+    	OBJECT-TYPE
+    	SYNTAX	    	InetAddress
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The current IP address. A value of 0.0.0.0 indicates an
+    	     error or an unset option."
+    	::= { trapInformation 3 }
+
+lhxErrorCode
+    	OBJECT-TYPE
+    	SYNTAX	    	DisplayString
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The LHX error code (F1 -  F25, EP)."
+    	::= { trapInformation 4 }
+
+portId OBJECT-TYPE
+    	SYNTAX        Integer32(1..256)
+    	MAX-ACCESS    accessible-for-notify
+    	STATUS        current
+    	DESCRIPTION
+    	    "A unique value for the physical port, the LHX controlller
+	     is connected to.
+	     Its value ranges between 1 and the value of portCount."
+    	::= { trapInformation 5 }
+
+probeId
+    	OBJECT-TYPE
+    	SYNTAX	    	DisplayString
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The physical Sensor ID (F1 - F7)."
+    	::= { trapInformation 6 }
+
+
+fanId	OBJECT-TYPE
+    	SYNTAX	    	DisplayString
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The Fan ID (M1 - M6)."
+    	::= { trapInformation 7 }
+
+
+powerSupplyId
+    	OBJECT-TYPE
+    	SYNTAX	    	DisplayString
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The Power Supply ID (1, 2)."
+    	::= { trapInformation 8 }
+
+oldSensorState
+    	OBJECT-TYPE
+        SYNTAX	    	SensorStateEnumeration
+        MAX-ACCESS  	accessible-for-notify
+        STATUS	    	current
+        DESCRIPTION
+            "The old sensor state used in Sensor State Transition traps."
+        ::= { trapInformation 9 }
+
+sensorTypeId
+    	OBJECT-TYPE
+        SYNTAX        GwSensorTypeEnumeration
+        MAX-ACCESS    accessible-for-notify
+        STATUS        current
+        DESCRIPTION
+            "A unique value for the type of sensor."
+        ::= { trapInformation 10 }
+
+sensorId
+    	OBJECT-TYPE
+        SYNTAX        Integer32(1..256)
+        MAX-ACCESS    accessible-for-notify
+        STATUS        current
+        DESCRIPTION
+            "A unique value for each sensor. Its value
+             ranges between 1 and the value of sensorCount."
+        ::= { trapInformation 11 }
+	
+oldOperationalState
+    	OBJECT-TYPE
+    	SYNTAX	    	OperationalStateEnumeration
+    	MAX-ACCESS  	read-only
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The old operational state used in Operational State Transition traps."
+    	DEFVAL {0}
+    	::= { trapInformation 12 }
+
+agentInetPortNumber   OBJECT-TYPE
+                      SYNTAX        InetPortNumber
+                      MAX-ACCESS    accessible-for-notify
+                      STATUS        current
+                      DESCRIPTION
+                          "The UDP port number used for accessing 
+                              the SNMP agent on the device.
+                              Examples: 
+                                   If the associated device MIB (PX2-MIB, EMD-MIB) has deviceCascadeType set to portForwarding, then
+                                       master: 50500
+                                       slave 1:50501
+                                       slave 2: 50502
+                                       ...... 
+                                   If cascading mode is not portForwarding and default (Standard) ports are being used, then
+                                        port: 161
+                                                       
+                            "
+         ::= { trapInformation 13  }  
+
+
+deviceSerialNumber
+    	OBJECT-TYPE
+    	SYNTAX	    	DisplayString
+    	MAX-ACCESS  	accessible-for-notify
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The serial number of the Device."
+    	::= { trapInformation 14 }
+
+	
+-- the LHX configuration
+
+portCount
+    	OBJECT-TYPE
+    	SYNTAX	    	Integer32(1..255)
+    	MAX-ACCESS  	read-only
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The number of lhx units supported."
+    	::= { configuration 1 }
+
+sensorCountTable
+    	OBJECT-TYPE
+        SYNTAX	    	SEQUENCE OF SensorCountEntryStruct
+        MAX-ACCESS  	not-accessible
+        STATUS	    	current
+        DESCRIPTION
+            "A list of lhx sensor count extries."
+        ::= { configuration 2 }
+
+sensorCountEntry
+    	OBJECT-TYPE
+        SYNTAX	    	SensorCountEntryStruct
+        MAX-ACCESS  	not-accessible
+        STATUS	    	current
+        DESCRIPTION
+            "An entry containing the number of lhx sensors of a certain type."
+        INDEX	    	{ portIdx, sensorTypeIdx }
+        ::= { sensorCountTable 1 }
+
+SensorCountEntryStruct
+    	::= SEQUENCE {
+		sensorCount Integer32
+    	}
+
+sensorCount
+    	OBJECT-TYPE
+    	SYNTAX	    	Integer32
+    	MAX-ACCESS  	read-only
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The number of sensors."
+    	::= { sensorCountEntry 1 }
+
+-- lhx centric configuration
+
+lhxConfigurationTable
+    	OBJECT-TYPE
+        SYNTAX	    	SEQUENCE OF LhxConfigurationEntryStruct
+        MAX-ACCESS  	not-accessible
+        STATUS	    	current
+        DESCRIPTION
+            "A list of lhx controller configuration extries.
+             The number of entries is given by the value of portCount."
+        ::= { lhx 1 }
+
+lhxConfigurationEntry
+    	OBJECT-TYPE
+        SYNTAX	    	LhxConfigurationEntryStruct
+        MAX-ACCESS  	not-accessible
+        STATUS	    	current
+        DESCRIPTION
+            "An entry containing parameters for an lhx."
+        INDEX	    	{ portIdx }
+        ::= { lhxConfigurationTable 1 }
+
+LhxConfigurationEntryStruct
+    	::= SEQUENCE {
+	    	operationalState    OperationalStateEnumeration,
+		setpointVentilators Integer32,
+		setpointWaterValve  Integer32,
+		defaultFanSpeed     Integer32,
+		maximumCoolingState TruthValue,
+		alertState  	    TruthValue,
+		model	    	    DisplayString,
+		fwVersion   	    DisplayString
+    	}
+
+operationalState
+    	OBJECT-TYPE
+    	SYNTAX	    	OperationalStateEnumeration
+    	MAX-ACCESS  	read-write
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The operational state of the lhx controller.
+	     To switch LHX power state while controller is connected,
+	     set operationalState to 1 (off) or 2 (on).
+	     Switching power state while LHX is disconnected or to 
+	     0 (disconnected) is undefined."
+    	DEFVAL {0}
+    	::= { lhxConfigurationEntry 1 }
+
+setpointVentilators
+    	OBJECT-TYPE
+    	SYNTAX	    	Integer32
+    	MAX-ACCESS  	read-write
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The setpoint of the ventilators."
+    	DEFVAL {0}
+    	::= { lhxConfigurationEntry 2 }
+
+setpointWaterValve
+    	OBJECT-TYPE
+    	SYNTAX	    	Integer32
+    	MAX-ACCESS  	read-write
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The setpoint of the water valve."
+    	DEFVAL {0}
+    	::= { lhxConfigurationEntry 3 }
+
+defaultFanSpeed
+    	OBJECT-TYPE
+    	SYNTAX	    	Integer32
+    	MAX-ACCESS  	read-write
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "The 'default' fan speed during normal operation in per mill.
+	     Default is 80% (= 800)."
+    	DEFVAL {0}
+    	::= { lhxConfigurationEntry 4 }
+
+maximumCoolingState
+    	OBJECT-TYPE
+	SYNTAX	    	TruthValue
+    	MAX-ACCESS  	read-write
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "Indicates whether maximum cooling was requested or not.
+	     To request maximum cooling, set maximumCoolingState to 1 (true).
+	     Setting maximumCoolingState to 2 (false) is undefined,
+	     set alertState to 2 (false) instead."
+    	DEFVAL {2}
+    	::= { lhxConfigurationEntry 5 }
+
+alertState
+    	OBJECT-TYPE
+	SYNTAX	    	TruthValue
+    	MAX-ACCESS  	read-write
+    	STATUS	    	current
+    	DESCRIPTION
+    	    "Indicates whether LHX controler is in alert state or not.
+	     To acknowledge alert status, set alertState to 2 (false).
+	     Setting alertState to 1 (true) is undefined."
+    	DEFVAL {2}
+    	::= { lhxConfigurationEntry 6 }
+
+model
+	OBJECT-TYPE
+	SYNTAX	    	DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+	    "The model indentifier of an LHX controller."
+	::= { lhxConfigurationEntry 7 }
+
+fwVersion
+	OBJECT-TYPE
+	SYNTAX	    	DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+	    "The firmware version of an LHX controller."
+	::= { lhxConfigurationEntry 8 }
+
+-- sensor centric configuration
+
+sensorConfigurationTable
+    	OBJECT-TYPE
+        SYNTAX	    	SEQUENCE OF SensorConfigurationEntryStruct
+        MAX-ACCESS  	not-accessible
+        STATUS	    	current
+        DESCRIPTION
+            "A list of lhx sensor configuration extries.
+             The number of entries is given by the value of portCount."
+        ::= { gwSensors 1 }
+
+sensorConfigurationEntry
+    	OBJECT-TYPE
+	SYNTAX	    	SensorConfigurationEntryStruct
+	MAX-ACCESS  	not-accessible
+	STATUS	    	current
+	DESCRIPTION
+            "An entry containing parameters for an lhx."
+	INDEX         { portIdx, sensorTypeIdx, sensorIdx }
+	::= { sensorConfigurationTable 1 }
+
+SensorConfigurationEntryStruct
+    	::= SEQUENCE {
+	    	portIdx     	    	    	Integer32,
+        	sensorTypeIdx    	    	Integer32,
+		sensorIdx   	    	    	Integer32,
+        	sensorLabel                 	DisplayString,
+        	sensorUnit  	    	    	SensorUnitsEnumeration,
+        	sensorDecimalDigits             Unsigned32,
+        	sensorMaximum                   Integer32,
+        	sensorMinimum                   Integer32,
+        	sensorHysteresis                Unsigned32,
+        	sensorLowerCriticalThreshold    Integer32,
+        	sensorLowerWarningThreshold     Integer32,
+        	sensorUpperCriticalThreshold	Integer32,
+        	sensorUpperWarningThreshold     Integer32,
+        	sensorEnabledThresholds         BITS,
+        	sensorThresholdMaximum          Integer32,
+	sensorThresholdMinimum          Integer32,
+		sensorName  	    	    	DisplayString
+        }
+
+portIdx
+    	OBJECT-TYPE
+        SYNTAX        Integer32(1..256)
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "A unique value for each port. Its value
+             ranges between 1 and the value of portCount."
+        ::= { sensorConfigurationEntry 1 }
+
+sensorTypeIdx
+    	OBJECT-TYPE
+        SYNTAX        Integer32(0..255)
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "A unique value for the type of sensor."
+        ::= { sensorConfigurationEntry 2 }
+
+sensorIdx
+    	OBJECT-TYPE
+        SYNTAX        Integer32(1..256)
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "A unique value for each sensor. Its value
+             ranges between 1 and the value of sensorCount."
+        ::= { sensorConfigurationEntry 3 }
+
+sensorLabel
+    	OBJECT-TYPE
+        SYNTAX        DisplayString
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The short ID of the sensor (e.g. F1, M2)."
+        ::= { sensorConfigurationEntry 4 }
+
+sensorUnit
+    	OBJECT-TYPE
+        SYNTAX        SensorUnitsEnumeration
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The base units.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 5 }
+
+sensorDecimalDigits
+    	OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The number of digits displayed to the right of the decimal point.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 6 }
+
+sensorMaximum
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The largest possible value.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 7 }
+
+sensorMinimum
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The smallest possible value.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 8 }
+
+sensorHysteresis
+    	OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The hysteresis used for deassertions.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 9 }
+
+sensorLowerCriticalThreshold
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The lower critical threshold.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 10 }
+
+sensorLowerWarningThreshold
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The lower non-critical (warning) threshold.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 11 }
+
+sensorUpperCriticalThreshold
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The upper critical  threshold.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 12 }
+
+sensorUpperWarningThreshold
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "The upper non-critical (warning) threshold.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 13 }
+
+sensorEnabledThresholds
+    	OBJECT-TYPE
+        SYNTAX BITS {
+    	    	lowerCritical(0),
+                lowerWarning(1),
+                upperWarning(2),
+                upperCritical(3)
+    	}
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+            "A bit string which indicates which thresholds are enabled.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 14 }
+
+sensorThresholdMaximum
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The largest possible threshold value.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 15 }
+
+sensorThresholdMinimum
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The smallest possible threshold value.
+             The value of this OID variable should be scaled by
+             sensorDecimalDigits.  For example, if the value is 1 and
+             sensorDecimalDigits is 2, then actual value is 0.01.
+             This parameter does not apply to state sensors."
+        ::= { sensorConfigurationEntry 16 }
+
+sensorName
+	OBJECT-TYPE
+        SYNTAX        DisplayString
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The descriptive ID of the sensor (e.g. Fan Speed 1)."
+        ::= { sensorConfigurationEntry 17 }
+
+-- the Sensor Measurements table
+
+sensorMeasurementsTable
+    	OBJECT-TYPE
+    	SYNTAX        SEQUENCE OF SensorMeasurementsEntryStruct
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "A list of external sensor entries. The number of
+             entries is given by the value of sensorCount
+             for the LHX."
+        ::= { measurements 1 }
+
+sensorMeasurementsEntry
+    	OBJECT-TYPE
+    	SYNTAX        SensorMeasurementsEntryStruct
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION
+            "An entry containing measurement objects for an external sensor."
+        INDEX         { portIdx, sensorTypeIdx, sensorIdx }
+        ::= { sensorMeasurementsTable 1 }
+
+SensorMeasurementsEntryStruct
+    	::= SEQUENCE {
+    	    	measurementsSensorIsAvailable	TruthValue,
+        	measurementsSensorState     	SensorStateEnumeration,
+        	measurementsSensorValue     	Integer32,
+        	measurementsSensorTimeStamp 	Unsigned32
+    	}
+
+measurementsSensorIsAvailable
+    	OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "Is the sensor available?"
+        ::= { sensorMeasurementsEntry 1 }
+
+measurementsSensorState
+    	OBJECT-TYPE
+        SYNTAX        SensorStateEnumeration
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The sensor state."
+        ::= { sensorMeasurementsEntry 2 }
+
+measurementsSensorValue
+    	OBJECT-TYPE
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The sensor reading.
+             This parameter does not apply to state sensors."
+        ::= { sensorMeasurementsEntry 3 }
+
+measurementsSensorTimeStamp
+    	OBJECT-TYPE
+        SYNTAX        Unsigned32
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION
+            "The sensor reading timestamp."
+        ::= { sensorMeasurementsEntry 4 }
+	
+-- Conformance Information
+-- compliance statements
+
+complianceRev1
+    	MODULE-COMPLIANCE
+        STATUS	    	current
+        DESCRIPTION
+            "The requirements for conformance to the LHX-MIB."
+        MODULE -- this module
+
+        GROUP configurationGroup
+        DESCRIPTION
+            "The configuration group."
+
+        GROUP measurementsGroup
+        DESCRIPTION
+            "The measurements group."
+
+        GROUP trapInformationGroup
+        DESCRIPTION
+            "The information group."
+
+        GROUP trapsGroup
+        DESCRIPTION
+            "The traps group."
+
+        ::= { compliances 1 }
+
+-- units of conformance
+
+configurationGroup
+    	OBJECT-GROUP
+        OBJECTS {
+		portCount,
+    	    	portId,
+		operationalState,
+		sensorCount,
+        	sensorLabel,
+        	sensorUnit,
+        	sensorDecimalDigits,
+        	sensorMaximum,
+        	sensorMinimum,
+        	sensorHysteresis,
+        	sensorLowerCriticalThreshold,
+        	sensorLowerWarningThreshold,
+        	sensorUpperCriticalThreshold,
+        	sensorUpperWarningThreshold,
+        	sensorEnabledThresholds,
+		setpointVentilators,
+		setpointWaterValve,
+		defaultFanSpeed,
+		maximumCoolingState,
+		alertState,
+		sensorThresholdMaximum,
+		sensorThresholdMinimum,
+		model,
+		fwVersion,
+		sensorName
+    	}
+        STATUS	    	current
+        DESCRIPTION
+            "A collection of objects representing configuration data."
+        ::= { groups 1 }
+
+measurementsGroup
+    	OBJECT-GROUP
+        OBJECTS {
+    	    	measurementsSensorIsAvailable, 	
+    	    	measurementsSensorState,	
+    	    	measurementsSensorValue,	
+    	    	measurementsSensorTimeStamp	
+    	}
+        STATUS	    	current
+        DESCRIPTION
+            "A collection of objects providing the measurement
+             capability of LHX."
+        ::= { groups 2 }
+
+trapInformationGroup
+    	OBJECT-GROUP
+        OBJECTS {
+		deviceName,
+    	    	deviceInetAddressType,
+    	    	deviceInetIPAddress,
+	    	lhxErrorCode,
+		portId,
+    	    	probeId,
+		fanId,
+		powerSupplyId,
+    	    	oldSensorState,
+		sensorTypeId,
+		sensorId,
+		oldOperationalState,
+           agentInetPortNumber,
+           deviceSerialNumber
+    	}
+        STATUS	    	current
+        DESCRIPTION
+            "A collection of objects providing
+             information in the traps."
+        ::= { groups 3 }
+
+trapsGroup
+    	NOTIFICATION-GROUP
+        NOTIFICATIONS {
+		lhxSensorFailure,
+		lhxFanFailure,
+		lhxPowerSupplyFailure,
+		lhxThresholdAirOutlet,
+		lhxThresholdAirInlet,
+		lhxThresholdWaterInlet,
+		lhxDoorOpened,
+		lhxMaximumCoolingRequest,
+		lhxEmergencyCooling,
+		lhxWaterLeak,
+		lhxThresholdHumidity,
+		lhxExternalWaterCoolingFailure,
+		lhxThresholdWaterOutlet,
+		lhxParameterDataLoss,
+		lhxStBusError,
+		lhxCondenserPumpFailure,
+		gwSensorStateChange,
+		gwLhxOperationalStateChange,
+		lhxCollectiveFault,
+		lhxVoltageLow,
+		lhxBaseElectronicsFailure
+    	}
+        STATUS	    	current
+        DESCRIPTION
+                "A collection of traps."
+        ::= { groups 4 }
+
+END

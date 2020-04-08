@@ -1,0 +1,329 @@
+--*****************************************************************************
+--                                                                          
+--    Copyright 2014 Electroline Equipment Inc                                   
+--    All Rights Reserved       
+--                                                                          
+--*****************************************************************************
+--    Filename: ELECTROLINE-COMMON-TEST.mib
+--    Author:   Alain Leclerc
+--    Creation Date: 2014.01.14
+--*****************************************************************************
+--    Description:
+--
+--	This file contains the SNMPv2 MIB definition of the test branch 
+--      for the electroline products.
+--		
+--*****************************************************************************
+--   Revision History:
+--   2014.01.14	Alain Leclerc			First Draft
+--*****************************************************************************
+
+ELECTROLINE-COMMON-TEST-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32
+        FROM SNMPv2-SMI
+    RowStatus, TruthValue, DateAndTime
+        FROM SNMPv2-TC        
+    commonPrivate
+        FROM ELECTROLINE-COMMON-ROOT-MIB
+    DisplayString
+    	FROM RFC1213-MIB
+    SnmpAdminString
+        FROM SNMP-FRAMEWORK-MIB;   -- RFC 3411;   
+
+TenthCelsius ::= TEXTUAL-CONVENTION
+     DISPLAY-HINT "d-1"
+     STATUS       current
+     DESCRIPTION
+         "This data type represents Temperature that are normally
+          expressed in Celsius.  Units are in tenths of a Celsius;
+          for example, 5.1 Celsius will be represented as 51."
+     SYNTAX       Integer32                                                              
+                                                              
+swMode OBJECT-TYPE
+    SYNTAX   	INTEGER {normal(0), testOnly(1), cmOnly(2), scanFeatureInDiagnosticMode(30)}   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This MIB can be used to control the software activity of the DVM
+        - In Normal mode, the device performs as programmed.
+        - In testOnly mode, the device stops all monitoring activity and 
+          populates only the test and calibration MIBS.
+        - In cmOnly mode, the device performs as a plain cable modem. All
+          other features are disabled.
+          
+        The value of this MIB is stored in non-volatile memory.
+        
+        Note that the MODE jumper previously used to access testOnly 
+        mode, now is used as an override for the swMode.
+        To have access to set this mode, the brcm factory mib must be enable.
+        Otherwise, read only"
+    ::= { commonPrivate 1 }
+                                                              
+                                                              
+-- ****************************************************************************
+-- * Definition of dvmTest Sub-groups
+-- ****************************************************************************
+prodTest OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Group of production tests objects related to all  models"
+	::= { commonPrivate 2 } 
+
+prodInventory   OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Group of inventory objects related to all models"
+ 	::= { prodTest 1}         
+
+prodInvHwType OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Hardware Model Identification Number. This information is used by the 
+       software to differentiate the hardware platform on which it is running.
+       For example, the HMS022 compatible version and the legacy version of the DHT
+       have different hardware types."
+    ::= { prodInventory 1 }
+
+prodInvHwMinorRev OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Hardware Revision Identification Number, representing the PCB version 
+       and / or the assembly modification level."
+    ::= { prodInventory 2 }
+
+prodInvHwMajorRev OBJECT-TYPE
+	SYNTAX 		INTEGER
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"This information is used to represent a family of hardware revisions.
+		 Major functional changes will trigger a modification of this value"
+	::= { prodInventory 3 }
+
+prodInvHwDrvRev OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This information is used to track any changes in the manufacturing process
+	    not covered by a PCB/Assembly revision and that have an impact on the drivers.
+       "
+    ::= { prodInventory 4 }
+
+prodModelNumber  OBJECT-TYPE
+     SYNTAX OCTET STRING (SIZE(0..255))
+     ACCESS read-write
+     STATUS current
+     DESCRIPTION 
+          "Displays the private electroline model number. 
+          Displayed in human-readable format."
+     ::= { prodInventory 5 }
+
+--*****************************************************************************
+-- * MANUFACTURING INVENTORY DATA
+-- *
+-- * This section contains additional manufacturing process related information 
+-- * for tracking purposes.
+--*****************************************************************************
+prodManufacturingInfo OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Electroline Private sub-tree to access manufacturing information"
+	::= { prodInventory 10 }
+
+prodMfcDateTime OBJECT-TYPE
+	SYNTAX 		DateAndTime
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"Date and time when this unit was tested (in a string format)."
+	::= { prodManufacturingInfo 1 }
+
+prodMfcTestSwVersion OBJECT-TYPE
+	SYNTAX 		OCTET STRING
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"Version of the test station on which this unit was tested."
+	::= { prodManufacturingInfo 2 }
+
+prodConfiguration	OBJECT-IDENTITY
+     STATUS current
+	DESCRIPTION "Electroline production configuration branch"
+::= { prodTest 2}
+
+-- ****************************************************************************
+-- * Definition of Configuration Sub-groups
+-- ****************************************************************************
+prodFormatFlash OBJECT-TYPE
+	SYNTAX INTEGER  {format(1)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This mib triggers the formating of the last blocks of the two 
+		flash banks.  These section contains the dht logs"
+	::= {prodConfiguration 1}      
+
+prodDocsisMode OBJECT-TYPE
+	SYNTAX INTEGER {docsis(1), euroDocsis(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		" 1 Set the Dht in DOCSIS mode
+		  2 Set the Dht in EuroDOCSIS mode
+			DEFAULT = 1  
+		"
+	::= {prodConfiguration 2} 
+
+ledsControl  OBJECT-IDENTITY
+    STATUS current
+	DESCRIPTION "Electroline manufacturing test leds group"
+	::= { prodTest 3 }
+
+ledsControlTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF LedsControlEntry
+     MAX-ACCESS  not-accessible
+     STATUS current
+     DESCRIPTION
+          "Provides Read/Write access to Leds port."
+     ::= { ledsControl 1 }
+
+ledsControlEntry OBJECT-TYPE
+     SYNTAX LedsControlEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+          "Led Control index and value."
+     INDEX { ledId }
+     ::= { ledsControlTable 1 }
+
+LedsControlEntry ::=
+     SEQUENCE
+     {
+          ledId
+               INTEGER,
+
+          ledState
+               INTEGER,
+               
+          ledDesc
+          	OCTET STRING
+     }
+
+ledId OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the le led Control value table."
+     ::= { ledsControlEntry 1 }
+
+ledState OBJECT-TYPE
+     SYNTAX INTEGER (0..2)
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "Control of the LED
+          0: Unknown state
+          1: OFF
+          2: ON
+
+          Note: Get on this mib always return Unknown state because
+          we cannot know internally what is the state of the led.         
+		  Note that inverse polarity is taken into account."
+
+     ::= { ledsControlEntry 2 }
+
+ledDesc OBJECT-TYPE
+     SYNTAX OCTET STRING
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Gives the name of the current PortId"
+     ::= { ledsControlEntry 3 }
+ 
+elineSpectrumAnalyzer OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Test function related to the spectrum analyzer"
+	::= { commonPrivate 3 }     
+	
+plantPower OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Test group to calculate the total power between 2 frequencies."
+	::= { elineSpectrumAnalyzer 1 } 
+
+plantPowerStartFrequency OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Fisrt frequency of the span to calculate in Hz
+       "
+    ::= { plantPower 1 }
+
+plantPowerStopFrequency OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Last frequency of the span to calculate in Hz
+       "
+    ::= { plantPower 2 }
+
+plantPowerNbAverage OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Number of FFT to perform and average the result
+       "
+    ::= { plantPower 3 }
+    
+plantPowerPower OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Return the calculated power in 0.01 dBmV.  Important, this function will hang the SNMP agent.  Be carrefull!
+       Also, the RBW used will be caluclated to get as near as possible to 2048 bins.  That we, we achieve the best
+       possible result within the span specified. You can look at the planPowerRbw and plantPowerNbBins mibs
+       to know the value used.
+       
+       Also, the FFT windows filter use is Hanning.  So do not expect to get the best result on analog channels."
+    ::= { plantPower 4 }
+       
+planPowerRBW OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Return the RBW used to make the last calculation"
+    ::= { plantPower 5 }
+       
+plantPowerNbBins OBJECT-TYPE
+    SYNTAX   	INTEGER   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Return the number of bins used to make the last calculation"
+    ::= { plantPower 6 }
+       
+privateStatus OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Status"
+	::= { commonPrivate 4 }        
+	
+dieTemperature OBJECT-TYPE
+    SYNTAX   	TenthCelsius   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Return the die temperature in tenth of Celsius read from the bcm chip internal temperature probe.  Note that only the 3383 has this probe."
+    ::= { privateStatus 1 }
+	
+END

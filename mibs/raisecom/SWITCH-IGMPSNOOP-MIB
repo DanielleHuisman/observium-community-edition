@@ -1,0 +1,293 @@
+--MibName=rcIgmpSnoop
+SWITCH-IGMPSNOOP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Integer32     	 			FROM SNMPv2-SMI
+    RowStatus,TruthValue		FROM SNMPv2-TC 
+    PortList,Vlanset,EnableVar	FROM SWITCH-TC 
+    dot1qVlanIndex,     
+    dot1qStaticMulticastAddress,
+    dot1qStaticMulticastReceivePort
+  					FROM Q-BRIDGE-MIB   
+    iscomSwitch	            	FROM RAISECOM-BASE-MIB;
+         
+rcIgmpSnoop MODULE-IDENTITY
+    LAST-UPDATED "0412200000Z"
+    ORGANIZATION "raisecom Group"
+    CONTACT-INFO
+            " 
+             Phone:  01082884499
+             Email:  support@raisecom.com"
+    DESCRIPTION
+            "The MIB module for igmp snooping."
+    REVISION      "0412200000Z"
+    DESCRIPTION
+            ""
+    ::= { iscomSwitch 11}   
+    
+------------------------------------------------------------------------------
+--
+--  rcCommonIgmpSnoop - IGMP Snooping Parameters
+--
+--  This group is used to instrument the Layer 2 IGMP Snooping support.
+--
+------------------------------------------------------------------------------
+--
+    rcIgmpSnoopEnable  OBJECT-TYPE
+        SYNTAX EnableVar
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "DURABLE: { enabled:all }
+             Setting this object to enabled(1) enables IGMP Snooping.  Setting
+             it to disabled(2) disables IGMP Snooping.
+             
+             Note that IGMP Snooping can function with or without GVRP and
+             GMRP enabled."  
+        DEFVAL {enable}
+        ::= { rcIgmpSnoop 1 }
+
+
+    rcIgmpSnoopAlerts  OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "DURABLE: { false }
+             Setting this object to true(1) enables the IP Router Alert
+             Option (as defined in RFC2113) for transmitted IGMP packets.
+             Setting it to false(2) disables this option."
+        ::= { rcIgmpSnoop 2 }
+
+    rcIgmpSnoopAging  OBJECT-TYPE
+        SYNTAX Integer32 (0|30..3600)
+        UNITS "second"
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "DURABLE: { 300 }
+             The timeout period in seconds for aging out Multicast Groups
+             dynamically learned with IGMP Snooping.  Note that aging operates
+             on a per interface per VLAN per multicast group basis.
+             0 means never aging"
+        ::= { rcIgmpSnoop 3 }
+
+    rcIgmpSnoopVlan  OBJECT-TYPE
+        SYNTAX Vlanset
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The enabled/disabled  status of igmp snooping of vlan."
+        ::= { rcIgmpSnoop 4 }        
+     
+    rcIgmpSnoopLeave  OBJECT-TYPE
+        SYNTAX Vlanset
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The enabled/disabled  status of igmp snooping immediate leave of vlan."
+        ::= { rcIgmpSnoop 5 }   
+           
+    rcIgmpSnoopFilter  OBJECT-TYPE
+        SYNTAX TruthValue
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "true indicates forward all unregistered multicast;
+             false indicates filter all unregistered multicast"
+        ::= { rcIgmpSnoop 6 } 
+        
+--     rcIgmpSnoopTable:multicast based on mac address,rfc2674q --
+    rcIgmpSnoopTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcIgmpSnoopEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table, which provides IGMP Snooping information, augments
+             the 'dot1qStaticMulticastTable' in the Q-MIB (RFC2674)."
+        ::= { rcIgmpSnoop 7 }
+
+    rcIgmpSnoopEntry OBJECT-TYPE
+        SYNTAX RcIgmpSnoopEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Displays by VLAN, Multicast Group, and Multicast receive port
+             the set of ports enabled to forward Multicast Group traffic as
+             determined by the IGMP Snooping task."
+    	INDEX   {
+       	 	dot1qVlanIndex,
+        	dot1qStaticMulticastAddress,
+        	dot1qStaticMulticastReceivePort
+    	}
+        ::= { rcIgmpSnoopTable 1 }
+
+    RcIgmpSnoopEntry ::= SEQUENCE {
+        rcIgmpSnoopEgressPorts   PortList
+    }
+
+    rcIgmpSnoopEgressPorts  OBJECT-TYPE
+        SYNTAX PortList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "This read-only object displays the set of ports enabled to
+             forward specific Multicast Group traffic as determined by the
+             IGMP Snooping task.
+            
+             It should be noted that the IGMP Snooping task generates a pseudo-
+             static (i.e., not saved in NVM) port list similar to the RFC2674
+             Q-MIB 'dot1qStaticMulticastStaticEgressPorts' object. Consequently,
+             a port will not be a member of 'rcCommonIgmpSnoopEgressPorts' if
+             it is a member of 'dot1qStaticMulticastForbiddenEgressPorts'."
+        ::= { rcIgmpSnoopEntry 1 }    
+
+--    rcIgmpSnoopMrouterTable --    
+    rcIgmpSnoopMrouterTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcIgmpSnoopMrouterEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table, which provides IGMP Snooping information, 
+            whitch is multicast router port."
+        ::= { rcIgmpSnoop 8 }
+
+    rcIgmpSnoopMrouterEntry OBJECT-TYPE
+        SYNTAX RcIgmpSnoopMrouterEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Displays by VLAN and Multicast router port."
+        INDEX { rcIgmpSnoopMrouterVlan, rcIgmpSnoopMrouterPort }
+        ::= { rcIgmpSnoopMrouterTable 1 }
+
+    RcIgmpSnoopMrouterEntry ::= SEQUENCE {
+        rcIgmpSnoopMrouterVlan   	INTEGER,
+        rcIgmpSnoopMrouterPort   INTEGER,
+        rcIgmpSnoopMrouterStatus 		RowStatus
+    	}
+
+	rcIgmpSnoopMrouterVlan OBJECT-TYPE
+		SYNTAX INTEGER
+		MAX-ACCESS not-accessible
+		STATUS current
+		DESCRIPTION
+			"the multicast router vlan."
+		::= { rcIgmpSnoopMrouterEntry 1 }
+		
+	rcIgmpSnoopMrouterPort OBJECT-TYPE
+		SYNTAX INTEGER 
+		MAX-ACCESS not-accessible
+		STATUS current
+		DESCRIPTION
+			"the multicast router port ."
+		::= { rcIgmpSnoopMrouterEntry 2 }
+		
+	rcIgmpSnoopMrouterStatus OBJECT-TYPE
+		SYNTAX RowStatus 
+		MAX-ACCESS read-create
+		STATUS current
+		DESCRIPTION
+			"the status of multicast router."
+		::= { rcIgmpSnoopMrouterEntry 3 }  
+		
+--     rcIgmpSnoopStaticMulticastTable:multicast based on ip address --
+rcIgmpSnoopStaticMulticastTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RcIgmpSnoopStaticMulticastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing filtering information for Multicast
+        and Broadcast IP addresses for each VLAN, configured
+        into the device by (local or network) management
+        specifying the set of ports to which frames received
+        from specific ports and containing specific Multicast
+        and Broadcast destination addresses are allowed to be
+        forwarded.  A value of zero in this table as the port
+        number from which frames with a specific destination
+        address are received, is used to specify all ports for
+        which there is no specific entry in this table for that
+        particular destination address.  Entries are valid for
+        Multicast and Broadcast addresses only."
+    ::= { rcIgmpSnoop 9 }
+
+rcIgmpSnoopStaticMulticastEntry OBJECT-TYPE
+    SYNTAX      RcIgmpSnoopStaticMulticastEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Filtering information configured into the device by
+        (local or network) management specifying the set of
+        ports to which frames received from this specific port
+        for this VLAN and containing this Multicast or Broadcast
+        destination address are allowed to be forwarded."
+    INDEX   {
+        dot1qVlanIndex,
+        rcIgmpSnoopStaticMulticastAddress
+    }
+    ::= { rcIgmpSnoopStaticMulticastTable 1 }
+
+RcIgmpSnoopStaticMulticastEntry ::=
+    SEQUENCE {
+        rcIgmpSnoopStaticMulticastAddress
+            IpAddress,
+        rcIgmpSnoopStaticMulticastStaticEgressPorts
+            PortList,
+        rcIgmpSnoopStaticMulticastStatus
+            INTEGER
+    }
+
+rcIgmpSnoopStaticMulticastAddress OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The destination IP address in a frame to which this
+        entry's filtering information applies.  This object must
+        take the value of a Multicast or Broadcast address."
+    ::= { rcIgmpSnoopStaticMulticastEntry 1 }
+
+rcIgmpSnoopStaticMulticastStaticEgressPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+
+    DESCRIPTION
+        "The set of ports to which frames received from a
+        specific port and destined for a specific Multicast or
+        Broadcast IP address must be forwarded, regardless of
+        any dynamic information e.g. from GMRP.  
+        The default value of this object is a string of ones of
+        appropriate length."
+    ::= { rcIgmpSnoopStaticMulticastEntry 2 }
+
+rcIgmpSnoopStaticMulticastStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    other(1),
+                    invalid(2),
+                    permanent(3),
+                    deleteOnReset(4),
+                    deleteOnTimeout(5)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the status of this entry.
+            other(1) - this entry is currently in use but
+                the conditions under which it will remain
+                so differ from the following values.
+            invalid(2) - writing this value to the object
+                removes the corresponding entry.
+            permanent(3) - this entry is currently in use
+                and will remain so after the next reset of
+                the bridge.
+
+            deleteOnReset(4) - this entry is currently in
+                use and will remain so until the next
+                reset of the bridge.
+            deleteOnTimeout(5) - this entry is currently in
+                use and will remain so until it is aged out."
+    DEFVAL      { permanent }
+    ::= { rcIgmpSnoopStaticMulticastEntry 3 }
+END

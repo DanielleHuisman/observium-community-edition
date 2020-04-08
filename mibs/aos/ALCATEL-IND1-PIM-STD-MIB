@@ -1,0 +1,3413 @@
+ALCATEL-IND1-PIM-STD-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    routingIND1Pim                  FROM ALCATEL-IND1-BASE
+    MODULE-IDENTITY, OBJECT-TYPE,
+    NOTIFICATION-TYPE, Unsigned32,
+    Counter32, Counter64, Gauge32, 
+    TimeTicks                        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION,
+    RowStatus, TruthValue,
+    StorageType                      FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP,
+    NOTIFICATION-GROUP               FROM SNMPv2-CONF
+    InterfaceIndexOrZero,
+    InterfaceIndex                   FROM IF-MIB
+    InetAddressType,
+    InetAddressPrefixLength,
+    InetAddress, InetVersion         FROM INET-ADDRESS-MIB
+    IANAipRouteProtocol              FROM IANA-RTPROTO-MIB;
+
+alaPimStdMIB MODULE-IDENTITY
+    LAST-UPDATED "200707020000Z"  -- 2 July 2007
+    ORGANIZATION "Alcatel-Lucent" 
+    CONTACT-INFO
+        "Please consult with Customer Service to insure the most appropriate
+         version of this document is used with the products in question:
+
+                 Alcatel-Lucent, Enterprise Solutions Division
+                (Formerly Alcatel Internetworking, Incorporated)
+                           26801 West Agoura Road
+                        Agoura Hills, CA  91301-5122
+                          United States Of America
+
+        Telephone:               North America  +1 800 995 2696
+                                 Latin America  +1 877 919 9526
+                                 Europe         +31 23 556 0100
+                                 Asia           +65 394 7933
+                                 All Other      +1 818 878 4507
+
+        Electronic Mail:         support@ind.alcatel.com
+        World Wide Web:          http://alcatel-lucent.com/wps/portal/enterprise
+        File Transfer Protocol:  ftp://ftp.ind.alcatel.com/pub/products/mibs"
+
+    DESCRIPTION
+        "This module describes an authoritative enterprise-specific Simple
+         Network Management Protocol (SNMP) Management Information Base (MIB):
+
+             This proprietary MIB contains management information for
+             the configuration of PIM routers.  This MIB is based on the
+             Internet Draft <draft-ietf-pim-mib-v2-10.txt> developed by
+             the IETF PIM Working Group. 
+
+         The right to make changes in specification and other information
+         contained in this document without prior notice is reserved.
+
+         No liability shall be assumed for any incidental, indirect, special, or
+         consequential damages whatsoever arising from or related to this
+         document or the information contained herein.
+
+         Vendors, end-users, and other interested parties are granted
+         non-exclusive license to use this specification in connection with
+         management of the products for which it is intended to be used.
+
+           Copyright (C) 1995-2007 Alcatel-Lucent
+                         ALL RIGHTS RESERVED WORLDWIDE"
+
+    REVISION     "200707020000Z" 
+    DESCRIPTION  "The latest version of this MIB Module."
+    ::= { routingIND1Pim 2 }
+
+--
+-- Textual Conventions
+--
+
+AlaPimMode ::= TEXTUAL-CONVENTION
+    STATUS     current
+    DESCRIPTION
+            "The PIM mode in which a group is operating.
+
+            none(1)      The group is not using PIM, which may be the
+                         case if, for example, it is a link-local or
+                         unroutable group address.
+
+            ssm(2)       Source-Specific Multicast (SSM) with PIM Sparse
+                         Mode.
+
+            asm(3)       Any Source Multicast (ASM), with PIM Sparse
+                         Mode.
+
+            bidir(4)     Bi-directional PIM.
+
+            dm(5)        PIM Dense Mode.
+
+            other(6)     Any other PIM mode."
+
+    SYNTAX     INTEGER {
+                  none(1),
+                  ssm(2),
+                  asm(3),
+                  bidir(4),
+                  dm(5),
+                  other(6)
+               }
+
+AlaPimGroupMappingOriginType ::= TEXTUAL-CONVENTION
+    STATUS     current
+    DESCRIPTION
+            "The mechanism by which a PIM group mapping was learned.
+
+            fixed(1)     Link-local or unroutable group mappings.
+
+            configRp(2)  Local static RP configuration.
+
+            configSsm(3) Local SSM Group configuration.
+
+            bsr(4)       The PIM Bootstrap Router (BSR) mechanism.
+
+            autoRP(5)    Cisco's Auto-RP mechanism.
+
+            embedded(6)  The Embedded-RP mechanism where the RP address
+                         is embedded in the multicast group address.
+
+            other(7)     Any other mechanism."
+
+    REFERENCE "RFC 3596, RFC 3956 and I-D.ietf-pim-sm-bsr"
+    SYNTAX     INTEGER {
+                  fixed(1),
+                  configRp(2),
+                  configSsm(3),
+                  bsr(4),
+                  autoRP(5),
+                  embedded(6),
+                  other(7)
+               }
+
+--
+-- Top-level structure
+--
+
+alaPimNotifications   OBJECT IDENTIFIER ::= { alaPimStdMIB 0 }
+alaPim                OBJECT IDENTIFIER ::= { alaPimStdMIB 1 }
+
+alaPimKeepalivePeriod OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The duration of the Keepalive Timer.  This is the period
+            during which the PIM router will maintain (S,G) state in the
+            absence of explicit (S,G) local membership or (S,G) join
+            messages received to maintain it.  This timer period is
+            called the Keepalive_Period in the PIM-SM specification.  It
+            is called the SourceLifetime in the PIM-DM specification.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    REFERENCE "RFC 4601 section 4.11"
+    DEFVAL { 210 }
+    ::= { alaPim 14 }
+
+alaPimRegisterSuppressionTime OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The duration of the Register Suppression Timer.  This is
+            the period during which a PIM Designated Router (DR) stops
+            sending Register-encapsulated data to the Rendezvous Point
+            (RP) after receiving a Register-Stop message.  This object
+            is used to run timers both at the DR and at the RP.  This
+            timer period is called the Register_Suppression_Time in the
+            PIM-SM specification.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    REFERENCE "RFC 4601 section 4.11"
+    DEFVAL { 60 }
+    ::= { alaPim 15 }
+
+alaPimStarGEntries OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the alaPimStarGTable."
+    ::= { alaPim 16 }
+
+alaPimStarGIEntries OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the alaPimStarGITable."
+    ::= { alaPim 17 }
+
+alaPimSGEntries OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the alaPimSGTable."
+    ::= { alaPim 18 }
+
+alaPimSGIEntries OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the alaPimSGITable."
+    ::= { alaPim 19 }
+
+alaPimSGRptEntries OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the alaPimSGRptTable."
+    ::= { alaPim 20 }
+
+alaPimSGRptIEntries OBJECT-TYPE
+    SYNTAX     Gauge32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of entries in the alaPimSGRptITable."
+    ::= { alaPim 21 }
+
+alaPimOutAsserts OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of Asserts sent by this router.
+            Discontinuities in the value of this counter can occur at
+            re-initialization of the management system, for example
+            when the device is rebooted."
+    REFERENCE "RFC 4601 section 4.6"
+    ::= { alaPim 22 }
+
+alaPimInAsserts OBJECT-TYPE
+    SYNTAX     Counter64
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of Asserts received by this router.  Asserts
+            are multicast to all routers on a network.  This counter is
+            incremented by all routers that receive an assert, not only
+            those routers that are contesting the assert.
+            
+            Discontinuities in the value of this counter can occur at
+            re-initialization of the management system, for example
+            when the device is rebooted."
+    REFERENCE "RFC 4601 section 4.6"
+    ::= { alaPim 23 }
+
+alaPimLastAssertInterface OBJECT-TYPE
+    SYNTAX     InterfaceIndexOrZero
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The interface on which this router most recently sent or
+            received an assert, or zero if this router has not sent or
+            received an assert."
+    REFERENCE "RFC 4601 section 4.6"
+    ::= { alaPim 24 }
+
+alaPimLastAssertGroupAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type of the multicast group address in the most
+            recently sent or received assert.  If this router has not
+            sent or received an assert then this object is set to
+            unknown(0)."
+    ::= { alaPim 25 }
+
+alaPimLastAssertGroupAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The multicast group address in the most recently sent or
+            received assert.  The InetAddressType is given by the
+            alaPimLastAssertGroupAddressType object."
+    ::= { alaPim 26 }
+
+alaPimLastAssertSourceAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type of the multicast source address in the
+            most recently sent or received assert.  If the most recent
+            assert was (*,G), or if this router has not sent or received
+            an assert, then this object is set to unknown(0)."
+    ::= { alaPim 27 }
+
+alaPimLastAssertSourceAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The multicast source address in the most recently sent or
+            received assert.  The InetAddressType is given by the
+            alaPimLastAssertSourceAddressType object."
+    ::= { alaPim 28 }
+
+alaPimNeighborLossNotificationPeriod OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The minimum time that must elapse between alaPimNeighborLoss
+            notifications originated by this router.  The maximum value
+            65535 represents an 'infinite' time, in which case no
+            alaPimNeighborLoss traps are ever sent.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    DEFVAL { 0 }
+    ::= { alaPim 29 }
+
+alaPimNeighborLossCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of neighbor loss events that have occurred.
+
+            This count is incremented when the neighbor timer expires,
+            and the router has no other neighbors on the same interface
+            with the same IP version and a lower IP address than itself.
+
+            This counter is incremented whenever a alaPimNeighborLoss 
+            notification would be generated.
+
+            Discontinuities in the value of this counter can occur at
+            re-initialization of the management system, for example
+            when the device is rebooted."
+    REFERENCE "RFC 4601 section 4.3.2"
+    ::= { alaPim 30 }
+
+alaPimInvalidRegisterNotificationPeriod OBJECT-TYPE
+    SYNTAX     Unsigned32 (10..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The minimum time that must elapse between
+            alaPimInvalidRegister notifications originated by this router. 
+            The default value of 65535 represents an 'infinite' time, in
+            which case no alaPimInvalidRegister notifications  are ever 
+            sent.
+
+            The non-zero minimum allowed value provides resilience
+            against propagation of denial-of-service attacks from the
+            data and control planes to the network management plane.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    DEFVAL { 65535 }
+    ::= { alaPim 31 }
+
+alaPimInvalidRegisterMsgsRcvd OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of invalid PIM Register messages that have been
+            received by this device.
+
+            A PIM Register message is invalid if either
+
+            o the destination address of the Register message does not
+            match the Group to RP mapping on this device, or
+
+            o this device believes the group address to be within an
+            SSM address range, but this Register implies ASM usage.
+
+            These conditions can occur transiently while RP mapping
+            changes propagate through the network.  If this counter is
+            incremented repeatedly over several minutes, then there is a
+            persisting configuration error that requires correction.
+
+            The active Group to RP mapping on this device is specified
+            by the object alaPimGroupMappingPimMode.  If there is no such
+            mapping, then the object alaPimGroupMappingPimMode is absent.
+            The RP address contained in the invalid Register is
+            alaPimInvalidRegisterRp.
+
+            Multicast data carried by invalid Register messages is
+            discarded.  The discarded data is from a source directly
+            connected to alaPimInvalidRegisterOrigin, and is addressed to
+            alaPimInvalidRegisterGroup.
+
+            Discontinuities in the value of this counter can occur at
+            re-initialization of the management system, for example
+            when the device is rebooted."
+    REFERENCE "RFC 4601 section 4.4.2, RFC 3569 and
+               I-D.ietf-mboned-ip-mcast-mib ipMcastSsmRangeTable"
+    ::= { alaPim 32 }
+
+alaPimInvalidRegisterAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type stored in alaPimInvalidRegisterOrigin,
+            alaPimInvalidRegisterGroup and alaPimInvalidRegisterRp.
+
+            If no unexpected Register messages have been received, then
+            this object is set to unknown(0)."
+    ::= { alaPim 33 }
+
+alaPimInvalidRegisterOrigin OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The source address of the last unexpected Register message
+            received by this device."
+    ::= { alaPim 34 }
+
+alaPimInvalidRegisterGroup OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The IP multicast group address to which the last unexpected
+            Register message received by this device was addressed."
+    ::= { alaPim 35 }
+
+alaPimInvalidRegisterRp OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The RP address to which the last unexpected Register
+            message received by this device was delivered."
+    ::= { alaPim 36 }
+
+alaPimInvalidJoinPruneNotificationPeriod OBJECT-TYPE
+    SYNTAX     Unsigned32 (10..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The minimum time that must elapse between
+            alaPimInvalidJoinPrune notifications originated by this router. 
+            The default value of 65535 represents an 'infinite' time, in
+            which case no alaPimInvalidJoinPrune notifications are ever 
+            sent.
+
+            The non-zero minimum allowed value provides resilience
+            against propagation of denial-of-service attacks from the
+            control plane to the network management plane.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    DEFVAL { 65535 }
+    ::= { alaPim 37 }
+
+alaPimInvalidJoinPruneMsgsRcvd OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of invalid PIM Join/Prune messages that have
+            been received by this device.
+
+            A PIM Join/Prune message is invalid if either
+
+            o the Group to RP mapping specified by this message does not
+            match the Group to RP mapping on this device, or
+
+            o this device believes the group address to be within an
+            SSM address range, but this Join/Prune (*,G) or (S,G,rpt)
+            implies ASM usage.
+
+            These conditions can occur transiently while RP mapping
+            changes propagate through the network.  If this counter is
+            incremented repeatedly over several minutes, then there is a
+            persisting configuration error that requires correction.
+
+            The active Group to RP mapping on this device is specified
+            by the object alaPimGroupMappingPimMode.  If there is no such
+            mapping, then the object alaPimGroupMappingPimMode is absent.
+            The RP address contained in the invalid Join/Prune is
+            alaPimInvalidJoinPruneRp.
+
+            Invalid Join/Prune messages are discarded.  This may result
+            in loss of multicast data affecting listeners downstream of
+            alaPimInvalidJoinPruneOrigin, for multicast data addressed to
+            alaPimInvalidJoinPruneGroup.
+
+            Discontinuities in the value of this counter can occur at
+            re-initialization of the management system, for example
+            when the device is rebooted."
+    REFERENCE "RFC 4601 section 4.5.2, RFC 3569 and
+               I-D.ietf.mboned-ip-mcast-mib ipMcastSsmRangeTable"
+    ::= { alaPim 38 }
+
+alaPimInvalidJoinPruneAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type stored in alaPimInvalidJoinPruneOrigin,
+            alaPimInvalidJoinPruneGroup and alaPimInvalidJoinPruneRp.
+
+            If no unexpected Join/Prune messages have been received,
+            this object is set to unknown(0)."
+    ::= { alaPim 39 }
+
+alaPimInvalidJoinPruneOrigin OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The source address of the last unexpected Join/Prune
+            message received by this device."
+    ::= { alaPim 40 }
+
+alaPimInvalidJoinPruneGroup OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The IP multicast group address carried in the last
+            unexpected Join/Prune message received by this device."
+    ::= { alaPim 41 }
+
+alaPimInvalidJoinPruneRp OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The RP address carried in the last unexpected Join/Prune
+            message received by this device."
+    ::= { alaPim 42 }
+
+alaPimRPMappingNotificationPeriod OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The minimum time that must elapse between
+            alaPimRPMappingChange notifications originated by this router. 
+            The default value of 65535 represents an 'infinite' time, in
+            which case no alaPimRPMappingChange notifications are ever 
+            sent.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    DEFVAL { 65535 }
+    ::= { alaPim 43 }
+
+alaPimRPMappingChangeCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of changes to active RP mappings on this device.
+
+            Information about active RP mappings is available in
+            alaPimGroupMappingTable.  Only changes to active mappings cause
+            this count to be incremented.  That is, changes that modify
+            the alaPimGroupMappingEntry with the highest precedence for a
+            group (lowest value of alaPimGroupMappingPrecedence).
+
+            Such changes may result from manual configuration of this
+            device, or from automatic RP mapping discovery methods
+            including the PIM Bootstrap Router (BSR) mechanism.
+
+            Discontinuities in the value of this counter can occur at
+            re-initialization of the management system, for example
+            when the device is rebooted."
+    REFERENCE "I-D.ietf-pim-sm-bsr"
+    ::= { alaPim 44 }
+
+alaPimInterfaceElectionNotificationPeriod OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The minimum time that must elapse between
+            alaPimInterfaceElection notifications originated by this 
+            router.  The default value of 65535 represents an 'infinite'
+            time, in which case no alaPimInterfaceElection notifications 
+            are ever sent.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    DEFVAL { 65535 }
+    ::= { alaPim 45 }
+
+alaPimInterfaceElectionWinCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The number of times this device has been elected DR or DF
+            on any interface.
+
+            Elections occur frequently on newly-active interfaces, as
+            triggered Hellos establish adjacencies.  This counter is not
+            incremented for elections on an interface until the first
+            periodic Hello has been sent.  If this router is the DR or
+            DF at the time of sending the first periodic Hello after
+            interface activation, then this counter is incremented
+            (once) at that time.
+
+            Discontinuities in the value of this counter can occur at
+            re-initialization of the management system, for example
+            when the device is rebooted."
+    REFERENCE "RFC 4601 section 4.3.2 and
+               I-D.ietf-pim-bidir section 3.5.2"
+    ::= { alaPim 46 }
+
+alaPimRefreshInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+            "The interval between successive State Refresh messages sent
+            by an Originator.  This timer period is called the
+            RefreshInterval in the PIM-DM specification.  This object is
+            used only by PIM-DM.
+
+            The storage type of this object is determined by
+            alaPimDeviceConfigStorageType."
+    REFERENCE "RFC 3973 section 4.8"
+    DEFVAL { 60 }
+    ::= { alaPim 47 }
+
+alaPimDeviceConfigStorageType OBJECT-TYPE
+    SYNTAX      StorageType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+           "The storage type used for the global PIM configuration of
+           this device, comprised of the objects listed below.  If this
+           storage type takes the value 'permanent', write-access to
+           the listed objects need not be allowed.
+
+           The objects described by this storage type are:
+           alaPimKeepalivePeriod, alaPimRegisterSuppressionTime,
+           alaPimNeighborLossNotificationPeriod, 
+           alaPimInvalidRegisterNotificaationPeriod,
+           alaPimInvalidJoinPruneNotificationPeriod, 
+           alaPimRPMappingNotificationPeriod,
+           alaPimInterfaceElectionNotificationPeriod and 
+           alaPimRefreshInterval."
+       DEFVAL { nonVolatile }
+    ::= { alaPim 48 }
+
+--
+-- The PIM Interface Table
+--
+
+alaPimInterfaceTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimInterfaceEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the router's PIM interfaces.
+            PIM is enabled on all interfaces listed in this table."
+    ::= { alaPim 1 }
+
+alaPimInterfaceEntry OBJECT-TYPE
+    SYNTAX     AlaPimInterfaceEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimInterfaceTable.  This
+            entry is preserved on agent restart."
+    INDEX      { alaPimInterfaceIfIndex,
+                 alaPimInterfaceIPVersion }
+    ::= { alaPimInterfaceTable 1 }
+
+AlaPimInterfaceEntry ::= SEQUENCE {
+    alaPimInterfaceIfIndex              InterfaceIndex,
+    alaPimInterfaceIPVersion            InetVersion,
+    alaPimInterfaceAddressType          InetAddressType,
+    alaPimInterfaceAddress              InetAddress,
+    alaPimInterfaceGenerationIDValue    Unsigned32,
+    alaPimInterfaceDR                   InetAddress,
+    alaPimInterfaceDRPriority           Unsigned32,
+    alaPimInterfaceDRPriorityEnabled    TruthValue,
+    alaPimInterfaceHelloInterval        Unsigned32,
+    alaPimInterfaceTrigHelloInterval    Unsigned32,
+    alaPimInterfaceHelloHoldtime        Unsigned32,
+    alaPimInterfaceJoinPruneInterval    Unsigned32,
+    alaPimInterfaceJoinPruneHoldtime    Unsigned32,
+    alaPimInterfaceDFElectionRobustness Unsigned32,
+    alaPimInterfaceLanDelayEnabled      TruthValue,
+    alaPimInterfacePropagationDelay     Unsigned32,
+    alaPimInterfaceOverrideInterval     Unsigned32,
+    alaPimInterfaceEffectPropagDelay    Unsigned32,
+    alaPimInterfaceEffectOverrideIvl    Unsigned32,
+    alaPimInterfaceSuppressionEnabled   TruthValue,
+    alaPimInterfaceBidirCapable         TruthValue,
+    alaPimInterfaceDomainBorder         TruthValue,
+    alaPimInterfaceStubInterface        TruthValue,
+    alaPimInterfacePruneLimitInterval   Unsigned32,
+    alaPimInterfaceGraftRetryInterval   Unsigned32,
+    alaPimInterfaceSRPriorityEnabled    TruthValue,
+    alaPimInterfaceStatus               RowStatus,
+    alaPimInterfaceStorageType          StorageType
+}
+
+alaPimInterfaceIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The ifIndex value of this PIM interface."
+    ::= { alaPimInterfaceEntry 1 }
+
+alaPimInterfaceIPVersion OBJECT-TYPE
+    SYNTAX     InetVersion
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP version of this PIM interface.  A physical interface
+            may be configured in multiple modes concurrently, e.g. IPv4
+            and IPv6, however the traffic is considered to be logically
+            separate."
+    ::= { alaPimInterfaceEntry 2 }
+
+alaPimInterfaceAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type of this PIM interface."
+    ::= { alaPimInterfaceEntry 3 }
+
+alaPimInterfaceAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The primary IP address of this router on this PIM
+            interface.  The InetAddressType is given by the
+            alaPimInterfaceAddressType object."
+    REFERENCE "RFC 4601 sections 4.1.6, 4.3.1-4.3.4 and 4.5.1"
+    ::= { alaPimInterfaceEntry 4 }
+
+alaPimInterfaceGenerationIDValue OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of the Generation ID this router inserted in the
+            last PIM Hello message it sent on this interface."
+    REFERENCE "RFC 4601 section 4.3.1"
+    ::= { alaPimInterfaceEntry 5 }
+
+alaPimInterfaceDR OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The primary IP address of the Designated Router on this PIM
+            interface.  The InetAddressType is given by the
+            alaPimInterfaceAddressType object."
+    REFERENCE "RFC 4601 section 4.3"
+    ::= { alaPimInterfaceEntry 6 }
+
+alaPimInterfaceDRPriority OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The Designated Router Priority value inserted into the DR
+            Priority option on this interface.  Numerically higher
+            values for this object indicate higher priorities."
+    REFERENCE "RFC 4601 section 4.3.2"
+    DEFVAL { 1 }
+    ::= { alaPimInterfaceEntry 7 }
+
+alaPimInterfaceDRPriorityEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if all routers on this interface are
+            using the DR Priority option."
+    REFERENCE "RFC 4601 section 4.3.2"
+    ::= { alaPimInterfaceEntry 8 }
+
+alaPimInterfaceHelloInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..18000)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The frequency at which PIM Hello messages are transmitted
+            on this interface.  This object corresponds to the
+            'Hello_Period' timer value defined in the PIM-SM
+            specification.  A value of zero represents an 'infinite'
+            interval, and indicates that periodic PIM Hello messages
+            should not be sent on this interface."
+    REFERENCE "RFC 4601 section 9"
+    DEFVAL { 30 }
+    ::= { alaPimInterfaceEntry 9 }
+
+alaPimInterfaceTrigHelloInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..60)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The maximum time before this router sends a triggered PIM
+            Hello message on this interface.  This object corresponds to
+            the 'Trigered_Hello_Delay' timer value defined in the PIM-SM
+            specification.  A value of zero has no special meaning and
+            indicates that triggered PIM Hello messages should always be
+            sent immediately."
+    REFERENCE "RFC 4601 section 4.11"
+    DEFVAL { 5 }
+    ::= { alaPimInterfaceEntry 10 }
+
+
+alaPimInterfaceHelloHoldtime OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The value set in the Holdtime field of PIM Hello messages
+            transmitted on this interface.  A value of 65535 represents
+            an 'infinite' holdtime.  Implementations are recommended
+            to use a holdtime that is 3.5 times the value of
+            alaPimInterfaceHelloInterval, or 65535 if
+            alaPimInterfaceHelloInterval is set to zero."
+    REFERENCE "RFC 4601 sections 4.3.2 and 4.9.2"
+    DEFVAL { 105 }
+    ::= { alaPimInterfaceEntry 11 }
+
+alaPimInterfaceJoinPruneInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..18000)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The frequency at which this router sends PIM Join/Prune
+            messages on this PIM interface.  This object corresponds to
+            the 't_periodic' timer value defined in the PIM-SM
+            specification.  A value of zero represents an 'infinite'
+            interval, and indicates that periodic PIM Join/Prune
+            messages should not be sent on this interface."
+    REFERENCE "RFC 4601 section 4.11"
+    DEFVAL { 60 }
+    ::= { alaPimInterfaceEntry 12 }
+
+alaPimInterfaceJoinPruneHoldtime OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The value inserted into the Holdtime field of a PIM
+            Join/Prune message sent on this interface.  A value of 65535
+            represents an 'infinite' holdtime.  Implementations are
+            recommended to use a holdtime that is 3.5 times the value of
+            alaPimInterfaceJoinPruneInterval, or 65535 if
+            alaPimInterfaceJoinPruneInterval is set to zero.  PIM-DM
+            implementations are recommended to use the value of
+            alaPimInterfacePruneLimitInterval."
+    REFERENCE "RFC 4601 sections 4.5.3 and 4.9.5"
+    DEFVAL { 210 }
+    ::= { alaPimInterfaceEntry 13 }
+
+alaPimInterfaceDFElectionRobustness OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The minimum number of PIM DF-Election messages that must be
+            lost in order for DF election on this interface to fail."
+    DEFVAL { 3 }
+    ::= { alaPimInterfaceEntry 14 }
+
+alaPimInterfaceLanDelayEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if all routers on this interface are
+            using the LAN Prune Delay option."
+    REFERENCE "RFC 4601 sections 4.3.3 and 4.9.2"
+    ::= { alaPimInterfaceEntry 15 }
+
+alaPimInterfacePropagationDelay OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..32767)
+    UNITS      "milliseconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The expected propagation delay between PIM routers on this
+            network or link.
+
+            This router inserts this value into the Propagation_Delay
+            field of the LAN Prune Delay option in the PIM Hello
+            messages sent on this interface.  Implementations should
+            enforce a lower bound on the permitted values for this
+            object to allow for scheduling and processing delays within
+            the local router."
+    DEFVAL { 500 }
+    ::= { alaPimInterfaceEntry 16 }
+
+alaPimInterfaceOverrideInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "milliseconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The value this router inserts into the Override_Interval
+            field of the LAN Prune Delay option in the PIM Hello
+            messages it sends on this interface.
+
+            When overriding a prune, PIM routers pick a random timer
+            duration up to the value of this object.  The more PIM
+            routers that are active on a network, the more likely it is
+            that the prune will be overridden after a small proportion
+            of this time has elapsed.
+
+            The more PIM routers are active on this network, the larger
+            this object should be to obtain an optimal spread of prune
+            override latencies."
+    REFERENCE "RFC 4601 section 4.3.3"
+    DEFVAL { 2500 }
+    ::= { alaPimInterfaceEntry 17 }
+
+alaPimInterfaceEffectPropagDelay OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..32767)
+    UNITS      "milliseconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The Effective Propagation Delay on this interface.  This
+            object is always 500 if alaPimInterfaceLanDelayEnabled is
+            FALSE."
+    REFERENCE "RFC 4601 section 4.3.3"
+    ::= { alaPimInterfaceEntry 18 }
+
+alaPimInterfaceEffectOverrideIvl OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "milliseconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The Effective Override Interval on this interface.  This
+            object is always 2500 if alaPimInterfaceLanDelayEnabled is
+            FALSE."
+    REFERENCE "RFC 4601 section 4.3.3"
+    ::= { alaPimInterfaceEntry 19 }
+
+alaPimInterfaceSuppressionEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether join suppression is enabled on this interface.
+            This object is always TRUE if alaPimInterfaceLanDelayEnabled is
+            FALSE."
+    REFERENCE "RFC 4601 section 4.3.3"
+    ::= { alaPimInterfaceEntry 20 }
+
+alaPimInterfaceBidirCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if all routers on this interface are
+            using the Bidirectional-PIM Capable option."
+    REFERENCE "I-D.ietf-pim-bidir section 3.2 and 3.7.4"
+    ::= { alaPimInterfaceEntry 21 }
+
+alaPimInterfaceDomainBorder OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "Whether or not this interface is a PIM domain border.  This
+            includes acting as a border for PIM Bootstrap Router (BSR)
+            messages, if the BSR mechanism is in use."
+    DEFVAL { false }
+    ::= { alaPimInterfaceEntry 22 }
+
+alaPimInterfaceStubInterface OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "Whether this interface is a 'stub interface'.  If this
+            object is set to TRUE, then no PIM packets are sent out this
+            interface, and any received PIM packets are ignored.
+
+            Setting this object to TRUE is a security measure for
+            interfaces towards untrusted hosts.  This allows an
+            interface to be configured for use with IGMP (Internet Group
+            Management Protocol) or MLD (Multicast Listener Discovery)
+			only, which protects the PIM router from forged PIM messages
+            on the interface.
+
+            To communicate with other PIM routers using this interface,
+            this object must remain set to FALSE.
+
+            Changing the value of this object while the interface is
+            operational causes the interface to be deactivated and
+            then reactivated."
+    REFERENCE "RFC 3376, RFC 3810"
+    DEFVAL { false }
+    ::= { alaPimInterfaceEntry 23 }
+
+alaPimInterfacePruneLimitInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The minimum interval that must transpire between two
+            successive Prunes sent by a router.  This object corresponds
+            to the 't_limit' timer value defined in the PIM-DM
+            specification.  This object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.8"
+    DEFVAL { 60 }
+    ::= { alaPimInterfaceEntry 24 }
+
+alaPimInterfaceGraftRetryInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    UNITS      "seconds"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The minimum interval that must transpire between two
+            successive Grafts sent by a router.  This object corresponds
+            to the 'Graft_Retry_Period' timer value defined in the
+            PIM-DM specification.  This object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.8"
+    DEFVAL { 3 }
+    ::= { alaPimInterfaceEntry 25 }
+
+alaPimInterfaceSRPriorityEnabled OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if all routers on this interface are
+            using the State Refresh option.  This object is used only by
+            PIM-DM."
+    ::= { alaPimInterfaceEntry 26 }
+
+alaPimInterfaceStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The status of this entry.  Creating the entry enables PIM
+            on the interface; destroying the entry disables PIM on the
+            interface.
+
+            This status object can be set to active(1) without setting
+            any other columnar objects in this entry.
+
+            All writeable objects in this entry can be modified when the
+            status of this entry is active(1)."
+    ::= { alaPimInterfaceEntry 27 }
+
+alaPimInterfaceStorageType OBJECT-TYPE
+    SYNTAX      StorageType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+           "The storage type for this row.  Rows having the value
+           'permanent' need not allow write-access to any columnar
+           objects in the row."
+       DEFVAL { nonVolatile }
+    ::= { alaPimInterfaceEntry 28 }
+
+--
+-- The PIM Neighbor Table
+--
+
+alaPimNeighborTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimNeighborEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the router's PIM neighbors."
+    ::= { alaPim 2 }
+
+alaPimNeighborEntry OBJECT-TYPE
+    SYNTAX     AlaPimNeighborEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimNeighborTable."
+    INDEX      { alaPimNeighborIfIndex,
+                 alaPimNeighborAddressType,
+                 alaPimNeighborAddress }
+    ::= { alaPimNeighborTable 1 }
+
+AlaPimNeighborEntry ::= SEQUENCE {
+    alaPimNeighborIfIndex              InterfaceIndex,
+    alaPimNeighborAddressType          InetAddressType,
+    alaPimNeighborAddress              InetAddress,
+    alaPimNeighborGenerationIDPresent  TruthValue,
+    alaPimNeighborGenerationIDValue    Unsigned32,
+    alaPimNeighborUpTime               TimeTicks,
+    alaPimNeighborExpiryTime           TimeTicks,
+    alaPimNeighborDRPriorityPresent    TruthValue,
+    alaPimNeighborDRPriority           Unsigned32,
+    alaPimNeighborLanPruneDelayPresent TruthValue,
+    alaPimNeighborTBit                 TruthValue,
+    alaPimNeighborPropagationDelay     Unsigned32,
+    alaPimNeighborOverrideInterval     Unsigned32,
+    alaPimNeighborBidirCapable         TruthValue,
+    alaPimNeighborSRCapable            TruthValue
+}
+
+alaPimNeighborIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The value of ifIndex for the interface used to reach this
+            PIM neighbor."
+    ::= { alaPimNeighborEntry 1 }
+
+alaPimNeighborAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address type of this PIM neighbor."
+    ::= { alaPimNeighborEntry 2 }
+
+alaPimNeighborAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The primary IP address of this PIM neighbor.  The
+            InetAddressType is given by the alaPimNeighborAddressType
+            object."
+    ::= { alaPimNeighborEntry 3 }
+
+alaPimNeighborGenerationIDPresent OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is using the Generation
+            ID option."
+    REFERENCE "RFC 4601 section 4.3.1"
+    ::= { alaPimNeighborEntry 4 }
+
+alaPimNeighborGenerationIDValue OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of the Generation ID from the last PIM Hello
+            message received from this neighbor.  This object is always
+            zero if alaPimNeighborGenerationIDPresent is FALSE."
+    REFERENCE "RFC 4601 section 4.3.1"
+    ::= { alaPimNeighborEntry 5 }
+
+alaPimNeighborUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since this PIM neighbor (last) became a neighbor
+            of the local router."
+    ::= { alaPimNeighborEntry 6 }
+
+alaPimNeighborExpiryTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The minimum time remaining before this PIM neighbor will
+            be aged out.  The value zero indicates that this PIM
+            neighbor will never be aged out."
+    ::= { alaPimNeighborEntry 7 }
+
+alaPimNeighborDRPriorityPresent OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is using the DR Priority
+            option."
+    REFERENCE "RFC 4601 section 4.3.2"
+    ::= { alaPimNeighborEntry 8 }
+
+alaPimNeighborDRPriority OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of the Designated Router Priority from the last
+            PIM Hello message received from this neighbor.  This object
+            is always zero if alaPimNeighborDRPriorityPresent is FALSE."
+    REFERENCE "RFC 4601 section 4.3.2"
+    ::= { alaPimNeighborEntry 9 }
+
+alaPimNeighborLanPruneDelayPresent OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is using the LAN Prune
+            Delay option."
+    REFERENCE "RFC 4601 section 4.3.3"
+    ::= { alaPimNeighborEntry 10 }
+
+alaPimNeighborTBit OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the T bit was set in the LAN Prune Delay option
+            received from this neighbor.  The T bit specifies the
+            ability of the neighbor to disable join suppression.  This
+            object is always TRUE if alaPimNeighborLanPruneDelayPresent is
+            FALSE."
+    REFERENCE "RFC 4601 section 4.3.3"
+    ::= { alaPimNeighborEntry 11 }
+
+alaPimNeighborPropagationDelay OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..32767)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of the Propagation_Delay field of the LAN Prune
+            Delay option received from this neighbor.  This object is
+            always zero if alaPimNeighborLanPruneDelayPresent is FALSE."
+    REFERENCE "RFC 4601 section 4.3.3"
+    ::= { alaPimNeighborEntry 12 }
+
+alaPimNeighborOverrideInterval OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..65535)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of the Override_Interval field of the LAN Prune
+            Delay option received from this neighbor.  This object is
+            always zero if alaPimNeighborLanPruneDelayPresent is FALSE."
+    REFERENCE "RFC 4601 section 4.3.3"
+    ::= { alaPimNeighborEntry 13 }
+
+alaPimNeighborBidirCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is using the
+            Bidirectional-PIM Capable option."
+    REFERENCE "I-D.ietf-pim-bidir section 3.2 and 3.7.4"
+    ::= { alaPimNeighborEntry 14 }
+
+alaPimNeighborSRCapable OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Evaluates to TRUE if this neighbor is using the State
+            Refresh Capable option.  This object is used only by
+            PIM-DM."
+    REFERENCE "RFC 3973 section 4.3.4"
+    ::= { alaPimNeighborEntry 15 }
+
+--
+-- The PIM Neighbor Secondary Address Table
+--
+
+alaPimNbrSecAddressTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimNbrSecAddressEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the secondary addresses
+            advertised by each PIM neighbor (on a subset of the rows of
+            the alaPimNeighborTable defined above)."
+    REFERENCE "RFC 4601 section 4.3.4"
+    ::= { alaPim 3 }
+
+alaPimNbrSecAddressEntry OBJECT-TYPE
+    SYNTAX     AlaPimNbrSecAddressEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimNbrSecAddressTable."
+    INDEX      { alaPimNbrSecAddressIfIndex,
+                 alaPimNbrSecAddressType,
+                 alaPimNbrSecAddressPrimary,
+                 alaPimNbrSecAddress }
+    ::= { alaPimNbrSecAddressTable 1 }
+
+AlaPimNbrSecAddressEntry ::= SEQUENCE {
+    alaPimNbrSecAddressIfIndex InterfaceIndex,
+    alaPimNbrSecAddressType    InetAddressType,
+    alaPimNbrSecAddressPrimary InetAddress,
+    alaPimNbrSecAddress        InetAddress
+}
+
+alaPimNbrSecAddressIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The value of ifIndex for the interface used to reach this
+            PIM neighbor."
+    ::= { alaPimNbrSecAddressEntry 1 }
+
+alaPimNbrSecAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address type of this PIM neighbor."
+    ::= { alaPimNbrSecAddressEntry 2 }
+
+alaPimNbrSecAddressPrimary OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The primary IP address of this PIM neighbor.  The
+            InetAddressType is given by the alaPimNbrSecAddressType
+            object."
+    ::= { alaPimNbrSecAddressEntry 3 }
+
+alaPimNbrSecAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The secondary IP address of this PIM neighbor.  The
+            InetAddressType is given by the alaPimNbrSecAddressType
+            object."
+    ::= { alaPimNbrSecAddressEntry 4 }
+
+--
+-- The PIM (*,G) State Table
+--
+
+alaPimStarGTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimStarGEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the non-interface specific
+            (*,G) state that PIM has."
+    REFERENCE "RFC 4601 section 4.1.3"
+    ::= { alaPim 4 }
+
+alaPimStarGEntry OBJECT-TYPE
+    SYNTAX     AlaPimStarGEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimStarGTable."
+    INDEX      { alaPimStarGAddressType,
+                 alaPimStarGGrpAddress }
+    ::= { alaPimStarGTable 1 }
+
+AlaPimStarGEntry ::= SEQUENCE {
+    alaPimStarGAddressType             InetAddressType,
+    alaPimStarGGrpAddress              InetAddress,
+    alaPimStarGUpTime                  TimeTicks,
+    alaPimStarGPimMode                 AlaPimMode,
+    alaPimStarGRPAddressType           InetAddressType,
+    alaPimStarGRPAddress               InetAddress,
+    alaPimStarGPimModeOrigin           AlaPimGroupMappingOriginType,
+    alaPimStarGRPIsLocal               TruthValue,
+    alaPimStarGUpstreamJoinState       INTEGER,
+    alaPimStarGUpstreamJoinTimer       TimeTicks,
+    alaPimStarGUpstreamNeighborType    InetAddressType,
+    alaPimStarGUpstreamNeighbor        InetAddress,
+    alaPimStarGRPFIfIndex              InterfaceIndexOrZero,
+    alaPimStarGRPFNextHopType          InetAddressType,
+    alaPimStarGRPFNextHop              InetAddress,
+    alaPimStarGRPFRouteProtocol        IANAipRouteProtocol,
+    alaPimStarGRPFRouteAddress         InetAddress,
+    alaPimStarGRPFRoutePrefixLength    InetAddressPrefixLength,
+    alaPimStarGRPFRouteMetricPref      Unsigned32,
+    alaPimStarGRPFRouteMetric          Unsigned32
+}
+
+alaPimStarGAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address type of this multicast group."
+    ::= { alaPimStarGEntry 1 }
+
+alaPimStarGGrpAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The multicast group address.  The InetAddressType is given
+            by the alaPimStarGAddressType object."
+    ::= { alaPimStarGEntry 2 }
+
+alaPimStarGUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since this entry was created by the local router."
+    ::= { alaPimStarGEntry 3 }
+
+alaPimStarGPimMode OBJECT-TYPE
+    SYNTAX     AlaPimMode  
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether this entry represents an ASM (Any Source Multicast,
+            used with PIM-SM) or BIDIR-PIM group."
+    ::= { alaPimStarGEntry 4 }
+
+alaPimStarGRPAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type of the Rendezvous Point (RP), or
+            unknown(0) if the RP address is unknown."
+    ::= { alaPimStarGEntry 5 }
+
+alaPimStarGRPAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address of the Rendezvous Point (RP) for the group.
+            The InetAddressType is given by the alaPimStarGRPAddressType."
+    ::= { alaPimStarGEntry 6 }
+
+alaPimStarGPimModeOrigin OBJECT-TYPE
+    SYNTAX     AlaPimGroupMappingOriginType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The mechanism by which the PIM mode and RP for the group
+            were learned."
+    ::= { alaPimStarGEntry 7 }
+
+alaPimStarGRPIsLocal OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router is the RP for the group."
+    ::= { alaPimStarGEntry 8 }
+
+alaPimStarGUpstreamJoinState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  notJoined (1),
+                  joined (2)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router should join the RP tree for the
+            group.  This corresponds to the state of the upstream (*,G)
+            state machine in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.5.6"
+    ::= { alaPimStarGEntry 9 }
+
+alaPimStarGUpstreamJoinTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router next sends a
+            periodic (*,G) Join message on alaPimStarGRPFIfIndex.  This
+            timer is called the (*,G) Upstream Join Timer in the PIM-SM
+            specification.  This object is zero if the timer is not
+            running."
+    REFERENCE "RFC 4601 section 4.10"
+    ::= { alaPimStarGEntry 10 }
+
+alaPimStarGUpstreamNeighborType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The primary address type of the upstream neighbor, or
+            unknown(0) if the upstream neighbor address is unknown or is
+            not a PIM neighbor."
+    ::= { alaPimStarGEntry 11 }
+
+alaPimStarGUpstreamNeighbor OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The primary address of the neighbor on alaPimStarGRPFIfIndex
+            that the local router is sending periodic (*,G) Join
+            messages to.  The InetAddressType is given by the
+            alaPimStarGUpstreamNeighborType object.  This address is called
+            RPF'(*,G) in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.1.6"
+    ::= { alaPimStarGEntry 12 }
+
+alaPimStarGRPFIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndexOrZero
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of ifIndex for the RPF interface towards the RP,
+            or zero if the RPF interface is unknown."
+    ::= { alaPimStarGEntry 13 }
+
+alaPimStarGRPFNextHopType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type of the RPF next hop towards the RP, or
+            unknown(0) if the RPF next hop is unknown."
+    ::= { alaPimStarGEntry 14 }
+
+alaPimStarGRPFNextHop OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address of the RPF next hop towards the RP.  The
+            InetAddressType is given by the alaPimStarGRPFNextHopType
+            object.  This address is called MRIB.next_hop(RP(G))
+            in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.5.5"
+    ::= { alaPimStarGEntry 15 }
+
+alaPimStarGRPFRouteProtocol OBJECT-TYPE
+    SYNTAX     IANAipRouteProtocol
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing mechanism via which the route used to find the
+            RPF interface towards the RP was learned."
+    ::= { alaPimStarGEntry 16 }
+
+alaPimStarGRPFRouteAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The IP address which when combined with the corresponding
+            value of alaPimStarGRPFRoutePrefixLength identifies the route
+            used to find the RPF interface towards the RP.  The
+            InetAddressType is given by the alaPimStarGRPFNextHopType
+            object.
+
+            This address object is only significant up to
+            alaPimStarGRPFRoutePrefixLength bits.  The remainder of the
+            address bits are zero."
+    ::= { alaPimStarGEntry 17 }
+
+alaPimStarGRPFRoutePrefixLength OBJECT-TYPE
+    SYNTAX     InetAddressPrefixLength
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The prefix length which when combined with the
+            corresponding value of alaPimStarGRPFRouteAddress identifies
+            the route used to find the RPF interface towards the RP.
+            The InetAddressType is given by the alaPimStarGRPFNextHopType
+            object."
+    ::= { alaPimStarGEntry 18 }
+
+alaPimStarGRPFRouteMetricPref OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..2147483647)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The metric preference of the route used to find the RPF
+            interface towards the RP."
+    ::= { alaPimStarGEntry 19 }
+
+alaPimStarGRPFRouteMetric OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing metric of the route used to find the RPF
+            interface towards the RP."
+    ::= { alaPimStarGEntry 20 }
+
+--
+-- The PIM (*,G,I) State Table
+--
+
+alaPimStarGITable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimStarGIEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the interface-specific (*,G)
+            state that PIM has."
+    REFERENCE "RFC 4601 section 4.1.3"
+    ::= { alaPim 5 }
+
+alaPimStarGIEntry OBJECT-TYPE
+    SYNTAX     AlaPimStarGIEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimStarGITable."
+    INDEX      { alaPimStarGAddressType,
+                 alaPimStarGGrpAddress,
+                 alaPimStarGIIfIndex }
+    ::= { alaPimStarGITable 1 }
+
+AlaPimStarGIEntry ::= SEQUENCE {
+    alaPimStarGIIfIndex                 InterfaceIndex,
+    alaPimStarGIUpTime                  TimeTicks,
+    alaPimStarGILocalMembership         TruthValue,
+    alaPimStarGIJoinPruneState          INTEGER,
+    alaPimStarGIPrunePendingTimer       TimeTicks,
+    alaPimStarGIJoinExpiryTimer         TimeTicks,
+    alaPimStarGIAssertState             INTEGER,
+    alaPimStarGIAssertTimer             TimeTicks,
+    alaPimStarGIAssertWinnerAddressType InetAddressType,
+    alaPimStarGIAssertWinnerAddress     InetAddress,
+    alaPimStarGIAssertWinnerMetricPref  Unsigned32,
+    alaPimStarGIAssertWinnerMetric      Unsigned32
+}
+
+alaPimStarGIIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The ifIndex of the interface that this entry corresponds
+            to."
+    ::= { alaPimStarGIEntry 1 }
+
+alaPimStarGIUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since this entry was created by the local router."
+    ::= { alaPimStarGIEntry 2 }
+
+alaPimStarGILocalMembership OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router has (*,G) local membership on this
+            interface (resulting from a mechanism such as IGMP or MLD).
+            This corresponds to local_receiver_include(*,G,I) in the
+            PIM-SM specification."
+    REFERENCE "RFC 3376, RFC 3810, RFC 4601 section 4.1.6"
+    ::= { alaPimStarGIEntry 3 }
+
+alaPimStarGIJoinPruneState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  noInfo (1),
+                  join (2),
+                  prunePending (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The state resulting from (*,G) Join/Prune messages
+            received on this interface.  This corresponds to the state
+            of the downstream per-interface (*,G) state machine in the
+            PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.5.2"
+    ::= { alaPimStarGIEntry 4 }
+
+alaPimStarGIPrunePendingTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router acts on a (*,G)
+            Prune message received on this interface, during which the
+            router is waiting to see whether another downstream router
+            will override the Prune message.  This timer is called the
+            (*,G) Prune-Pending Timer in the PIM-SM specification.  This
+            object is zero if the timer is not running."
+    REFERENCE "RFC 4601 section 4.5.1"
+    ::= { alaPimStarGIEntry 5 }
+
+alaPimStarGIJoinExpiryTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before (*,G) Join state for this
+            interface expires.  This timer is called the (*,G) Join
+            Expiry Timer in the PIM-SM specification.  This object is
+            zero if the timer is not running.  A value of 'FFFFFFFF'h
+            indicates an infinite expiry time."
+    REFERENCE "RFC 4601 section 4.10"
+    ::= { alaPimStarGIEntry 6 }
+
+alaPimStarGIAssertState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  noInfo (1),
+                  iAmAssertWinner (2),
+                  iAmAssertLoser (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The (*,G) Assert state for this interface.  This
+            corresponds to the state of the per-interface (*,G) Assert
+            state machine in the PIM-SM specification.  If
+            alaPimStarGPimMode is 'bidir', this object must be 'noInfo'."
+    REFERENCE "RFC 4601 section 4.6.2"
+    ::= { alaPimStarGIEntry 7 }
+
+alaPimStarGIAssertTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimStarGIAssertState is 'iAmAssertWinner', this is the
+            time remaining before the local router next sends a (*,G)
+            Assert message on this interface.  If alaPimStarGIAssertState
+            is 'iAmAssertLoser', this is the time remaining before the
+            (*,G) Assert state expires.  If alaPimStarGIAssertState is
+            'noInfo', this is zero.  This timer is called the (*,G)
+            Assert Timer in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.6.2"
+    ::= { alaPimStarGIEntry 8 }
+
+alaPimStarGIAssertWinnerAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimStarGIAssertState is 'iAmAssertLoser', this is the
+            address type of the assert winner; otherwise, this object is
+            unknown(0)."
+    ::= { alaPimStarGIEntry 9 }
+
+alaPimStarGIAssertWinnerAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimStarGIAssertState is 'iAmAssertLoser', this is the
+            address of the assert winner.  The InetAddressType is given
+            by the alaPimStarGIAssertWinnerAddressType object."
+    ::= { alaPimStarGIEntry 10 }
+
+alaPimStarGIAssertWinnerMetricPref OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..2147483647)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimStarGIAssertState is 'iAmAssertLoser', this is the
+            metric preference of the route to the RP advertised by the
+            assert winner; otherwise, this object is zero."
+    ::= { alaPimStarGIEntry 11 }
+
+alaPimStarGIAssertWinnerMetric OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimStarGIAssertState is 'iAmAssertLoser', this is the
+            routing metric of the route to the RP advertised by the
+            assert winner; otherwise, this object is zero."
+    ::= { alaPimStarGIEntry 12 }
+
+--
+-- The PIM (S,G) State Table
+--
+
+alaPimSGTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimSGEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the non-interface specific
+            (S,G) state that PIM has."
+    REFERENCE "RFC 4601 section 4.1.4"
+    ::= { alaPim 6 }
+
+alaPimSGEntry OBJECT-TYPE
+    SYNTAX     AlaPimSGEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimSGTable."
+    INDEX      { alaPimSGAddressType,
+                 alaPimSGGrpAddress,
+                 alaPimSGSrcAddress }
+    ::= { alaPimSGTable 1 }
+
+AlaPimSGEntry ::= SEQUENCE {
+    alaPimSGAddressType               InetAddressType,
+    alaPimSGGrpAddress                InetAddress,
+    alaPimSGSrcAddress                InetAddress,
+    alaPimSGUpTime                    TimeTicks,
+    alaPimSGPimMode                   AlaPimMode,
+    alaPimSGUpstreamJoinState         INTEGER,
+    alaPimSGUpstreamJoinTimer         TimeTicks,
+    alaPimSGUpstreamNeighbor          InetAddress,
+    alaPimSGRPFIfIndex                InterfaceIndexOrZero,
+    alaPimSGRPFNextHopType            InetAddressType,
+    alaPimSGRPFNextHop                InetAddress,
+    alaPimSGRPFRouteProtocol          IANAipRouteProtocol,
+    alaPimSGRPFRouteAddress           InetAddress,
+    alaPimSGRPFRoutePrefixLength      InetAddressPrefixLength,
+    alaPimSGRPFRouteMetricPref        Unsigned32,
+    alaPimSGRPFRouteMetric            Unsigned32,
+    alaPimSGSPTBit                    TruthValue,
+    alaPimSGKeepaliveTimer            TimeTicks,
+    alaPimSGDRRegisterState           INTEGER,
+    alaPimSGDRRegisterStopTimer       TimeTicks,
+    alaPimSGRPRegisterPMBRAddressType InetAddressType,
+    alaPimSGRPRegisterPMBRAddress     InetAddress,
+    alaPimSGUpstreamPruneState        INTEGER,
+    alaPimSGUpstreamPruneLimitTimer   TimeTicks,
+    alaPimSGOriginatorState           INTEGER,
+    alaPimSGSourceActiveTimer         TimeTicks,
+    alaPimSGStateRefreshTimer         TimeTicks
+}
+
+alaPimSGAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address type of the source and multicast group for this
+            entry."
+    ::= { alaPimSGEntry 1 }
+
+alaPimSGGrpAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The multicast group address for this entry.  The
+            InetAddressType is given by the alaPimSGAddressType object."
+    ::= { alaPimSGEntry 2 }
+
+alaPimSGSrcAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The source address for this entry.  The InetAddressType is
+            given by the alaPimSGAddressType object."
+    ::= { alaPimSGEntry 3 }
+
+alaPimSGUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since this entry was created by the local router."
+    ::= { alaPimSGEntry 4 }
+
+alaPimSGPimMode OBJECT-TYPE
+    SYNTAX     AlaPimMode
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether alaPimSGGrpAddress is an SSM (Source Specific
+            Multicast, used with PIM-SM) or ASM (Any Source Multicast,
+            used with PIM-SM), or DM (Dense Mode)  group."
+    REFERENCE "RFC 4601 sections 4.5.2, RFC 3569 and
+               I-D.ietf-mboned-ip-mcast-mib ipMcastSsmRangeTable"
+    ::= { alaPimSGEntry 5 }
+
+alaPimSGUpstreamJoinState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  notApplicable (0),
+                  notJoined (1),
+                  joined (2)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router should join the shortest-path tree
+            for the source and group represented by this entry.  This
+            corresponds to the state of the upstream (S,G) state machine
+            in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.5.7"
+    ::= { alaPimSGEntry 6 }
+
+alaPimSGUpstreamJoinTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router next sends a
+            periodic (S,G) Join message on alaPimSGRPFIfIndex.  This timer
+            is called the (S,G) Upstream Join Timer in the PIM-SM
+            specification.  This object is zero if the timer is not
+            running."
+    REFERENCE "RFC 4601 section 4.10 and 4.11"
+    ::= { alaPimSGEntry 7 }
+
+alaPimSGUpstreamNeighbor OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The primary address of the neighbor on alaPimSGRPFIfIndex that
+            the local router is sending periodic (S,G) Join messages to.
+            This is zero if the RPF next hop is unknown or is not a
+            PIM neighbor.  The InetAddressType is given by the
+            alaPimSGAddressType object.  This address is called RPF'(S,G)
+            in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.1.6"
+    ::= { alaPimSGEntry 8 }
+
+alaPimSGRPFIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndexOrZero
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The value of ifIndex for the RPF interface towards the
+            source, or zero if the RPF interface is unknown."
+    ::= { alaPimSGEntry 9 }
+
+alaPimSGRPFNextHopType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type of the RPF next hop towards the source, or
+            unknown(0) if the RPF next hop is unknown."
+    ::= { alaPimSGEntry 10 }
+
+alaPimSGRPFNextHop OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address of the RPF next hop towards the source.  The
+            InetAddressType is given by the alaPimSGRPFNextHopType.  This
+            address is called MRIB.next_hop(S) in the PIM-SM
+            specification."
+    REFERENCE "RFC 4601 section 4.5.5"
+    ::= { alaPimSGEntry 11 }
+
+alaPimSGRPFRouteProtocol OBJECT-TYPE
+    SYNTAX     IANAipRouteProtocol
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing mechanism via which the route used to find the
+            RPF interface towards the source was learned."
+    ::= { alaPimSGEntry 12 }
+
+alaPimSGRPFRouteAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The IP address which when combined with the corresponding
+            value of alaPimSGRPFRoutePrefixLength identifies the route used
+            to find the RPF interface towards the source.  The
+            InetAddressType is given by the alaPimSGRPFNextHopType object.
+
+            This address object is only significant up to
+            alaPimSGRPFRoutePrefixLength bits.  The remainder of the
+            address bits are zero."
+    ::= { alaPimSGEntry 13 }
+
+alaPimSGRPFRoutePrefixLength OBJECT-TYPE
+    SYNTAX     InetAddressPrefixLength
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The prefix length which when combined with the
+            corresponding value of alaPimSGRPFRouteAddress identifies the
+            route used to find the RPF interface towards the source.
+            The InetAddressType is given by the alaPimSGRPFNextHopType
+            object."
+    ::= { alaPimSGEntry 14 }
+
+alaPimSGRPFRouteMetricPref OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..2147483647)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The metric preference of the route used to find the RPF
+            interface towards the source."
+    ::= { alaPimSGEntry 15 }
+
+alaPimSGRPFRouteMetric OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The routing metric of the route used to find the RPF
+            interface towards the source."
+    ::= { alaPimSGEntry 16 }
+
+alaPimSGSPTBit OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the SPT bit is set; and therefore whether
+            forwarding is taking place on the shortest-path tree."
+    ::= { alaPimSGEntry 17 }
+
+alaPimSGKeepaliveTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before, in the absence of explicit (S,G)
+            local membership or (S,G) Join messages received to maintain
+            it, this (S,G) state expires.  This timer is called the
+            (S,G) Keepalive Timer in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.1.4"
+    ::= { alaPimSGEntry 18 }
+
+alaPimSGDRRegisterState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  noInfo (1),
+                  join (2),
+                  joinPending (3),
+                  prune (4)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router should encapsulate (S,G) data
+            packets in Register messages and send them to the RP.  This
+            corresponds to the state of the per-(S,G) Register state
+            machine in the PIM-SM specification.  This object is always
+            'noInfo' unless alaPimSGPimMode is 'asm'."
+    REFERENCE "RFC 4601 section 4.4.1"
+    ::= { alaPimSGEntry 19 }
+
+alaPimSGDRRegisterStopTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGDRRegisterState is 'prune', this is the time
+            remaining before the local router sends a Null-Register
+            message to the RP.  If alaPimSGDRRegisterState is
+            'joinPending', this is the time remaining before the local
+            router resumes encapsulating data packets and sending them
+            to the RP.  Otherwise, this is zero.  This timer is called
+            the Register-Stop Timer in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.4"
+    ::= { alaPimSGEntry 20 }
+
+alaPimSGRPRegisterPMBRAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The address type of the first PIM Multicast Border Router
+            to send a Register message with the Border bit set.  This
+            object is unknown(0) if the local router is not the RP for
+            the group."
+    ::= { alaPimSGEntry 21 }
+
+alaPimSGRPRegisterPMBRAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The IP address of the first PIM Multicast Border Router to
+            send a Register message with the Border bit set.  The
+            InetAddressType is given by the
+            alaPimSGRPRegisterPMBRAddressType object."
+    ::= { alaPimSGEntry 22 }
+
+alaPimSGUpstreamPruneState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  notApplicable (0),
+                  forwarding (1),
+                  ackpending (2),
+                  pruned (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router has pruned itself from the tree.
+            This corresponds to the state of the upstream prune (S,G)
+            state machine in the PIM-DM specification.  This object is
+            used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.4.1"
+    ::= { alaPimSGEntry 23 }
+
+alaPimSGUpstreamPruneLimitTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router may send a (S,G)
+            Prune message on alaPimSGRPFIfIndex.  This timer is called the
+            (S,G) Prune Limit Timer in the PIM-DM specification.  This
+            object is zero if the timer is not running.  This object is
+            used only by PIM-DM."
+    REFERENCE "RFC 2973 section 4.8"
+    ::= { alaPimSGEntry 24 }
+
+alaPimSGOriginatorState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  notApplicable (0),
+                  notOriginator (1),
+                  originator (2)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the router is an originator for an (S,G) message
+            flow.  This corresponds to the state of the per-(S,G)
+            Originator state machine in the PIM-DM specification.  This
+            object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.5.2"
+    ::= { alaPimSGEntry 25 }
+
+alaPimSGSourceActiveTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGOriginatorState is 'originator', this is the time
+            remaining before the local router reverts to a notOriginator
+            state.  Otherwise, this is zero.  This timer is called the
+            Source Active Timer in the PIM-DM specification.  This
+            object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.8"
+    ::= { alaPimSGEntry 26 }
+
+alaPimSGStateRefreshTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGOriginatorState is 'originator', this is the time
+            remaining before the local router sends a State Refresh
+            message.  Otherwise, this is zero.  This timer is called the
+            State Refresh Timer in the PIM-DM specification.  This
+            object is used only by PIM-DM."
+    REFERENCE "RFC 3973 section 4.8"
+    ::= { alaPimSGEntry 27 }
+
+--
+-- The PIM (S,G,I) State Table
+--
+
+alaPimSGITable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimSGIEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the interface-specific (S,G)
+            state that PIM has."
+    REFERENCE "RFC 4601 section 4.1.4"
+    ::= { alaPim 7 }
+
+alaPimSGIEntry OBJECT-TYPE
+    SYNTAX     AlaPimSGIEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimSGITable."
+    INDEX      { alaPimSGAddressType,
+                 alaPimSGGrpAddress,
+                 alaPimSGSrcAddress,
+                 alaPimSGIIfIndex }
+    ::= { alaPimSGITable 1 }
+
+AlaPimSGIEntry ::= SEQUENCE {
+    alaPimSGIIfIndex                 InterfaceIndex,
+    alaPimSGIUpTime                  TimeTicks,
+    alaPimSGILocalMembership         TruthValue,
+    alaPimSGIJoinPruneState          INTEGER,
+    alaPimSGIPrunePendingTimer       TimeTicks,
+    alaPimSGIJoinExpiryTimer         TimeTicks,
+    alaPimSGIAssertState             INTEGER,
+    alaPimSGIAssertTimer             TimeTicks,
+    alaPimSGIAssertWinnerAddressType InetAddressType,
+    alaPimSGIAssertWinnerAddress     InetAddress,
+    alaPimSGIAssertWinnerMetricPref  Unsigned32,
+    alaPimSGIAssertWinnerMetric      Unsigned32
+}
+
+alaPimSGIIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The ifIndex of the interface that this entry corresponds
+            to."
+    ::= { alaPimSGIEntry 1 }
+
+alaPimSGIUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since this entry was created by the local router."
+    ::= { alaPimSGIEntry 2 }
+
+alaPimSGILocalMembership OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router has (S,G) local membership on this
+            interface (resulting from a mechanism such as IGMP or MLD).
+            This corresponds to local_receiver_include(S,G,I) in the
+            PIM-SM specification."
+    REFERENCE "RFC 3376, RFC 3810, RFC 4601 sections 4.1.6, 4.6.1 and 
+               4.6.2"
+    ::= { alaPimSGIEntry 3 }
+
+alaPimSGIJoinPruneState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  noInfo (1),
+                  join (2),
+                  prunePending (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The state resulting from (S,G) Join/Prune messages
+            received on this interface.  This corresponds to the state
+            of the downstream per-interface (S,G) state machine in the
+            PIM-SM and PIM-DM specification."
+    REFERENCE "RFC 4601 section 4.5.3 and RFC 3973 section 4.4.2"
+    ::= { alaPimSGIEntry 4 }
+
+alaPimSGIPrunePendingTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router acts on an (S,G)
+            Prune message received on this interface, during which the
+            router is waiting to see whether another downstream router
+            will override the Prune message.  This timer is called the
+            (S,G) Prune-Pending Timer in the PIM-SM specification.  This
+            object is zero if the timer is not running."
+    REFERENCE "RFC 4601 section 4.5.3 and 4.5.4"
+    ::= { alaPimSGIEntry 5 }
+
+alaPimSGIJoinExpiryTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before (S,G) Join state for this
+            interface expires.  This timer is called the (S,G) Join
+            Expiry Timer in the PIM-SM specification.  This object is
+            zero if the timer is not running.  A value of 'FFFFFFFF'h
+            indicates an infinite expiry time.  This timer is called the
+            (S,G) Prune Timer in the PIM-DM specification."
+    REFERENCE "RFC 4601 section 4.10 and RFC 3973 section 4.8"
+    ::= { alaPimSGIEntry 6 }
+
+alaPimSGIAssertState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  noInfo (1),
+                  iAmAssertWinner (2),
+                  iAmAssertLoser (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The (S,G) Assert state for this interface.  This
+            corresponds to the state of the per-interface (S,G) Assert
+            state machine in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.6.1"
+    ::= { alaPimSGIEntry 7 }
+
+alaPimSGIAssertTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGIAssertState is 'iAmAssertWinner', this is the time
+            remaining before the local router next sends a (S,G) Assert
+            message on this interface.  If alaPimSGIAssertState is
+            'iAmAssertLoser', this is the time remaining before the
+            (S,G) Assert state expires.  If alaPimSGIAssertState is
+            'noInfo', this is zero.  This timer is called the (S,G)
+            Assert Timer in the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.6.1"
+    ::= { alaPimSGIEntry 8 }
+
+alaPimSGIAssertWinnerAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGIAssertState is 'iAmAssertLoser', this is the
+            address type of the assert winner; otherwise, this object is
+            unknown(0)."
+    ::= { alaPimSGIEntry 9 }
+
+alaPimSGIAssertWinnerAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|16|20))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGIAssertState is 'iAmAssertLoser', this is the
+            address of the assert winner.  The InetAddressType is given
+            by the alaPimSGIAssertWinnerAddressType object."
+    ::= { alaPimSGIEntry 10 }
+
+alaPimSGIAssertWinnerMetricPref OBJECT-TYPE
+    SYNTAX     Unsigned32 (0..2147483647)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGIAssertState is 'iAmAssertLoser', this is the
+            metric preference of the route to the source advertised by
+            the assert winner; otherwise, this object is zero."
+    ::= { alaPimSGIEntry 11 }
+
+alaPimSGIAssertWinnerMetric OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "If alaPimSGIAssertState is 'iAmAssertLoser', this is the
+            routing metric of the route to the source advertised by the
+            assert winner; otherwise, this object is zero."
+    ::= { alaPimSGIEntry 12 }
+
+--
+-- The PIM (S,G,rpt) State Table
+--
+
+alaPimSGRptTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimSGRptEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the non-interface specific
+            (S,G,rpt) state that PIM has."
+    REFERENCE "RFC 4601 section 4.1.5"
+    ::= { alaPim 8 }
+
+alaPimSGRptEntry OBJECT-TYPE
+    SYNTAX     AlaPimSGRptEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimSGRptTable."
+    INDEX      { alaPimStarGAddressType,
+                 alaPimStarGGrpAddress,
+                 alaPimSGRptSrcAddress }
+    ::= { alaPimSGRptTable 1 }
+
+AlaPimSGRptEntry ::= SEQUENCE {
+    alaPimSGRptSrcAddress             InetAddress,
+    alaPimSGRptUpTime                 TimeTicks,
+    alaPimSGRptUpstreamPruneState     INTEGER,
+    alaPimSGRptUpstreamOverrideTimer  TimeTicks
+}
+
+alaPimSGRptSrcAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The source address for this entry.  The InetAddressType is
+            given by the alaPimStarGAddressType object."
+    ::= { alaPimSGRptEntry 1 }
+
+alaPimSGRptUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since this entry was created by the local router."
+    ::= { alaPimSGRptEntry 2 }
+
+alaPimSGRptUpstreamPruneState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  rptNotJoined (1),
+                  pruned (2),
+                  notPruned (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router should prune the source off the RP
+            tree.  This corresponds to the state of the upstream
+            (S,G,rpt) state machine for triggered messages in the PIM-SM
+            specification."
+    REFERENCE "RFC 4601 section 4.5.9"
+    ::= { alaPimSGRptEntry 3 }
+
+alaPimSGRptUpstreamOverrideTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router sends a
+            triggered (S,G,rpt) Join message on alaPimStarGRPFIfIndex.
+            This timer is called the (S,G,rpt) Upstream Override Timer
+            in the PIM-SM specification.  This object is zero if the
+            timer is not running."
+    REFERENCE "RFC 4601 section 4.5.9"
+    ::= { alaPimSGRptEntry 4 }
+
+--
+-- The PIM (S,G,rpt,I) State Table
+--
+
+alaPimSGRptITable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimSGRptIEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing the interface-specific
+            (S,G,rpt) state that PIM has."
+    REFERENCE "RFC 4601 section 4.1.5"
+    ::= { alaPim 9 }
+
+alaPimSGRptIEntry OBJECT-TYPE
+    SYNTAX     AlaPimSGRptIEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimSGRptITable."
+    INDEX      { alaPimStarGAddressType,
+                 alaPimStarGGrpAddress,
+                 alaPimSGRptSrcAddress,
+                 alaPimSGRptIIfIndex }
+    ::= { alaPimSGRptITable 1 }
+
+AlaPimSGRptIEntry ::= SEQUENCE {
+    alaPimSGRptIIfIndex            InterfaceIndex,
+    alaPimSGRptIUpTime             TimeTicks,
+    alaPimSGRptILocalMembership    TruthValue,
+    alaPimSGRptIJoinPruneState     INTEGER,
+    alaPimSGRptIPrunePendingTimer  TimeTicks,
+    alaPimSGRptIPruneExpiryTimer   TimeTicks
+}
+
+alaPimSGRptIIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The ifIndex of the interface that this entry corresponds
+            to."
+    ::= { alaPimSGRptIEntry 1 }
+
+alaPimSGRptIUpTime OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time since this entry was created by the local router."
+    ::= { alaPimSGRptIEntry 2 }
+
+alaPimSGRptILocalMembership OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "Whether the local router has both (*,G) include local
+            membership and (S,G) exclude local membership on this
+            interface (resulting from a mechanism such as IGMP or MLD).
+            This corresponds to local_receiver_exclude(S,G,I) in the
+            PIM-SM specification."
+    REFERENCE "RFC 3376, RFC 3810, RFC 4601 section 4.1.6"
+    ::= { alaPimSGRptIEntry 3 }
+
+alaPimSGRptIJoinPruneState OBJECT-TYPE
+    SYNTAX     INTEGER {
+                  noInfo (1),
+                  prune (2),
+                  prunePending (3)
+               }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The state resulting from (S,G,rpt) Join/Prune messages
+            received on this interface.  This corresponds to the state
+            of the downstream per-interface (S,G,rpt) state machine in
+            the PIM-SM specification."
+    REFERENCE "RFC 4601 section 4.5.4"
+    ::= { alaPimSGRptIEntry 4 }
+
+alaPimSGRptIPrunePendingTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before the local router starts pruning
+            this source off the RP tree.  This timer is called the
+            (S,G,rpt) Prune-Pending Timer in the PIM-SM specification.
+            This object is zero if the timer is not running."
+    REFERENCE "RFC 4601 section 4.5.4"
+    ::= { alaPimSGRptIEntry 5 }
+
+alaPimSGRptIPruneExpiryTimer OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The time remaining before (S,G,rpt) Prune state for this
+            interface expires.  This timer is called the (S,G,rpt)
+            Prune Expiry Timer in the PIM-SM specification.  This object
+            is zero if the timer is not running.  A value of 'FFFFFFFF'h
+            indicates an infinite expiry time."
+    REFERENCE "RFC 4601 section 4.5.4"
+    ::= { alaPimSGRptIEntry 6 }
+
+--
+-- The PIM Static RP Table
+--
+
+alaPimStaticRPTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimStaticRPEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "This table is used to create and manage static
+            configuration of RPs.
+
+            If the group prefixes configured for two or more rows in
+            this table overlap, the row with the greatest value of
+            alaPimStaticRPGrpPrefixLength is used for the overlapping
+            range."
+    REFERENCE "RFC 4601 section 3.7"
+    ::= { alaPim 11 }
+
+alaPimStaticRPEntry OBJECT-TYPE
+    SYNTAX     AlaPimStaticRPEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimStaticRPTable.  This
+            entry is preserved on agent restart."
+    INDEX      { alaPimStaticRPAddressType,
+                 alaPimStaticRPGrpAddress,
+                 alaPimStaticRPGrpPrefixLength }
+    ::= { alaPimStaticRPTable 1 }
+
+AlaPimStaticRPEntry ::= SEQUENCE {
+    alaPimStaticRPAddressType      InetAddressType,
+    alaPimStaticRPGrpAddress       InetAddress,
+    alaPimStaticRPGrpPrefixLength  InetAddressPrefixLength,
+    alaPimStaticRPRPAddress        InetAddress,
+    alaPimStaticRPPimMode          AlaPimMode,
+    alaPimStaticRPOverrideDynamic  TruthValue,
+    alaPimStaticRPPrecedence       Unsigned32,
+    alaPimStaticRPRowStatus        RowStatus,
+    alaPimStaticRPStorageType      StorageType
+}
+
+alaPimStaticRPAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address type of this entry."
+    ::= { alaPimStaticRPEntry 1 }
+
+alaPimStaticRPGrpAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The multicast group address which, when combined with
+            alaPimStaticRPGrpPrefixLength, gives the group prefix for this
+            entry.  The InetAddressType is given by the
+            alaPimStaticRPAddressType object.
+
+            This address object is only significant up to
+            alaPimSGRPFRoutePrefixLength bits.  The remainder of the
+            address bits are zero.  This is especially important for
+            this index field, which is part of the index of this entry.
+            Any non-zero bits would signify an entirely different
+            entry."
+    ::= { alaPimStaticRPEntry 2 }
+
+alaPimStaticRPGrpPrefixLength OBJECT-TYPE
+    SYNTAX     InetAddressPrefixLength (4..128)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The multicast group prefix length, which, when combined
+            with alaPimStaticRPGrpAddress, gives the group prefix for this
+            entry.  The InetAddressType is given by the
+            alaPimStaticRPAddressType object.  If alaPimStaticRPAddressType is
+            'ipv4' or 'ipv4z', this object must be in the range 4..32.
+            If alaPimStaticRPGrpAddressType is 'ipv6' or 'ipv6z', this
+            object must be in the range 8..128."
+    ::= { alaPimStaticRPEntry 3 }
+
+alaPimStaticRPRPAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The IP address of the RP to be used for groups within this
+            group prefix.  The InetAddressType is given by the
+            alaPimStaticRPAddressType object."
+    ::= { alaPimStaticRPEntry 4 }
+
+alaPimStaticRPPimMode OBJECT-TYPE
+    SYNTAX     AlaPimMode
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The PIM mode to be used for groups in this group prefix.
+
+            If this object is set to ssm(2) or dm(5), then 
+            alaPimStaticRPRPAddress must be set to zero.  No RP
+            operations are ever possible for PIM Mode SSM or DM."
+    REFERENCE "RFC 4601 section 3.7, RFC 3569 and
+               I-D.ietf-mboned-ip-mcast-mib ipMcastSsmRangeTable"
+    DEFVAL { asm }
+    ::= { alaPimStaticRPEntry 5 }
+
+alaPimStaticRPOverrideDynamic OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "Whether this static RP configuration overrides RP
+            information learned dynamically for groups in this group
+            prefix."
+    DEFVAL { false }
+    ::= { alaPimStaticRPEntry 6 }
+
+alaPimStaticRPPrecedence OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The value for alaPimGroupMappingPrecedence to be used for this
+            static RP configuration.  This allows fine control over
+            which configuration is overridden by this static
+            configuration.
+
+            If alaPimStaticRPOverrideDynamic is set to TRUE, all dynamic RP
+            configuration is overridden by this static configuration,
+            whatever the value of this object.
+
+            The absolute values of this object have a significance only
+            on the local router and do not need to be coordinated with
+            other routers.  A setting of this object may have different
+            effects when applied to other routers.
+
+            Do not use this object unless fine control of static RP
+            behavior on the local router is required.
+
+            A value of 65535 is used to represent an 'undefined' value 
+            indicating that this object is not being used."
+    ::= { alaPimStaticRPEntry 7 }
+
+alaPimStaticRPRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "The status of this row, by which rows in this table can
+            be created and destroyed.
+
+            This status object cannot be set to active(1) before valid
+            values have been written to alaPimStaticRPRPAddress.
+
+            All writeable objects in this entry can be modified when the
+            status of this entry is active(1)."
+    ::= { alaPimStaticRPEntry 8 }
+
+alaPimStaticRPStorageType OBJECT-TYPE
+    SYNTAX      StorageType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+           "The storage type for this row.  Rows having the value
+           'permanent' need not allow write-access to any columnar
+           objects in the row."
+       DEFVAL { nonVolatile }
+    ::= { alaPimStaticRPEntry 9 }
+
+--
+-- The PIM Group Mapping Table
+--
+
+alaPimGroupMappingTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF AlaPimGroupMappingEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The (conceptual) table listing mappings from multicast
+            group prefixes to the PIM mode and RP address to use for
+            groups within that group prefix.
+
+            Rows in this table are created for a variety of reasons,
+            indicated by the value of the alaPimGroupMappingOrigin object.
+
+            -  Rows with a alaPimGroupMappingOrigin value of 'fixed' are
+               created automatically by the router at startup, to
+               correspond to the well-defined prefixes of link-local and
+               unroutable group addresses.  These rows are never
+               destroyed.
+
+            -  Rows with a alaPimGroupMappingOrigin value of 'embedded' are
+               created by the router to correspond to group prefixes
+               that are to be treated as being in Embedded-RP format.
+
+            -  Rows with a alaPimGroupMappingOrigin value of 'configRp' are
+               created and destroyed as a result of rows in the
+               alaPimStaticRPTable being created and destroyed.
+
+            -  Rows with a alaPimGroupMappingOrigin value of 'configSsm'
+               are created and destroyed as a result of configuration of
+               SSM address ranges to the local router.
+
+            -  Rows with a alaPimGroupMappingOrigin value of 'bsr' are
+               created as a result of running the PIM Bootstrap Router
+               (BSR) mechanism.  If the local router is not the elected
+               BSR, these rows are created to correspond to group
+               prefixes in the PIM Bootstrap messages received from the
+               elected BSR.  If the local router is the elected BSR,
+               these rows are created to correspond to group prefixes in
+               the PIM Bootstrap messages that the local router sends.
+               In either case, these rows are destroyed when the group
+               prefixes are timed out by the BSR mechanism.
+
+            -  Rows with a alaPimGroupMappingOrigin value of 'other' are
+               created and destroyed according to some other mechanism
+               not specified here.
+
+            Given the collection of rows in this table at any point in
+            time, the PIM mode and RP address to use for a particular
+            group is determined using the following algorithm.
+
+            1. From the set of all rows, the subset whose group prefix
+               contains the group in question are selected.
+
+            2. If there are no such rows, the behavior is undefined.
+
+            3. From the selected subset of rows, the subset that have
+               the greatest value of alaPimGroupMappingGrpPrefixLength are
+               selected.
+
+            4. If there are multiple selected rows, and a subset are 
+               defined by alaPimStaticRPTable (alaPimGroupMappingOrigin value
+               of 'configRp') with alaPimStaticRPOverrideDynanic set to
+               TRUE, then this subset is selected.
+
+            5. If there are still multiple selected rows, the subset
+               that have the highest precedence (the lowest numerical
+               value for alaPimGroupMappingPrecedence) are selected.
+
+            6. If there are still multiple selected rows, the row
+               selected is implementation dependent; the implementation
+               might or might not apply the PIM hash function to select
+               the row.
+
+            7. The group mode to use is given by the value of
+               alaPimGroupMappingPimMode from the single selected row; the
+               RP to use is given by the value of
+               alaPimGroupMappingRPAddress, unless alaPimGroupMappingOrigin is
+               'embedded', in which case the RP is extracted from the
+               group address in question."
+    REFERENCE "RFC 4601 section 3.7, RFC 3956 and RFC 4610"
+    ::= { alaPim 13 }
+
+alaPimGroupMappingEntry OBJECT-TYPE
+    SYNTAX     AlaPimGroupMappingEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the alaPimGroupMappingTable."
+    INDEX      { alaPimGroupMappingOrigin,
+                 alaPimGroupMappingAddressType,
+                 alaPimGroupMappingGrpAddress,
+                 alaPimGroupMappingGrpPrefixLength,
+                 alaPimGroupMappingRPAddressType,
+                 alaPimGroupMappingRPAddress }
+    ::= { alaPimGroupMappingTable 1 }
+
+AlaPimGroupMappingEntry ::= SEQUENCE {
+    alaPimGroupMappingOrigin           AlaPimGroupMappingOriginType,
+    alaPimGroupMappingAddressType      InetAddressType,
+    alaPimGroupMappingGrpAddress       InetAddress,
+    alaPimGroupMappingGrpPrefixLength  InetAddressPrefixLength,
+    alaPimGroupMappingRPAddressType    InetAddressType,
+    alaPimGroupMappingRPAddress        InetAddress,
+    alaPimGroupMappingPimMode          AlaPimMode,
+    alaPimGroupMappingPrecedence       Unsigned32
+}
+
+alaPimGroupMappingOrigin OBJECT-TYPE
+    SYNTAX     AlaPimGroupMappingOriginType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The mechanism by which this group mapping was learned."
+    ::= { alaPimGroupMappingEntry 1 }
+
+alaPimGroupMappingAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address type of the IP multicast group prefix."
+    ::= { alaPimGroupMappingEntry 2 }
+
+alaPimGroupMappingGrpAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP multicast group address which, when combined with
+            alaPimGroupMappingGrpPrefixLength, gives the group prefix for
+            this mapping.  The InetAddressType is given by the
+            alaPimGroupMappingAddressType object.
+
+            This address object is only significant up to
+            alaPimGroupMappingGrpPrefixLength bits.  The remainder of the
+            address bits are zero.  This is especially important for
+            this index field, which is part of the index of this entry.
+            Any non-zero bits would signify an entirely different
+            entry."
+    ::= { alaPimGroupMappingEntry 3 }
+
+alaPimGroupMappingGrpPrefixLength OBJECT-TYPE
+    SYNTAX     InetAddressPrefixLength (4..128)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The multicast group prefix length, which, when combined
+            with alaPimGroupMappingGrpAddress, gives the group prefix for
+            this mapping.  The InetAddressType is given by the
+            alaPimGroupMappingAddressType object.  If
+            alaPimGroupMappingAddressType is 'ipv4' or 'ipv4z', this
+            object must be in the range 4..32.  If
+            alaPimGroupMappingAddressType is 'ipv6' or 'ipv6z', this object
+            must be in the range 8..128."
+    ::= { alaPimGroupMappingEntry 4 }
+
+alaPimGroupMappingRPAddressType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The address type of the RP to be used for groups within
+            this group prefix, or unknown(0) if no RP is to be used or
+            if the RP address is unknown.  This object must be
+            unknown(0) if alaPimGroupMappingPimMode is ssm(2) or dm(5), or if
+            alaPimGroupMappingOrigin is embedded(6)."
+    ::= { alaPimGroupMappingEntry 5 }
+
+alaPimGroupMappingRPAddress OBJECT-TYPE
+    SYNTAX     InetAddress (SIZE (0|4|8|16|20))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The IP address of the RP to be used for groups within this
+            group prefix.  The InetAddressType is given by the
+            alaPimGroupMappingRPAddressType object."
+    ::= { alaPimGroupMappingEntry 6 }
+
+alaPimGroupMappingPimMode OBJECT-TYPE
+    SYNTAX     AlaPimMode
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The PIM mode to be used for groups in this group prefix."
+    ::= { alaPimGroupMappingEntry 7 }
+
+alaPimGroupMappingPrecedence OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The precedence of this row, used in the algorithm that
+            determines which row applies to a given group address
+            (described above).  Numerically higher values for this
+            object indicate lower precedences, with the value zero
+            denoting the highest precedence.
+
+            The absolute values of this object have a significance only
+            on the local router and do not need to be coordinated with
+            other routers."
+    ::= { alaPimGroupMappingEntry 8 }
+
+--
+-- PIM Notifications
+--
+
+alaPimNeighborLoss NOTIFICATION-TYPE
+    OBJECTS { alaPimNeighborUpTime }
+    STATUS     current
+    DESCRIPTION
+            "A alaPimNeighborLoss notification signifies the loss of an 
+            adjacency with a neighbor.  This notification should be 
+            generated when the neighbor timer expires, and the router 
+            has no other neighbors on the same interface with the same 
+            IP version and a lower IP address than itself.
+
+            This notification is generated whenever the counter
+            alaPimNeighborLossCount is incremented, subject
+            to the rate limit specified by 
+            alaPimNeighborLossNotificationPeriod."
+    REFERENCE "RFC 4601 section 4.3.2"
+    ::= { alaPimNotifications 1 }
+
+alaPimInvalidRegister NOTIFICATION-TYPE
+    OBJECTS { alaPimGroupMappingPimMode,
+              alaPimInvalidRegisterAddressType,
+              alaPimInvalidRegisterOrigin,
+              alaPimInvalidRegisterGroup,
+              alaPimInvalidRegisterRp
+            }
+    STATUS      current
+    DESCRIPTION
+            "A alaPimInvalidRegister notification signifies that an invalid 
+            PIM Register message was received by this device.
+
+            This notification is generated whenever the counter
+            alaPimInvalidRegisterMsgsRcvd is incremented, subject to the
+            rate limit specified by 
+            alaPimInvalidRegisterNotificationPeriod."
+    REFERENCE "RFC 4601 section 4.4.2"
+    ::= { alaPimNotifications 2 }
+
+alaPimInvalidJoinPrune NOTIFICATION-TYPE
+    OBJECTS { alaPimGroupMappingPimMode,
+              alaPimInvalidJoinPruneAddressType,
+              alaPimInvalidJoinPruneOrigin,
+              alaPimInvalidJoinPruneGroup,
+              alaPimInvalidJoinPruneRp,
+              alaPimNeighborUpTime
+            }
+    STATUS      current
+    DESCRIPTION
+            "A alaPimInvalidJoinPrune notification signifies that an 
+            invalid PIM Join/Prune message was received by this device.
+
+            This notification is generated whenever the counter
+            alaPimInvalidJoinPruneMsgsRcvd is incremented, subject to the
+            rate limit specified by 
+            alaPimInvalidJoinPruneNotificationPeriod."
+    REFERENCE "RFC 4601 section 4.5.2"
+    ::= { alaPimNotifications 3 }
+
+alaPimRPMappingChange NOTIFICATION-TYPE
+    OBJECTS { alaPimGroupMappingPimMode,
+              alaPimGroupMappingPrecedence
+            }
+    STATUS      current
+    DESCRIPTION
+            "A alaPimRPMappingChange notification signifies a change to the 
+            active RP mapping on this device.
+
+            This notification is generated whenever the counter
+            alaPimRPMappingChangeCount is incremented, subject to the
+            rate limit specified by 
+            alaPimRPMappingChangeNotificationPeriod."
+    ::= { alaPimNotifications 4 }
+
+alaPimInterfaceElection NOTIFICATION-TYPE
+    OBJECTS { alaPimInterfaceAddressType,
+              alaPimInterfaceAddress }
+    STATUS      current
+    DESCRIPTION
+            "A alaPimInterfaceElection notification signifies that a new DR 
+            or DR has been elected on a network.
+
+            This notification is generated whenever the counter
+            alaPimInterfaceElectionsWinCount is incremented, subject to the
+            rate limit specified by 
+            alaPimInterfaceElectionNotificationPeriod."
+    REFERENCE "RFC 4601 section 4.3.2 and
+               I-D.ietf-pim-bidir section 3.5.2"
+    ::= { alaPimNotifications 5 }
+
+--
+-- Conformance Information
+--
+
+alaPimMIBConformance OBJECT IDENTIFIER ::= { alaPimStdMIB 2 }
+alaPimMIBCompliances OBJECT IDENTIFIER ::= { alaPimMIBConformance 1 }
+alaPimMIBGroups      OBJECT IDENTIFIER ::= { alaPimMIBConformance 2 }
+
+--
+-- Compliance Statements
+--
+
+alaPimMIBComplianceAsm MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for the PIM-SM MIB."
+    MODULE  -- this module
+    MANDATORY-GROUPS { alaPimTopologyGroup,
+                       alaPimSsmGroup,
+                       alaPimRPConfigGroup,
+                       alaPimSmGroup }
+
+      GROUP   alaPimNotificationGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimTuningParametersGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimRouterStatisticsGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimStaticRPPrecedenceGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimNetMgmtNotificationObjects
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimNetMgmtNotificationGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimDiagnosticsGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimDeviceStorageGroup
+      DESCRIPTION
+          "This group is optional."
+
+    ::= { alaPimMIBCompliances 1 }
+
+alaPimMIBComplianceSsm MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for PIM SSM MIB."
+    MODULE  -- this module
+    MANDATORY-GROUPS { alaPimTopologyGroup,
+                       alaPimSsmGroup }
+
+      GROUP   alaPimNotificationGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimTuningParametersGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimRouterStatisticsGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimNetMgmtNotificationObjects
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimNetMgmtNotificationGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimDiagnosticsGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimDeviceStorageGroup
+      DESCRIPTION
+          "This group is optional."
+
+    ::= { alaPimMIBCompliances 3 }
+
+alaPimMIBComplianceDm MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for PIM-DM MIB."
+    MODULE  -- this module
+    MANDATORY-GROUPS { alaPimTopologyGroup,
+                       alaPimSsmGroup,
+                       alaPimRPConfigGroup,
+                       alaPimSmGroup,
+                       alaPimDmGroup }
+
+      GROUP   alaPimNotificationGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimTuningParametersGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimRouterStatisticsGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimStaticRPPrecedenceGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimNetMgmtNotificationObjects
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimNetMgmtNotificationGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimDiagnosticsGroup
+      DESCRIPTION
+          "This group is optional."
+
+      GROUP   alaPimDeviceStorageGroup
+      DESCRIPTION
+          "This group is optional."
+
+    ::= { alaPimMIBCompliances 4 }
+
+
+--
+-- Units of Conformance
+--
+
+alaPimTopologyGroup OBJECT-GROUP
+    OBJECTS { alaPimInterfaceAddressType,
+              alaPimInterfaceAddress,
+              alaPimInterfaceGenerationIDValue,
+              alaPimInterfaceDR,
+              alaPimInterfaceDRPriorityEnabled,
+              alaPimInterfaceHelloHoldtime,
+              alaPimInterfaceJoinPruneHoldtime,
+              alaPimInterfaceLanDelayEnabled,
+              alaPimInterfaceEffectPropagDelay,
+              alaPimInterfaceEffectOverrideIvl,
+              alaPimInterfaceSuppressionEnabled,
+              alaPimInterfaceBidirCapable,
+              alaPimNeighborGenerationIDPresent,
+              alaPimNeighborGenerationIDValue,
+              alaPimNeighborUpTime,
+              alaPimNeighborExpiryTime,
+              alaPimNeighborDRPriorityPresent,
+              alaPimNeighborDRPriority,
+              alaPimNeighborLanPruneDelayPresent,
+              alaPimNeighborTBit,
+              alaPimNeighborPropagationDelay,
+              alaPimNeighborOverrideInterval,
+              alaPimNeighborBidirCapable,
+              alaPimNbrSecAddress
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of read-only objects used to report local PIM
+            topology."
+    ::= { alaPimMIBGroups 1 }
+
+alaPimNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alaPimNeighborLoss }
+    STATUS  current
+    DESCRIPTION
+            "A collection of notifications for signaling important PIM
+            events."
+    ::= { alaPimMIBGroups 2 }
+
+alaPimTuningParametersGroup OBJECT-GROUP
+    OBJECTS { alaPimKeepalivePeriod,
+              alaPimRegisterSuppressionTime,
+              alaPimInterfaceDRPriority,
+              alaPimInterfaceHelloInterval,
+              alaPimInterfaceTrigHelloInterval,
+              alaPimInterfaceJoinPruneInterval,
+              alaPimInterfacePropagationDelay,
+              alaPimInterfaceOverrideInterval,
+              alaPimInterfaceDomainBorder,
+              alaPimInterfaceStubInterface,
+              alaPimInterfaceStatus,
+              alaPimInterfaceStorageType
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of writeable objects used to configure PIM
+            behavior and to tune performance."
+    ::= { alaPimMIBGroups 3 }
+
+alaPimRouterStatisticsGroup OBJECT-GROUP
+    OBJECTS { alaPimStarGEntries,
+              alaPimStarGIEntries,
+              alaPimSGEntries,
+              alaPimSGIEntries,
+              alaPimSGRptEntries,
+              alaPimSGRptIEntries
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of statistics global to the PIM router."
+    ::= { alaPimMIBGroups 4 }
+
+alaPimSsmGroup OBJECT-GROUP
+    OBJECTS { alaPimSGUpTime,
+              alaPimSGPimMode,
+              alaPimSGUpstreamJoinState,
+              alaPimSGUpstreamJoinTimer,
+              alaPimSGUpstreamNeighbor,
+              alaPimSGRPFIfIndex,
+              alaPimSGRPFNextHopType,
+              alaPimSGRPFNextHop,
+              alaPimSGRPFRouteProtocol,
+              alaPimSGRPFRouteAddress,
+              alaPimSGRPFRoutePrefixLength,
+              alaPimSGRPFRouteMetricPref,
+              alaPimSGRPFRouteMetric,
+              alaPimSGSPTBit,
+              alaPimSGKeepaliveTimer,
+              alaPimSGDRRegisterState,
+              alaPimSGDRRegisterStopTimer,
+              alaPimSGRPRegisterPMBRAddressType,
+              alaPimSGRPRegisterPMBRAddress,
+              alaPimSGIUpTime,
+              alaPimSGILocalMembership,
+              alaPimSGIJoinPruneState,
+              alaPimSGIPrunePendingTimer,
+              alaPimSGIJoinExpiryTimer,
+              alaPimSGIAssertState,
+              alaPimSGIAssertTimer,
+              alaPimSGIAssertWinnerAddressType,
+              alaPimSGIAssertWinnerAddress,
+              alaPimSGIAssertWinnerMetricPref,
+              alaPimSGIAssertWinnerMetric
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects to support management of PIM
+            routers running the PIM SSM (Source Specific Multicast)
+            protocol, in PIM mode SM (Sparse Mode)."
+    ::= { alaPimMIBGroups 5 }
+
+alaPimRPConfigGroup OBJECT-GROUP
+    OBJECTS { alaPimStaticRPRPAddress,
+              alaPimStaticRPPimMode,
+              alaPimStaticRPOverrideDynamic,
+              alaPimStaticRPRowStatus,
+              alaPimStaticRPStorageType,
+              alaPimGroupMappingPimMode,
+              alaPimGroupMappingPrecedence
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects to support configuration of RPs
+            (Rendezvous Points) and Group Mappings."
+    ::= { alaPimMIBGroups 6 }
+
+alaPimSmGroup OBJECT-GROUP
+    OBJECTS { alaPimStarGUpTime,
+              alaPimStarGPimMode,
+              alaPimStarGRPAddressType,
+              alaPimStarGRPAddress,
+              alaPimStarGPimModeOrigin,
+              alaPimStarGRPIsLocal,
+              alaPimStarGUpstreamJoinState,
+              alaPimStarGUpstreamJoinTimer,
+              alaPimStarGUpstreamNeighborType,
+              alaPimStarGUpstreamNeighbor,
+              alaPimStarGRPFIfIndex,
+              alaPimStarGRPFNextHopType,
+              alaPimStarGRPFNextHop,
+              alaPimStarGRPFRouteProtocol,
+              alaPimStarGRPFRouteAddress,
+              alaPimStarGRPFRoutePrefixLength,
+              alaPimStarGRPFRouteMetricPref,
+              alaPimStarGRPFRouteMetric,
+              alaPimStarGIUpTime,
+              alaPimStarGILocalMembership,
+              alaPimStarGIJoinPruneState,
+              alaPimStarGIPrunePendingTimer,
+              alaPimStarGIJoinExpiryTimer,
+              alaPimStarGIAssertState,
+              alaPimStarGIAssertTimer,
+              alaPimStarGIAssertWinnerAddressType,
+              alaPimStarGIAssertWinnerAddress,
+              alaPimStarGIAssertWinnerMetricPref,
+              alaPimStarGIAssertWinnerMetric,
+              alaPimSGRptUpTime,
+              alaPimSGRptUpstreamPruneState,
+              alaPimSGRptUpstreamOverrideTimer,
+              alaPimSGRptIUpTime,
+              alaPimSGRptILocalMembership,
+              alaPimSGRptIJoinPruneState,
+              alaPimSGRptIPrunePendingTimer,
+              alaPimSGRptIPruneExpiryTimer
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects to support management of PIM
+            routers running PIM-SM (Sparse Mode).  The groups
+            alaPimSsmGroup and alaPimRPConfigGroup are also required."
+    ::= { alaPimMIBGroups 7 }
+
+alaPimStaticRPPrecedenceGroup OBJECT-GROUP
+    OBJECTS { alaPimStaticRPPrecedence }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects to allow fine control of
+            interactions between static RP configuration and
+            dynamically acquired group to RP mappings."
+    ::= { alaPimMIBGroups 10 }
+
+alaPimNetMgmtNotificationObjects OBJECT-GROUP
+    OBJECTS { alaPimInvalidRegisterNotificationPeriod,
+              alaPimInvalidRegisterMsgsRcvd,
+              alaPimInvalidRegisterAddressType,
+              alaPimInvalidRegisterOrigin,
+              alaPimInvalidRegisterGroup,
+              alaPimInvalidRegisterRp,
+              alaPimInvalidJoinPruneNotificationPeriod,
+              alaPimInvalidJoinPruneMsgsRcvd,
+              alaPimInvalidJoinPruneAddressType,
+              alaPimInvalidJoinPruneOrigin,
+              alaPimInvalidJoinPruneGroup,
+              alaPimInvalidJoinPruneRp,
+              alaPimRPMappingNotificationPeriod,
+              alaPimRPMappingChangeCount,
+              alaPimInterfaceElectionNotificationPeriod,
+              alaPimInterfaceElectionWinCount
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects to support notification of PIM
+            network management events."
+    ::= { alaPimMIBGroups 11 }
+
+alaPimNetMgmtNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alaPimInvalidRegister,
+                    alaPimInvalidJoinPrune,
+                    alaPimRPMappingChange,
+                    alaPimInterfaceElection
+                  }
+    STATUS  current
+    DESCRIPTION
+            "A collection of notifications for signaling PIM network
+            management events."
+    ::= { alaPimMIBGroups 12 }
+
+alaPimDiagnosticsGroup OBJECT-GROUP
+    OBJECTS { alaPimInAsserts,
+              alaPimOutAsserts,
+              alaPimLastAssertInterface,
+              alaPimLastAssertGroupAddressType,
+              alaPimLastAssertGroupAddress,
+              alaPimLastAssertSourceAddressType,
+              alaPimLastAssertSourceAddress,
+              alaPimNeighborLossNotificationPeriod,
+              alaPimNeighborLossCount
+            }
+    STATUS  current
+    DESCRIPTION
+            "Objects providing additonal diagnostics related to a PIM
+            router."
+    ::= { alaPimMIBGroups 13 }
+
+alaPimDmGroup OBJECT-GROUP
+    OBJECTS {
+              alaPimRefreshInterval,
+              alaPimInterfacePruneLimitInterval,
+              alaPimInterfaceGraftRetryInterval,
+              alaPimInterfaceSRPriorityEnabled,
+              alaPimNeighborSRCapable,
+              alaPimSGUpstreamPruneState,
+              alaPimSGUpstreamPruneLimitTimer,
+              alaPimSGOriginatorState,
+              alaPimSGSourceActiveTimer,
+              alaPimSGStateRefreshTimer
+            }
+    STATUS  current
+    DESCRIPTION
+            "A collection of objects required for management of PIM
+            Dense Mode (PIM-DM) function.  The groups alaPimSsmGroup and
+            alaPimSmGroup are also required."
+    REFERENCE "RFC 3973"
+    ::= { alaPimMIBGroups 14 }
+
+alaPimDeviceStorageGroup OBJECT-GROUP
+    OBJECTS { alaPimDeviceConfigStorageType
+            }
+    STATUS  current
+    DESCRIPTION
+            "An object that specifies the volatility of global PIM
+            configuration settings on this device."
+    ::= { alaPimMIBGroups 15 }
+
+END

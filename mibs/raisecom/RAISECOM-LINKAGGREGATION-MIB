@@ -1,0 +1,257 @@
+--MibName=rcLinkAggregation
+-- *****************************************************************
+-- rcLinkAggregation.mib:   Raisecom Link Aggregation MIB file 
+--
+-- Copyright (c) 1994-2004 by Raisecom, Inc.
+-- All rights reserved. 
+
+-- 1. 2013.6.13, kangyy, ESW00011758, 修改负载分担模式和trunk组模式的取值
+
+
+RAISECOM-LINKAGGREGATION-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE     	FROM SNMPv2-SMI
+    PortList,EnableVar					FROM SWITCH-TC
+    TruthValue                          FROM SNMPv2-TC
+    dot3adAggPortIndex                  FROM IEEE8023-LAG-MIB
+    iscomSwitch	            			FROM RAISECOM-BASE-MIB;
+
+
+rcLinkAggregation MODULE-IDENTITY
+    	LAST-UPDATED "201002080000Z"
+    	ORGANIZATION "RAISECOM Group"
+    	CONTACT-INFO
+            	" 
+             	Phone:  01082884499
+             	Email:  support@raisecom.com"
+    	DESCRIPTION
+            	"The MIB module for managing link aggregation of switch."
+    	REVISION      "9103310000Z"
+    	DESCRIPTION
+            ""
+    	::= { iscomSwitch 6}  
+    	
+------------------------------------------------------------------
+-- 标量
+------------------------------------------------------------------
+rcLinkAggregationStatus OBJECT-TYPE
+    	SYNTAX   EnableVar
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+              "Enable or disable link aggregation."
+    	DEFVAL  { enable }
+    	::= { rcLinkAggregation 1 }
+
+
+rcLinkAggregationLoadSharingMode OBJECT-TYPE
+    	SYNTAX INTEGER {
+               		srcMAC(1),
+			        destMAC(2),
+			        srcXORDestMAC(3),
+			        srcIP(4),
+			        destIP(5),
+			        srcXORDestIP(6)
+			        --,SrcXORDestMACXORSrcPort(7)
+                    } 
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            " The Rule to be applied to this Link Aggregator's Trunk Group
+			Table. The rules are based on the following selections SrcMAC (1),
+			means that the last three bits of the Source MAC Address are used to
+			index the Trunk Group to get the destination port. DestMAC (2), means
+			the last three bits of the Destination MAC Address are used to index 
+			into the Trunk Group to get the destination port. SrcXORDestMAC (3),
+			means that the last three bits of the Source MAC Address are logically
+			XORed with the last three bits of the Destination MAC Address and used
+			to index into the Trunk Group to get the destination port. SrcIP (4),
+			means the last three bits of the Source IP Address are used to index
+			into the Trunk Group to get the destination port. DestIP (5), means
+			the last three bits of the Destination IP Address are used to index
+			into the Trunk Group to get the destination port. SrcXORDestIP (6),
+			means the last three bits of the Source IP Address are logically XORed
+			with the last three bits of the Destination IP Address and used to 
+			index into the Trunk Group to get the destination port. This rule
+			defines the distribution algorithm applied to the aggregated link."      
+    	DEFVAL { srcXORDestMAC }
+    	::= { rcLinkAggregation 2 }
+    	
+rcLinkAggregationTicketGenerationAlgorithm OBJECT-TYPE
+    	SYNTAX INTEGER {
+                    direct-map(1),  
+                    crc(2) 
+                    }
+   		MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            "There are two algorithm to generate trunk ticket: direct-map and crc.
+            Direct-map uses the last two bits of mac address as the trunk ticket;
+            Crc uses crc algorithm on all mac address to generate trunk ticket."    
+    	DEFVAL {direct-map}
+    	::= { rcLinkAggregation 3 }
+      
+	
+rcLinkAggregationMaxGroup OBJECT-TYPE
+    	SYNTAX   INTEGER (0..8)
+    	MAX-ACCESS  read-only
+    	STATUS      current
+    	DESCRIPTION
+              "The number of maximum link aggregation group that system supports."
+        ::= { rcLinkAggregation 4 }
+ 
+
+------------------------------------------------------------------
+-- rcLinkAggregationGroupTable
+------------------------------------------------------------------
+rcLinkAggregationGroupTable OBJECT-TYPE
+    	SYNTAX  SEQUENCE OF RcLinkAggregationGroupEntry
+    	MAX-ACCESS  not-accessible
+    	STATUS      current
+    	DESCRIPTION
+            "Some ports participate in a link aggregation group."
+    	::= { rcLinkAggregation 5 }
+
+rcLinkAggregationGroupEntry OBJECT-TYPE
+    	SYNTAX      RcLinkAggregationGroupEntry      
+    	MAX-ACCESS  not-accessible
+    	STATUS      current
+    	DESCRIPTION
+            "The entry is used to set some ports into a link aggregation group."
+    	INDEX   { rcLinkAggregationGroupID }
+    	::= { rcLinkAggregationGroupTable 1 }
+
+        RcLinkAggregationGroupEntry ::= SEQUENCE
+        {
+            rcLinkAggregationGroupID   	            INTEGER,
+            rcLinkAggregationGroupSettingPorts      PortList, 
+            rcLinkAggregationGroupCurrentPorts      PortList,
+            rcLinkAggregationGroupMode              INTEGER,
+            rcLinkAggregationGroupMinLinks          INTEGER,
+            rcLinkAggregationGroupMaxLinks          INTEGER
+        }
+
+rcLinkAggregationGroupID OBJECT-TYPE
+    	SYNTAX      INTEGER  (1..8)
+    	MAX-ACCESS  not-accessible
+    	STATUS      current
+    	DESCRIPTION
+            "The link aggregation group ID."
+    	::= { rcLinkAggregationGroupEntry 1 }
+
+rcLinkAggregationGroupSettingPorts OBJECT-TYPE
+    	SYNTAX      PortList
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            "When a bit of PortList is set, the port this bit specified participate
+             in a appointed link aggregation group."
+    ::= { rcLinkAggregationGroupEntry 2 }
+
+rcLinkAggregationGroupCurrentPorts OBJECT-TYPE
+    	SYNTAX      PortList
+    	MAX-ACCESS  read-only
+    	STATUS      current
+    	DESCRIPTION
+            "Show these ports that are in active status in a link aggregation group."
+    	::= { rcLinkAggregationGroupEntry 3 }
+    	
+rcLinkAggregationGroupMode OBJECT-TYPE
+    	SYNTAX INTEGER {
+                    manual(1), 
+                    lacp-static(2)
+                    --,
+                    --other(255),
+                    --lacp-dynamic(3)
+                    }
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            "Show these ports that are in active status in a link aggregation group."
+    	::= { rcLinkAggregationGroupEntry 4 }
+
+rcLinkAggregationGroupMinLinks OBJECT-TYPE
+    	SYNTAX      INTEGER  (1..64)
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            "The link aggregation group ID."
+    	::= { rcLinkAggregationGroupEntry 5 }
+
+rcLinkAggregationGroupMaxLinks OBJECT-TYPE
+    	SYNTAX      INTEGER  (1..64)
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            "The link aggregation group ID."
+    	::= { rcLinkAggregationGroupEntry 6 }    	
+
+------------------------------------------------------------------
+-- rcLinkAggregationPortStatsClearTable
+------------------------------------------------------------------
+rcLinkAggregationPortStatsClearTable OBJECT-TYPE
+    	SYNTAX  SEQUENCE OF RcLinkAggregationPortStatsClearEntry
+    	MAX-ACCESS  not-accessible
+    	STATUS      current
+    	DESCRIPTION
+            "Clear link aggregation group stattistics table."
+    	::= { rcLinkAggregation 6 }
+
+rcLinkAggregationPortStatsClearEntry OBJECT-TYPE
+    	SYNTAX      RcLinkAggregationPortStatsClearEntry      
+    	MAX-ACCESS  not-accessible
+    	STATUS      current
+    	DESCRIPTION
+            "The entry is used to clear statistics of a link aggregation group."
+    	INDEX   { dot3adAggPortIndex }
+    	::= { rcLinkAggregationPortStatsClearTable 1 }
+
+        RcLinkAggregationPortStatsClearEntry ::= SEQUENCE
+        {
+            rcLinkAggregationPortStatsClear   TruthValue
+        }
+
+rcLinkAggregationPortStatsClear OBJECT-TYPE
+    	SYNTAX      TruthValue
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            "Clear link aggregation group port statistics."
+    	::= { rcLinkAggregationPortStatsClearEntry 1 }
+    	
+------------------------------------------------------------------
+-- rcLinkAggregationPortLACPTable
+------------------------------------------------------------------
+rcLinkAggregationPortLACPTable OBJECT-TYPE
+    	SYNTAX  SEQUENCE OF RcLinkAggregationPortLACPEntry
+    	MAX-ACCESS  not-accessible
+    	STATUS      current
+    	DESCRIPTION
+            "Enable or disable LACP table."
+    	::= { rcLinkAggregation 7 }
+
+rcLinkAggregationPortLACPEntry OBJECT-TYPE
+    	SYNTAX      RcLinkAggregationPortLACPEntry      
+    	MAX-ACCESS  not-accessible
+    	STATUS      current
+    	DESCRIPTION
+            "The entry is used to enable or disable LACP of a port."
+    	INDEX   { dot3adAggPortIndex }
+    	::= { rcLinkAggregationPortLACPTable 1 }
+
+        RcLinkAggregationPortLACPEntry ::= SEQUENCE
+        {
+            rcLinkAggregationPortLACPEnable   EnableVar
+        }
+
+rcLinkAggregationPortLACPEnable OBJECT-TYPE
+    	SYNTAX      EnableVar
+    	MAX-ACCESS  read-write
+    	STATUS      current
+    	DESCRIPTION
+            "Enable or disable LACP." 
+        DEFVAL  { disable }
+    	::= { rcLinkAggregationPortLACPEntry 1 }
+    	
+END

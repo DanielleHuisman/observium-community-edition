@@ -1,0 +1,4120 @@
+XEROX-JOB-MONITORING-MIB DEFINITIONS ::= BEGIN
+
+-- Module:  Job Monitoring MIB
+--
+--
+-- Date:    6-June-2002
+-- Version: 5.11.pub
+-- File:    41jobmon.dfm, .mib, .pdf, .txt
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+        OBJECT-IDENTITY, Counter32, Integer32
+              FROM SNMPv2-SMI                     -- RFC 1442/1902/2578 
+        DateAndTime, RowStatus, DisplayString
+              FROM SNMPv2-TC                      -- RFC 1443/1903/2579
+        MODULE-COMPLIANCE, OBJECT-GROUP
+              FROM SNMPv2-CONF                    -- RFC 1444/1904/2580
+        hrDeviceIndex, ProductID, InternationalDisplayString
+              FROM HOST-RESOURCES-MIB             -- RFC 1514/2790
+        xeroxCommonMIB
+              FROM XEROX-COMMON-MIB                   -- 02common.mib
+        Ordinal16, Ordinal32, Cardinal32,
+        CodeIndexedStringIndex,
+        Cardinal64High, Cardinal64Low,
+        zeroDotZero, Cardinal16
+              FROM XEROX-GENERAL-TC                   -- 06gentc.mib
+        XcmHrDevInfoXStatus, XcmHrDevTrafficUnit
+              FROM XEROX-HOST-RESOURCES-EXT-TC        -- 10hosttc.mib
+        XcmPrtChannelType, XcmPrtMediumSize,
+        XcmPrtPrintQuality, XcmPrtInterpreterLangFamily
+              FROM XEROX-PRINTER-EXT-TC               -- 15prtxtc.mib
+                  -- being promoted by PWG to draft Printer MIB.
+                  -- We should import from there instead when
+                  -- the draft Printer MIB is published as
+                  -- an RFC.
+        XcmJMJobState,         XcmJMJobStateReasons,
+        XcmJMJobXStateReasons, XcmJMJobX2StateReasons,
+        XcmJMJobServiceTypeOID, XcmJMGroupSupport,
+        XcmJMImpsCountType,    XcmJMMediumType,
+        XcmJMDocFileNameType, XcmJMDocType, XcmJMDocState,
+        XcmJMDocOutputMethod
+              FROM XEROX-JOB-MONITORING-TC;            -- 40jobtc.mib
+
+xcmJobMonMIB MODULE-IDENTITY
+        LAST-UPDATED "0206060000Z"  -- yymmddhhmmZ, year 20yy
+
+
+        ORGANIZATION "Xerox Common Management Interface Working Group"
+        CONTACT-INFO
+        "       XCMI Editors
+                E-Mail:       coherence@crt.xerox.com
+
+                --
+                --
+        "
+        DESCRIPTION "
+            File:     41jobmon.dfm, .mib, .txt, .pdf
+            Version:  4.03.pub
+
+            This MIB specifies job and document objects for
+            monitoring print jobs, including accounting, of print
+            jobs.  This MIB does not provide for management and
+            control of print jobs, such as cancelling or modifying
+            them.  If job control is desired, another MIB that
+            augments this one should be developed.
+
+            The groups in this MIB are arranged so that an
+            additional MIB may be developed that supports monitoring
+            of multifunction jobs (print, scan, FAX, etc.),
+            including scan-only jobs.  Such a MIB is intended to
+            augment this MIB.  See the companion Job Monitoring MIB
+            textual conventions module: XEROX-JOB-MONITORING-TC for
+            the textual conventions and for an explanation of the
+            use of this MIB (see file 40jobtc.txt).
+
+            The specification for many of the objects in this MIB is
+            taken directly from the ISO 10175 Document Printing
+            Application (DPA) standard, clause 9.2, Job Attributes
+            and clause 9.3, Document Attributes.  Such direct
+            inclusions are explicitly indicated.  However, this MIB
+            is intended to be used with non-DPA implementations, so
+            only a small set of general DPA attributes have been
+            included in the Job Monitoring MIB.  In addition, a
+            single print-centric group is included.  Finally, some
+            of the ISO DPA specifications have been generalized so
+            that they may be used with non-print job services.  For
+            example, changing the names and descriptions from
+            'printer' to 'device'.  All such changes to ISO DPA text
+
+
+            are indicated inside square brackets to make it clear
+            how this Job Monitoring MIB differs from ISO DPA.
+
+            Copyright 1996-2002 Xerox Corporation. All Rights Reserved.
+        REFERENCES
+            See 40jobtc.txt for the conformance requirements and
+            textual conventions for use with this MIB module."
+        ::= { xeroxCommonMIB 59 }
+
+--  Dummy for Emissary 7.0 'not used' warning on 'zeroDotZero'
+--  which is used only in DEFVAL.
+
+--  The value of '59' is intentional (last arc of the MIB itself)
+xcmJobZeroDummy OBJECT IDENTIFIER ::= { zeroDotZero 59 }
+
+-- Textual conventions for this MIB module:
+-- See XEROX-JOB-MONITORING-TC module
+-- (files:  40jobtc.dfm, .mib, .txt, .pdf)
+
+-- NOTE - The term "Mandatory" in this MIB, as in all MIBs, means that
+-- the object or group is mandatory, if an agent claims conformance to
+-- this MIB.  Conformance to the XCMI Job Monitoring MIB no longer
+-- requires implementation of the Printer Working Group (PWG) Job
+-- Monitoring MIB, as of version 4.00.  See 40jobtc.txt for the
+-- conformance requirements for implementing the PWG Job Monitoring MIB.
+-- The term "Conditionally Mandatory" in this MIB,
+-- as in all XCMI MIBs, means that an agent SHALL implement the feature,
+-- if the server or device implements the corresponding feature.
+-- Conversely, if an agent is not claiming conformance to
+-- this MIB, an agent need not implement the mandatory (or conditionally
+-- mandatory) objects or groups in this MIB.
+
+--          JobMon Base Group (CONDITIONALLY MANDATORY)
+
+--          Implementation of this group is conditionally mandatory for
+--          all systems, i.e., an agent SHALL implement this group if
+--          the agent supports SNMP traps and/or the XCMI Simple Job
+--          Management MIB (SJMM).
+
+xcmJobMonBase        OBJECT IDENTIFIER ::= { xcmJobMonMIB 1 }
+
+xcmJobMonBaseTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF XcmJobMonBaseEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table of general counters and capabilities for ease of use
+        of the XCMI Job Monitoring MIB on this host system.
+
+        Usage:  The ONLY valid row in the 'xcmJobMonBaseTable'
+        shall ALWAYS have an 'xcmJobMonBaseIndex' of one ('1')."
+    ::= { xcmJobMonBase 2 }
+
+
+xcmJobMonBaseEntry OBJECT-TYPE
+    SYNTAX      XcmJobMonBaseEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry of general counters and capabilities for ease of use
+        of the XCMI Job Monitoring MIB on this host system.
+
+        Usage:  The ONLY valid row in the 'xcmJobMonBaseTable'
+        shall ALWAYS have an 'xcmJobMonBaseIndex' of one ('1')."
+    INDEX       { xcmJobMonBaseIndex }
+    ::= { xcmJobMonBaseTable 1 }
+
+XcmJobMonBaseEntry ::= SEQUENCE {
+        --  General Info
+        xcmJobMonBaseIndex             Ordinal32,
+        xcmJobMonBaseRowStatus         RowStatus,
+        xcmJobMonBaseVersionID         ProductID,
+        xcmJobMonBaseVersionDate       DateAndTime,
+        xcmJobMonBaseGroupSupport      XcmJMGroupSupport,
+        xcmJobMonBaseCreateSupport     XcmJMGroupSupport,
+        xcmJobMonBaseUpdateSupport     XcmJMGroupSupport
+    }
+
+xcmJobMonBaseIndex OBJECT-TYPE
+    SYNTAX      Ordinal32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A unique value used by this host system to identify this
+        conceptual row in the 'xcmJobMonBaseTable'.
+
+        Usage:  The ONLY valid row in the 'xcmJobMonBaseTable'
+        shall ALWAYS have an 'xcmJobMonBaseIndex' of one ('1')."
+--  DEFVAL omitted                      - index object
+    ::= { xcmJobMonBaseEntry 1 }
+
+xcmJobMonBaseRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is used to display status of the ONLY valid
+        conceptual row in the 'xcmJobMonBaseTable'.
+
+        Usage:  'xcmJobMonBaseRowStatus' is 'read-only' because
+        the ONLY valid conceptual row shall NOT be deleted."
+--  DEFVAL omitted                      - row status object
+    ::= { xcmJobMonBaseEntry 2 }
+
+
+xcmJobMonBaseVersionID OBJECT-TYPE
+    SYNTAX      ProductID
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The software product ID of the SNMP sub-agent which implements
+        the XCMI Job Monitoring MIB on this host system.
+
+        Usage:  This object shall specify the software product ID of an
+        SNMP sub-agent (possibly also found in a conceptual row in the
+        'hrSWRunTable' and/or 'hrSWInstalledTable' in the IETF HR MIB).
+        This object shall NOT specify a particular release of the XCMI
+        Job Monitoring MIB, or the whole host system product.
+
+        Note:   Contrast with 'sysObjectID' for the whole SNMP agent in
+        the IETF MIB-II (RFC 1213) and 'hrDeviceID' for the whole device
+        (or whole product, in the case of 'xcmHrDevice...') in the IETF
+        Host Resources MIB (RFC 1514)."
+    REFERENCE
+        "See:   'hrSW[Installed|Run]ID' in the Software Installed and
+                Software Running groups of the IETF HR MIB (RFC 1514)."
+    DEFVAL      { zeroDotZero }   -- no sub-agent version ID
+    ::= { xcmJobMonBaseEntry 3 }
+
+xcmJobMonBaseVersionDate OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The software build date of the SNMP sub-agent which implements
+        the XCMI Job Monitoring MIB on this host system.
+
+        Usage:  This object shall specify the BUILD date of the SNMP
+        sub-agent software (not available elsewhere in IETF/XCMI MIBs).
+        This object shall NOT specify the INSTALL date of the SNMP
+        sub-agent software on this host system, nor the RESET date.
+
+        Note:   Contrast with 'hrSWInstalledDate' in the Software
+        Installed group of the IETF Host Resources MIB (RFC 1514), and
+        'xcmHrDevInfoResetDate' in the Device Info group of the XCMI
+        Host Resources Extensions MIB."
+    REFERENCE
+        "See:   'hrSW[Installed|Run]ID' in the Software Installed and
+                Software Running groups of the IETF HR MIB (RFC 1514)."
+    DEFVAL      { '0000000000000000'H } -- no sub-agent version date
+    ::= { xcmJobMonBaseEntry 4 }
+
+xcmJobMonBaseGroupSupport OBJECT-TYPE
+    SYNTAX      XcmJMGroupSupport
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The terse conformance statement of ALL mandatory, conditionally
+        mandatory, and optional XCMI Job Monitoring MIB groups
+
+
+        supported by this management agent implementation (i.e.,
+        version)  on this host system, specified in a bit-mask.
+
+        Usage:  Conforming management agents shall ALWAYS accurately
+        report their support for XCMI Job Monitoring MIB groups."
+    DEFVAL { 3 }                  -- all conditionally mandatory groups
+                                  -- that have to be implemented if
+                                  -- implementing this MIB at all,
+                                  -- namely, xcmJMBaseGroup and
+                                  -- xcmJMJobGenBasicGroup.
+    ::= { xcmJobMonBaseEntry 5 }
+
+xcmJobMonBaseCreateSupport OBJECT-TYPE
+    SYNTAX      XcmJMGroupSupport
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The terse conformance statement of ALL mandatory, conditionally
+        mandatory, and optional XCMI Job Monitoring MIB groups
+        supported for dynamic row creation (via '...RowStatus')
+        by this management agent implementation (i.e., version)
+        on this host system, specified in a bit-mask.
+
+        Usage:  Conforming management agents shall ALWAYS accurately
+        report their support for XCMI Job Monitoring MIB groups."
+    DEFVAL      { 0 }                   -- no dynamic row create groups
+    ::= { xcmJobMonBaseEntry 6 }
+
+xcmJobMonBaseUpdateSupport OBJECT-TYPE
+    SYNTAX      XcmJMGroupSupport
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The terse conformance statement of ALL mandatory, conditionally
+        mandatory, and optional XCMI Job Monitoring MIB groups
+        supported for existing row update (via SNMP Set-Request PDUs)
+        by this management agent implementation (i.e., version)
+        on this host system, specified in a bit-mask.
+
+        Usage:  Conforming management agents shall ALWAYS accurately
+        report their support for XCMI Job Monitoring MIB groups."
+    DEFVAL      { 0 }                   -- no existing row update groups
+    ::= { xcmJobMonBaseEntry 7 }
+
+-- ********************** General groups *******************
+--
+--           The Job General Basic Group (CONDITIONALLY MANDATORY)
+
+-- The Job General Basic Group provides general
+-- information about each job that is independent of the type of job
+-- and does not require spooling.
+
+-- The implementation of every object in this group is conditionally
+-- mandatory, i.e., an agent SHALL implement this group if the agent
+
+
+-- supports SNMP traps and/or the XCMI Simple Job Management MIB (SJMM).
+
+-- NOTE - While a conforming implementation should respond with an
+-- instrumented value on an SNMP Get for each object in the group,
+-- a conforming implementation shall at least respond with a fixed or
+-- empty value, if an instrumented value would significantly exceed the
+-- implementation constraints.
+
+-- The Job General Basic group consists
+-- entirely of the xcmJobGenBasicTable.
+
+xcmJobGenBasic  OBJECT IDENTIFIER ::= { xcmJobMonMIB 6 }
+
+xcmJobGenBasicTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmJobGenBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A table of general mandatory job information per (logical or
+        physical) device that is independent of the type of device
+        (printer, scanner, fax, ...) and that does not require a
+        spooling implementation (though a spooling implementation shall
+        also implement this group, in which case spooled jobs shall also
+        appear in the job table).
+
+        Job information applies to the job as a whole or to all its
+        documents.  The specification for most objects is taken
+        directly from the ISO 10175 Document Printing Application (DPA)
+        standard clause 9.2, Job Attributes.  However, this MIB is
+        intended to be used with non-DPA implementations, so only a
+        small set of general DPA attributes have been included here."
+    ::= { xcmJobGenBasic 1}
+
+xcmJobGenBasicEntry OBJECT-TYPE
+    SYNTAX     XcmJobGenBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "An entry exists in this table for each job in the device,
+         no matter what the state of the job is.  Each device is
+         represented as a separate device entry in the Host Resources
+         MIB device table as a device of type 'printer',
+         'scanner', 'fax', ....  The management station references each
+         job using the xcmJobIdentifierOnSystem assigned by the
+         system (printer, server, supervisor, spooler) that
+         accepted the job submission (by some other protocol)."
+    INDEX { hrDeviceIndex, xcmJobIdentifierOnSystem }
+    ::= { xcmJobGenBasicTable 1 }
+
+
+XcmJobGenBasicEntry ::= SEQUENCE {
+    --  Implementation of this group is conditionally mandatory for
+    --  all systems, i.e., an agent SHALL implement this group if
+    --  the agent supports SNMP traps and/or the XCMI Simple Job
+    --  Management MIB (SJMM).  Other tables in this MIB (and the
+    --  SJMM MIB) augment this table.
+    xcmJobIdentifierOnSystem     DisplayString,            -- cond.man.
+    xcmJobIdentifierUpstream     DisplayString,            -- cond.man.
+    xcmJobClientId               OCTET STRING,             -- cond.man.
+    xcmJobServiceType            XcmJMJobServiceTypeOID,   -- cond.man.
+    xcmJobName                   CodeIndexedStringIndex,   -- cond.man.
+    xcmJobOwner                  CodeIndexedStringIndex,   -- cond.man.
+    xcmJobSourceChannelType      XcmPrtChannelType,        -- cond.man.
+    xcmJobSubmittedLocaleIndex   Cardinal32,               -- cond.man.
+    xcmJobCurrentState           XcmJMJobState,            -- cond.man.
+    xcmJobStateReasons           XcmJMJobStateReasons,     -- cond.man.
+    xcmJobXStateReasons          XcmJMJobXStateReasons,    -- cond.man.
+    xcmJobX2StateReasons         XcmJMJobX2StateReasons    -- cond.man.
+}
+
+xcmJobIdentifierOnSystem OBJECT-TYPE
+    SYNTAX     DisplayString (SIZE(0..255))          -- not localized
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The job identifier generated on the system that the agent is
+        instrumenting.  The job identifier is generated by the job
+        service provider when it accepts a submit job request from a job
+        service requester using whatever job submission protocol that
+        the job service provider supports.
+
+        This job identifier is for each job and sub job submitted.  The
+        job service provider promote a simple job request to a compound
+        job, if the job service needs access to multiple devices, such
+        as a scanner and a printer or to two printers, or to a printer
+        and a fax.  See the textual conventions for a more complete
+        description of compound jobs.
+
+        The xcmJobIdentifierOnSystem is used as one of the indexes into
+        each job and document table, along with the HrDeviceIndex from
+        the Host Resources MIB which is an index value for each
+        different job service instance (analogous to each instance of a
+        logical printer in ISO DPA).
+
+        NOTE: Different jobs on different systems may have the same job
+        identifier.  Additional information is needed to make the job
+        identifier unique in the network, such as the server or system
+        component name.
+
+        See also xcmJobIdentifierUpstream in this group.
+
+        ISO DPA:  Job-identifier
+        This attribute provides the job-identifier for this job on the
+        server.  The server shall generate a job-identifier value that
+
+
+        is unique on that server, but need not be unique across the
+        distributed environment.  [In other words, the server's name
+        need not be part of the job-identifier.]
+
+        The value of the job-identifier attribute shall be returned by
+        the server as part of the PrintResult in the first Print
+        operation for the job (see 8.2.1).  The client shall pass its
+        value as part of the PrintArgument in subsequent Print
+        operations for the same job."
+    REFERENCE
+        "See note on maximum length of trap var bind that
+        xcmJobIdentifierOnSystem contributes to:
+        'xcmJobV2AlertPrefixNew' in the Job Alert Group of this MIB."
+--  DEFVAL omitted                      - index object
+    ::= { xcmJobGenBasicEntry 1 }
+
+xcmJobIdentifierUpstream OBJECT-TYPE
+    SYNTAX     DisplayString (SIZE(0..255))   -- not localized
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Uniquely identifies the job on the immediately upstream
+        client, server or device as generated by that client, server or
+        device.  The server or device is specified by hrDeviceIndex.
+        For an agent representing a spooling system, this object is the
+        identifier generated by the submitting client and hrDeviceIndex
+        identifies a logical device.
+
+        NOTE: Since multiple clients may each generate the same
+        identifier for the job, the xcmJobIdentifierUpstream is not
+        necessarily unique on the server.  Client implementers are
+        encouraged to generate client job ids that are unique.
+        In some cases, the xcmJobSourceChannelType may help to
+        disambiguate client job ids.
+
+        NOTE: This object in this MIB is a generalization of the
+        corresponding ISO DPA attribute: job-identifier-on-client
+        which is printer-centric.
+
+        ISO DPA:  Job-identifier-on-client[-upstream]
+        This attribute provides the job-identifier for this job to
+        uniquely identify the job on the client submitting the job, and
+        the value shall be assigned by that client.
+        The client shall supply the value of the job-identifier-on-
+        client[-upstream] attribute at the time that the client submits
+        the job to the server, if such client has its own job-identifier
+        for the job.
+
+        NOTE - This attribute is intended for jobs submitted from
+        legacy servers which have their own job-identifier for the job.
+        If a job passes through a chain of servers between the client
+        initiating the job and the output device, the value of the job
+        attribute job-identifier-on-client shall be the value of the
+        job's job-identifier on the immediate upstream server and the
+
+
+        value of the job attribute job-identifier-on-printer[-device]
+        shall be the value of the job's job-identifier on the immediate
+        downstream server or printer.
+
+        NOTE - A job has attributes for identifying itself on the
+        current server, on the immediate upstream server (where the job
+        came from), and on the immediate downstream server or printer
+        (where the job went). These attributes are
+            job-identifier               [job-identifier-on-system]
+            job-identifier-on-client     [job-identifier-upstream]
+            job-identifier-on-printer    [job-identifier-downstream]
+        respectively."
+    DEFVAL { ''H }                      -- no identifier upstream
+    ::= { xcmJobGenBasicEntry 2 }
+
+xcmJobClientId OBJECT-TYPE
+    SYNTAX     OCTET STRING(SIZE(0..255))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "A client end system supplies the 'xcmJobClientId' attribute
+        to clearly identify jobs which that client has submitted to the
+        server.  This attribute is used as one of the indices into the
+        ClientIdMap table.  There are two types of job-submitting
+        clients:
+          1. XCMI-conforming job submitting clients
+          2. non-XCMI-conforming job submitting clients
+
+        For XCMI-conforming job submitting clients, the 'xcmJobClientId'
+        shall be a globally unique job id.  This globally unique job id
+        shall be a textual string representation in standard dotted
+        decimal form of an OID (used in traps related to this job
+        generated by this host system).  See XcmGlobalUniqueID in the
+        Xerox General textual conventions in 06gentc.mib for a
+        description of the contents required for XCMI-conforming job
+        submitting clients.
+
+        For non-XCMI-conforming job submitting clients, the job id may
+        be any textual string and may not necessarily be unique, even if
+        the job submitter is a strictly conforming ISO DPA client.
+
+        ISO DPA:   Job-client-id
+        This attribute supplies a human-readable descriptor for the
+        job.  This descriptor may be printed by the server on auxiliary
+        sheets to help identify the user's printed output, and
+        discriminate between different jobs.
+
+        Use and treatment of this attribute is implementation and site
+        specific.
+
+        If the client specifies the value of the job attribute job-
+        client-id, no server shall change it.  If the client does not
+        specify the value of the job attribute job-client-id, the first
+        server shall set it to the value of the job attribute job-
+
+
+        identifier, so that no downstream server shall change it. These
+        rules ensure that if an implementation prints the value of the
+        job-client-id on an auxiliary sheet, it has a value that is
+        meaningful to the client originally submitting the job, no
+        matter how many servers the job passes through.
+
+        For example, client A submits a job to server B and does not
+        specify a value for the job attribute job-client-id.  Server B
+        assigns a job-identifier of 123 to the job, and forwards this
+        job to server C.  Server C assigns a job-identifier of 456 to
+        the job and forwards this job to printer D.  Printer D is not a
+        DPA server, but it has its own queue and assigns a job-id of
+        789 to the job. The following table shows the value of the
+        relevant job attributes in the two servers B and C:
+
+                   job-         job-          job-          job-
+                   client-id    identifier-   identifier    identifier-
+                                on-client                   on-printer
+                   ---------    -----------   ----------    -----------
+        server B   123          unspecified   123           456
+        server C   123          123           456           789*
+
+        * If printer D did not assign a job-id to its jobs, then the
+        value of the job attribute job-identifier-on-printer for server
+        C would be unspecified."
+    REFERENCE
+        "See note on maximum length of trap var bind that
+        xcmJobClientId contributes to:
+        'xcmJobV2AlertPrefixNew' in the Job Alert Group of this MIB."
+--  DEFVAL omitted                      - index object for map table
+    ::= { xcmJobGenBasicEntry 3 }
+
+xcmJobServiceType OBJECT-TYPE
+    SYNTAX     XcmJMJobServiceTypeOID
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Job-service-type (ISO DPA extension)
+        This attribute specifies the type of the service to which this
+        job was submitted.  The value of this object is filled in by the
+        job service provider, not by the job service requester,
+        depending on the service-name-requested (instance) parameter
+        supplied by the job service requester in the create-job
+        operation.
+
+        The value is an OBJECT IDENTIFIER, so the implementers, third
+        parties, and customers can add their own service types.  Values
+        are scan-to-file, scan-to-print, print, etc.
+
+        NOTE - the Host Resources Extension MIB defines OIDs for device
+        types, which are closely related to job-service-types.  However,
+        job-service-types are related to one or more device types."
+    DEFVAL { zeroDotZero }        -- no service type
+    ::= { xcmJobGenBasicEntry 4 }
+
+
+xcmJobName OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  Job-name
+        This attribute supplies a human readable string for the print-
+        job. This string is used for naming the print-job in human-
+        readable 'free-form' fashion.
+
+        This attribute is intended for enabling a user or the user's
+        application to convey a job name that may be printed on a start
+        sheet, returned in a ListObjectAttributes result, or used in
+        notification or logging messages.
+
+        If this attribute is not specified, no job name is assumed, but
+        implementation specific defaults are allowed, such as the value
+        of the document-name attribute of the first document in the
+        job."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenBasicEntry 5 }
+
+xcmJobOwner OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  Job-owner
+        This attribute supplies the name of the human owner of the
+        print-job.
+
+        The value of job-owner will often be the same as job-
+        originator. The job-owner will be different from job-originator
+        when the job has been submitted by the originator on behalf of
+        the owner. This attribute is not to take the place of the
+        security parameters or the access-and-accounting attributes.
+        If this attribute is not specified, the value of user-name or
+        job-originator should be used for any circumstances which
+        require a value for job-owner."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenBasicEntry 6 }
+
+xcmJobSourceChannelType OBJECT-TYPE
+    SYNTAX     XcmPrtChannelType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Job-source-channel-type (ISO DPA extension)
+        This attribute specifies the type of channel that is receiving
+        the job from the input device.  See XCMI Printer Extensions TC
+        for values defined by the Printer MIB (RFC 1759)."
+    DEFVAL { other }                    -- no job source channel type
+    ::= { xcmJobGenBasicEntry 7 }
+
+
+xcmJobSubmittedLocaleIndex OBJECT-TYPE
+    SYNTAX     Cardinal32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Job-submitted-locale (ISO DPA extension)
+        This object is the locale (country, territory, and language)
+        index into the xcmGenLocalizationTable specifying the locale of
+        the submitting user.  This object permits a management station
+        to determine the exact coded character set that the submitting
+        client used, in case the code conversion that the agent might
+        perform to a different coded character set is not sufficient.
+        This object also allows the system and the accounting package to
+        determine the language that the submitting user used for
+        selecting media.
+
+        NOTE: ISO DPA has an operation-locale attribute which is passed
+        as common arguments of every ISO DPA operation.  ISO DPA should
+        be amended to indicate that the server may copy the
+        operation-locale attribute to the job object, so that the server
+        can remember the locale that the client specified.  Then an
+        agent could copy the value of the coded character set from the
+        job's operation-locale attribute in order to return as the value
+        of xcmJobSubmittedLocaleIndex."
+    DEFVAL { 0 }                        -- no job submission locale
+    ::= { xcmJobGenBasicEntry 8 }
+
+xcmJobCurrentState OBJECT-TYPE
+    -- This is a type 2 enum.
+    SYNTAX     XcmJMJobState
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  Current-job-state
+        This attribute identifies the current state of the job
+        (pending, processing, held, etc.)
+
+        Print clients and DP-Servers shall be prepared to receive all
+        the standard job states.  DP-Servers are not required to
+        generate all job states, only those which are appropriate for
+        the particular implementation.
+
+        It is not conformant for an agent to return the unknown value
+        if the job's state can be determined.
+
+        If a server implementation or policy is to start processing
+        documents before the last Print request (with a TRUE value for
+        the job-submission-complete parameter) and the value of the
+        job's job-scheduling attribute is not after-complete, the
+        server shall change the job's current-job-state from pre-
+        processing [building] directly to the processing state when the
+        server begins processing any of the job's documents."
+    DEFVAL { unknown }                  -- unknown current state
+
+
+    ::= { xcmJobGenBasicEntry 9 }
+
+xcmJobStateReasons OBJECT-TYPE
+    SYNTAX     XcmJMJobStateReasons
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object is bit-encoded, so that multiple reasons can occur
+        at once.  Each bit corresponds to an ISO DPA OID for the same
+        reason.  See textual conventions.
+
+        ISO DPA:   Job-state-reasons
+        This attribute identifies the reason or reasons that the job is
+        in the held, terminating, retained, or completed state.  The
+        server shall indicate the particular reason(s) by setting the
+        value of the job-state-reasons attribute.  When the job is not
+        in any of these states, the server shall set the value of the
+        job-state-reasons attribute to the empty set."
+    DEFVAL { 0 }                        -- no job state reasons
+    ::= { xcmJobGenBasicEntry 10 }
+
+xcmJobXStateReasons OBJECT-TYPE
+    SYNTAX     XcmJMJobXStateReasons
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object is bit-encoded, so that multiple reasons can occur
+        at once.  Each bit corresponds to a Xerox extension OID for the
+        same reason.  See textual conventions.
+
+        ISO DPA:   Job-state-reasons (extended with Xerox OIDs)
+        This attribute identifies the reason or reasons that the job is
+        in the held, [processing,] terminating,
+        retained, or completed state.  The server shall indicate the
+        particular reason(s) by setting the value of the
+        job-state-reasons attribute.  When the job is not in any of
+        these states, the server shall set the value of the
+        job-state-reasons attribute to the empty set.
+
+        See the Xerox Job Model Specification for the specification of
+        which reasons can be used in which job states."
+    DEFVAL { 0 }                        -- no job state reasons
+    ::= { xcmJobGenBasicEntry 11 }
+
+xcmJobX2StateReasons OBJECT-TYPE
+    SYNTAX     XcmJMJobX2StateReasons
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object is bit-encoded, so that multiple reasons can occur
+        at once.  Each bit corresponds to a second set of 31 Xerox
+        extension OIDs for the same reason.  See textual conventions.
+
+        ISO DPA:   Job-state-reasons (extended with Xerox OIDs)
+
+
+        This attribute identifies the reason or reasons that the job is
+        in the held, [processing,] terminating,
+        retained, or completed state.  The server shall indicate the
+        particular reason(s) by setting the value of the
+        job-state-reasons attribute.  When the job is not in any of
+        these states, the server shall set the value of the
+        job-state-reasons attribute to the empty set.
+
+        See the Xerox Job Model Specification for the specification of
+        which reasons can be used in which job states."
+    DEFVAL { 0 }                        -- no job state reasons
+    ::= { xcmJobGenBasicEntry 12 }
+
+--
+--                The Devices Assigned Group (DEPRECATED)
+
+-- This group is deprecated; new products shall not implement it
+-- and shall use the PWG jmJobStateReasons1 object and the
+-- PWG jobStateReasonsN (N=2, 3, 4) reasons that give device state
+-- on a per-job basis, such as 'jobPrinting', 'jobInterpreting',
+-- 'jobScanning', jobFaxIncoming, jobFaxOutgoing, etc., since more than
+-- one job may be in the 'processing' state for a single device.
+-- Child job ids shall be done as a PWG multi-valued job attribute.
+--
+-- The Devices Assigned group contains information about the device(s)
+-- that have been assigned to the job, when they are assigned.  The
+-- complete state of the job includes the state(s) of such assigned
+-- devices, at least when the job is actually using the device and the
+-- device is acting on behalf of the job.  If a job service is purely
+-- software with no associated devices, the xcmDevicesAssignedTable
+-- may still be used to indicate state of a software process(es), if the
+-- implementer wishes to expose the state of such software "engines" to
+-- the end-user and/or operator as part of the complete state of the
+-- job; otherwise the xcmDevicesAssignedTable contains no rows.
+--
+-- The implementation of every object in this group is deprecated.
+-- NOTE - While SNMP conformance means that a conforming implementation
+-- should respond with an instrumented value on an SNMP Get for each
+-- object in the group, a conforming implementation shall at least
+-- respond with a fixed or empty value, if an instrumented value would
+-- significantly exceed the implementation constraints.
+--
+-- The Devices Assigned group consists entirely of the
+-- xcmDevicesAssignedTable.
+
+-- The devices assigned table contains the hrDeviceIndex and the state
+-- of each of the devices to which the service has assigned (parts
+-- of) the job.  Implementations, such as physical printers, that only
+-- assign a job to a single device need only implement one row of this
+-- table.
+--
+-- NOTE - the names of these objects have been generalized from the DPA
+-- attributes, so that they can apply to other devices in addition to
+-- printers.  Some additional states will be added for such other
+
+
+-- devices, such as scanning, dialing, etc.
+
+xcmDevicesAssigned  OBJECT IDENTIFIER ::= { xcmJobMonMIB 7 }
+
+xcmDevicesAssignedTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmDevicesAssignedEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- actually deprecated
+    DESCRIPTION
+        "This table contains the hrDeviceIndex values and states of the
+        device(s) to which this job has been assigned, if the job has
+        been assigned to a physical device by the job service provider.
+        If the job service provider has not (yet) assigned the job to a
+        device, there shall not be any rows in this table for the job.
+        Some implementations assign jobs to physical devices when the
+        job is submitted which is called early binding.  Other
+        implementations delay assigning jobs to physical devices until
+        the physical device is ready to accept another job which is
+        called late binding.  Late binding is used when load balancing
+        between several physical devices.
+
+        NOTE: Some systems may assign a job to more than one
+        device and progress part of the job on each.  Therefore, the
+        device state is represented as a table.  For example, print
+        systems that only assign a job to a single printer, need only
+        implement a single row of this table.  As another example,
+        multifunction devices/systems that scan and print, in
+        order to implement a copy service may either:
+          1. assign a simple job to at least two devices: a scanner and
+             a printer or
+          2. create a compound job with a single device assigned to each
+             contained sub-job."
+    ::= { xcmDevicesAssigned 1 }
+
+xcmDevicesAssignedEntry OBJECT-TYPE
+    SYNTAX     XcmDevicesAssignedEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- actually deprecated
+    DESCRIPTION
+        "Entries may exist in the table for each device index whose
+        device type is 'printer', 'scanner', etc. and for each job.
+        See Host Resources MIB and the XCMI Host Resources Extension MIB
+        where OIDs are assigned for device types."
+    INDEX { hrDeviceIndex, xcmJobIdentifierOnSystem,
+            xcmDevicesAssignedHrDeviceIndex }
+    ::= { xcmDevicesAssignedTable 1 }
+
+XcmDevicesAssignedEntry ::= SEQUENCE {
+    xcmDevicesAssignedHrDeviceIndex   Ordinal32,           -- deprecated
+    xcmDeviceStateOfDevicesAssigned   XcmHrDevInfoXStatus, -- deprecated
+    xcmJobIdentifierDownstream        DisplayString        -- deprecated
+}
+
+
+xcmDevicesAssignedHrDeviceIndex OBJECT-TYPE
+    SYNTAX     Ordinal32
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- actually deprecated
+    DESCRIPTION
+        "The hrDeviceIndex of one of the [physical] devices (printers,
+        scanners, FAX, etc.  to which the job has been assigned.
+        For devices and systems that ensure that
+        jobs are not lost across crashes and power cycles, these index
+        values shall remain stable across successive device power
+        cycles.  However, if a (low-end) device is not ensuring that job
+        are persistent across crashes and power cycles, these index
+        values need not remain stable across such crashes or power
+        cycles.
+
+        The representation of the assigned device(s)is an
+        index into the Host Resources MIB device table, rather than
+        being the distinguished name of the physical printer as in the
+        ISO DPA printers-assigned attribute.
+
+            NOTE - The name of the physical printer [or scanner] is
+            contained in the XCMI Host Resources Extension MIB table for
+            this device.
+
+        ISO DPA:   Printers-assigned
+        This attribute identifies the physical [devices] printer or
+        printers to which this job has been assigned, if any.
+
+        When the job is first submitted and the server has not yet
+        assigned any printers to the job, the [table] shall be empty.
+
+        If the server intends to use a single printer for the job, and
+        the server has assigned a printer to the job, [each row] shall
+        contain just that [device].
+
+        If a server has split the job into multiple pieces and assigned
+        each piece to a different printer, the table shall contain n
+        rows, one for each assigned device. A job with multiple
+        job-result-sets is an example of a job that would be easy to
+        split into multiple pieces.
+
+        A table with no elements shall be
+        returned if this attribute is supported, but this job has not
+        yet been assigned to any physical printers [or other devices].
+
+        The number of rows in the table for this attribute shall
+        be the same as the number of rows in the table for the
+        associated job attribute printer-state-of-printers-assigned
+        [number of rows for the xcmDeviceStateOfDevicesAssigned table].
+
+        In addition, the ith element of each of these associated
+        attributes shall be a value that pertains to the printer named
+        by the ith element of printers-assigned.
+
+
+        The printers-assigned value shall not be the same as the printer
+        requested by the user if the job's printer-name-requested
+        attribute specified a logical printer that supports one or more
+        different physical printers.  The printers-assigned value might
+        differ also if the job has been re-assigned by an operator to
+        ensure successful completion of the job, allowing the user to
+        find out where a job has been re-assigned (when necessary).
+
+        The value of the job's printers-assigned attribute shall remain
+        after the job has completed, so that users can determine the
+        physical printer(s) on which the job was printed."
+--  DEFVAL omitted                      - index object
+    ::= { xcmDevicesAssignedEntry 1 }
+
+xcmDeviceStateOfDevicesAssigned OBJECT-TYPE
+    SYNTAX     XcmHrDevInfoXStatus
+    MAX-ACCESS read-only
+    STATUS     current                 -- actually deprecated
+    DESCRIPTION
+        "For the MIB, the object applies to scanners, Faxes, etc., as
+        well as printers.  For job services that are purely software or
+        that have software document transforms that the implementation
+        wishes to expose the state of the software 'engine' may also
+        include rows in this table.  The purpose of the
+        xcmDeviceStateOfDevicesAssigned is to give more detailed
+        information about the state of a job when the job is in the
+        processing state.  Consequently, the value of this object shall
+        reflect the state of the device only when the job is in the
+        processing state.  When the job is in any other state, the value
+        of the xcmDeviceStateOfDevicesAssigned object shall be
+        'unknown'.
+
+        Changes of the values of xcmDeviceStateOfDevicesAssigned
+        shall generate a trap.  Since the value of this object
+        shall change only when the job is in the processing state, traps
+        shall only be generated for changes in
+        xcmDeviceStateOfDevicesAssigned  while the job is in the
+        processing state.  Therefore, the
+        xcmDeviceStateOfDevicesAssigned object shall not generate a trap
+        when the job is not in the processing state.
+
+        NOTE: the xcmDeviceStateOfDevicesAssigned is a duplicate of an
+        object in the Host Resources Extension MIB.  But since that
+        object is in an optional group, xcmDeviceStateOfDevicesAssigned
+        is duplicated in this deprecated table, so that implementers are
+        not forced to implement the entire optional group in the HRX
+        MIB, such to get this state of the device that is part of the
+        overall job state.
+
+        NOTE: This group and table has been DEPRECATED, because
+        some devices can be processing more than one
+        job at a time.  However, if the device stops, only one of those
+
+
+        jobs is actually affected.  So the deviceStopped bit in the
+        PWG Job Monitoring MIB should be used (on a per job basis)
+        to indicate that the device has a problem.
+
+        ISO DPA:   Printer-state-of-printers-assigned
+        This attribute identifies the current state of each assigned
+        [device] printer. This attribute gives the client access to
+        information within each assigned printer.  Because this
+        attribute contains a value that is updated within the printer,
+        the server may choose to update the value of this attribute only
+        when a client [or management station] queries its value.
+
+        See the [devices-assigned] printers-assigned attribute for the
+        correspondence between elements of this attribute and those of
+        [devices-assigned] printers-assigned."
+--  DEFVAL { commonUnknown }             unknown device state
+    ::= { xcmDevicesAssignedEntry 2 }
+
+xcmJobIdentifierDownstream OBJECT-TYPE
+    SYNTAX     DisplayString (SIZE(0..255))
+    MAX-ACCESS read-only
+    STATUS     current                 -- actually deprecated
+    DESCRIPTION
+        "Uniquely identifies the job(s) on the immediately downstream
+        server or device as generated by that server or device that this
+        system has submitted in order to perform this job.  The
+        downstream server or device is specified by its own value of
+        hrDeviceIndex.  For an agent representing a spooling system,
+        this object is the identifier generated by that spooling system
+        and hrDeviceIndex identifies a logical device.
+
+        NOTE: This object in this MIB is a generalization of the
+        corresponding ISO DPA attribute: job-identifier-on-printer which
+        is printer-centric.
+
+        ISO DPA:  job-identifier-on-printer
+        This attribute provides the job-identifier for this job to
+        uniquely identify it on the printer or next server downstream,
+        and it shall be assigned by that printer or server.
+
+        The value of the job-identifier-on-printer attribute shall be
+        the job-identifier that the printer or the next server
+        downstream generates at the time the server submits the job to
+        the printer or the next server downstream.  If the printer or
+        the next server downstream does not generate its own job
+        identifier, the server shall leave the value of this attribute
+        unspecified.
+
+        NOTE - This attribute is intended for jobs submitted to other
+        servers, such as a gateway to a legacy server, or to printers
+        which have their own internal queue and assign their own job
+        identifiers."
+    DEFVAL { ''H }                      -- no identifier downstream
+    ::= { xcmDevicesAssignedEntry 3 }
+
+
+--
+--                The Client Id Map Group (OPTIONAL)
+
+-- The PWG Job Mon Job ID group provides the same client ID mapping
+-- capability as this group.  When implementing the PWG Job Mon MIB,
+-- this XCMI Client ID Map group SHALL NOT be implemented unless traps
+-- are needed, in which case both the XCMI Job Alert group and this XCMI
+-- Client ID Map group are implemented.  An implementation conforms to
+-- XCMI when implementing either the PWG or XCMI Job Mon MIBS, or both.
+--
+-- The Client Id Map group provides a mapping table between job
+-- submission client job ids and the server-generated job ids.
+--
+-- The implementation of this group is OPTIONAL.
+-- NOTE - While SNMP conformance means that a conforming implementation
+-- should respond with an instrumented value on an SNMP Get for each
+-- object in the group, a conforming implementation shall at least
+-- respond with a fixed or empty value, if an instrumented value would
+-- significantly exceed the implementation constraints.
+--
+-- The Client Id Map group consists entirely of the xcmClientIdMapTable.
+
+-- The client id map table provides a mapping between:
+--
+--   1) each job identifier that a client might generate when it
+--      submits a print job (which may be a completely unrelated client
+--      to the SNMP management station since a different protocol
+--      shall be used) for use by the client software and management
+--      station software or for display to the user and
+--
+--   2) the corresponding job identifier that the device (or device
+--      agent) shall generate when the job is submitted to the
+--      device (or device agent).
+
+-- Providing such a map permits an SNMP management
+-- station to obtain information on a particular job without having
+-- to scan the entire job table.  An SNMP management
+-- station is able to access this map table using the client job
+-- id as the index and get the server job identifier that the server
+-- assigned to the job when the job was submitted.  The management
+-- station may then get any information about the job from the job
+-- table using the server-generated job identifier as the table index.
+
+xcmClientIdMap  OBJECT IDENTIFIER ::= { xcmJobMonMIB 8 }
+
+xcmClientIdMapTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmClientIdMapEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A table that maps 1) job identifiers generated by the client
+        that submitted the job to 2) job identifiers generated by the
+        server that accepted the job."
+
+
+    ::= { xcmClientIdMap 1}
+
+xcmClientIdMapEntry OBJECT-TYPE
+    SYNTAX     XcmClientIdMapEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Entries exist in this table for each device entry in the
+        Host Resources MIB device table whose type is 'printer',
+        'scanner', 'fax', etc.  Such a device may represent a logical, a
+        physical, or a logical-and-physical device, as specified in the
+        xcmHrDevInfoRealiszation object in the Host Resources Extension
+        MIB.
+
+        The Host Resources Extension MIB has OIDs added for use in
+        hrDeviceType.
+
+        NOTE - The map table is indexed by both the xcmJobClientId
+        (which the submitting job service requester may,
+        optionally, supply to identify the job or the client or user
+        that submitted the job) and the xcmJobIdentifierOnSystem (which
+        the accepting job service provider shall supply to
+        uniquely identifier the job on the accepting system.  Thus
+        the job service provider guarantees that each map entry
+        has a unique pair of indices."
+    INDEX { xcmJobClientId, xcmJobIdentifierOnSystem }
+    ::= { xcmClientIdMapTable 1 }
+
+XcmClientIdMapEntry ::= SEQUENCE {
+    xcmClientIdMapHrDeviceIndex   Ordinal32          -- optional
+}
+
+xcmClientIdMapHrDeviceIndex OBJECT-TYPE
+    SYNTAX     Ordinal32             -- uses the same 31-bits as HR MIB
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The device index from the Host Resources MIB, so that the
+         client can determine to which (logical or physical) device this
+         job has been submitted."
+--  DEFVAL omitted                      - output object of map table
+    ::= { xcmClientIdMapEntry 2 }  -- xcmClientIdMapJobIdOnSystem
+                                   -- (entry 1) was deleted but
+                                   -- the OIDs were not renumbered.
+
+-- xcmJobStateMsg  OBJECT IDENTIFIER ::= { xcmJobMonMIB 9 }
+-- group deleted in V2.51
+
+--
+--            The Job General Extended Group (CONDITIONALLY MANDATORY)
+
+-- This group had been deprecated in favor of the equivalent PWG Job
+-- Mon objects and attributes, but was undeprecated starting with
+-- version 4.00.  Either the PWG Job Mon MIB, or this XCMI Job Mon MIB,
+
+
+-- may be used.
+
+-- The Job General Extended group provides additional
+-- general information about each job that is independent of the
+-- type of job and does not require spooling.
+
+-- In order to claim conformance to this group, it is necessary to
+-- implement every object in the group.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+-- The Job General Extended group
+-- consists solely of the xcmJobGenExtTable.
+
+xcmJobGenExt  OBJECT IDENTIFIER ::= { xcmJobMonMIB 10 }
+
+xcmJobGenExtTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmJobGenExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "A table of general job information per (logical or
+        physical) device that is independent of the type of device and
+        that does not require a spooling implementation (though a
+        spooling implementation shall also implement this group, in
+        which case spooled jobs shall also appear in the job table).
+
+        Job information applies to the job as a whole or to all its
+        documents.  The specification for most objects is taken directly
+        from the ISO 10175 Document Printing Application (DPA) standard
+        clause 9.2, Job Attributes.    However, this MIB is
+        intended to be used with non-DPA implementations, so only a
+        small set of general DPA attributes have been included here."
+    ::= { xcmJobGenExt 1}
+
+xcmJobGenExtEntry OBJECT-TYPE
+    SYNTAX     XcmJobGenExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "An entry exists in this table for each job in the device,
+         no matter what the state of the job is.  Each device is
+         represented as a separate device entry in the Host Resources
+         MIB device table as a device of type 'printer', 'scanner',
+         'fax', etc.
+
+         The management station references each job using
+         the xcmJobIdentifierOnSystem assigned by this (logical
+         for spooling or physical for non-spooling) device that
+         accepted the job submission (by some other protocol).
+
+         This table augments the Job General Basic
+         table in this MIB."
+    AUGMENTS { xcmJobGenBasicEntry }
+    ::= { xcmJobGenExtTable 1 }
+
+
+XcmJobGenExtEntry ::= SEQUENCE {
+    -- Note that objects in this table had been deprecated, but are
+    -- again current starting with version 4.00.  The objects are
+    -- all device-independent.
+    -- This table augments the Job General Basic table.
+    xcmJobOriginator              CodeIndexedStringIndex,
+    xcmJobSubmittingApplication   CodeIndexedStringIndex,
+    xcmJobComment                 CodeIndexedStringIndex,
+    xcmJobCopies                  Ordinal32,
+    xcmJobCopiesCompleted         Counter32,
+    xcmJobOutputBinIndex          Integer32,
+    xcmJobServiceNameRequested    CodeIndexedStringIndex,
+    xcmJobPreviousState           XcmJMJobState,
+    xcmJobEstimatedCompletionTime DateAndTime,
+    xcmJobSubmissionTime          DateAndTime,
+    xcmJobPagesCompleted          Counter32,
+    xcmJobOctetsCompletedHigh     Cardinal64High,
+    xcmJobOctetsCompletedLow      Cardinal64Low,
+    xcmJobErrorCount              Counter32,
+    xcmJobWarningCount            Counter32,
+    xcmJobProcessingTime          Counter32,
+    xcmJobNumberOfDocuments       Cardinal32,
+    xcmJobAuthorizationUserName   CodeIndexedStringIndex
+}
+
+xcmJobOriginator OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Job-originator
+        This attribute supplies the name of the human or programmatic
+        originator of the print-job.
+
+        If this attribute is not specified, no value for job originator
+        is assumed, but implementation specific defaults are allowed.
+
+        NOTE - This attribute may be different from job-owner (1) when
+        a program submits the print-job on behalf of a user or (2) when
+        an operator must resubmit a misprinted job on behalf of the
+        original job owner.  However, an operation to resubmit a print-
+        job is outside the scope of this part of ISO/IEC 10175."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenExtEntry 1 }
+
+xcmJobSubmittingApplication OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  (ISO DPA extension)
+        This attribute supplies the name of the programmatic
+        originator of the print-job, i.e., name of the program
+
+
+        that submitted the job on behalf of the end-user.
+
+        If this attribute is not specified, no value for job
+        programmatic originator is assumed, but implementation-specific
+        defaults are allowed."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenExtEntry 2 }
+
+xcmJobComment OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Job-comment
+        This attribute supplies an arbitrary human-readable text string
+        associated with the print-job.
+
+        This attribute is intended for enabling a user to convey a text
+        string that may be printed on a job start sheet, for example,
+        in an implementation-dependent manner."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenExtEntry 3 }
+
+xcmJobCopies OBJECT-TYPE
+    SYNTAX     Ordinal32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "For the MIB:  this object is generalized so that it applies
+        to scanning as well as printing.
+
+        ISO DPA:  job-copies (an element of results-profile attribute)
+        Total number of job copies in the job, i.e., number of job
+        copies summed across the job-result-sets.  If a job contains
+        documents A, B, C, a job-copies value of 2 results in:
+        A, B, C, A, B, C.  See ISO DPA results-profile attribute
+        description for the specification of a job result set and
+        the definition of job-copies.
+
+        NOTE - In ISO DPA, job-copies is a separate value for each job
+        result set, not the summation.  But it didn't seem worth the
+        effort to make job-copies a table since not many systems support
+        multiple job results sets for a single job."
+    DEFVAL { 1 }                        -- one job copy
+    ::= { xcmJobGenExtEntry 4 }
+
+xcmJobCopiesCompleted OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "For the MIB:  this object is generalized so that it applies
+        to scanning as well as printing.
+
+
+        ISO DPA:  Job-copies-completed
+        This attribute indicates the number of job-copies of the job
+        that the printer(s) have completed printing.  The server shall
+        not reset its value during the processing of multiple print-job
+        results that are part of the same job (see the results-profile
+        job attribute).  Since this attribute is intended to measure
+        the progress of a job, the value shall include repeated job-
+        copies due to multiple print-job results for the same job.
+        The accuracy of this value is implementation-dependent. It is
+        expected that the value reported is never greater than the
+        actual value.  This attribute may not be supported for all
+        printers and all page description languages.
+
+        The value of this attribute shall be 0 if printing has not
+        started for this job."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenExtEntry 5 }
+
+xcmJobOutputBinIndex OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  output-bin
+        Special MIB definition:  specifies the index of the output
+        subunit table for the job.
+
+        NOTE - ISO DPA allows the output-bin to be specified
+        differently for each job result set in a job.  However, it
+        doesn't seem worth the effort to make output-bin a table, since
+        multiple job-result-sets is an unlikely feature to be supported
+        and/or used, especially with different output-bins."
+    DEFVAL { 0 }                        -- no output bin index
+    ::= { xcmJobGenExtEntry 6 }
+
+xcmJobServiceNameRequested OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "Specifies the job service name instance on which the job is
+        to be processed as specified by the job service requester when
+        the job was submitted.
+
+        NOTE: this object has been generalized for use in this MIB from
+        ISO DPA where the attribute is only a logical or physical
+        printer, not a job service instance, such as a scan-to-file
+        service instance.
+
+        ISO DPA: Printer-name-requested
+        This attribute identifies the printer to be used for printing
+        the job.  The client shall specify the value of this attribute
+        with the first invocation of the Print operation for the print-
+
+
+        job as the explicit printer-name component of the
+        PrintArgument, rather than as an attribute (see 8.2.1.1).
+
+        NOTES
+        1.  To cause a server to select a printer according to other
+        attributes, the System Administrator should define a logical
+        printer that supports ALL of the physical printers supported by
+        the server.
+
+        2.  For the server that supports only a single printer, the
+        logical printer name may be the same as the server name, as
+        long as they cannot be confused for each other in the name
+        service directory.
+
+        3.  Initial-value-job objects should have the value of their
+        printer-name-requested attribute specified as an empty value in
+        order to indicate that no printer-name is defaulted."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenExtEntry 7 }
+
+xcmJobPreviousState OBJECT-TYPE
+    -- This is a type 2 enum.
+    SYNTAX     XcmJMJobState
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This object permits the management application to display
+        the previous job state to the user without having to monitor
+        all job state changes.  For example, when a job completes,
+        the previous state indicates what the job was doing just before
+        completing.  If the job was printing, then the completion
+        was normal.  If the previous state was terminating, then the
+        completion was abnormal.  Another example, is when a job is
+        paused.  The xcmJobPreviousState indicates the state that the
+        job was in when the job was paused.
+
+        ISO DPA:  job-previous-state
+        This attribute identifies the state of the job (pending,
+        processing, held, etc.) before the last change of job state.
+
+        Standard values are defined in the specification for the
+        current-job-state [xcmJobCurrentState] job-status attribute.
+        See textual-conventions."
+    DEFVAL { unknown }                  -- unknown previous state
+    ::= { xcmJobGenExtEntry 8 }
+
+xcmJobEstimatedCompletionTime OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "Job Monitoring MIB: If the estimated completion time is
+        unknown, the agent should return the DEFVAL.  This object
+        is a 'best efforts' object, so any estimate based on any data
+
+
+        such as the octet-count or the number of pages (perhaps obtained
+        from the PostScript commenting conventions up front) is far
+        preferable than returning the DEFVAL.  A learning algorithm
+        based on recent job sizes and their times could be used.
+
+        ISO DPA:  Estimated-completion-time
+        This attribute indicates the estimated time by which this job
+        will be completed.
+
+        The time to complete one job is dependent on the time required
+        to complete all other jobs that the scheduling algorithm
+        determines must be printed before this job may be printed. The
+        time to complete each individual job may depend on when on-
+        request resources are available. The time to print each
+        individual job is dependent on the characteristics of the
+        document formats in which the individual documents of the job
+        are encoded and on the complexities and other characteristics
+        of  the documents themselves.
+
+        This attribute is highly implementation-dependent.  The
+        estimated-completion-time may be easy to calculate for some
+        combinations of document formats and scheduling algorithms. It
+        may be impossible to calculate for other combinations.  It is
+        recommended that, where possible, document creators provide
+        system hints to the print system (perhaps appropriately encoded
+        in document format headers) that help the print system
+        understand which features of the document formats the document
+        will be exercising."
+    DEFVAL      { '0000000000000000'H } -- no estimated date/time
+    ::= { xcmJobGenExtEntry 9 }
+
+xcmJobSubmissionTime OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Submission-time
+        This attribute indicates the time at which the latest Print
+        request for this job was accepted by the server.
+
+        An implementation that can tell time shall return a valid value
+        for this object.  Only a device that cannot tell time shall
+        return the DEFVAL."
+    DEFVAL      { '0000000000000000'H } -- no date/time
+    ::= { xcmJobGenExtEntry 10 }
+
+xcmJobPagesCompleted OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "For the MIB:  this object is generalized so that it applies
+        to scanning as well as printing.
+
+
+        ISO DPA:  Pages-completed
+        This attribute indicates the number of pages of the job that
+        the printer(s) have completed printing.
+
+        NOTE - The number of source pages, impressions and sheets of
+        media may differ.  The following examples illustrate how they
+        may differ when attributes, rather than the document contents,
+        control the printing. If number-up is 0 or 1, there is one
+        source page per impression, and if number-up is 2, there are
+        two source pages per impression.  If sides is 1, there is one
+        impression per sheet of media, but if sides is 2, there are two
+        impressions per sheet of media. By inference, if number-up is 4
+        and sides is 2, there are 4 source pages per impression and 8
+        source pages per sheet of media.
+
+        The server shall not reset its value during the processing of
+        multiple copies of documents or the job.  Since this attribute
+        is intended to measure the progress of a job, the value shall
+        include repeated pages due to multiple copies.  When the job
+        completes, this attribute should contain the value of the total
+        number of source pages that the printer processed for the
+        print-job.
+
+        The accuracy of this value is implementation-dependent. It is
+        expected that the value reported is never greater than the
+        actual value.  This attribute may not be supported for all
+        printers and all page description languages.
+
+        The value of this attribute shall be 0 if printing has not
+        started for this job. "
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenExtEntry 11 }
+
+xcmJobOctetsCompletedHigh OBJECT-TYPE
+    SYNTAX     Cardinal64High
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "For the Job Monitoring MIB:  two objects are used to represent
+        a full 62-bit value.  The sign bit of each half is not used.
+        This object is generalized for use with input devices as well.
+
+        ISO DPA:  Octets-completed [high 31 bits]
+        This attribute indicates the number of octets of the job that
+        the printer(s) [devices(s)] have completed printing
+        [processing].  The server shall not
+        reset its value during the processing of multiple copies of
+        documents or the job.  Since this attribute is intended to
+        measure the progress of a job, the value shall include repeated
+        pages due to multiple copies.
+
+        The accuracy of this value is implementation-dependent. It may
+        be approximated by the number of octets conveyed to the
+
+
+        printer [device]. This attribute may not be supported for all
+        printers and all page description languages.
+
+        The value of this attribute shall be 0 if the device has not
+        started this job."
+    DEFVAL { 0 }                        -- no octets completed
+    ::= { xcmJobGenExtEntry 12 }
+
+xcmJobOctetsCompletedLow OBJECT-TYPE
+    SYNTAX     Cardinal64Low
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Octets-completed [low 31 bits]
+        See explanation of xcmJobOctetsCompletedHigh."
+    DEFVAL { 0 }                        -- no octets completed
+    ::= { xcmJobGenExtEntry 13 }
+
+xcmJobErrorCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Error-count
+        This attribute provides the number of error events occurring
+        while processing the job."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenExtEntry 14 }
+
+xcmJobWarningCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Warning-count
+        This attribute provides the number of warning events occurring
+        while processing the job."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenExtEntry 15 }
+
+xcmJobProcessingTime OBJECT-TYPE
+    SYNTAX     Counter32
+    UNITS      "seconds"
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Processing-time
+        This attribute indicates how long an individual job has been
+        processing [in seconds]."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenExtEntry 16 }
+
+
+xcmJobNumberOfDocuments OBJECT-TYPE
+    SYNTAX     Cardinal32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Number-of-documents
+        This attribute indicates the number of documents in the job.
+        The number indicates how many Print operations that specified a
+        document (of any document-type have been submitted for
+        printing until job submission has been completed; at that point
+        this attribute shall then indicate the total number of
+        printable documents, fonts, and resource objects submitted by
+        the client in the job.  If the first Print operation does not
+        contain a first-document component (see 8.2.1), the value of
+        this attribute shall be 0.
+
+        The server shall count fonts and resource objects passed to the
+        server by means of Print operation invocations, as documents
+        for the purposes of this attribute."
+    DEFVAL { 0 }                        -- no documents
+    ::= { xcmJobGenExtEntry 17 }
+
+xcmJobAuthorizationUserName OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "The user's name for authorization purposes.  The value of
+        xcmJobAuthorizationUserName may be the same or may be different
+        than the value of the xcmJobAccountingUserName object, depending
+        on the security system and the accounting system being used.
+
+        ISO DPA:   User-name
+        This attribute specifies the name of the user requesting access
+        to print [or other] service operations.  The usage of
+        this attribute may be mandatory, depending upon the local
+        security policy used."
+    REFERENCE
+        "See XCMI security MIB (62sectc.txt and 63sec.txt)."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenExtEntry 18 }
+
+-- xcmJobTreeBasic  OBJECT IDENTIFIER ::= { xcmJobMonMIB 11 }
+-- OID was reserved, but no objects were ever defined.  Now deleted.
+
+-- ************************** Document groups **************************
+--
+--         The Document General Basic Group (conditionally mandatory)
+--
+-- The Document General Basic group provides
+-- information about each document in each job that is independent of
+-- the type of job and does not require spooling.  Each document
+-- entry is accessed using the job identifier and the document sequence
+-- number which the system assigns starting at 1 for each job.
+
+
+-- For conformance to this MIB module, implementation of all objects in
+-- this group is conditionally mandatory: mandatory for all devices
+-- that monitor general document attributes over the network.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+
+-- This group had been deleted, and was restored in version 4.01.
+
+-- The Document General Basic group
+-- consists entirely of the xcmDocGenBasicTable.
+
+xcmDocGenBasic  OBJECT IDENTIFIER ::= { xcmJobMonMIB 12 }
+
+xcmDocGenBasicTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmDocGenBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A table of general mandatory document information that is per
+        document which in turn is per job and which in turn is per
+        (logical or physical) device and is independent of the type of
+        device (printer, scanner, fax, ...) and that does not require a
+        spooling implementation (though a spooling implementations shall
+        also implement this group, in which case spooled jobs shall also
+        appear in the job table).
+
+        Document information applies to an individual document contained
+        in a job.  The specification for most objects is taken directly
+        from the ISO 10175 Document Printing Application (DPA) standard
+        clause 9.3, Document Attributes.    However, this MIB is
+        intended to be used with non-DPA implementations, so only a
+        small set of general DPA attributes have been included here."
+    ::= { xcmDocGenBasic 1}
+
+xcmDocGenBasicEntry OBJECT-TYPE
+    SYNTAX     XcmDocGenBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "An entry exists in this table for each document in each job,
+         no matter what the state of the job is.  Each printer is
+         represented as a separate device entry in the Host Resources
+         MIB device table as a device of type 'printer', 'scanner', o
+         'fax', etc.  The management station references each job using
+         the xcmJobIdentifierOnSystem assigned by this (logical
+         for spooling or physical for non-spooling) device that
+         accepted the job submission (by some other protocol)."
+    INDEX { hrDeviceIndex, xcmJobIdentifierOnSystem,
+            xcmDocSequenceNumber }
+    ::= { xcmDocGenBasicTable 1 }
+
+
+XcmDocGenBasicEntry ::= SEQUENCE {
+    xcmDocSequenceNumber  Ordinal32,                    -- cond. mand.
+    xcmDocName            CodeIndexedStringIndex,       -- cond. mand.
+    xcmDocFileName        CodeIndexedStringIndex,       -- cond. mand.
+    xcmDocFileNameType    XcmJMDocFileNameType,         -- cond. mand.
+    xcmDocType            XcmJMDocType,                 -- cond. mand.
+    xcmDocFormat          XcmPrtInterpreterLangFamily,  -- cond. mand.
+    xcmDocFormatVariants  CodeIndexedStringIndex,       -- cond. mand.
+    xcmDocFormatVersion   CodeIndexedStringIndex,       -- cond. mand.
+    xcmDocOctetCount      Cardinal32,                   -- cond. mand.
+    xcmDocState           XcmJMDocState                 -- cond. mand.
+}
+
+xcmDocSequenceNumber OBJECT-TYPE
+    SYNTAX     Ordinal32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For the MIB, a row shall not exist in this table if the job
+        does not (yet) have any documents.  A 32-bit index is required,
+        since the ISO DPA has a 2**31-1 maximum-value integer for the
+        document-sequence-number attribute.
+
+        ISO DPA:   Document-sequence-number
+        This attribute specifies the number of this document in
+        relation to the set of documents in this job. The first
+        document in the job is numbered 1.
+
+        The document-sequence-number is not passed as an input
+        attribute in the print operation.  Documents are assumed to be
+        submitted in order (i.e., document number 1 followed by
+        document number 2, etc.).
+
+        [If the job service requester does not submit a document on the
+        first create-job call, no document row shall be added to this
+        table.  The rest of this ISO DPA paragraph does not apply:]
+        A server shall return a value of 0 for this attribute if the
+        first Print operation has not submitted a document (e.g., the
+        first-document element is omitted in the create-job element of
+        the Print operation).
+
+        If a document is cancelled in a multi-document job, the
+        document-sequence numbers of the other documents shall not
+        change."
+    ::= { xcmDocGenBasicEntry 1 }
+
+xcmDocName OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For the MIB, the single xcmDocName object is both the document
+        name for scan-to-file and the document name for file-to-print.
+
+
+        ISO DPA:   Document-name
+        This attribute supplies a human readable string for the
+        document. This string is used for naming the document in a
+        human-readable 'free-form' fashion.
+
+        This attribute is intended for enabling a user or the user's
+        application to convey a document name that may be printed on a
+        start sheet, returned in a ListObjectAttributes result, or used
+        in notification or logging messages.
+
+        If this attribute is not specified, no document name is
+        assumed, but implementation specific defaults are allowed, such
+        as the simple-name part of the value of the document-file-name
+        attribute.  It is suggested, however, that the server not
+        supply additional text for this attribute when printing its
+        value (e.g. on a start sheet).  This string only has meaning to
+        the clients and can therefore take several forms, e.g. the name
+        of a mail folder, name of a revisable document, the file
+        specification minus the file path, the title of a document,
+        etc."
+    ::= { xcmDocGenBasicEntry 2 }
+
+xcmDocFileName OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For the MIB, the single xcmDocFileName object is both the
+        document file name for scan-to-file and the document file name
+        for file-to-print.  If this attribute is specified for a
+        scan-to-print job, the result of the scan is also copied to the
+        file specified by xcmDocFileName as a side-effect of the
+        scan-to-print operation.
+
+        ISO DPA:   Document-file-name
+        This attribute specifies the file name of the document, if the
+        document came from a file.
+
+        The file name may include the full path to the file, in which
+        case the name-syntax element of the DistinguishedNameString
+        data type shall specify the syntax of the file name.  If the
+        document did not come from a file, the client should not
+        specify this attribute."
+    ::= { xcmDocGenBasicEntry 3 }
+
+xcmDocFileNameType OBJECT-TYPE
+    SYNTAX     XcmJMDocFileNameType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The type of file name syntax from which a document is
+        obtained for an output job, such as print, or for which a
+        document is produced for an input job, such as scan-
+
+
+        to-file.  The file name syntax types are taken from ISO DPA
+        for the DistinguishedNameStringSyntax data type.
+
+        ISO DPA:   distinguished-name-syntax data type, name-syntax
+        element.  See textual-conventions."
+    ::= { xcmDocGenBasicEntry 4 }
+
+xcmDocType OBJECT-TYPE
+    SYNTAX     XcmJMDocType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  Document-type
+        This attribute indicates that the document being passed by the
+        current Print abstract-operation is either a printable
+        document, a font, or a resource.
+
+        How resources are managed during the printing process is
+        necessarily dependent on the characteristics of the server and
+        printer implementations. These methods are considered
+        implementation-specific, and shall not be dictated by ISO/IEC
+        10175.  In particular, ISO/IEC 10175 does not require that
+        resources be passed in advance of the documents that use them;
+        i.e., resources may be passed to the server in any order within
+        the job, subject only to the requirement that the resources be
+        present at the server before processing begins on the documents
+        that use them."
+    ::= { xcmDocGenBasicEntry 5 }
+
+xcmDocFormat OBJECT-TYPE
+    SYNTAX     XcmPrtInterpreterLangFamily
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The interpreter language family enum value registered by IANA
+        is used according to the Printer MIB (RFC 1759).  See
+        prtInterpreterLangFamily.  For the Job Monitoring
+        MIB, an index into the prtInterpreterTable is not used, since
+        the exact format of the document need not conform exactly to one
+        of the printer's intepreters and, furthermore, the device need
+        not even be a printer (so that the Printer MIB need not be used
+        for non-printers).
+
+        For scan-to-file jobs, the xcmDocFormat object specifies the
+        document format desired as a result of the scan.
+
+        ISO DPA:   Document-format
+        This attribute identifies the overall print document format
+        used for the document.  It consists of three elements, a
+        document-format, a document-format-variants and a document-
+        format-version. The latter two elements are optional.
+        The document-format element identifies a particular family of
+        document formats, of which there may exist several versions or
+        variants.  The document-format-variants and document-format-
+
+
+        version elements identify a specific instance of a document
+        format. The variant refers to a particular functional subset of
+        a format. For example, the format PostScript has variants of
+        level 1 and level 2, and the format PCL has several variants,
+        including PCL4 and PCL5.  The version distinguishes among
+        successive releases of the same basic format and variant. For
+        example, successive versions of Xerox Interpress include
+        versions 2.0, 2.1, 3.0, 3.1, etc."
+    ::= { xcmDocGenBasicEntry 6 }
+
+xcmDocFormatVariants OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For scan-to-file jobs, the xcmDocFormatVariants object
+        specifies the document format variant desired as a result of the
+        scan.
+
+        ISO DPA:   Document-format-variants
+        The document-format-variants and document-format-version
+        elements identify a specific instance of a document format. The
+        variant refers to a particular functional subset of a format.
+        For example, the format PostScript has variants of level 1 and
+        level 2, and the format PCL has several variants, including
+        PCL4 and PCL5.
+
+        The document-format-variants element consists of a single
+        text string.  If it is necessary to identify more than one
+        variant, the respective variant values shall all be contained
+        in the document-format-variants element, separated from one
+        another by commas.
+
+        If the client omits the document-format-variants or document-
+        format-version elements, the server may supply a format-
+        specific default which will restrict the outcome of the rules
+        described in the next paragraph. This rule shall not cause a
+        job to fail in validation if it would have succeeded with the
+        rules of the next paragraph.
+
+        If the client omits the document-format-variants element, the
+        server shall print the document if the requested printer's
+        document-formats-supported attribute contains a DocFormat
+        which differs from the specified document-format only in the
+        value of its document-format-variants.  If the
+        document-format-variants is omitted from the printer
+        document-formats-supported attribute, the printer shall accept
+        documents with any variant of the specified format. Similar
+        rules apply if the document-format-version element is omitted.
+
+        If the client omits the document-format-variants or document-
+        format-version elements, the server may supply a format-
+        specific default. Such a default shall be one that could have
+        matched a document-format according to the rules of the
+
+
+        preceding paragraph.
+
+        Proprietary values for the document-format, document-format-
+        variants, and document-format-version elements are assigned by
+        the owners of those formats.  Annex F contains a set of
+        document-formats and variants for various commercially
+        available formats and variants that are currently in common
+        use."
+    ::= { xcmDocGenBasicEntry 7 }
+
+xcmDocFormatVersion OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For scan-to-file jobs, the xcmDocFormatVersion object specifies
+        the document format version desired as a result of the scan.
+
+        ISO DPA:   Document-format-version
+        The version distinguishes among successive releases of the same
+        basic format and variant. For example, successive versions of
+        Xerox Interpress include versions 2.0, 2.1, 3.0, 3.1, etc."
+    ::= { xcmDocGenBasicEntry 8 }
+
+xcmDocOctetCount OBJECT-TYPE
+    SYNTAX     Cardinal32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For the MIB, the value of the xcmDocOctetCount is used for both
+        scan-to-file and file-to-print jobs.  In the case of
+        scan-to-file jobs, the value starts at 0 and counts the number
+        of octets scanned.
+
+        ISO DPA:   Octet-count
+        This attribute specifies the size of the document in octets."
+    ::= { xcmDocGenBasicEntry 9 }
+
+xcmDocState OBJECT-TYPE
+    SYNTAX     XcmJMDocState
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For the MIB, if the document is being
+        scanned and printed in the same simple job, the xcmDocState
+        object represents the state of the document being printed, since
+        level 1 scan-to-print jobs must scan directly to the printer.
+
+        ISO DPA:   Document-state
+        This attribute identifies the current state of the document
+        [whether being scanned or printed.]."
+    ::= { xcmDocGenBasicEntry 10 }
+
+--
+
+
+--         The Document Printing Extended Group
+--                   (conditionally mandatory)
+--
+-- The Document Printing Extended group provides
+-- additional (print-centric) information about each document and does
+-- not require spooling.
+
+-- For conformance to this MIB module, implementation of all objects in
+-- this group is conditionally mandatory: mandatory for all devices
+-- that monitor document printing attributes over the network.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+
+-- This group had been deleted, and was restored in version 4.01.
+
+-- The Document Printing Extended group consists entirely
+-- of the xcmDocPrintExtTable.
+
+xcmDocPrintExt  OBJECT IDENTIFIER ::= { xcmJobMonMIB 13 }
+
+xcmDocPrintExtTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmDocPrintExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A table of print-centric document information which
+        is per document which in turn is per job and which in turn is
+        per (logical or physical) printer.  Document information applies
+        to an individual document contained in the job.  The
+        specification for most objects is taken directly from the ISO
+        10175 Document Printing Application (DPA) standard clause 9.3,
+        Document Attributes and is print-centric.    However, this MIB
+        is intended to be used with non-DPA implementations, so only a
+        small set of general DPA attributes have been included here."
+    ::= { xcmDocPrintExt 1}
+
+xcmDocPrintExtEntry OBJECT-TYPE
+    SYNTAX     XcmDocPrintExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "An entry exists in this table for each job in the device,
+         no matter what the state of the job is.  Each printer is
+         represented as a separate device entry in the Host Resources
+         MIB device table as a device of type 'printer'.
+
+         The management station references each job using
+         the xcmJobIdentifierOnSystem assigned by this (logical
+         for spooling or physical for non-spooling) device that
+         accepted the job submission (by some other protocol).
+
+         The management station accesses each document in the job using
+         the xcmDocSequenceNumber from the xcmDocGenBasicTable.
+
+
+         This table extends (for print jobs only) the
+         Document General Basic table in this MIB."
+    INDEX { hrDeviceIndex, xcmJobIdentifierOnSystem,
+            xcmDocSequenceNumber }
+    ::= { xcmDocPrintExtTable 1 }
+
+XcmDocPrintExtEntry ::= SEQUENCE {
+    -- Note that objects in this table are print-centric and
+    -- are conditionally mandatory:  .
+    -- This table extends the Document General Basic
+    -- table.
+    xcmDocPrintDefaultMediumName InternationalDisplayString,
+                                                          -- cond. mand.
+    xcmDocPrintDefaultInputIndex Cardinal16,              -- cond. mand.
+    xcmDocPrintFinishing         InternationalDisplayString,
+                                                          -- cond. mand.
+    xcmDocPrintOutputMethod      XcmJMDocOutputMethod,    -- cond. mand.
+    xcmDocPrintNumberUp          InternationalDisplayString,
+                                                          -- cond. mand.
+    xcmDocPrintSides             INTEGER(1..2),           -- cond. mand.
+    xcmDocPrintCopyCount         Cardinal32,              -- cond. mand.
+    xcmDocPrintCopiesCompleted   Counter32                -- cond. mand.
+}
+
+xcmDocPrintDefaultMediumName OBJECT-TYPE
+    SYNTAX     InternationalDisplayString (SIZE(0..255))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The value of this object is the name of the medium
+        that is the default medium for this
+        document.  A null string indicates that neither the
+        submitting client, nor the system, nor the printer has
+        specified a default medium for this document.
+
+        NOTE: This attribute that is supplied by the job service
+        requester is localizable by the job service provider, since the
+        job service provider must understand and support the specified
+        value.
+
+        ISO DPA:   Default-medium
+        This attribute identifies a medium that the server shall use as
+        the medium default for the pages of the document that require a
+        specification.
+
+        Standard values are defined in the specification of the medium-
+        identifier medium attribute.
+
+        If the page-media-select attribute is specified (either by the
+        client or by a server default, i.e., the page-media-select
+        attribute of the initial-value-job object specified by the
+        logical or physical printer), then the server shall use the
+        page-media-select value to override the default-medium
+
+
+        specification on a page by page basis.
+
+        The default-medium attribute may contain a value of id-val-
+        generic-none (see DPA 9.1.2) indicating that the server shall
+        not use a default medium.  Instead, the server shall rely on
+        lower precedence document attributes (such as default-input-
+        tray) for the media specification.
+
+        If the document data, itself, specifies media, such
+        specification shall override the default-medium attribute on a
+        page by page basis.  If the document data specifies media which
+        are not also values of media-used, then a printer may receive a
+        document which requires media that are not ready. In such a
+        case, an implementation may either abort the document or try
+        printing the document on some alternative medium, such as the
+        default medium.
+
+        A client has numerous ways to specify the media to be used when
+        printing a document and different document pages can be
+        specified in different ways. The client can specify the media
+        in the document contents or with attributes. Some attributes
+        override the document contents, and other attributes may be
+        overridden by the document contents. In addition, the client
+        can specify the media by name or by the input-tray containing
+        it.
+
+        Before printing each page of a document, the server determines
+        the medium or input-tray for that page by finding the first
+        condition in the list of numbered steps below that is
+        satisfied. For this discussion, either the medium or the input-
+        tray is sufficient information:
+
+        a)  If page-media-select has a medium value for the current
+        page, use that medium, regardless of document contents and
+        other attributes.
+
+        b)  If input-tray-select has a value, use that tray.
+
+        c)  If the document contents specify a medium, and that medium
+        is the same as the value of one of the original-medium elements
+        in the media-substitution attribute, then use the corresponding
+        substitution-medium in the media-substitution attribute.
+
+        d)  If the document contents specify a medium, use that medium.
+
+        e)  If the document contents specify an input-tray, use that
+        input-tray.
+
+        f)  If the default-medium has a value, and the document format
+        interpreter allows its use, and that medium is the same as the
+        value of one of the original-medium elements in media-
+        substitution attribute, then use the corresponding
+        substitution-medium in the media-substitution attribute.
+
+
+        g)  If the default-medium has a value and the document format
+        interpreter allows its use, use the default-medium.
+
+        h)  If the default-input-tray has a value and the document
+        format interpreter allows its use, use the default-input-tray.
+
+        i)  Use the medium or input-tray selected by the document
+        format processor in the printer. This selection is
+        implementation-dependent."
+    ::= { xcmDocPrintExtEntry 1 }
+
+xcmDocPrintDefaultInputIndex OBJECT-TYPE
+    SYNTAX     Cardinal16
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The value of this object is the index of the input sub-unit in
+        the prtInputTable in the printer MIB that is the default input
+        tray for this document.  An index value of 0 indicates that
+        neither the submitting client, the print server, nor printer
+        has specified a default input tray for this document.
+
+        The Printer MIB (RFC 1759) requires that input sub-unit indices
+        remain stable across successive device power cycles.
+
+        ISO DPA:   Default-input-tray
+        This attribute identifies an input-tray that the server shall
+        use as the input-tray default for the pages of the document
+        that require a specification.
+
+        The correspondence between the simple-name of an input-tray
+        (alphanumeric or numeric) and the actual tray in the printer is
+        printer-dependent, and a tray named by such a simple-name may
+        also have an OBJECT IDENTIFIER that names it as well.
+
+        A server may try to convert a simple-name received from a
+        client to one of the server's OIDs, depending on
+        implementation. However, a server shall always return an input-
+        tray as an OID to the client if the server identifies the
+        input-tray using an OID.
+
+        Examples: The simple-name strings: envelope, top, 2, or 02, or
+        the OID value: id-val-input-tray-top.
+
+        If the default-medium attribute is specified (either by the
+        client or by a server default, i.e., the default-medium
+        attribute of the initial-value-job object specified by the
+        logical or physical printer), then the server shall use the
+        default-medium value and shall ignore the default-input-tray
+        attribute, if specified.  If the page-media-select attribute is
+        specified (either by the client or by a server default, i.e.,
+        the page-media-select attribute of the initial-value-job object
+        specified by the logical or physical printer), then the server
+
+
+        shall use the page-media-select value to override the default-
+        input-tray specification on a page by page basis.
+
+        If the document data, itself, specifies media or input trays,
+        such specification shall override the default-input-tray
+        attribute on a page by page basis.  If the document data
+        specifies media or input-trays which are not also values of
+        media-used or input-trays-used, respectively, then a printer
+        may receive a document which requires media or input-trays
+        which are not ready. In such a case, an implementation may
+        either abort the document or try printing the document using
+        some alternative input-tray, such as the default input-tray.
+
+        The following standard values are defined:
+
+        top             The top input tray in the printer.  (id-
+                        val-input-tray-top)
+
+        middle          The middle input tray in the printer.  (id-
+                        val-input-tray-middle)
+
+        bottom          The bottom input tray in the printer.  (id-
+                        val-input-tray-bottom)
+
+        envelope        The envelope input tray in the printer.
+                        (id-val-input-tray-envelope)
+
+        manual          The manual feed input tray in the printer.
+                        (id-val-input-tray-manual)
+
+        large-capacity  The large capacity input tray in the
+                        printer.  (id-val-input-tray-large-
+                        capacity)
+
+        main            The main input tray  (id-val-input-tray-
+                        main)
+
+        side            The side input tray  (id-val-input-tray-
+                        side)"
+    ::= { xcmDocPrintExtEntry 2 }
+
+xcmDocPrintFinishing OBJECT-TYPE
+    SYNTAX     InternationalDisplayString (SIZE(0..255))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Specifies finishing to be performed on the document.
+
+        NOTE: This attribute that is supplied by the job service
+        requester is localizable by the job service provider, since the
+        job service provider must understand and support the specified
+        value."
+    ::= { xcmDocPrintExtEntry 3 }
+
+
+xcmDocPrintOutputMethod OBJECT-TYPE
+    SYNTAX     XcmJMDocOutputMethod
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object is bit coded, so that multiple document output
+        requests may be made for the document.  Each bit corresponds to
+        one of the ISO DPA output OIDs.  See XcmJMDocOutputMethod
+        textual convention for the algorithm that maps DPA OIDs to bits.
+
+        ISO DPA:   Output
+        This attribute identifies the output processing for the media
+        on which the document is to be printed."
+    ::= { xcmDocPrintExtEntry 4 }
+
+xcmDocPrintNumberUp OBJECT-TYPE
+    SYNTAX     InternationalDisplayString (SIZE(0..255))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For the MIB: this object is specified as a text string which
+        can be a number, e.g., '2' meaning the number of logical pages
+        per side, or a name, e.g., 'simple-2-up' meaning an imposition
+        object in the system that specifies 2 logical pages per side.
+
+        NOTE: This attribute that is supplied by the job service
+        requester is localizable by the job service provider, since the
+        job service provider must understand and support the specified
+        value.
+
+        ISO DPA: number-up (excerpted)
+        This attribute specifies the number of source page-images to
+        impose upon a single instance of a selected medium. The
+        attribute can be specified either by a number directly or by
+        naming an imposition object which specifies some particular
+        number-up imposition.
+
+        In general, only certain all-numeric text values are valid for
+        this attribute, depending upon the server and printer
+        implementations to which the print-request is directed.  A
+        text value of '0' or 'none' shall suppress any server default
+        number up, if any.
+
+        This attribute primarily controls the translation, scaling and
+        rotation of page images, but a site may choose to add
+        embellishments, such as borders to each logical page. A site may
+        even choose to add an attribute to control the presence or
+        characteristics of such embellishments.
+
+        The following standard text values are defined:
+
+          '0'  This value suppresses any number-up operation or its
+               embellishments.
+
+
+          '1'  This value specifies that 1 logical page is to be imaged
+               on one surface of the medium, possibly with
+               embellishments.
+
+          '2'  This value specifies that 2 logical pages are to be
+               imaged on one surface of the medium, possibly with
+               embellishments.
+
+          '4'  This value specifies that 4 logical pages are to be
+               imaged on one surface of the medium, possibly with
+               embellishments.
+
+        NOTE - The value '0' or 'none' specifies that no convenience
+        imposition functions shall be performed; '0' or 'none' is needed
+        to suppress any special number-up operation because a value of
+        '1' or 'simple-1-up' for some sites may cause the server to
+        alter the placement, or size of the page image, or to add
+        embellishments, such as borders or to rotate the page depending
+        on content-orientation.
+
+        See ISO DPA number-up description for further details on the
+        semantics of number-up, including figures."
+    ::= { xcmDocPrintExtEntry 5 }
+
+xcmDocPrintSides OBJECT-TYPE
+    SYNTAX     INTEGER(1..2)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "NOTE - The xcmDocPrintSides attribute is for print jobs.  A
+        scanner-specific object, xcmDocScanSides is needed to be
+        added when scanning is supported, so that input and output sides
+        can be specified independently.
+
+        ISO DPA:   Sides
+        This attribute specifies the number of printable surfaces of
+        the medium to be imaged."
+    ::= { xcmDocPrintExtEntry 6 }
+
+xcmDocPrintCopyCount OBJECT-TYPE
+    SYNTAX     Cardinal32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  Copy-count
+        This attribute specifies the number of copies of the documents,
+        or of the selected pages of the document, to be printed.
+        A value of 1 for copy-count shall generate a single human
+        perceptible copy of the electronic document.  If a value of 0
+        is supplied [by the job service requester and is supported by
+        the job service provider], the job may be processed normally,
+        but no print output shall be produced or the server shall return
+        an unsupported-attribute-value AttributeError [to the job
+
+
+        service requester, if a copy-count of 0 is not supported]."
+    ::= { xcmDocPrintExtEntry 7 }
+
+xcmDocPrintCopiesCompleted OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "For the MIB: on job recovery after power failure or a crash,
+        the value of xcmDocPrintCopiesCompleted may be set to a lower
+        value which would normally violate the SNMP constraints of a
+        Counter32 type.
+
+        ISO DPA:  Copies-completed
+        This attribute indicates the number of complete copies of this
+        document that have been printed.
+
+        Some printers print multiple copies of each individual page of
+        a document, completing the printing of all copies at the same
+        time, printing as many of these pages as necessary to satisfy
+        the copy count. The value of copies-completed is 0 if printing
+        has not started for this document."
+    ::= { xcmDocPrintExtEntry 8 }
+
+-- ********************** Job Spooling Groups *************************
+--
+--      The Job General Spooling Basic Group (CONDITIONALLY MANDATORY)
+
+-- This group had been deprecated in favor of the equivalent PWG Job
+-- Mon objects and attributes, but was undeprecated starting with
+-- version 4.00.  Either the PWG Job Mon MIB, or this XCMI Job Mon MIB,
+-- may be used.
+
+-- The Job General Spooling Basic group provides
+-- general information about each job that is independent of the type of
+-- job but does require spooling of job (and document)
+-- instructions.  Spooling of document data need not be performed.
+
+-- In order to claim conformance to this group, it is necessary to
+-- implement every object in the group.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+--
+-- The Job General Spooling Basic group consists entirely of the
+-- xcmJobGenSpoolingBasicTable.
+
+xcmJobGenSpoolingBasic  OBJECT IDENTIFIER ::= { xcmJobMonMIB 14 }
+
+xcmJobGenSpoolingBasicTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmJobGenSpoolingBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "A table of general job information per
+
+
+        (logical or physical) device that is independent of the type of
+        device (printer, scanner, fax, ...) but does require spooling
+        of job (and document) instructions, but not necessarily of
+        document-content data.
+
+        Job information applies to the job as a whole or to all its
+        documents.  The specification for most objects is taken directly
+        from the ISO 10175 Document Printing Application (DPA) standard
+        clause 9.2, Job Attributes.    However, this MIB is
+        intended to be used with non-DPA implementations, so only a
+        small set of general DPA attributes have been included here."
+    ::= { xcmJobGenSpoolingBasic 1}
+
+xcmJobGenSpoolingBasicEntry OBJECT-TYPE
+    SYNTAX     XcmJobGenSpoolingBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "An entry exists in this table for each job in the device,
+         no matter what the state of the job is.  Each device is
+         represented as a separate device entry in the Host Resources
+         MIB device table as a device of type 'printer', 'scanner',
+         'fax', etc.  The management station references each job using
+         the xcmJobIdentifierOnSystem assigned by this logical
+         (for spooling) device that accepted the job submission
+         (by some other protocol)."
+    AUGMENTS { xcmJobGenBasicEntry }
+    ::= { xcmJobGenSpoolingBasicTable 1 }
+
+XcmJobGenSpoolingBasicEntry ::= SEQUENCE {
+    -- Note that objects in this table are all device-independent.
+    xcmJobNumberOfJobResultSets  Ordinal32,
+    xcmJobPriority               INTEGER(0..100),
+    xcmJobTotalOctetsHigh        Cardinal64High,
+    xcmJobTotalOctetsLow         Cardinal64Low,
+    xcmJobInterveningJobs        Integer32
+}
+
+xcmJobNumberOfJobResultSets OBJECT-TYPE
+    SYNTAX     Ordinal32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  number-of-job-result-sets
+        The hardcopy output of a print-job consists of one or more job
+        sets, each of which may be specified to be delivered to, or
+        held for, one particular recipient who is not necessarily the
+        job creator.  Each job set may be specified to contain one or
+        more job copies.  Each job copy shall contain one or more
+        copies of each of the documents specified by means of the Print
+        operations that compose the job.
+
+        For example, consider the following job being submitted:
+            results-profile: {delivery-address=Jones, job-copies=1},
+
+
+                             {delivery-address=Smith, job-copies=2}
+            documentA with copy-count=1
+            documentB with copy-count=2
+
+        +-------------------------------------------------------------+
+        | +----------------------------+                              |
+        | | +-------------+            |                              |
+        | | | document A  |            |                              |
+        | | +-------------+            |                              |
+        | | | document B  |  job copy  |  job result set #1 for Jones |
+        | | +-------------+            |                              |
+        | | | document B  |            |                              |
+        | | +-------------+            |                              |
+        | +----------------------------+                              |
+        +-------------------------------------------------------------+
+
+        +-------------------------------------------------------------+
+        | +----------------------------+                              |
+        | | +-------------+            |                              |
+        | | | document A  |            |                              |
+        | | +-------------+            |                              |
+        | | | document B  |  job copy  |                              |
+        | | +-------------+            |                              |
+        | | | document B  |            |                              |
+        | | +-------------+            |                              |
+        | +----------------------------+                              |
+                                          job result set #2 for Smith |
+        | +----------------------------+                              |
+        | | +-------------+            |                              |
+        | | | document A  |            |                              |
+        | | +-------------+            |                              |
+        | | | document B  |  job copy  |                              |
+        | | +-------------+            |                              |
+        | | | document B  |            |                              |
+        | | +-------------+            |                              |
+        | +----------------------------+                              |
+        +-------------------------------------------------------------+"
+    DEFVAL { 1 }                        -- one result set
+    ::= { xcmJobGenSpoolingBasicEntry 1 }
+
+xcmJobPriority OBJECT-TYPE
+    SYNTAX     INTEGER(0..100)
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "For the MIB:  A value of 0 means that the priority was not
+         specified by the job service requester and the system did not
+         specify a default value.
+
+        ISO DPA:  Job-priority
+        This attribute specifies a priority for scheduling the print-
+        job. It is used by servers that employ a priority-based
+        scheduling algorithm.
+
+
+        A higher value specifies a higher priority. The value 1 is
+        defined to indicate the lowest possible priority (a job which a
+        priority-based scheduling algorithm shall pass over in favor
+        of higher priority jobs). The value 100 is defined to indicate
+        the highest possible priority. Priority is expected to be
+        evenly or 'normally' distributed across this range. The mapping
+        of vendor-defined priority over this range is implementation-
+        specific.
+        [The following DPA sentence is covered by the value of 0, since
+        the DPA range is 1..100.  A value of 0 returned by an SNMP agent
+        indicates the same semantics as ISO DPA returning the job object
+        without the job-priority attribute present:]
+        The omission of this attribute implies that the user
+        places no constraints concerning priority on the scheduling of
+        the print-job."
+    DEFVAL { 0 }                        -- default job priority
+    ::= { xcmJobGenSpoolingBasicEntry 2 }
+
+xcmJobTotalOctetsHigh OBJECT-TYPE
+    SYNTAX     Cardinal64High
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "For the Job Monitoring MIB:  two objects are used to represent
+        a full 62-bit value.  The sign bit of each half is not used.
+        This object is generalized for use with input devices as well.
+
+        ISO DPA:  Total-job-octets [high 31 bits]
+        This attribute indicates the size of the job in octets,
+        including document and job copies.
+
+        The server may update the value of this attribute after each
+        document has been transferred to the server or the server may
+        provide this value after all documents have been transferred to
+        the server, depending on implementation.  In other words, while
+        the job is in the pre-processing [building] state and when the
+        job is in the held state with the job-state-reasons containing a
+        document-needed value, the value of the total-job-octets job
+        status attribute depends on implementation and may not
+        correctly reflect the size of the job.
+
+        In computing this value, the server shall include the
+        multiplicative factors contributed by the (1) copy-count
+        document attribute, (2) the results-profile.job-copies job
+        attribute element and (3) multiple values of the results-
+        profile job attribute, independent of whether the printer can
+        process multiple copies of the job or document without making
+        multiple passes over the job or document data and independent
+        of the value of the output document attribute (page-collate vs.
+        no-page-collate).  Thus the server computation is independent
+        of the printer implementation and shall be:
+
+        a)  Document contribution:  Multiply each copy-count by the
+
+
+        size of the document in octets.
+
+        b)  Add each document contribution together
+
+        c)  Job result contribution:  Multiply the job size by the
+        number job-copies in the result set.
+
+        d)  Add each job result contribution together
+
+        e)  Multiply the value by the number of values in the job's
+        result-profile attribute."
+    DEFVAL { 0 }                        -- no job size in octets
+    ::= { xcmJobGenSpoolingBasicEntry 3 }
+
+xcmJobTotalOctetsLow OBJECT-TYPE
+    SYNTAX     Cardinal64Low
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "ISO DPA:  Total-job-octets [low 31 bits]
+        This attribute indicates the size of the job in octets,
+        including document and job copies.  See xcmJobTotalOctetsHigh
+        for the specification."
+    DEFVAL { 0 }                        -- no job size in octets
+    ::= { xcmJobGenSpoolingBasicEntry 4 }
+
+xcmJobInterveningJobs OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "The number of jobs that are expected to complete before this
+        job is completed according to the implementation's queuing and
+        processing algorithm if no other jobs were to be submitted.  In
+        other words, this value is the job's queue position.  The agent
+        SHALL return a value of 0 for this object when there are no
+        other jobs that are expected to complete before this job.
+
+        A value of (-2) shall be used when the number of intervening
+        jobs is unknown.
+
+        NOTE the ISO DPA language does not include the case when
+        multiple jobs are in the 'processing' (or printing) state:
+        ISO DPA:  Intervening-jobs
+        This attribute indicates the number of other jobs to be
+        processed before this job may be scheduled for processing.  The
+        server shall set the value of this attribute to 0 when the job
+        begins processing."
+    DEFVAL { -2 }                       -- unknown intervening jobs
+    ::= { xcmJobGenSpoolingBasicEntry 5 }
+
+--
+--             The Job General Spooling Extended Group
+--                   (conditionally mandatory)
+
+
+--
+-- The Job General Spooling Extended group provides additional
+-- general information about each job that is independent of the type of
+-- job but does require spooling.
+
+-- For conformance to this MIB module, implementation of all objects in
+-- this group is conditionally mandatory: mandatory for all devices
+-- that monitor job spooling attributes over the network.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+
+-- This group had been deleted, and was restored in version 4.01.
+
+-- The Job General Spooling Extended group consists solely of the
+-- xcmJobGenSpoolingExtTable.
+
+xcmJobGenSpoolingExt  OBJECT IDENTIFIER ::= { xcmJobMonMIB 15 }
+
+xcmJobGenSpoolingExtTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmJobGenSpoolingExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A table of general extended job information per device
+        that is independent of the type of device but that does require
+        a spooling implementation.
+
+        Job information applies to the job as a whole or to all its
+        documents.  The specification for each object is taken directly
+        from the ISO 10175 Document Printing Application (DPA) standard
+        clause 9.2, Job Attributes.    However, this MIB is
+        intended to be used with non-DPA implementations, so only a
+        small set of general DPA attributes have been included here."
+    ::= { xcmJobGenSpoolingExt 1}
+
+xcmJobGenSpoolingExtEntry OBJECT-TYPE
+    SYNTAX     XcmJobGenSpoolingExtEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "An entry exists in this table for each job in the (logical)
+         device, no matter what the state of the job is.  Each device is
+         represented as a separate device entry in the Host Resources
+         MIB device table as a device of type 'printer', 'scanner',
+         'fax', etc.
+
+         The management station references each job using
+         the xcmJobIdentifierOnSystem assigned by this (logical) device
+         that accepted the job submission (by some other protocol).
+
+         This table augments the Job General Basic
+         table in this MIB."
+    AUGMENTS { xcmJobGenBasicEntry }
+    ::= { xcmJobGenSpoolingExtTable 1 }
+
+
+XcmJobGenSpoolingExtEntry ::= SEQUENCE {
+    -- Note that objects in this table are conditionally mandatory:
+    -- and are all device-independent.
+    -- This table augments the Job General Spooling Basic
+    -- table.
+    xcmJobProcessAfter            DateAndTime,            -- cond. mand.
+    xcmJobDeadlineTime            DateAndTime,            -- cond. mand.
+    xcmJobDiscardTime             DateAndTime,            -- cond. mand.
+    xcmJobRetentionPeriod         Cardinal32,             -- cond. mand.
+    xcmJobMessageToOperator       CodeIndexedStringIndex, -- cond. mand.
+    xcmJobMessageFromOperator     CodeIndexedStringIndex, -- cond. mand.
+    xcmJobMessageFromAdministrator
+                                  CodeIndexedStringIndex, -- cond. mand.
+    xcmJobPageCount               Cardinal32              -- cond. mand.
+}
+
+xcmJobProcessAfter OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Specifies the calendar date and time of day after which the
+        server is to process the job on the specified device.  The
+        server shall hold the job in the held state until the specified
+        date and time.
+
+        NOTE: In this MIB, this object applies to any type of job, not
+        just print jobs and so this object is a generalization of the
+        ISO DPA attribute which is only for print jobs.
+
+        ISO DPA: Job-print-after
+        This attribute specifies the calendar date and time of day
+        after which the print-job shall become a candidate to be
+        scheduled for printing [processing].
+
+        If the value of this attribute is in the future, the server
+        shall set the value of the job's current-job-state to held and
+        add the job-print-after-specified value to the job's job-state-
+        reasons attribute and shall not schedule the print-job for
+        printing until the specified date and time has passed.  When
+        the specified date and time arrives, the server shall remove
+        the job-print-after-specified value from the job's job-state-
+        reason attribute and, if no other reasons remain, shall change
+        the job's current-job-state to pending so that the job becomes
+        a candidate for being scheduled on printer(s).
+
+        [For purposes of this MIB, the agent shall return the DEFVAL
+        if the job did not specify this attribute and disregard the next
+        paragraph.]
+        The server shall assign an empty value (see DPA 9.1.2) to the
+        job-print-after attribute when no print after time has been
+        assigned, so that the job shall be a candidate for scheduling
+        immediately."
+
+
+    DEFVAL      { '0000000000000000'H } -- unknown date/time
+    ::= { xcmJobGenSpoolingExtEntry 1 }
+
+-- NOTE: xcmJobGenSpoolingExtEntry 2 not used; getNext shall skip over.
+
+xcmJobDeadlineTime OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  job-deadline-time
+        This attribute specifies the calendar date and time of day by
+        which the user desires the print-job to be completed.  This
+        attribute is treated as a scheduling hint only.  If the
+        specified deadline time arrives before completion of the job,
+        the server shall generate the error-past-deadline event for the
+        job, but the current-job-state shall not be changed. This
+        attribute is intended for use by servers that implement some
+        form of deadline scheduling.
+
+        [For purposes of this MIB, the agent shall return the DEFVAL
+        if the job did not specify this attribute and disregard the next
+        paragraph.]
+        The server shall assign an empty value (see DPA 9.1.2) to the
+        job-deadline-time attribute when there is no deadline for the
+        job."
+    DEFVAL      { '0000000000000000'H } -- unknown date/time
+    ::= { xcmJobGenSpoolingExtEntry 3 }
+
+xcmJobDiscardTime OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  job-discard-time
+        This attribute specifies the calendar date and time of day at
+        which the print-job should be discarded, whether or not the job
+        has printed.
+
+        If this attribute is supported and the discard time has not
+        arrived, the server shall retain job and document attributes and
+        status; the server is not required to retain job document files
+        if the job has completed processing and has exceeded the job's
+        job-retention-period. When the job-discard-time arrives, the
+        server shall set the job's job-retention-period to zero and
+        shall perform a CancelJob operation on the specified job.
+
+        Whether or not the print-job is discarded if the
+        error-past-discard event occurs while the job is being printed
+        is implementation-dependent.
+
+        [For purposes of this MIB, the agent shall return the DEFVAL
+        if the job did not specify this attribute and disregard the next
+        paragraph.]
+
+
+        The server shall assign an empty value (see DPA 9.1.2) to the
+        job-discard-time attribute when there is no discard time for the
+        job."
+    DEFVAL      { '0000000000000000'H } -- unknown date/time
+    ::= { xcmJobGenSpoolingExtEntry 4 }
+
+xcmJobRetentionPeriod OBJECT-TYPE
+    SYNTAX     Cardinal32
+    UNITS      "seconds"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  job-retention-period
+        This attribute specifies the minimum period [in seconds] of time
+        following the completion of job processing that the
+        server shall keep job attributes, document attributes, and
+        document data.  The server may keep these attributes and data
+        longer than the value of the job-retention-period attribute.
+
+        Job-retention-period specifies a lower bound on how long job
+        attributes, document attributes and document data shall be
+        retained by a server after printing [processing] has completed,
+        whilst job-discard-time sets an upper bound on retention of the
+        job and document attributes independent of whether the job is
+        ever scheduled for, starts or completes printing [processing].
+
+        In addition to providing status information to a user after a
+        job has completed printing [processing, the job-retention-period
+        also provides the mechanism for retaining job's document data
+        after it has been printed [processed], so that the job may be
+        printed [processed] again, possibly with modified attributes,
+        such as the job-copies component of the job-results attribute.
+        However, the mechanism to reprint the job is outside the scope
+        of this part of ISO/IEC 10175.  [See ResubmitJob in Part 3.]"
+    ::= { xcmJobGenSpoolingExtEntry 5 }
+
+xcmJobMessageToOperator OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  job-message-to-operator
+        This attribute carries a message from the user to the operator
+        to indicate something about the processing of this print-job.
+        This message, unlike the job-start-message, is not necessarily
+        related to other job-scheduling attributes.  The server shall
+        make this message available to the operator when the job has
+        been accepted."
+    ::= { xcmJobGenSpoolingExtEntry 6 }
+
+
+xcmJobMessageFromOperator OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Xerox extension to ISO DPA:  job-message-from-operator
+        This attribute carries a message from the operator to the user
+        to indicate something about the processing of this print-job.
+        What additional notification methods are used, if any, in
+        addition to providing a value for this job attribute depends on
+        implementation."
+    ::= { xcmJobGenSpoolingExtEntry 7 }
+
+xcmJobMessageFromAdministrator OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  Job-message-from-administrator
+        This attribute provides a message from an operator, system
+        administrator or 'intelligent' process to indicate to the user
+        the reasons for modification or other management action taken
+        on a job."
+    ::= { xcmJobGenSpoolingExtEntry 8 }
+
+xcmJobPageCount OBJECT-TYPE
+    SYNTAX     Cardinal32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "ISO DPA:  Job-page-count
+        This attribute contains the number of source pages in the job
+        that the server expects to image. The server shall compute this
+        value by the following procedure:
+
+        a)  For each document in the job object, multiply the value
+        of document's page-count attribute by the value of its copy-
+        count attribute and call the result document-set-page-count.
+
+        b)  Add up all the document-set-page-counts from the previous
+        step and call this sum the job-copy-page-count.
+
+        c)  For each job-result-set, multiply the value of job-copy-
+        page-count from the previous step by the value of job-copies
+        element of the job-result-set and call the result job-result-
+        set-page-count.
+
+        d)  Add up all the job-result-set-page-counts from the
+        previous step and set this sum into the job-page-count
+        attribute.
+
+        The value of this attribute is a measure of the amount of
+        computation involved.
+
+
+        The accuracy of this value is dependent on the accuracy of the
+        page-count attribute in each document.  If some documents have
+        a page-count value of 0, the server may set the value of this
+        attribute to 0 and not use it for scheduling."
+    ::= { xcmJobGenSpoolingExtEntry 9 }
+
+-- ************************** Accounting Groups ***********************
+--
+--     The Job General Accounting Basic Group (CONDITIONALLY MANDATORY)
+
+-- This group had been deprecated in favor of the equivalent PWG Job
+-- Mon objects and attributes, but was undeprecated starting with
+-- version 4.00.  Either the PWG Job Mon MIB, or this XCMI Job Mon MIB,
+-- may be used.
+
+-- The Job General Accounting Basic group provides general
+-- accounting information about each job that is independent of the type
+-- of job (print, scan, fax, etc.).
+
+-- In order to claim conformance to this group, it is necessary to
+-- implement every object in the group.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+--
+-- The Job General Accounting Basic group consists entirely of the
+-- xcmJobGenAccountingBasicTable.
+
+xcmJobGenAccountingBasic  OBJECT IDENTIFIER ::= { xcmJobMonMIB 16 }
+
+xcmJobGenAccountingBasicTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmJobGenAccountingBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "A table of general job accounting
+        information per (logical if spooling or physical if not
+        spooling) device that is independent of the type of device
+        (printer, scanner, fax, ...).
+
+        Job information applies to the job as a whole or to all its
+        documents.  The specification for most objects is taken directly
+        from the ISO 10175 Document Printing Application (DPA) standard
+        clause 9.2, Job Attributes.  However, this MIB is
+        intended to be used with non-DPA implementations, so only a
+        small set of general DPA attributes have been included here."
+    ::= { xcmJobGenAccountingBasic 1}
+
+xcmJobGenAccountingBasicEntry OBJECT-TYPE
+    SYNTAX     XcmJobGenAccountingBasicEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "An entry exists in this table for each job in the device,
+
+
+         no matter what the state of the job is.  Each device is
+         represented as a separate device entry in the Host Resources
+         MIB device table as a device of type 'printer', 'scanner',
+         'fax', etc.  The management station references each job using
+         the xcmJobIdentifierOnSystem assigned by this logical
+         (for spooling) or physical (not spooling) device that accepted
+         the job submission (by some other protocol)."
+    AUGMENTS { xcmJobGenBasicEntry }
+    ::= { xcmJobGenAccountingBasicTable 1 }
+
+XcmJobGenAccountingBasicEntry ::= SEQUENCE {
+    xcmJobAccountingBasicRowStatus RowStatus,
+    xcmJobAccountingUserName     CodeIndexedStringIndex,
+    xcmJobAccountingInformation  OCTET STRING,
+    xcmJobStartedProcessingTime  DateAndTime,
+    xcmJobImpressionsCompleted   Counter32,
+    xcmJobMediaSheetsCompleted   Counter32,
+    xcmJobCompletionTime         DateAndTime,
+    xcmJobWorkUnitType           XcmHrDevTrafficUnit,
+    xcmJobUnitsOfWorkCompleted   Counter32
+}
+
+xcmJobAccountingBasicRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current                 -- was deprecated, current in v4
+    DESCRIPTION "
+        Manages the status of this conceptual row in the
+        xcmJobGenAccountingBasicTable.  When an accounting program
+        has copied the data from this row into an accounting system,
+        the accounting program should set destroy into this object
+        in order to delete this row and all related xcmJob.,
+        and xcmXxxConsumed. rows, in order to
+        indicate that this accounting and job information is no
+        longer needed to be retained by the SNMP agent."
+--  DEFVAL omitted                      - row status object
+    ::= { xcmJobGenAccountingBasicEntry 1 }
+
+xcmJobAccountingUserName OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This attribute specifies the name of the user for accounting
+        purposes.  See xcmJobOriginator, xcmJobOwner, and
+        xcmJobAuthorizationUserName for additional
+        user names for other purposes (and whose values may be
+        different).  An agent may return the same value for all four
+        attributes, if the printer or service does not support all
+        four concepts.
+
+        NOTE: There is no corresponding ISO DPA attribute (but there
+        should be).  Often the xcmJobAuthorizationUserName will be the
+        same as xcmJobAccountingUserName."
+
+
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmJobGenAccountingBasicEntry 2 }
+
+xcmJobAccountingInformation OBJECT-TYPE
+    SYNTAX     OCTET STRING(SIZE(0..255))
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This object is intended as an accounting identifier, so
+        that a user can indicate to which account this job should
+        be charged.  A user can have any number of accounts.  For
+        example, a lawyer might charge each customer separately.
+        The value can be text, binary, or encrypted.
+
+        ISO DPA:  Accounting-information
+        This attribute specifies information required by accounting
+        services (e.g. the account to be charged for any services
+        rendered).
+
+        Accounting information is intended to be interpreted by an
+        accounting system, and may be opaque to the print service."
+    DEFVAL { ''H }                      -- no accounting info
+    ::= { xcmJobGenAccountingBasicEntry 3 }
+
+xcmJobStartedProcessingTime OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "The time at which the job started to be processed by the
+        intended device (printed, scanned, faxed, etc.).
+
+        NOTE: For use with this MIB, this attribute has been generalized
+        to be used with any device, whereas the corresponding ISO DPA
+        attribute is only started printing.
+
+        A conforming implementation shall return an actual date and
+        time, rather than the DEFVAL, unless the implementation cannot
+        tell time.
+
+        ISO DPA: Started-printing-time
+        This attribute indicates the time at which this job started
+        printing [processing]."
+    DEFVAL      { '0000000000000000'H } -- unknown date/time
+    ::= { xcmJobGenAccountingBasicEntry 4 }
+
+xcmJobImpressionsCompleted OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "If no impressions are completed, this value shall remain 0.
+
+        ISO DPA:  Impressions-completed
+
+
+        This attribute indicates the number of impressions that the
+        printer engine(s) have placed on the media for the job. See the
+        note in the pages-completed attribute for the relationship of
+        the pages-completed, impressions-completed and media-sheets-
+        completed attributes.
+
+        The server shall not reset its value during the processing of
+        multiple copies of documents or the job.  Since this attribute
+        is intended to measure the progress of a job, the value shall
+        include repeated pages due to multiple copies. When the job
+        completes, this attribute should contain the value of the total
+        number of impressions that the printer made for the print-job.
+        The accuracy of this value is implementation-dependent. It is
+        expected that the value reported is never greater than the
+        actual value.  This attribute may not be supported for all
+        printers and all page description languages.
+
+        The value of this attribute shall be 0 if printing [processing]
+        has not started for this job."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenAccountingBasicEntry 5 }
+
+xcmJobMediaSheetsCompleted OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "If no media sheets are completed, this value shall remain 0.
+
+        ISO DPA:  Media-sheets-completed
+        This attribute indicates the number of sheets of media that the
+        printer(s) have completed printing for the job. See the note in
+        the pages-completed attribute for the relationship of the
+        pages-completed, impressions-completed and media-sheets-
+        completed attributes.
+
+        The server shall not reset its value during the processing of
+        multiple copies of documents or the job.  Since this attribute
+        is intended to measure the progress of a job, the value shall
+        include repeated pages due to multiple copies. When the job
+        completes, this attribute should contain the value of the total
+        number of sheets of media used for the print-job.
+
+        The accuracy of this value is implementation-dependent. It is
+        expected that the value reported is never greater than the
+        actual value.  This attribute may not be supported for all
+        printers and all page description languages.
+
+        The value of this attribute shall be 0 if printing has not
+        started for this job."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenAccountingBasicEntry 6 }
+
+
+xcmJobCompletionTime OBJECT-TYPE
+    SYNTAX     DateAndTime
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "A conforming implementation shall return an actual date and
+        time, rather than the DEFVAL, unless the implementation cannot
+        tell time.
+
+        ISO DPA:  Completion-time
+        This attribute indicates the time at which this job completed.
+        Providing this time is useful for jobs which are retained after
+        printing."
+    DEFVAL      { '0000000000000000'H } -- unknown date/time
+    ::= { xcmJobGenAccountingBasicEntry 7 }
+
+xcmJobWorkUnitType OBJECT-TYPE
+    SYNTAX     XcmHrDevTrafficUnit
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "Xerox extension
+        This attribute indicates the type of work that is being
+        accounted for.  It shall be different from pages, sheets, or
+        impressions, which already have their own objects."
+    DEFVAL { unknown }                  -- unknown job work unit
+    ::= { xcmJobGenAccountingBasicEntry 8 }
+
+xcmJobUnitsOfWorkCompleted OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "Xerox extension:
+        The number of work units completed.  See xcmJobWorkUnitType to
+        determine what is being counted."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobGenAccountingBasicEntry 9 }
+
+--
+--            Media Consumed Group (CONDITIONALLY MANDATORY)
+
+-- This group had been deprecated in favor of the equivalent PWG Job
+-- Mon objects and attributes, but was undeprecated starting with
+-- version 4.00.  Either the PWG Job Mon MIB, or this XCMI Job Mon MIB,
+-- may be used.
+
+-- The Media Consumed group contains the media used by this (print) job
+-- and the number of sheets consumed for each of these media summed
+-- over all the documents in the job.
+
+-- In order to claim conformance to this group, it is necessary to
+-- implement every object in the group.
+-- NOTE - SNMP conformance to a group merely means that each object
+
+
+-- shall be responded to on a Get; returning actual values is optional.
+--
+-- The Media Consumed group consists entirely of the
+--  xcmMediaConsumedTable.
+
+-- At the beginning of a job, each row in this table may be used to
+-- indicate the intent to use the indicated type of media and the value
+-- of xcmMediaConsumedSheetCount in each row shall be set to 0.
+-- For example, an agent may fill in the xcmMediaConsumedTable when the
+-- job is accepted for printing by the server using the ISO DPA
+-- media-used document attribute values summed over the entire job.  In
+-- this case, the value of the xcmMediaConsumedSheetCount shall be 0 in
+-- each row.  Then the system operator is able to determine the media
+-- needs of the job while the job is waiting to be printed.  If the job
+-- needs media that are not ready in the printer(s), the job shall be in
+-- the held state with the xcmJobStateReasons set to (at least) the
+-- resources-needed value.  In such cases, the xcmMediaConsumedTable can
+-- help the system operator sort out the conflicting demands for media.
+
+-- Alternatively, an implementation may wait until the document actually
+-- makes references to a (new) type of medium before creating the row in
+-- this table for the job.
+
+-- The media consumed is indicated both as a type or class of medium
+-- using an enum and as a name using a text string in the locale of the
+-- user submitting the job.  Thus accounting systems that do not want to
+-- deal with different localized specifications of media can use the
+-- type enum of the xcmMediaConsumedType object.  Accounting systems
+-- that wish to charge different amounts for different media of the
+-- same media type can use the media-name xcmMediaConsumedName object.
+
+xcmMediaConsumed  OBJECT IDENTIFIER ::= { xcmJobMonMIB 17 }
+
+xcmMediaConsumedTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmMediaConsumedEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This table contains pairs of media indexes and the number of
+        sheets of that media consumed by this job."
+    ::= { xcmMediaConsumed 1 }
+
+xcmMediaConsumedEntry OBJECT-TYPE
+    SYNTAX     XcmMediaConsumedEntry
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "Entries may exist in the table for each device index in the
+        Host Resource MIB whose device type is `printer', 'fax', etc.,
+        and for each job."
+    INDEX { hrDeviceIndex, xcmJobIdentifierOnSystem,
+            xcmMediaConsumedIndex }
+    ::= { xcmMediaConsumedTable 1 }
+
+
+XcmMediaConsumedEntry ::= SEQUENCE {
+    xcmMediaConsumedIndex         Ordinal16,
+    xcmMediaConsumedRowStatus     RowStatus,
+    xcmMediaConsumedType          XcmJMMediumType,
+    xcmMediaConsumedName          CodeIndexedStringIndex,
+    xcmMediaConsumedSheetCount    Counter32
+}
+
+xcmMediaConsumedIndex OBJECT-TYPE
+    SYNTAX     Ordinal16
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "A unique value used by the device to identify this medium
+        entry in this job.  For devices and systems that ensure that
+        jobs are not lost across crashes and power cycles, these
+        values shall remain stable across successive device power
+        cycles.  However, if a (low-end) device is not ensuring that job
+        are persistent across crashes and power cycles, these index
+        values need not remain stable across such crashes or power
+        cycles."
+--  DEFVAL omitted                      - index object
+    ::= { xcmMediaConsumedEntry 1 }
+
+xcmMediaConsumedRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "Manages the status of this conceptual row in the
+        xcmMediaConsumedTable.  When an accounting program
+        has copied the data from this row into an accounting system,
+        the accounting program should delete this row in order to
+        indicate that this accounting information is no longer needed
+        to be retained by the SNMP agent.
+
+        Since the accounting data may be of interest to end-users,
+        the accounting program may want to wait for some period before
+        deleting the row.
+
+        If the accounting table becomes filled up so that the agent is
+        unable to add new entries, a device may either refuse to accept
+        new jobs, so that the valuable revenue stream is not lost, or
+        may remove the oldest entry in the display and add the new
+        job's accounting data."
+--  DEFVAL omitted                      - row status object
+    ::= { xcmMediaConsumedEntry 2 }
+
+
+xcmMediaConsumedType OBJECT-TYPE
+    SYNTAX     XcmJMMediumType
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This attribute indicates the medium type that has been consumed
+        by the device(s) for this job, e.g. stationery, envelope,
+        transparency, etc."
+    DEFVAL { unknown }                  -- unknown media consumed type
+    ::= { xcmMediaConsumedEntry 3 }
+
+xcmMediaConsumedName OBJECT-TYPE
+    SYNTAX     CodeIndexedStringIndex
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This attribute indicates the name of the medium that has been
+        consumed by the device(s) for this job, e.g. letter-white,
+        iso-a4-white, iso-a4-blanc, monarch-envelope,
+        iso-a4-transparent, etc.
+
+        ISO DPA assigns OIDs to medium names, but also allows the SA to
+        define new media using text strings.  Hence, the object in this
+        MIB is a text string, so that the SA can define additional
+        medium names as needed."
+    DEFVAL { 0 }                        -- no code indexed string
+    ::= { xcmMediaConsumedEntry 4 }
+
+xcmMediaConsumedSheetCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This attribute indicates the number of sheets of the medium
+        that have been consumed by the device(s) for this job."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmMediaConsumedEntry 5 }
+
+--
+--       Color Impressions Consumed Group (conditionally mandatory)
+--
+-- The Color Impressions Consumed group contains the colorant used by
+-- this job and the number of impressions produced for each colorant
+-- summed over all the documents in the job.
+
+-- For conformance to this MIB module, implementation of all objects in
+-- this group is conditionally mandatory: mandatory for all devices
+-- that monitor color impression attributes over the network.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+
+-- This group had been deleted, and was restored in version 4.01.
+
+-- The Color Impressions Consumed group consists entirely of the
+
+
+-- xcmColorImpsConsumedTable.
+
+xcmColorImpsConsumed  OBJECT IDENTIFIER ::= { xcmJobMonMIB 18 }
+
+xcmColorImpsConsumedTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF XcmColorImpsConsumedEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "This table contains pairs of colorant indexes and the number
+        of impressions of that colorant consumed by this job."
+    ::= { xcmColorImpsConsumed 1 }
+
+xcmColorImpsConsumedEntry OBJECT-TYPE
+    SYNTAX     XcmColorImpsConsumedEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "Entries may exist in the table for each device index whose
+        device type is 'printer', 'fax', etc. and for each job."
+    INDEX { hrDeviceIndex, xcmJobIdentifierOnSystem,
+            xcmColorImpsConsumedIndex }
+    ::= { xcmColorImpsConsumedTable 1 }
+
+XcmColorImpsConsumedEntry ::= SEQUENCE {
+    xcmColorImpsConsumedIndex           Ordinal16, -- cond. mand.
+    xcmColorImpsConsumedRowStatus       RowStatus, -- cond. mand.
+    xcmColorImpsConsumedTypeIndex       Ordinal16, -- cond. mand.
+    xcmColorImpsConsumedCount           Counter32  -- cond. mand.
+}
+
+xcmColorImpsConsumedIndex OBJECT-TYPE
+    SYNTAX     Ordinal16
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "A unique value used by the printer to identify this colorant
+        entry for this job.  For devices and systems that ensure that
+        jobs are not lost across crashes and power cycles, these
+        values shall remain stable across successive device power
+        cycles.
+        However, if a (low-end) device is not ensuring that job are
+        persistent across crashes and power cycles, these index values
+        need not remain stable across such crashes or power cycles."
+    ::= { xcmColorImpsConsumedEntry 1 }
+
+xcmColorImpsConsumedRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Manages the status of this conceptual row in the
+        xcmColorImpsConsumedTable.  When an accounting program
+        has copied the data from this row into an accounting system,
+
+
+        the accounting program should delete this row in order to
+        indicate that this accounting information is no longer needed
+        to be retained by the SNMP agent."
+    ::= { xcmColorImpsConsumedEntry 2 }
+
+xcmColorImpsConsumedTypeIndex OBJECT-TYPE
+    SYNTAX     Ordinal16
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This attribute indicates one of the colorant type (index into
+        the prtColorantsTable in the Printer MIB) that have been
+        consumed by the printer(s) for this print job."
+    ::= { xcmColorImpsConsumedEntry 3 }
+
+xcmColorImpsConsumedCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This attribute indicates the number of impressions that have
+        been consumed by the printer(s) for this print job and this
+        colorant.  For implementations that make a separate impression
+        for each colorant used shall increment this count once for
+        each colorant, so that the total number of
+        xcmColorImpsConsumedCount for the job will be a multiple of the
+        xcmJobImpressionsCompleted value."
+    ::= { xcmColorImpsConsumedEntry 4 }
+
+--
+--       Job Impressions by Medium Size Group (CONDITIONALLY MANDATORY)
+
+-- This group had been deprecated in favor of the equivalent PWG Job
+-- Mon objects and attributes, but was undeprecated starting with
+-- version 4.00.  Either the PWG Job Mon MIB, or this XCMI Job Mon MIB,
+-- may be used.
+
+-- When accounting impressions by medium size
+-- is needed by another new product that wants to keep these attributes
+-- private to Xerox, rather that registering them with the PWG, the XCMI
+-- WG will add an attribute table to this XCMI Job Mon MIB with the same
+-- structure (four indexed) as the PWG Job Mon attribute table.  We will
+-- link multiple attributes together using the last index.  Thus the ith
+-- value of each attribute will go together as a structure.  So there
+-- can also be multiple instances of linked values.
+--
+-- Impressions by Medium Size Group contains the number of impressions
+-- produced for each medium size, count-type, and quality-type for the
+-- (print) job on the device.  In practice, no known implementation is
+-- able to change the medium size, count-type, or quality-type for
+-- individual documents or impressions.  Once the types are set for a
+-- job, that's how accounting is done for every impression in the job.
+-- There is no known need for more accurate accounting.
+--
+
+
+-- In order to claim conformance to this group, it is necessary to
+-- implement every object in the group.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+--
+-- The Impressions by Medium Size group consists entirely of the
+--  xcmJobImpsByMediumSizeTable.
+
+xcmJobImpsByMediumSize  OBJECT IDENTIFIER ::= { xcmJobMonMIB 21 }
+
+xcmJobImpsByMediumSizeTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF XcmJobImpsByMediumSizeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This table contains tuples of medium size, count-type,
+        and the number of impressions counted by count-type on that
+        medium consumed by this job."
+    ::= { xcmJobImpsByMediumSize 1 }
+
+xcmJobImpsByMediumSizeEntry OBJECT-TYPE
+    SYNTAX      XcmJobImpsByMediumSizeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This entry has one tuple of medium size, count-type,
+        and the number of impressions counted by count-type on that
+        medium consumed by this job."
+    INDEX   { hrDeviceIndex,
+              xcmJobIdentifierOnSystem,
+              xcmJobImpsByMediumSizeIndex }
+    ::= { xcmJobImpsByMediumSizeTable 1 }
+
+XcmJobImpsByMediumSizeEntry ::= SEQUENCE {
+    xcmJobImpsByMediumSizeIndex        Ordinal16,
+    xcmJobImpsByMediumSizeRowStatus    RowStatus,
+    xcmJobImpsByMediumSizeMediumSize   XcmPrtMediumSize,
+    xcmJobImpsByMediumSizeCountType    XcmJMImpsCountType,
+    xcmJobImpsByMediumSizeCount        Counter32,
+    xcmJobImpsByMediumSizeCountQuality XcmPrtPrintQuality
+    }
+
+xcmJobImpsByMediumSizeIndex OBJECT-TYPE
+    SYNTAX     Ordinal16
+    MAX-ACCESS not-accessible
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "A unique value used by the device to identify this
+        impressions-by-medium-size entry in this job.  For devices and
+        systems that ensure that jobs are not lost across crashes and
+        power cycles, these values shall remain stable across successive
+        device power cycles.  However, if a (low-end) device is not
+        ensuring that job are persistent across crashes and power
+        cycles, these index values need not remain stable across such
+
+
+        crashes or power cycles."
+--  DEFVAL omitted                      - index object
+    ::= { xcmJobImpsByMediumSizeEntry 1 }
+
+xcmJobImpsByMediumSizeRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "Manages the status of this conceptual row in the
+        xcmJobImpsByMediumSizeTable.  When an accounting program
+        has copied the data from this row into an accounting system,
+        the accounting program should delete this row in order to
+        indicate that this accounting information is no longer needed
+        to be retained by the SNMP agent.
+
+        Since the accounting data may be of interest to end-users,
+        the accounting program may want to wait for some period before
+        deleting the row.
+
+        If the accounting table becomes filled up so that the agent is
+        unable to add new entries, a device may either refuse to accept
+        new jobs, so that the valuable revenue stream is not lost, or
+        may remove the oldest entry in the display and add the new
+        job's accounting data."
+--  DEFVAL omitted                      - row status object
+    ::= { xcmJobImpsByMediumSizeEntry 2 }
+
+xcmJobImpsByMediumSizeMediumSize OBJECT-TYPE
+    SYNTAX     XcmPrtMediumSize
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This attribute indicates the medium size that has been produced
+        by the device(s) for this job, e.g. naLetter(1000), isoA4(1024),
+        jisB4(1084), etc."
+    DEFVAL { unknown }                  -- unknown medium size
+    ::= { xcmJobImpsByMediumSizeEntry 3 }
+
+xcmJobImpsByMediumSizeCountType OBJECT-TYPE
+    SYNTAX     XcmJMImpsCountType
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This attribute indicates the count-type that is how to count
+        impressions produced by the device(s) for this job, e.g.
+        blackAndWhiteCount, highlightColorCount, fullColorCount,
+        etc."
+    DEFVAL { totalCount }               -- total medium size count type
+    ::= { xcmJobImpsByMediumSizeEntry 4 }
+
+
+xcmJobImpsByMediumSizeCount OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "This attribute indicates the number of impressions by medium
+        size, count-type, and quality-type for the job, which are
+        specified respectively by xcmJobImpsByMediumSizeMediumSize,
+        xcmJobImpsByMediumSizeCountType, and
+        xcmJobImpsByMediumSizeCountQuality."
+--  DEFVAL omitted                      - not allowed on 'Counter32'
+    ::= { xcmJobImpsByMediumSizeEntry 5 }
+
+xcmJobImpsByMediumSizeCountQuality OBJECT-TYPE
+    SYNTAX     XcmPrtPrintQuality
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This attribute indicates the quality-type used for counting
+        impressions produced by the device(s) for this job, e.g., draft,
+        normal, high, etc."
+    REFERENCE "
+        xcmPrtInterpPrintQuality, from 16prtx.mib"
+    DEFVAL { normal }      -- normal quality, medium size count type
+    ::= { xcmJobImpsByMediumSizeEntry 6 }
+
+-- ************************** Alert groups *****************************
+--
+--                Job Alert Group (CONDITIONALLY MANDATORY)
+
+-- This group is conditionally mandatory for all systems,
+-- i.e., an agent SHALL implement this group if the agent supports
+-- SNMP traps.
+
+--                          NOTE
+-- The PWG Job Mon MIB does not yet have trapping.  When trapping is
+-- added to the PWG Job Mon MIB, then the XCMI xcmJobAlert will
+-- be considered for deprecation by the XCMI WG, provided that no
+-- important capabilities are lost.
+--
+--  This group describes notifications (SNMP trap messages) to be
+--  generated for state changes in Job objects being
+--  processed by the printing system.
+--
+--  Implementation of this group is conditionally mandatory,
+--  i.e., an agent SHALL implement this group if the agent supports
+--  SNMP traps.
+
+-- NOTE - While SNMP conformance means that a conforming implementation
+-- should respond with an instrumented value on an SNMP Get for each
+-- object in the group, a conforming implementation shall at least
+-- respond with a fixed or empty value, if an instrumented value would
+-- significantly exceed the implementation constraints.
+
+
+xcmJobAlert  OBJECT IDENTIFIER ::= { xcmJobMonMIB 19 }
+
+-- xcmJobAlertReason ::= { xcmJobAlert 1 }
+-- was deleted from V2.51.
+-- xcmJobAlertTime ::= { xcmJobAlert 2 }
+-- was deleted in V2.51.
+
+-- xcmJobV1Alert was renamed to xcmJobV1AlertNew in V2.53.
+xcmJobV1AlertNew OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap sent
+        whenever the state of a job changes."
+    REFERENCE
+        "See SNMPv2 'xcmJobV2AlertNew' trap definitions below for
+        'special semantics'."
+    ::= { xcmJobAlert 4 }
+
+xcmJobV2AlertPrefixNew OBJECT IDENTIFIER ::= { xcmJobV1AlertNew 0 }
+
+-- xcmJobV2AlertPrefix OBJECT IDENTIFIER ::= { xcmJobV1Alert 0 }
+-- was deleted in V2.53.  Use the new xcmJobV2AlertPrefixNew instead.
+-- xcmJobV2StateAlert ::= { xcmJobV2AlertPrefix 1 }
+-- was deleted from V2.52.  Use the new xcmJobV2AlertNew instead.
+
+xcmJobV2AlertNew NOTIFICATION-TYPE
+    OBJECTS { hrDeviceIndex, xcmJobIdentifierOnSystem }
+    STATUS  current                    -- supersedes xcmJobV2StateAlert
+    DESCRIPTION
+        "This trap is sent whenever the state of a job changes.  The
+        'state of a job' is comprised by the aggregate values of the
+        xcmJobCurrentState, xcmJobPriority, xcmJobStateReasons,
+        xcmJobXStateReasons, xcmJobX2StateReasons,
+        xcmDevicesAssigned and xcmDeviceStateOfDevicesAssigned
+        fields of the job's table entries:  This notification is
+        sent whenever any of these values changes with the following
+        exceptions:
+
+        1. Changes in xcmDeviceStateOfDevicesAssigned shall only
+        generate traps when the job is in the processing state
+        (NOTE - xcmJMDevicesAssignedGroup is deprecated)
+
+        2. Changes in xcmJobStateReasons, xcmJobXStateReasons, and
+        xcmJobX2StateReasons shall only generate traps when the job is
+        in the processing state (rare).  The normal polling cycle will
+        pick up any changes while the job is not in the processing
+        state.  Since most changes in reasons also accompany a job state
+        change, the chances that a change in a reason will have to wait
+        for the normal polling cycle is very small.  For example, a
+        requester further modifies a held job adding more reasons for it
+        to be held will have to wait for the polling cycle, since the
+        job does not change state (remaining in the held state).
+
+
+        NOTE - the hrDeviceIndex is included for convenience, even
+        though the Printer MIB (RFC 1759) doesn't include hrDeviceIndex
+        in its traps.  Then the management station doesn't have to parse
+        the received varBind OIDs on a trap in order to discover which
+        device trapped.
+
+        NOTE - the addition of an entire row to the job tables
+        corresponds to the acceptance of another job by the server.  The
+        state of the job changes from unknown to a specific value
+        (usually pending).  Therefore, the agent shall generate a trap
+        when a job is accepted (so that the management station can
+        display the newly arrived job in a timely fashion).
+
+        Similarly when the server removes a job because the job has been
+        in the completed state for a sufficient time or the job has been
+        deleted by a Delete operation, the SNMP agent shall reflect
+        that removal by removing the row from the job tables, and shall
+        generate a trap (since the state of the job has changed to
+        non-existent).
+
+        The IETF Printer MIB maintains a table which serves as a sort
+        of 'audit-trail' of recent alerts.  There is no need for such
+        a table here, since the job's tables will serve virtually the
+        same purpose.
+
+        As with all SNMP notifications, critical applications cannot
+        completely rely upon delivery:  some amount of polling is
+        recommended.
+
+        The variable-bindings of this trap have been chosen to give the
+        minimum of information:  the xcmJobIdentifierOnSystem
+        value and hrDeviceIndex are provided.  With these an application
+        is able to obtain the full job table entry.  An application has
+        to look at the job tables anyway.  The time of the alert is
+        returned as part of any SNMP trap.
+
+        The hrDeviceIndex maps one-to-one with the PWG Job Mon
+        jmGeneralJobSetIndex.  (The PWG Job Mon does not require the
+        Host Resources MIB, so the name of the primary index for all PWG
+        Job Mon tables is not hrDeviceIndex, but serves the same
+        purpose of allowing multiple instances in a single device or
+        server.
+
+        The Job Alert's special semantics is covered by U.S. patent
+        5778183.
+        This notification has the following special semantics:
+
+            o  If the job's xcmJobClientId field is not empty,
+               its value will also be appended to trap object ID.
+
+               NOTE: If the format of the xcmJobClientId is dotted
+               decimal representation, then it will be encoded as a BER
+               binary OID appended to the trap object ID.
+
+
+               NOTE: The BER binary OID shall not include the ASN.1/BER
+               tag of 6 indicating an OID and shall not include the
+               ASN.1/BER length field in octets of the OID.
+
+        This trap OID qualifier allows job-submission and monitoring
+        applications to limit the alerts they receive to ones generated
+        by jobs which they have submitted.
+
+        NOTE: The sum of the trap var bind values must be less than can
+        fit into a PDU on any transport, roughly 540 octets on some
+        transports.  Thus implementers are warned to minimize the length
+        of the xcmJobClientId and xcmJobIdentifierOnSystem objects."
+    ::= { xcmJobV2AlertPrefixNew 1 }
+
+-- Note that the SNMPv2 to SNMPv1 translation rules dictate that the
+-- preceding structure will result in SNMPv1 traps of the following
+-- form:
+--
+-- For SNMPv1, xcmJobAlert was renamed in V2.53.  Use xcmJobAlertNew.
+
+-- xcmJobAlertNew TRAP-TYPE
+--     ENTERPRISE xcmJobV1AlertNew
+--     VARIABLE { hrDeviceIndex,
+--            xcmJobIdentifierOnSystem }
+--     DESCRIPTION
+--         "This trap is sent whenever a job changes state."
+--     ::= 1
+
+--
+--            Document Alert Group (conditionally mandatory)
+--
+--  This group describes notifications (SNMP trap messages) to be
+--  generated for state changes in Document objects being
+--  processed by the printing system.
+
+-- For conformance to this MIB module, implementation of all objects in
+-- this group is conditionally mandatory: mandatory for all devices
+-- that support document alerts over the network.
+-- NOTE - SNMP conformance to a group merely means that each object
+-- shall be responded to on a Get; returning actual values is optional.
+
+-- This group had been deleted, and was restored in version 4.01.
+
+-- In order to claim conformance to this group, it is necessary to
+-- implement every object in the group.
+
+xcmDocAlert  OBJECT IDENTIFIER ::= { xcmJobMonMIB 20 }
+
+
+-- xcmDocAlertReason ::= { xcmDocAlert 1 }
+-- was not restored when the DocAlert group was restored in v4.01..
+-- xcmDocAlertTime ::= { xcmDocAlert 2 }
+-- was not restored when the DocAlert group was restored in v4.01..
+
+-- xcmDocV1Alert was renamed to xcmDocV1AlertNew in when restoring
+-- the DocAlert group in v4.01.
+xcmDocV1AlertNew OBJECT-IDENTITY
+    STATUS     current
+    DESCRIPTION
+        "The value of the enterprise-specific OID in an SNMPv1 trap sent
+        whenever the state of a document changes."
+    REFERENCE
+        "See SNMPv2 'xcmDocV2AlertNew' trap definitions below for
+        'special semantics'."
+    ::= { xcmDocAlert 4 }
+
+xcmDocV2AlertPrefixNew  OBJECT IDENTIFIER ::= { xcmDocV1AlertNew 0 }
+
+-- xcmDocV2AlertPrefix OBJECT IDENTIFIER ::= { xcmDocV1Alert 0 }
+-- was not restored when the DocAlert group was restored in v4.01.
+-- Use the new xcmDocV2AlertPrefixNew instead.
+-- xcmDocV2StateAlert ::= { xcmDocV2AlertPrefix 1 }
+-- was not restored when the DocAlert group was restored in v4.01.
+-- Use the new xcmDocV2AlertNew instead.
+
+xcmDocV2AlertNew NOTIFICATION-TYPE
+    OBJECTS { hrDeviceIndex, xcmJobIdentifierOnSystem,
+              xcmDocSequenceNumber }
+    STATUS current                    -- supersedes xcmDocV2StateAlert
+    DESCRIPTION
+        "This trap is sent whenever the state of one of the documents in
+        a job changes.  The state of a single document is represented in
+        the xcmDocGenBasicTable column: xcmDocState.
+
+        The job's xcmJobIdentifierOnSystem and the document's
+        xcmDocSequenceNumber are included in the trap's variable
+        bindings; these can be used to reference the document's
+        xcmDocGenBasicTable entry.
+
+        NOTE - the addition of an entire row to the document tables
+        corresponds to the acceptance of another document (in a job) by
+        the server.  The state of the document changes from unknown to a
+        specific value (usually transfer pending).  Therefore, the agent
+        generates a trap when a document (within a job) is accepted (so
+        that the management station can display the newly arrived
+        document in a timely fashion).
+
+        This notification has the following special semantics:
+
+            1  The agent shall append the document's job's
+               xcmJobClientId to the trap object ID, if the document's
+               job's xcmJobClientId field is not empty.
+               NOTE: If the format of the xcmJobClientId is dotted
+
+
+               decimal representation, then it will be encoded as a BER
+               binary OID appended to the trap object ID.
+
+               NOTE: The BER binary OID shall not include the ASN.1/BER
+               tag of 6 indicating an OID and shall not include the
+               ASN.1/BER length field in octets of the OID.
+
+            2  The agent shall append the value of the document's
+               xcmDocSequenceNumber field to the trap object ID.
+
+        These trap OID qualifiers allow job-submission and monitoring
+        applications to specify exactly which alerts they are interested
+        in and to limit the alerts they receive to ones generated by
+        jobs or jobs and documents that they have submitted.
+
+        NOTE: The sum of the trap var bind values must be less than can
+        fit into a PDU on any transport, roughly 540 octets on some
+        transports.  Thus implementers are warned to minimize the length
+        of the xcmJobClientId and xcmJobIdentifierOnSystem objects."
+    ::= { xcmDocV2AlertPrefixNew 1 }
+
+-- Note that the SNMPv2 to SNMPv1 translation rules dictate that the
+-- preceding structure will result in SNMPv1 traps of the following
+-- form:
+--
+-- For SNMPv1, xcmDocAlert was renamed when restoring the Doc Alert
+-- group in v4.01.  Use xcmDocAlertNew.
+
+-- xcmDocAlertNew TRAP-TYPE
+--     ENTERPRISE xcmDocV1AlertNew
+--     VARIABLE { hrDeviceIndex, xcmJobIdentifierOnSystem,
+--                xcmDocSequenceNumber }
+--     DESCRIPTION
+--         "This trap is sent whenever a document (in a job) changes
+--         state."
+--     ::= 1
+
+-- ***************** Conformance Information ***************************
+
+xcmJobMonMIBConformance  OBJECT IDENTIFIER ::= { xcmJobMonMIB 2 }
+
+xcmJobMonCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The mandatory compliance statement for the agents that
+        implement the XCMI Job Monitoring MIB, i.e., all the mandatory
+        groups.
+
+        NOTE: These two groups are CONDITIONALLY MANDATORY as far as
+        XCMI Conformance is concerned.  But if the conditions are
+        satisfied (traps and/or SJMM), then these groups MUST be
+        implemented, making them effectively MANDATORY."
+    MODULE -- this module
+    MANDATORY-GROUPS { xcmJMBaseGroup,
+
+
+                       xcmJMJobGenBasicGroup }
+
+    -- The xcmJMJobAlertGroup
+    -- is a conditionally mandatory group, i.e., an agent SHALL
+    -- implement the group if implementing SNMP traps.
+
+    -- The xcmJMClientIdMapGroup
+    -- is an optional group.
+
+    -- xcmJMDevicesAssignedGroup
+    -- is a deprecated group.
+
+-- OBJECT       xcmJobIdentifierOnSystem
+-- SYNTAX       DisplayString (SIZE(0..32))
+-- DESCRIPTION  "
+--     This OBJECT clause commented out because the SMICng compiler
+--     does not allow compliance OBJECT macros for non-accessible
+--     objects."
+
+    OBJECT       xcmJobIdentifierUpstream
+    SYNTAX       DisplayString (SIZE(0..32))
+    DESCRIPTION  ""
+
+    OBJECT       xcmJobClientId
+    SYNTAX       OCTET STRING (SIZE(0..32))
+    DESCRIPTION  ""
+
+--     OBJECT       xcmJobIdentifierDownstream
+--     SYNTAX       DisplayString (SIZE(0..32))
+--     DESCRIPTION  "Deprecated"
+
+--     OBJECT       xcmJobAccountingInformation
+--     SYNTAX       OCTET STRING (SIZE(0..32))
+--     DESCRIPTION  "Deprecated"
+
+    ::= { xcmJobMonMIBConformance 1 }
+
+--
+-- *********************** MIB Groups **********************************
+--
+
+xcmJobMonMIBGroups  OBJECT IDENTIFIER ::= { xcmJobMonMIBConformance 3 }
+
+xcmJMBaseGroup OBJECT-GROUP                 -- conditionally mandatory
+                 -- agent SHALL implement if traps and/or SJMM
+    OBJECTS {    xcmJobMonBaseRowStatus,
+                 xcmJobMonBaseVersionID,
+                 xcmJobMonBaseVersionDate,
+                 xcmJobMonBaseGroupSupport,
+                 xcmJobMonBaseCreateSupport,
+                 xcmJobMonBaseUpdateSupport  }
+    STATUS       current
+    DESCRIPTION
+        "The conditionally mandatory Job Monitoring Base group,
+
+
+        i.e., SHALL be implemented if implementing traps and/or SJMM."
+    ::= { xcmJobMonMIBGroups 1 }   -- assign last arc same as group
+
+xcmJMJobGenBasicGroup OBJECT-GROUP          -- conditionally mandatory
+                 -- agent SHALL implement if traps and/or SJMM
+    OBJECTS {    xcmJobIdentifierOnSystem,
+                 xcmJobIdentifierUpstream,
+                 xcmJobClientId,
+                 xcmJobServiceType,
+                 xcmJobName,
+                 xcmJobOwner,
+                 xcmJobSourceChannelType,
+                 xcmJobSubmittedLocaleIndex,
+                 xcmJobCurrentState,
+                 xcmJobStateReasons,
+                 xcmJobXStateReasons,
+                 xcmJobX2StateReasons
+ }
+    STATUS    current
+    DESCRIPTION
+        "The conditionally mandatory Job General Basic group,
+        i.e., SHALL be implemented if implementing traps and/or SJMM."
+    ::= { xcmJobMonMIBGroups 6 }   -- assign last arc same as group
+
+xcmJMDevicesAssignedGroup OBJECT-GROUP                    -- deprecated
+    OBJECTS {    xcmDeviceStateOfDevicesAssigned,
+                 xcmJobIdentifierDownstream
+ }
+    STATUS    current                 -- actually deprecated
+    DESCRIPTION
+        "The deprecated Devices Assigned group."
+    ::= { xcmJobMonMIBGroups 7 }
+
+xcmJMClientIdMapGroup OBJECT-GROUP                        -- optional
+    OBJECTS {    xcmClientIdMapHrDeviceIndex }
+    STATUS    current
+    DESCRIPTION
+        "The optional client id map group - applies to all jobs."
+    ::= { xcmJobMonMIBGroups 8 }
+
+xcmJMJobGenExtGroup OBJECT-GROUP           -- conditionally mandatory
+    OBJECTS {    xcmJobOriginator,
+                 xcmJobSubmittingApplication,
+                 xcmJobComment,
+                 xcmJobCopies,
+                 xcmJobCopiesCompleted,
+                 xcmJobOutputBinIndex,
+                 xcmJobServiceNameRequested,
+                 xcmJobPreviousState,
+                 xcmJobEstimatedCompletionTime,
+                 xcmJobSubmissionTime,
+                 xcmJobPagesCompleted,
+                 xcmJobOctetsCompletedHigh,
+                 xcmJobOctetsCompletedLow,
+
+
+                 xcmJobErrorCount,
+                 xcmJobWarningCount,
+                 xcmJobProcessingTime,
+                 xcmJobNumberOfDocuments,
+                 xcmJobAuthorizationUserName }
+    STATUS    current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "The Job General Extended group."
+    ::= { xcmJobMonMIBGroups 10 }
+
+xcmJMDocGenBasicGroup OBJECT-GROUP -- conditionally mandatory
+    OBJECTS {    xcmDocSequenceNumber,
+                 xcmDocName,
+                 xcmDocFileName,
+                 xcmDocFileNameType,
+                 xcmDocType,
+                 xcmDocFormat,
+                 xcmDocFormatVariants,
+                 xcmDocFormatVersion,
+                 xcmDocOctetCount,
+                 xcmDocState }
+    STATUS    current
+    DESCRIPTION
+        "The document information group."
+    ::= { xcmJobMonMIBGroups 12 }
+
+xcmJMDocPrintExtGroup OBJECT-GROUP      -- cond. mandatory
+    OBJECTS {    xcmDocPrintDefaultMediumName,
+                 xcmDocPrintDefaultInputIndex,
+                 xcmDocPrintFinishing,
+                 xcmDocPrintOutputMethod,
+                 xcmDocPrintNumberUp,
+                 xcmDocPrintSides,
+                 xcmDocPrintCopyCount,
+                 xcmDocPrintCopiesCompleted }
+    STATUS    current
+    DESCRIPTION
+        "The Document Print-centric group."
+    ::= { xcmJobMonMIBGroups 13 }
+
+xcmJMJobGenSpoolingBasicGroup OBJECT-GROUP  -- conditionally mandatory
+    OBJECTS {    xcmJobNumberOfJobResultSets,
+                 xcmJobPriority,
+                 xcmJobTotalOctetsHigh,
+                 xcmJobTotalOctetsLow,
+                 xcmJobInterveningJobs }
+    STATUS    current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "The Job General Spooling Basic group."
+    ::= { xcmJobMonMIBGroups 14 }
+
+
+xcmJMJobGenSpoolingExtGroup OBJECT-GROUP    -- conditionally mandatory
+    OBJECTS {    xcmJobProcessAfter,
+                 xcmJobDeadlineTime,
+                 xcmJobDiscardTime,
+                 xcmJobRetentionPeriod,
+                 xcmJobMessageToOperator,
+                 xcmJobMessageFromOperator,
+                 xcmJobMessageFromAdministrator,
+                 xcmJobPageCount }
+    STATUS    current
+    DESCRIPTION
+        "The Job General Spooling Extended group."
+    ::= { xcmJobMonMIBGroups 15 }
+
+xcmJMJobGenAccountingBasicGroup OBJECT-GROUP  -- conditionally mandatory
+    OBJECTS {    xcmJobAccountingBasicRowStatus,
+                 xcmJobAccountingUserName,
+                 xcmJobAccountingInformation,
+                 xcmJobStartedProcessingTime,
+                 xcmJobImpressionsCompleted,
+                 xcmJobMediaSheetsCompleted,
+                 xcmJobCompletionTime,
+                 xcmJobWorkUnitType,
+                 xcmJobUnitsOfWorkCompleted }
+    STATUS    current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "The Job General Accounting Basic group."
+    ::= { xcmJobMonMIBGroups 16 }
+
+xcmJMMediaConsumedGroup OBJECT-GROUP      -- conditionally mandatory
+    OBJECTS {    xcmMediaConsumedRowStatus,
+                 xcmMediaConsumedType,
+                 xcmMediaConsumedName,
+                 xcmMediaConsumedSheetCount }
+    STATUS    current                 -- was deprecated, current in v4
+    DESCRIPTION
+        "The media consumed group."
+    ::= { xcmJobMonMIBGroups 17 }
+
+xcmJMColorImpsConsumedGroup OBJECT-GROUP          -- cond. mand.
+    OBJECTS {    xcmColorImpsConsumedRowStatus,
+                 xcmColorImpsConsumedTypeIndex,
+                 xcmColorImpsConsumedCount }
+    STATUS    current
+    DESCRIPTION
+        "The optional color impressions consumed group."
+    ::= { xcmJobMonMIBGroups 18 }
+
+xcmJMJobImpsByMediumSizeGroup OBJECT-GROUP  -- conditionally mandatory
+    OBJECTS {    xcmJobImpsByMediumSizeRowStatus,
+                 xcmJobImpsByMediumSizeMediumSize,
+                 xcmJobImpsByMediumSizeCountType,
+                 xcmJobImpsByMediumSizeCount,
+                 xcmJobImpsByMediumSizeCountQuality   }
+
+
+    STATUS       current              -- was deprecated, current in v4
+    DESCRIPTION "The Job Impressions by Medium Size group."
+    ::= { xcmJobMonMIBGroups 21 }
+
+-- xcmJMJobAlertGroup OBJECT-GROUP       conditionally mandatory
+--                       agent SHALL implement if implementing traps
+--     OBJECTS { }
+--     STATUS    current
+--     DESCRIPTION
+--         "The conditionally mandatory job alert group defines no
+--         objects and so has to be commented out in order to compile."
+--     ::= { xcmJobMonMIBGroups 19 }
+
+-- xcmJMDocAlertGroup OBJECT-GROUP       conditionally mandatory
+--                       agent SHALL implement if implementing traps
+--     OBJECTS { }
+--     STATUS    current
+--     DESCRIPTION
+--         "The conditionally mandatory doc alert group defines no
+--         objects and so has to be commented out in order to compile."
+--     ::= { xcmJobMonMIBGroups 20 }
+
+END

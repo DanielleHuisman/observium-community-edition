@@ -1,0 +1,339 @@
+-- *****************************************************************
+-- QTECH-AUTHEN-KEY-MIB.mib:  Qtech Authentication Key MIB file
+--
+-- March 2002, Wuzg
+--
+-- Copyright (c) 2002 by Qtech Networks Co.,Ltd.
+-- All rights reserved.
+-- 
+-- *****************************************************************
+--
+
+QTECH-AUTHEN-KEY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32,
+        Unsigned32
+                FROM SNMPv2-SMI
+        DisplayString,
+        RowStatus,
+        DateAndTime,
+        TEXTUAL-CONVENTION
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus
+                FROM QTECH-TC        
+        qtechMgmt
+                FROM QTECH-SMI;
+
+qtechAuthenKeyMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "Qtech Networks Co.,Ltd."
+        CONTACT-INFO
+                " 
+                Tel: 4008-111-000 
+
+                E-mail: service@qtech.com.cn"
+        DESCRIPTION
+                "This module defines authentication key managment mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { qtechMgmt 24}
+
+
+
+qtechAuthenKeyMIBObjects OBJECT IDENTIFIER ::= { qtechAuthenKeyMIB 1 }
+
+
+QtechKeyTimeMode ::= TEXTUAL-CONVENTION        
+   STATUS current                          
+   DESCRIPTION                             
+            "Time managment mode of key." 
+   SYNTAX INTEGER {                        
+            infinite(1), -- Key will be valid all along when the key start to become effective
+            duration(2), -- Key will be valid for designate duration when the key start to 
+                         -- become effective.  
+            end-time(3)  -- Key will be valid when the key start to become effective till
+                         -- designate end time reach.                           
+  }                        
+  
+--    Key management is a method of controlling authentication keys used by some protocol. Not 
+-- all protocols can use key management. To manage authentication keys, define a  key chain, 
+-- identify the keys that belong to the key chain, and specify how long each key is valid. Each
+-- key has its own key identifier (specified with the key chain and key number),
+-- which is stored locally. 
+--     The combination of the key identifier and the interface associated with the message
+-- uniquely identifies the authentication algorithm and Message Digest 5 (MD5) authentication
+-- key in use.
+--     You can configure multiple keys with life times. Only one authentication packet is sent,
+-- regardless of how many valid keys exist. The software examines the key numbers in order from
+-- lowest to highest, and uses the first valid key it encounters. The lifetimes allow for 
+-- overlap during key changes. Note that the router must know these lifetimes.
+
+qtechAuthenKeyChainTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechAuthenKeyChainEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of key chain entries."
+        ::= { qtechAuthenKeyMIBObjects 1 }
+    
+qtechAuthenKeyChainEntry OBJECT-TYPE
+        SYNTAX QtechAuthenKeyChainEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry contains key chain."  
+        INDEX { qtechAuthenKeyChainName }
+        ::= { qtechAuthenKeyChainTable 1 }
+        
+QtechAuthenKeyChainEntry ::= 
+        SEQUENCE {
+                qtechAuthenKeyChainName DisplayString,
+                qtechAuthenKeyChainEntryStatus ConfigStatus
+        } 
+           
+qtechAuthenKeyChainName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key chain name of this entry.This value is unique for every entry
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { qtechAuthenKeyChainEntry  1 }
+                
+qtechAuthenKeyChainEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set its value to invalid will delete this entry.
+            set its value to valid has no effect."
+        ::= { qtechAuthenKeyChainEntry 2 }
+
+
+qtechAuthenKeyTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF QtechAuthenKeyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of authentication key entries."
+        ::= { qtechAuthenKeyMIBObjects 2 }
+    
+qtechAuthenKeyEntry OBJECT-TYPE
+        SYNTAX QtechAuthenKeyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry contains authentication key parameters.
+                                
+                We must set all specifies valid values for the 
+                non-defaulted configuration objects, certainly, it should
+                also modify  the default values for the other configuration 
+                objects if the defaults are not appropriate.
+                                       
+                Once the appropriate instance of all the configuration
+                objects have been created or set,the row status should be set
+                to active to initiate the request."  
+        INDEX { qtechKeyChainName,qtechAuthenKeyNumber }
+        ::= { qtechAuthenKeyTable 1 }
+        
+QtechAuthenKeyEntry ::= 
+        SEQUENCE {
+                qtechKeyChainName DisplayString,
+                qtechAuthenKeyNumber Integer32,
+                qtechKeyString DisplayString,
+                qtechAuthenKeyReceiveQtechTime DateAndTime,
+                qtechAuthenKeyReceiveTimeMode QtechKeyTimeMode,
+                qtechAuthenKeyReceiveEndTime DateAndTime,
+                qtechAuthenKeyReceiveDuration Unsigned32,
+                qtechAuthenKeySendQtechTime DateAndTime,
+                qtechAuthenKeySendTimeMode QtechKeyTimeMode,
+                qtechAuthenKeySendEndTime DateAndTime,
+                qtechAuthenKeySendDuration Unsigned32,
+                qtechAuthenReceiveKeyState       INTEGER,
+                qtechAuthenSendKeyState       INTEGER,
+                qtechAuthenKeyEntryStauts RowStatus 
+        }
+
+qtechKeyChainName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key chain name of this key belong to which indentified in qtechAuthenKeyChainEntry.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { qtechAuthenKeyEntry  1 }
+
+qtechAuthenKeyNumber OBJECT-TYPE
+        SYNTAX Integer32(0..2147483647)
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+               "The number identify a unique key in the key chain."
+        ::= { qtechAuthenKeyEntry 2 }
+
+qtechKeyString OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..80))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key String of the key. The string can contain from 1 to
+             80 uppercase and lowercase alphanumeric characters,
+             but the first character cannot be a number."
+        ::= { qtechAuthenKeyEntry  3 }
+           
+qtechAuthenKeyReceiveQtechTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The start time which the key can be received."
+        ::= { qtechAuthenKeyEntry 4 }
+        
+qtechAuthenKeyReceiveTimeMode OBJECT-TYPE
+        SYNTAX QtechKeyTimeMode
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The time mode of key receive."
+        ::= { qtechAuthenKeyEntry 5 }
+
+qtechAuthenKeyReceiveEndTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The end time which the key can be received."
+        ::= { qtechAuthenKeyEntry 6 }
+
+qtechAuthenKeyReceiveDuration OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The duration time which the key is valid, in units of second."
+        ::= { qtechAuthenKeyEntry 7 }
+        
+qtechAuthenKeySendQtechTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The start time which the key can be send."
+        ::= { qtechAuthenKeyEntry 8 }
+        
+qtechAuthenKeySendTimeMode OBJECT-TYPE
+        SYNTAX QtechKeyTimeMode
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The time mode of key send."
+        ::= { qtechAuthenKeyEntry 9 }
+
+qtechAuthenKeySendEndTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The end time which the key can be send."
+        ::= { qtechAuthenKeyEntry 10 }
+
+qtechAuthenKeySendDuration OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The duration time which the key is valid,in units of second."
+        ::= { qtechAuthenKeyEntry 11 }        
+
+qtechAuthenReceiveKeyState OBJECT-TYPE
+        SYNTAX INTEGER{
+                  valid(1),
+                  invalid(2)
+               }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The key is valid or invalid currently for receiving."
+        ::= { qtechAuthenKeyEntry 12 }        
+        
+qtechAuthenSendKeyState OBJECT-TYPE
+        SYNTAX INTEGER{
+                  valid(1),
+                  invalid(2)
+               }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The key is valid or invalid currently for sending."
+        ::= { qtechAuthenKeyEntry 13 }        
+                  
+qtechAuthenKeyEntryStauts OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "entry status for this list."
+        ::= { qtechAuthenKeyEntry 14 }
+ 
+-- conformance information
+
+qtechAuthenKeyChainMIBConformance OBJECT IDENTIFIER ::= { qtechAuthenKeyMIB 2 }
+qtechAuthenKeyChainMIBCompliances OBJECT IDENTIFIER ::= { qtechAuthenKeyChainMIBConformance 1 }
+qtechAuthenKeyChainMIBGroups      OBJECT IDENTIFIER ::= { qtechAuthenKeyChainMIBConformance 2 }
+
+
+-- compliance statements
+
+qtechAuthenKeyChainMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the Qtech Acl MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { qtechAuthenKeyChainMIBGroup }
+        ::= { qtechAuthenKeyChainMIBCompliances 1 }
+        
+        
+-- units of conformance
+
+qtechAuthenKeyChainMIBGroup OBJECT-GROUP
+        OBJECTS {
+                qtechAuthenKeyChainName,
+                qtechAuthenKeyChainEntryStatus,        
+                qtechKeyChainName,
+                qtechAuthenKeyNumber, 
+                qtechKeyString, 
+                qtechAuthenKeyReceiveQtechTime ,
+                qtechAuthenKeyReceiveTimeMode, 
+                qtechAuthenKeyReceiveEndTime ,
+                qtechAuthenKeyReceiveDuration, 
+                qtechAuthenKeySendQtechTime ,
+                qtechAuthenKeySendTimeMode ,
+                qtechAuthenKeySendEndTime ,
+                qtechAuthenKeySendDuration, 
+                qtechAuthenReceiveKeyState,
+                qtechAuthenSendKeyState,
+                qtechAuthenKeyEntryStauts 
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing acl (echo) ability to a
+                Qtech agent."
+        ::= { qtechAuthenKeyChainMIBGroups 1 }        
+        
+END

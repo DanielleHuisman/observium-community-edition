@@ -1,0 +1,1680 @@
+--******************************************************************************
+-- HM-FW-MIB: Managed objects for 
+--
+-- May 2011
+-- 
+-- Copyright (c) Hirschmann Automation & Control GmbH 2011
+--******************************************************************************
+
+HM2-FW-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS 
+	OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE,
+	Integer32, Unsigned32, Counter64
+		FROM SNMPv2-SMI	
+	RowStatus, DisplayString, TruthValue
+		FROM SNMPv2-TC	
+	MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
+	SnmpAdminString     
+		FROM SNMP-FRAMEWORK-MIB                
+    InterfaceIndex 
+      	FROM IF-MIB
+    hm2ConfigurationMibs, HmActionValue, HmTimeSeconds1970, HmEnabledStatus		   
+        FROM HM2-TC-MIB;
+
+hm2FwMib MODULE-IDENTITY
+	LAST-UPDATED "201109130000Z"
+	ORGANIZATION "Hirschmann Automation and Control GmbH"
+	CONTACT-INFO
+        "Postal:     Stuttgarter Str. 45-51
+                     72654 Neckartenzlingen
+                     Germany
+         Phone:      +49 - 7127 -14 -0
+         E-mail:     hac.support@belden.com"
+         DESCRIPTION
+         "SNMP interface for Hirschmann Firewall modules.
+
+          Copyright (C) "
+         REVISION     "201109130000Z" -- Sep 13, 2011
+         DESCRIPTION
+         	 "- Modified Interface Mapping Table for L3 and DynFw
+         	  - Use HmActionValue instead of TruthValue
+         	 "
+         REVISION     "201107010000Z" -- July 1, 2011
+         DESCRIPTION
+         	 "- Modifications to address representation
+         	 "
+         REVISION     "201106140000Z" -- June 14, 2011
+         DESCRIPTION
+         	 "- Restructured IF mapping tables
+         	  - Added variable for pending actions"
+         REVISION     "201105310000Z" -- May 31, 2011
+         DESCRIPTION
+          "Initial version."
+	 ::= { hm2ConfigurationMibs 79 }
+
+hm2FwNotifications 		OBJECT IDENTIFIER 	::= { hm2FwMib 0 }
+hm2FwObjects 			OBJECT IDENTIFIER	::= { hm2FwMib 1 }
+hm2FwConformance 		OBJECT IDENTIFIER	::= { hm2FwMib 2 }
+
+hm2FwGeneralSettings 	OBJECT IDENTIFIER 	::= { hm2FwObjects 1 }
+hm2DynFw 				OBJECT IDENTIFIER 	::= { hm2FwObjects 2 }
+hm2L3Fw 				OBJECT IDENTIFIER 	::= { hm2FwObjects 3 }
+hm2FwLearningMode 		OBJECT IDENTIFIER 	::= { hm2FwObjects 4 }
+
+--******************************************************************************
+--                         General Settings Objects
+--******************************************************************************
+
+hm2DynFwMaxRules OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Maximum number of allowed rules for dynamic firewalling."
+        ::= { hm2FwGeneralSettings 1 }
+
+hm2L3MaxRules OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-only
+	STATUS current	
+	DESCRIPTION
+		"Maximum number of allowed rules for L3 firewalling."
+        ::= { hm2FwGeneralSettings 2 }
+
+hm2ResetStatistics OBJECT-TYPE
+	SYNTAX HmActionValue
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Setting this value to action(2) will reset the statistics of the
+		 whole firewall module. It will be set to noop(1) automatically
+		 after reset."
+		 ::= { hm2FwGeneralSettings 3 }
+
+hm2FlushTables OBJECT-TYPE
+	SYNTAX HmActionValue
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Setting this value to action(2) will flush all connection tracking states.
+		 It will be set to noop(1) automatically after table flush."
+		 ::= { hm2FwGeneralSettings 4 }
+	 
+hm2DefaultPolicy OBJECT-TYPE
+	SYNTAX INTEGER {
+			 accept(1), 
+		         drop(2),
+		         reject(3)
+			}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The default policy for forwarding packets:
+		 o accept(1): Packets matching this rule are accepted and will 
+ 	 	   be forwarded
+ 	 	 o drop(2): Packets matching this rule will be silently 
+ 	 	   discarded
+ 	 	 o reject(3): Packets matching this rule will be dropped and
+ 	 	   the originator gets informed by an ICMP message"
+ 	DEFVAL { accept }
+ 	 	   ::= { hm2FwGeneralSettings 5 }
+ 	   
+hm2ConnTrackValidateCheckSum OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This value describes, whether the Firewall connection tracking 
+		 in the Linux kernel shall validate the protocol checksums.
+		 Disable this validation (false) improves routing throughput."
+	DEFVAL { true }	 
+		 ::={ hm2FwGeneralSettings 6 }
+
+--******************************************************************************
+--                         Dynamic Firewall
+--******************************************************************************
+
+hm2DynFwRuleAppliedTrap NOTIFICATION-TYPE
+	OBJECTS { hm2DynFwRuleIndex }
+	STATUS current
+	DESCRIPTION
+		"A rule of the dynamic firewall was applied. The rule is 
+		 identified by the given rule index of the rule table."
+		 ::= { hm2FwNotifications 1 }
+
+hm2DynFwRuleAppliedAndLoggedTrap NOTIFICATION-TYPE
+	OBJECTS { hm2DynFwRuleIndex }
+	STATUS current
+	DESCRIPTION
+		"A rule of the dynamic firewall was applied and logged according to
+		 the current logging mechanism. The rule is identified by the 
+		 given rule index of the rule table."
+		 ::= { hm2FwNotifications 2 }
+
+hm2DynFwRuleObjects OBJECT IDENTIFIER ::= { hm2DynFw 1 }
+	 
+hm2DynFwRuleCount OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of current dynamic firewalls rules"
+	::= { hm2DynFwRuleObjects 1 }
+
+hm2DynFwIfMappingRuleCount OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of current DynFw IF mapping entries."
+	::={ hm2DynFwRuleObjects 2 }
+
+hm2DynFwRulePendingActions OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"This value describes, whether the DynFW rule table was modified
+		 but not yet written to the firewall implementation (set to 
+		 true). After writing all modifications to the firewall, the 
+		 value switches automatically back to false."
+	DEFVAL { false }	 
+		 ::={ hm2DynFwRuleObjects 3 }
+
+hm2DynFwCommitPendingActions OBJECT-TYPE
+	SYNTAX HmActionValue
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Setting this value to action(2) writes not yet committed changes
+		 to the firewall (DynFW and Interface Mapping Table). After 
+		 writing all modifications, the value switches automatically 
+		 back to noop(1)."
+	DEFVAL { noop }	 
+		 ::={ hm2DynFwRuleObjects 4 }
+	 
+
+hm2DynFwRuleTables OBJECT IDENTIFIER ::= { hm2DynFw 2 }
+
+hm2DynFwRuleTable OBJECT-TYPE 
+	SYNTAX SEQUENCE OF Hm2DynFwRuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The list of rules for this dynamic firewall"
+	::= { hm2DynFwRuleTables 1 }
+	
+hm2DynFwRuleEntry OBJECT-TYPE
+	SYNTAX Hm2DynFwRuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Dynamic firewall rule entry."
+	INDEX { hm2DynFwRuleIndex }
+	::= { hm2DynFwRuleTable 1 }
+		 
+Hm2DynFwRuleEntry ::=
+	SEQUENCE {
+		hm2DynFwRuleIndex Integer32,
+		hm2DynFwSourceAddress DisplayString,
+		hm2DynFwSourcePort DisplayString,
+		hm2DynFwTargetAddress DisplayString,
+		hm2DynFwTargetPort DisplayString,
+		hm2DynFwProto INTEGER,
+		hm2DynFwRuleParams DisplayString,
+		hm2DynFwAction INTEGER,
+		hm2DynFwLog TruthValue,
+		hm2DynFwTrap TruthValue,
+		hm2DynFwRowStatus RowStatus,
+		hm2DynFwDescription DisplayString
+	}
+		
+hm2DynFwRuleIndex OBJECT-TYPE
+	SYNTAX Integer32 ( 1..512 )
+	MAX-ACCESS accessible-for-notify
+	STATUS current
+	DESCRIPTION
+		"Rule index of this dynamic firewall rule"
+	::= { hm2DynFwRuleEntry 1 }
+
+hm2DynFwSourceAddress OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..20) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The source address of the packet to filter. Allowed formats are:
+		- keyword 'any'
+		- single address ('10.0.0.1')
+        - CIDR address range ('10.0.0.0/8')
+        - netobject ('$name')
+		"
+	DEFVAL  { "any" }     
+	::= { hm2DynFwRuleEntry 2 }
+
+hm2DynFwSourcePort OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..50) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The source port of the packet to filter. Allowed formats are:
+		- keyword 'any'
+		- single port ('10')
+		- port range with first and last port separated by hyphen 
+		  ('10-15')
+		- comma separated list of ports ('1235,25,123')
+		- combination of the points above ('10,25-30,125,1993')
+
+        The number of named ports (1 for each individual port, 2 for port
+        ranges) must not exceed 15.
+		"
+	DEFVAL { "any" }
+	::= { hm2DynFwRuleEntry 3 }
+
+hm2DynFwTargetAddress OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..20) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The destination address of the packet to filter. Allowed formats are:
+		- keyword 'any'
+		- single address ('10.0.0.1')
+        - CIDR address range ('10.0.0.0/8')
+        - netobject ('$name')
+		"
+	DEFVAL  { "any" }     
+	::= { hm2DynFwRuleEntry 4 }
+
+hm2DynFwTargetPort OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..50) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The destination port of the packet to filter. Allowed formats are:
+		- keyword 'any'
+		- single port ('10')
+		- port range with first and last port separated by hyphen 
+		  ('10-15')
+		- comma separated list of ports ('1235,25,123')
+		- combination of the points above ('10,25-30,125,1993')
+
+        The number of named ports (1 for each individual port, 2 for port
+        ranges) must not exceed 15.
+		"
+	DEFVAL { "any" }
+	::= { hm2DynFwRuleEntry 5 }
+
+hm2DynFwProto OBJECT-TYPE
+	SYNTAX		 INTEGER { 
+		                   icmp(1), 
+		                   igmp(2),
+		                   ipip(3),
+		                   tcp(4),
+		                   udp(5),
+		                   esp(6),
+		                   ah(7),
+		                   icmpv6(8),
+		                   any(9)		                 
+			}
+	MAX-ACCESS 	 read-create
+	STATUS 		 current
+	DESCRIPTION
+		 "The IP protocol (RFC 791) for protocol-independent
+                  filtering. The following values are currently
+                  supported:
+                  o  icmp(1): internet control message protocol (RFC 792)
+                  o  igmp(2): internet group management protocol
+                  o  ipip(3): IP in IP tunnelling (RFC 1853)
+                  o  tcp(4): transmission control protocol (RFC 793)
+                  o  udp(5): user datagram protocol (RFC 768)
+                  o  esp(6): IPsec encapsulated security payload (RFC 2406)
+                  o  ah(7): IPsec authentication header (RFC 2402)
+                  o  icmpv6(8): internet control message protocol for IPv6
+                  o  any(9): apply to all protocols"
+	 DEFVAL  { any }
+	 ::= { hm2DynFwRuleEntry 6 }
+ 
+ hm2DynFwRuleParams OBJECT-TYPE
+ 	 SYNTAX DisplayString ( SIZE(0..50) )
+ 	 MAX-ACCESS read-create
+ 	 STATUS current
+ 	 DESCRIPTION
+ 	 	 "Additional parameters to this rule as string. 
+                  A parameter has the syntax: 
+                           <param>=<val>
+                  Parameters are separated by a comma.
+                  If more than one value is given for a parameter, values are
+                  separated by a |-sign
+                  Following paramters are defined based on the different 
+                  protocols:
+                  o icmp: type=<ICMP type> (specify ICMP type to filter)
+                          code=<ICMP code> (specify ICMP code to filter)
+                  o tcp:  frag=<true/false> (apply to fragments)
+                          flags=<SYN/ACK/FIN> (apply to packets with give flags
+                  o udp/tcp: state=<new/rel/est> (apply to packets according
+                             current state of connection>
+                  o general: mac=<MAC> (specify source MAC address for this
+                             rule)
+                 "
+ 	 ::= { hm2DynFwRuleEntry 7 }	 	 
+ 
+ 
+ hm2DynFwAction OBJECT-TYPE
+ 	 SYNTAX INTEGER { accept(1), drop(2), reject(3) }
+ 	 MAX-ACCESS read-create
+ 	 STATUS current
+ 	 DESCRIPTION
+ 	 	 "The action of the corresponding rule:
+ 	 	 o accept(1): Packets matching this rule are accepted and will 
+ 	 	   be forwarded
+ 	 	 o drop(2): Packets matching this rule will be silently 
+ 	 	   discarded
+ 	 	 o reject(3): Packets matching this rule will be dropped and
+ 	 	   the originator gets informed by an ICMP message"
+ 	 ::= { hm2DynFwRuleEntry 8 }
+
+hm2DynFwLog OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if application of this rule shall be logged"
+	DEFVAL { false }
+		::={ hm2DynFwRuleEntry 9 }
+
+hm2DynFwTrap OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if application of this rule shall send a trap."
+	DEFVAL { false }
+	::={ hm2DynFwRuleEntry 10 }
+
+hm2DynFwRowStatus OBJECT-TYPE
+	SYNTAX RowStatus
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"This is a standard row status value:
+            - active(1): The rule is active. Note that until committed, the rule
+              will not be applied.
+            - notInService(2): The rule is inactive because of user action.
+            - notReady(3): The rule is inactive because of agent action.
+            - createAndGo(4): Create the rule with default parameters
+              activated.
+            - createAndWait(5): Create the rule inactive.
+            - destroy(6): Delete the rule. You cannot delete a rule with
+              interface mappings to it."
+		::= { hm2DynFwRuleEntry 11 }
+		
+hm2DynFwDescription OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(0..32) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"User defined textual description related to this rule."
+	DEFVAL  { "" }
+	::= { hm2DynFwRuleEntry 12 }
+
+hm2DynFwRuleIfMappingTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF Hm2DynFwRuleIfMappingEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Table for mapping L3 rules to interfaces"
+		::={ hm2DynFwRuleTables 2 }
+	
+hm2DynFwRuleIfMappingEntry OBJECT-TYPE
+	SYNTAX Hm2DynFwRuleIfMappingEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Entry in rule interface mapping table"
+	INDEX { hm2DynFwIfmInterface, hm2DynFwIfmDirection, 
+		hm2DynFwIfmRuleIndex } 
+		::={ hm2DynFwRuleIfMappingTable 1 }
+	
+Hm2DynFwRuleIfMappingEntry ::= SEQUENCE {	
+	hm2DynFwIfmRuleIndex Integer32,
+	hm2DynFwIfmDirection INTEGER,	
+	hm2DynFwIfmPriority Unsigned32,
+	hm2DynFwIfmInterface InterfaceIndex,
+	hm2DynFwIfmRowStatus RowStatus
+}
+
+hm2DynFwIfmRuleIndex OBJECT-TYPE
+	SYNTAX Integer32 (1..2048)
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The index of the DynFw rule this mapping entry is assigned to.
+		 The DynFw rule must exist before creation of mapping entry."
+		::={ hm2DynFwRuleIfMappingEntry 1 }
+		
+	
+hm2DynFwIfmDirection OBJECT-TYPE
+	SYNTAX INTEGER {
+			ingress(1),
+			egress(2),
+			both(3)
+	}
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+        "Meanings:
+            - ingress(1): Apply this rule to packets arriving on this interface
+            - egress(2): Apply this rule to packets leaving from this interface
+            - both(3): Apply this rule to packets coming in and going out on this
+              interface.
+
+        If an ingress and an egress interface are given, this is taken to mean
+        that the rule shall apply to packets arriving on the ingress interface
+        AND to be leaving on the egress interface. A rule without ingress
+        interface matches on all packets going out to the egress interface
+        given, and vice versa."
+		::={ hm2DynFwRuleIfMappingEntry 2 }
+
+hm2DynFwIfmPriority OBJECT-TYPE
+	SYNTAX Unsigned32
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+         "The priority is the sorting key for rules in to this interface. They
+         don't need to be unique, but no clear order can be assumed among rules
+         with the same priority.
+		 Priorities are processed in ascending order (0 highest priority)."
+		 ::={ hm2DynFwRuleIfMappingEntry 3 } 
+
+hm2DynFwIfmInterface OBJECT-TYPE
+	SYNTAX InterfaceIndex
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The interface this mapping entry is applied to. This has to be either
+        an hm2AgentSwitchIpInterfaceIfIndex or an hm2AgentSwitchIpVlanIfIndex.
+        Note that for physical interfaces this only works if the corresponding
+        hm2AgentSwitchIpInterfaceRoutingMode is set to enable."
+		::={ hm2DynFwRuleIfMappingEntry 4 }
+	 
+hm2DynFwIfmRowStatus OBJECT-TYPE
+	SYNTAX RowStatus
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The RowStatus value for this entry with the usual meanings:
+        
+            - active(1): The interface mapping is in place
+            - notInService(2): The interface mapping is not in place because the
+              user said so
+            - notReady(3): The interface mapping is not in place because the
+              agent said so
+            - createAndGo(4): Create this mapping with the default priority and
+              activate it.
+            - createAndWait(5): Create this mapping deactivated.
+            - destroy(6): Destroy this interface mapping."
+		::={ hm2DynFwRuleIfMappingEntry 5 }
+	
+hm2DynFwStats OBJECT IDENTIFIER ::={ hm2DynFw 4 }
+
+hm2DynFwGeneralStats OBJECT IDENTIFIER ::={ hm2DynFwStats 1 }
+
+hm2DynFwStatsTtPck OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of packets processed by the dynamic firewall"
+		::= { hm2DynFwGeneralStats 1 }
+
+hm2DynFwStatsTtPckSize OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of bytes processed by the dynamic firewall"
+		::= { hm2DynFwGeneralStats 2 }
+
+hm2DynFwStatsTtPckDenDrop OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of packets dropped or denied by the dynamic 
+		 firewall"
+		::={ hm2DynFwGeneralStats 3 }
+	
+hm2DynFwStatsTtPckAccepted OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of packets accepted by the dynamic firewall"
+		::={ hm2DynFwGeneralStats 4 }
+	
+hm2DynFwStatsTables OBJECT IDENTIFIER ::= { hm2DynFwStats 2 }
+	
+hm2DynFwStatsRuleTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF Hm2DynFwStatsRuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Table of per-rule statistics of the dynamic firewall"
+		::= { hm2DynFwStatsTables 1 }
+	
+hm2DynFwStatsRuleEntry OBJECT-TYPE
+	SYNTAX Hm2DynFwStatsRuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Statistics table entry for the dynamic firewall"
+	INDEX { hm2DynFwRuleIndex }
+	::={ hm2DynFwStatsRuleTable 1 }
+	
+	Hm2DynFwStatsRuleEntry ::= SEQUENCE {
+	hm2DynFwStatsPacketCount Counter64,
+	hm2DynFwStatsPacketSize Counter64,	
+	hm2DynFwStatsLastApplied HmTimeSeconds1970
+}
+
+hm2DynFwStatsPacketCount OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of packets matched by this rule"
+		::={ hm2DynFwStatsRuleEntry 1 }
+	
+hm2DynFwStatsPacketSize OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of bytes processed by this rule"
+		::={ hm2DynFwStatsRuleEntry 2 }
+	
+hm2DynFwStatsLastApplied OBJECT-TYPE
+	SYNTAX HmTimeSeconds1970
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Local system time (hm2SystemLocalTime) when the rule was applied the last time"
+		::={ hm2DynFwStatsRuleEntry 3 }
+
+--******************************************************************************
+--			L3 Firewall
+--******************************************************************************
+
+hm2L3RuleAppliedTrap NOTIFICATION-TYPE
+	OBJECTS { hm2L3RuleIndex }
+	STATUS current
+	DESCRIPTION
+		"A rule of the L3 firewall was applied. The rule is 
+		 identified by the given rule index of the rule table."
+		 ::= { hm2FwNotifications 3 }
+
+hm2L3RuleAppliedAndLoggedTrap NOTIFICATION-TYPE
+	OBJECTS { hm2L3RuleIndex }
+	STATUS current
+	DESCRIPTION
+		"A rule of the L3 firewall was applied and logged according
+		 the current logging mechanism. The rule is identified by the 
+		 given rule index of the rule table."
+		 ::= { hm2FwNotifications 4 }
+	 
+hm2L3RuleObjects OBJECT IDENTIFIER ::= { hm2L3Fw 1 } 
+	 
+hm2L3RuleCount OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of current L3 rules"
+	::= { hm2L3RuleObjects 1 }
+
+hm2L3IfMappingRuleCount OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of current L3 IF mapping entries."
+	::={ hm2L3RuleObjects 2 }
+
+hm2L3RulePendingActions OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"This value describes, whether the L3 rule table was modified
+		 but not yet written to the firewall implementation (set to 
+		 true). After writing all modifications to the firewall, the 
+		 value switches automatically back to false."
+	DEFVAL { false }	 
+		 ::={ hm2L3RuleObjects 3 }
+
+hm2L3CommitPendingActions OBJECT-TYPE
+	SYNTAX HmActionValue
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Setting this value to action(2) writes not yet committed changes
+		 to the firewall (L3 and Interface Mapping Table). After writing
+		 all modifications, the value switches automatically back to 
+		 noop(1)."
+	DEFVAL { noop }	 
+		 ::={ hm2L3RuleObjects 4 }
+
+hm2L3RuleTables OBJECT IDENTIFIER ::= { hm2L3Fw 2 }
+
+hm2L3RuleTable OBJECT-TYPE 
+	SYNTAX SEQUENCE OF Hm2L3RuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The list of L3 rules for this firewall"
+	::= { hm2L3RuleTables 1 }
+	
+	 hm2L3RuleEntry OBJECT-TYPE
+		SYNTAX Hm2L3RuleEntry
+		MAX-ACCESS not-accessible
+		STATUS current
+		DESCRIPTION
+			"L3 rule entry."
+		INDEX { hm2L3RuleIndex }
+		::= { hm2L3RuleTable 1 }
+		 
+Hm2L3RuleEntry ::=
+	SEQUENCE {
+		hm2L3RuleIndex Integer32,
+		hm2L3SourceAddress DisplayString,
+		hm2L3SourcePort DisplayString,
+		hm2L3TargetAddress DisplayString,
+		hm2L3TargetPort DisplayString,
+		hm2L3Proto INTEGER,
+		hm2L3RuleParams DisplayString,
+		hm2L3Action INTEGER,
+		hm2L3Log TruthValue,
+		hm2L3Trap TruthValue,
+		hm2L3RowStatus RowStatus,
+		hm2L3Description DisplayString,
+		hm2DPIProfileIndex Integer32
+	}
+		
+hm2L3RuleIndex OBJECT-TYPE
+	SYNTAX Integer32 ( 1..2048 )
+	MAX-ACCESS accessible-for-notify
+	STATUS current
+	DESCRIPTION
+		"Rule index of this L3 rule"
+	::= { hm2L3RuleEntry 1 }
+
+hm2L3SourceAddress OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..20) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The source address of the packet to filter. Allowed formats are:
+		- keyword 'any'
+		- single address ('10.0.0.1')
+        - CIDR address range ('10.0.0.0/8')
+        - netobject ('$name')
+        - a prepending '!' selects the complement set
+		"
+	DEFVAL  { "any" }     
+	::= { hm2L3RuleEntry 2 }
+
+hm2L3SourcePort OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..50) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The source port of the packet to reroute. Allowed formats are:
+		- keyword 'any'
+		- single port ('10')
+		- port range with first and last port separated by hyphen 
+		  ('10-15')
+		- comma separated list of ports ('1235,25,123')
+		- combination of the points above ('10,25-30,125,1993')
+
+        The number of named ports (1 for each individual port, 2 for port
+        ranges) must not exceed 15.
+		"
+	DEFVAL { "any" }
+	::= { hm2L3RuleEntry 3 }
+
+hm2L3TargetAddress OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..20) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The destination address of the packet to filter. Allowed formats are:
+		- keyword 'any'
+		- single address ('10.0.0.1')
+        - CIDR address range ('10.0.0.0/8')
+        - netobject ('$name')
+		"
+	DEFVAL  { "any" }     
+	::= { hm2L3RuleEntry 4 }
+
+hm2L3TargetPort OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(1..50) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The destination port of the packet to. Allowed formats are:
+		- keyword 'any'
+		- single port ('10')
+		- port range with first and last port separated by hyphen 
+		  ('10-15')
+		- comma separated list of ports ('1235,25,123')
+		- combination of the points above ('10,25-30,125,1993')
+
+        The number of named ports (1 for each individual port, 2 for port
+        ranges) must not exceed 15.
+		"
+	DEFVAL { "any" }
+	::= { hm2L3RuleEntry 5 }
+
+hm2L3Proto OBJECT-TYPE
+	SYNTAX INTEGER { 
+		                   icmp(1), 
+		                   igmp(2),
+		                   ipip(3),
+		                   tcp(4),
+		                   udp(5),
+		                   esp(6),
+		                   ah(7),
+		                   icmpv6(8),
+		                   any(9)		                 
+			}
+	MAX-ACCESS 	 read-create
+	STATUS 		 current
+	DESCRIPTION
+		 "The IP protocol (RFC 791) for protocol-independent
+                  filtering. The following values are currently
+                  supported:
+                  o  icmp(1): internet control message protocol (RFC 792)
+                  o  igmp(2): internet group management protocol
+                  o  ipip(3): IP in IP tunnelling (RFC 1853)
+                  o  tcp(4): transmission control protocol (RFC 793)
+                  o  udp(5): user datagram protocol (RFC 768)
+                  o  esp(6): IPsec encapsulated security payload (RFC 2406)
+                  o  ah(7): IPsec authentication header (RFC 2402)
+                  o  icmpv6(8): internet control message protocol for IPv6
+                  o  any(9): apply to all protocols"
+	 DEFVAL  { any }
+	 ::= { hm2L3RuleEntry 6 }
+
+ hm2L3RuleParams OBJECT-TYPE
+ 	 SYNTAX DisplayString ( SIZE(0..50) )
+ 	 MAX-ACCESS read-create
+ 	 STATUS current
+ 	 DESCRIPTION
+ 	 	 "Additional parameters to this rule as string. 
+                  A parameter has the syntax: 
+                           <param>=<val>
+                  Parameters are separated by a comma.
+                  If more than one value is given for a parameter, values are
+                  separated by a |-sign (pipe).
+                  Following parameters are defined based on the different 
+                  protocols:
+                  o icmp: type=<ICMP type> (specify ICMP type to filter)
+                          code=<ICMP code> (specify ICMP code to filter)
+                  o tcp:  flags=<SYN/ACK/FIN> (apply to packets with given flags)
+                  o general: state=<new/rel/est> (apply to packets according to
+                             current state of connection>)
+                             mac=<MAC> (specify source MAC address for this rule)
+                             frag=<true/false> (apply to fragments)
+                 "
+ 	 ::= { hm2L3RuleEntry 7 }	 	 
+
+hm2L3Action OBJECT-TYPE
+ 	 SYNTAX INTEGER {
+			accept(1),
+			drop(2),
+			reject(3),
+			enforce-modbus(4),
+			enforce-opc(5)
+ 	 }
+ 	 MAX-ACCESS read-create
+ 	 STATUS current
+ 	 DESCRIPTION
+ 	 	 "The action of the corresponding rule:
+ 	 	 o accept(1): Packets matching this rule are accepted and will 
+ 	 	   be forwarded
+ 	 	 o drop(2): Packets matching this rule will be silently 
+ 	 	   discarded
+ 	 	 o reject(3): Packets matching this rule will be dropped and
+ 	 	   the originator gets informed by an ICMP message
+ 	 	 o enforce-modbus(4): Packets matching this rule are enforced by
+	 	   modbus enforcer and will be forwarded or discarded.
+	 	   The selected protocol should be tcp or udp
+	 	 o enforce-opc(5): Packets matching this rule are enforced by
+	 	   opc enforcer and will be forwarded or discarded.
+	 	   The selected protocol should be tcp"
+ 	 ::= { hm2L3RuleEntry 8 }
+
+hm2L3Log OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if application of this rule shall be logged"
+	DEFVAL { false }
+		::={ hm2L3RuleEntry 9 }
+
+hm2L3Trap OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if application of this rule shall send a trap."
+	DEFVAL { false }
+	::={ hm2L3RuleEntry 10 }
+
+hm2L3RowStatus OBJECT-TYPE
+	SYNTAX RowStatus
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"This is a standard row status value:
+            - active(1): The rule is active. Note that until committed, the rule
+              will not be applied. You cannot activate the rule
+              if an enforcer mappings to an inactive profile.
+            - notInService(2): The rule is inactive because of user action.
+            - notReady(3): The rule is inactive because of agent action.
+            - createAndGo(4): Create the rule with default parameters
+              activated.
+            - createAndWait(5): Create the rule inactive.
+            - destroy(6): Delete the rule. You cannot delete a rule with
+              interface mappings to it."
+		::= { hm2L3RuleEntry 11 }
+
+hm2L3Description OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(0..32) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"User defined textual description related to this rule."
+	DEFVAL  { "" }
+	::= { hm2L3RuleEntry 12 }
+
+hm2DPIProfileIndex OBJECT-TYPE
+	SYNTAX Integer32 (0..32)
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The index of the DPI profile this rule is assigned to
+		depending on enforcer action.
+		Value 0 no DPI profile this rule is assigned to.
+		You cannot assign the rule to an inactive profile
+		if an active enforcer will mapping to it."
+	DEFVAL { 0 }
+	::= { hm2L3RuleEntry 13 }
+
+hm2L3RuleIfMappingTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF Hm2L3RuleIfMappingEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Table for mapping L3 rules to interfaces"
+		::={ hm2L3RuleTables 2 }
+	
+hm2L3RuleIfMappingEntry OBJECT-TYPE
+	SYNTAX Hm2L3RuleIfMappingEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Entry in rule interface mapping table"
+	INDEX { hm2L3IfmInterface, hm2L3IfmDirection, hm2L3IfmRuleIndex } 
+		::={ hm2L3RuleIfMappingTable 1 }
+
+Hm2L3RuleIfMappingEntry ::= SEQUENCE {	
+	hm2L3IfmRuleIndex Integer32,
+	hm2L3IfmDirection INTEGER,
+	hm2L3IfmPriority Unsigned32,
+	hm2L3IfmInterface InterfaceIndex,
+	hm2L3IfmRowStatus RowStatus
+}
+
+hm2L3IfmRuleIndex OBJECT-TYPE
+	SYNTAX Integer32 (1..2048)
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The index of the L3 rule this mapping entry is assigned to.
+		 The rule must exist before the mapping entry can be created."
+		::={ hm2L3RuleIfMappingEntry 1 }
+
+	
+hm2L3IfmDirection OBJECT-TYPE
+	SYNTAX INTEGER {
+			ingress(1),
+			egress(2),
+			both(3)
+	}
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+        "Meanings:
+            - ingress(1): Apply this rule to packets arriving on this interface
+            - egress(2): Apply this rule to packets leaving from this interface
+            - both(3): Apply this rule to packets coming in and going out on this
+              interface.
+
+        If an ingress and an egress interface are given, this is taken to mean
+        that the rule shall apply to packets arriving on the ingress interface
+        AND to-be leaving on the egress interface. A rule without ingress
+        interface matches on all packets going out to the egress interface
+        given, and vice versa."
+		::={ hm2L3RuleIfMappingEntry 2 }
+	
+hm2L3IfmPriority OBJECT-TYPE
+	SYNTAX Unsigned32
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+         "The priority is the sorting key for rules in to this interface. They
+         don't need to be unique, but no clear order can be assumed among rules
+         with the same priority.
+		 Priorities are processed in ascending order (0 highest 
+		 priority."
+		::={ hm2L3RuleIfMappingEntry 3 }
+	
+hm2L3IfmInterface OBJECT-TYPE
+	SYNTAX InterfaceIndex
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The interface this mapping entry is assigned to. This has to be either
+        an hm2AgentSwitchIpInterfaceIfIndex or an hm2AgentSwitchIpVlanIfIndex.
+        Note that for physical interfaces this only works if the corresponding
+        hm2AgentSwitchIpInterfaceRoutingMode is set to enable."
+		::={ hm2L3RuleIfMappingEntry 4 }
+	
+hm2L3IfmRowStatus OBJECT-TYPE
+	SYNTAX RowStatus
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"The RowStatus value for this entry with the usual meanings:
+        
+            - active(1): The interface mapping is in place
+            - notInService(2): The interface mapping is not in place because the
+              user said so
+            - notReady(3): The interface mapping is not in place because the
+              agent said so
+            - createAndGo(4): Create this mapping with the default priority and
+              activate it.
+            - createAndWait(5): Create this mapping deactivated.
+            - destroy(6): Destroy this interface mapping."
+		::={ hm2L3RuleIfMappingEntry 5 }
+	 
+hm2L3Stats OBJECT IDENTIFIER ::={ hm2L3Fw 4 }
+
+hm2L3GeneralStats OBJECT IDENTIFIER ::= { hm2L3Stats 1 }
+
+hm2L3StatsTotalPck OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of packets processed by the L3 firewall"
+		::= { hm2L3GeneralStats 1 }
+
+hm2L3StatsTotalPckSize OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of bytes processed by the L3 firewall"
+		::= { hm2L3GeneralStats 2 }
+	
+hm2L3StatsTotalPckDenDrop OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of packets dropped or denied by the L3 firewall"
+		::={ hm2L3GeneralStats 3 }
+	
+hm2L3StatsTotalPckAccepted OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total number of packets accepted by the L3 firewall"
+		::={ hm2L3GeneralStats 4 }
+
+hm2L3StatsTables OBJECT IDENTIFIER ::= { hm2L3Stats 2 }
+	
+hm2L3StatsRuleTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF Hm2L3StatsRuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Table of per-rule statistics of the L3 firewall"
+		::= { hm2L3StatsTables 1 }
+	
+hm2L3StatsRuleEntry OBJECT-TYPE
+	SYNTAX Hm2L3StatsRuleEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Statistics table entry for the L3 firewall"
+	INDEX { hm2L3RuleIndex }
+	::={ hm2L3StatsRuleTable 1 }
+	
+Hm2L3StatsRuleEntry ::= SEQUENCE {
+	hm2L3StatsPacketCount Counter64,	
+	hm2L3StatsPacketSize Counter64,	
+	hm2L3StatsLastApplied HmTimeSeconds1970
+}
+
+hm2L3StatsPacketCount OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of packets matched by this rule"
+		::={ hm2L3StatsRuleEntry 1 }
+
+hm2L3StatsPacketSize OBJECT-TYPE
+	SYNTAX Counter64
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Number of bytes processed by this rule"
+		::={ hm2L3StatsRuleEntry 2 }
+	
+hm2L3StatsLastApplied OBJECT-TYPE
+	SYNTAX HmTimeSeconds1970
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Time of last application of the rule in seconds since the Unix epoch."
+		::={ hm2L3StatsRuleEntry 3 }
+
+hm2DPIProfileModbusObjects OBJECT IDENTIFIER ::= { hm2L3Fw 11 } 
+
+hm2DPIProfileModbusPendingActions OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"This value describes, whether the DPI MODBUS profile table was modified
+		 but not yet written to the enforcer implementation (set to 
+		 true). After writing all modifications to the enforcer, the 
+		 value switches automatically back to false."
+	DEFVAL { false }	 
+	::= { hm2DPIProfileModbusObjects 1 }
+
+hm2DPIProfileModbusCommitPendingActions OBJECT-TYPE
+	SYNTAX HmActionValue
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Setting this value to action(2) writes not yet committed changes
+		 to the enforcer (DPI MODBUS Profile Table). After writing
+		 all modifications, the value switches automatically back to 
+		 noop(1)."
+	DEFVAL { noop }	 
+	::= { hm2DPIProfileModbusObjects 2 }
+
+hm2DPIProfileOpcObjects OBJECT IDENTIFIER ::= { hm2L3Fw 12 } 
+
+hm2DPIProfileOpcPendingActions OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"This value describes, whether the L3 OPC profile table was modified
+		 but not yet written to the enforcer implementation (set to 
+		 true). After writing all modifications to the enforcer, the 
+		 value switches automatically back to false."
+	DEFVAL { false }	 
+	::= { hm2DPIProfileOpcObjects 1 }
+
+hm2DPIProfileOpcCommitPendingActions OBJECT-TYPE
+	SYNTAX HmActionValue
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Setting this value to action(2) writes not yet committed changes
+		 to the enforcer (DPI OPC Profile Table). After writing
+		 all modifications, the value switches automatically back to 
+		 noop(1)."
+	DEFVAL { noop }	 
+	::= { hm2DPIProfileOpcObjects 2 }
+
+hm2DPIProfileTables OBJECT IDENTIFIER ::= { hm2L3Fw 21 }
+
+hm2DPIProfileModbusTable OBJECT-TYPE 
+	SYNTAX SEQUENCE OF Hm2DPIProfileModbusEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The list of DPI MODBUS profiles for this enforcer"
+	::= { hm2DPIProfileTables 1 }
+
+hm2DPIProfileModbusEntry OBJECT-TYPE
+	SYNTAX Hm2DPIProfileModbusEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"DPI MODBUS profile entry."
+	INDEX { hm2DPIProfileModbusIndex }
+	::= { hm2DPIProfileModbusTable 1 }
+
+Hm2DPIProfileModbusEntry ::=
+	SEQUENCE {
+		hm2DPIProfileModbusIndex Integer32,
+		hm2DPIProfileModbusDescription DisplayString,
+		hm2DPIProfileModbusFunctionType INTEGER,
+		hm2DPIProfileModbusFunctionCodeList DisplayString,
+		hm2DPIProfileModbusUnitIdentifierList DisplayString,
+		hm2DPIProfileModbusSanityCheck TruthValue,
+		hm2DPIProfileModbusException TruthValue,
+		hm2DPIProfileModbusReset TruthValue,
+		hm2DPIProfileModbusRowStatus RowStatus
+	}
+
+hm2DPIProfileModbusIndex OBJECT-TYPE
+	SYNTAX Integer32 ( 1..32 )
+	MAX-ACCESS accessible-for-notify
+	STATUS current
+	DESCRIPTION
+		"Profile index of this DPI MODBUS profile"
+	::= { hm2DPIProfileModbusEntry 1 }
+
+hm2DPIProfileModbusDescription OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(0..32) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"User defined textual description related to this profile."
+	DEFVAL { "modbus" }
+	::= { hm2DPIProfileModbusEntry 2 }
+
+hm2DPIProfileModbusFunctionType OBJECT-TYPE
+ 	 SYNTAX INTEGER {
+			readonly(1),
+			readwrite(2),
+			programming(3),
+			all(4),
+			advanced(5)
+ 	 }
+ 	 MAX-ACCESS read-create
+ 	 STATUS current
+ 	 DESCRIPTION
+ 	 	 "The function types of the corresponding function codes:
+ 	 	 o readonly(1): Selects read only function codes for the function code list.
+ 	 	 o readwrite(2): Selects read write function codes for the function code list.
+ 	 	 o programming(3): Selects programming function codes for the function code list.
+ 	 	 o all(4): Selects all possible function codes for the function code list. Any function code will be allowed.
+	 	 o advanced(5): Keeps the function code list from the previous selection and makes it editable by the user."
+	DEFVAL { readonly }
+	::= { hm2DPIProfileModbusEntry 3 }
+
+hm2DPIProfileModbusFunctionCodeList OBJECT-TYPE
+ 	 SYNTAX DisplayString ( SIZE(1..1400) )
+ 	 MAX-ACCESS read-create
+ 	 STATUS current
+ 	 DESCRIPTION
+		"The function codes for this enforcer as string.
+		A function code has the syntax:
+			<val>
+		Function codes are separated by a comma.
+		If more than one value is given for a function code, values are
+		separated by a | -sign (pipe).
+		Following function codes are defined:
+			<1..255>|<0-65535>|<0-65535> (apply to packets with given function codes <1..255>, address range <0-65535>, address range <0-65535>)
+			1|<0-65535> (apply to packets with given function code read coils, coil address range <0-65535>)
+			2|<0-65535> (apply to packets with given function code read discrete inputs, input address range <0-65535>)
+			3|<0-65535> (apply to packets with given function code read holding registers, register address range <0-65535>)
+			4|<0-65535> (apply to packets with given function code read input registers, register address range <0-65535>)
+			5|<0-65535> (apply to packets with given function code write single coil, coil address range <0-65535>)
+			6|<0-65535> (apply to packets with given function code write single register, register address range <0-65535>)
+			7 (apply to packets with given function code read exception status)
+			8 (apply to packets with given function code diagnostic)
+			11 (apply to packets with given function code get com event counter)
+			12 (apply to packets with given function code get comm event log)
+			13 (apply to packets with given function code program (584/984))
+			14 (apply to packets with given function code poll (584/984))
+			15|<0-65535> (apply to packets with given function code write multiple coils, coil address range <0-65535>)
+			16|<0-65535> (apply to packets with given function code write multiple registers, register address range <0-65535>)
+			17 (apply to packets with given function code report slave id)
+			20 (apply to packets with given function code read file record)
+			21 (apply to packets with given function code write file record)
+			22|<0-65535> (apply to packets with given function code mask write register, register address range <0-65535>)
+			23|<0-65535>|<0-65535> (apply to packets with given function code read/write multiple registers, read address range <0-65535>, write address range <0-65535>)
+			24|<0-65535> (apply to packets with given function code read fifo queue, pointer address range <0-65535>)
+			40 (apply to packets with given function code program (concept))
+			42 (apply to packets with given function code concept symbol table)
+			43 (apply to packets with given function code encapsulated interface transport)
+			48 (apply to packets with given function code advantech co. ltd. - management functions)
+			66 (apply to packets with given function code scan data inc. - expanded read holding registers)
+			67 (apply to packets with given function code scan data inc. - expanded write holding registers)
+			90 (apply to packets with given function code unity programming/ofs)
+			100 (apply to packets with given function code scattered register read)
+			125 (apply to packets with given function code schneider electric - firmware replacement)
+			126 (apply to packets with given function code schneider electric - program)"
+	DEFVAL  { "1,2,3,4,7,11,12,17,20,24" }
+	::= { hm2DPIProfileModbusEntry 4 }
+
+hm2DPIProfileModbusUnitIdentifierList OBJECT-TYPE
+ 	 SYNTAX DisplayString ( SIZE(1..1400) )
+ 	 MAX-ACCESS read-create
+ 	 STATUS current
+ 	 DESCRIPTION
+		"Unit identifiers for this enforcer as string.
+		A unit identifier has the syntax:
+			<val>
+		To specify no options, the value 'none' must be given.
+		Unit identifiers are separated by a comma.
+		Following unit identifiers are defined:
+			<0..255> (apply to packets for which a
+			unit identifier is set)"
+	DEFVAL { "none" }
+	::= { hm2DPIProfileModbusEntry 5 }
+
+hm2DPIProfileModbusSanityCheck OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if apply to packets for which a
+		sanity check including format and specification shall be done"
+	DEFVAL { true }
+	::= { hm2DPIProfileModbusEntry 6 }
+
+hm2DPIProfileModbusException OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if apply to packets for which a
+		device exception message shall be sent"
+	DEFVAL { false }
+	::= { hm2DPIProfileModbusEntry 7 }
+
+hm2DPIProfileModbusReset OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if apply to packets for which a
+		reset connection message shall be sent"
+	DEFVAL { true }
+	::= { hm2DPIProfileModbusEntry 8 }
+
+hm2DPIProfileModbusRowStatus OBJECT-TYPE
+	SYNTAX RowStatus
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"This is a standard row status value:
+            - active(1): The profile is active. You cannot modify it.
+            - notInService(2): The profile is inactive because of user action.
+              You cannot inactivate the profile if an active enforcer mappings to it.
+            - notReady(3): The profile is inactive because of agent action.
+            - createAndGo(4): Create the profile with default parameters
+              activated.
+            - createAndWait(5): Create the profile inactive.
+            - destroy(6): Delete the profile.
+              You cannot delete the active profile or if an enforcer mappings to it."
+	::= { hm2DPIProfileModbusEntry 9 }
+
+hm2DPIProfileOpcTable OBJECT-TYPE 
+	SYNTAX SEQUENCE OF Hm2DPIProfileOpcEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The list of DPI OPC profiles for this enforcer"
+	::= { hm2DPIProfileTables 2 }
+
+hm2DPIProfileOpcEntry OBJECT-TYPE
+	SYNTAX Hm2DPIProfileOpcEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"DPI OPC profile entry."
+	INDEX { hm2DPIProfileOpcIndex }
+	::= { hm2DPIProfileOpcTable 1 }
+
+Hm2DPIProfileOpcEntry ::=
+	SEQUENCE {
+		hm2DPIProfileOpcIndex Integer32,
+		hm2DPIProfileOpcDescription DisplayString,
+		hm2DPIProfileOpcSanityCheck TruthValue,
+		hm2DPIProfileOpcFragmentCheck TruthValue,
+		hm2DPIProfileOpcTimeoutConnect Unsigned32,
+		hm2DPIProfileOpcRowStatus RowStatus
+	}
+
+hm2DPIProfileOpcIndex OBJECT-TYPE
+	SYNTAX Integer32 ( 1..32 )
+	MAX-ACCESS accessible-for-notify
+	STATUS current
+	DESCRIPTION
+		"Profile index of this DPI OPC profile"
+	::= { hm2DPIProfileOpcEntry 1 }
+
+hm2DPIProfileOpcDescription OBJECT-TYPE
+	SYNTAX DisplayString ( SIZE(0..32) )
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"User defined textual description related to this profile."
+	DEFVAL { "opc" }
+	::= { hm2DPIProfileOpcEntry 2 }
+
+hm2DPIProfileOpcSanityCheck OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if apply to packets for which a
+		sanity check including format and specification shall be done"
+	DEFVAL { true }
+	::= { hm2DPIProfileOpcEntry 3 }
+
+hm2DPIProfileOpcFragmentCheck OBJECT-TYPE
+	SYNTAX TruthValue
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"Set to true if apply to packets for which a
+		fragment check shall be done"
+	DEFVAL { true }
+	::= { hm2DPIProfileOpcEntry 4 }
+
+hm2DPIProfileOpcTimeoutConnect OBJECT-TYPE
+	SYNTAX      Unsigned32 (0..60)
+	MAX-ACCESS  read-create
+	STATUS      current
+	DESCRIPTION
+		"Set to nonzero if apply to packets for which a
+		timeout at connect in seconds shall be done.
+		Value 0 disables this match criteria."
+	DEFVAL { 5 }
+	::= { hm2DPIProfileOpcEntry 5 }
+
+hm2DPIProfileOpcRowStatus OBJECT-TYPE
+	SYNTAX RowStatus
+	MAX-ACCESS read-create
+	STATUS current
+	DESCRIPTION
+		"This is a standard row status value:
+            - active(1): The profile is active. You cannot modify it.
+            - notInService(2): The profile is inactive because of user action.
+              You cannot inactivate the profile if an active enforcer mappings to it.
+            - notReady(3): The profile is inactive because of agent action.
+            - createAndGo(4): Create the profile with default parameters
+              activated.
+            - createAndWait(5): Create the profile inactive.
+            - destroy(6): Delete the profile.
+              You cannot delete the active profile or if an enforcer mappings to it."
+	::= { hm2DPIProfileOpcEntry 6 }
+
+--******************************************************************************
+--                         Firewall Learning Mode
+--******************************************************************************
+
+hm2FLMObjects OBJECT IDENTIFIER ::= { hm2FwLearningMode 1 }
+
+hm2FLMAdminState	OBJECT-TYPE
+	SYNTAX		HmEnabledStatus
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"Enable or disable the Firewall Learning Mode."
+	DEFVAL		{ disable }
+	::= { hm2FLMObjects 1 }
+
+hm2FLMAction		OBJECT-TYPE
+	SYNTAX		INTEGER {
+			none(1),
+			start(2),
+			stop(3),
+			continue(4),
+			clear(5)
+			}
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"Actions to control the Firewall Learning Mode."
+	DEFVAL  { none }
+	::= { hm2FLMObjects 2 }
+
+hm2FLMAppState	OBJECT-TYPE
+	SYNTAX		INTEGER {
+			off(1),
+			stopped-data-notpresent(2),
+			stopped-data-present(3),
+			learning(4),
+			pending(5)
+			}
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"State of running FLM Application."
+	::= { hm2FLMObjects 3 }
+
+hm2FLMAppInfoEnum	OBJECT-TYPE
+	SYNTAX		INTEGER {
+			none(1),
+			normal(2),
+			low-memory(3),
+			out-of-memory(4),
+			connection-drop(5)
+			}
+	MAX-ACCESS   read-only
+	STATUS 	current
+	DESCRIPTION
+		"Memory status of FLM Application."
+	::= { hm2FLMObjects 4 }
+
+hm2FLMAppInfoString	OBJECT-TYPE
+	SYNTAX		SnmpAdminString (SIZE (0..80))
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Special status message."
+	::= { hm2FLMObjects 5 }
+
+hm2FLML3Entries	OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Number of Layer 3 entries in the connection table."
+	::= { hm2FLMObjects 6 }
+
+hm2FLMFreeMem		OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Free memory(%) for learning data."
+	::= { hm2FLMObjects 7 }
+
+hm2FLMMaxEntries	OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Number of maximum interface entries that can be selected."
+	::= { hm2FLMObjects 8 }
+
+hm2FLMTables  OBJECT IDENTIFIER ::= { hm2FwLearningMode 2 }
+
+hm2FLMInterfaceTable	OBJECT-TYPE
+	SYNTAX		SEQUENCE OF Hm2FLMInterfaceEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"The list of interfaces selected for Firewall Learning Mode."
+	::= { hm2FLMTables 1 }
+
+hm2FLMInterfaceEntry	OBJECT-TYPE
+	SYNTAX		Hm2FLMInterfaceEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"Interface selected for Firewall Learning Mode."
+	INDEX { hm2FLMInterfaceIndex }
+	::= { hm2FLMInterfaceTable 1 }
+
+Hm2FLMInterfaceEntry ::=
+	SEQUENCE {
+		hm2FLMInterfaceIndex InterfaceIndex,
+		hm2FLMInterfaceRowStatus RowStatus
+	}
+
+hm2FLMInterfaceIndex	OBJECT-TYPE
+	SYNTAX		InterfaceIndex
+	MAX-ACCESS	read-write
+	STATUS		current
+	DESCRIPTION
+		"Interface index of the entry."
+	::= { hm2FLMInterfaceEntry 1 }
+
+hm2FLMInterfaceRowStatus	OBJECT-TYPE
+	SYNTAX		RowStatus
+	MAX-ACCESS	read-create
+	STATUS		current
+	DESCRIPTION
+		"This is a standard row status value:
+            - active(1): The interface is active. 
+            - notInService(2): The interface is inactive because routing was disabled.
+            - notReady(3): The interface is inactive because of agent action.
+            - createAndGo(4): Create the interface with default parameters
+              activated.
+            - createAndWait(5): Create the interface inactive.
+            - destroy(6): Delete the interface."
+	::= { hm2FLMInterfaceEntry 2 }
+
+--******************************************************************************
+--			Compliance statements
+--******************************************************************************
+
+hm2FwCompliances OBJECT IDENTIFIER ::= { hm2FwConformance 1 }
+hm2FwGroups OBJECT IDENTIFIER ::= { hm2FwConformance 2 }
+
+hm2FwCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for an SNMP entity which
+         implements the Hirschmann firewall MIB."
+    MODULE     -- this module
+    MANDATORY-GROUPS { hm2FwGeneralGroup, hm2FwNotificationsGroup }
+    ::= { hm2FwCompliances 1 }
+
+hm2FwGeneralGroup OBJECT-GROUP
+    OBJECTS {
+    	hm2DynFwMaxRules,
+    	hm2L3MaxRules,
+    	hm2ResetStatistics,
+    	hm2FlushTables,
+    	hm2DefaultPolicy,
+       
+    	hm2DynFwRuleCount,
+    	hm2DynFwIfMappingRuleCount,
+    	hm2DynFwRulePendingActions,
+    	hm2DynFwCommitPendingActions,
+    	hm2DynFwRuleIndex,
+	hm2DynFwSourceAddress,
+	hm2DynFwSourcePort,
+	hm2DynFwTargetAddress,
+	hm2DynFwTargetPort,
+	hm2DynFwProto,
+	hm2DynFwRuleParams,
+	hm2DynFwAction,
+	hm2DynFwLog,
+	hm2DynFwTrap,
+        hm2DynFwDescription,
+	hm2DynFwRowStatus,
+    	hm2DynFwIfmPriority,
+	hm2DynFwIfmRowStatus,
+	
+	hm2DynFwStatsPacketCount,
+	hm2DynFwStatsPacketSize,
+	hm2DynFwStatsLastApplied,
+	hm2DynFwStatsTtPck,
+	hm2DynFwStatsTtPckSize,
+	hm2DynFwStatsTtPckDenDrop,
+	hm2DynFwStatsTtPckAccepted,
+		
+	hm2L3RuleCount,
+	hm2L3IfMappingRuleCount,
+	hm2L3RulePendingActions,
+    	hm2L3CommitPendingActions,
+    	hm2L3RuleIndex,
+	hm2L3SourceAddress,
+	hm2L3SourcePort,
+	hm2L3TargetAddress,
+	hm2L3TargetPort,
+	hm2L3Proto,	
+	hm2L3Action,
+	hm2L3RuleParams,	
+	hm2L3Log,
+	hm2L3Trap,
+        hm2L3Description,
+	hm2L3RowStatus,
+	hm2DPIProfileIndex,
+    	hm2L3IfmPriority,
+	hm2L3IfmRowStatus,
+	hm2L3StatsPacketCount,
+	hm2L3StatsPacketSize,
+	hm2L3StatsLastApplied,
+	hm2L3StatsTotalPck,
+	hm2L3StatsTotalPckSize,
+	hm2L3StatsTotalPckDenDrop,
+	hm2L3StatsTotalPckAccepted,
+	
+	hm2DPIProfileModbusPendingActions,
+	hm2DPIProfileModbusCommitPendingActions,
+	hm2DPIProfileModbusIndex,
+	hm2DPIProfileModbusDescription,
+	hm2DPIProfileModbusFunctionType,
+	hm2DPIProfileModbusFunctionCodeList,
+	hm2DPIProfileModbusUnitIdentifierList,
+	hm2DPIProfileModbusSanityCheck,
+	hm2DPIProfileModbusException,
+	hm2DPIProfileModbusReset,
+	hm2DPIProfileModbusRowStatus,
+	
+	hm2DPIProfileOpcPendingActions,
+	hm2DPIProfileOpcCommitPendingActions,
+	hm2DPIProfileOpcIndex,
+	hm2DPIProfileOpcDescription,
+	hm2DPIProfileOpcSanityCheck,
+	hm2DPIProfileOpcFragmentCheck,
+	hm2DPIProfileOpcTimeoutConnect,
+	hm2DPIProfileOpcRowStatus
+	
+    }
+    STATUS      current
+    DESCRIPTION
+        "A collection of all Hirschmann objects provided by the firewall
+        module."
+    ::= { hm2FwGroups 1 }
+
+hm2FwNotificationsGroup  NOTIFICATION-GROUP
+	NOTIFICATIONS {
+		hm2DynFwRuleAppliedTrap,
+		hm2DynFwRuleAppliedAndLoggedTrap,
+		
+		hm2L3RuleAppliedTrap,
+		hm2L3RuleAppliedAndLoggedTrap		
+	}
+	STATUS current
+	DESCRIPTION
+		"A collection of all Hirschmann notifications provided by the
+		firewall module."
+		::= { hm2FwGroups 2 }
+
+END
+	

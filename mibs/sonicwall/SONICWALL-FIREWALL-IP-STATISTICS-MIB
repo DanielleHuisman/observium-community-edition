@@ -1,0 +1,676 @@
+-- ****************************************************************************
+-- SONICWALL-FIREWALL-IP-STATISTICS
+--
+-- June 2002  Initial Version                                  Srikanth Nayani
+-- Apr  2003  Change Postal                                    Susan Yan
+-- Nov 2005   Add CPU and RAM Utilizations                     GM Anderson
+-- 03-10-08 - Removed Imports that are not used to 
+--            prevent warnings in MIB compilation              Mike Uy 
+-- 04-17-09 - Updated E-mail CONTACT-INFO                      Rosalea Real
+-- 11-11-09 - Renamed this file from sonic_stats.mib to
+--            SONICWALL-FIREWALL-IP-STATISTICS-MIB.MIB         Mike Uy
+-- 11-11-09 - Updated SonicWALL company address                Mike Uy
+-- 01-25-12 - Modified the data types for FwStatsModule
+--            entries to Gauge and Integer                     Ajit Nair
+-- 06-01-12 - Add dynamic NAT count, management/forward CPU,
+--            interface statistics.                            Thomas Tang
+-- 07-23-12 - Updated company copyright and organization       Mike Uy
+-- 02-18-14 - Add Sensor Table for hardware health monitoring  Thomas Tang
+-- 02-28-14 - Add Syslog Module for syslog configuration and
+--            syslog statistic info exposing                   Thomas Tang
+--
+-- 01-08-15 - Update Postal
+--            Add DPI-SSL Connection Counts                    Thomas Tang
+--
+-- Copyright (c) 2015 DELL Inc.
+-- All rights reserved.
+-- ****************************************************************************
+
+SONICWALL-FIREWALL-IP-STATISTICS-MIB DEFINITIONS ::= BEGIN
+
+
+IMPORTS
+    DisplayString,TruthValue	FROM SNMPv2-TC
+    IpAddress,
+    Integer32,
+    Counter64,
+    Unsigned32,
+    Counter32,
+    OBJECT-TYPE,
+	MODULE-IDENTITY             FROM SNMPv2-SMI
+	Counter, Gauge				FROM RFC1155-SMI
+    sonicwallFw           		FROM SONICWALL-SMI;
+
+sonicwallFwStatsModule MODULE-IDENTITY
+	LAST-UPDATED "201501080000Z"
+	ORGANIZATION "DELL SonicWall"
+	CONTACT-INFO
+		"	DELL SonicWall
+
+		   Postal: 5455 Great America Parkway
+                   Santa Clara, CA 95054
+                   USA
+
+		   Tel: +1 408 745 9600
+		   Fax: +1 408 745 9300
+
+		E-mail: products@sonicwall.com"
+	DESCRIPTION
+		"The Generic MIB Module for SonicWALL Firewall."
+
+    REVISION      "201501080000Z"
+    DESCRIPTION   "Update Postal, Tel, Fax
+                   Add DPI-SSL Connection Counts"
+
+	REVISION      "201402280000Z"  -- Feb 28, 2014
+	DESCRIPTION   "Add Syslog Module for syslog configuration and syslog statistic info exposing"
+
+	REVISION      "201402180000Z"  -- Feb 18, 2014
+	DESCRIPTION   "Add Sensor Table for hardware health monitoring"
+
+	REVISION      "200511090000Z"
+	DESCRIPTION   "Initial Version"
+    ::= { sonicwallFw 3 }
+
+-- -------------------------------------------------------------
+-- Textual Conventions
+-- -------------------------------------------------------------
+SyslogFacility  ::=  TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    		"The Syslog standard facilities defined by RFC 3164."
+	REFERENCE "The Syslog Protocol (RFC 3164): Section 4."
+ 	SYNTAX  INTEGER {
+			kern            (0), -- kernel messages
+			user            (1), -- user-level messages
+			mail            (2), -- mail system
+			daemon          (3), -- system daemons
+			auth            (4), -- security/authorization messages
+			syslog          (5), -- messages generated internally by syslogd
+			lpr             (6), -- line printer subsystem
+			news            (7), -- network news subsystem
+			uucp            (8), -- UUCP subsystem
+			cron            (9), -- clock daemon
+			authpriv        (10),-- security/authorization messages
+			ftp             (11),-- FTP daemon
+			ntp             (12),-- NTP subsystem
+			audit           (13),-- log audit
+			alert           (14),-- log alert
+			cron2           (15),-- clock daemon
+			local0          (16),-- local use 0
+			local1          (17),-- local use 1
+			local2          (18),-- local use 2
+			local3          (19),-- local use 3
+			local4          (20),-- local use 4
+			local5          (21),-- local use 5
+			local6          (22),-- local use 6
+			local7          (23) -- local use 7
+		}
+
+-- =======================
+-- sonic Firewall Statistics
+-- =======================
+
+
+sonicwallFwStats OBJECT IDENTIFIER ::= {sonicwallFwStatsModule 1}
+
+sonicMaxConnCacheEntries OBJECT-TYPE
+	SYNTAX INTEGER (1..2147483647)
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Maximum number of connection cache entries allowed through the firewall"
+	::= { sonicwallFwStats 1 }
+
+sonicCurrentConnCacheEntries OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Number of active connection cache entries through the firewall"
+	::= { sonicwallFwStats 2 }
+
+sonicCurrentCPUUtil OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Instantaneous CPU Utilization in percent"
+	::= { sonicwallFwStats 3 }
+
+sonicCurrentRAMUtil OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Instantaneous RAM Utilization in percent"
+	::= { sonicwallFwStats 4 }
+
+sonicNatTranslationCount OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Current number of dynamic NAT translations being performed."
+	::= { sonicwallFwStats 5 }
+
+sonicCurrentManagementCPUUtil OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Instantaneous management CPU Utilization in percent."
+	::= { sonicwallFwStats 6 }
+
+sonicCurrentFwdAndInspectCPUUtil OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Instantaneous Forwarding/Inspection CPU Utilization in percent."
+	::= { sonicwallFwStats 7 }
+
+-- =======================
+-- sonic Interface Statistics Table
+-- =======================
+
+sonicIfStatTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF SonicIfStatEntry 
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"List of physical interfaces and their current usage in percentage."
+	::= { sonicwallFwStats 8 }
+
+sonicIfStatEntry OBJECT-TYPE
+	SYNTAX SonicIfStatEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Interface status entry."
+	INDEX { sonicIfIndex }
+	::= { sonicIfStatTable 1 }
+
+SonicIfStatEntry ::= SEQUENCE {
+	sonicIfIndex		INTEGER,
+	sonicIfUsage		INTEGER,
+	sonicIfThroughput	INTEGER
+	}
+
+sonicIfIndex OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"A unique value for each interface.  Its value
+		ranges between 1 and the value of ifNumber.  The
+		value for each interface must remain constant at
+ 		least from one re-initialization of the entity's
+		network management system to the next re-
+		initialization."
+	::= { sonicIfStatEntry 1 }
+
+sonicIfUsage OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Interface bandwidth usage value in percentage."
+	::= { sonicIfStatEntry 2 }
+
+sonicIfThroughput OBJECT-TYPE
+	SYNTAX INTEGER
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Interface throughput value in bits per second."
+	::= { sonicIfStatEntry 3 }
+
+sonicwallFwVPNStats OBJECT IDENTIFIER ::= {sonicwallFwStatsModule 2}
+
+sonicwallFwVpnIPSecStats OBJECT IDENTIFIER ::= {sonicwallFwVPNStats 1}
+
+
+-- =======================
+-- sonic IPsec Statistics Table
+-- =======================
+
+sonicSAStatTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF SonicSAStatEntry 
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"This table provides statistics for each Security Association."
+	::= { sonicwallFwVpnIPSecStats 1 }
+
+sonicSAStatEntry OBJECT-TYPE
+	SYNTAX SonicSAStatEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"Entries in table cannot be added or deleted. This table is
+		completely controlled by the agent. Each SA statistics will be
+		represented by an entry in this table. "
+	INDEX { sonicIpsecSaIndex}
+	::= { sonicSAStatTable 1 }
+
+SonicSAStatEntry ::= SEQUENCE {
+	sonicIpsecSaIndex			   Counter,
+	sonicSAStatPeerGateway         IpAddress,
+	sonicSAStatSrcAddrBegin        IpAddress,
+	sonicSAStatSrcAddrEnd	       IpAddress,
+	sonicSAStatDstAddrBegin        IpAddress,
+	sonicSAStatDstAddrEnd	       IpAddress,
+	sonicSAStatCreateTime          DisplayString,
+	sonicSAStatEncryptPktCount     Counter,
+	sonicSAStatEncryptByteCount    Counter,
+	sonicSAStatDecryptPktCount     Counter,
+	sonicSAStatDecryptByteCount    Counter,
+	sonicSAStatInFragPktCount      Counter,
+	sonicSAStatOutFragPktCount     Counter,
+    sonicSAStatUserName            DisplayString
+	}
+
+
+sonicIpsecSaIndex OBJECT-TYPE
+	SYNTAX Counter
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		" Phase2  SA index."
+	::= { sonicSAStatEntry 1 }
+
+sonicSAStatPeerGateway OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Peer gateway address where the tunnel gets terminated ."
+	::= { sonicSAStatEntry 2 }
+
+sonicSAStatSrcAddrBegin OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"First address of the Source network for the phase2 SA ."
+	::= { sonicSAStatEntry 3 }
+
+sonicSAStatSrcAddrEnd OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Last address of the Source network for the phase2 SA ."
+	::= { sonicSAStatEntry 4 }
+
+sonicSAStatDstAddrBegin OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"First address of the destination network for the phase2 SA ."
+	::= { sonicSAStatEntry 5 }
+
+sonicSAStatDstAddrEnd OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Last address of the destination network for the phase2 SA ."
+	::= { sonicSAStatEntry 6 }
+
+sonicSAStatCreateTime OBJECT-TYPE
+	SYNTAX DisplayString
+    MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+	"Time this phase2 SA was actually created in GMT."
+	::= { sonicSAStatEntry 7 }
+
+sonicSAStatEncryptPktCount OBJECT-TYPE
+	SYNTAX Counter
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total encrypted packet count for this phase2 SA."
+	::= { sonicSAStatEntry 8 }
+
+sonicSAStatEncryptByteCount OBJECT-TYPE
+	SYNTAX Counter
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total encrypted byte count for this phase2 SA."
+	::= { sonicSAStatEntry 9 }
+
+sonicSAStatDecryptPktCount OBJECT-TYPE
+	SYNTAX Counter
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total decrypted packet count for this phase2 SA."
+	::= { sonicSAStatEntry  10}
+
+sonicSAStatDecryptByteCount OBJECT-TYPE
+	SYNTAX Counter
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Total decrypted byte count for this phase2 SA."
+	::= { sonicSAStatEntry  11 }
+
+sonicSAStatInFragPktCount OBJECT-TYPE
+	SYNTAX Counter
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Incoming Fragmented packet count for this phase2 SA"
+	::= { sonicSAStatEntry 12 }
+
+sonicSAStatOutFragPktCount OBJECT-TYPE
+	SYNTAX Counter
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Outgoing Fragmented packet count for this phase2 SA"
+	::= { sonicSAStatEntry 13 }
+
+
+sonicSAStatUserName  OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Name of the security policy used for creating this phase2 SA."
+	::= { sonicSAStatEntry 14 }
+
+sonicwallFwHWStats OBJECT IDENTIFIER ::= {sonicwallFwStatsModule 3}
+
+-- =======================================================================
+-- Sensor Stats
+-- =======================================================================
+sonicwallFwHWSensorStats OBJECT IDENTIFIER ::= {sonicwallFwHWStats 3}
+
+-- =======================================================================
+-- Sensor Table
+-- =======================================================================
+
+sonicwallSensorsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SonicwallSensorsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This lists all the sensors and their value in SonicWALL firewall device."
+    ::= { sonicwallFwHWSensorStats 1 }
+
+sonicwallSensorsEntry OBJECT-TYPE
+    SYNTAX      SonicwallSensorsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "SonicWALL sensor entry"
+    INDEX       { sonicwallSensorsIndex }
+    ::= { sonicwallSensorsTable 1 }
+
+SonicwallSensorsEntry ::= 
+	SEQUENCE {
+	    sonicwallSensorsIndex    Integer32,
+	    sonicwallSensorsId		 Integer32,
+	    sonicwallSensorsDevice   DisplayString,
+	    sonicwallSensorsValue    Integer32,
+	    sonicwallSensorsUnit	 DisplayString
+	}
+
+sonicwallSensorsIndex OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Index that identifies the sensor"
+    ::= { sonicwallSensorsEntry 1 }
+
+sonicwallSensorsId OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Index that identifies the sensor ID"
+    ::= { sonicwallSensorsEntry 2 }
+
+sonicwallSensorsDevice OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sensor descriptive name"
+    ::= { sonicwallSensorsEntry 3 }
+
+sonicwallSensorsValue OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sensor value"
+    ::= { sonicwallSensorsEntry 4 }
+
+sonicwallSensorsUnit OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sensor unit"
+    ::= { sonicwallSensorsEntry 5 }
+
+sonicwallFwSyslogStats OBJECT IDENTIFIER ::= {sonicwallFwStatsModule 4}
+
+-- =======================================================================
+-- Syslog Stats
+-- =======================================================================
+
+-- Subgroups
+
+sonicwallFwSyslogSetting OBJECT IDENTIFIER ::= {sonicwallFwSyslogStats 1}
+sonicwallFwSyslogServer OBJECT IDENTIFIER ::= {sonicwallFwSyslogStats 2}
+sonicwallFwSyslogStatistic OBJECT IDENTIFIER ::= {sonicwallFwSyslogStats 3}
+
+-- Syslog setting objects
+
+sonicSyslogFacility OBJECT-TYPE
+    SYNTAX     SyslogFacility
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION                
+        "Syslog facility configured on firewall."
+    ::= { sonicwallFwSyslogSetting 1 }
+
+sonicSyslogOverrideSetting OBJECT-TYPE
+	SYNTAX     TruthValue
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION
+		"When using SonicWALL ViewPoint for reporting solution,
+		 this object indicates whether the appliance overrides Syslog
+		 settings with reporting software settings."
+    ::= { sonicwallFwSyslogSetting 2 }
+
+sonicSyslogFormat OBJECT-TYPE
+    SYNTAX     INTEGER {
+    				default(0),
+        			webTrends(1),
+        			enhSyslog(2),
+        			arcSight(3)
+        		}
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION                
+        "Syslog format configured on firewall.
+         The following Syslog formats can be specified:
+         Default - Use the default SonicWALL Syslog format.
+         WebTrends - Use the WebTrends Syslog format. You must have WebTrends software
+		 installed on your system.
+		 Enhanced Syslog - Use the Enhanced SonicWALL Syslog format.
+		 ArcSight - Use the ArcSight Syslog format. A Syslog server must be configured with
+		 the ArcSight Logger application to decode the ArcSight messages."
+    ::= { sonicwallFwSyslogSetting 3 }
+
+sonicSyslogID OBJECT-TYPE
+	SYNTAX     DisplayString (SIZE (0..32))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION
+		"The Syslog ID field is included in all generated syslog messages, prefixed by id=.
+		 The Syslog ID field is disabled when the Override Syslog Settings with Reporting Software Settings option is enabled."
+    ::= { sonicwallFwSyslogSetting 4 }
+
+sonicSyslogEventRateLimitEnable OBJECT-TYPE
+	SYNTAX     TruthValue
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION
+		"This object indicates whether the appliance enables rate limiting of events to prevent the
+		 internal or external logging mechanism from being overwhelmed by log events."
+    ::= { sonicwallFwSyslogSetting 5 }
+
+sonicSyslogEventRateLimit OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Event rate limiting: Maximum Events Per Second."
+	::= { sonicwallFwSyslogSetting 6 }
+
+sonicSyslogDataRateLimitEnable OBJECT-TYPE
+	SYNTAX     TruthValue
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION
+		"This object indicates whether the appliance enables rate limiting of data to prevent the
+		 internal or external logging mechanism from being overwhelmed by log events."
+    ::= { sonicwallFwSyslogSetting 7 }
+
+sonicSyslogDataRateLimit OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Data rate limiting: Maximum Bytes Per Second."
+	::= { sonicwallFwSyslogSetting 8 }
+
+sonicSyslogNDPPEnable OBJECT-TYPE
+	SYNTAX     TruthValue
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION
+		"This object indicates whether the appliance enables NDPP Enforcement for Syslog Server."
+    ::= { sonicwallFwSyslogSetting 9 }
+
+-- Syslog server objects
+
+sonicSyslogMaxServers OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION                
+        "The maximum number of syslog servers that can be configured for the system in sonicSyslogTable."
+    ::= { sonicwallFwSyslogServer 1 }
+
+sonicSyslogServerTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SonicSyslogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains entries of syslog servers for the appliance.
+ 		 The maximum number of entries is indicated by the object sonicwallSyslogMaxServers."
+    ::= { sonicwallFwSyslogServer 2 }
+
+sonicSyslogServerEntry OBJECT-TYPE
+    SYNTAX      SonicSyslogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry containing info about syslog server configured by SonicWALL firewall appliance"
+    INDEX       { sonicSyslogServerIndex }
+    ::= { sonicSyslogServerTable 1 }
+
+SonicSyslogEntry ::= 
+	SEQUENCE {
+	    sonicSyslogServerIndex    INTEGER,
+	    sonicSyslogServerAddr     IpAddress,
+	    sonicSyslogServerPort     INTEGER
+	}
+
+sonicSyslogServerIndex OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Index that identifies the syslog server"
+    ::= { sonicSyslogServerEntry 1 }
+
+sonicSyslogServerAddr OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Syslog server address."
+    ::= { sonicSyslogServerEntry 2 }
+
+sonicSyslogServerPort OBJECT-TYPE
+    SYNTAX      INTEGER (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Syslog server port."
+    ::= { sonicSyslogServerEntry 3 }
+
+-- Syslog statistics objects
+
+sonicSyslogMessage OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Running total of syslog message generated since startup."
+    ::= { sonicwallFwSyslogStatistic 1 }
+
+
+sonicSyslogStreamData OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Running total of syslog stream data generated since startup."
+    ::= { sonicwallFwSyslogStatistic 2 }
+
+-- =======================================================================
+-- sonic DPI-SSL Stats
+-- =======================================================================
+
+sonicwallFwDpiSslStats OBJECT IDENTIFIER ::= {sonicwallFwStatsModule 5}
+
+sonicDpiSslConnCountCur OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Current SSL-inspected connections through the firewall."
+	::= { sonicwallFwDpiSslStats 1 }
+
+sonicDpiSslConnCountHighWater OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Highwater SSL-inspected connections through the firewall."
+	::= { sonicwallFwDpiSslStats 2 }
+
+sonicDpiSslConnCountMax OBJECT-TYPE
+	SYNTAX Gauge
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"Maximum SSL-inspected connections through the firewall."
+	::= { sonicwallFwDpiSslStats 3 }
+
+END

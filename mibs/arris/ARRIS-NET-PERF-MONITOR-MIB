@@ -1,0 +1,783 @@
+-- iso(1).org(3).dod(6).internet(1).private(4).enterprises(1).arris(4115).arrisProducts(1).arrisProdIdCM(3).arrisNetPerfMonitorMib(7)
+
+ARRIS-NET-PERF-MONITOR-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+   MODULE-IDENTITY,
+   OBJECT-TYPE,
+   Integer32,
+   Unsigned32,
+   Counter32,
+   Counter64,
+   IpAddress
+      FROM SNMPv2-SMI
+   arrisProdIdCM
+      FROM ARRIS-MIB
+   TruthValue,
+   DisplayString, 
+   TimeInterval, 
+   RowStatus, 
+   TimeStamp, 
+   DateAndTime, 
+   TEXTUAL-CONVENTION
+      FROM SNMPv2-TC
+   InetAddressType,
+   InetAddress
+      FROM INET-ADDRESS-MIB
+   SnmpAdminString
+      FROM SNMP-FRAMEWORK-MIB;
+
+   arrisNetPerfMonitorMib MODULE-IDENTITY
+      LAST-UPDATED    "1210150000Z"  -- October 15, 2012
+      ORGANIZATION    "ARRIS Broadband"
+      CONTACT-INFO    "Edmond Zhao
+                       Postal: ARRIS Technology (Shenzhen) Co
+					   South and East Wing, 4/F, Block 2
+                       Vision (Shenzhen) Business Park
+                       Shenzhen, P.R.China
+                       Phone:  +86-755-2671-6300
+                       E-mail: edmond.zhao@arrisi.com"
+      DESCRIPTION
+       "This MIB module supplies the basic proprietary 
+        management objects for ARRIS modems."
+
+      -- Revision history
+      REVISION    "1210150000Z"  -- October 15, 2012
+         DESCRIPTION
+      "Initial version"
+::= { arrisProdIdCM 13 }
+
+arrisNpmSetup OBJECT IDENTIFIER ::= { arrisNetPerfMonitorMib 1 }
+arrisNpmWebDlTest OBJECT IDENTIFIER ::= { arrisNetPerfMonitorMib 2 }
+arrisNpmDnsTest OBJECT IDENTIFIER ::= { arrisNetPerfMonitorMib 3 }
+arrisNpmNetLatencyTest OBJECT IDENTIFIER ::= { arrisNetPerfMonitorMib 4 }
+
+-- These objects are used to configure the basic operating elements associated
+-- with running the QOE testing
+--
+-- They are all branched from the arrisNpmSetup mib
+--
+
+arrisNpmSetupBgTrafficRateEnable OBJECT-TYPE
+    SYNTAX  INTEGER {
+       disable(0),
+       enable(1)
+    }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The setting of this MIB enables the CM to enforce background traffic
+         rate checking before attempting to run any NPM tests. Disabling the
+         background traffic testing means that the NPM tests will run 
+         regardless of the current user traffic levels within the modem."
+    DEFVAL { enable }
+    ::= { arrisNpmSetup  1 }
+
+arrisNpmSetupBgTrafficMaxDownstreamRate OBJECT-TYPE
+    SYNTAX  Unsigned32 (0..1000000)
+    UNITS "Kbps"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB controls the maximum background downstream traffic rate that
+         the CM can be passing and still run the NPM tests. The traffic rate
+         is determined by monitoring the ifXTable ifHCInOctet count on the 
+         downstream interface of the modem every 1 second. Sampling is run
+         for 5 seconds before attempting to run an NPM test.
+         If the observed downstream traffic rate exceeds this value, then the
+         NPM test is not allowed to run. No results will be available for this
+         instance of the test, and the corresponding results MIB will indicate
+         this."
+    DEFVAL { 64 }
+    ::= { arrisNpmSetup  2 }
+
+arrisNpmSetupBgTrafficMaxUpstreamRate OBJECT-TYPE
+    SYNTAX  Unsigned32 (0..1000000)
+    UNITS "Kbps"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB controls the maximum background upstream traffic rate that
+         the CM can be passing and still run the NPM tests. The traffic rate
+         is determined by monitoring the ifXTable ifHCInOctet count on the 
+         upstream interface of the modem every 1 second. Sampling is run
+         for 5 seconds before attempting to run an NPM test.
+         If the observed upstream traffic rate exceeds this value, then the
+         NPM test is not allowed to run. No results will be available for this
+         instance of the test, and the corresponding results MIB will indicate
+         this."
+    DEFVAL { 32 }
+    ::= { arrisNpmSetup  3 }
+
+arrisNpmSetupGroupReference OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..128))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB object is provided to allow the SNMP NMS record the name of
+         any logical grouping that the CM maybe associated with at the offset
+         of the tests. The value is reported in any results recorded that are
+         subsequently retrieved from the CM once the associated test are run to
+         completion. The value may be left blank."
+    ::= { arrisNpmSetup 4 }
+
+-- ------------------------------------------------------------------------------
+-- These MIB objects are associated with configuring details for and 
+-- retrieving details from the Web Page Download Testing.
+--
+
+arrisNpmSetupWebPageDlTestRunTime OBJECT-TYPE
+    SYNTAX Unsigned32 (0..4294967295)
+    UNITS "Seconds"  
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates to the modem to run the Web Page Download test. The
+         supplied time is used as a countdown timer, indicating the number of 
+         seconds to wait before running the test. A value of 0 means run 
+         immediately. The test results for the Web Page Download test are
+         made available once the test has completed. Given that there can 
+         be multiple URLs included in this test, the SNMP manager should wait
+         for at least 5 minutes before attempting to retrieve the test results."
+    DEFVAL { 0 }
+    ::= { arrisNpmWebDlTest 1 }
+
+arrisNpmSetupWebPageDlTestTimeout OBJECT-TYPE
+    SYNTAX Unsigned32 (0..4294967295)
+    UNITS "Seconds" 
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates how long the Webpage Download test should wait for 
+         an attempt to download a URL before marking the attempt as a failure."
+    DEFVAL { 5 }
+    ::= { arrisNpmWebDlTest 2 }
+
+-- This table is used to setup the required URLs for the Web Page Download
+-- test ahead of running the actual test (controlled by the previous MIB
+-- object.)
+--
+
+arrisNpmSetupWebPageDlTestTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF ArrisNpmSetupWebPageDlTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table contains the URLs to be used by the Web Page Download Test.
+         When the test runs, the cable modem attempts to download the main page
+         associated with each of the supplied URLs, recording the time taken,
+         and the bytes downloaded for each URL.
+
+         The table is limited to a maximum of 10 entries. Once 10 entries are
+         configured, new entries can only be added if an existing entry is 
+         removed."
+    ::= { arrisNpmWebDlTest 3 }
+
+arrisNpmSetupWebPageDlTestEntry OBJECT-TYPE
+    SYNTAX ArrisNpmSetupWebPageDlTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An entry describing the URLs used in the Web Page Download Test."
+    INDEX { arrisNpmSetupWebPageDlTestConfigIndex }
+    ::= { arrisNpmSetupWebPageDlTestTable 1 }
+    
+ArrisNpmSetupWebPageDlTestEntry ::=
+    SEQUENCE { 
+        arrisNpmSetupWebPageDlTestConfigIndex
+            INTEGER,
+        arrisNpmSetupWebPageDlTestConfigUrl
+            OCTET STRING,
+        arrisNpmSetupWebPageDlTestConfigRowStatus
+            RowStatus
+    }
+
+arrisNpmSetupWebPageDlTestConfigIndex OBJECT-TYPE
+    SYNTAX INTEGER(1..10)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This index is used as a simple value to act as the index into the
+         arrisNpmSetupWebPageDlTestTable, as opposed to using the full URL name
+         as the index."
+    ::= { arrisNpmSetupWebPageDlTestEntry 1 }
+
+arrisNpmSetupWebPageDlTestConfigUrl OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE (0..255))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This object is used as the index into the Web Page Download test
+         URL configuration table, and is the actual "
+    ::= { arrisNpmSetupWebPageDlTestEntry 2 }
+    
+arrisNpmSetupWebPageDlTestConfigRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The RowStats for contolling entries in the this table."
+    ::= { arrisNpmSetupWebPageDlTestEntry 3 }
+
+-- --------------------------------------------------------------------------
+-- This MIB is used to retrieve the results of the Web Page Download test
+-- The results are kept separate from the configuration in order to try 
+-- speedup the retrieval using SNMP GET-NEXT operation
+
+arrisNpmResultWebPageDlTestTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF ArrisNpmResultWebPageDlTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table contains the results from the running of the Web Page
+         Download Test. Each entry setup in the arrisNpmSetupWebPageDlTestTable 
+         has a corresponding entry in this table; the same index is used between
+         both tables.
+
+         The results are stored in JSON formatted strings"
+    ::= { arrisNpmWebDlTest 4 }
+
+arrisNpmResultWebPageDlTestEntry OBJECT-TYPE
+    SYNTAX ArrisNpmResultWebPageDlTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An entry describing the URLs used in the Web Page Download Test.
+         Please note that the index used is related to the other
+         arrisNpmSetupWebPageDlTestTable index."
+
+    INDEX { arrisNpmSetupWebPageDlTestConfigIndex }
+    ::= { arrisNpmResultWebPageDlTestTable 1 }
+
+ArrisNpmResultWebPageDlTestEntry ::=
+    SEQUENCE { 
+        arrisNpmResultWebPageDlTestResult
+            OCTET STRING
+    }
+
+arrisNpmResultWebPageDlTestResult OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE (0..400))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This object contains a JSON formatted string containing the results 
+         associated with running the webpage download test using the URL in the
+         corresponding arrisNpmSetupWebPageDlTestTable. The string follows the
+         following format
+
+         { 'results': {
+            'time':'<in the format YYYY-MM-DD HH:MM:SS>'
+            'cm':'cm-mac-addr',
+            'group':'<group the selected CM is configured with>',
+            'url':'<fill in corresponding URL>',
+            'bytes':'<total bytes transferred>',
+            'time':'<total time measured in milliseconds>',
+            'run':'<1 if test was run, 0 if test was NOT run>',
+            'fail':'<1 if test failed, 0 if test was successful>'
+            }
+         }
+
+         <time> defines the time the actual test was run
+         <cm> defines the CM MAC addres value
+         <group> is taken from the arrisNpmSetupGroupReference MIB object
+         <url> is taken from the arrisNpmSetupWebPageDlTestConfigUrl MIB object
+         <bytes> identifies the number of bytes downloaded for this URL entry
+         <duration> includes the total time in milliseconds to download the 
+                    web page. This value excludes the inital DNS resolve for 
+                    the URL, but includes the DNS resolve time for all embedded
+                    links in the downloaded content
+         <run>  indicates if the test was actually run (1). If the test was not
+                allowed to run due to background traffic rates, then this will
+                return a (0).
+         <fail> indicates, when the test was actually run, whether the URL was
+                successfully downloaded or if the transfer was interrupted or
+                could not resolve the URL. 
+         
+         An example of this format is as follows 
+
+         { 'results': { 'time':'2011-02-08 08:49:37', 'cm':'00ca.1231.3939', 
+             'group':'CMTS-MD-1-0-2', 'url':'www.cnn.com', 
+             'bytes':'12023291', 'duration':'8923', 'run':'1', 'fail':'0' } }
+
+         This information should be sufficiently detailed so as to ensure every
+         retrieved result can be interpretted on its own, without requiring 
+         other lookups to retrieve associated data."
+    ::= { arrisNpmResultWebPageDlTestEntry 1 }
+
+-- ----------------------------------------------------------------------------
+-- The following MIBs define settings for DNS resolution testing. It is possible
+-- with these MIB entries to override the use of DHCP supplied DNS values and
+-- use these IP address values instead
+-- 
+-- The arrisNpmResultDnsTestTable includes DNS resolution latency time for 
+-- resolving each of the URL names found in the arrisNpmSetupWebPageDlTestTable 
+-- with either the DHCP supplied DNS server or the Primary and/or Secondary
+-- DNS servers configured here.
+    
+arrisNpmSetupDnsTestEnable OBJECT-TYPE
+    SYNTAX  INTEGER {
+       disable(0),
+       enable(1)
+    }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "If this MIB is set to 'enable' then the CM must run the DNS Latency
+         test before running the Web Page Download test. The default is to not
+         run the DNS Latency test unless explicitly configured to do so."
+    DEFVAL { disable }
+    ::= { arrisNpmDnsTest 1 }
+
+
+arrisNpmSetupDnsTestRunTime OBJECT-TYPE
+    SYNTAX Unsigned32 (0..4294967295)
+    UNITS "Seconds"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates to the modem to run the DNS Latency test. The
+         supplied time is used as a countdown timer, indicating the number of 
+         seconds to wait before running the test. A value of 0 means run 
+         immediately. The test results for the DNS Latency Test are
+         made available once the test has completed. Given that there can 
+         be multiple URLs included in this test, the SNMP manager should wait
+         for at least 5 minutes before attempting to retrieve the test results.
+ 
+         If arrisNpmSetupDnsTestEnable is enabled, then setting this MIB will
+         not get the test to run, as the Web Page Download test control will be
+         used. 
+   
+         The DNS Latency test relies on URLs being configured within the 
+         arrisNpmSetupWebPageDlTestTable. The test will not run if there are no
+         entries present in that table. "
+    ::= { arrisNpmDnsTest 2 }
+
+arrisNpmSetupDnsTestRunTimeTimeout OBJECT-TYPE
+    SYNTAX Unsigned32 (0..4294967295)
+    UNITS "Seconds"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates how long the Webpage Download test should wait for 
+         an attempt to download a URL before marking the attempt as a failure."
+    DEFVAL { 5 }
+    ::= { arrisNpmDnsTest 3 }
+
+arrisNpmSetupDnsPrimaryServerIpType OBJECT-TYPE
+    SYNTAX InetAddressType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB is used to setup the IP address details of the Primary DNS
+         server to use if the DHCP supplied values are not to be used"
+    DEFVAL { ipv4 }
+    ::= { arrisNpmDnsTest 4 }
+
+arrisNpmSetupDnsPrimaryServerIpAddress OBJECT-TYPE
+    SYNTAX InetAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB is used to setup the IP address details of the Primary DNS
+         server to use if the DHCP supplied values are not to be used. By
+         default this value is set to 0, to indicate that this address should
+         not be used for the DNS resolution testing."
+    DEFVAL { "0.0.0.0" }
+    ::= { arrisNpmDnsTest 5 }
+
+arrisNpmSetupDnsSecondaryServerIpType OBJECT-TYPE
+    SYNTAX InetAddressType
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB is used to setup the IP address details of the Secondary DNS
+         server to use if the DHCP supplied values are not to be used"
+    DEFVAL { ipv4 }
+    ::= { arrisNpmDnsTest 6 }
+
+arrisNpmSetupDnsSecondaryServerIpAddress OBJECT-TYPE
+    SYNTAX InetAddress
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB is used to setup the IP address details of the Secondary DNS
+         server to use if the DHCP supplied values are not to be used. By
+         default this value is set to 0, to indicate that this address should
+         not be used for the DNS resolution testing."
+    DEFVAL { "0.0.0.0" }
+    ::= { arrisNpmDnsTest 7 }
+
+-- --------------------------------------------------------------------------
+-- This MIB is used to retrieve the results of the DNS Latency test
+
+arrisNpmResultDnsTestTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF ArrisNpmResultDnsTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table contains the results from the running of the DNS Latency
+         Test. Each entry setup in the arrisNpmSetupWebPageDlTestTable 
+         has a corresponding entry in this table; the same index is used between
+         both tables.
+
+         The results are stored in JSON formatted strings"
+    ::= { arrisNpmDnsTest 8 }
+
+arrisNpmResultDnsTestEntry OBJECT-TYPE
+    SYNTAX ArrisNpmResultDnsTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An entry describing the URLs used in the Web Page Download Test.
+         Please note that the index used is related to the other
+         arrisNpmSetupWebPageDlTestTable index."
+
+    INDEX { arrisNpmResultDnsTestResultIndex }
+    ::= { arrisNpmResultDnsTestTable 1 }
+
+ArrisNpmResultDnsTestEntry ::= SEQUENCE { 
+        arrisNpmResultDnsTestResultIndex INTEGER,
+        arrisNpmResultDnsTestResult  OCTET STRING
+    }
+
+arrisNpmResultDnsTestResultIndex OBJECT-TYPE
+    SYNTAX INTEGER(1..20)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This index is used as a simple value to act as the index into the
+         arrisNpmResultDnsTestTable."
+    ::= { arrisNpmResultDnsTestEntry 1 }
+
+arrisNpmResultDnsTestResult OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE (0..400))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This object contains a JSON formatted string containing the results 
+         associated with running the webpage download test using the URL in the
+         corresponding arrisNpmSetupWebPageDlTestTable. The string follows the
+         following format
+
+         { 'results': {
+            'time':'<in the format YYYY-MM-DD HH:MM:SS>'
+            'cm':'cm-mac-addr',
+            'group':'<group the selected CM is configured with>',
+            'server':'<ip address of DNS server used>', 
+            'url':'<fill in corresponding URL>',
+            'time':'<total time measured in milliseconds>',
+            'run':'<1 if test was run, 0 if test was NOT run>',
+            'fail':'<1 if test failed, 0 if test was successful>'
+            }
+         }
+
+         <time> defines the time the actual test was run
+         <cm> defines the CM MAC addres value
+         <group> is taken from the arrisNpmSetupGroupReference MIB object
+         <server> is the DNS server used for this instance of the test
+         <url> is taken from the arrisNpmSetupWebPageDlTestConfigUrl MIB object
+         <duration> includes the total time in milliseconds to download the 
+                    web page. This value excludes the inital DNS resolve for 
+                    the URL, but includes the DNS resolve time for all embedded
+                    links in the downloaded content
+         <run>  indicates if the test was actually run (1). If the test was not
+                allowed to run due to background traffic rates, then this will
+                return a (0).
+         <fail> indicates, when the test was actually run, whether the URL was
+                successfully downloaded or if the transfer was interrupted or
+                could not resolve the URL. 
+         
+         An example of this format is as follows 
+
+         { 'results': { 'time':'2011-02-08 08:49:37', 'cm':'00ca.1231.3939', 
+             'group':'CMTS-MD-1-0-2', 'server':'8.8.8.8', 'url':'www.cnn.com', 
+             'bytes':'12023291', 'duration':'8923', 'run':'1', 'fail':'0' } }
+
+         This information should be sufficiently detailed so as to ensure every
+         retrieved result can be interpretted on its own, without requiring 
+         other lookups to retrieve associated data."
+    ::= { arrisNpmResultDnsTestEntry 2 }
+
+
+-- ----------------------------------------------------------------------------
+-- The following MIB objects are associated with setting up the Network Latency
+-- tests.
+--
+-- The Latency Test runs like all other tests, relying on a countdown timer to
+-- trigger the tests. The tests can be configured with up to 2 different
+-- remote test node server addresses.
+--
+
+arrisNpmSetupNetLatencyTestRunUnderLoadEnable OBJECT-TYPE
+    SYNTAX  INTEGER {
+       disable(0),
+       enable(1)
+    }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "If this MIB object is set to 'enable' then the CM must run the Network
+         Latency test repeatedly during the Web Page Download test. The purpose
+         of this test condition is to detect the typical latency when there is 
+         CM originated network load applied to the default service flow of the 
+         modem.
+       
+         When this option is selected, the UDP Ping packets are transmitted
+         every 300ms for the duration of the Web Page Download test, to each
+         of the configured servers. The test is not run if there are no 
+         servers configured in the arrisNpmSetupNetLatencyServerTable ."
+    DEFVAL { disable }
+    ::= { arrisNpmNetLatencyTest 1 }
+
+arrisNpmSetupNetLatencyTestRunTime OBJECT-TYPE
+    SYNTAX Unsigned32 (0..4294967295)
+    UNITS "Seconds"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates to the modem to run the Network Latency test. The
+         supplied time is used as a countdown timer, indicating the number of 
+         seconds to wait before running the test. A value of 0 means run 
+         immediately. The test results for the Network Latency Test are
+         made available once the test has completed. Given that there can 
+         be multiple test servers configured for this test, the SNMP manager 
+         should wait for at least 5 minutes before attempting to retrieve the
+         test results.
+ 
+         If arrisNpmSetupNetLatencyRunUnderLoadEnable is enabled, then setting
+         this MIB will not result in a test being run, as the tests are tied
+         into the operation of the Web Page Download test.
+   
+         The Network Latency test relies on test serveres being configured 
+         within the arrisNpmSetupNetLatencyServerTable. The test will not run
+         if there are no entries present in that table. 
+
+         For every server configured in that table, the CM is required to issue
+         a UDP ping request and measure the time it takes to transmit and 
+         receive the UDP ping response. If the 
+         arrisNpmSetupNetLatencyTestPingCount has been modified then the CM 
+         must repeat the UDP ping requests that number of times. The CM must 
+         wait arrisNpmSetupNetLatencyTestPingInterval between UDP Ping requests.
+
+         When performing multiple UDP Ping requests in a row, the CM must 
+         maintain statistics related to the network performance of each 
+         configured test server. These statistics include minimum, maximum,
+         mean, mode and standard deviation, along with successful and failed
+         ping attempts. All failed UDP Ping requests are excluded from the 
+         generation of statisctics. A failed UDP Ping request occurs when the
+         UDP Ping response is not received back from the remote server within 
+         arrisNpmSetupNetLatencyTestPingTimeout seconds. " 
+    DEFVAL { 0 }
+    ::= { arrisNpmNetLatencyTest 2 }
+
+arrisNpmSetupNetLatencyTestPingCount OBJECT-TYPE
+    SYNTAX  Unsigned32 (1..10)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates to the modem how many UDP Ping requests to issue to
+         each of the conigured test node servers. The interval between each 
+         ping is goverened by the arrisNpmSetupNetLatencyTestPingInterval MIB
+         object."
+    DEFVAL { 1 }
+    ::= { arrisNpmNetLatencyTest 3 }
+
+arrisNpmSetupNetLatencyTestPingInterval OBJECT-TYPE
+    SYNTAX  Unsigned32 (1..36000000)
+    UNITS "Milliseconds"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates to the modem what interval to use between 
+         successive UDP Pings to each configured test server."
+    DEFVAL { 50 }
+    ::= { arrisNpmNetLatencyTest 4 }
+
+arrisNpmSetupNetLatencyTestPingTimeout OBJECT-TYPE
+    SYNTAX  Unsigned32 (1..6)
+    UNITS "Seconds"
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB indicates to the modem how long to wait for a UDP Ping 
+         response before declaring that the UDP Ping request failed. The units
+         are in seconds."
+    DEFVAL { 3 }
+    ::= { arrisNpmNetLatencyTest 5 }
+
+-- --------------------------------------------------------------------------
+-- This table is used to setup the required Network Latency test nodes
+-- for performing UDP Pings to. 
+
+-- test ahead of running the actual test (controlled by the previous MIB
+-- object.)
+--
+
+arrisNpmSetupNetLatencyServerTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF ArrisNpmSetupNetLatencyServerEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table contains the results from the running of the DNS Latency
+         Test. Each entry setup in the arrisNpmSetupWebPageDlTestTable 
+         has a corresponding entry in this table; the same index is used between
+         both tables.
+
+         A maximum of 5 different server entries can be added to this table. Each
+         Server will be used when running the UDP Ping test, and separate results
+         will be recorded for each server.
+
+         The results are stored in JSON formatted strings"
+    ::= { arrisNpmNetLatencyTest 6 }
+
+arrisNpmSetupNetLatencyServerEntry OBJECT-TYPE
+    SYNTAX ArrisNpmSetupNetLatencyServerEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An entry describing the URLs used in the Network Latency Test.
+         This table must be configured with at least one entry in order for
+         the Network Latency test to run."
+
+    INDEX { arrisNpmSetupNetLatencyConfigIndex }
+
+    ::= { arrisNpmSetupNetLatencyServerTable 1 }
+
+ArrisNpmSetupNetLatencyServerEntry ::=
+    SEQUENCE {
+        arrisNpmSetupNetLatencyConfigIndex
+            INTEGER,
+        arrisNpmSetupNetLatencyConfigServer
+            OCTET STRING,
+        arrisNpmSetupNetLatencyConfigServerPort
+            Unsigned32,
+        arrisNpmSetupNetLatencyConfigServerRowStatus
+            RowStatus
+    }
+
+arrisNpmSetupNetLatencyConfigIndex OBJECT-TYPE
+    SYNTAX INTEGER(1..5)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Abritrary index used to coordinates entries in this table."
+    ::= { arrisNpmSetupNetLatencyServerEntry 1 }
+
+arrisNpmSetupNetLatencyConfigServer OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE (0..512))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB object can store either theIPv4 n.n.n.n address or a FQDN of
+         the Primary Network Latency test server that the CM must transmit
+         UDP ping packets to."
+    DEFVAL { "" }
+    ::= { arrisNpmSetupNetLatencyServerEntry 2 }
+
+arrisNpmSetupNetLatencyConfigServerPort OBJECT-TYPE
+    SYNTAX Unsigned32 (49152..65535)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "This MIB object defines the UDP destination port that the CM must
+         transmit its UDP Ping packet to. Each Server can have its own
+         UDP port number."
+    DEFVAL { 50000 }
+    ::= { arrisNpmSetupNetLatencyServerEntry 3 }
+
+arrisNpmSetupNetLatencyConfigServerRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "The RowStats for controling entries in the this table."
+    ::= { arrisNpmSetupNetLatencyServerEntry 4 }
+
+-- --------------------------------------------------------------------------
+-- This MIB is used to retrieve the results of the Network Latency test
+
+arrisNpmResultNetLatencyTestTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF ArrisNpmResultNetLatencyTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table contains the results from the running of the Network
+         Latency Test. Each entry in the arrisNpmSetupNetLatencyServerTable 
+         has a corresponding entry in this table.
+
+         The results are stored in JSON formatted strings."
+    ::= { arrisNpmNetLatencyTest 7 }
+
+arrisNpmResultNetLatencyTestEntry OBJECT-TYPE
+    SYNTAX ArrisNpmResultNetLatencyTestEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An entry describing the results of the Netowrk Latency test on the
+         configured test servers."
+
+    INDEX { arrisNpmSetupNetLatencyConfigIndex }
+    ::= { arrisNpmResultNetLatencyTestTable 1 }
+
+ArrisNpmResultNetLatencyTestEntry ::=
+    SEQUENCE { 
+        arrisNpmResultNetLatencyTestResult OCTET STRING
+    }
+
+arrisNpmResultNetLatencyTestResult OBJECT-TYPE
+    SYNTAX OCTET STRING (SIZE (0..400))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "This object contains a JSON formatted string containing the results 
+         associated with running the network latency test using the configured
+         server addresses. The string follows the following format
+
+         { 'results': {
+            'time':'<in the format YYYY-MM-DD HH:MM:SS>'
+            'cm':'cm-mac-addr',
+            'group':'<group the selected CM is configured with>',
+            'server':'<ip details of conigured test server used>', 
+            'avg':'<average RTT measured over test iteration in ms>',
+            'min':'<minimum RTT measured over test iteration in ms>',
+            'max':'<maximum RTT measured over test iteration in ms>',
+            'median':'<middle value of all RTT measurements in ms>',
+            'range':'<diff between the max and the min RTT values in ms>',
+            'std':'<standard deviation of sample in ms>',
+            'run':'<number of UDP Pings included in test>',
+            'fail':'<number of UDP Ping timeouts or DNS failures>'
+            }
+         }
+
+         <time> defines the time the actual test was run
+         <cm> defines the CM MAC addres value
+         <group> is taken from the arrisNpmSetupGroupReference MIB object
+         <server> is the DNS server used for this instance of the test
+         <avg> is the overall average of all successful pings
+         <min< is the min recorded successful ping RTT
+         <max> is the max recorded successful ping RTT (not including failures)
+         <median> is the middle value of all RTT values recorded
+         <range> is the difference between the max and min RTT
+         <std> is the population standard deviation of all RTT values recorded
+         <run>  indicates if the test was actually run (1). If the test was not
+                allowed to run due to background traffic rates, then this will
+                return a (0).
+         <fail> indicates, when the test was actually run, whether the URL was
+                successfully downloaded or if the transfer was interrupted or
+                could not resolve the URL. 
+         
+         An example of this format is as follows  
+         { 'results':{'time':'2011-02-08 08:49:37','cm':'00ca.1231.3939',
+         'group':'CMTS-MD-1-02','server':'10.89.112.76','avg':'120',
+         'min':'50','max':'180','median':'165', 'range':'65','std':'72',
+         'run':'1', 'fail':'0' } 
+
+         This information should be sufficiently detailed so as to ensure every
+         retrieved result can be interpretted on its own, without requiring 
+         other lookups to retrieve associated data.
+         Note that it is possible to exclude the <median> and <range> values
+         when reporting.
+         "
+    ::= { arrisNpmResultNetLatencyTestEntry 1 }
+
+END

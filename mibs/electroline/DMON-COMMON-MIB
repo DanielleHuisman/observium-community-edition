@@ -1,0 +1,1044 @@
+DMON-COMMON-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        IpAddress,
+        Unsigned32,
+        Integer32,
+        Counter32,
+        enterprises
+                FROM SNMPv2-SMI
+        RowStatus,
+        DateAndTime,
+        TimeInterval,
+        StorageType,
+        TruthValue
+                FROM SNMPv2-TC
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE
+                FROM SNMPv2-CONF
+        TenthdB,
+        TenthdBmV
+                FROM DOCS-IF-MIB
+        DisplayString
+                FROM RFC1213-MIB
+        ModulationType,
+        dmonMib
+                FROM DMON-MIB;
+
+        
+dmonCommonGroup MODULE-IDENTITY
+        LAST-UPDATED    "201111081500Z"
+        ORGANIZATION    " "
+        CONTACT-INFO
+            "         
+             Postal:  
+             E-mail:  "
+        DESCRIPTION
+            "This is the MIB module for COMMON settings in DMON.
+            
+            History
+              09/09/2011 - Maurice Garcia
+                -Adds
+                  -dmonParkModeDwellTime Object
+                -Updatea 
+                  -UNITS AND SYNTAX from Db to TenthdBmV            
+                  -cfgBERRulesHI UNIT to trillionth
+                  -cfgBERRulesHIHI UNIT to trillionth
+              
+              09/23/2011 - Maurice Garcia
+                -Missed a couple of entries changing from 
+                  billionth to trillionth
+
+              09/26/2011 - Louis Roy
+                - Modification of the parking control table
+                	- dmonParkModeReceiverStatus is now read-only with
+                	more values
+                	- dmonParkModeReceiverControl have been added
+                - The BERR Rules have been changed to have more flexibility
+                	- Pre and Post FEC BER can now have different thresholds   
+            
+              10/22/2011 -Maurice Garcia
+                -Modify Default values for the following from +/-6 to +/-3 and +/-12 to +/-6
+                  -cfgInputPowerRuleHIHI
+                  -cfgInputPowerRuleHI
+                  -cfgInputPowerRuleLO
+                  -cfgInputPowerRuleLOLO 
+                  
+                -Added Default Values +/-3 and +/-6
+                  -cfgMERRulesLO
+                  -cfgMERRulesLOLO
+                
+                -Added seconds unit   
+                  -dmonParkModeDwellTime
+                  -dmonDwellingTIme  
+            
+              10/24/2011 -Maurice Garcia
+                -Added 2 new operational modes
+                  -dmonOperationMode
+                    -restart (3)
+                    -baseline (4)  
+              
+              11/04/2011 -Maurice Garcia
+                -modify for readability
+                  -modify units from TenthdBmV to dBmV
+                  -modify units from TenthdBm to dB
+                -modify cfgChannelMapSource
+                  -changed enumeration and added DEFVAL to dsg(0)
+                  
+                -Added
+                  -dmonOperation
+                    This addtion resulted in a renumbering of the IOD alignment
+                    -dmonOperationMode
+                    -dmonOperationStatus
+                    -dmonOperationAutoScanTask
+                      Rename from  dmonAutoScanTask to dmonOperationAutoScanTask 
+            
+              11/08/2011 -Maurice Garcia
+                -Modify dmonParkModeDwellTime
+                  -Change Syntax to Integer32 
+            
+            "
+					          
+        ::= { dmonMib 2 }
+        
+        
+    -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    -- DMON System Info
+    -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+dmonGpsPosition  OBJECT-TYPE
+      SYNTAX DisplayString (SIZE(1..255))
+      MAX-ACCESS read-write
+      STATUS current
+      DESCRIPTION
+         "Latitude, longitude, and altitude for DMon.Value: D,M,H,D1,M1,H1,A.   
+         (D:0~89 latitude degrees; M:0.0~59.9999 latitude minutes; H:N or S hemisphere; D1:0~179 longitude degrees; M1:0.0~59.9999 longitude minutes; H1:E or W hemisphere; A:300~17680.00 altitude in meters.)"
+      ::={dmonCommonGroup 1  }
+
+    -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    -- Operation
+    -- ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+dmonOperation OBJECT IDENTIFIER ::= { dmonCommonGroup 2 }
+    
+dmonOperationMode OBJECT-TYPE
+          SYNTAX INTEGER {
+            auto (0),
+            manual (1),
+            fast-scan (2),
+            re-start(3)
+          }
+          MAX-ACCESS read-write
+          STATUS     current
+          DESCRIPTION
+          "Sets the main operation mode of the monitor. 
+
+            auto:
+              This opearation is the normal Monitoring Mode
+
+            manual:
+
+            fast-scan:
+              This mode is to asertain the minimum PHY metrics
+                -dmonPhyChannelPower
+                -dmonPhyChannelSigQMER
+                -dmonPhyChannelSigQEqualizationData
+                -dmonPhyChannelQAMlocked
+                -dmonPhyChannelFEClocked
+                
+            re-start:
+              When the re-started option is selected, the DMon MUST purge only the data
+              from the dmonPhyHistoryInfoTable and restart the Channel Scan startup procedure.
+              The DMon MUST retain the last baseline measurement and revert to auto mode operation.
+              
+              
+          "	
+          DEFVAL {auto}
+          ::= { dmonOperation 1 }
+
+dmonOperationStatus OBJECT-TYPE
+          SYNTAX INTEGER {
+            auto (0),
+            manual (1),
+            fast-scan (2),
+            re-start(3),
+            baseline (4)
+          }
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+          "
+            auto:
+              This status is initiated by setting dmonOperationMode to 0
+
+            manual:
+              This status is initiated by setting dmonOperationMode to 1
+              
+            fast-scan:
+              This status is initiated by setting dmonOperationMode to 2
+                 
+            re-start:
+              This status is initiated by setting dmonOperationMode to 3
+              
+            baseline:              
+              This process is manually initiated for cases where the plant 
+              has been recalibrated, probe has been moved to another location 
+              or is newly installed. 
+              
+              This status is initiated by setting cfgPropertyProvisionningRunNow to TRUE
+                                 
+          "	
+
+          ::= { dmonOperation 2 }
+
+dmonOperationAutoScanTask OBJECT-TYPE
+          SYNTAX INTEGER {
+                 none (0),
+                 physcan (1),
+                 mpegscan (2),
+                 bothscan (3)
+          }
+          MAX-ACCESS read-write
+          STATUS current
+          DESCRIPTION 
+                  "This object provision the auto scan task(s)."
+          DEFVAL {bothscan}
+          
+          ::= { dmonOperation 3 }
+
+dmonVideoModeTable OBJECT IDENTIFIER  ::= { dmonCommonGroup 4 }
+
+dmonVideoModeChannelBandwidth  OBJECT-TYPE
+          SYNTAX INTEGER {
+                 six-mhz (0),
+                 eight-mhz (1)
+          }
+          MAX-ACCESS read-write
+          STATUS    current
+          DESCRIPTION
+                  "Determines main bandwidth operating mode, either 6 or 8 MHz channels. Can be overruled by
+                   the user specific frequency table which can specify the bandwidth used for a channel.
+                   Default for US 6MHz, Europe 8MHz"
+          ::= { dmonVideoModeTable 1 }
+
+dmonParkModeControlTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF DmonParkModeControlEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+               "A set of data to control Parking mode."
+     ::= { dmonCommonGroup 5 }
+
+dmonParkModeControlEntry  OBJECT-TYPE
+     SYNTAX   DmonParkModeControlEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION 
+     "..."
+     INDEX {dmonParkModeReceiverID}  
+  ::= { dmonParkModeControlTable 1 }   
+   
+DmonParkModeControlEntry ::= SEQUENCE {
+         dmonParkModeReceiverID                 Integer32,
+         dmonParkModeReceiverStatus             INTEGER,
+         dmonParkModeReceiverParkingFrequency   Integer32,
+         dmonParkModeReceiverSymbolRate         Integer32,
+         dmonParkModeReceiverQamType            ModulationType,
+         dmonParkModeReceiverInverseMode        INTEGER,
+         dmonParkModeDwellTime                  Integer32,
+         dmonParkModeReceiverControl            INTEGER
+     }
+     
+dmonParkModeReceiverID OBJECT-TYPE
+     SYNTAX      Integer32 
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+            "The Receiver ID which can do parking mode."
+     ::= { dmonParkModeControlEntry 1 }
+     
+dmonParkModeReceiverStatus OBJECT-TYPE
+     SYNTAX      INTEGER{
+         isScanning(0),
+         isParked-Infinite(1),
+         isParked-Timed(2),
+         isUsedByDOCSIS(3),
+         other(4)
+     }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+            "Satus of the Receiver entry."
+     ::= { dmonParkModeControlEntry 2 }
+     
+dmonParkModeReceiverParkingFrequency OBJECT-TYPE
+     SYNTAX      Integer32 (0..1000000000)
+     UNITS       "hertz"
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+            "The center of the downstream frequency associated with
+             this channel what Receiver trise to park in."
+     ::= { dmonParkModeControlEntry 3 }
+     
+dmonParkModeReceiverSymbolRate  OBJECT-TYPE
+    SYNTAX      Integer32 (0..100000000)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "The symbol rate of the parking channel."
+    ::={ dmonParkModeControlEntry 4 }
+
+dmonParkModeReceiverQamType   OBJECT-TYPE
+    SYNTAX      ModulationType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The modulation type associated with this channel. 
+         Setting it to unknown will disable scanning this channel"
+    ::={dmonParkModeControlEntry 5}
+
+dmonParkModeReceiverInverseMode  OBJECT-TYPE
+    SYNTAX    INTEGER{
+          disabled(0),
+          enabled(1)
+    }  
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The inverse mode accociated with this channel."
+    DEFVAL {disabled}
+    ::={dmonParkModeControlEntry 6 }
+
+dmonParkModeDwellTime  OBJECT-TYPE
+    SYNTAX    Integer32 (0..1000000000)
+    UNITS  "second" 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Set the amount of time in seconds to have a receiver dwell on a given channel in Parking Mode.  
+        Once expire, the receiver must return to default scanning mode.
+        When set to 0, it means indefinitely."
+        
+    DEFVAL {3600} -- 1 HOUR
+    ::={dmonParkModeControlEntry 7 }
+
+dmonParkModeReceiverControl OBJECT-TYPE
+     SYNTAX      INTEGER{
+         scanningMode(0),
+         parkingMode(1),
+         notAvailable(2)
+     }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+            "Whether the receiver is at parking mode.  Writing the value NotAvailable(2) will be ignored,
+             this value is only for informational purpose."
+     ::= { dmonParkModeControlEntry 8 }
+
+          
+dmonLocalAccess  OBJECT-TYPE
+          SYNTAX INTEGER {
+                 disabled (0),
+                 enabled (1)
+          }
+          MAX-ACCESS read-write
+          STATUS current
+          DESCRIPTION 
+                 "Determines wheter local user logged in on the webpages can change the configuration."
+          DEFVAL {disabled}
+          ::= { dmonCommonGroup 6 }
+
+dmonDwellingTIme OBJECT-TYPE
+          SYNTAX TimeInterval
+          UNITS  "second" 
+          MAX-ACCESS read-write
+          STATUS current
+          DESCRIPTION
+                 "Number of seconds to remain locked on channel for Physical level measurements."
+          DEFVAL {10}
+          ::= { dmonCommonGroup 7 }
+
+dmonLanguageCharset OBJECT-TYPE
+      SYNTAX INTEGER {
+  		  utf8 (0),
+  		  gbk (1),
+  		  gb18030 (2),
+  		  big5 (3),
+  		  iso-8859-15 (4),
+  		  ascii (5)
+      }
+      MAX-ACCESS read-write
+      STATUS     current
+      DESCRIPTION
+          "Sets the encoding of program names. "
+      ::= { dmonCommonGroup 8 }
+
+dmonChannelPlan OBJECT-TYPE
+         SYNTAX INTEGER {
+                eia542 (0),
+                fixed-inc (1),
+                userdefined (2)
+         }
+         MAX-ACCESS read-write
+         STATUS current
+         DESCRIPTION
+                "The frequency table to use. EIA-542 is the default table in the USA. fixed-inc is based on a table used 
+                 of a fixed-inc table that user specifies the start freq, incremental step, end freq, and bandwidth.
+                 user defined makes use of a user suppied table in the UserFreqTable."
+         DEFVAL {eia542}
+         ::= { dmonCommonGroup 9 }
+
+dmonFixedIncTable OBJECT IDENTIFIER  ::= { dmonCommonGroup 10 }
+
+dmonFixedIncStartFreq OBJECT-TYPE
+          SYNTAX      Unsigned32 (57000000..999000000)
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "The start Frequency of the Fixed-inc table. "
+          ::= { dmonFixedIncTable 1 }
+ 
+dmonFixedIncFreqStep OBJECT-TYPE
+          SYNTAX      Unsigned32 (1000000..54000000)
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "The incremental step of the Frequency in the Fixed-inc table. "
+          ::= { dmonFixedIncTable 2 } 
+          
+dmonFixedIncEndFreq OBJECT-TYPE
+          SYNTAX      Unsigned32 (57000000..999000000)
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "The end Frequency of the Fixed-inc table. "
+          ::= { dmonFixedIncTable 3 }
+          
+dmonFixedIncSymbolRate OBJECT-TYPE
+          SYNTAX      Unsigned32 (0..999000000)
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "The Frequency Symbolrate of the Fixed-inc table. "
+          ::= { dmonFixedIncTable 4 }
+ 
+dmonFixedIncInverseMode  OBJECT-TYPE
+    SYNTAX    INTEGER{
+          disabled(0),
+          enabled(1)
+    }  
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The inverse mode accociated with this channel."
+    DEFVAL {disabled}
+    ::={dmonFixedIncTable 5 }
+     
+dmonFixedIncQamType   OBJECT-TYPE
+    SYNTAX      ModulationType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The modulation type associated with this channel. 
+         Setting it to unknown will disable scanning this channel"
+    ::={dmonFixedIncTable 6}
+          
+dmonUserFreqTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF DmonUserFreqEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "This table defines the set of channel frequencies to scan 
+             when DMON is in user defined table mode. The lowest index entries are 
+             searched first, skipping over all entries that have a '0' frequency 
+             value in this table."
+        ::= { dmonCommonGroup 11 }
+
+dmonUserFreqEntry OBJECT-TYPE
+        SYNTAX      DmonUserFreqEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Each entry defines a channel frequency to scan during monitoring."
+        INDEX { dmonUserFreqProvIndex }
+        ::= { dmonUserFreqTable 1 }
+
+DmonUserFreqEntry ::= SEQUENCE 
+        {
+            dmonUserFreqProvIndex       INTEGER,
+            dmonUserFreqProvStatus      RowStatus,
+            dmonUserFreqProvFrequency   Unsigned32,
+            dmonUserFreqProvModulation  ModulationType,
+            dmonUserFreqProvSymbolRate  Unsigned32,
+            dmonUserFreqProvInversion   INTEGER
+        }
+
+dmonUserFreqProvIndex OBJECT-TYPE
+          SYNTAX      INTEGER (1..255)
+          MAX-ACCESS  not-accessible
+          STATUS      current
+          DESCRIPTION
+              "The index of the Provisioned Gold List entry"
+          ::= { dmonUserFreqEntry 1 }
+
+dmonUserFreqProvStatus OBJECT-TYPE
+          SYNTAX      RowStatus 
+          MAX-ACCESS  read-create
+          STATUS      current
+          DESCRIPTION
+            "Controls and reflects the status of rows in this
+             table. Rows in this table may be created by either the
+             create-and-go or create-and-wait paradigms.  There is no
+             restriction on changing values in a row of this table while
+             the row is active."
+          ::= { dmonUserFreqEntry 2 }
+
+dmonUserFreqProvFrequency OBJECT-TYPE
+          SYNTAX      Unsigned32 (57000000..999000000)
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "The Frequency used for monitoring. "
+          ::= { dmonUserFreqEntry 3 }
+
+dmonUserFreqProvModulation OBJECT-TYPE
+          SYNTAX      ModulationType
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "The modulation type associated with this channel. 
+               Setting it to unknown will disable scanning this channel"
+     ::= { dmonUserFreqEntry 4 }
+
+dmonUserFreqProvSymbolRate OBJECT-TYPE
+          SYNTAX Unsigned32
+          MAX-ACCESS read-write
+          STATUS current
+          DESCRIPTION
+                 "Symbolrate to use for scanning. If not set, the default symbolrate will be used."
+          DEFVAL {0}
+          ::= { dmonUserFreqEntry 5 }
+          
+dmonUserFreqProvInversion OBJECT-TYPE
+          SYNTAX INTEGER{
+              disabled (0),
+              enabled (1)
+          }
+          MAX-ACCESS  read-write
+          STATUS      current
+          DESCRIPTION
+              "The Inverse mode of this channel,Defaultly disabled"
+          DEFVAL {0}
+          ::= {dmonUserFreqEntry 6}
+
+
+
+-- ****************************************************************************
+-- * Channel Map Configuration 
+-- *
+-- * The following MIB objects are dedicated to the DMON Channel Map
+-- ****************************************************************************
+cfgChannelMap OBJECT IDENTIFIER
+--	STATUS current
+--	DESCRIPTION 
+--		"This sub-tree contains configuration information of the channel map"
+	::= { dmonCommonGroup 18 }
+
+cfgChannelMapSource OBJECT-TYPE
+        SYNTAX INTEGER {
+            dsg(0),
+            auto-discovery(1),
+            provisioning(2)
+        }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+        "Specify the source of the channel map
+
+          This mode is not persistent and MUST be configured at digest of 
+          the DOCSIS configuration file during CMTS registration
+          
+          dsg:
+            DMon uses DSG to retrieve the channel map from the SCTE-65. 
+            The DMon will use that data to update the dmonPhyInfoTable with 
+            this information.
+            
+          auto-discovery:
+            Auto discover is use to blindly determine the Downstream QAM 
+            channels and build the dmonPhyInfoTable.
+          
+          provisioning:
+	         The mode will manual define the channel map via the dmonPhyInfoTable via the 
+           DOCSIS Configuration file
+        "
+        
+        DEFVAL {0}
+        
+        ::= { cfgChannelMap 1 }
+
+-- ****************************************************************************
+-- * Channel Map Exclusion table
+-- ****************************************************************************
+cfgChannelExclusionTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgChannelExclusionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This is the list of single channels or ranges of channel that must be ignored in the channel map." 
+    ::= { cfgChannelMap 2 }
+
+cfgChannelExclusionEntry OBJECT-TYPE
+     SYNTAX CfgChannelExclusionEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"Channel exclusion entry definition"     
+     INDEX { cfgChannelExclusionIndex }
+     ::= { cfgChannelExclusionTable 1 }
+
+CfgChannelExclusionEntry ::=
+     SEQUENCE
+     {
+          cfgChannelExclusionIndex				    INTEGER,
+          cfgChannelExclusionStatus				    RowStatus,
+          cfgChannelExclusionStartFrequency		Integer32,
+          cfgChannelExclusionStopFrequency		Integer32
+     }
+
+cfgChannelExclusionIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the ChannelExclusion table"
+     ::= { cfgChannelExclusionEntry 1 }    
+
+cfgChannelExclusionStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this conceptual row.
+
+         To create a row in this table, a manager must set this object to 
+         either createAndGo(4) or createAndWait(5).
+
+         Until instances of all corresponding columns are appropriately 
+         configured, the value of the corresponding instance of the 
+         cfgChannelExclusionStatus column is 'notReady'.
+         In particular, a newly created row cannot be made active until the 
+         corresponding instances of cfgChannelExclusionStartFrequency and 
+         cfgChannelExclusionStopFrequency have been set.
+         
+         Only exlusion with a status of active(1) will be applied."
+    ::= { cfgChannelExclusionEntry 2 }
+
+cfgChannelExclusionStartFrequency OBJECT-TYPE
+     SYNTAX Integer32 (0..1000000000)
+     UNITS	"hertz"
+     MAX-ACCESS read-create
+     STATUS current
+     DESCRIPTION
+          "This represents the beginning of the exclusion.  If the row represents
+          a single channel, this value will be the same of cfgChannelExclusionStopFrequency."
+     ::= { cfgChannelExclusionEntry 3 }
+     
+cfgChannelExclusionStopFrequency OBJECT-TYPE
+     SYNTAX Integer32 (0..1000000000)
+     UNITS	"hertz"
+     MAX-ACCESS read-create
+     STATUS current
+     DESCRIPTION
+          "This represents the end of the exclusion.  If the row represents
+          a single channel, this value will be the same of cfgChannelExclusionStartFrequency"
+     ::= { cfgChannelExclusionEntry 4 }
+
+-- ****************************************************************************
+-- * Channel Map Inclusion table
+-- ****************************************************************************
+cfgChannelInclusionTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgChannelInclusionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This is the list of single channels or ranges of channels that must be added in the channel map." 
+    ::= { cfgChannelMap 3 }
+
+cfgChannelInclusionEntry OBJECT-TYPE
+     SYNTAX CfgChannelInclusionEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"Channel inclusion entry definition"     
+     INDEX { cfgChannelInclusionIndex }
+     ::= { cfgChannelInclusionTable 1 }
+
+CfgChannelInclusionEntry ::=
+     SEQUENCE
+     {
+          cfgChannelInclusionIndex				    INTEGER,
+          cfgChannelInclusionStatus		        RowStatus,
+          cfgChannelInclusionType             INTEGER,
+          cfgChannelInclusionModulation       INTEGER,
+          cfgChannelInclusionBandwidth        INTEGER,
+          cfgChannelInclusionStartFrequency		Integer32,
+          cfgChannelInclusionStopFrequency		Integer32
+     }
+
+cfgChannelInclusionIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the ChannelInclusion table"
+     ::= { cfgChannelInclusionEntry 1 }    
+
+cfgChannelInclusionStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this conceptual row.
+
+         To create a row in this table, a manager must set this object to 
+         either createAndGo(4) or createAndWait(5).
+
+         Until instances of all corresponding columns are appropriately 
+         configured, the value of the corresponding instance of the 
+         cfgChannelInclusionStatus column is 'notReady'.
+         In particular, a newly created row cannot be made active until the 
+         corresponding instances of cfgChannelInclusionStartFrequency, 
+         cfgChannelInclusionStopFrequency,cfgChannelInclusionType and
+         cfgChannelInclusionModulation have been set.
+         
+         Only inclusion with a status of active(1) will be applied."
+    ::= { cfgChannelInclusionEntry 2 }
+
+cfgChannelInclusionType OBJECT-TYPE
+        SYNTAX INTEGER {
+            linear-qam(0),
+            docsis(1),
+            sdv(2),
+            vod(3),
+            analog(4),
+            oob(5)
+        }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the channel type.  This may change the monitoring behavior."
+        ::= { cfgChannelInclusionEntry 3 }
+
+cfgChannelInclusionModulation OBJECT-TYPE
+        SYNTAX INTEGER {
+          analog(0),
+          qam64(1),
+          qam128(2),
+          qam256(3),
+          qam512(4),
+          qam1024(5)
+        }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "indicate the modulation used on this channel"
+        ::= { cfgChannelInclusionEntry 4 }
+
+cfgChannelInclusionBandwidth OBJECT-TYPE
+        SYNTAX INTEGER {
+          six-mhz(0),
+          eight-mhz(1)
+        }
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+            "Indicates the channel bandwidth"
+        ::= { cfgChannelInclusionEntry 5 }
+
+
+cfgChannelInclusionStartFrequency OBJECT-TYPE
+     SYNTAX Integer32 (0..1000000000)
+     UNITS	"hertz"
+     MAX-ACCESS read-create
+     STATUS current
+     DESCRIPTION
+          "This represents the beginning of the Inclusion.  If the row represents
+          a single channel, this value will be the same of cfgChannelInclusionStopFrequency."
+     ::= { cfgChannelInclusionEntry 6 }
+     
+cfgChannelInclusionStopFrequency OBJECT-TYPE
+     SYNTAX Integer32 (0..1000000000)
+     UNITS	"hertz"
+     MAX-ACCESS read-create
+     STATUS current
+     DESCRIPTION
+          "This represents the end of the inclusion.  If the row represents
+          a single channel, this value will be the same of cfgChannelInclusionStartFrequency"
+     ::= { cfgChannelInclusionEntry 7 }
+
+-- ****************************************************************************
+-- * Provisionning rules 
+-- *
+-- * The following MIB objects are dedicated to the DMON Channel Map
+-- ****************************************************************************
+cfgPropertyProvisionning OBJECT IDENTIFIER
+--	STATUS current
+--	DESCRIPTION 
+--		"This sub-tree contains rules to auto-populate the channels properties."
+	::= { dmonCommonGroup 19 }
+
+cfgPropertyProvisionningRunNow OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If set to true, a special scan is performed to establish the input Power baseLine.
+        When read, always returns false(2)."
+    ::= { cfgPropertyProvisionning 1 }
+    
+
+cfgInputPowerBaselineResultTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgInputPowerBaselineResultEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table show the input power baseline of the last provisionning scan.
+       The entries in this table are stored in non-volatile memory." 
+    ::= { cfgPropertyProvisionning 2 }
+
+cfgInputPowerBaselineResultEntry OBJECT-TYPE
+     SYNTAX CfgInputPowerBaselineResultEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"cfgInputPowerBaselineResultTable entry definition"     
+     INDEX { cfgInputPowerBaseLineChannelIndex }
+     ::= { cfgInputPowerBaselineResultTable 1 }
+
+CfgInputPowerBaselineResultEntry ::=
+     SEQUENCE
+     {
+          cfgInputPowerBaseLineChannelIndex			INTEGER,
+          cfgInputPowerBaseLineChannelFrequency Integer32,
+          cfgInputPowerBaseLineChannelPower			TenthdBmV,
+          cfgInputPowerBaseLineChannelMER			  TenthdB,
+          cfgInputPowerBaseLineChannelStatus		INTEGER
+     }         
+
+cfgInputPowerBaseLineChannelIndex OBJECT-TYPE
+     SYNTAX INTEGER (1..255)
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the cfgInputPowerBaselineResult table"
+     ::= { cfgInputPowerBaselineResultEntry 1 }
+
+cfgInputPowerBaseLineChannelFrequency OBJECT-TYPE
+     SYNTAX Integer32 (0..1000000000)
+     UNITS	"hertz"
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "The center of the downstream frequency associated with
+ 		   this channel."
+     ::= { cfgInputPowerBaselineResultEntry 2 }
+
+cfgInputPowerBaseLineChannelPower OBJECT-TYPE
+     SYNTAX      TenthdBmV
+     UNITS       "dBmV"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+            "The received power level of the channel."
+     ::= { cfgInputPowerBaselineResultEntry 3 }
+
+cfgInputPowerBaseLineChannelMER OBJECT-TYPE
+     SYNTAX      TenthdB
+     UNITS       "TenthdB"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+            "The channel MER."
+     ::= { cfgInputPowerBaselineResultEntry 4 }
+
+cfgInputPowerBaseLineChannelStatus OBJECT-TYPE
+     SYNTAX INTEGER {
+	     unknown(0),
+	     success(1),
+	     error(2)
+     }
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "This object specifies if the baseline has been successfully retrived for this
+          particular channel during the last scan.  The main reason for failure is if the QAM locked
+          has not been achieved."
+     ::= { cfgInputPowerBaselineResultEntry 5 }
+
+
+cfgInputPowerRules OBJECT IDENTIFIER
+--	STATUS current
+--	DESCRIPTION 
+--		"This is the list of offsets to used from the baseline to populate the input power properties."
+	::= { cfgPropertyProvisionning 3 }
+
+
+cfgInputPowerRuleHIHI OBJECT-TYPE
+     SYNTAX      TenthdBmV
+     UNITS       "dBmV"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente the offset from the baseline to apply for the HIHI threshold.
+          The entry in this object is stored in non-volatile memory."
+     DEFVAL{ 6 }
+     ::= { cfgInputPowerRules 1 }  
+     
+cfgInputPowerRuleHI OBJECT-TYPE
+     SYNTAX      TenthdBmV
+     UNITS       "dBmV"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente the offset from the baseline to apply for the HI threshold.
+         The entry in this object is stored in non-volatile memory."
+     DEFVAL{ 3 }
+     ::= { cfgInputPowerRules 2 }
+     
+cfgInputPowerRuleLO OBJECT-TYPE
+     SYNTAX      TenthdBmV
+     UNITS       "dBmV"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente the offset from the baseline to apply for the LO threshold.
+         The entry in this object is stored in non-volatile memory."
+     DEFVAL{ -3 }
+     ::= { cfgInputPowerRules 3 }
+
+cfgInputPowerRuleLOLO OBJECT-TYPE
+     SYNTAX      TenthdBmV
+     UNITS       "dBmV"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente the offset from the baseline to apply for the LOLO threshold.
+          The entry in this object is stored in non-volatile memory."
+     DEFVAL{ -6 }
+     ::= { cfgInputPowerRules 4 }
+
+cfgBERRules OBJECT IDENTIFIER
+--	STATUS current
+--	DESCRIPTION 
+--		"This is the list of default threshold to used for the BER property."
+	::= { cfgPropertyProvisionning 4 }
+
+cfgPreFECBERRulesHIHI OBJECT-TYPE
+     SYNTAX Integer32
+     UNITS	"trillionth"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente default HIHI threshold for the PreFEC BER property.
+          The entry in this object is stored in non-volatile memory."
+     ::= { cfgBERRules 2 }  
+     
+cfgPreFECBERRulesHI OBJECT-TYPE
+     SYNTAX Integer32
+     UNITS	"trillionth"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente default HI threshold for the PreFEC BER property.
+          The entry in this object is stored in non-volatile memory."
+     ::= { cfgBERRules 3 }
+
+cfgPostFECBERRulesHIHI OBJECT-TYPE
+     SYNTAX Integer32
+     UNITS	"trillionth"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente default HIHI threshold for the PostFEC BER property.
+          The entry in this object is stored in non-volatile memory."
+     ::= { cfgBERRules 4 }  
+     
+cfgPostFECBERRulesHI OBJECT-TYPE
+     SYNTAX Integer32
+     UNITS	"trillionth"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente default HI threshold for the PostFEC BER property.
+          The entry in this object is stored in non-volatile memory."
+     ::= { cfgBERRules 5 }
+
+
+cfgMERRulesTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgMERRulesEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table show the input power baseline of the last provisionning scan.
+       The entries in this table are stored in non-volatile memory." 
+    ::= { cfgPropertyProvisionning 5 }
+
+cfgMERRulesEntry OBJECT-TYPE
+     SYNTAX CfgMERRulesEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"cfgMERRulesTable entry definition"     
+     INDEX { cfgMERRulesTableIndex }
+     ::= { cfgMERRulesTable 1 }
+
+CfgMERRulesEntry ::=
+     SEQUENCE
+     {
+          cfgMERRulesTableIndex				INTEGER,
+          cfgMERRulesLO								TenthdB,
+          cfgMERRulesLOLO							TenthdB
+     }         
+
+cfgMERRulesTableIndex OBJECT-TYPE
+     SYNTAX INTEGER {
+      qam64(1),
+      qam128(2),
+      qam256(3),
+      qam512(4),
+      qam1024(5)
+}
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the cfgMERRulesTable table"
+     ::= { cfgMERRulesEntry 1 }
+
+cfgMERRulesLO OBJECT-TYPE
+     SYNTAX TenthdB
+     UNITS "dB"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente default LO threshold for the MER property.
+          The entry in this object is stored in non-volatile memory."
+     DEFVAL{ -3 }
+     ::= { cfgMERRulesEntry 2 }
+
+cfgMERRulesLOLO OBJECT-TYPE
+     SYNTAX TenthdB
+     UNITS "dB"
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "This represente default LOLO threshold for the MER property.
+          The entry in this object is stored in non-volatile memory."
+     DEFVAL{ -6 }
+     ::= { cfgMERRulesEntry 3 }
+
+                 
+END
+

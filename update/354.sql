@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS `eigrp_ases`;
+CREATE TABLE IF NOT EXISTS `eigrp_ases` (  `eigrp_as_id` int(11) NOT NULL AUTO_INCREMENT,  `eigrp_vpn` int(11) NOT NULL,  `eigrp_as` int(11) NOT NULL,  `device_id` int(11) NOT NULL,  `cEigrpNbrCount` int(11) NOT NULL,  `cEigrpAsRouterIdType` enum('unknown','ipv4','ipv6','ipv4z','ipv6z','dns') NOT NULL DEFAULT 'ipv4',  `cEigrpAsRouterId` varchar(32) NOT NULL,  `cEigrpTopoRoutes` int(11) NOT NULL,  PRIMARY KEY (`eigrp_as_id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE utf8_unicode_ci;
+DROP TABLE IF EXISTS `eigrp_peers`;
+CREATE TABLE IF NOT EXISTS `eigrp_peers` (  `eigrp_peer_id` int(11) NOT NULL AUTO_INCREMENT,  `device_id` int(11) NOT NULL,  `eigrp_vpn` int(11) NOT NULL,  `eigrp_as` int(11) NOT NULL,  `peer_addrtype` enum('unknown','ipv4','ipv6','ipv4z','ipv6z','dns') NOT NULL COMMENT 'inetAddrType',  `peer_addr` varchar(64) NOT NULL,  `peer_ifindex` int(11) NOT NULL,  `peer_holdtime` int(11) NOT NULL,  `peer_uptime` int(11) NOT NULL,  `peer_srtt` int(11) NOT NULL,  `peer_rto` int(11) NOT NULL,  `peer_version` varchar(20) DEFAULT NULL,  PRIMARY KEY (`eigrp_peer_id`),  UNIQUE KEY `table_unique` (`device_id`,`eigrp_vpn`,`eigrp_as`,`peer_addr`)) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE utf8_unicode_ci;
+DROP TABLE IF EXISTS `eigrp_ports`;
+CREATE TABLE IF NOT EXISTS `eigrp_ports` (  `eigrp_port_id` int(11) NOT NULL AUTO_INCREMENT,  `eigrp_vpn` int(11) NOT NULL,  `eigrp_as` int(11) NOT NULL,  `eigrp_ifIndex` int(11) NOT NULL,  `port_id` int(11) NOT NULL,  `device_id` int(11) NOT NULL,  `eigrp_peer_count` int(11) NOT NULL,  `eigrp_MeanSrtt` int(11) NOT NULL,  `eigrp_authmode` text COLLATE utf8_unicode_ci NOT NULL,  PRIMARY KEY (`eigrp_port_id`),  UNIQUE KEY `eigrp_vpn` (`eigrp_vpn`,`eigrp_as`,`eigrp_ifIndex`,`device_id`),  KEY `device_id` (`device_id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE utf8_unicode_ci;
+DROP TABLE IF EXISTS `eigrp_vpns`;
+CREATE TABLE IF NOT EXISTS `eigrp_vpns` (  `eigrp_vpn_id` int(11) NOT NULL AUTO_INCREMENT,  `eigrp_vpn` int(11) NOT NULL,  `eigrp_vpn_name` varchar(32) NOT NULL,  `device_id` int(11) NOT NULL,  PRIMARY KEY (`eigrp_vpn_id`),  KEY `device_id` (`device_id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE utf8_unicode_ci;
+ALTER TABLE `entity_attribs` ADD `device_id` INT NULL DEFAULT NULL AFTER `attrib_id`;
+ALTER TABLE `entity_attribs` DROP INDEX `device_id`;
+ALTER TABLE `entity_attribs` ADD INDEX(`device_id`);
+

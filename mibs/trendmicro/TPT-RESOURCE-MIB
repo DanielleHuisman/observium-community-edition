@@ -1,0 +1,856 @@
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Trend Micro, Inc.
+-- Copyright information is in the DESCRIPTION section of the MODULE-IDENTITY.
+-- 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+TPT-RESOURCE-MIB
+
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+  MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, OBJECT-IDENTITY, 
+  Integer32, Unsigned32, Counter64
+    FROM SNMPv2-SMI
+
+  TEXTUAL-CONVENTION
+    FROM SNMPv2-TC
+
+  tpt-tpa-objs, tpt-tpa-eventsV2, tpt-tpa-unkparams
+    FROM TPT-TPAMIBS-MIB
+  ;
+
+tpt-resource MODULE-IDENTITY
+  LAST-UPDATED "201605251854Z" -- May 25, 2016
+  ORGANIZATION "Trend Micro, Inc."
+  CONTACT-INFO "www.trendmicro.com"
+  DESCRIPTION
+    "Resource consumption and threshold notifications.
+
+     Copyright (C) 2016 Trend Micro Incorporated. All Rights Reserved.
+     
+     Trend Micro makes no warranty of any kind with regard to this material,
+     including, but not limited to, the implied warranties of merchantability
+     and fitness for a particular purpose. Trend Micro shall not be liable for
+     errors contained herein or for incidental or consequential damages in
+     connection with the furnishing, performance, or use of this material. This
+     document contains proprietary information, which is protected by copyright. No
+     part of this document may be photocopied, reproduced, or translated into
+     another language without the prior written consent of Trend Micro. The
+     information is provided 'as is' without warranty of any kind and is subject to
+     change without notice. The only warranties for Trend Micro products and
+     services are set forth in the express warranty statements accompanying such
+     products and services. Nothing herein should be construed as constituting an
+     additional warranty. Trend Micro shall not be liable for technical or editorial
+     errors or omissions contained herein. TippingPoint(R), the TippingPoint logo, and
+     Digital Vaccine(R) are registered trademarks of Trend Micro. All other company
+     and product names may be trademarks of their respective holders. All rights
+     reserved. This document contains confidential information, trade secrets or
+     both, which are the property of Trend Micro. No part of this documentation may
+     be reproduced in any form or by any means or used to make any derivative work
+     (such as translation, transformation, or adaptation) without written permission
+     from Trend Micro or one of its subsidiaries. All other company and product
+     names may be trademarks of their respective holders.
+    "
+  
+  REVISION "201605251854Z" -- May 25, 2016 
+  DESCRIPTION "Updated copyright information. Minor MIB syntax fixes."
+    
+  ::= { tpt-tpa-objs 5 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+--  Variable definitions
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Textual conventions for resource data and notifications
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+ResourceIdentifier ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "An identifier of the resource parameter pertaining to a notification."
+  SYNTAX      INTEGER { filesystem(1), hpCPU(2), hpMemory(3), chassisTemp(4), 
+                        fan(5), powerSupply(6), hardDisk(7), i2cBus(8) }
+
+ResourceState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "A selection from a set of state levels used in resource thresholds."
+  SYNTAX      INTEGER { unknown(0), red(1), yellow(2), green(3) }
+
+PowerSupplyState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION
+    "A selection from a set of state levels used in power supply status."
+  SYNTAX      INTEGER { unknown(0), red(1), green(2) }
+
+SnmpVersions ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "An indicator of which SNMP versions are enabled."
+  SYNTAX      INTEGER { none(0), snmpv2(1), snmpv3(2), snmpv2-and-snmpv3(3) }
+
+EnabledOrNot ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "An indication of whether a feature is configured as enabled or disabled."
+  SYNTAX      INTEGER { disabled(0), enabled(1) }
+
+FilesystemState ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION
+    "Current state of the filesystem."
+  SYNTAX      INTEGER { unformatted(0), formatted(1), mounted(2) }
+
+RemoteAuthType ::= TEXTUAL-CONVENTION
+  STATUS      current
+  DESCRIPTION 
+    "An indication of which remote authentication are enabled."
+  SYNTAX      INTEGER { none(0), radius(1), sms(2), tacacs(3) }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Filesystem information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceNumberOfFilesystems OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of filesystems on the device's hard disk."
+  ::= { tpt-resource 1 }
+
+resourceFSTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF ResourceFSEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "Table of per-filesystem resource information."
+  ::= { tpt-resource 2 } 
+
+resourceFSEntry OBJECT-TYPE
+  SYNTAX      ResourceFSEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "An entry in the resource filesystem table.  
+     Rows cannot be created or deleted.
+    "
+  INDEX       { resourceFSIndex }
+  ::= { resourceFSTable 1 }
+
+ResourceFSEntry ::= SEQUENCE {
+  resourceFSInUseMB       Integer32,
+  resourceFSThresholdMaj  Integer32,
+  resourceFSThresholdCrit Integer32,
+  resourceFSRangeMin      Integer32,
+  resourceFSRangeMax      Integer32,
+  resourceFSName          OCTET STRING,
+  resourceFSIndex         Unsigned32,
+  resourceFSState         FilesystemState,
+  resourceFSEncryption    EnabledOrNot
+}
+
+resourceFSInUseMB OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of MB in use for this filesystem."
+  ::= { resourceFSEntry 1 }
+
+resourceFSThresholdMaj OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The major threshold value (percent) in use for this filesystem."
+  ::= { resourceFSEntry 2 }
+
+resourceFSThresholdCrit OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The critical threshold value (percent) in use for this filesystem."
+  ::= { resourceFSEntry 3 }
+
+resourceFSRangeMin OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The minimum value of the range of MB in use (usually zero)."
+  ::= { resourceFSEntry 4 }
+
+resourceFSRangeMax OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The size (in MB) of this filesystem."
+  ::= { resourceFSEntry 5 }
+
+resourceFSName OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The name of this filesystem."
+  ::= { resourceFSEntry 6 }
+
+resourceFSIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION
+    "The number of this table row, from one to the number of filesystems."
+  ::= { resourceFSEntry 7 }
+
+resourceFSState OBJECT-TYPE
+  SYNTAX      FilesystemState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Current state of the filesystem." 
+  ::= { resourceFSEntry 8 }
+
+resourceFSEncryption OBJECT-TYPE
+  SYNTAX      EnabledOrNot
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Indicates whether this filesystem is encrypted or not."
+  ::= { resourceFSEntry 9 }
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Memory information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceHPMemoryObjs OBJECT-IDENTITY
+  STATUS      current
+  DESCRIPTION "Sub-tree of host processor memory information."
+  ::= { tpt-resource 3 } 
+
+resourceHPMemoryInUsePercent OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The percentage of host processor memory in use."
+  ::= { resourceHPMemoryObjs 1 }
+
+resourceHPMemoryThresholdMaj OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The major threshold value for host processor memory in use."
+  ::= { resourceHPMemoryObjs 2 }
+
+resourceHPMemoryThresholdCrit OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The critical threshold value for host processor memory in use."
+  ::= { resourceHPMemoryObjs 3 }
+
+resourceHPMemoryRangeMin OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The minimum percentage of host processor memory in use (usually zero)."
+  ::= { resourceHPMemoryObjs 4 }
+
+resourceHPMemoryRangeMax OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The maximum percentage of host processor memory in use (usually 100)."
+  ::= { resourceHPMemoryObjs 5 }
+
+resourceHPMemoryTotal OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The size (in bytes) of host processor memory."
+  ::= { resourceHPMemoryObjs 6 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- CPU information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceHPCPUObjs OBJECT-IDENTITY
+  STATUS      current
+  DESCRIPTION "Sub-tree of host processor CPU information."
+  ::= { tpt-resource 4 } 
+
+resourceHPCPUBusyPercent OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The percentage of host processor CPU busy."
+  ::= { resourceHPCPUObjs 1 }
+
+resourceHPCPUThresholdMaj OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The major threshold value for host processor CPU busy."
+  ::= { resourceHPCPUObjs 2 }
+
+resourceHPCPUThresholdCrit OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The critical threshold value for host processor CPU busy."
+  ::= { resourceHPCPUObjs 3 }
+
+resourceHPCPURangeMin OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The minimum percentage of host processor CPU busy (usually zero)."
+  ::= { resourceHPCPUObjs 4 }
+
+resourceHPCPURangeMax OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The maximum percentage of host processor CPU busy (usually 100)."
+  ::= { resourceHPCPUObjs 5 }
+
+resourceNPCPUBusyPercentA OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Total Utilization of XLR A"
+  ::= { resourceHPCPUObjs 6 }
+
+resourceNPCPUBusyPercentTier2A OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "F Thread Utilization of XLR A"
+  ::= { resourceHPCPUObjs 7 }
+
+resourceNPCPUBusyPercentTier3A OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "KS Thread Utilization of XLR A"
+  ::= { resourceHPCPUObjs 8 }
+
+resourceNPCPUBusyPercentTier4A OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "L Thread Utilization of XLR A"
+  ::= { resourceHPCPUObjs 9 }
+
+resourceNPCPUBusyPercentB OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Total Utilization of XLR B"
+  ::= { resourceHPCPUObjs 10 }
+
+resourceNPCPUBusyPercentTier2B OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "F Thread Utilization of XLR B"
+  ::= { resourceHPCPUObjs 11 }
+
+resourceNPCPUBusyPercentTier3B OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "KS Thread Utilization of XLR B"
+  ::= { resourceHPCPUObjs 12 }
+
+resourceNPCPUBusyPercentTier4B OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "L Thread Utilization of XLR B"
+  ::= { resourceHPCPUObjs 13 }
+
+resourceNPCPUBusyPercentC OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Total Utilization of XLR C"
+  ::= { resourceHPCPUObjs 14 }
+
+resourceNPCPUBusyPercentTier2C OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "F Thread Utilization of XLR C"
+  ::= { resourceHPCPUObjs 15 }
+
+resourceNPCPUBusyPercentTier3C OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "KS Thread Utilization of XLR C"
+  ::= { resourceHPCPUObjs 16 }
+
+resourceNPCPUBusyPercentTier4C OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "L Thread Utilization of XLR C"
+  ::= { resourceHPCPUObjs 17 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Chassis temperature information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceChassisTempObjs OBJECT-IDENTITY
+  STATUS      current
+  DESCRIPTION "Sub-tree of chassis temperature information."
+  ::= { tpt-resource 5 } 
+
+resourceChassisTempDegreesC OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The chassis temperature in degrees C."
+  ::= { resourceChassisTempObjs 1 }
+
+resourceChassisTempThresholdMaj OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The major threshold value for chassis temperature."
+  ::= { resourceChassisTempObjs 2 }
+
+resourceChassisTempThresholdCrit OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The critical threshold value for chassis temperature."
+  ::= { resourceChassisTempObjs 3 }
+
+resourceChassisTempRangeMin OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The minimum value of the chassis temperature range."
+  ::= { resourceChassisTempObjs 4 }
+
+resourceChassisTempRangeMax OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The maximum value of the chassis temperature range."
+  ::= { resourceChassisTempObjs 5 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Power supply information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourcePowerSupplyObjs OBJECT-IDENTITY
+  STATUS      current
+  DESCRIPTION "Sub-tree of power supply information."
+  ::= { tpt-resource 9 } 
+
+resourcePowerSupplyStatus OBJECT-TYPE
+  SYNTAX      ResourceState
+  MAX-ACCESS  read-only
+  STATUS      deprecated
+  DESCRIPTION
+    "DEPRECATED as of TOS V. 3.5.0.
+     If the device has dual power supplies and power supply monitoring is
+     enabled, this value indicates whether one or both power supplies is
+     functional (red or green respectively). Otherwise the value is unknown."
+  ::= { resourcePowerSupplyObjs 1 }
+
+resourcePowerSupplyQuantity OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of power supplies (1 or 2)."
+  ::= { resourcePowerSupplyObjs 2 }
+
+resourcePowerSupplyMonitoring OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "If power supply monitoring is currently enabled, this value is 1; 
+     otherwise, this value is 0."
+  ::= { resourcePowerSupplyObjs 3 }
+
+resourcePowerSupplyTable OBJECT-TYPE
+  SYNTAX      SEQUENCE OF ResourcePowerSupplyEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION 
+    "Table of power supplies on the device. The number of entries depends on
+     the value of resourcePowerSupplyQuantity. The maximum number of entries
+     is implementation dependent."
+  ::= { resourcePowerSupplyObjs 4 }
+
+resourcePowerSupplyEntry OBJECT-TYPE
+  SYNTAX      ResourcePowerSupplyEntry
+  MAX-ACCESS  not-accessible
+  STATUS      current
+  DESCRIPTION 
+    "An entry in the power supply table.
+     Rows cannot be created or deleted."
+  INDEX       { powerSupplyUnitIndex }
+  ::= { resourcePowerSupplyTable 1 }
+
+ResourcePowerSupplyEntry ::= SEQUENCE {
+  powerSupplyUnitIndex   Integer32,
+  powerSupplyStatus      ResourceState
+}
+
+powerSupplyUnitIndex OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "Index into the power supply units on a device. Starts with 1"
+  ::= { resourcePowerSupplyEntry 1 }
+
+powerSupplyStatus OBJECT-TYPE
+  SYNTAX      ResourceState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION 
+    "If the device has dual power supplies and power supply monitoring is 
+     enabled, this value indicates whether one or both power supplies is 
+     functional (red or green respectively).  Otherwise the value is unknown."
+  ::= { resourcePowerSupplyEntry 2 }
+
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- System log counts
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceLogCountObjs OBJECT-IDENTITY
+  STATUS      current
+  DESCRIPTION "Sub-tree of system log entry counts by type."
+  ::= { tpt-resource 7 } 
+
+resourceLogCountCritical OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of system log entries of type 'critical'."
+  ::= { resourceLogCountObjs 1 }
+
+resourceLogCountError OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of system log entries of type 'error'."
+  ::= { resourceLogCountObjs 2 }
+
+resourceLogCountWarning OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of system log entries of type 'warning'."
+  ::= { resourceLogCountObjs 3 }
+
+resourceLogCountInfo OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The number of system log entries of type 'info'."
+  ::= { resourceLogCountObjs 4 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- System metrics
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceMetricObjs OBJECT-IDENTITY
+  STATUS      current
+  DESCRIPTION "Sub-tree of selected system performance metrics."
+  ::= { tpt-resource 8 } 
+
+resourceMetricFastpath OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Fast path throughput in bits per second."
+  ::= { resourceMetricObjs 1 }
+
+resourceMetricSmartpath OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Smart path throughput in bits per second."
+  ::= { resourceMetricObjs 2 }
+
+resourceMetricCongestion OBJECT-TYPE
+  SYNTAX      Counter64
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Congestion count in packets."
+  ::= { resourceMetricObjs 3 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Operating system information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceVersion OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..60))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Build version and date."
+  ::= { tpt-resource 6 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Date and Time information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceDateTime OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Current date and time of device in seconds since January 1, 1970. 
+     No timezone offset (UTC)"
+  ::= { tpt-resource 10 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- SNMP version information 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceSnmpRunState OBJECT-TYPE
+  SYNTAX      SnmpVersions
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "An indicator of which SNMP versions are running on the device."
+  ::= { tpt-resource 11 }
+
+resourceSnmpConfig OBJECT-TYPE
+  SYNTAX      SnmpVersions
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "An indicator of which SNMP versions are configured on the device."
+  ::= { tpt-resource 12 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Remote authentication configuration 
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+resourceRemoteAuthEnabled OBJECT-TYPE
+  SYNTAX      EnabledOrNot
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "An indicator of whether remote authentication is enabled on the device."
+  ::= { tpt-resource 13 }
+
+resourceRemoteAuthTimeout OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The configured remote authentication timeout value in seconds."
+  ::= { tpt-resource 14 }
+
+resourceRemoteAuthType OBJECT-TYPE
+  SYNTAX      RemoteAuthType
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "An indicator of which remote authentication mechanism is
+     enabled on the device."
+  ::= { tpt-resource 15 }
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+--
+-- Policy notifications
+--
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+tptResourceNotifyDeviceID OBJECT-TYPE
+  SYNTAX      OCTET STRING (SIZE (0..40))
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The unique identifier of the device sending this notification."
+  ::= { tpt-tpa-unkparams 61 }
+
+tptResourceNotifyIdentifier OBJECT-TYPE
+  SYNTAX      ResourceIdentifier
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The type of the resource that triggered this notification."
+  ::= { tpt-tpa-unkparams 62 }
+
+tptResourceNotifyFSIndex OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "For a filesystem resource, the index of the filesystem (otherwise 0)."
+  ::= { tpt-tpa-unkparams 63 }
+
+tptResourceNotifyCurrentValue OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The current value of the resource that triggered this notification."
+  ::= { tpt-tpa-unkparams 64 }
+
+tptResourceNotifyThresholdMaj OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The major threshold of this resource (between green and yellow states)."
+  ::= { tpt-tpa-unkparams 65 }
+
+tptResourceNotifyThresholdCrit OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The critical threshold of this resource (between yellow and red states)."
+  ::= { tpt-tpa-unkparams 66 }
+
+tptResourceNotifyRangeMin OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The minimum end of the range of values that this resource can take."
+  ::= { tpt-tpa-unkparams 67 }
+
+tptResourceNotifyRangeMax OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The maximum end of the range of values that this resource can take."
+  ::= { tpt-tpa-unkparams 68 }
+
+tptResourceNotifyStateBefore OBJECT-TYPE
+  SYNTAX      ResourceState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The state of this resource before the current threshold transition."
+  ::= { tpt-tpa-unkparams 69 }
+
+tptResourceNotifyStateAfter OBJECT-TYPE
+  SYNTAX      ResourceState
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The state of this resource after the current threshold transition."
+  ::= { tpt-tpa-unkparams 70 }
+
+tptResourceNotifyTimeStamp OBJECT-TYPE
+  SYNTAX      Unsigned32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "The time of the threshold crossing represented by this notification 
+     (in seconds since January 1, 1970)."
+  ::= { tpt-tpa-unkparams 71 }
+
+tptResourceNotifySubIdentifier OBJECT-TYPE
+  SYNTAX      Integer32
+  MAX-ACCESS  read-only
+  STATUS      current
+  DESCRIPTION
+    "Sub-Identifier into the type of the resource which trigger this notification.
+     It starts with 1. It is not used in models 5100N or older (set to 0)."
+  ::= { tpt-tpa-unkparams 72 }
+
+tptResourceNotify NOTIFICATION-TYPE
+  OBJECTS     { tptResourceNotifyDeviceID,     tptResourceNotifyIdentifier, 
+                tptResourceNotifyFSIndex,      tptResourceNotifyCurrentValue,
+                tptResourceNotifyThresholdMaj, tptResourceNotifyThresholdCrit, 
+                tptResourceNotifyRangeMin,     tptResourceNotifyRangeMax,    
+                tptResourceNotifyStateBefore,  tptResourceNotifyStateAfter,
+                tptResourceNotifyTimeStamp,    tptResourceNotifySubIdentifier
+              }
+  STATUS      current
+  DESCRIPTION
+    "Notification: Used to inform the management station that a resource 
+     parameter has crossed a predefined threshold."
+  ::= { tpt-tpa-eventsV2 14 }
+
+
+END
+

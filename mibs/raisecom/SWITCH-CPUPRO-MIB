@@ -1,0 +1,203 @@
+--MibName=SWITCH-CPUPRO-MIB
+-- *****************************************************************
+-- RAISECOM-CPUPRO-MIB.mib:  Raisecom CPUPro MIB file
+--
+-- Apr 2010, wangzhongfei huochao
+--
+-- Copyright (c) 1994-2006 by Raisecom Technology Co., Ltd.
+-- All rights reserved.
+--
+-- *****************************************************************
+
+-- *****************************************************************
+-- Modi Report：Format: <number>, <time>, <author>, <desc>
+-- 01,20110815,huochao,将节点rcCpuProPacketIndex的取值"all"去掉，这种设计不合理
+--                     "all"的配置和获取可以通过遍历的方式进行
+-- *****************************************************************
+
+
+SWITCH-CPUPRO-MIB  DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, NOTIFICATION-TYPE,
+    OBJECT-TYPE                         FROM SNMPv2-SMI
+
+    MODULE-COMPLIANCE,
+    NOTIFICATION-GROUP,
+    OBJECT-GROUP                        FROM SNMPv2-CONF  
+      
+    EnableVar                           FROM SWITCH-TC
+    iscomSwitch	                        FROM RAISECOM-BASE-MIB;
+   
+
+rcCpuPro MODULE-IDENTITY
+        LAST-UPDATED    "201004010000Z"
+        ORGANIZATION    "Raisecom Technology Co., Ltd."
+        CONTACT-INFO
+                "Raisecom Systems
+
+                Postal: No.617/619 Haitai Tower,
+                229 Fourth North Loop Middle Road,
+                Haidian District, Beijing, PRC
+
+                Tel: +86-10-82884499
+
+                E-mail: wangzhongfei@raisecom.com"
+        DESCRIPTION
+         "The MIB module is for configuration of Cpu Protection
+         feature."
+        REVISION   "201004010000Z"
+        DESCRIPTION
+            "The initial revision of this MIB module."
+        ::= { iscomSwitch 60 }
+
+------------------------------------------------------------------------------
+-- define groups in rcCpuPro
+------------------------------------------------------------------------------
+    rcCpuProGroup   OBJECT IDENTIFIER ::= { rcCpuPro 1 }
+
+------------------------------------------------------------------------------
+-- begin rcCpuProGroup  rcCpuProPortTable--
+------------------------------------------------------------------------
+rcCpuProPortTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcCpuProPortEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table provides the status of the cpu protection in per port."
+        ::= { rcCpuProGroup 1 }  
+        
+rcCpuProPacketTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcCpuProPacketEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "A table provides the mechanism to control cpu protection with per packet type."
+        ::= { rcCpuProGroup 2 }
+
+
+rcCpuProPortEntry OBJECT-TYPE
+        SYNTAX RcCpuProPortEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Table entry for cpu protection status in per port."
+        INDEX { rcCpuProPortIndex, rcCpuProPacketIndex}
+        ::= { rcCpuProPortTable 1 }
+
+RcCpuProPortEntry ::= SEQUENCE
+    {
+        rcCpuProPortIndex          INTEGER,
+        rcCpuProPortPacketEnable   EnableVar,
+        rcCpuProPortPacketAttackStatus  INTEGER,
+        rcCpuProPortPacketAttackedCount Counter
+    }
+
+rcCpuProPortIndex OBJECT-TYPE
+        SYNTAX INTEGER
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "An index that uniquely identifies a configuration about cpu pro.
+            Eg:for iscom2826/2826e,the value range is from 1 to 26, for iscom2812gf,
+            from 1 to 12, for iscom2828f,from 1 to 28, for iscom2852,from 1 to 52,and so on."
+        ::= { rcCpuProPortEntry 1}
+
+        
+rcCpuProPortPacketEnable OBJECT-TYPE 
+        SYNTAX EnableVar
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Enable or disable cpu pro for arp, bpdu or icmp flood for the port"  
+        DEFVAL {disable}
+        ::= { rcCpuProPortEntry 2 }
+        
+rcCpuProPortPacketAttackStatus OBJECT-TYPE 
+        SYNTAX INTEGER{
+                      attacking(1),
+                      not-attacking(2)
+                      }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "This object specifies if the packet is attacking the cpu."  
+        ::= { rcCpuProPortEntry 3 }
+        
+rcCpuProPortPacketAttackedCount OBJECT-TYPE 
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "This object specifies the totle number of special packet attacked the cpu."  
+        ::= { rcCpuProPortEntry 4 }   
+
+rcCpuProPacketEntry OBJECT-TYPE
+        SYNTAX RcCpuProPacketEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "Table entry for cpu protection config based on port."
+        INDEX {rcCpuProPacketIndex}
+        ::= { rcCpuProPacketTable 1 }   
+
+RcCpuProPacketEntry ::= SEQUENCE
+    {
+        rcCpuProPacketIndex        INTEGER,
+        rcCpuProPacketInterval     INTEGER,
+        rcCpuProPacketHigh         INTEGER,
+        rcCpuProPacketLow          INTEGER,
+        rcCpuProPacketAction       INTEGER     
+    }
+
+        
+rcCpuProPacketIndex OBJECT-TYPE 
+        SYNTAX  INTEGER{
+                        bpdu(1),
+                        arp(2),
+                        icmp(3)
+                        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "This object specifies which packet type the entry information belongs to, under the port."  
+        ::= { rcCpuProPacketEntry 1 }    
+        
+rcCpuProPacketInterval OBJECT-TYPE 
+        SYNTAX  INTEGER(0..65535)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This object specifies the sample interval for special packet."  
+        ::= { rcCpuProPacketEntry 2 }  
+         
+rcCpuProPacketHigh OBJECT-TYPE 
+        SYNTAX  INTEGER(2..65535)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "If the number of packets received exceeds the high threshold value, the relative packet will be denied."  
+        ::= { rcCpuProPacketEntry 3 }   
+       
+rcCpuProPacketLow OBJECT-TYPE 
+        SYNTAX  INTEGER(1..65535)
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "After the cpu was attacked, If the number of packets received is under the low threshold value, 
+             the relative packet will be received not denied."  
+        ::= { rcCpuProPacketEntry 4 }  
+         
+rcCpuProPacketAction OBJECT-TYPE 
+        SYNTAX  INTEGER{
+                        shutdown(1),
+                        filter(2),
+                        deny(3)
+                        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "This object specifies which atction the CPUpro will take after be attacked."  
+        ::= { rcCpuProPacketEntry 5 }   
+       
+END

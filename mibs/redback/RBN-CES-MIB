@@ -1,0 +1,1051 @@
+-- *****************************************************************
+-- RBN-CES-MIB    Ericsson Circuit Emulation Service(CES) MIB
+--
+-- Copyright (c) 2010 Ericsson AB.
+-- All rights reserved.
+--
+-- *****************************************************************
+
+RBN-CES-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Unsigned32, Integer32, Counter64, Gauge32
+        FROM SNMPv2-SMI
+
+    MODULE-COMPLIANCE, OBJECT-GROUP
+        FROM SNMPv2-CONF
+
+    RowStatus, TruthValue, DateAndTime, TimeInterval
+        FROM SNMPv2-TC
+
+    RbnPercentage
+        FROM RBN-TC
+
+    InterfaceIndex
+        FROM IF-MIB
+
+    RbnAlarmId
+        FROM RBN-ALARM-TC
+
+    rbnMgmt
+        FROM RBN-SMI;
+
+rbnCesMIB MODULE-IDENTITY
+    LAST-UPDATED    "201012020000Z" -- Dec 2, 2010
+    ORGANIZATION    "Ericsson AB."
+    CONTACT-INFO
+            "       Ericsson, Inc.
+
+            Postal: 100 Headquarters Drive
+                    San Jose, CA  95134-1370
+                    USA
+
+             Phone: +1 408 750 5000
+               Fax: +1 408 750 5599"
+    DESCRIPTION
+        "This MIB describes objects used for managing Circuit Emulation
+        Service(CES) protocols, including RFC 5086: Structure-Aware Time
+        Division Multiplexed (TDM) Circuit Emulation Service over Packet
+        Switched Network (CESoPSN) and RFC 4553: Structure Agnostic
+        Circuit Emulation Service over Packet Switch Network(SAToP)."
+
+    REVISION "201012020000Z" -- Dec 2, 2010 
+    DESCRIPTION
+        " Initial Version."
+    ::= { rbnMgmt 56 }
+
+rbnCesMIBObjects     OBJECT IDENTIFIER ::= { rbnCesMIB 1 }
+rbnCesMIBConformance OBJECT IDENTIFIER ::= { rbnCesMIB 2 }
+
+--
+-- CES Global Object Definitions
+--
+rbnCesSlaInfoResetAll OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Setting this object to 'true' resets all CES Service Level
+        Agreement(SLA) information objects in the rbnCesSlaInfoTable.
+        This object always returns 'false' value."
+    DEFVAL { false }
+    ::= { rbnCesMIBObjects 1 }
+
+--
+-- CES Configurations Table
+--
+rbnCesCfgTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnCesCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Configuration table for CES circuits."
+    ::= { rbnCesMIBObjects 2 }
+
+rbnCesCfgEntry OBJECT-TYPE
+    SYNTAX      RbnCesCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table represents a CES circuit."
+    INDEX { rbnCesCfgIndex }
+    ::= { rbnCesCfgTable 1 }
+
+RbnCesCfgEntry ::=
+    SEQUENCE {
+        rbnCesCfgIndex                 InterfaceIndex,
+        rbnCesCfgPktLatency            Unsigned32,
+        rbnCesCfgJtrBfrDepth           Unsigned32,
+        rbnCesCfgConsecPktsInSync      Unsigned32,
+        rbnCesCfgConsecMissPktsOutSync Unsigned32,
+        rbnCesCfgIdlePattern           OCTET STRING,
+        rbnCesCfgTrunkCtl              TruthValue,
+        rbnCesCfgAdminStatus           INTEGER,
+        rbnCesCfgRowStatus             RowStatus
+    }
+
+rbnCesCfgIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+        "This object is used to uniquely identify a CES circuit. The value
+        of this object should be the same as the value of ifIndex when they
+        are used to identify the same CES circuit."
+    ::= { rbnCesCfgEntry 1 }
+
+rbnCesCfgPktLatency OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specifies the time of packetizing frames into a packet.
+        The packet latency is calculated by multiplying number of frames by a
+        constant frame packetization time(125 microseconds). The system
+        packetizes 8 frames into a packet by default"
+    DEFVAL { 1000 }
+    ::= { rbnCesCfgEntry 2 }
+
+rbnCesCfgJtrBfrDepth OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The number of microseconds of expected packet delay variation
+        for this CES PW over PSN. The value must be at least two times
+        the expected packet jitter through the network."
+    DEFVAL { 5000 }
+    ::= { rbnCesCfgEntry 3 }
+
+rbnCesCfgConsecPktsInSync OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The number of consecutive packets that are required to
+        exit loss of packet state(LOPS)"
+    DEFVAL { 10 }
+    ::= { rbnCesCfgEntry 4 }
+
+rbnCesCfgConsecMissPktsOutSync OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The number of consecutive missing packets that are required to
+        enter loss of packet state(LOPS)"
+    DEFVAL { 1 }
+    ::= { rbnCesCfgEntry 5 }
+
+rbnCesCfgIdlePattern OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (1)) 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The object determines the value to be used on the TDM channel
+        when packets have over/underflow in the jitter buffer or
+        are missing for any reason at the CES bound. The default value for
+        E1 is 0x54 and T1 is 0x3F."
+    DEFVAL { '3F'H }
+    ::= { rbnCesCfgEntry 6 }
+
+rbnCesCfgTrunkCtl OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object enforces the RFC 5086 requirement that controls at most
+        one CES PW state(AIS or RDI) on the outgoing T1/E1 trunk."
+    DEFVAL { false }
+    ::= { rbnCesCfgEntry 7 }
+
+rbnCesCfgAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        up(1),
+        down(2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "This object controls CES feature on the circuit. Setting this object
+         to 'up' enables CES on the circuit; setting this object to 'down'
+         disables CES on the circuit and removes corresponding entries in the
+         rbnCesStatsTable, rbnCesEplStatsTable, and rbnCesSlaInfoTable.
+
+         To modify other 'read-create' objects in the conceptual row, this
+         object must be set to 'down'. The value of 'rbnCesCfgRowStatus'
+         must be 'active' in order for this object to be set to 'up'."
+     DEFVAL { down }
+     ::= { rbnCesCfgEntry 8 }
+
+rbnCesCfgRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "This object is used to manage the creation and deletion of CES
+         configuration conceptual rows.
+
+         Except 'rbnCesCfgAdminStatus', 'read-create' objects in
+         the conceptual row cannot be modified when this object is set to
+         active(1).
+
+         To change this object from 'active' to a different value,
+         the 'rbnCesCfgAdminStatus' object must be 'down'.
+
+         To create a row in this table, this object could be set to
+         either 'createAndGo(4)' or 'createAndWait(5)'. Until all objects in
+         the conceptual row are appropriately configured, this object 
+         will transit to 'notReady(3)'."
+    ::= { rbnCesCfgEntry 9 }
+
+--
+-- CES Statistics Table
+--
+rbnCesStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnCesStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "CES statistics table."
+    ::= { rbnCesMIBObjects 3 }
+
+rbnCesStatsEntry OBJECT-TYPE
+    SYNTAX      RbnCesStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table represents a CES circuit."
+    AUGMENTS { rbnCesCfgEntry }
+    ::= { rbnCesStatsTable 1 }
+
+RbnCesStatsEntry ::=
+    SEQUENCE {
+        rbnCesStatsEgressOutOfBfrDroppedPkts       Counter64,
+        rbnCesStatsEgressMissingPkts               Counter64,
+        rbnCesStatsEgressMalformedPkts             Counter64,
+        rbnCesStatsEgressJtrBfrOverrunPkts         Counter64,
+        rbnCesStatsEgressJtrBfrUnderruns           Counter64,
+        rbnCesStatsEgressMisOrderPkts              Counter64,
+        rbnCesStatsEgressRemoteLossPkts            Counter64,
+        rbnCesStatsEgressWindowSwitchovers         Counter64,
+        rbnCesStatsEgressRemoteAcDownPkts          Counter64,
+        rbnCesStatsEgressDuplicatePkts             Counter64,
+        rbnCesStatsEgressDeniedPkts                Counter64,
+        rbnCesStatsEgressErrorEvents               Counter64,
+        rbnCesStatsEgressErrorDataBlocks           Counter64,
+        rbnCesStatsIngressOutOfBfrDroppedPkts      Counter64,
+        rbnCesStatsIngressSizeViolationDroppedPkts Counter64,
+        rbnCesStatsIngressTransmitDroppedPkts      Counter64
+    }
+
+rbnCesStatsEgressOutOfBfrDroppedPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets dropped due to buffer starvation in the
+        PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 1 }
+
+rbnCesStatsEgressMissingPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of missing packets detected via control word sequence
+        number gaps in the PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 2 }
+
+rbnCesStatsEgressMalformedPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of malformed packets including unexpected size in
+        the PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 3 }
+
+rbnCesStatsEgressJtrBfrOverrunPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets dropped due to jitter buffer overrun in the
+        PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 4 }
+
+rbnCesStatsEgressJtrBfrUnderruns OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of times jitter buffer underrun has been detected in the
+        PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 5 }
+
+rbnCesStatsEgressMisOrderPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of out of sequence packets received in the PSN to TDM
+        direction(egress)."
+    ::= { rbnCesStatsEntry 6 }
+
+rbnCesStatsEgressRemoteLossPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets received with the R bit set in the PSN to
+        TDM direction(egress)."
+    ::= { rbnCesStatsEntry 7 }
+
+rbnCesStatsEgressWindowSwitchovers OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of times serial number lost synchronization and was 
+        forced to move to a new window in the PSN to TDM direction(egress)." 
+    ::= { rbnCesStatsEntry 8 }
+
+rbnCesStatsEgressRemoteAcDownPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets received with L bit set to 1, indicating that
+        the far end's attachment circuit is down (in LOF or LOS or AIS) in
+        the PSN to TDM direction(egress). Either AIS or idle pattern
+        was played out on the local access circuit."
+    ::= { rbnCesStatsEntry 9 }
+
+rbnCesStatsEgressDuplicatePkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets dropped due to being duplicated, as determined
+        by the PW codeword sequence number in the PSN to TDM
+        direction(egress)."
+    ::= { rbnCesStatsEntry 10 }
+
+rbnCesStatsEgressDeniedPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets dropped because they are denied in the
+        PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 11 }
+
+rbnCesStatsEgressErrorEvents OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of times a packet is replaced with a dummy packet in
+        the PSN to TDM direction(egress) because the system is in underrun
+        mode or the packet was lost."
+    ::= { rbnCesStatsEntry 12 }
+
+rbnCesStatsEgressErrorDataBlocks OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Block of data transmitted to the TDM attachment circuit and
+        of a size defined in accordance with the [ITU-T G.826] rules for the
+        corresponding TDM service that has experienced at least one
+        CESoPSN/SAToP error event in the PSN to TDM direction(egress).
+
+        For example, consider a T1/E1 Attachment Circuit
+        Error Data Block for T1 = Error Event * (192 * Packet Latency)
+        Error Data Block for E1 = Error Event * (256 * Packet Latency)"
+    REFERENCE
+        "ITU-T G.826: Error performance parameters and objectives for
+        international, constant bit rate digital paths at or above the
+        primary rate"
+    ::= { rbnCesStatsEntry 13 }
+
+rbnCesStatsIngressOutOfBfrDroppedPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets that could not be sent due to buffer starvation
+        in the PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 14 }
+
+rbnCesStatsIngressSizeViolationDroppedPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets not transmitted because their size is greater
+        than the largest supported in the PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 15 }
+
+rbnCesStatsIngressTransmitDroppedPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of packets not transmitted due to congestion in
+        the transmit queue in the PSN to TDM direction(egress)."
+    ::= { rbnCesStatsEntry 16 }
+
+--
+-- CES Excessive Packet Loss(EPL) Configuration Table
+--
+rbnCesEplCfgTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnCesEplCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "CES excessive packet loss configuration table."
+    ::= { rbnCesMIBObjects 4 }
+
+rbnCesEplCfgEntry OBJECT-TYPE
+    SYNTAX      RbnCesEplCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table represents a set of global CES excessive
+        packet loss configuration."
+    INDEX { rbnCesEplCfgIndex }
+    ::= { rbnCesEplCfgTable 1 }
+
+RbnCesEplCfgEntry ::=
+    SEQUENCE {
+        rbnCesEplCfgIndex                Integer32,
+        rbnCesEplCfgThreshold            RbnPercentage,
+        rbnCesEplCfgFaultDeclarationTime Unsigned32,
+        rbnCesEplCfgClearingTime         Unsigned32,
+        rbnCesEplCfgStatsResetAll        TruthValue,
+        rbnCesEplCfgAdminStatus          INTEGER, 
+        rbnCesEplCfgRowStatus            RowStatus
+    }
+
+rbnCesEplCfgIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..2147483647)
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+        "This object is used to uniquely identify a set of CES excessive
+        packet loss configuration."
+    ::= { rbnCesEplCfgEntry 1 }
+
+rbnCesEplCfgThreshold OBJECT-TYPE
+    SYNTAX      RbnPercentage
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Threshold in percentage representing the upper limits of
+        measurement for excessive packet loss. It is the ratio of
+        (Total Lost Packets) / (Total Transmitted Packets)"
+    ::= { rbnCesEplCfgEntry 2 }
+
+rbnCesEplCfgFaultDeclarationTime OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object controls fault declaration time of excessive packet loss
+        alarm. It is a successive duration that experience excessive packet
+        loss defect."
+    DEFVAL { 2500 }
+    ::= { rbnCesEplCfgEntry 3 }
+
+rbnCesEplCfgClearingTime OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object controls how excessive packet loss alarms are cleared.
+        It is a successive periods of duration T that do not experience an
+        excessive packet loss defect. Duration T is a system constant value
+        which is 25 milliseconds."
+    DEFVAL { 10000 }
+    ::= { rbnCesEplCfgEntry 4 }
+
+rbnCesEplCfgStatsResetAll OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Setting this object to 'true' resets all CES excessive packet
+        loss statistic objects in the rbnCesEplStatsTable. This object
+        always returns 'false' value."
+    DEFVAL { false }
+    ::= { rbnCesEplCfgEntry 5 }
+
+rbnCesEplCfgAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        up(1),
+        down(2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "This object controls the CES excessive packet loss configurations.
+         Setting this object to 'up' enables CES excessive packet loss
+         monitoring on all CES circuits in the system; setting this object
+         to 'down' disables the feature and removes all entries in the
+         rbnCesEplStatsTable. There is only one active CES excessive packet
+         loss configuration allowed.
+
+         To modify other 'read-create' objects in the conceptual row, the
+         'rbnCesEplCfgAdminStatus' object must be set to 'down'. The value of
+         the 'rbnCesEplCfgRowStatus' object must be 'active' in order for this
+         object to be set to 'up'."
+     DEFVAL { down }
+     ::= { rbnCesEplCfgEntry 6 }
+
+rbnCesEplCfgRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "This object is used to manage the creation and deletion of CES
+         excessive packet loss configuration conceptual rows.
+
+         Except 'rbnCesEplCfgAdminStatus', 'read-create' objects in
+         the conceptual row cannot be modified when this object is set to
+         active(1).
+
+         To change this object from 'active' to a different value,
+         the 'rbnCesEplCfgAdminStatus' object must be 'down'.
+
+         To create a row in this table, this object could be set to
+         either 'createAndGo(4)' or 'createAndWait(5)'. Until all objects in
+         the conceptual row are appropriately configured, this object 
+         will transit to 'notReady(3)'."
+    ::= { rbnCesEplCfgEntry 7 }
+
+--
+-- CES Excessive Packet Loss(EPL) Statistics Table
+--
+rbnCesEplStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnCesEplStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "CES excessive packet loss statistics table."
+    ::= { rbnCesMIBObjects 5 }
+
+rbnCesEplStatsEntry OBJECT-TYPE
+    SYNTAX      RbnCesEplStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table represents a CES circuit."
+    INDEX { rbnCesEplStatsIndex }
+    ::= { rbnCesEplStatsTable 1 }
+
+RbnCesEplStatsEntry ::=
+    SEQUENCE {
+        rbnCesEplStatsIndex                 InterfaceIndex,
+        rbnCesEplStatsEntryTime             DateAndTime,
+        rbnCesEplStatsEntryTotalPktLossTime TimeInterval,
+        rbnCesEplStatsExitTime              TimeInterval,
+        rbnCesEplStatsExitTotalPktLossTime  TimeInterval,
+        rbnCesEplStatsCount                 Gauge32,
+        rbnCesEplStatsTotalCircuitTime      TimeInterval,
+        rbnCesEplStatsTotalFailureRate      RbnPercentage,
+        rbnCesEplStatsReset                 TruthValue
+    }
+
+rbnCesEplStatsIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+        "This object is used to uniquely identify a CES circuit. The value
+        of this object should be the same as the value of ifIndex when they
+        are used to identify the same CES circuit."
+    ::= { rbnCesEplStatsEntry 1 }
+
+rbnCesEplStatsEntryTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Date and time when the current excessive packet loss snapshot starts."
+    ::= { rbnCesEplStatsEntry 2 }
+
+rbnCesEplStatsEntryTotalPktLossTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The entry total packet loss time of current excessive packet loss
+        snapshot."
+    ::= { rbnCesEplStatsEntry 3 }
+
+rbnCesEplStatsExitTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The exit packet loss time of current excessive packet loss snapshot."
+    ::= { rbnCesEplStatsEntry 4 }
+
+rbnCesEplStatsExitTotalPktLossTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The exit total packet loss time of current excessive packet loss
+        snapshot."
+    ::= { rbnCesEplStatsEntry 5 }
+
+rbnCesEplStatsCount OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The total number of times when the CES PW was in the excessive
+        packet loss state."
+    ::= { rbnCesEplStatsEntry 6 }
+
+rbnCesEplStatsTotalCircuitTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total CES PW time including CES PW up time and time spent in excessive
+        packet loss state."
+    ::= { rbnCesEplStatsEntry 7 }
+
+rbnCesEplStatsTotalFailureRate OBJECT-TYPE
+    SYNTAX      RbnPercentage
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The percentage of time the CES PW spent in the excessive packet
+        loss state during the total CES PW time."
+    ::= { rbnCesEplStatsEntry 8 }
+
+rbnCesEplStatsReset OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object is used to reset CES EPL statistic objects in the entry.
+        Setting this object to 'true' resets 'rbnCesEplStatsEntryTime'
+        to current time and other CES EPL statistic objects to zero. The object
+        always returns 'false' value."
+    DEFVAL { false }
+    ::= { rbnCesEplStatsEntry 9 }
+
+--
+-- CES Service Level Agreement(SLA) Information Table
+--
+rbnCesSlaInfoTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnCesSlaInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "CES Service Level Agreement information table."
+    ::= { rbnCesMIBObjects 6 }
+
+rbnCesSlaInfoEntry OBJECT-TYPE
+    SYNTAX      RbnCesSlaInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table represents a CES circuit that is in its
+        outage state."
+    INDEX { rbnCesSlaInfoIndex }
+    ::= { rbnCesSlaInfoTable 1 }
+
+RbnCesSlaInfoEntry ::=
+    SEQUENCE {
+        rbnCesSlaInfoIndex             InterfaceIndex,
+        rbnCesSlaInfoLatestOutageTime  TimeInterval,
+        rbnCesSlaInfoEntryLatestOutage DateAndTime,
+        rbnCesSlaInfoExitLatestOutage  DateAndTime,
+        rbnCesSlaInfoLastOutageTime    TimeInterval,
+        rbnCesSlaInfoLastUpTime        TimeInterval,
+        rbnCesSlaInfoTotalOutageTime   TimeInterval,
+        rbnCesSlaInfoTotalUpTime       TimeInterval,
+        rbnCesSlaInfoOutageCount       Gauge32,
+        rbnCesSlaInfoReset             TruthValue
+    }
+
+rbnCesSlaInfoIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+        "This object is used to uniquely identify a CES circuit. The value
+        of this object should be the same as the value of ifIndex when they
+        are used to identify the same CES interface."
+    ::= { rbnCesSlaInfoEntry 1 }
+
+rbnCesSlaInfoLatestOutageTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The amount of time during the latest occurrence when the CES PW was
+        in the packet loss or underrun state."
+    ::= { rbnCesSlaInfoEntry 2 }
+
+rbnCesSlaInfoEntryLatestOutage OBJECT-TYPE
+    SYNTAX      DateAndTime 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Date and time of the most recent occurrence when the CES PW entered
+        the packet loss or underrun state."
+    ::= { rbnCesSlaInfoEntry 3 }
+
+rbnCesSlaInfoExitLatestOutage OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Date and time of the most recent occurrence when the CES PW exited
+        the packet loss or underrun state."
+    ::= { rbnCesSlaInfoEntry 4 }
+
+rbnCesSlaInfoLastOutageTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The duration of the previous occurrence(the one before the latest
+        occurrence) when the CES PW was in the packet loss or underrun state."
+    ::= { rbnCesSlaInfoEntry 5 }
+
+rbnCesSlaInfoLastUpTime OBJECT-TYPE
+    SYNTAX      TimeInterval 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total CES PW up time before the latest outage occurred."
+    ::= { rbnCesSlaInfoEntry 6 }
+
+rbnCesSlaInfoTotalOutageTime OBJECT-TYPE
+    SYNTAX      TimeInterval 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total outage time since the CES PW was created."
+    ::= { rbnCesSlaInfoEntry 7 }
+
+rbnCesSlaInfoTotalUpTime OBJECT-TYPE
+    SYNTAX      TimeInterval 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Total CES PW up time since it was created excluding 
+        the cumulative outage time."
+    ::= { rbnCesSlaInfoEntry 8 }
+
+rbnCesSlaInfoOutageCount OBJECT-TYPE
+    SYNTAX      Gauge32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of times a CES PW outage occurred."
+    ::= { rbnCesSlaInfoEntry 9 }
+
+rbnCesSlaInfoReset OBJECT-TYPE
+    SYNTAX      TruthValue 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Setting this object to 'true' resets CES SLA objects to zero.
+        The object always returns 'false' value."
+    DEFVAL { false }
+    ::= { rbnCesSlaInfoEntry 10 }
+
+--
+-- CES Card Alarm Table
+--
+rbnCesCardAlarmTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RbnCesCardAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table consists of CES specific card alarms. The alarms are used
+        to indicate CES card level communication errors. Other card alarms are
+        not included in the table."
+    REFERENCE
+        "RBN-CARDMON-MIB and RBN-ALARM-TC."
+    ::= { rbnCesMIBObjects 7 }
+
+rbnCesCardAlarmEntry OBJECT-TYPE
+    SYNTAX      RbnCesCardAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry in this table represents a CES specific card alarm."
+    INDEX { rbnCesCardAlarmId }
+    ::= { rbnCesCardAlarmTable 1 }
+
+RbnCesCardAlarmEntry ::=
+    SEQUENCE {
+        rbnCesCardAlarmId                 RbnAlarmId,
+        rbnCesCardAlarmNotificationEnable TruthValue
+    }
+
+rbnCesCardAlarmId OBJECT-TYPE
+    SYNTAX      RbnAlarmId 
+    MAX-ACCESS  not-accessible 
+    STATUS      current
+    DESCRIPTION
+        "This object is used to uniquely identify a CES card alarm."
+    ::= { rbnCesCardAlarmEntry 1 }
+
+rbnCesCardAlarmNotificationEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates whether rbnCardAlarm notification is generated.
+        If true, a notification is generated for the card alarm indicated
+        by rbnCesCardAlarmId. Otherwise no notification is generated."
+    DEFVAL { false }
+    ::= { rbnCesCardAlarmEntry 2 }
+
+--
+-- Conformance Information
+--
+rbnCesMIBCompliances OBJECT IDENTIFIER ::= { rbnCesMIBConformance 1 }
+rbnCesMIBGroups      OBJECT IDENTIFIER ::= { rbnCesMIBConformance 2 }
+
+rbnCesMIBCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "The compliance statement for CES MIB implementations."
+    MODULE -- this module
+    MANDATORY-GROUPS  {
+        rbnCesCfgGroup,
+        rbnCesStatsGroup,
+        rbnCesEplCfgGroup,
+        rbnCesEplStatsGroup,
+        rbnCesSlaInfoGroup,
+        rbnCesCardAlarmGroup
+    }
+
+    OBJECT rbnCesSlaInfoResetAll 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgPktLatency
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgJtrBfrDepth
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgConsecPktsInSync 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgConsecMissPktsOutSync
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgIdlePattern
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgTrunkCtl
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgAdminStatus 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCfgRowStatus 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesEplCfgThreshold
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesEplCfgFaultDeclarationTime 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesEplCfgClearingTime
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesEplCfgStatsResetAll 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesEplCfgAdminStatus 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesEplCfgRowStatus 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesEplStatsReset 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesSlaInfoReset 
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    OBJECT rbnCesCardAlarmNotificationEnable
+    MIN-ACCESS  read-only
+    DESCRIPTION
+        "Write access is not required."
+
+    ::= { rbnCesMIBCompliances 1 }
+
+rbnCesCfgGroup  OBJECT-GROUP
+    OBJECTS  {
+        rbnCesSlaInfoResetAll,
+        rbnCesCfgPktLatency,
+        rbnCesCfgJtrBfrDepth,
+        rbnCesCfgConsecPktsInSync,
+        rbnCesCfgConsecMissPktsOutSync,
+        rbnCesCfgIdlePattern,
+        rbnCesCfgTrunkCtl,
+        rbnCesCfgAdminStatus,
+        rbnCesCfgRowStatus
+    }
+    STATUS current
+    DESCRIPTION
+       "Conformance group for CES configurations."
+    ::= { rbnCesMIBGroups 1 }
+
+rbnCesStatsGroup  OBJECT-GROUP
+    OBJECTS  {
+        rbnCesStatsEgressOutOfBfrDroppedPkts,
+        rbnCesStatsEgressMissingPkts,
+        rbnCesStatsEgressMalformedPkts,
+        rbnCesStatsEgressJtrBfrOverrunPkts,
+        rbnCesStatsEgressJtrBfrUnderruns,
+        rbnCesStatsEgressMisOrderPkts,
+        rbnCesStatsEgressRemoteLossPkts,
+        rbnCesStatsEgressWindowSwitchovers,
+        rbnCesStatsEgressRemoteAcDownPkts,
+        rbnCesStatsEgressDuplicatePkts,
+        rbnCesStatsEgressDeniedPkts,
+        rbnCesStatsEgressErrorEvents,
+        rbnCesStatsEgressErrorDataBlocks,
+        rbnCesStatsIngressOutOfBfrDroppedPkts,
+        rbnCesStatsIngressSizeViolationDroppedPkts,
+        rbnCesStatsIngressTransmitDroppedPkts
+    }
+    STATUS current
+    DESCRIPTION
+       "Conformance group for CES statistics."
+    ::= { rbnCesMIBGroups 2 }
+
+rbnCesEplCfgGroup  OBJECT-GROUP
+    OBJECTS  {
+        rbnCesEplCfgThreshold,
+        rbnCesEplCfgFaultDeclarationTime,
+        rbnCesEplCfgClearingTime,
+        rbnCesEplCfgStatsResetAll,
+        rbnCesEplCfgAdminStatus, 
+        rbnCesEplCfgRowStatus
+    }
+    STATUS current
+    DESCRIPTION
+       "Conformance group for CES excessive packet loss configurations."
+    ::= { rbnCesMIBGroups 3 }
+
+rbnCesEplStatsGroup  OBJECT-GROUP
+    OBJECTS  {
+        rbnCesEplStatsEntryTime,
+        rbnCesEplStatsEntryTotalPktLossTime,
+        rbnCesEplStatsExitTime,
+        rbnCesEplStatsExitTotalPktLossTime,
+        rbnCesEplStatsCount,
+        rbnCesEplStatsTotalCircuitTime,
+        rbnCesEplStatsTotalFailureRate,
+        rbnCesEplStatsReset
+    }
+    STATUS current
+    DESCRIPTION
+       "Conformance group for CES excessive packet loss statistics."
+    ::= { rbnCesMIBGroups 4 }
+
+rbnCesSlaInfoGroup  OBJECT-GROUP
+    OBJECTS  {
+        rbnCesSlaInfoLatestOutageTime,
+        rbnCesSlaInfoEntryLatestOutage,
+        rbnCesSlaInfoExitLatestOutage,
+        rbnCesSlaInfoLastOutageTime,
+        rbnCesSlaInfoLastUpTime,
+        rbnCesSlaInfoTotalOutageTime,
+        rbnCesSlaInfoTotalUpTime,
+        rbnCesSlaInfoOutageCount,
+        rbnCesSlaInfoReset
+    }
+    STATUS current
+    DESCRIPTION
+       "Conformance group for CES service level agreement statistics."
+    ::= { rbnCesMIBGroups 5 }
+
+rbnCesCardAlarmGroup  OBJECT-GROUP
+    OBJECTS  {
+        rbnCesCardAlarmNotificationEnable
+    }
+    STATUS current
+    DESCRIPTION
+       "Conformance group for CES card alarms."
+    ::= { rbnCesMIBGroups 6 }
+
+END

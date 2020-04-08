@@ -1,0 +1,5074 @@
+
+SWITCH_MIB DEFINITIONS ::= BEGIN
+-- FILE : SWITCH.MIB file, v 2.01.08 b2JzCg
+-- ==================================================================
+
+IMPORTS
+     mgmt, NetworkAddress, IpAddress, Counter, Gauge,
+     TimeTicks                      FROM RFC1155-SMI
+     DisplayString                  FROM RFC1213-MIB
+     TRAP-TYPE                      FROM RFC-1215
+     OBJECT-TYPE                    FROM RFC-1212;
+
+
+-- mgmt        			OBJECT IDENTIFIER ::= { iso org(3) dod(6) internet(1) mgmt(2) }
+-- directory   			OBJECT IDENTIFIER ::= { internet 1 }
+-- experimental                 OBJECT IDENTIFIER ::= { internet 3 }
+-- private     			OBJECT IDENTIFIER ::= { internet 4 }
+-- enterprises 			OBJECT IDENTIFIER ::= { private 1 }
+
+
+MacAddress ::= OCTET STRING (SIZE (6))    -- a 6 octet address in
+
+PortList ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "Each octet within this value specifies a set of eight
+    ports, with the first octet specifying ports 1 through
+    8, the second octet specifying ports 9 through 16, etc.
+    Within each octet, the most significant bit represents
+    the lowest numbered port, and the least significant bit
+    represents the highest numbered port.  Thus, each port
+    of the bridge is represented by a single bit within the
+    value of this object.  If that bit has a value of '1'
+    then that port is included in the set of ports; the port
+    is not included if its bit has a value of '0'."
+    SYNTAX  OCTET STRING
+
+
+
+
+
+BitList ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    " "
+    SYNTAX  OCTET STRING
+
+
+
+
+-- =======================================================================
+private        OBJECT IDENTIFIER ::= { 1 3 6 1 4 }
+enterprises    OBJECT IDENTIFIER ::= { 1 3 6 1 4 1 }
+kti            OBJECT IDENTIFIER ::= { 1 3 6 1 4 1 867 }
+switch         OBJECT IDENTIFIER ::= { 1 3 6 1 4 1 867 100}
+-- =======================================================================
+
+-- Switch Common MIB Definition
+
+basicSwitchMgt  OBJECT IDENTIFIER ::= { switch 1 }
+basicPortMgt    OBJECT IDENTIFIER ::= { switch 2 }
+trapMgt         OBJECT IDENTIFIER ::= { switch 3 }
+addrMgt         OBJECT IDENTIFIER ::= { switch 4 }
+statisticMgt    OBJECT IDENTIFIER ::= { switch 5 }
+portMirrorMgt   OBJECT IDENTIFIER ::= { switch 6 }
+virtualLanMgt   OBJECT IDENTIFIER ::= { switch 7 }
+trunkMgt        OBJECT IDENTIFIER ::= { switch 8 }
+spanningTreeMgt OBJECT IDENTIFIER ::= { switch 9 }
+priorityMgt     OBJECT IDENTIFIER ::= { switch 10 }
+igmpMgt         OBJECT IDENTIFIER ::= { switch 11 }
+dot1xMgt	OBJECT IDENTIFIER ::= { switch 12 }
+macsecMgt	OBJECT IDENTIFIER ::= { switch 13 }
+ratecontrolMgt  OBJECT IDENTIFIER ::= { switch 14 }
+stormcontrolMgt OBJECT IDENTIFIER ::= { switch 15 }
+loggingMgt	OBJECT IDENTIFIER ::= { switch 16 }
+option82Mgt     OBJECT IDENTIFIER ::= { switch 17 }
+mvrMgt          OBJECT IDENTIFIER ::= { switch 18 }
+ipmacMgt        OBJECT IDENTIFIER ::= { switch 19 }
+aclMgt          OBJECT IDENTIFIER ::= { switch 20 }
+loopbackMgt     OBJECT IDENTIFIER ::= { switch 21 }
+dhcpsnoopMgt    OBJECT IDENTIFIER ::= { switch 22 }
+lldpMgt         OBJECT IDENTIFIER ::= { switch 23 }
+-- =======================================================================
+
+
+-- 1 =======================================================================
+-- (.655.6.5.100.1)
+-- Switch management, mandatory
+--
+
+   switchSoftwareVersion   OBJECT-TYPE
+     SYNTAX    DisplayString( SIZE(0..16))
+     ACCESS    read-only
+     STATUS    mandatory
+     DESCRIPTION
+          " The current software/firmware version implemented in this
+        device represented in non-zero integer.
+        e.g. 10000 means version 1.00.00"
+      ::= { basicSwitchMgt 2 }
+
+   switchHwAgingSwitch  OBJECT-TYPE
+       SYNTAX  INTEGER
+           {   enable (1),
+           disable (2)
+           }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " Enable the HW aging or not."
+       ::= { basicSwitchMgt 3 }
+
+   switchAgingTime  OBJECT-TYPE
+       SYNTAX  INTEGER (1..65535)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " The timeout period in seconds for aging out
+         dynamically learned forwarding information.
+         802.1D-1990 recommends a default of 300 seconds.
+         the unit is 1 sec."
+       REFERENCE
+           " IEEE 802.1D-1990: Section 6.7.1.1.3 "
+       ::= { basicSwitchMgt 4 }
+
+   switchRestartControl  OBJECT-TYPE
+       SYNTAX     INTEGER {
+               running(1),
+               reset(2),
+               restore(3)
+         }
+       MAX-ACCESS read-write
+       STATUS     current
+       DESCRIPTION
+       "Setting this object to warmBoot(2) causes the device to
+       restart the application software with current configuration
+       parameters saved in non-volatile memory.  Setting this
+       object to coldBoot(3) causes the device to reinitialize
+       configuration parameters in non-volatile memory to default
+       values and restart the application software.  When the device
+       is running normally, this variable has a value of
+       running(1)."
+       ::= { basicSwitchMgt 5 }
+
+
+   switchPortNumber OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+           " The total port number of this switch."
+       ::= { basicSwitchMgt 6 }
+
+    switchAutoMode OBJECT-TYPE
+	SYNTAX	INTEGER
+		{
+		    autoDetect(1),
+		    autoNegotiation(2)
+		}
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		" AutoDetect(1)/AutoNegotiation(2) of the Auto Mode in this switch."
+       ::= { basicSwitchMgt 9 }
+       
+   switchVlanMode OBJECT-TYPE
+  SYNTAX	INTEGER
+		{
+		    iVL(1),
+		    sVL(2)
+		}
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"IVL(1)/SVL(2) of the VLAN Mode in this switch."
+       ::= { basicSwitchMgt 10 }
+
+
+       
+
+-- 2 =======================================================================
+-- (.655.6.100.1.2)
+-- 
+-- Port Management, mandatory
+--
+
+-- (.655.6.100.1.2.1)
+-- basic port management
+--
+
+   portTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF PortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+           " Basic information for each port."
+       ::= { basicPortMgt  1 }
+
+   portEntry  OBJECT-TYPE
+       SYNTAX  PortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       INDEX   { portIndex }
+--       DESCRIPTION
+--         " Port information entry."
+       ::= { portTable  1 }
+
+   PortEntry ::=
+       SEQUENCE {
+       portIndex
+           INTEGER,
+       portName
+           DisplayString,
+       portType
+           INTEGER,
+       portLink
+           INTEGER,
+       portAdminEnable
+           INTEGER,
+       portAutoNegotiation
+           INTEGER,
+       portCapabilities
+            BitList,
+       portPartnerCapability
+            BitList,
+       portSpeedDpxStatus
+           INTEGER,
+       portFlowControlConfiguration
+           INTEGER
+--     portPowerSaving
+--         INTEGER,
+--     portTrunkID
+--         INTEGER,
+--     portMaximumPacketLength
+--         INTEGER
+       }
+
+   portIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " port number,
+         This is defined as ifIndex in the IF-MIB.
+           "
+       ::= { portEntry 1 }
+
+   portName  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..12))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " Name of each port."
+       ::= { portEntry 2 }
+
+   portType  OBJECT-TYPE
+       SYNTAX  INTEGER
+           {   
+         --  other(1),
+         --  HundredBaseTX(2),
+         --  hundredBaseFX(3)
+             other(1),
+             tx100(2),
+             fx100(3),
+             sx1000(11),
+             lx1000(12),
+             t1000(13),
+             gbic1000(14),
+             fx1000(15)
+           }
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The type of each port."
+       ::= { portEntry 3 }
+
+   portLink  OBJECT-TYPE
+       SYNTAX  INTEGER
+           {   
+           up(1),
+           down(2)
+           }
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " This object indicates the link status of each port is
+         up or down."
+       ::= { portEntry 4 }
+
+   portAdminEnable  OBJECT-TYPE
+       SYNTAX  INTEGER
+           {   enable (1),
+           disable (2)
+           }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " Enable/disable status of the port"
+       ::= { portEntry 5 }
+
+
+-- Port Speed & duplex mode
+
+
+--   portAdminMode    OBJECT-TYPE
+--       SYNTAX  INTEGER
+--           {   
+--           autoNegotiation (1),
+--           half10M (2),
+--           full10M (3),
+--           half100M (4),
+--           full100M (5)
+--           }
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--           " To Control the speed & duplex mode for 10/100Mb ports,
+--            default = AutoNegotiation (1)
+--         (1) AutoNegotiation : detect by AN (i.e. AN enable)
+--             if link partner do not support AN,
+--             the port is force to half duplex mode.
+--         (2) 10MHalf : force to 10M bps & half duplex mode
+--         (3) 10MFull : force to 10M bps & full duplex mode
+--         (4) 100MHalf : force to 100M bps & half duplex mode
+--         (5) 100MFull : force to 100M bps & full duplex mode
+--         (6) 1000MHalf : force to 1000M bps & half duplex mode
+--         (7) 1000MFull : force to 1000M bps & full duplex mode
+--         The actual operating speed and duplex of the port
+--         is given by portSpeedDpxStatus."
+--       ::= { portEntry 6 }
+       
+
+   portAutoNegotiation  OBJECT-TYPE
+       SYNTAX  INTEGER
+           {   enable (1),
+           disable (2)
+           }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " Enable(1)/disable(2) status of auto negotiation"
+       ::= { portEntry 6 }
+
+
+       
+    portCapabilities OBJECT-TYPE
+     SYNTAX   BitList
+        MAX-ACCESS  read-only
+        STATUS      current
+    DESCRIPTION "Port capabilities.
+         {
+            portCap10half(0),
+            portCap10full(1),
+            portCap100half(2),
+            portCap100full(3),
+            portCap1000half(4),
+            portCap1000full(5),    
+            reserved6(6),
+            reserved7(7),
+            reserved8(8),
+            reserved9(9),
+            reserved10(10),
+            reserved11(11),
+            reserved12(12),
+            reserved13(13),
+            reserved14(14),
+            portCapFlowCtrl(15)
+         }    
+    "
+
+    ::= { portEntry 7 }
+
+   portPartnerCapability  OBJECT-TYPE
+    SYNTAX  BitList
+      MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Port PartnerCapability.
+         {
+            portCap10half(0),
+            portCap10full(1),
+            portCap100half(2),
+            portCap100full(3),
+            portCap1000half(4),
+            portCap1000full(5),    
+            reserved6(6),
+            reserved7(7),
+            reserved8(8),
+            reserved9(9),
+            reserved10(10),
+            reserved11(11),
+            reserved12(12),
+            reserved13(13),
+            reserved14(14),
+            portCapFlowCtrl(15)
+         }    
+    "      
+       ::= { portEntry 8 }  
+
+   portSpeedDpxStatus  OBJECT-TYPE
+    SYNTAX  INTEGER
+        {
+            half0m(1),
+            halfDuplex10(2),
+            fullDuplex10(3),
+            halfDuplex100(4),
+            fullDuplex100(5),
+--            halfDuplex1000(6),
+            fullDuplex1000(7)
+--            full0m(8),
+        }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           "The operating speed and duplex mode of the switched port.
+           "
+       ::= { portEntry 9 }
+
+
+-- Flow control objects
+   portFlowControlConfiguration  OBJECT-TYPE
+       SYNTAX  INTEGER
+           {   enable (1),
+           disable (2)
+           }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " Flow control configuration,
+           "
+       ::= { portEntry 10 }
+
+--   portPowerSaving OBJECT-TYPE
+--    SYNTAX  INTEGER
+--        {
+--            enable(1),
+--            disable(2)
+--        }
+--    ACCESS  read-write
+--    STATUS  mandatory
+--    DESCRIPTION
+--        " Enable/disable Power Saving status of the port
+--        "
+--    ::= { portEntry 11 }
+
+--    portTrunkID OBJECT-TYPE
+--    SYNTAX  INTEGER
+--    ACCESS  read-only
+--    STATUS  current
+--    DESCRIPTION
+--           " The trunk to which this port belongs. A value of 0
+--         means that this port does not belong to any trunk.
+--         A value greater than zero means that this port
+--         belongs to trunk at trunkIndex, defined by the
+--         corresponding trunkPorts.
+--           "
+--    ::= { portEntry 12 }
+
+--   portMaximumPacketLength OBJECT-TYPE
+--    SYNTAX  INTEGER
+--    ACCESS  read-write
+--    STATUS  mandatory
+--    DESCRIPTION
+--        " Select Maximum Packet Length of the port. The value must is 1518, 1532, 9216, 9600.
+--        "
+--    ::= { portEntry 13 }
+    
+-- (.655.6.100.1.2.2)
+-- net configuration
+--
+
+   netConfigTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF NetConfigEntry
+     ACCESS    not-accessible
+     STATUS    mandatory
+     DESCRIPTION
+          " This table contains addressing information relevant
+        to this interface corresponding to IfEntry table.
+        The number of entries is given by the value of ifNumber."
+       ::= { basicPortMgt  2 }
+
+   netConfigEntry  OBJECT-TYPE
+     SYNTAX    NetConfigEntry
+     ACCESS    not-accessible
+     STATUS    mandatory
+     INDEX     { netConfigIndex }
+     ::= { netConfigTable 1}
+
+   NetConfigEntry  ::=
+      SEQUENCE {
+        netConfigIndex
+             INTEGER,
+        netConfigOperation
+             INTEGER,
+        netConfigMacAddr
+             MacAddress,
+        netConfigIpAddr
+             IpAddress,
+        netConfigSNetMask
+             IpAddress,
+        netConfigDfGateway
+             IpAddress
+--        DHCPConfiguration
+--             INTEGER,
+--        DHCPRenewRelease
+--             INTEGER
+      }
+
+   netConfigIndex    OBJECT-TYPE
+       SYNTAX    INTEGER
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " This index value uniquely identifies the interface
+        to which this entry is applicable.
+        This is defined as ifIndex in the IF-MIB.
+          "
+       ::= { netConfigEntry 1 }
+
+   netConfigOperation    OBJECT-TYPE
+       SYNTAX    INTEGER  {
+              ok(1),
+              failure(2)
+             }
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " This object indicates the operational status of this
+        device. "
+       ::= { netConfigEntry 2 }
+
+   netConfigMacAddr  OBJECT-TYPE
+       SYNTAX    MacAddress
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " The MAC address of the specified interface of the
+        device."
+       ::= { netConfigEntry 3 }
+
+   netConfigIpAddr   OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-write
+       STATUS    mandatory
+       DESCRIPTION
+          " The Internet address of the specified interface of the
+        device."
+       ::= { netConfigEntry 4 }
+
+   netConfigSNetMask OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-write
+       STATUS    mandatory
+       DESCRIPTION
+          " The internet address subnet mask of the specified interface
+        of the device."
+       ::= { netConfigEntry 5 }
+
+   netConfigDfGateway     OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-write
+       STATUS    mandatory
+       DESCRIPTION
+          " The default gateway address which the routed packets are
+        delivered to."
+       ::= { netConfigEntry 6 }
+       
+--  DHCPConfiguration    OBJECT-TYPE
+--       SYNTAX    INTEGER  {
+--              enable(1),
+--              disable(2)
+--             }
+--       ACCESS    read-write
+--       STATUS    mandatory
+--       DESCRIPTION
+--          " Request IP form DHCP Server. "
+--       ::= { netConfigEntry 7 } 
+       
+--   DHCPRenewRelease    OBJECT-TYPE
+--       SYNTAX    INTEGER  {
+--              dhcpEnable(1),
+--              dhcpDisable(2)
+--             }
+--       ACCESS    read-write
+--       STATUS    mandatory
+--       DESCRIPTION
+--          " Select Renew(3) or Release(4) must is in DHCP Enable mode"
+--       ::= { netConfigEntry 8 }  
+   
+   
+   protectedTable  OBJECT-TYPE
+     SYNTAX    SEQUENCE OF ProtectedEntry
+     ACCESS    not-accessible
+     STATUS    mandatory
+       ::= { basicPortMgt  3 }
+
+   protectedEntry  OBJECT-TYPE
+     SYNTAX    ProtectedEntry
+     ACCESS    not-accessible
+     STATUS    mandatory
+     INDEX     { protectedenable }
+     ::= { protectedTable 1 }
+
+   ProtectedEntry  ::=
+      SEQUENCE {
+        protectedenable
+             INTEGER
+      }
+
+   protectedenable    OBJECT-TYPE
+       SYNTAX    INTEGER
+        {
+          enable(1),
+          disable(2)
+        }
+       ACCESS    read-write
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select whether the protected Port  is Enable(1) or Disable(2).
+          "
+       ::= { protectedEntry 1 }
+
+--       
+     
+   protectedPortTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF ProtectedPortEntry
+     ACCESS    not-accessible
+     STATUS    mandatory
+     DESCRIPTION
+          " 
+          "
+       ::= { basicPortMgt  4 }
+
+   protectedPortEntry  OBJECT-TYPE
+     SYNTAX    ProtectedPortEntry
+     ACCESS    not-accessible
+     STATUS    mandatory
+     INDEX     { protectedindex }
+     ::= { protectedPortTable 1}
+
+   ProtectedPortEntry  ::=
+      SEQUENCE {
+        protectedindex
+             INTEGER,
+        protectedPortenable
+             INTEGER
+      }
+       
+    protectedindex    OBJECT-TYPE
+       SYNTAX    INTEGER
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " 
+          "
+       ::= { protectedPortEntry 1 }   
+       
+    protectedPortenable    OBJECT-TYPE
+       SYNTAX    INTEGER
+        {
+          enable(1),
+          disable(2)
+        }
+       ACCESS    read-write
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select whether the protected Port of Port is Enable(1) or Disable(2).
+          "
+       ::= { protectedPortEntry 2 }  
+-- 3 =======================================================================
+-- (.655.6.100.1.3)
+-- Trap management, mandatory
+
+   switchTrapManagerTable        OBJECT-TYPE
+      SYNTAX    SEQUENCE OF SwitchTrapManagerEntry     --1.00.03
+      ACCESS    not-accessible
+      STATUS    mandatory
+      DESCRIPTION
+          " This table contains the information needed
+        for sending traps."
+      ::= { trapMgt 1 }
+
+   switchTrapManagerEntry        OBJECT-TYPE
+      SYNTAX    SwitchTrapManagerEntry
+      ACCESS    not-accessible
+      STATUS    mandatory
+      INDEX   { switchTrapManagerIndex }
+      ::=  { switchTrapManagerTable 1}
+
+   SwitchTrapManagerEntry  ::=
+    SEQUENCE {
+        switchTrapManagerIndex
+          INTEGER,
+        switchTrapManagerIpAddr
+          IpAddress,
+        switchTrapManagerComm
+          DisplayString,
+        switchTrapState
+          INTEGER
+       }
+
+   switchTrapManagerIndex    OBJECT-TYPE
+      SYNTAX    INTEGER
+      ACCESS    read-only
+      STATUS    mandatory
+      ::= { switchTrapManagerEntry 1}
+
+--   switchTrapManagerMacAddr  OBJECT-TYPE
+--      SYNTAX    MacAddress
+--      ACCESS    read-only
+--      STATUS    mandatory
+--      DESCRIPTION
+--           " The MAC address of the management station which
+--         trap is sent to ."
+--      ::= { switchTrapManagerEntry 2}
+
+   switchTrapManagerIpAddr    OBJECT-TYPE
+      SYNTAX    IpAddress
+      ACCESS    read-write
+      STATUS    mandatory
+      DESCRIPTION
+           " The Internet address of the management station which
+         trap is sent to ."
+      ::= { switchTrapManagerEntry 2}
+
+   switchTrapManagerComm         OBJECT-TYPE
+      SYNTAX    DisplayString (SIZE(1..16))
+      ACCESS    read-write
+      STATUS    mandatory
+      DESCRIPTION
+          "  Community name used for sending the trap to this management
+         station"
+       ::= { switchTrapManagerEntry 3 }
+       
+   switchTrapState    OBJECT-TYPE
+      SYNTAX    INTEGER
+       {   enable(1),		 
+		       disable(2)
+	     }
+      ACCESS    read-write
+      STATUS    mandatory
+      ::= { switchTrapManagerEntry 4}
+-- 4 =======================================================================
+-- (.655.6.100.1.4)
+-- address management, mandatory
+
+
+-- 4 1 =====================================================================
+-- port address table ======================================================
+-- (.655.6.100.1.4.1)
+
+--   addrPortMgt	OBJECT IDENTIFIER ::= { addrMgt 1 }
+
+--   addrPortTable	OBJECT-TYPE
+--       SYNTAX  SEQUENCE OF AddrPortEntry
+--       ACCESS  not-accessible
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " Address table for each port."
+--       ::= { addrPortMgt  1 }
+
+--   addrPortEntry	OBJECT-TYPE
+--       SYNTAX  AddrPortEntry
+--       ACCESS  not-accessible
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " Address table entry for each port."
+--       INDEX   { addrPortIndex }
+--       ::= { addrPortTable  1 }
+
+--   AddrPortEntry ::=
+--       SEQUENCE {
+--	   addrPortIndex
+--	       INTEGER,
+--	   addrPortLastSrcAddress
+--	       MacAddress
+--       }
+
+--   addrPortIndex  OBJECT-TYPE
+--       SYNTAX  INTEGER
+--       ACCESS  read-only
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " Port index.
+--		 This is defined as ifIndex in the IF-MIB.
+--	       "
+--       ::= { addrPortEntry 1 }
+
+--   addrPortLastSrcAddress OBJECT-TYPE
+--       SYNTAX  MacAddress
+--       ACCESS  read-only
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " The object is the last source address in this port
+--	       "
+--       ::= { addrPortEntry 2 }
+
+
+-- 4.2	=====================================================================
+-- static address table ======================================================
+-- (.655.6.100.1.4.2)
+
+
+   addrStaticMgt OBJECT IDENTIFIER ::= { addrMgt 2 }
+
+   addrStaticMaxEntryNumber  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The max. count of static address table
+	       "
+       ::= { addrStaticMgt  1 }
+
+
+   addrStaticUsedEntryNumber  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The used count of address entry.
+	       "
+       ::= { addrStaticMgt  3 }
+
+   addrStaticMessageStatus  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   ok (1),		 
+		   address_found (23),
+		   bad_value (4)
+	       }
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The last status of static operation:
+		 (1) ok		
+		 (2) address_found     : set the same address
+		 (3) bad_value	       : address set error because of address is
+					 broadcast address or invalid routing port
+					 number.
+	       "
+       ::= { addrStaticMgt  4 }
+
+ 
+
+-- static table
+--
+
+   addrStaticTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF AddrStaticEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The table contain information about static entry in the device."
+       ::= { addrStaticMgt  5 }
+
+   addrStaticEntry  OBJECT-TYPE
+       SYNTAX  AddrStaticEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " "
+       INDEX   { addrStaticIndex }
+       ::= { addrStaticTable  1 }
+
+   AddrStaticEntry ::=
+       SEQUENCE {
+	   addrStaticIndex
+	       INTEGER,
+	   addrStaticSetAddress
+	       OCTET STRING
+       }
+
+   addrStaticIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This index value uniquely identifies the address in
+		 static table.
+		 Value range between 1 and the value of
+		 addrStaticMaxAddrNumber.
+	       "
+       ::= { addrStaticEntry 1 }
+
+   addrStaticSetAddress  OBJECT-TYPE
+       SYNTAX  OCTET STRING
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " To set/modify the [static address] [Destination] [Port vid].
+	       [6 bytes]/[4 bytes (portlist)][2 bytes].
+		 If 802.1Q Virtual LAN is disable,vid is always 1.
+		     "
+
+       ::= { addrStaticEntry 2 }
+--
+-- struct {
+--	 byte6 addr;-> MAC address
+--		       All 0: delete
+--	 byte4 port_select_bit;
+--	 -- each bit represent the port's capability
+--	    - 1: routing, !1: not route
+--	 -- The port map for the system (24+2)
+--	   - bit 0 = port 1, bit 1= port 2, ...bit 25= port 26, bit 26=CPU
+-- }
+
+-- dynamic table
+--
+
+   addrdynamicTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF AddrdynamicEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The table contain information about dynamic entry in the device."
+       ::= { addrMgt  3 }
+
+   addrdynamicEntry  OBJECT-TYPE
+       SYNTAX  AddrdynamicEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " "
+       INDEX   { addrdynamicIndex }
+       ::= { addrdynamicTable  1 }
+
+   AddrdynamicEntry ::=
+       SEQUENCE {
+	   addrdynamicIndex
+	       INTEGER,
+	   addrdynamicAddress
+	       OCTET STRING
+       }
+
+   addrdynamicIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This index value uniquely identifies the address in
+		 dynamic table.
+	       "
+       ::= { addrdynamicEntry 1 }
+
+   addrdynamicAddress  OBJECT-TYPE
+       SYNTAX  OCTET STRING
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       "Display the [dynamic address] [port] [vid].
+	       [6 bytes]/[1 bytes (portnumber)][2 bytes].
+		     "
+
+       ::= { addrdynamicEntry 2 }
+
+-- 5  ======================================================
+-- (.655.6.4.1.5)
+-- port statistic management, mandatory
+
+
+   resetMIBCounter  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   noClear(1),
+		   clear(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	  " Clear all MIB counters for all ports to zero
+	  "
+       ::= { statisticMgt 1 }
+
+   statisticPortTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF StatisticPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       "A table that contains information about every
+	       port that is associated with this transparent
+	       bridge."
+       ::= { statisticMgt 2 }
+
+   statisticPortEntry OBJECT-TYPE
+       SYNTAX  StatisticPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       "A list of information for each port of a
+	       transparent bridge."
+       INDEX   { statisticPort }
+       ::= { statisticPortTable 1 }
+
+   StatisticPortEntry ::=
+       SEQUENCE {
+	   statisticPort
+	       INTEGER,
+	   statisticPortReceiveGoodUnicastFrameCount
+	       Counter,
+	   statisticPortReceiveGoodBroadcastFrameCount
+	       Counter,
+	   statisticPortReceiveGoodMulticastFrameCount
+	       Counter,
+	   statisticPortReceive8023XMACControl
+	       Counter,
+	   statisticPortReceiveCRCError
+	       Counter,
+	   statisticPortReceiveFragment    
+	       Counter,
+	   statisticPortReceiveJabbers
+         Counter, 
+	   statisticPortReceiveTotalByteCountCount
+	       Counter,
+     statisticPortTransmitGoodUnicastFrameCount
+	       Counter,
+     statisticPortTransmitGoodBroadcastFrameCount
+	       Counter,
+	   statisticPortTransmitGoodMulticastFrameCount
+	       Counter,
+     statisticPortTransmit8023XMACControl
+	       Counter,    
+	   statisticPortTotalTransmitByteCount
+	       Counter      
+       }
+
+   statisticPort OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is defined as ifIndex in the IF-MIB."
+       ::= { statisticPortEntry 1 }
+       
+-- RX Counter
+
+   statisticPortReceiveGoodUnicastFrameCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of Good Unicast Frame packets received by a port"
+       ::= { statisticPortEntry 2 }   
+       
+    statisticPortReceiveGoodBroadcastFrameCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of Good Broadcast Frame packets received by a port"
+       ::= { statisticPortEntry 3 }  
+     
+    statisticPortReceiveGoodMulticastFrameCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of Good Multicast Frame packets received by a port"
+       ::= { statisticPortEntry 4 }   
+       
+    statisticPortReceive8023XMACControl  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  802.3XMACControl Frame  packets received by a port"
+       ::= { statisticPortEntry 5 }              
+
+     statisticPortReceiveCRCError  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  CRCErrors  packets received by a port"
+       ::= { statisticPortEntry 6 } 
+      
+      statisticPortReceiveFragment   OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  Fragment  packets received by a port"
+       ::= { statisticPortEntry 7 }   
+      
+      statisticPortReceiveJabbers   OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  Jabbers  packets received by a port"
+       ::= { statisticPortEntry 8 }   
+     
+     statisticPortReceiveTotalByteCountCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  Total Byte Count  received by a port"
+       ::= { statisticPortEntry 9 }     
+       
+-- Tx Counter
+  
+     statisticPortTransmitGoodUnicastFrameCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  Good Unicast Frame Transmit by a port"
+       ::= { statisticPortEntry 10 }  
+       
+     statisticPortTransmitGoodBroadcastFrameCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  Good Broadcast Frame Transmit by a port"
+       ::= { statisticPortEntry 11 }     
+      
+     statisticPortTransmitGoodMulticastFrameCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  Good Multicast Frame Transmit by a port"
+       ::= { statisticPortEntry 12 } 
+       
+    statisticPortTransmit8023XMACControl  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  802.3XMACControl Frame  Transmit by a port"
+       ::= { statisticPortEntry 13 } 
+    
+    statisticPortTotalTransmitByteCount  OBJECT-TYPE
+       SYNTAX  Counter
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The counter of  Total Byte Count Transmit by a port"
+       ::= { statisticPortEntry 14 }                
+       
+-- 6 ======================================================
+-- (.655.6.100.1.6)
+-- Port Moirroring management, optional
+
+
+    portMirrorSwitch  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		   off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A state to present whether the port monitor function is
+		 ON or OF in the device.
+		 The default is OFF.
+	       "
+       ::= { portMirrorMgt 1 }
+
+
+    mirrorCapturePort OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	      "Destination port for mirrored packets. This is defined
+	       as ifIndex in the IF-MIB."
+       ::= { portMirrorMgt 2 }
+
+-- Ingress
+
+    mirrorIngressPort OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	      "Source ports for mirrored ingress packets.
+	      "
+       ::= { portMirrorMgt 3 }
+
+    mirrorIngressFiterRule OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {
+		   all(1),
+		   da(2),
+		   sa(3)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" all(1): Mirror all ingress frames
+		  DA(2): Mirror all received frame with DA=mirrorIngressMAC
+		  SA(2): Mirror all received frame with SA=mirrorIngressMAC
+		"
+       ::= { portMirrorMgt 4 }
+
+--    mirrorIngressDividerSwitch OBJECT-TYPE
+--       SYNTAX  INTEGER
+--	       {   on(1),
+--		   off(2)
+--	       }
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--		" Ingress divder enable/disable.
+--		"
+--       ::= { portMirrorMgt 5 }
+
+    mirrorIngressDividerCount OBJECT-TYPE
+       SYNTAX  INTEGER (1..1023)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" Mirror every n received frame (n= mirrorIngressDividerCount)
+		"
+       ::= { portMirrorMgt 6 }
+
+    mirrorIngressMAC OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" MAC address that will be compared against ingress frame
+		  in accordance with mirrorIngressFiterRule
+		"
+       ::= { portMirrorMgt 7 }
+
+-- Egress
+
+    mirrorEgressPort OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	      "Source ports for mirrored Egress packets.
+	      "
+       ::= { portMirrorMgt 8 }
+
+    mirrorEgressFiterRule OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {
+		   all(1),
+		   da(2),
+		   sa(3)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" all(1): Mirror all Egress frames
+		  DA(2): Mirror all transmitted frame with DA=mirrorEgressMAC
+		  SA(2): Mirror all Transmitted frame with SA=mirrorEgressMAC
+		"
+       ::= { portMirrorMgt 9 }
+
+--    mirrorEgressDividerSwitch OBJECT-TYPE
+--       SYNTAX  INTEGER
+--	       {   on(1),
+--		   off(2)
+--	       }
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--		" Egress divder enable/disable.
+--		"
+--       ::= { portMirrorMgt 10 }
+
+    mirrorEgressDividerCount OBJECT-TYPE
+       SYNTAX  INTEGER (1..1023)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" Mirror every n transmitted frame (n= mirrorEgressDividerCount)
+		"
+       ::= { portMirrorMgt 11 }
+
+    mirrorEgressMAC OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" MAC address that will be compared against egress frame
+		  in accordance with mirrorEgressFiterRule
+		"
+       ::= { portMirrorMgt 12 }
+       
+-- 7 ======================================================
+-- (.655.6.100.1.7)
+-- virtual LAN management, optional
+
+
+   virtualLanSwitch  OBJECT-TYPE
+       SYNTAX  INTEGER
+	        {     vlan1q_enable(1),
+		         portbased_enable(2),
+		         metro_enable(3),
+		         disable(4)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A state to present whether the virtul LAN function is
+		 ON or OFF in the device. 1q_enable(1),portbased_enable(2)
+     ,metro_enable(3),disable(4).
+		 The default value is OFF.
+	       "
+       ::= { virtualLanMgt 1 }
+
+   virtualLanMaxDomainCount  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " Max. Virtual LAN domain count in this device
+	       "
+       ::= { virtualLanMgt 2 }
+
+--   virtualLanMaxMemberCount  OBJECT-TYPE
+--       SYNTAX  INTEGER
+--       ACCESS  read-only
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " Max. member in a Virtual LAN domain in this device
+--	       "
+--       ::= { virtualLanMgt 3 }
+
+   virtualLanPortBasedTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF VirtualLanPortBasedEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The table contain information for Virtual LAN function."
+       ::= { virtualLanMgt 5 }
+
+   virtualLanPortBasedEntry  OBJECT-TYPE
+       SYNTAX  VirtualLanPortBasedEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Table entry of port monitor."
+       INDEX   { virtualLanNameIndex }
+       ::= { virtualLanPortBasedTable  1 }
+
+   VirtualLanPortBasedEntry ::=
+       SEQUENCE {
+	   virtualLanNameIndex
+	       INTEGER,
+	   virtualLanName
+	       DisplayString,
+	   virtualLanPortGet
+	       PortList,
+	   virtualLanPortAdd
+	       PortList,
+	   virtualLanPortRemove
+	       PortList
+       }
+
+   virtualLanNameIndex	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " VLAN ID, the value range between 1 and the value of
+		 virtualLanMaxDomainCount"
+       ::= { virtualLanPortBasedEntry 1 }
+
+   virtualLanName  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..16))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " Domain name"
+       ::= { virtualLanPortBasedEntry 2 }
+
+   virtualLanPortGet  OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " Get the ports to belong the given VLAN"
+       ::= { virtualLanPortBasedEntry 3 }
+
+--   virtualLanDomainDestroy  OBJECT-TYPE
+--       SYNTAX  INTEGER
+--	       {   noDestroy(1),
+--		   destroy(2)
+--	       }
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " To reset the domain's VLAN configuration.
+--		 The default VLAN can not be destroy. Ports which do not belong
+--		 to other VLAN are belong to the default VLAN.
+--	       "
+--       ::= { virtualLanPortBasedEntry 4 }
+
+   virtualLanPortAdd  OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " Add ports to the given VLAN"
+       ::= { virtualLanPortBasedEntry 5 }
+
+   virtualLanPortRemove  OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " Remove the given ports from the given VLAN"
+       ::= { virtualLanPortBasedEntry 6 }
+
+   virtualLanPortTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF VirtualLanPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Table for port configuration in VLAN."
+       ::= { virtualLanMgt 6 }
+
+   virtualLanPortEntry  OBJECT-TYPE
+       SYNTAX  VirtualLanPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Table for port configuration in VLAN."
+       INDEX   { virtualLanPortIndex }
+       ::= { virtualLanPortTable  1 }
+       
+     VirtualLanPortEntry ::=
+       SEQUENCE {
+	   virtualLanPortIndex
+	       INTEGER,
+--	   virtualLanPortMode
+--	       INTEGER,
+	   vLanPortPrivatevLantype
+	       INTEGER,
+	   vLanPortStackRule  
+	       INTEGER
+--	   vlanPortPVID
+--         INTEGER 
+       }   
+       
+    virtualLanPortIndex	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is defined as ifIndex in the IF-MIB."
+       ::= { virtualLanPortEntry 1 } 
+       
+--   virtualLanPortMode	OBJECT-TYPE
+--       SYNTAX  INTEGER
+--       {
+--        access(1),
+--        dot1qTrunk(2),
+--        hybrid(3)
+--       }
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " This variable Setting it to access(1) sets an access link. sets a hybrid link. Setting it to dot1qTrunk(2) sets a trunk link.sets the 802.1Q VLAN mode.Setting it to hybrid(3) "
+--       ::= { virtualLanPortEntry 2 } 
+       
+     vLanPortPrivatevLantype	OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+        normal(1),
+        host(2),
+        promiscuous(3)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The port type defined for Private vlan. "
+       ::= { virtualLanPortEntry 3 }  
+       
+     vLanPortStackRule	OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+        normal(1),
+        access(2),
+        tunnel(3)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       "  It sets rule of port in VLAN Stacking.
+         "
+       ::= { virtualLanPortEntry 4 }     
+           
+--      vlanPortPVID 	OBJECT-TYPE
+--       SYNTAX  INTEGER(1..4096)
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " It sets pvid of port in VLAN. 
+--         "
+--       ::= { virtualLanPortEntry 5 }     
+             
+    
+-- 8  ======================================================
+-- (.655.6.100.1.8)
+-- Port Trunk management, optional
+      
+   portTrunkSwitch  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the power link is ON or OFF.
+		 The default is OFF.
+	       "
+       ::= { trunkMgt 1 }
+
+   portTrunkMaxGroupCount  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " Max. Trunk group count in this device
+	       "
+       ::= { trunkMgt 2 }
+
+   portTrunkMaxPortCount	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " Max. Trunk port in a group in this device
+	       "
+       ::= { trunkMgt 3 }
+   lacpSystemPriority  OBJECT-TYPE
+       SYNTAX  INTEGER(1..65535)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " lacp Port Configuration,A switch to select whether the System Priority.
+	       "
+       ::= { trunkMgt 4 }     
+             
+   portTrunkGroupTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF PortTrunkGroupEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " "
+       ::= { trunkMgt 5 }
+
+   portTrunkGroupEntry  OBJECT-TYPE
+       SYNTAX  PortTrunkGroupEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Table entry of port Trunk.
+         "
+       INDEX   { trunkIndex }
+       ::= { portTrunkGroupTable  1 }
+
+   PortTrunkGroupEntry ::=
+       SEQUENCE {
+	   trunkIndex
+	       INTEGER,
+	   trunkportselectd
+	       INTEGER
+       }
+
+   trunkIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The port index of Trunking Group Configuration.
+         "
+       ::= { portTrunkGroupEntry 1 }    
+        
+   trunkportselectd  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A port belong to which is group ."
+       ::= { portTrunkGroupEntry 2 }
+      
+  lacpPortTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF LacpPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The table contain information for Port lacp function."
+       ::= { trunkMgt 6 }
+
+   lacpPortEntry  OBJECT-TYPE
+       SYNTAX  LacpPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Table entry of port lacp."
+       INDEX   { lacpPortIndex }
+       ::= { lacpPortTable  1 }
+ 
+ 
+   LacpPortEntry ::=
+       SEQUENCE {
+	   lacpPortIndex
+ 	       INTEGER,
+	   lacpEnablePort
+	       INTEGER
+     }       
+
+   lacpPortIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " lacp port index"
+       ::= { lacpPortEntry 1 }    
+          
+   lacpEnablePort    OBJECT-TYPE
+       SYNTAX  INTEGER
+               {   enable(1),
+		disable(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	      " lacp Port Configuration,it select portenable witch is enable or disable.
+	      "
+       ::= { lacpPortEntry 2 } 
+        
+ 
+               
+-- 9  ======================================================
+-- (.655.6.100.1.9)
+-- spanning tree management, optional
+
+   spanningTreeConfTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF SpanningTreeConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { spanningTreeMgt 1 }
+
+   spanningTreeConfEntry OBJECT-TYPE
+       SYNTAX  SpanningTreeConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { spanningTreeSwitch }
+       ::= {  spanningTreeConfTable 1 }
+
+   SpanningTreeConfEntry ::=
+       SEQUENCE {
+	   spanningTreeSwitch
+	       INTEGER,
+	   spanningTreeForceVersion
+	       INTEGER,
+	   spanningTreeBridgePriority
+	       INTEGER
+       }
+
+   spanningTreeSwitch OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the spanning tree is ON or OFF.
+		 The default is OFF.  If the value is changed, the system will
+		 be restarted."
+       ::= { spanningTreeConfEntry 1 }
+
+   spanningTreeForceVersion	OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   normal(1),
+		       stp(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the Force Version is Normal or Compatible with old STP.
+		 The default is Normal.  If the value is changed, the system will
+		 be restarted."
+       ::= { spanningTreeConfEntry 2 }
+
+   spanningTreeBridgePriority	OBJECT-TYPE
+       SYNTAX  INTEGER (0..61440)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the Bridge Priority.
+		 The default is 32768.  The value must be in steps of 4096 
+        ."
+       ::= { spanningTreeConfEntry 3 }
+       
+-- 10  ======================================================
+-- (.655.6.100.1.10)
+-- switch Port Priority management, mandatory
+
+   prioritySwitch  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		   off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the priority is enable/disable
+	       "
+       ::= { priorityMgt 1 }
+       
+    priorityMode  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   wrr(1),		   
+		   sp1-wrr(2),
+		   sp2-wrr2(3),
+		   sp4(4)		   
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the priority Mode is Strict/Wrr
+	       "
+       ::= { priorityMgt 2 }  
+       
+      
+
+-- Port based
+
+
+   qosConfTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF QosConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " A Switch set up QoS information for each port."
+       ::= { priorityMgt 3}
+
+   qosConfEntry  OBJECT-TYPE
+       SYNTAX  QosConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Port priority information entry."
+       INDEX   { portPriorityIndex }
+       ::= { qosConfTable	1 }
+
+   QosConfEntry ::=
+       SEQUENCE {
+           portPriorityIndex
+               INTEGER,
+	   portPriorityPortSetting
+	       INTEGER,
+	   portPriority8021pSetting
+	       INTEGER,
+	   portPriorityDSCPSetting
+	       INTEGER
+       }
+
+   portPriorityIndex  OBJECT-TYPE
+       SYNTAX  INTEGER 
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " port number,
+         This is defined as ifIndex in the IF-MIB.
+           "
+       ::= { qosConfEntry 1 }
+
+
+   portPriorityPortSetting  OBJECT-TYPE
+       SYNTAX  INTEGER
+       { low(0),
+         medium(1),
+         normal(2),
+         high(3) 
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is PortPriority,0(LOW),1(Normal),2(Medium),3(High) "
+       ::= { qosConfEntry 2 }
+
+   portPriority8021pSetting	OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on (1),	  
+		    off (2)	
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " 802.1p priority setting.
+	       "
+       ::= { qosConfEntry 3 }
+
+   portPriorityDSCPSetting	OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on (1),	  
+		   off (2)	
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " DSCP priority setting.
+	       "
+       ::= { qosConfEntry 4 }
+       
+-- Prioritymap 
+   
+    priority8021pmapTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF Priority8021pmapEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " A Switch set up QoS Map for the switch."
+       ::= { priorityMgt 4}
+
+   priority8021pmapEntry  OBJECT-TYPE
+       SYNTAX  Priority8021pmapEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Priority information entry."
+       INDEX   { map8021ptagIndex }
+       ::= { priority8021pmapTable	1 }
+
+   Priority8021pmapEntry ::=
+       SEQUENCE {
+           map8021ptagIndex
+               INTEGER,
+           map8021ptagvalue
+               INTEGER,
+	   map8021ptagpriority
+	       INTEGER
+       }
+
+   map8021ptagIndex  OBJECT-TYPE
+       SYNTAX INTEGER (1..8)
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is the index of Priority tag value"
+       ::= { priority8021pmapEntry 1 }         
+
+   map8021ptagvalue  OBJECT-TYPE
+       SYNTAX INTEGER (0..7)
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is Priority tag 0-7"
+       ::= { priority8021pmapEntry 2 }  
+       
+   map8021ptagpriority  OBJECT-TYPE
+       SYNTAX INTEGER 
+       { low(0),
+         medium(1),
+         normal(2),
+         high(3) 
+       }       
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is to assign priority queue of tag value,00(LOW),01(Normal),02(Medium),03(High) "
+       ::= { priority8021pmapEntry 3 }               
+           
+
+    priorityDSCPmapTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF PriorityDSCPmapEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " A Switch set up QoS Map for the switch."
+       ::= { priorityMgt 5}
+
+   priorityDSCPmapEntry  OBJECT-TYPE
+       SYNTAX  PriorityDSCPmapEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Priority information entry."
+       INDEX   { mapDSCPIndex }
+       ::= { priorityDSCPmapTable	1 }
+
+   PriorityDSCPmapEntry ::=
+       SEQUENCE {
+           mapDSCPIndex
+               INTEGER,       
+           mapDSCPValue
+               INTEGER,
+	   mapDSCPpriority
+	       INTEGER
+       }
+       
+   mapDSCPIndex  OBJECT-TYPE
+       SYNTAX INTEGER (1..8)   
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is the index DSCP value , index=8 for all others"
+       ::= { priorityDSCPmapEntry 1 }  
+
+   mapDSCPValue  OBJECT-TYPE
+       SYNTAX INTEGER (0..63)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is DSCP value "
+       ::= { priorityDSCPmapEntry 2 }  
+       
+   mapDSCPpriority  OBJECT-TYPE
+       SYNTAX INTEGER 
+       { low(0),
+         normal(1),
+         medium(2),
+         high(3) 
+       }       
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is to assign priority queue of DSCP value,00(LOW),01(Normal),02(Medium),03(High) "
+       ::= { priorityDSCPmapEntry 3 }               
+                      
+       
+-- 11  ======================================================
+-- (.655.6.100.1.11)
+-- igmp snooping management, optional
+
+
+
+      igmpPortTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF IgmpPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { igmpMgt 2 }
+
+     igmpPortEntry	OBJECT-TYPE
+       SYNTAX  IgmpPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+         "
+      INDEX   { igmpPortGroupIndex }
+       ::= { igmpPortTable  1 }
+       
+     IgmpPortEntry ::=
+       SEQUENCE {
+     igmpPortGroupIndex
+         INTEGER,
+     igmpRouterPortno 
+         INTEGER,
+     igmpLeavePortMode
+         INTEGER,
+     igmpGroupLimitedMaximumGroupNumber
+         INTEGER,
+     igmpFilteringPortProfileEntryName
+         DisplayString
+       } 
+     igmpPortGroupIndex	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		   " 
+       "
+       ::= { igmpPortEntry 1 }    
+       
+     igmpRouterPortno	OBJECT-TYPE
+       SYNTAX  INTEGER
+       { 
+         on(1),
+         off(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" A switch to select whether the Router Port.
+    "
+       ::= { igmpPortEntry 2 }    
+
+     igmpLeavePortMode	OBJECT-TYPE
+       SYNTAX  INTEGER
+       { 
+         normal(1),
+         immediate(2),
+         fast(3)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" To set leave mode of port. 
+		  Leave mode: normal(1)/immediate(2)/fast(3).
+       "
+       ::= { igmpPortEntry 3 } 
+       
+   igmpGroupLimitedMaximumGroupNumber	OBJECT-TYPE
+       SYNTAX  INTEGER(0..255)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The maximum group number of port. Range: 0~255."
+       ::= { igmpPortEntry 4 }  
+
+   igmpFilteringPortProfileEntryName  OBJECT-TYPE
+--re consider ( SIZE(0..16))
+       SYNTAX  DisplayString( SIZE(0..8))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The profile of port.
+	       "
+       ::= { igmpPortEntry 5 }
+
+-- Multi-Port Group information
+--
+
+   multiPortGroupTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MultiPortGroupEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The information for the multicast group which stored in the
+		  multi-port table
+	       "
+       ::= { igmpMgt 3 }
+
+   multiPortGroupEntry	OBJECT-TYPE
+       SYNTAX  MultiPortGroupEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " multi-port information entry."
+       INDEX   { multiPortGroupIndex }
+       ::= { multiPortGroupTable  1 }
+
+   MultiPortGroupEntry ::=
+       SEQUENCE {
+	   multiPortGroupIndex
+	       INTEGER,
+	   multiPortGroupVid
+	       INTEGER,
+	   multiPortGroupMACAddress
+	       IpAddress,
+	   multiPortGroupMember  
+	       PortList
+       }
+
+
+   multiPortGroupIndex	OBJECT-TYPE
+       SYNTAX  INTEGER (1..2)
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		" "
+       ::= { multiPortGroupEntry 1 }
+
+   multiPortGroupVid  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		" "
+       ::= { multiPortGroupEntry 2}
+       
+   multiPortGroupMACAddress  OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		" "
+       ::= { multiPortGroupEntry 3}
+
+   multiPortGroupMember  OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The port number belong to the multicast group
+	       "
+       ::= { multiPortGroupEntry 4 }
+       
+--    singlePortGroupTable  OBJECT-TYPE
+--       SYNTAX  SEQUENCE OF SinglePortGroupEntry
+--       ACCESS  not-accessible
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " The information for the multicast group which stored in the
+--		  single-port table
+--	       "
+--       ::= { igmpMgt 4 }
+
+--   singlePortGroupEntry  OBJECT-TYPE
+--       SYNTAX  SinglePortGroupEntry
+--       ACCESS  not-accessible
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " single-port information entry."
+--       INDEX   { singlePortGroupIndex }
+--       ::= { singlePortGroupTable  1 }
+
+--   SinglePortGroupEntry ::=
+--       SEQUENCE {
+--	   singlePortGroupIndex
+--	       INTEGER
+--       }
+
+--   singlePortGroupIndex  OBJECT-TYPE
+--       SYNTAX  INTEGER
+--       ACCESS  read-only
+--       STATUS  mandatory
+--       DESCRIPTION
+--		" "
+--       ::= { singlePortGroupEntry 1 }    
+ 
+
+
+
+   igmpFilteringProfileTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF IgmpFilteringProfileEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Profile Setup."
+       ::= { igmpMgt 6 }
+
+    igmpFilteringProfileEntry  OBJECT-TYPE
+       SYNTAX  IgmpFilteringProfileEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+         "
+	     INDEX   { igmpFilteringProfileindex }
+       ::= { igmpFilteringProfileTable  1 }
+
+     IgmpFilteringProfileEntry ::=
+       SEQUENCE {
+       igmpFilteringProfileindex
+	       INTEGER,
+       igmpFilteringProfileShowProfileEntry
+	       DisplayString
+       }
+     
+     igmpFilteringProfileindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       "
+         "
+       ::= { igmpFilteringProfileEntry 1 }   
+    
+    igmpFilteringProfileShowProfileEntry  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..60))
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " To show profile entry. Format:profileEntryName"
+       ::= { igmpFilteringProfileEntry 2 }
+       
+   igmpFilteringRuleTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF IgmpFilteringRuleEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Rule Setup."
+       ::= { igmpMgt 7 }
+
+   igmpFilteringRuleEntry  OBJECT-TYPE
+       SYNTAX  IgmpFilteringRuleEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+         "
+	     INDEX   { igmpFilteringRuleindex }
+       ::= { igmpFilteringRuleTable  1 }
+
+     IgmpFilteringRuleEntry ::=
+       SEQUENCE {
+       igmpFilteringRuleindex
+	       INTEGER,
+       igmpFilteringRuleShowRuleEntry
+	       DisplayString
+       }
+       
+       igmpFilteringRuleindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+         "
+       ::= { igmpFilteringRuleEntry 1 }  
+      
+    igmpFilteringRuleShowRuleEntry  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..60))
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " To show rule entry. Format:profileEntryName,startAddress,endAddress"
+       ::= { igmpFilteringRuleEntry 2 }       
+
+
+
+
+
+
+   igmpSwitch  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the igmp snooping is enable/disable
+		 Port Mirroring should be disable when set igmp enable.
+	       "
+       ::= { igmpMgt 201 }
+       
+     igmpQuerying  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the igmp igmp Querying.
+	       "
+       ::= { igmpMgt 202 }   
+       
+      igmpUnregisteredIPMCFlooding  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the igmp Unregistered IPMC Flooding.
+	       "
+       ::= { igmpMgt 203 }
+       
+      igmpQueryInterval   OBJECT-TYPE
+       SYNTAX  INTEGER(60..125)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the igmp Query Interval(60-125).
+	       "
+       ::= { igmpMgt 204 } 
+       
+       igmpReportDelay    OBJECT-TYPE
+       SYNTAX  INTEGER(5..25)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the igmp Report Delay(5-25).
+	       "
+       ::= { igmpMgt 205 } 
+       
+      igmpQueryTimeout    OBJECT-TYPE
+       SYNTAX  INTEGER(255..500)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the igmp Query Timeout(255-500).
+	       "
+       ::= { igmpMgt 206 }                    
+
+   igmpFilteringEnabled  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A state to present whether the igmp filtering function is ON or OFF in the device. The default value is OFF.
+	       "
+       ::= { igmpMgt 207 }
+       
+  igmpGroupLimitedPortEnabled_map OBJECT-TYPE
+        SYNTAX  PortList
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            " A switch to enable/disable group limited of ports.
+            "
+        ::= { igmpMgt 208 }  
+
+
+
+
+      
+   igmpFilteringProfileAddEntry  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..60))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " To add entry. Format:profileEntryName,startAddress,endAddress  Example:abc,225.0.0.0,238.0.0.1  NOTE:Please don't use space or ',' for profile naming."
+       ::= { igmpMgt 211 }
+
+   igmpFilteringProfileDeleteProfileEntry  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..60))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " To delete profile entry. Format:profileEntryName  Example:abc"
+       ::= { igmpMgt 212 }
+
+   igmpFilteringProfileDeleteRuleEntry  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..60))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " To delete rule entry. Format:profileEntryName,startAddress,endAddress  Example:abc,225.0.0.0,238.0.0.1"
+       ::= { igmpMgt 213 }
+
+   igmpFilteringProfileProfileEntryCount OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The number of profile entry."
+       ::= { igmpMgt 214 }       
+            
+   igmpFilteringProfileRuleEntryCount	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The number of rule entry."
+       ::= { igmpMgt 215 }            
+       
+ -- 12  ======================================================
+-- (.655.6.100.1.12)
+-- switch 802.1x management, mandatory
+
+   dot1xEnabled  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   port_based(1),
+	       		mac_based(2),
+		   	disable(3),
+		   	transparent(4)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the 802.1x is port_based(1)/mac_based(2)/disable(3)/transparent(4)
+	       "
+       ::= { dot1xMgt 1 }
+
+   reAuthEnabled  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   enable(1),
+		   	   disable(2),
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the re-authentication function is enable/disable
+	       "
+       ::= { dot1xMgt 2 }
+
+   reAuthPeriod  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select the period of re-authentication function. ((0..65535) seconds ) 
+	       "
+       ::= { dot1xMgt 3 }
+
+   reAuthMax  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select the maximun retry times of re-authentication function. (0-10) 
+	       "
+       ::= { dot1xMgt 4 }
+
+   maxReqCount  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The number that the authenticator retires on server timeouts before it declares authentication failure. (0-10)
+	       "
+       ::= { dot1xMgt 5 }
+
+   serverTimeout  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The timeout after an access-request is sent to the server before backend state machine retries. ((0..65535) seconds )
+	       "
+       ::= { dot1xMgt 6 }
+
+   suppTimeout  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The timeout after an EAPOL authentication-request is sent to supplicant before backend state machine retries. ((0..65535) seconds )
+	       "
+       ::= { dot1xMgt 7 }
+
+   quietPeriod  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The timeout after a failure before authenticator re-tries to authenticate a supplicant. ((0..65535) seconds )
+	       "
+       ::= { dot1xMgt 8 }
+
+   txPeriod  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The timeout after an EAPOL identify-request is sent to supplicant before authenticator state machine retries. ((0..65535) seconds )
+	       "
+       ::= { dot1xMgt 9 }
+
+--   radiusServerIp  OBJECT-TYPE
+--       SYNTAX  DisplayString(SIZE(0..16))
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " The IP address of the radius server. 
+--	       "
+--       ::= { dot1xMgt 10 }
+--
+--   securityKey  OBJECT-TYPE
+--       SYNTAX  DisplayString(SIZE(0..32))
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " The key in calculating MD5 encryption for enconding/deconding the Mesage-Authenticator in RADIUS packets. 
+--	       "
+--       ::= { dot1xMgt 11 }
+--
+--   radiusServerPort  OBJECT-TYPE
+--       SYNTAX  INTEGER(1..65536)
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " The port of radius server. It is rang between 1 and 65535. 
+--	       "
+--       ::= { dot1xMgt 12 }
+
+--  radiusServerACCOUNTPort  OBJECT-TYPE
+--     SYNTAX  INTEGER
+--     ACCESS  read-only
+--     STATUS  mandatory
+--     DESCRIPTION
+--      " The ACCOUNT port of radius server. 
+--      "
+--     ::= { dot1xMgt 13 }
+       
+    dot1xguestvlan  OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+         disable(0),
+         enable(1)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " It selects guest vlan vid or disable(0). 
+	       "
+       ::= { dot1xMgt 14 }
+    dot1xdynamicvlan  OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+         enable(1),
+         disable(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " It selects dynamic vlan enable or disable. 
+	       "
+       ::= { dot1xMgt 15 }      
+
+-- port authentication mode.
+--
+   portAuthModeTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF PortAuthModeEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The authentication mode of port in 802.1x."
+       ::= { dot1xMgt 16 }
+
+
+   portAuthModeEntry  OBJECT-TYPE
+       SYNTAX  PortAuthModeEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " For 802.1p frame, mapping the 802.1p pri[2:0] (priority tag)
+		 to the priority queue of the system.
+	       "
+       INDEX   { portDot1xIndex }
+       ::= { portAuthModeTable	1 }
+
+   PortAuthModeEntry ::=
+       SEQUENCE {
+	   portDot1xIndex
+	       INTEGER,
+	   portAuthMode
+	       INTEGER
+       }
+
+   portDot1xIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is defined as ifIndex in the IF-MIB. "
+       ::= { portAuthModeEntry 1 }
+
+   portAuthMode  OBJECT-TYPE
+       SYNTAX  INTEGER
+       	{	
+       		forceUnauthorized (1),	
+       		forceAuthorized (2), 		
+       		auto (3),
+       		none (4)
+       	}
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The authentocation mode of port. 1.ForceUnauthorized, 2.ForceAuthorized, 3.Auto, 4.None"
+       ::= { portAuthModeEntry 2 }
+
+
+
+
+
+
+
+
+-- mac based
+   macBasedStateTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MacBasedStateEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       "Show mac-based 802.1x authenticator state."
+       ::= { dot1xMgt 17 }
+
+
+   macBasedStateEntry  OBJECT-TYPE
+       SYNTAX  MacBasedStateEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { macBasedStateIndex }
+       ::= { macBasedStateTable	1 }
+
+   MacBasedStateEntry ::=
+       SEQUENCE {
+	   macBasedStateIndex
+	     INTEGER,
+	     authVid
+	       INTEGER,
+           authMac
+             MacAddress,                                                         
+           authPort
+             INTEGER
+       }
+
+
+
+
+   macBasedStateIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " Mac based state index."
+       ::= { macBasedStateEntry 1 }
+       
+
+
+   authVid  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       "The vid of Authenticator."
+       ::= { macBasedStateEntry 2 }
+
+
+       
+   authMac   OBJECT-TYPE
+      SYNTAX    MacAddress
+      ACCESS    read-only
+      STATUS    mandatory
+      DESCRIPTION
+           "The mac address of Authenticator."
+      ::= { macBasedStateEntry 3 }
+
+   authPort  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       "The port of Authenticator."
+       ::= { macBasedStateEntry 4 }
+
+
+
+
+
+
+-- 2 radius server
+   standbyRadiusServerTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF StandbyRadiusServerEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       "Radius server configuration."
+       ::= { dot1xMgt 20 }
+
+
+   standbyRadiusServerEntry  OBJECT-TYPE
+       SYNTAX  StandbyRadiusServerEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { standbyRadiusServerIndex }
+       ::= { standbyRadiusServerTable	1 }
+
+   StandbyRadiusServerEntry ::=
+       SEQUENCE {
+	   standbyRadiusServerIndex
+	     INTEGER,
+	   standbyRadiusServerActive
+	     INTEGER,
+	   standbyRadiusServerIp
+	     DisplayString,
+	   standbyRadiusServerAuthPort
+	     INTEGER,
+	   standbyRadiusServerSecurityKey
+	     DisplayString,
+           standbyRadiusServerRunning
+             INTEGER                                                         
+       }
+
+
+
+   standbyRadiusServerIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " Radius server index."
+       ::= { standbyRadiusServerEntry 1 }
+
+
+
+
+   standbyRadiusServerActive  OBJECT-TYPE
+       SYNTAX  INTEGER
+       { 
+         yes(1),
+         no(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the radius server active is Yes(1)/No(2)."
+       ::= { standbyRadiusServerEntry 2 }
+       
+   standbyRadiusServerIp  OBJECT-TYPE
+       SYNTAX  DisplayString(SIZE(0..16))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The IP address of the radius server."
+       ::= { standbyRadiusServerEntry 3 }
+
+   standbyRadiusServerAuthPort  OBJECT-TYPE
+       SYNTAX  INTEGER(1..65536)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The port of radius server. It is between 1 and 65535."
+       ::= { standbyRadiusServerEntry 4 }
+
+
+
+   standbyRadiusServerSecurityKey  OBJECT-TYPE
+       SYNTAX  DisplayString(SIZE(0..32))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The key in calculating MD5 encryption for enconding/deconding the Mesage-Authenticator in RADIUS packets."
+       ::= { standbyRadiusServerEntry 5 }
+       
+
+
+   standbyRadiusServerRunning  OBJECT-TYPE
+       SYNTAX  INTEGER
+       { 
+         yes(1),
+         no(2)
+       }
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The running state of radius server. Running state: Yes(1)/No(2)."
+       ::= { standbyRadiusServerEntry 6 }
+
+
+
+
+
+
+-- mac based revoke
+   macBasedReauthPort  OBJECT-TYPE
+       SYNTAX  PortList
+       MAX-ACCESS  read-create
+       STATUS  current
+       DESCRIPTION
+	       "Reauthenticate ethernet port(s)."
+       ::= { dot1xMgt 231 }
+
+   macBasedReauthMac  OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       "Reauthenticate MAC address."
+       ::= { dot1xMgt 232 }
+
+
+
+
+
+   aaaLogin  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   local(1),
+		   	   radius(2),
+		   	   local_radius(3)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to define login authentication method/precedence is local(1)/radius(2)/local_radius(3).
+	       "
+       ::= { dot1xMgt 233 }
+
+-- 13  ======================================================
+-- (.655.6.100.1.13)
+-- switch MAC Security management, mandatory
+--macsecMgt
+
+   macsecEnabled  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   enable(1),
+		   	   disable(2),
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the MAC security is enable/disable
+	       "
+       ::= { macsecMgt 1 }
+
+   macsecModeTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MacsecModeEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The security mode of port in MAC Security."
+       ::= { macsecMgt 2 }
+
+
+
+   macsecModeEntry  OBJECT-TYPE
+       SYNTAX  MacsecModeEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The MAC Security Mode Entry.
+	       "
+       INDEX   { portmacsecIndex }
+       ::= { macsecModeTable	1 }
+
+
+   MacsecModeEntry ::=
+       SEQUENCE {
+	   portmacsecIndex
+	       INTEGER,
+	   portmacsecMode
+	       INTEGER,
+	   portmaxmacno
+	       INTEGER,
+	   portlearnmacno
+	       INTEGER
+       }
+
+
+  portmacsecIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " This is defined as ifIndex in the IF-MIB. "
+       ::= { macsecModeEntry 1 }
+
+
+   portmacsecMode  OBJECT-TYPE
+       SYNTAX  INTEGER
+       	{	
+          nosecurity (1),
+       		statichithaccept (2),
+       		limitbymacno(3)
+       		
+       	}
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The security mode of port. 1.NoSecurity  2.STATICWITHACCEPT  3.LIMITBYMACNO"
+       ::= { macsecModeEntry 2 }
+       
+    portmaxmacno  OBJECT-TYPE
+       SYNTAX  INTEGER(0..8192)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The max mac number of port. The value is rang 0 and 8192."
+       ::= { macsecModeEntry 3 } 
+       
+     portlearnmacno  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The learned mac number of port."
+       ::= { macsecModeEntry 4 } 
+
+-- 14 ===============================================================
+-- (.4413.1.1.1.12)
+-- rate control Management.
+
+   ingressEgressRateControl 	OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   enable(1),
+		   	     disable(2),
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select Packet Drop for ingress Limit whether the is enable/disable.
+	       "
+       ::= { ratecontrolMgt 1 }
+   
+       
+-- ingress Rate Control
+   rcIngressPortTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF RcIngressPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The information for Ingress Rate Control of per port.
+	       "
+       ::= { ratecontrolMgt 2 }
+
+   rcIngressPortEntry	OBJECT-TYPE
+       SYNTAX  RcIngressPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Ingress Rate Control information entry."
+       INDEX   { rcIngressPortIndex }
+       ::= { rcIngressPortTable  1 }
+
+   RcIngressPortEntry ::=
+       SEQUENCE {
+	   rcIngressPortIndex
+	       INTEGER,
+	   rcIngressCount
+	       INTEGER,
+	   rcIngressUnit
+	       INTEGER ,
+     rcIngressRate
+	       INTEGER       
+       }
+
+   rcIngressPortIndex	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		" "
+       ::= { rcIngressPortEntry 1 }
+
+   rcIngressCount  OBJECT-TYPE
+       SYNTAX  INTEGER (0..1000)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" A switch to select Ingress Count whether it is between 0 and 1000. When it is 0 ,No limit.
+		"
+       ::= { rcIngressPortEntry 2 }
+       
+   rcIngressUnit  OBJECT-TYPE
+       SYNTAX  INTEGER 
+        {   bpsM(1),
+            bpsk(2),
+	      }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		"A switch to select Ingress Unit whether it is 1=1Mbps/2=62.5kbps
+		"
+       ::= { rcIngressPortEntry 3 }
+       
+   rcIngressRate  OBJECT-TYPE
+       SYNTAX  INTEGER 
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		"The Ingress rate is unit*count kbps. No limite ,when the value is 0. 
+		"
+       ::= { rcIngressPortEntry 4 }
+       
+-- Egress Rate Control
+   rcEgressPortTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF RcEgressPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The information for Egress Rate Control of per port.
+	       "
+       ::= { ratecontrolMgt 3 }
+
+   rcEgressPortEntry	OBJECT-TYPE
+       SYNTAX  RcEgressPortEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Engress Rate Control information entry."
+       INDEX   { rcEgressPortIndex }
+       ::= { rcEgressPortTable  1 }
+
+   RcEgressPortEntry ::=
+       SEQUENCE {
+	   rcEgressPortIndex
+	       INTEGER,
+	   rcEgressCount
+	       INTEGER,
+	   rcEgressUnit
+	       INTEGER,
+	   rcEgressRate
+	       INTEGER
+       }
+
+   rcEgressPortIndex	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		" "
+       ::= { rcEgressPortEntry 1 }
+    
+     rcEgressCount  OBJECT-TYPE
+       SYNTAX  INTEGER (0..1000)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	  " A switch to select Egress Count whether it is between 0 and 1000. When it is 0 ,No limit.
+		"
+       ::= { rcEgressPortEntry 2 }
+       
+     rcEgressUnit  OBJECT-TYPE
+       SYNTAX  INTEGER
+        {   bpsM(1),
+            bpsk(2),
+	      }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	  " A switch to select Egress Unit whether it is 1=1Mbps/2=62.5kbps
+		"
+       ::= { rcEgressPortEntry 3 }
+       
+    rcEgressRate  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	  " The Egress rate is unit*count kbps. No limite ,when the value is 0.
+		"
+       ::= { rcEgressPortEntry 4 }
+           
+-- 15 ===============================================================
+-- (.4413.1.1.1.15)
+-- Storm Control Management.
+
+
+    confbyportTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF ConfbyportEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { stormcontrolMgt 2 }
+
+   confbyportEntry OBJECT-TYPE
+       SYNTAX  ConfbyportEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { portindex }
+       ::= { confbyportTable 1 }
+
+   ConfbyportEntry ::=
+       SEQUENCE {
+     portindex
+         INTEGER,
+	   broadcastbyport
+	       INTEGER,
+ 	   multicastbyport
+	       INTEGER,
+	   floodingbyport 
+	       INTEGER           
+       }  
+       
+   portindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The port index of Storm Control.
+           "
+       ::= { confbyportEntry 1 }                              
+
+   broadcastbyport 	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {
+           on(1),
+           off(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select on/off of Broadcast Control by port.
+         "
+       ::= { confbyportEntry 2 }
+       
+   multicastbyport 	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {
+           on(1),
+           off(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select on/off of Multicast Control by port.
+         "
+       ::= { confbyportEntry 3 } 
+       
+   floodingbyport 	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {
+           on(1),
+           off(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select on/off of Flooding Control by port.
+         "
+       ::= { confbyportEntry 4 }          
+
+
+
+
+
+
+
+
+   scuint	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {   rate_k(1),
+		   	   rate_M(2)
+	      }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select Suppression Unit Rate(1=62.5Kbps/2=1Mbps) of Storm Control.
+         "
+       ::= { stormcontrolMgt 201 }  
+       
+   sccount  OBJECT-TYPE
+         SYNTAX  INTEGER(0..1000)
+         ACCESS  read-write
+         STATUS  mandatory
+         DESCRIPTION
+  	     " A switch to select N of Storm Control (Suppression Rate = N*Unit). When it is 0 ,NO limit.
+  		   "
+         ::= { stormcontrolMgt 202 }     
+       
+       
+  -- 16 =============================================================== 
+      
+ systemLogEnable  OBJECT-TYPE
+       SYNTAX  INTEGER
+       	{	
+          disable(2),
+       		enable(1)
+       	}
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the System Log Setting is enable/disable"
+       ::= { loggingMgt 1 }
+      
+ systemLogLevel OBJECT-TYPE
+     SYNTAX    INTEGER (1..7)
+     ACCESS    read-write
+     STATUS    mandatory
+     DESCRIPTION
+         " A switch to select whether the System Log Level is (0-7)"
+     ::= { loggingMgt 2 }      
+     
+  systemRemotelog OBJECT-TYPE
+     SYNTAX    INTEGER 
+     	{	
+          disable(2),
+       		enable(1)
+      }
+     ACCESS    read-write
+     STATUS    mandatory
+     DESCRIPTION
+         "  A switch to select whether the System Remote Log Setting is enable/disable. When it is enable,Remote Log Server IP can not be empty"
+     ::= { loggingMgt 3 }  
+     
+   systemServerIPTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF SystemServerIPEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " The information for system server ip.
+	       "
+       ::= { loggingMgt 4 }
+
+   systemServerIPEntry	OBJECT-TYPE
+       SYNTAX  SystemServerIPEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " System log of server ip information entry."
+       INDEX   { systemServerIPIndex }
+       ::= { systemServerIPTable  1 }
+
+   SystemServerIPEntry ::=
+       SEQUENCE {
+	   systemServerIPIndex
+	       INTEGER,
+	   systemServerIP
+	       IpAddress
+       }
+
+   systemServerIPIndex	OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		" A switch to select the index of System Log Server IP"
+       ::= { systemServerIPEntry 1 }
+       
+   systemServerIP	OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" A switch to specify the System Log Server IP. When the value is null,the Server IP Address is nill."
+       ::= { systemServerIPEntry 2 }
+          
+-- ==================================================================
+-- ==================================================================
+-- 17  ======================================================
+-- (.655.6.100.1.17)
+-- option82
+
+  dhcprelaystatus OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the dhcp relay status is ON or OFF.
+		 The default is OFF."
+       ::= { option82Mgt 1 }
+
+   option82relaystatus OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the dhcp option 82 relay status is ON or OFF.
+		 The default is OFF."
+       ::= { option82Mgt 2 }
+
+--   dhcpagentoption82mode	OBJECT-TYPE
+--       SYNTAX  INTEGER
+--	       {   replace(1),
+--		        keep(2),
+--		         drop(3)
+--	       }
+--       ACCESS  read-write
+--       STATUS  mandatory
+--       DESCRIPTION
+--	       " A switch to select whether the dhcp agent option 82 mode.
+--         The default is Replace. 1:Replace ,2:Keep ,3:Drop."
+--       ::= { option82Mgt 3 }
+
+   addinformationstate	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {
+           on(1),
+           off(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the relay agent ioformation state."
+       ::= { option82Mgt 4 }
+       
+   addinformation 	OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..15))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " Relay Agent ioformation"
+       ::= { option82Mgt 5 } 
+      
+    option82serverip 	OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to set up the dhcp server ip address "
+       ::= { option82Mgt 6 }           
+
+
+
+
+
+
+
+
+
+-- 18  ======================================================
+-- (.655.6.100.1.17)
+-- mvrMgt
+
+   mvrConfTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MvrConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { mvrMgt 1 }
+
+   mvrConfEntry OBJECT-TYPE
+       SYNTAX  MvrConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { mvrindex }
+       ::= { mvrConfTable 1 }
+
+   MvrConfEntry ::=
+       SEQUENCE {
+	   mvrindex
+	       INTEGER,
+	   mvrname
+	       DisplayString,
+	   mvractive 
+	       INTEGER,
+	   addmvrvid
+	       INTEGER,
+	   mvrpriority
+	       INTEGER,
+	   mvrmode   
+         INTEGER,
+     mvrsourceport
+         PortList,
+     mvrreceiveport
+         PortList,
+     mvrtag
+         PortList, 
+     mvrdelete
+	       INTEGER           
+       }
+       
+     mvrindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The item of Multicast Vlan.
+           "
+       ::= { mvrConfEntry 1 }
+       
+     mvrname  OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Name of Multicast Vlan.
+           "
+       ::= { mvrConfEntry 2 }  
+       
+      mvractive	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {
+           active(1),
+           nactive(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select active or nactive of Multicast Vlan.
+         "
+       ::= { mvrConfEntry 3 }  
+       
+      addmvrvid  OBJECT-TYPE
+         SYNTAX  INTEGER(2..4094)
+         ACCESS  read-write
+         STATUS  mandatory
+         DESCRIPTION
+  	     " A switch to select vid of Multicast Vlan .
+  		   "
+         ::= { mvrConfEntry 4 } 
+         
+      mvrpriority  OBJECT-TYPE
+         SYNTAX  INTEGER(0..7)
+         ACCESS  read-write
+         STATUS  mandatory
+         DESCRIPTION
+  	     " A switch to select 802.1p Priority of Multicast Vlan .
+  		   "
+         ::= { mvrConfEntry 5 }  
+         
+      mvrmode	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {
+           compatible(1),
+           dynamic(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select Mode of Multicast Vlan .
+         "
+       ::= { mvrConfEntry 6 }   
+      
+      mvrsourceport OBJECT-TYPE
+        SYNTAX  PortList
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            " A switch to select SourcePort of Multicast Vlan.
+            "
+        ::= { mvrConfEntry 7 }
+        
+       mvrreceiveport OBJECT-TYPE
+        SYNTAX  PortList
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            " A switch to select ReceivePort of Multicast Vlan.
+            "
+        ::= { mvrConfEntry 8 }  
+
+
+
+       mvrtag OBJECT-TYPE
+        SYNTAX  PortList
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+            " A switch to select Tag of Multicast Vlan.
+            "
+        ::= { mvrConfEntry 9 }    
+        
+     mvrdelete	OBJECT-TYPE
+       SYNTAX  INTEGER 
+       {
+           action(1),
+           noAction(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select Mode of Multicast Vlan .
+         "
+       ::= { mvrConfEntry 10 }   
+        
+   mvrGroupaddTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MvrGroupaddEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { mvrMgt 2 }
+
+     mvrGroupaddEntry OBJECT-TYPE
+       SYNTAX  MvrGroupaddEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { mvrgroupindex }
+       ::= { mvrGroupaddTable 1 }
+
+     MvrGroupaddEntry ::=
+       SEQUENCE {
+	   mvrgroupindex
+	       INTEGER,
+	   mvrgroupvid
+         INTEGER,   
+	   mvrgroupaddname
+	       DisplayString,
+	   mvrgroupaddIPrange 
+	       PortList,
+	   mvrgroupDeleteEntry
+	       DisplayString
+       }   
+     mvrgroupindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The item of MVR Group VLAN.
+           "
+       ::= { mvrGroupaddEntry 1 } 
+       
+     mvrgroupvid  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Vlan id of Multicast Group Vlan.
+           "
+       ::= { mvrGroupaddEntry 2 }     
+       
+     mvrgroupaddname  OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Name of Multicast Group Vlan.
+           "
+       ::= { mvrGroupaddEntry 3 }  
+     
+     mvrgroupaddIPrange   OBJECT-TYPE
+       SYNTAX    PortList
+       ACCESS    read-write
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select start ipaddress of Multicast Group Vlan.
+          "
+       ::= { mvrGroupaddEntry 4 }    
+        
+
+
+
+
+
+     mvrgroupDeleteEntry  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..60))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " To delete group entry. Format:vid,groupEntryName  Example:100,abc"
+       ::= { mvrGroupaddEntry 5 }  
+
+
+
+
+   mvrGroup1_Table	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MvrGroup1_Entry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { mvrMgt 3 }
+
+     mvrGroup1_Entry OBJECT-TYPE
+       SYNTAX  MvrGroup1_Entry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { mvrgroupindex_1 }
+       ::= { mvrGroup1_Table 1}
+
+     MvrGroup1_Entry ::=
+       SEQUENCE {
+	   mvrgroupindex_1
+	       INTEGER,
+	   mvrgroupid_1
+         INTEGER,   
+	   mvrgroupname_1
+	       DisplayString,
+	   mvrgroupstartip_1 
+	       IpAddress,
+	   mvrgroupendip_1
+	       IpAddress 
+       }   
+     mvrgroupindex_1  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The item of MVR Group VLAN.
+           "
+       ::= { mvrGroup1_Entry 1 } 
+       
+     mvrgroupid_1  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Vlan id of Multicast Group Vlan.
+           "
+       ::= { mvrGroup1_Entry 2 }     
+       
+     mvrgroupname_1  OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Name of Multicast Group Vlan.
+           "
+       ::= { mvrGroup1_Entry 3 }  
+     
+     mvrgroupstartip_1   OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select start ipaddress of Multicast Group Vlan.
+          "
+       ::= { mvrGroup1_Entry 4 }  
+       
+       
+     mvrgroupendip_1   OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select end ipaddress of Multicast Group Vlan.
+          "
+       ::= { mvrGroup1_Entry 5 }   
+                 
+    mvrGroup2_Table	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MvrGroup2_Entry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { mvrMgt 4 }
+
+     mvrGroup2_Entry OBJECT-TYPE
+       SYNTAX  MvrGroup2_Entry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { mvrgroupindex_2 }
+       ::= { mvrGroup2_Table 1 }
+
+     MvrGroup2_Entry ::=
+       SEQUENCE {
+	   mvrgroupindex_2
+	       INTEGER,
+	   mvrgroupid_2
+         INTEGER,   
+	   mvrgroupname_2
+	       DisplayString,
+	   mvrgroupstartip_2 
+	       IpAddress,
+	   mvrgroupendip_2
+	       IpAddress 
+       }   
+     mvrgroupindex_2  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The item of MVR Group VLAN.
+           "
+       ::= { mvrGroup2_Entry 1 } 
+       
+     mvrgroupid_2  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Vlan id of Multicast Group Vlan.
+           "
+       ::= { mvrGroup2_Entry 2 }     
+       
+     mvrgroupname_2  OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Name of Multicast Group Vlan.
+           "
+       ::= { mvrGroup2_Entry 3 }  
+     
+     mvrgroupstartip_2   OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select start ipaddress of Multicast Group Vlan.
+          "
+       ::= { mvrGroup2_Entry 4 }  
+       
+       
+     mvrgroupendip_2   OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select end ipaddress of Multicast Group Vlan.
+          "
+       ::= { mvrGroup2_Entry 5 }   
+       
+       
+     mvrGroup3_Table	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF MvrGroup3_Entry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { mvrMgt 5 }
+
+     mvrGroup3_Entry OBJECT-TYPE
+       SYNTAX  MvrGroup3_Entry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { mvrgroupindex_3 }
+       ::= { mvrGroup3_Table 1 }
+
+     MvrGroup3_Entry ::=
+       SEQUENCE {
+	   mvrgroupindex_3
+	       INTEGER,
+	   mvrgroupid_3
+         INTEGER,   
+	   mvrgroupname_3
+	       DisplayString,
+	   mvrgroupstartip_3 
+	       IpAddress,
+	   mvrgroupendip_3
+	       IpAddress 
+       }   
+     mvrgroupindex_3  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The item of MVR Group VLAN.
+           "
+       ::= { mvrGroup3_Entry 1 } 
+       
+     mvrgroupid_3  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Vlan id of Multicast Group Vlan.
+           "
+       ::= { mvrGroup3_Entry 2 }     
+       
+     mvrgroupname_3  OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Name of Multicast Group Vlan.
+           "
+       ::= { mvrGroup3_Entry 3 }  
+     
+     mvrgroupstartip_3   OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select start ipaddress of Multicast Group Vlan.
+          "
+       ::= { mvrGroup3_Entry 4 }  
+       
+       
+     mvrgroupendip_3   OBJECT-TYPE
+       SYNTAX    IpAddress
+       ACCESS    read-only
+       STATUS    mandatory
+       DESCRIPTION
+          " A switch to select end ipaddress of Multicast Group Vlan.
+          "
+       ::= { mvrGroup3_Entry 5 }   
+         
+-- ==================================================================
+-- ==================================================================
+-- 19  ======================================================
+
+     ipmacConfTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF IpmacConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { ipmacMgt 1 }
+
+     ipmacConfEntry OBJECT-TYPE
+       SYNTAX  IpmacConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { ipmacindex }
+       ::= { ipmacConfTable 1 }
+
+     IpmacConfEntry ::=
+       SEQUENCE {
+	      ipmacindex
+	        INTEGER ,
+        ipmacportenable
+          INTEGER
+       }
+       
+     ipmacindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " 
+           "
+       ::= { ipmacConfEntry 1 }
+
+     ipmacportenable  OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+          enable(1),
+          disable(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Enable/Disable of IP MAC Binding in port.
+           "
+       ::= { ipmacConfEntry 2 }
+       
+     ipmacBindingTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF IpmacBindingEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { ipmacMgt 2 }
+
+     ipmacBindingEntry OBJECT-TYPE
+       SYNTAX  IpmacBindingEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { ipmacruleindex }
+       ::= { ipmacBindingTable 1 }
+
+     IpmacBindingEntry ::=
+       SEQUENCE {
+	      ipmacruleindex
+	        INTEGER ,
+	      ipmacruleactive
+	        INTEGER ,
+        ipmacSrcMac
+          MacAddress,
+        ipmacSrcIP
+          IpAddress,
+        ipmacSrcPort
+          PortList
+       }
+       
+     ipmacruleindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " 
+           "
+       ::= { ipmacBindingEntry 1 }
+       
+     ipmacruleactive  OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+          active(1),
+          delete(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           "  A switch to select active/noactive of Address Binding List.
+           "
+       ::= { ipmacBindingEntry 2 }
+
+     ipmacSrcMac  OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Source MAC Address of Address Binding List.
+           "
+       ::= { ipmacBindingEntry 3 }
+       
+     ipmacSrcIP  OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Source IP Address of Address Binding List.
+           "
+       ::= { ipmacBindingEntry 4 }
+       
+     ipmacSrcPort  OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Source Port of Address Binding List.
+           "
+       ::= { ipmacBindingEntry 5 }
+       
+    ipmacdeleteall  OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+          action(1),
+          noaction(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           "  A switch to select delete all of Address Binding List.
+           "
+       ::= { ipmacMgt 3 }
+
+-- 20  ======================================================
+
+     aclFunction  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		   off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether acl function is enable/disable
+	       "
+       ::= { aclMgt 1 }
+
+     acMaxRule  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " To support Max Rule "
+       ::= { aclMgt 2 }       
+       
+     aclConfTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF AclConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { aclMgt 3 }       
+
+     aclConfEntry OBJECT-TYPE
+       SYNTAX  AclConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   {aclRuleNo }
+       ::= { aclConfTable 1 }
+
+     AclConfEntry ::=
+           SEQUENCE {
+	  aclRuleNo
+	        INTEGER ,  
+	  aclRuleActive
+	        INTEGER ,  	
+	  aclRuleName
+	        DisplayString , 
+	  aclRuleL2Frame
+	        INTEGER ,  		        	         	                
+          aclRuleSrcMac
+                MacAddress,
+          aclRuleSrcMacBitMask
+                MacAddress,      
+          aclRuleDestMac
+                MacAddress,
+          aclRuleDestMacBitMask
+                MacAddress,                   
+	  aclRuleTaggedFrame
+	        INTEGER ,   
+	  aclRuleVLAN
+	        INTEGER ,  
+	  aclRuleEthernetTypeAny
+	        INTEGER ,
+	  aclRuleEthernetType
+	        OCTET STRING,	        
+	  aclRuleL3Frame
+	        INTEGER,
+	  aclRuleSrcIp
+	        IpAddress,    
+	  aclRuleSrcIpAddressPrefix
+	        INTEGER,
+	  aclRuleDestIp
+	        IpAddress,
+	  aclRuleDestIpAddressPrefix
+	        INTEGER,	
+    aclRuleIpProtocolAny
+          INTEGER,
+    aclRuleIpProtocol
+          INTEGER,	
+    aclRuleL4Frame  
+          INTEGER,                    	                	        	          
+	  aclRuleSourceSocketPortNumber
+	        INTEGER,
+          aclRuleSourceSocketPortNumberANY
+	        INTEGER,	        	        
+	  aclRuleDestinationSocketPortNumberANY
+	        INTEGER,	        	        	                                          
+          aclRuleDestinationSocketPortNumber
+                INTEGER,
+          aclRuleSrcPort
+                PortList,                
+          aclRuleAction  
+                 INTEGER,     
+          aclRuleActionFloodToOnePort
+                 INTEGER,  
+          aclRuleAcRateLimit 
+                 INTEGER,       
+          aclRuleAcRateUnit
+                INTEGER
+       }  
+       
+     aclRuleNo  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+            " This is the number of the rule"
+       ::= { aclConfEntry 1 }
+       
+     aclRuleActive  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   on(1),
+		   off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the the rule to be active/in-active"
+       ::= { aclConfEntry 2 }       
+       
+     aclRuleName  OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..15))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " Name of the rule."
+       ::= { aclConfEntry 3 }       
+       
+     aclRuleL2Frame  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   l2_Others(0),
+	           ether_II(1),
+		   snap(2),
+		   any(99)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of L2 Frame"
+       ::= { aclConfEntry 4 }         
+       
+
+     aclRuleSrcMac  OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+             " This is to assign the value of Source MAC Address "
+       ::= { aclConfEntry 5 }
+       
+     aclRuleSrcMacBitMask  OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Source MAC Address Bit Mask,
+                If the value is 00 00 00 00 00 00, it works ANY"           
+       ::= { aclConfEntry 6 }  
+        
+     aclRuleDestMac  OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Destination MAC Address "
+       ::= { aclConfEntry 7 }
+       
+     aclRuleDestMacBitMask  OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+                " This is to assign the value of Destination MAC Address Bit Mask,
+                  If the value is 00 00 00 00 00 00, it works ANY"    
+       ::= { aclConfEntry 8 }          
+       
+    aclRuleTaggedFrame  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   untagged(0),
+	           tagged(1),
+		   any(99)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Tagged Frame"
+       ::= { aclConfEntry 9 }      
+
+   aclRuleVLAN  OBJECT-TYPE
+       SYNTAX  INTEGER  
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of VLAN , if vlan>4095, any"
+       ::= { aclConfEntry 10 }                          
+               
+   aclRuleEthernetTypeAny  OBJECT-TYPE
+      SYNTAX  INTEGER  
+	       {   ethernettype(0),
+		   any(1)
+	       }      
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Ethernet Type to be ANY  "
+       ::= { aclConfEntry 11 }  
+                     
+   aclRuleEthernetType  OBJECT-TYPE
+       SYNTAX  OCTET STRING (SIZE (2)) 
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Ethernet Type "
+       ::= { aclConfEntry 12 }       
+       
+       
+   aclRuleL3Frame  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   l3_Others(0),
+	           ipv4(1),
+		   ipv6(2),
+		   any(99)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of L3 Frame"
+       ::= { aclConfEntry 13 }                            
+       
+     aclRuleSrcIp OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+               " This is to assign the value of Source IP Address Prefix"
+       ::= { aclConfEntry 14 }
+       
+    aclRuleSrcIpAddressPrefix  OBJECT-TYPE
+       SYNTAX  INTEGER (1..32)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Source IP Address Prefix"
+       ::= { aclConfEntry 15 }             
+       
+     aclRuleDestIp OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+               " This is to assign the value of Destination IP Address Prefix"
+       ::= { aclConfEntry 16 }
+       
+    aclRuleDestIpAddressPrefix  OBJECT-TYPE
+       SYNTAX  INTEGER  (1..32)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Destination IP Address Prefix"
+       ::= { aclConfEntry 17 }   
+       
+   aclRuleIpProtocolAny  OBJECT-TYPE
+      SYNTAX  INTEGER  
+	       {   ipProtocol(0),
+		   any(1)
+	       }      
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of IP Protocol to be ANY  "
+       ::= { aclConfEntry 18 }  
+         
+   aclRuleIpProtocol  OBJECT-TYPE
+      SYNTAX  INTEGER  (0..255)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of IP Protocol  "
+       ::= { aclConfEntry 19 }          
+              
+  aclRuleL4Frame  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   l4_Others(0),
+	           tcp(1),
+	           udp(2),
+		   icmp/igmp(3),
+		   any(99)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of L4 Frame"
+       ::= { aclConfEntry 20 }   
+              
+    aclRuleSourceSocketPortNumberANY    OBJECT-TYPE
+      SYNTAX  INTEGER  
+	       {   socketPortNumber(0),
+		   any(1)
+	       }       
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Source Socket Port Number to ANY"
+       ::= { aclConfEntry 21 }  
+    
+    aclRuleSourceSocketPortNumber    OBJECT-TYPE
+       SYNTAX  INTEGER  (0..65535)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Source Socket Port Number"
+       ::= { aclConfEntry 22 }     
+
+    aclRuleDestinationSocketPortNumberANY     OBJECT-TYPE
+       SYNTAX  INTEGER  
+	       {   socketPortNumber(0),
+		   any(1)
+	       }       
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Destination Socket Port Number to ANY"
+       ::= { aclConfEntry 23 }                        
+              
+   aclRuleDestinationSocketPortNumber     OBJECT-TYPE
+       SYNTAX  INTEGER  (0..65535)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the value of Destination Socket Port Number"
+       ::= { aclConfEntry 24 }                        
+                            
+     aclRuleSrcPort  OBJECT-TYPE
+       SYNTAX  PortList
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " 
+           "
+       ::= { aclConfEntry 25 }    
+
+   aclRuleAction  OBJECT-TYPE
+       SYNTAX  INTEGER
+	       {   permit(0),
+	           deny(1),
+		   flood_All(2),
+		   flood_To_One_Port(3)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign Policy/Action"
+       ::= { aclConfEntry 26 }   
+       
+   aclRuleActionFloodToOnePort  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the port in Flood_To_One_port mode of Policy/Action"
+       ::= { aclConfEntry 27 }                     
+
+  aclRuleAcRateLimit  OBJECT-TYPE
+       SYNTAX  INTEGER (0..1000)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the rate limit , 0= no limit"
+       ::= { aclConfEntry 28 }  
+       
+  aclRuleAcRateUnit  OBJECT-TYPE
+       SYNTAX  INTEGER  
+	       {   bpsk(0),
+	           bpsM(1),
+	       }       
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+              " This is to assign the rate unit 0=62.5k/1=1M"
+       ::= { aclConfEntry 29 }                   
+
+
+
+-- 21  ======================================================
+-- (.655.6.100.1.21)
+
+
+   loopbackConfTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF LoopbackConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " A Switch set up loopback configuration for each port."
+       ::= { loopbackMgt 1}
+
+  loopbackConfEntry  OBJECT-TYPE
+       SYNTAX  LoopbackConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " Port loopback information entry."
+       INDEX   { portLoopbackIndex }
+       ::= { loopbackConfTable	1 }
+
+   LoopbackConfEntry ::=
+       SEQUENCE {
+           portLoopbackIndex
+               INTEGER,
+	   portloopbackEnable
+	       INTEGER,
+	   portloopbackControl
+	       INTEGER,	
+	   portloopbackInShutdown
+	       INTEGER,	
+	   portloopbackInLoop
+	       INTEGER	 	              	       
+       }
+
+   portLoopbackIndex  OBJECT-TYPE
+       SYNTAX  INTEGER 
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " port number,
+         This is defined as ifIndex in the IF-MIB.
+           "
+       ::= { loopbackConfEntry 1 }
+
+
+   portloopbackEnable  OBJECT-TYPE
+       SYNTAX  INTEGER
+       { enabled(1),
+         disabled(2), 
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       "Port loopback detection function is enabled/disabled. "
+       ::= { loopbackConfEntry 2 }
+       
+   portloopbackControl  OBJECT-TYPE
+       SYNTAX  INTEGER
+       { enabled(1),
+         disabled(2), 
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       "Configure the Switch to enable/disable to shutdown the current port once the port is found in a loop "
+       ::= { loopbackConfEntry 3 }   
+
+       
+  portloopbackInShutdown  OBJECT-TYPE
+       SYNTAX  INTEGER
+       { yes(1),
+         no(2), 
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	        "The port is in Shutdown"
+       ::= { loopbackConfEntry 4 }           
+                           
+  portloopbackInLoop  OBJECT-TYPE
+       SYNTAX  INTEGER
+       { yes(1),
+         no(2), 
+       }
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	        "The port is in a loop"
+       ::= { loopbackConfEntry 5 }                                      
+
+-- 22  ======================================================
+-- (.655.6.100.1.22)
+
+  portConfTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF PortConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { dhcpsnoopMgt 2 }
+
+     portConfEntry OBJECT-TYPE
+       SYNTAX  PortConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { dhcpsnoopportindex }
+       ::= { portConfTable 1 }
+
+     PortConfEntry ::=
+       SEQUENCE {
+	      dhcpsnoopportindex
+	        INTEGER ,
+        dhcpsnooptrust
+          INTEGER,
+        dhcpsnooprate
+          INTEGER
+       }
+       
+     dhcpsnoopportindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " 
+           "
+       ::= { portConfEntry 1 }
+
+     dhcpsnooptrust  OBJECT-TYPE
+       SYNTAX  INTEGER
+       {
+          trust(1),
+          untrust(2)
+       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to select Trust/Untrust port of DHCP SNOOPING.
+           "
+       ::= { portConfEntry 2 }
+       
+     dhcpsnooprate  OBJECT-TYPE
+       SYNTAX  INTEGER (0..5)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		" A switch to select dhcp snooping rate whether it is between 0 and 5 (*62.5 Kbps). When it is 0 ,No limit.
+		"
+       ::= { portConfEntry 3 }
+       
+  dhcpsnoopTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF DhcpsnoopEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { dhcpsnoopMgt 3 }
+
+     dhcpsnoopEntry OBJECT-TYPE
+       SYNTAX  DhcpsnoopEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       INDEX   { tableindex }
+       ::= { dhcpsnoopTable 1 }
+
+     DhcpsnoopEntry ::=
+       SEQUENCE {
+	      tableindex
+	        INTEGER ,
+        dhcpsnoopvid
+          INTEGER,
+        dhcpsnoopip
+          IpAddress,
+        dhcpsnoopmac
+          MacAddress,
+        dhcpsnooplease
+          INTEGER,
+        dhcpsnoopport
+          INTEGER
+       }
+       
+     tableindex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " 
+           "
+       ::= { dhcpsnoopEntry 1 }
+
+     dhcpsnoopvid  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " A switch to show dhcp snooping table of VID.
+           "
+       ::= { dhcpsnoopEntry 2 }
+       
+     dhcpsnoopip  OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		       " A switch to show dhcp snooping table of ip address.
+		      "
+       ::= { dhcpsnoopEntry 3 }
+       
+     dhcpsnoopmac  OBJECT-TYPE
+       SYNTAX  MacAddress
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		       " A switch to show dhcp snooping table of MAC.
+		      "
+       ::= { dhcpsnoopEntry 4 }
+
+     dhcpsnooplease  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		       " A switch to show dhcp snooping table of Lease time.
+		      "
+       ::= { dhcpsnoopEntry 5 }
+
+     dhcpsnoopport  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		       " A switch to show dhcp snooping table of port.
+		      "
+       ::= { dhcpsnoopEntry 6 }
+
+
+
+
+
+
+   dhcpsnoopstatus OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the dhcp snoop status is ON or OFF.
+		 The default is OFF."
+       ::= { dhcpsnoopMgt 201 }
+       
+   dhcpsnoopwrite OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the dhcp Write delay status is ON or OFF.
+		 The default is OFF."
+       ::= { dhcpsnoopMgt 202 }
+       
+   dhcpsnoopwritedelay OBJECT-TYPE
+        SYNTAX  INTEGER
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the dhcp Write delay time is between 10 and 65535.
+		 The default is 10."
+       ::= { dhcpsnoopMgt 203 }
+       
+  dhcpsnoopfile OBJECT-TYPE
+       SYNTAX  DisplayString( SIZE(0..32))
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The filename of dhcp snooping table"
+       ::= { dhcpsnoopMgt 204 }
+       
+  dhcpsnoopagentip OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to set up the tftp server ip address"
+       ::= { dhcpsnoopMgt 205 }
+       
+  dhcpsnooprenew OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   action(1),
+		         noaction(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the dhcp snoop status is renew."
+       ::= { dhcpsnoopMgt 206 }
+
+
+
+
+-- 23  ======================================================
+
+   lldpPortConfTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF LldpPortConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { lldpMgt 3 }
+
+   lldpPortConfEntry OBJECT-TYPE
+       SYNTAX  LldpPortConfEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       INDEX   { lldpPortIndex }
+       ::= { lldpPortConfTable 1 }
+       
+    LldpPortConfEntry ::=
+       SEQUENCE {
+	    lldpPortIndex
+	       INTEGER,
+      lldpPortstate 
+	       INTEGER
+       }   
+       
+    lldpPortIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The port number of lldp,
+           "
+       ::= { lldpPortConfEntry 1 }
+       
+    lldpPortstate  OBJECT-TYPE
+       SYNTAX  INTEGER 
+        {   disabled(1),
+		   	    rxtx(2),
+		   	    tx(3),
+		   	    rx(4)
+	      }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+		"A switch to select LLDP port state whether it is disabled/RX and TX/TX only/RX only
+		"
+       ::= { lldpPortConfEntry 2 }
+       
+   lldplistTable	OBJECT-TYPE
+       SYNTAX  SEQUENCE OF LldplistEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       DESCRIPTION
+	       " 
+	       "
+       ::= { lldpMgt 4 }
+
+   lldplistEntry OBJECT-TYPE
+       SYNTAX  LldplistEntry
+       ACCESS  not-accessible
+       STATUS  mandatory
+       INDEX   { lldpIdIndex }
+       ::= { lldplistTable 1 }
+       
+    LldplistEntry ::=
+       SEQUENCE {
+	    lldpIdIndex
+	       INTEGER,
+      lldpPortID 
+	       INTEGER,
+	    lldpChassid 
+	       DisplayString,
+	    lldpRemotePortid 
+	       DisplayString,
+	    lldpTimelive 
+	       INTEGER,
+	    lldpPortDescr 
+	       DisplayString,
+	    lldpSystemName 
+	       DisplayString,
+	    lldpSystDescr 
+	       DisplayString,
+      lldpSystemCapa 
+	       DisplayString, 
+	    lldpMamgtAddr  
+	       IpAddress
+       }  
+              
+     lldpIdIndex  OBJECT-TYPE
+       SYNTAX  INTEGER
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+           " The id of lldp table list,
+           "
+       ::= { lldplistEntry 1 }
+       
+     lldpPortID  OBJECT-TYPE
+       SYNTAX  INTEGER 
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		"It is local Port.
+		"
+       ::= { lldplistEntry 2 }
+       
+     lldpChassid 	OBJECT-TYPE
+       SYNTAX  DisplayString(SIZE(0..200))
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Chassis ID of lldp."
+       ::= { lldplistEntry 3 }  
+       
+     lldpRemotePortid 	OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Remote Port ID of lldp."
+       ::= { lldplistEntry 4 } 
+        
+      lldpTimelive  OBJECT-TYPE
+       SYNTAX  INTEGER 
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+		  "The Time to live of lldp.
+		  "
+       ::= { lldplistEntry 5 }
+       
+     lldpPortDescr 	OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Port Description of remote switch."
+       ::= { lldplistEntry 6 } 
+       
+     lldpSystemName 	OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The System Description of remote switch."
+       ::= { lldplistEntry 7 } 
+       
+     lldpSystDescr 	OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The System Description of remote switch."
+       ::= { lldplistEntry 8 } 
+     
+     lldpSystemCapa 	OBJECT-TYPE
+       SYNTAX  DisplayString
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The System Capabilities of remote switch."
+       ::= { lldplistEntry 9 }     
+       
+     lldpMamgtAddr 	OBJECT-TYPE
+       SYNTAX  IpAddress
+       ACCESS  read-only
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Management Address of remote switch. "
+       ::= { lldplistEntry 10 }           
+
+
+
+
+
+
+
+   lldpstate OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the lldp status is ON or OFF.
+		 The default is OFF."
+       ::= { lldpMgt 201 }  
+         
+   lldpportdesrstate OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Transmitted TLVs of lldp whether the Port Description is ON or OFF.
+		 The default is ON."
+       ::= { lldpMgt 202 }  
+       
+   lldpsystemnamestate OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Transmitted TLVs of lldp whether the System Name  is ON or OFF.
+		 The default is ON."
+       ::= { lldpMgt 203 }  
+       
+   lldpsystemdescrstate OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Transmitted TLVs of lldp whether the System Description  is ON or OFF.
+		 The default is ON."
+       ::= { lldpMgt 204 }  
+         
+    lldpsystemcapastate OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Transmitted TLVs of lldp whether the System Capabilities  is ON or OFF.
+		 The default is ON."
+       ::= { lldpMgt 205 }    
+       
+    lldpmgmtaddrstate OBJECT-TYPE
+        SYNTAX  INTEGER
+	       {   on(1),
+		         off(2)
+	       }
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " The Transmitted TLVs of lldp whether the Management Address is ON or OFF.
+		 The default is ON."
+       ::= { lldpMgt 206 }       
+
+
+
+
+
+
+
+
+   lldpInterval	OBJECT-TYPE
+       SYNTAX  INTEGER (5..32768)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the lldp Interval.
+		 The default is 30. 
+        ."
+       ::= { lldpMgt 211 }
+   
+   lldpTxhold	OBJECT-TYPE
+       SYNTAX  INTEGER (2..10)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the lldp Tx Hold.
+		 The default is 4. 
+        ."
+       ::= { lldpMgt 212 }  
+  
+   lldpTxdelay	OBJECT-TYPE
+       SYNTAX  INTEGER (1..8192)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the lldp Tx Delay.
+		 The default is 2. 
+        ."
+       ::= { lldpMgt 213 }  
+       
+   lldpReinitdelay	OBJECT-TYPE
+       SYNTAX  INTEGER (1..10)
+       ACCESS  read-write
+       STATUS  mandatory
+       DESCRIPTION
+	       " A switch to select whether the lldp Reinit Delay.
+		 The default is 2. 
+        ."
+       ::= { lldpMgt 214 }  
+   
+
+
+
+---
+-- Traps defined by RFC1493
+-- ==========================================================================
+
+switchTrapLevel  OBJECT IDENTIFIER ::= { trapMgt 1 }
+--virtualLanDomainIndex  OBJECT IDENTIFIER ::= { virtualLanEntry 1 }
+--trunkGroupIndex        OBJECT IDENTIFIER ::= { trunkGroupEntry 1 }
+
+   newRoot	   TRAP-TYPE
+       ENTERPRISE  dot1dBridge
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Become the new root of the Spanning Tree."
+       ::= 1
+
+   topologyChange  TRAP-TYPE
+       ENTERPRISE  dot1dBridge
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Spanning tree topology change."
+       ::= 2
+
+-- ==================================================================
+
+   -- Traps for use by reset & test
+
+   switch_Reset    TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Successfully reset the switching hub."
+       ::= 100
+
+
+   switch_FReset    TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Fattory reset of the switching hub is successful."
+       ::= 101
+
+-- ==================================================================
+
+   -- Traps for use by port status
+
+   switch_Port_Enabled	TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel,	  
+		     portIndex }
+       DESCRIPTION
+		   " Enable a port."
+       ::= 110
+
+   switch_Port_Disabled  TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel,	 
+		     portIndex }
+       DESCRIPTION
+		   " Disable a port."
+       ::= 111
+
+
+-- =====================
+
+  -- Traps for use by port status changed
+
+   switch_Port_Speed_Duplex_Change TRAP-TYPE
+      ENTERPRISE  switch
+      VARIABLES   { switchTrapLevel,	 
+		    portIndex,
+		    portSpeedDpxStatus
+		  }
+      DESCRIPTION
+		  " Speed & Duplex status of the switching port is changed."
+      ::= 120
+
+
+-- ===============================
+
+--   switch_Static_Addr_In_Collision  TRAP-TYPE
+--       ENTERPRISE  switch
+--       VARIABLES   { switchTrapLevel,	 
+--		     switchTrapStaticCollisionAddress1,
+--		     switchTrapStaticCollisionAddress2,
+--		     switchTrapStaticCollisionAddressNew
+--		   }
+--      DESCRIPTION
+--		   " Set address is collision in setting static address."
+--       ::= 130
+
+
+-- ===============================
+
+   -- Traps for use by port Mirror
+
+   switch_Port_Mirror_On  TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	 
+       DESCRIPTION
+		   " Enable port Mirror function."
+       ::= 140
+
+   switch_Port_Mirror_Off  TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Disable port Mirror function."
+       ::= 141
+
+
+-- ===============================
+
+   -- Traps for use by virtual LAN
+
+   switch_Virtual_LAN_On  TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Enable Virtual LAN function."
+       ::= 150
+
+   switch_Virtual_LAN_Off  TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Disable Virtual LAN function."
+       ::= 151
+
+   switch_VL_ReConfiguration   TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel,	  
+		     --virtualLanDomainIndex
+		   }
+       DESCRIPTION
+		   " VLAN re-configuration."
+       ::= 152
+
+-- ===============================
+
+   -- Traps for use by Port Trunk
+
+   switch_Port_Trunk_On  TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	 
+       DESCRIPTION
+		   " Enable Port Trunk function."
+       ::= 160
+
+   switch_Port_Trunk_Off  TRAP-TYPE
+       ENTERPRISE  switch
+       VARIABLES   { switchTrapLevel }	  
+       DESCRIPTION
+		   " Disable Port Trunk function."
+       ::= 161
+
+--
+
+   switch_Port_Trunk_ReConfigure  TRAP-TYPE
+       ENTERPRISE switch
+       VARIABLES   { 	switchTrapLevel,
+       								trunkIndex
+       }
+       DESCRIPTION
+		   " One Port Trunk group re-configure."
+       ::= 162
+
+-- ==================================================================   
+  
+      
+END
+
+-- EOF

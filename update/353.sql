@@ -1,0 +1,1 @@
+ALTER TABLE `ports_cbqos` CHANGE `PrePolicyPkt` `PrePolicyPkt` BIGINT NOT NULL, CHANGE `PrePolicyByte` `PrePolicyByte` BIGINT NOT NULL, CHANGE `PostPolicyByte` `PostPolicyByte` BIGINT NOT NULL, CHANGE `DropPkt` `DropPkt` BIGINT NOT NULL, CHANGE `DropByte` `DropByte` BIGINT NOT NULL, CHANGE `NoBufDropPkt` `NoBufDropPkt` BIGINT NOT NULL;

@@ -1,0 +1,431 @@
+-- This file is corresponding to Release 9.1.10.101 from 2014/08/11 00:00:00
+
+
+-- (C)opyright 2005-2014 bintec elmeg GmbH, All Rights Reserved
+-- $RCSfile: mibmedia,v $
+-- $Revision: 1.18 $
+
+BIANCA-BRICK-PROXY-MIB DEFINITIONS ::= BEGIN
+
+	IMPORTS
+	    IpAddress, Counter, enterprises, TimeTicks
+		FROM RFC1155-SMI
+
+	    DisplayString
+		FROM RFC1158-MIB
+
+	    OBJECT-TYPE
+		FROM RFC-1212;
+
+    bintec 	OBJECT IDENTIFIER ::= { enterprises 272 }
+    bibo	OBJECT IDENTIFIER ::= { bintec 4 }
+    biboip	OBJECT IDENTIFIER ::= { bibo 5 }
+    media	OBJECT IDENTIFIER
+	::= { bibo 50 }
+
+	ipProxyTable OBJECT-TYPE
+	    SYNTAX  SEQUENCE OF  IpProxyEntry
+	    ACCESS  not-accessible
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Contains all settings of supported proxy applications."
+	::= { biboip 50}
+
+	ipProxyEntry OBJECT-TYPE
+	    SYNTAX IpProxyEntry
+	    ACCESS not-accessible
+	    STATUS mandatory
+	    DESCRIPTION
+		"This table defines proxy settings of Application Level Gateway (dynamic
+		 NAT rules for special media protocols)."
+	    INDEX { ipProxyDescr }
+	::= { ipProxyTable 1 }
+
+	IpProxyEntry ::=
+	    SEQUENCE {
+		ipProxyDescr	    DisplayString,
+		ipProxyAdminStatus  INTEGER,
+		ipProxyApplication  INTEGER,
+		ipProxyProtocol     INTEGER,
+		ipProxyIntPort	    INTEGER,
+		ipProxyExtPort      INTEGER,
+		ipProxyIntAddr	    IpAddress,
+		ipProxyPriority	    INTEGER,
+		ipProxyTimeout	    INTEGER
+	   }
+
+	ipProxyDescr OBJECT-TYPE
+	    SYNTAX DisplayString  (SIZE (0..40))
+	    ACCESS read-write
+	    STATUS mandatory
+	    DESCRIPTION
+		"User defined description of a proxy entry."
+	    DEFVAL { "" }
+	::= { ipProxyEntry 1 }
+
+	ipProxyAdminStatus  OBJECT-TYPE
+	   SYNTAX  INTEGER {
+	   	enable(1),
+		disable(2),
+		delete(3)
+	    }
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Available values are:
+			enable(1)
+			disable(2)
+			delete(3)
+
+		 Enable or disable functionality of given proxy entry.
+		 Entry can also be deleted by setting this variable to value delete.
+
+		 Default value is enable."
+	    DEFVAL { enable }
+	::= { ipProxyEntry 2 }
+
+	ipProxyApplication  OBJECT-TYPE
+	   SYNTAX  INTEGER {
+		sip(1),
+		mgcp(2),
+		rtsp(3),
+		h323udp(4),
+		h323tcp(8),
+		none(15)
+	    }
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Predefined application (media protocol) ID for this transparent
+		 proxy:
+
+		  'sip'     -> represents a SIP proxy Application Level Gateway
+			       (ALG);
+		  'mgcp'    -> represents a MGCP proxy ALG;
+		  'rtsp'    -> represents a multimedia proxy ALG;
+		  'h323udp',
+		  'h323tcp' -> represents a H323 UDP or TCP ALG."
+	    DEFVAL { none }
+	::= { ipProxyEntry 3 }
+
+	ipProxyProtocol  OBJECT-TYPE
+	   SYNTAX  INTEGER {
+	   	tcp(6),
+		udp(17)
+	    }
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Transport layer protocol used by this proxy:
+
+		  'udp' -> handles UDP based transport;
+		  'tcp' -> hanldes TCP based transport.
+
+		 Default value is udp."
+	    DEFVAL { udp }
+	::= { ipProxyEntry 4 }
+
+	ipProxyIntPort  OBJECT-TYPE
+	   SYNTAX  INTEGER (0..65535)
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Reroute to internal port: This setting is obsolete. Its
+		 functionality is now handled by mediaTerminalTable."
+	    DEFVAL { 0 }
+	::= { ipProxyEntry 5 }
+
+	ipProxyExtPort  OBJECT-TYPE
+	   SYNTAX  INTEGER (0..65535)
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Listen for packages from and to a port on an external device
+		 (located in WAN): In case of outgoing packages (to devices in
+		 WAN) this is the destination port, in case of incoming packages
+		 (from WAN) this is the source port. 'ExtPort' has to be unique
+		 for all ipProxyTable entries with the same 'Protocol' setting."
+	    DEFVAL { 0 }
+	::= { ipProxyEntry 6 }
+
+	ipProxyIntAddr  OBJECT-TYPE
+	    SYNTAX  IpAddress
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Rerouted internal address: This setting is obsolete. Its
+		 functionality is now handled by mediaTerminalTable."
+	::= { ipProxyEntry 7 }
+
+	ipProxyPriority  OBJECT-TYPE
+	    SYNTAX  INTEGER {
+		default(1),
+		low-latency(2),
+		high(3),
+		medium(4),
+		low(5)
+	    }
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"QOS priority for sessions controlled by this proxy entry:
+
+		  'default'     -> use source priority, do not make any changes;
+		  'low-latency' -> mark all packets in related sessions (also
+				   RTP) as high priority;
+		  'high',
+		  'medium',
+		  'low'	 -> not used in currently implemented proxy
+				   applications."
+	    DEFVAL { default }
+	::= { ipProxyEntry 8 }
+
+	ipProxyTimeout  OBJECT-TYPE
+	    SYNTAX  INTEGER (0..86400)
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Proxy session idle timeout in seconds: if no packages were
+		 received within the time frame defined by this timeout the
+		 session will be killed."
+	    DEFVAL { 7200 }
+	::= { ipProxyEntry 9 }
+
+	mediaConnTable OBJECT-TYPE
+	    SYNTAX  SEQUENCE OF MediaConnEntry
+	    ACCESS  not-accessible
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Describes a currently active RTP session created by a SIP
+		 proxy entry."
+	::= { media 1 }
+
+	mediaConnEntry OBJECT-TYPE
+	    SYNTAX  MediaConnEntry
+	    ACCESS  not-accessible
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Lists RTP session parameters for monitoring usage."
+	    INDEX   { mediaConnIndex }
+	::= { mediaConnTable 1 }
+
+	MediaConnEntry ::=
+	    SEQUENCE {
+		mediaConnIndex			INTEGER,
+		mediaConnIntAddr		IpAddress,
+		mediaConnIntPort		INTEGER,
+		mediaConnExtAddr		IpAddress,
+		mediaConnExtPort		INTEGER,
+		mediaConnRemoteAddr		IpAddress,
+		mediaConnRemotePort		INTEGER,
+		mediaConnAge			TimeTicks
+	}
+
+	mediaConnIndex OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Unique ID of entry."
+	    DEFVAL { 1 }
+	::= { mediaConnEntry 1 }
+
+	mediaConnIntAddr OBJECT-TYPE
+	    SYNTAX  IpAddress
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Internal address of RTP stream."
+	::= { mediaConnEntry 2 }
+
+	mediaConnIntPort OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Internal port of RTP stream."
+	::= { mediaConnEntry 3 }
+
+	mediaConnExtAddr OBJECT-TYPE
+	    SYNTAX  IpAddress
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"External (public) address of RTP stream."
+	::= { mediaConnEntry 4 }
+
+	mediaConnExtPort OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"External (public) port of RTP stream."
+	::= { mediaConnEntry 5 }
+
+	mediaConnRemoteAddr OBJECT-TYPE
+	    SYNTAX  IpAddress
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Destination address of RTP stream."
+	::= { mediaConnEntry 6 }
+
+	mediaConnRemotePort OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Destination port of RTP stream."
+	::= { mediaConnEntry 7 }
+
+	mediaConnAge OBJECT-TYPE
+	    SYNTAX  TimeTicks
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Age of RTP session."
+	::= { mediaConnEntry 8 }
+
+	mediaTerminalTable OBJECT-TYPE
+	    SYNTAX  SEQUENCE OF MediaTerminalEntry
+	    ACCESS  not-accessible
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Describes NAT access to proxy controlled terminals (devices) in
+		 LAN."
+	::= { media 2 }
+
+	mediaTerminalEntry OBJECT-TYPE
+	    SYNTAX  MediaTerminalEntry
+	    ACCESS  not-accessible
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Definition of a NAT access rules to a SIP terminal (device)
+		 located in LAN."
+	    INDEX   { mediaTerminalIntAddr, mediaTerminalIntPort }
+	::= { mediaTerminalTable 1  }
+
+	MediaTerminalEntry ::=
+	    SEQUENCE {
+		mediaTerminalIntAddr		IpAddress,
+		mediaTerminalIntPort		INTEGER,
+		mediaTerminalExtPort		INTEGER,
+		mediaTerminalRemotePort		INTEGER,
+		mediaTerminalLifetime		INTEGER,
+		mediaTerminalAge		TimeTicks,
+		mediaTerminalProto		INTEGER,
+		mediaTerminalType		INTEGER,
+		mediaTerminalSessions		INTEGER
+	    }
+
+	mediaTerminalIntAddr  OBJECT-TYPE
+	    SYNTAX  IpAddress
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"The terminal's internal address (address of a device in LAN)."
+	::= { mediaTerminalEntry 1 }
+
+	mediaTerminalIntPort  OBJECT-TYPE
+	    SYNTAX  INTEGER (0..65535)
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"The terminal's internal port (port of a device in LAN)."
+	    DEFVAL { 0 }
+	::= { mediaTerminalEntry 2 }
+
+	mediaTerminalExtPort  OBJECT-TYPE
+	    SYNTAX  INTEGER (0..65535)
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"The terminal's external port (a port on the WAN side of the
+		 gateway used for NAT access to a device in LAN)."
+	    DEFVAL { 0 }
+	::= { mediaTerminalEntry 3 }
+
+	mediaTerminalRemotePort  OBJECT-TYPE
+	    SYNTAX  INTEGER (0..65535)
+	    ACCESS  read-write
+	STATUS  mandatory
+	    DESCRIPTION
+		"The port of a remote device (located in WAN): this entry is
+		 only useful for 'Type' = 'client'. In all other cases this
+		 value has to be '0' (disabled)."
+	    DEFVAL { 0 }
+	::= { mediaTerminalEntry 4 }
+
+	mediaTerminalLifetime  OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"The lifetime of sessions (s) defined by this terminal entry: this
+		 parameter is only useful for 'Type' = 'client'. In this case
+		 'Lifetime' is set to 86400 seconds by default. So if the
+		 terminal did not send or receive any data within this timeout,
+		 this terminal entry will be deleted. For 'Type' = 'server' the
+		 lifetime has to be '0' (disabled)."
+	    DEFVAL { 0 }
+	::= { mediaTerminalEntry 5 }
+
+	mediaTerminalAge  OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Current age of terminal's last action."
+	    DEFVAL { 0 }
+	::= { mediaTerminalEntry 6 }
+
+	mediaTerminalProto  OBJECT-TYPE
+	    SYNTAX  INTEGER {
+		tcp(6),
+		udp(17)
+		}
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"The terminal's transport protocol:
+
+		  'udp' -> terminal uses UDP as transport;
+		  'tcp' -> terminal uses TCP as transport.
+
+		 Default value is udp."
+	    DEFVAL { udp }
+	::= { mediaTerminalEntry 7 }
+
+	mediaTerminalType  OBJECT-TYPE
+	    SYNTAX  INTEGER {
+		client(1),
+		server(2),
+		delete(8)
+	    }
+	    ACCESS  read-write
+	    STATUS  mandatory
+	    DESCRIPTION
+		"The type of the terminal entry:
+
+		  'client' -> autodetected (and thus listed here automatically)
+			      or manually added IP phone or softclient;
+		  'server' -> manually added internal rerouted SIP server;
+		  'delete' -> delete flag.
+
+		 Manually added clients are usually obsolete as they are
+		 autodetected by the Application Level Gateway anyways (see
+		 ipProxyTable for definition of dynamic NAT rules). 'Type' =
+		 'server' is used in order to enable access from WAN to a SIP
+		 registrar or SIP proxy located in LAN."
+	    DEFVAL { client }
+	::= { mediaTerminalEntry 8 }
+
+	mediaTerminalSessions  OBJECT-TYPE
+	    SYNTAX  INTEGER
+	    ACCESS  read-only
+	    STATUS  mandatory
+	    DESCRIPTION
+		"Terminal's currently active RTP sessions."
+	    DEFVAL { 0 }
+	::= { mediaTerminalEntry 10 }
+END

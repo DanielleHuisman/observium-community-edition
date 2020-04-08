@@ -1,0 +1,330 @@
+ARRIS-GPS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Unsigned32,
+    Integer32
+        FROM SNMPv2-SMI
+    TruthValue,
+    DisplayString,
+    DateAndTime,
+    TEXTUAL-CONVENTION
+        FROM SNMPv2-TC
+    OBJECT-GROUP,
+    MODULE-COMPLIANCE,
+    NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
+    arris
+        FROM ARRIS-MIB;
+
+arrisGpsMib MODULE-IDENTITY
+    LAST-UPDATED    "201408170000Z" -- Aug 17, 2014
+    ORGANIZATION    "Arris Broadband"
+    CONTACT-INFO    "Byron Griffin
+                     Postal: ARRIS Broadband
+                     3871 Lakefield Drive
+                     Suite 300
+                     Suwanee, GA 30024-1242
+                     U.S.A.
+                     Phone:  +1 503-495-9278
+                     E-mail: byron.griffin@arrisi.com"
+    DESCRIPTION
+        "This MIB module supplies the basic proprietary
+         (ARRIS-specific) management objects for ARRIS
+         GPS devices."
+
+    -- Revision history
+        REVISION "201408170000Z" -- Aug 17, 2014
+        DESCRIPTION
+            "Initial version.
+             Add new MIBs for GPS device support."
+    ::= { arris 12 }
+
+arrisGpsScanOnBoot OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Enables or disables GPS scans during the device start up.
+         If this MIB is set, the modem will automatically start a GPS
+         scan when it is power cycled or reset. If a successful lock
+         cannot be obtained, the scan will time out after a time
+         specified in the ScanTimeout MIB.
+         The value of this parameter is stored in NVRAM since the
+         configuration for it may not be received until post provisioning
+         (e.g. via TR-069).
+         TR-069/TR-181 reference: Device.FAP.GPS.ScanOnBoot."
+    DEFVAL { true }
+    ::= { arrisGpsMib 1 }
+
+arrisGpsScanPeriodically OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Enables or disables periodic GPS scans.
+         Note that if ScanPeriodically is set to FALSE and either
+         ScanOnBoot is set to FALSE or the initial scan fails then
+         the current position (post the last reset or reboot) will not be
+         obtained.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.ScanPeriodically."
+    DEFVAL { false }
+    ::= { arrisGpsMib 2 }
+
+arrisGpsPeriodicInterval OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..86400)
+    UNITS         "seconds"
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "When ScanPeriodically is true, this value indicates the interval
+         in seconds at which GPS scan is performed. This time period
+         represents the amount of time between scans. The scan itself is
+         performed until successful or times out.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.PeriodicInterval."
+    DEFVAL { 86400 }
+    ::= { arrisGpsMib 3 }
+
+arrisGpsPeriodicTime OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..32))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "PeriodicTime is used only to set the 'phase' of the GPS scan. The
+         actual value of PeriodicTime can be arbitrarily far into the past or
+         future.
+         For example, if PeriodicInterval is 86400 (a day) and if PeriodicTime
+         is set to UTC midnight on some day (in the past, present, or future)
+         then periodic GPS scans will occur every day at UTC midnight. These
+         MUST begin on the very next midnight, even if PeriodicTime refers to
+         a day in the future.
+         The Unknown Time value indicates that no particular time reference
+         is specified. That is, the CPE MAY locally choose the time reference,
+         and needs only to adhere to the specified PeriodicInterval.
+         If absolute time is not available to the CPE, its periodic GPS scan
+         behavior MUST be the same as if PeriodicTime parameter was set to
+         the 'Unknown Time' value.
+         The absolute UTC time will be specified as follows (ref: RFC1902):
+         YYYYMMDDHHMMZ,
+         where:
+           YYYY - four digits of year
+             MM - month (01 through 12)
+             DD - day of month (01 through 31)
+             HH - hours (00 through 23)
+             MM - minutes (00 through 59)
+              Z - the character 'Z' denotes Greenwich Mean Time (GMT).
+         For example, '199502192015Z' represents 8:15pm GMT on 19 February
+         1995.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.PeriodicTime."
+    DEFVAL { "Unknown Time" }
+    ::= { arrisGpsMib 4 }
+
+arrisGpsPowerDownAfterSuccessfulScan OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Enable/disable the ability to put the GPS to sleep after a
+         successful scan.  When set to FALSE the GPS will run periodically
+         (if configured) even if a successful scan has occurred since the
+         last restart or boot up.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: No standard reference.
+         Device.FAP.GPS.arrisPowerDownAfterSuccessfulScan (custom)"
+    DEFVAL { true }
+    ::= { arrisGpsMib 5 }
+
+arrisGpsScanTimeout OBJECT-TYPE
+    SYNTAX        Unsigned32 (1..3600)
+    UNITS         "seconds"
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Specifies the time-out value in seconds since the scan started
+         after which the scan will time out. A timed out scan is to be
+         reported as C2 with ErrorDetails indicating 'Timed out'.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.ScanTimeout."
+    DEFVAL { 600 }
+    ::= { arrisGpsMib 6 }
+
+arrisGpsScanStatus OBJECT-TYPE
+    SYNTAX        INTEGER
+                  { indeterminate(0),
+                    inprogress(1),
+                    success(2),
+                    error(3),
+                    errorTimeout(4)
+                  }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates the current status of this scan. Enumeration of:
+         - Indeterminate (The scan has not been executed and there are
+                          no valid scan results available)
+         - InProgress
+         - Success
+         - Error
+         - Error_TIMEOUT 
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.ScanStatus."
+    DEFVAL { indeterminate }
+    ::= { arrisGpsMib 7 }
+
+arrisGpsErrorDetails OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..255))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Provides more detail when the ScanStatus is either Error or
+         Error_TIMEOUT.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.ErrorDetails."
+    DEFVAL { "" }
+    ::= { arrisGpsMib 8 }
+
+arrisGpsLastScanTime OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..32))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The date and time when the last GPS scan completed. Note that
+         completion does not imply scan success.
+         The Unknown Time value is returned if no scans have been completed.
+         The absolute UTC time will be specified as follows (ref: RFC1902):
+         YYYYMMDDHHMMZ
+         where:
+           YYYY - four digits of year
+             MM - month (01 through 12)
+             DD - day of month (01 through 31)
+             HH - hours (00 through 23)
+             MM - minutes (00 through 59)
+              Z - the character 'Z' denotes Greenwich Mean Time (GMT).
+         For example, '199502192015Z' represents 8:15pm GMT on 19 February
+         1995.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.LastScanTime."
+    DEFVAL { "Unknown Time" }
+    ::= { arrisGpsMib 9 }
+
+arrisGpsLastSuccessfulScanTime OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..32))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Specifies the date and time, when the GPS scan last completed
+         successfully. This value is retained across reboot and is only
+         reset after another scan completes successfully or GPSReset is set
+         to true.
+         The values for LockedLatitude, LockedLongitude and NumberOfSatellites
+         correspond to this time. If a scan has never succeeded before, the
+         value will be the Unknown Time value, as defined in
+         [Section 3.2/TR-106a4].
+         The absolute UTC time will be specified as follows (ref: RFC1902):
+         YYYYMMDDHHMMZ
+         where:
+           YYYY - four digits of year
+             MM - month (01 through 12)
+             DD - day of month (01 through 31)
+             HH - hours (00 through 23)
+             MM - minutes (00 through 59)
+              Z - the character 'Z' denotes Greenwich Mean Time (GMT).
+         For example, '199502192015Z' represents 8:15pm GMT on 19 February
+         1995.
+         The value of this parameter is persistent in NVRAM.
+         TR-069/TR-181 reference: Device.FAP.GPS.LastSuccessfulScanTime."
+    DEFVAL { "Unknown Time" }
+    ::= { arrisGpsMib 10 }
+
+arrisGpsLockedLatitude OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..32))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This parameter specifies the latitude of the device's position in
+         degrees, multiplied by 1 million. The positive value signifies the
+         direction, north of the equator. The negative value signifies the
+         direction, south of the equator.
+         Range is from: 90d00.00' South (-90,000,000) to 90d00.00' North
+         (90,000,000).
+         Example: A latitude of 13d19.43' N would be represented as
+         13,323,833, derived as (13*1,000,000)+((19.43*1,000,000)/60). Latitude
+         of 50d00.00' S would be represented as value -50,000,000.
+         This value is retained across reboots and is only reset after another
+         scan completes successfully or GPSReset is set to true. If a scan has
+         never succeeded before, an empty value is reported.
+         The value of this parameter is persistent in NVRAM.
+         TR-069/TR-181 reference: Device.FAP.GPS.LockedLatitude."
+    DEFVAL { "" }
+    ::= { arrisGpsMib 11 }
+
+arrisGpsLockedLongitude OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..32))
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This parameter specifies the longitude of the device's position in
+         degrees, multiplied by 1 million. The positive value signifies the
+         direction, east of the prime meridian. The negative value signifies
+         the direction, west of the prime meridian.
+         Range is from: 180d00.00' West (-180,000,000) to 180d00.00' East
+         (180,000,000).
+         Example: A longitude of 13d19.43' E would be represented as
+         13,323,833, derived as (13*1,000,000)+((19.43*1,000,000)/60). A
+         longitude of 50d00.00' W would be represented as value -50,000,000.
+         This value is retained across reboots and is only reset after another
+         scan completes successfully or GPSReset is set to true. If a scan has
+         never succeeded before, an empty value is reported.
+         The value of this parameter is persistent in NVRAM.
+         TR-069/TR-181 reference: Device.FAP.GPS.LockedLongitude."
+    DEFVAL { "" }
+    ::= { arrisGpsMib 12 }
+
+arrisGpsNumberOfSatellites OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The number of satellites that were locked during the test execution.
+         The greater the number of satellites the better the precision of the
+         results.
+         This value is retained across reboots and is only reset after another
+         scan completes successfully or GPSReset is set to true. If a scan has
+         never succeeded before, the value 0 is reported.
+         The value of this parameter is persistent in NVRAM.
+         TR-069/TR-181 reference: Device.FAP.GPS.NumberOfSatellites."
+    DEFVAL { 0 }
+    ::= { arrisGpsMib 13 }
+
+arrisGpsReset OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "Setting this to true will cause a reset on the GPS Hardware. Setting
+         this to false has no effect. The value of this parameter is not part
+         of the device configuration and is always false when read.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: Device.FAP.GPS.GPSReset."
+    DEFVAL { false }
+    ::= { arrisGpsMib 14 }
+
+arrisGpsSuccessfulScanSinceBootup OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "Indicates whether or not the last successful scan occurred since
+         the last time the modem powered up or reset.
+         The value of this parameter is not persistent.
+         TR-069/TR-181 reference: No standard reference.
+         Device.FAP.GPS.arrisSuccessfulScanSinceBootup (custom)"
+    DEFVAL { false }
+    ::= { arrisGpsMib 15 }
+
+END
+

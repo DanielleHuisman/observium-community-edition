@@ -1,0 +1,317 @@
+PKTC-MDI-MIB DEFINITIONS ::= BEGIN
+IMPORTS 
+    MODULE-IDENTITY, 
+    OBJECT-TYPE, 
+    Unsigned32
+                       FROM SNMPv2-SMI 
+    OBJECT-GROUP, 
+    MODULE-COMPLIANCE 
+                       FROM SNMPv2-CONF 
+    SnmpAdminString 
+                       FROM SNMP-FRAMEWORK-MIB 
+     
+    TEXTUAL-CONVENTION,
+    RowStatus
+                       FROM SNMPv2-TC
+    ifIndex
+                       FROM IF-MIB
+    pktcApplicationMibs
+                       FROM CLAB-DEF-MIB;
+
+pktcMdiMib MODULE-IDENTITY
+LAST-UPDATED "200909170000Z" -- September 17, 2009
+    ORGANIZATION "Cable Television Laboratories, Inc." 
+    CONTACT-INFO 
+            "Broadband Network Services
+             Cable Television Laboratories, Inc.
+             858 Coal Creek Circle,
+             Louisville, CO 80027, USA 
+             Phone: +1 303-661-9100
+             Email: mibs@cablelabs.com
+        
+             Acknowledgements:
+             Thomas Clack,  Broadcom
+             Eugene Nechamkin, Broadcom
+             Josh Littlefield, Cisco
+             Jerry Mahler, Motorola
+             Eduardo Cardona, CableLabs."
+     DESCRIPTION 
+            "This MIB module contains the PacketCable client
+            Telephony Delivery Interface (MDI) and Network 
+            Delivery Interface relationships." 
+     REVISION "200909170000Z" -- September 17, 2009
+     DESCRIPTION
+            "Revised version includes ECN 
+            DECT-PROV-N-09.0576-7
+            and published as part of PKT-SP-DECT-PROV-I02" 
+     REVISION "200902260000Z" -- February 26, 2009
+     DESCRIPTION
+             "Initial version, published as part of the CableLabs
+             DECT Provisioning Specification 
+             PKT-SP-DECT-PROV-I01-090226
+             Copyright 2009 Cable Television Laboratories, Inc.
+             All rights reserved."   
+    ::= { pktcApplicationMibs 6 }
+
+-- Textual Conventions
+
+PktcMdiType ::= TEXTUAL-CONVENTION 
+    STATUS      current 
+    DESCRIPTION 
+            "This data type represents the MDI types. 
+            'pots' refers to Plan Old Telephony Service analog phone
+            lines.
+            'dectFP' refers to DECT FP air interface.
+            'dectPP' refers to DECT PP air interface."
+    REFERENCE 
+            "PacketCable DECT-HDV Specification"
+    SYNTAX      INTEGER 
+                {
+                  pots(1),
+                  dectPP(2) 
+                }
+
+-- Object Definitions
+pktcMdiNotifications OBJECT IDENTIFIER ::= { pktcMdiMib 0 }
+pktcMdiObjects OBJECT IDENTIFIER ::= { pktcMdiMib 1 }
+
+pktcMdiMdiTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcMdiMdiEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object represents the list of Media Delivery
+        Interface (MDI) of the device."
+    REFERENCE
+        "PacketCable DECT Provisioning Specification"
+    ::= {pktcMdiObjects 1 }
+
+pktcMdiMdiEntry    OBJECT-TYPE
+    SYNTAX      PktcMdiMdiEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcMdiMdiTable.
+        The device associates one instance of this object for each
+        type of port. 
+        For POTS Ports the Instance identifier corresponds to the 
+        Interface Index (i.e., ifIndex) associated to the POTS 
+        (e.g., ifIndex 9...) 
+        For DECT Ports there is an instance for each paired PP in 
+        the order of appearance in a manner that the assigned entry
+        identifier (Interface Index) is persistent cross device 
+        initializations while the PP stays paired within the FP.  Each
+        PP association with the interface Index is maintained by the 
+        unique PP identifier (e.g., IPEI). The starting ifIndex number 
+        is defined in the device capabilities."
+    INDEX {
+            ifIndex
+          }
+    ::= {pktcMdiMdiTable 1 }
+
+PktcMdiMdiEntry ::= SEQUENCE {
+  
+    pktcMdiMdiType
+                 PktcMdiType,
+    pktcMdiMdiName
+                 SnmpAdminString,
+    pktcMdiMdiActivityStatus
+                 INTEGER
+      }
+
+pktcMdiMdiType    OBJECT-TYPE
+    SYNTAX      PktcMdiType 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the identifier of the Media Port
+         in the context of the MDI type. 
+         It can be used as a reference point to objects related to the
+         particular Media Port. For DECT Media Ports, this attribute 
+         represents a unique identifier of the DECT handset (PP), 
+         typically the value of 'IPEI' contained in the PUN part of the
+         IPUI is used by default, and for DECT handsets of type 
+         residential/default. IPEI is 36 bits, therefore, 
+         the representation of this attribute is a 5-octet string 
+         with the 4 MSB set to '0'. For POTs media Ports this 
+         attribute has no meaning and reports a sequential number
+         for the set of POTS available."
+    ::= {pktcMdiMdiEntry 1 }
+
+pktcMdiMdiName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the name assigned by the user
+        or operator to the media port. This attribute provides an
+        identification of the media port in a human readable format.
+        For example: 'Office Line', 'Fax Line', telephone number, etc.
+
+        By default the FP populates the following values:
+        For POTS as 'TERM n' where n = 1..m and n=1 corresponds to 
+        ifIndex = 9 
+        For DECT handsets as 'handset n' where n = 1..p and p is the
+        maximum number of PP supported or allowed to register, which
+        ever is small. Typically 'n' corresponds to the PP terminal
+        identifier."
+    ::= {pktcMdiMdiEntry 2 }
+
+pktcMdiMdiActivityStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                 active(1),
+                 inactive(2)
+                }
+                  
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This attribute indicates the service media activities 
+        potentially going on for the particular MDI:
+
+        'notActive': 
+        No service media activities are currently happening through
+        the port. 
+
+        'active':
+        There are service media activities on the port. Examples of 
+        Services media activities (e.g., telephony) are: tones generated
+        on the port in response to SIP requests, loopback tests, etc. 
+        
+        The particular definition of all Telephony activities should be
+        specified in the corresponding document for the particular 
+        PacketCable client."
+    ::= {pktcMdiMdiEntry 3 }
+
+pktcMdiNslTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PktcMdiNslEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object represents the Network Service Line definitions
+        of the device. This object allows the aggregation of MDIs as
+        part of a NSL."
+    REFERENCE
+        "PacketCable DECT Provisioning Specification"
+    ::= {pktcMdiObjects 2 }
+
+pktcMdiNslEntry    OBJECT-TYPE
+    SYNTAX      PktcMdiNslEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Conceptual row of pktcMdiNslTable.
+        A PacketCable HDV client that supports a single analog line
+        must consider all the MDIs as part of a single line NSL#1 
+        A PacketCable HDV client capable of multi-line support that has 
+        not configured an instance in the Nsl object must consider all 
+        MDIs as part of a single line NSL#1."
+    INDEX {
+            pktcMdiNslIndex
+          }
+    ::= {pktcMdiNslTable 1 }
+
+PktcMdiNslEntry ::= SEQUENCE {
+    pktcMdiNslIndex
+                 Unsigned32,
+    pktcMdiNslName
+                 SnmpAdminString,
+    pktcMdiNslPortListIn
+                 SnmpAdminString,
+    pktcMdiNslPortListOut
+                 SnmpAdminString,
+    pktcMdiNslRowStatus
+                 RowStatus
+   }
+
+pktcMdiNslIndex    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This key represents the unique identifier of a Network Service
+        Line (NSL) assigned by the Operator to the Subscriber. In NCS 
+        this value represents the numeric value of an CNS telephony 
+        endpoint (aaln/#).
+
+        In RST this number represents the number in a NSL# tag and used
+        in the mapping of RST users and PacketCable applications."
+    ::= {pktcMdiNslEntry 1 }
+
+pktcMdiNslName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the line name assigned by a User 
+        or by the operator.  This attribute provides an identification
+        of the Service Line in a human-readable format. 
+        For example: 'Office Line', 'Fax Line' etc. 
+        Another example of human-readable identification is the 
+        Telephone Number associated with the particular NSL."
+    ::= {pktcMdiNslEntry 2 }
+    
+pktcMdiNslPortListIn    OBJECT-TYPE
+    SYNTAX      SnmpAdminString 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the comma separated list of MDI
+        Indexes (MDI.Index attribute) associated with this NSL object
+        instance for incoming calls."
+    ::= {pktcMdiNslEntry 3 }
+
+pktcMdiNslPortListOut    OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This attribute represents the comma separated list of MDI
+        Indexes (MDI.Index attribute) associated with this NSL 
+        object instance for outgoing requests. 
+        For the voice telephony service this attribute does not 
+        preclude a HDV PP to make an outgoing call from a phone 
+        line not associated with the NSL."
+    ::= {pktcMdiNslEntry 4 }
+
+pktcMdiNslRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The conceptual row status of this object."
+    ::= {pktcMdiNslEntry 5 }
+
+-- Conformance Definitions
+		pktcMdiMibConformance OBJECT IDENTIFIER ::= { pktcMdiMib 2 }
+pktcMdiMibCompliances OBJECT IDENTIFIER ::= { pktcMdiMibConformance 1 }
+pktcMdiMibGroups      OBJECT IDENTIFIER ::= { pktcMdiMibConformance 2 }
+
+pktcMdiCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+         "The compliance statement for the MDI requirements of 
+         the PacketCable client device."
+    MODULE -- this MODULE
+    MANDATORY-GROUPS {
+            pktcMdiGroup
+            }
+    ::= { pktcMdiMibCompliances 1 }
+
+            pktcMdiGroup OBJECT-GROUP
+    OBJECTS {
+              pktcMdiMdiType,
+              pktcMdiMdiName,
+              pktcMdiMdiActivityStatus,
+              pktcMdiNslName,
+              pktcMdiNslPortListIn,
+              pktcMdiNslPortListOut,
+              pktcMdiNslRowStatus
+    }
+    STATUS      current
+    DESCRIPTION
+             "Group of objects for Telephony Delivery
+             Interfaces (MDI)."
+    ::= { pktcMdiMibGroups 1 }
+END

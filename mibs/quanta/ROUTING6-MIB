@@ -1,0 +1,2907 @@
+ROUTING6-MIB DEFINITIONS ::= BEGIN
+
+-- Quanta Computer Inc. Routing MIB
+-- Copyright Quanta Computer Inc. (2007) All rights reserved.
+
+-- This SNMP Management Information Specification
+-- embodies Quanta Computer Inc.'s confidential and proprietary
+-- intellectual property. Quanta Computer Inc. retains all title
+-- and ownership in the Specification including any revisions.
+
+-- This Specification is supplied "AS IS", Quanta Computer Inc.
+-- makes no warranty, either expressed or implied,
+-- as to the use, operation, condition, or performance of the
+-- Specification.
+
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+    mib-2, Counter32, Unsigned32, Integer32, IpAddress,
+    Gauge32                               FROM SNMPv2-SMI
+    DisplayString, PhysAddress, TruthValue, TimeStamp, TEXTUAL-CONVENTION,
+    VariablePointer, RowPointer, RowStatus, MacAddress
+                                          FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP,
+    NOTIFICATION-GROUP                    FROM SNMPv2-CONF
+    Ipv6IfIndex, Ipv6Address, Ipv6AddressPrefix,
+    Ipv6AddressIfIdentifier,
+    Ipv6IfIndexOrZero                     FROM IPV6-TC
+    ospfv3IfEntry, ospfv3VirtIfEntry,
+    ospfv3AreaEntry                       FROM OSPFV3-MIB
+    RouterID, AreaID                      FROM OSPF-MIB
+    switch                                FROM QUANTA-SWITCH-MIB;
+
+    routingIpv6 MODULE-IDENTITY
+        LAST-UPDATED "201101260000Z" -- 26 Jan 2011 12:00:00 GMT
+        ORGANIZATION "Quanta Computer Inc."
+        CONTACT-INFO
+          "                      Customer Support
+          Postal:                Quanta Computer Inc.
+                                 4, Wen Ming 1 St., Kuei Shan Hsiang,
+                                 Tao Yuan Shien, Taiwan, R.O.C.
+          Tel:                   +886 3 328 0050
+          E-Mail:                strong.chen@quantatw.com"
+
+        DESCRIPTION
+          "The Quanta Private MIB for FastPath Ipv6 Routing"
+
+        -- Revision history.
+        REVISION
+          "201108310000Z" -- 26 Jan 2011 12:00:00 GMT
+        DESCRIPTION
+          "Updated for release"
+
+    ::= { switch 30 }
+
+    SpfTimerRange ::= TEXTUAL-CONVENTION
+      STATUS      current
+      DESCRIPTION
+         "The range of intervals on which Spf timers can be configured."
+      SYNTAX      Integer32 (0..65535)
+      
+    AutoCostRefBw ::= TEXTUAL-CONVENTION
+     STATUS      current
+     DESCRIPTION
+        "The value of reference bandwidth from which ospf calculates metric cost."
+     SYNTAX      Unsigned32 (1..4294967)
+
+    --**************************************************************************************
+    -- agentIpv6Group
+    --
+    --**************************************************************************************
+    
+    agentIpv6Group                       OBJECT IDENTIFIER ::= { routingIpv6 1 }
+    
+    agentIpv6RoutingMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Administratively enables/disables ipv6 unicast routing on the switch."
+         ::= { agentIpv6Group 1 }
+
+    --**************************************************************************************
+    -- agentIpv6InterfaceTable
+    --
+    --**************************************************************************************
+        
+    agentIpv6InterfaceTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentIpv6InterfaceEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     ""
+         ::= { agentIpv6Group 2 }
+
+    agentIpv6InterfaceEntry OBJECT-TYPE
+         SYNTAX      AgentIpv6InterfaceEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     ""
+         INDEX       { agentIpv6InterfaceIfIndex }
+         ::= { agentIpv6InterfaceTable 1 }
+         
+    AgentIpv6InterfaceEntry ::= SEQUENCE {         
+          agentIpv6InterfaceIfIndex
+              Integer32,
+          agentIpv6InterfaceMtuValue
+              Unsigned32,
+          agentIpv6InterfaceDadTransmits
+              Integer32,
+          agentIpv6InterfaceLinkLocalOnly
+              INTEGER,
+          agentIpv6InterfaceIcmpUnreachables
+              INTEGER,
+          agentIpv6InterfaceAutoconfig
+              INTEGER,
+          agentIpv6InterfaceDhcpClient
+              INTEGER
+          }
+          
+    agentIpv6InterfaceIfIndex OBJECT-TYPE
+         SYNTAX      Integer32 (0..2147483647)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The IfIndex associated with this instance."
+         ::= { agentIpv6InterfaceEntry 1 }
+          
+    agentIpv6InterfaceMtuValue OBJECT-TYPE
+         SYNTAX      Unsigned32 (0|1280..1500)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the MTU value for this interface.If it is not yet configured,
+                      retrieving the value of this object results in a zero value.
+                      Setting the value zero to this object effectively un-configures the MTU."
+         ::= { agentIpv6InterfaceEntry 2 }
+          
+    agentIpv6InterfaceDadTransmits OBJECT-TYPE
+         SYNTAX      Integer32 (0..600)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the dad transmits value for this interface."  
+         ::= { agentIpv6InterfaceEntry 3 }
+
+    agentIpv6InterfaceLinkLocalOnly OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "When enabled, interface is capable of ipv6 operation without a global address.
+                      In this case, an eui-64 based link-local address is used. "
+         DEFVAL      { disable }
+         ::= { agentIpv6InterfaceEntry 4 }
+     
+    agentIpv6InterfaceIcmpUnreachables OBJECT-TYPE
+         SYNTAX      INTEGER {
+                    enable(1),
+                    disable(2)
+                  }
+
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "If this object is enable, it indicates that ICMPv6 unreachables can be sent on this
+                      interface."
+         ::= { agentIpv6InterfaceEntry 5 }
+          
+    agentIpv6InterfaceAutoconfig OBJECT-TYPE
+         SYNTAX      INTEGER{
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "If this object is enabled, it indicates that the IPv6 address
+                      is automatically generated using IPv6 stateless address auto configuration."
+         ::= { agentIpv6InterfaceEntry 6 }
+
+    agentIpv6InterfaceDhcpClient OBJECT-TYPE
+         SYNTAX      INTEGER{
+                     enable(1),
+                     disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "If this object is enabled, the interface uses DHCPv6 Client
+                      protocol to acquire an IPv6 address."
+         ::= { agentIpv6InterfaceEntry 7 }
+
+    --**************************************************************************************
+    -- agentIpv6RouterAdvertisementTable
+    --
+    --**************************************************************************************
+        
+    agentIpv6RouterAdvertisementTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentIpv6RouterAdvertisementEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     "There is no global administrative flag for router advertisement.  The global
+                     routing flag (agentIpv6RoutingMode) will be used for this purpose.  If routing
+                     is disabled, router advertisement is disabled as well."
+         ::= { agentIpv6Group 3 }
+
+    agentIpv6RouterAdvertisementEntry OBJECT-TYPE
+         SYNTAX      AgentIpv6RouterAdvertisementEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     ""
+         INDEX       { agentIpv6RouterAdvertisementIfIndex }
+         ::= { agentIpv6RouterAdvertisementTable 1 }
+         
+    AgentIpv6RouterAdvertisementEntry ::= SEQUENCE {         
+          agentIpv6RouterAdvertisementIfIndex
+              Integer32,
+          agentIpv6RouterAdvertisementSuppressMode
+              INTEGER,
+          agentIpv6RouterAdvertisementMaxAdvertisementInterval
+              Integer32,
+          agentIpv6RouterAdvertisementMinAdvertisementInterval
+              Integer32,
+          agentIpv6RouterAdvertisementAdvertisementLifetime
+              Integer32,
+          agentIpv6RouterAdvertisementNbrSolicitInterval
+              Unsigned32,
+          agentIpv6RouterAdvertisementReachableTime
+              Integer32,
+          agentIpv6RouterAdvertisementManagedFlag
+              INTEGER,
+          agentIpv6RouterAdvertisementOtherFlag
+              INTEGER
+          }
+          
+    agentIpv6RouterAdvertisementIfIndex OBJECT-TYPE
+         SYNTAX      Integer32 (0..2147483647)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Interface Number to configure Router Advertisement on."
+         ::= { agentIpv6RouterAdvertisementEntry 1 }
+         
+    agentIpv6RouterAdvertisementSuppressMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Enable or disable router advertisement suppression on the interface."
+         DEFVAL      { disable }
+         ::= { agentIpv6RouterAdvertisementEntry 2 }
+         
+    agentIpv6RouterAdvertisementMaxAdvertisementInterval OBJECT-TYPE
+         SYNTAX      Integer32 (4..1800)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Maximum time allowed between sending router advertisements 
+                     from the interface. (Max * 0.75 >= Min)"
+         DEFVAL      { 600 }
+         ::= { agentIpv6RouterAdvertisementEntry 3 }
+         
+    agentIpv6RouterAdvertisementMinAdvertisementInterval OBJECT-TYPE
+         SYNTAX      Integer32 (3..1350)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Mimimum time allowed between sending router advertisements 
+                     from the interface. (Max * 0.75 >= Min)"
+         DEFVAL      { 200 }
+         ::= { agentIpv6RouterAdvertisementEntry 4 }
+                  
+    agentIpv6RouterAdvertisementAdvertisementLifetime OBJECT-TYPE
+         SYNTAX      Integer32 (0..9000)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Value of lifetime field of router advertisement sent from 
+                     the interface.
+                     
+                     This value must be greater than or equal to 
+                     agentIpv6RouterAdvertisementMaxAdvertisementInterval."
+         DEFVAL      { 1800 }
+         ::= { agentIpv6RouterAdvertisementEntry 5 }
+         
+    agentIpv6RouterAdvertisementNbrSolicitInterval OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Value of retrans time field of router advertisement sent from 
+                     the interface. A value of 0 means this router does not specifiy 
+                     the interval. The valid value range is 1000..4294967295"
+                     
+         DEFVAL      { 0 }
+         ::= { agentIpv6RouterAdvertisementEntry 6 }
+         
+    agentIpv6RouterAdvertisementReachableTime OBJECT-TYPE
+         SYNTAX      Integer32 (0..3600000)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Value of reachable time field of router advertisement sent from 
+                     the interface. A value of 0 means this router does not specifiy 
+                     the interval."
+                     
+         DEFVAL      { 0 }
+         ::= { agentIpv6RouterAdvertisementEntry 7 }
+         
+    agentIpv6RouterAdvertisementManagedFlag OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Value of managed config field of router advertisement sent from 
+                      the interface."
+         DEFVAL      { disable }
+         ::= { agentIpv6RouterAdvertisementEntry 8 }
+
+    agentIpv6RouterAdvertisementOtherFlag OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Value of other config field of router advertisement sent from 
+                      the interface."
+         DEFVAL      { disable }
+         ::= { agentIpv6RouterAdvertisementEntry 9 }
+         
+         
+
+    -- Address Prefix table
+    
+    -- The IPv6 Address Prefix table contains information on
+    -- the entity's IPv6 Address Prefixes that are associated
+    -- with IPv6 interfaces.
+      
+    agentIpv6AddrPrefixTable OBJECT-TYPE
+         SYNTAX  SEQUENCE OF AgentIpv6AddrPrefixEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "The list of IPv6 address prefixes of
+             IPv6 interfaces."
+         ::= { agentIpv6Group 4 }
+      
+    agentIpv6AddrPrefixEntry OBJECT-TYPE
+         SYNTAX  AgentIpv6AddrPrefixEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+             "An interface entry containing objects of
+             a particular IPv6 address prefix."
+         INDEX   { agentIpv6InterfaceIfIndex,
+                   agentIpv6AddrPrefix,
+                   agentIpv6AddrPrefixLength }
+         ::= { agentIpv6AddrPrefixTable 1 }
+      
+    AgentIpv6AddrPrefixEntry ::= SEQUENCE {
+          agentIpv6AddrPrefix                     Ipv6AddressPrefix,
+          agentIpv6AddrPrefixLength               INTEGER,
+          agentIpv6AddrPrefixOnLinkFlag           TruthValue,
+          agentIpv6AddrPrefixAutonomousFlag       TruthValue,
+          agentIpv6AddrPrefixAdvPreferredLifetime Unsigned32,
+          agentIpv6AddrPrefixAdvValidLifetime     Unsigned32
+         }
+      
+    agentIpv6AddrPrefix OBJECT-TYPE
+         SYNTAX      Ipv6AddressPrefix
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+           "The prefix associated with the this interface."
+         ::= { agentIpv6AddrPrefixEntry 1 }
+      
+    agentIpv6AddrPrefixLength OBJECT-TYPE
+         SYNTAX      INTEGER (0..128)
+         UNITS       "bits"
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+           "The length of the prefix (in bits)."
+         ::= { agentIpv6AddrPrefixEntry 2 }
+      
+    agentIpv6AddrPrefixOnLinkFlag OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+           "This object has the value 'true(1)', if this
+           prefix can be used  for on-link determination
+           and the value 'false(2)' otherwise."
+         ::= { agentIpv6AddrPrefixEntry 3 }
+      
+    agentIpv6AddrPrefixAutonomousFlag OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+           "Autonomous address configuration flag. When
+           true(1), indicates that this prefix can be used
+           for autonomous address configuration (i.e. can
+           be used to form a local interface address).
+           If false(2), it is not used to autoconfigure
+           a local interface address."
+         ::= { agentIpv6AddrPrefixEntry 4 }
+      
+      
+      
+      
+      
+      
+    agentIpv6AddrPrefixAdvPreferredLifetime OBJECT-TYPE
+         SYNTAX      Unsigned32
+         UNITS       "seconds"
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+            "It is the length of time in seconds that this
+            prefix will remain preferred, i.e. time until
+            deprecation.  A value of 4,294,967,295 represents
+            infinity.
+      
+            The address generated from a deprecated prefix
+            should no longer be used as a source address in
+            new communications, but packets received on such
+            an interface are processed as expected."
+         ::= { agentIpv6AddrPrefixEntry 5 }
+      
+    agentIpv6AddrPrefixAdvValidLifetime OBJECT-TYPE
+         SYNTAX      Unsigned32
+         UNITS       "seconds"
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+           "It is the length of time in seconds that this
+           prefix will remain valid, i.e. time until
+           invalidation.  A value of 4,294,967,295 represents
+           infinity.
+      
+           The address generated from an invalidated prefix
+           should not appear as the destination or source
+           address of a packet."
+         ::= { agentIpv6AddrPrefixEntry 6 }
+      
+      
+      
+      
+    -- the IPv6 Address table
+    
+    -- The IPv6 address table contains this node's IPv6
+    -- addressing information.
+      
+    agentIpv6AddrTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF AgentIpv6AddrEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+          "The table of addressing information relevant to
+          this node's interface addresses."
+        ::= { agentIpv6Group 5 }
+      
+      
+    agentIpv6AddrEntry OBJECT-TYPE
+        SYNTAX      AgentIpv6AddrEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The addressing information for one of this
+            node's interface addresses."
+        INDEX   { agentIpv6InterfaceIfIndex, agentIpv6AddrAddress }
+        ::= { agentIpv6AddrTable 1 }
+      
+    AgentIpv6AddrEntry ::=
+        SEQUENCE {
+             agentIpv6AddrAddress        Ipv6Address,
+             agentIpv6AddrPfxLength      INTEGER,
+             agentIpv6AddrEui64Flag      TruthValue,
+             agentIpv6AddrStatus         RowStatus
+            }
+      
+    agentIpv6AddrAddress OBJECT-TYPE
+        SYNTAX      Ipv6Address
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+          "The IPv6 address to which this entry's addressing
+          information pertains."
+        ::= { agentIpv6AddrEntry 1 }
+      
+    agentIpv6AddrPfxLength OBJECT-TYPE
+        SYNTAX      INTEGER(0..128)
+        UNITS       "bits"
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION
+          "The length of the prefix (in bits) associated with
+          the IPv6 address of this entry."
+        ::= { agentIpv6AddrEntry 2 }
+      
+    agentIpv6AddrEui64Flag OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+           "This object has the value 'true(1)', if this
+           address uses and eui-64 generated interface identifier and the value
+           'false(2)' otherwise."
+         ::= { agentIpv6AddrEntry 3 }
+      
+    agentIpv6AddrStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                 "Creates a new entry in the Address table.
+                 Allowed values are:
+                 
+                 createAndGo(4)  - Creates an entry in this table, associating the address
+                                   with a given interface.  The agentIpv6NetMask
+                                   object must be set during creation.
+                                    
+                 destroy(6)      - Removes the associated address from the interface."
+         ::= { agentIpv6AddrEntry 4 }
+      
+      
+      
+    -- IPv6 Static Routing table
+    
+    agentIpv6StaticRouteTable OBJECT-TYPE
+         SYNTAX     SEQUENCE OF AgentIpv6StaticRouteEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "IPv6 Static Routing table. This table contains
+           an entry for each valid IPv6 static unicast route
+           that can be used for packet forwarding
+           determination."
+         ::= { agentIpv6Group 6 }
+      
+    agentIpv6StaticRouteEntry OBJECT-TYPE
+         SYNTAX     AgentIpv6StaticRouteEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+                 "A routing entry."
+         INDEX   { agentIpv6StaticRouteDest,
+                   agentIpv6StaticRoutePfxLength,
+                   agentIpv6StaticRouteIfIndex,
+                   agentIpv6StaticRouteNextHop }
+         ::= { agentIpv6StaticRouteTable 1 }
+      
+    AgentIpv6StaticRouteEntry ::= SEQUENCE {
+             agentIpv6StaticRouteDest           Ipv6AddressPrefix,
+             agentIpv6StaticRoutePfxLength      INTEGER,
+             agentIpv6StaticRouteIfIndex        Ipv6IfIndexOrZero,
+             agentIpv6StaticRouteNextHop        Ipv6Address,
+             agentIpv6StaticRoutePreference     INTEGER,
+             agentIpv6StaticRouteStatus         RowStatus
+         }
+      
+    agentIpv6StaticRouteDest OBJECT-TYPE
+         SYNTAX     Ipv6AddressPrefix
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "The destination IPv6 address of this route.
+           This object may not take a Multicast address
+           value."
+         ::= { agentIpv6StaticRouteEntry 1 }
+      
+    agentIpv6StaticRoutePfxLength OBJECT-TYPE
+         SYNTAX     INTEGER(0..128)
+         UNITS      "bits"
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "Indicates the prefix length of the destination
+           address."
+         ::= { agentIpv6StaticRouteEntry 2 }
+    
+    agentIpv6StaticRouteIfIndex OBJECT-TYPE
+         SYNTAX     Ipv6IfIndexOrZero
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "The index value which uniquely identifies the local
+           interface through which the next hop of this
+           route should be reached.  The interface identified
+           by a particular value of this index is the same
+           interface as identified by the same value of
+           ipv6IfIndex.  For routes with global address next hop this
+           value can be zero."
+         ::= { agentIpv6StaticRouteEntry 3 }
+    
+    agentIpv6StaticRouteNextHop OBJECT-TYPE
+         SYNTAX     Ipv6Address
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "The address of the next
+           system en route. "
+         ::= { agentIpv6StaticRouteEntry 4 }
+    
+    
+    agentIpv6StaticRoutePreference OBJECT-TYPE
+         SYNTAX     INTEGER (1..255)
+         MAX-ACCESS read-create
+         STATUS     current
+         DESCRIPTION
+            "The routing preference metric for this route. A lower
+             value is more preferred."
+         DEFVAL      { 1 }
+         ::= { agentIpv6StaticRouteEntry 5 }
+    
+    agentIpv6StaticRouteStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                 "Creates a new entry in the Address table.
+                 Allowed values are:
+                 
+                 createAndGo(4)  - Creates an entry in this table. 
+                                    
+                 destroy(6)      - Removes the associated route from the interface."
+         ::= { agentIpv6StaticRouteEntry 6 }
+    
+
+    --**************************************************************************************
+    -- agentIpv6ServicePortGroup
+    --
+    --**************************************************************************************
+    
+    agentIpv6ServicePortGroup            OBJECT IDENTIFIER ::= { agentIpv6Group 7 }
+
+    -- IPv6 Service Port Prefix Table
+    
+    agentIpv6ServicePortPrefixTable OBJECT-TYPE
+         SYNTAX     SEQUENCE OF AgentIpv6ServicePortPrefixEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "IPv6 Service Port Prefix Table. This table contains
+           an entry for each valid IPv6 prefix configured on the
+           Service Port."
+         ::= { agentIpv6ServicePortGroup 1 }
+      
+    agentIpv6ServicePortPrefixEntry OBJECT-TYPE
+         SYNTAX     AgentIpv6ServicePortPrefixEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+                 "An IPv6 Service Port Prefix entry."
+         INDEX   { agentIpv6ServicePortPrefixIndex }
+         ::= { agentIpv6ServicePortPrefixTable 1 }
+      
+    AgentIpv6ServicePortPrefixEntry ::= SEQUENCE {
+             agentIpv6ServicePortPrefixIndex    Unsigned32,
+             agentIpv6ServicePortPrefix         Ipv6Address,
+             agentIpv6ServicePortPrefixLength   Unsigned32
+         }
+
+    agentIpv6ServicePortPrefixIndex OBJECT-TYPE
+         SYNTAX     Unsigned32
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "The index of the Ipv6 Prefix Address configured on the
+           Service Port. Removal of a row will cause index values 
+           to be reassigned."
+         ::= { agentIpv6ServicePortPrefixEntry 1 }
+      
+    agentIpv6ServicePortPrefix OBJECT-TYPE
+         SYNTAX     Ipv6Address
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The Ipv6 Prefix Address configured on the Service Port."
+         ::= { agentIpv6ServicePortPrefixEntry 2 }
+
+    agentIpv6ServicePortPrefixLength OBJECT-TYPE
+         SYNTAX     Unsigned32
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The length of the IPv6 Prefix Address."
+         ::= { agentIpv6ServicePortPrefixEntry 3 }
+
+    -- IPv6 Service Port Default Router Table
+
+    agentIpv6ServicePortDefaultRouterTable OBJECT-TYPE
+         SYNTAX     SEQUENCE OF AgentIpv6ServicePortDefaultRouterEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "IPv6 Service Port Default Router Table. This table contains
+           an entry for each valid IPv6 Default Router configured on the
+           Service Port."
+         ::= { agentIpv6ServicePortGroup 2 }
+      
+    agentIpv6ServicePortDefaultRouterEntry OBJECT-TYPE
+         SYNTAX     AgentIpv6ServicePortDefaultRouterEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+                 "An IPv6 Service Port Default Router entry."
+         INDEX   { agentIpv6ServicePortDefaultRouterIndex }
+         ::= { agentIpv6ServicePortDefaultRouterTable 1 }
+      
+    AgentIpv6ServicePortDefaultRouterEntry ::= SEQUENCE {
+             agentIpv6ServicePortDefaultRouterIndex    Unsigned32,
+             agentIpv6ServicePortDefaultRouter         Ipv6Address
+         }
+
+    agentIpv6ServicePortDefaultRouterIndex OBJECT-TYPE
+         SYNTAX     Unsigned32
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "The index of the IPv6 Default Router Address 
+           configured on the Service Port. Removal of a 
+           row will cause index values to be reassigned."
+         ::= { agentIpv6ServicePortDefaultRouterEntry 1 }
+
+    agentIpv6ServicePortDefaultRouter OBJECT-TYPE
+         SYNTAX     Ipv6Address
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+            "The Address of the IPv6 Default Router configured 
+            on the Service Port."
+         ::= { agentIpv6ServicePortDefaultRouterEntry 2 }
+
+
+    -- IPv6 Service Port Neighbor Table
+
+    agentIpv6ServicePortNbrTable OBJECT-TYPE
+         SYNTAX     SEQUENCE OF AgentIpv6ServicePortNbrEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "IPv6 Service Port Neighbor Table. This table contains
+           an entry for each valid IPv6 Neighbor configured on the
+           Service Port."
+         ::= { agentIpv6ServicePortGroup 3 }
+      
+    agentIpv6ServicePortNbrEntry OBJECT-TYPE
+         SYNTAX     AgentIpv6ServicePortNbrEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+                 "An IPv6 Service Port Neighbor entry."
+         INDEX   { agentIpv6ServicePortNbrAddr }
+         ::= { agentIpv6ServicePortNbrTable 1 }
+      
+    AgentIpv6ServicePortNbrEntry ::= SEQUENCE {
+             agentIpv6ServicePortNbrAddr         Ipv6Address,
+             agentIpv6ServicePortNbrPhysAddr     MacAddress,
+             agentIpv6ServicePortNbrState        INTEGER,
+             agentIpv6ServicePortNbrUpdated      TimeStamp,
+             agentIpv6ServicePortNbrIsRouter     TruthValue
+
+         }
+
+    agentIpv6ServicePortNbrAddr OBJECT-TYPE
+         SYNTAX     Ipv6Address
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "The Ipv6 Address of a neighbor switch visible to the Service Port."
+         ::= { agentIpv6ServicePortNbrEntry 1 }
+
+    agentIpv6ServicePortNbrPhysAddr OBJECT-TYPE
+         SYNTAX     MacAddress
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The MacAddress of the neighboring switch."
+         ::= { agentIpv6ServicePortNbrEntry 2 }
+
+    agentIpv6ServicePortNbrState OBJECT-TYPE
+         SYNTAX     INTEGER { reachable(1),
+                              stale(2),
+                              delay(3),
+                              probe(4),
+                              unknown(6)
+                            }
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The state of the neighboring switch:
+            reachable(1) - The neighbor is reachable by this switch.
+            stale(2)     - Information about the neighbor is scheduled for deletion.
+            delay(3)     - No information has been received from neighbor during delay period.
+            probe(4)     - Switch is attempting to probe for this neighbor.
+            unknown(6)   - Unknown status."
+         ::= { agentIpv6ServicePortNbrEntry 3 }
+
+    agentIpv6ServicePortNbrUpdated OBJECT-TYPE
+         SYNTAX     TimeStamp
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The last sysUpTime that this neighbor has been updated."
+         ::= { agentIpv6ServicePortNbrEntry 4 }
+
+    agentIpv6ServicePortNbrIsRouter OBJECT-TYPE
+         SYNTAX     TruthValue
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "Returns true(1) if the neighbor machine is a router, 
+           false(2) otherwise."
+         ::= { agentIpv6ServicePortNbrEntry 5 }
+
+
+    agentIpv6ServicePortConfigProtocol OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(1),
+                     dhcp6(2)
+                  }
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION
+           "The switch's ServicePort IPv6 config protocol"
+         ::= { agentIpv6ServicePortGroup 4 }
+
+    agentIpv6ServicePortDhcpRestart OBJECT-TYPE
+         SYNTAX     TruthValue
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION
+           "The switch's ServicePort IPv6 DHCP Restart"
+         ::= { agentIpv6ServicePortGroup 5 }
+
+    --**************************************************************************************
+    -- agentIpv6ServicePort2Group
+    --
+    --**************************************************************************************
+    
+--    agentIpv6ServicePort2Group            OBJECT IDENTIFIER ::= { agentIpv6Group 8 }
+         
+    -- IPv6 Service Port 2 Prefix Table
+    
+--    agentIpv6ServicePort2PrefixTable OBJECT-TYPE
+--         SYNTAX     SEQUENCE OF AgentIpv6ServicePort2PrefixEntry
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--           "IPv6 Service Port 2 Prefix Table. This table contains
+--           an entry for each valid IPv6 prefix configured on the
+--           Service Port 2."
+--         ::= { agentIpv6ServicePort2Group 1 }
+--      
+--    agentIpv6ServicePort2PrefixEntry OBJECT-TYPE
+--         SYNTAX     AgentIpv6ServicePort2PrefixEntry
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--                 "An IPv6 Service Port 2 Prefix entry."
+--         INDEX   { agentIpv6ServicePort2PrefixIndex }
+--         ::= { agentIpv6ServicePort2PrefixTable 1 }
+--      
+--    AgentIpv6ServicePort2PrefixEntry ::= SEQUENCE {
+--             agentIpv6ServicePort2PrefixIndex    Unsigned32,
+--             agentIpv6ServicePort2Prefix         Ipv6Address,
+--             agentIpv6ServicePort2PrefixLength   Unsigned32
+--         }
+--
+--    agentIpv6ServicePort2PrefixIndex OBJECT-TYPE
+--         SYNTAX     Unsigned32
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--           "The index of the Ipv6 Prefix Address configured on the
+--           Service Port 2. Removal of a row will cause index values 
+--           to be reassigned."
+--         ::= { agentIpv6ServicePort2PrefixEntry 1 }
+--      
+--    agentIpv6ServicePort2Prefix OBJECT-TYPE
+--         SYNTAX     Ipv6Address
+--         MAX-ACCESS read-only
+--         STATUS     current
+--         DESCRIPTION
+--           "The Ipv6 Prefix Address configured on the Service Port 2."
+--         ::= { agentIpv6ServicePort2PrefixEntry 2 }
+--
+--    agentIpv6ServicePort2PrefixLength OBJECT-TYPE
+--         SYNTAX     Unsigned32
+--         MAX-ACCESS read-only
+--         STATUS     current
+--         DESCRIPTION
+--           "The length of the IPv6 Prefix Address."
+--         ::= { agentIpv6ServicePort2PrefixEntry 3 }
+         
+    -- IPv6 Service Port 2 Default Router Table
+
+--    agentIpv6ServicePort2DefaultRouterTable OBJECT-TYPE
+--         SYNTAX     SEQUENCE OF AgentIpv6ServicePort2DefaultRouterEntry
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--           "IPv6 Service Port 2 Default Router Table. This table contains
+--           an entry for each valid IPv6 Default Router configured on the
+--           Service Port 2."
+--         ::= { agentIpv6ServicePort2Group 2 }
+--      
+--    agentIpv6ServicePort2DefaultRouterEntry OBJECT-TYPE
+--         SYNTAX     AgentIpv6ServicePort2DefaultRouterEntry
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--                 "An IPv6 Service Port 2 Default Router entry."
+--         INDEX   { agentIpv6ServicePort2DefaultRouterIndex }
+--         ::= { agentIpv6ServicePort2DefaultRouterTable 1 }
+--      
+--    AgentIpv6ServicePort2DefaultRouterEntry ::= SEQUENCE {
+--             agentIpv6ServicePort2DefaultRouterIndex    Unsigned32,
+--             agentIpv6ServicePort2DefaultRouter         Ipv6Address
+--         }
+--
+--    agentIpv6ServicePort2DefaultRouterIndex OBJECT-TYPE
+--         SYNTAX     Unsigned32
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--           "The index of the IPv6 Default Router Address 
+--           configured on the Service Port 2. Removal of a 
+--           row will cause index values to be reassigned."
+--         ::= { agentIpv6ServicePort2DefaultRouterEntry 1 }
+--
+--    agentIpv6ServicePort2DefaultRouter OBJECT-TYPE
+--         SYNTAX     Ipv6Address
+--         MAX-ACCESS read-only
+--         STATUS     current
+--         DESCRIPTION
+--            "The Address of the IPv6 Default Router configured 
+--            on the Service Port 2."
+--         ::= { agentIpv6ServicePort2DefaultRouterEntry 2 }
+
+
+    -- IPv6 Service Port Neighbor Table
+
+--    agentIpv6ServicePort2NbrTable OBJECT-TYPE
+--         SYNTAX     SEQUENCE OF AgentIpv6ServicePort2NbrEntry
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--           "IPv6 Service Port 2 Neighbor Table. This table contains
+--           an entry for each valid IPv6 Neighbor configured on the
+--           Service Port 2."
+--         ::= { agentIpv6ServicePort2Group 3 }
+--      
+--    agentIpv6ServicePort2NbrEntry OBJECT-TYPE
+--         SYNTAX     AgentIpv6ServicePort2NbrEntry
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--                 "An IPv6 Service Port 2 Neighbor entry."
+--         INDEX   { agentIpv6ServicePort2NbrAddr }
+--         ::= { agentIpv6ServicePort2NbrTable 1 }
+--      
+--    AgentIpv6ServicePort2NbrEntry ::= SEQUENCE {
+--             agentIpv6ServicePort2NbrAddr         Ipv6Address,
+--             agentIpv6ServicePort2NbrPhysAddr     MacAddress,
+--             agentIpv6ServicePort2NbrState        INTEGER,
+--             agentIpv6ServicePort2NbrUpdated      TimeStamp,
+--             agentIpv6ServicePort2NbrIsRouter     TruthValue
+--
+--         }
+--
+--    agentIpv6ServicePort2NbrAddr OBJECT-TYPE
+--         SYNTAX     Ipv6Address
+--         MAX-ACCESS not-accessible
+--         STATUS     current
+--         DESCRIPTION
+--           "The Ipv6 Address of a neighbor switch visible to the Service Port 2."
+--         ::= { agentIpv6ServicePort2NbrEntry 1 }
+--
+--    agentIpv6ServicePort2NbrPhysAddr OBJECT-TYPE
+--         SYNTAX     MacAddress
+--         MAX-ACCESS read-only
+--         STATUS     current
+--         DESCRIPTION
+--           "The MacAddress of the neighboring switch."
+--         ::= { agentIpv6ServicePort2NbrEntry 2 }
+--
+--    agentIpv6ServicePort2NbrState OBJECT-TYPE
+--         SYNTAX     INTEGER { reachable(1),
+--                              stale(2),
+--                              delay(3),
+--                              probe(4),
+--                              unknown(6)
+--                            }
+--         MAX-ACCESS read-only
+--         STATUS     current
+--         DESCRIPTION
+--           "The state of the neighboring switch:
+--            reachable(1) - The neighbor is reachable by this switch.
+--            stale(2)     - Information about the neighbor is scheduled for deletion.
+--            delay(3)     - No information has been received from neighbor during delay period.
+--            probe(4)     - Switch is attempting to probe for this neighbor.
+--            unknown(6)   - Unknown status."
+--         ::= { agentIpv6ServicePort2NbrEntry 3 }
+--
+--    agentIpv6ServicePort2NbrUpdated OBJECT-TYPE
+--         SYNTAX     TimeStamp
+--         MAX-ACCESS read-only
+--         STATUS     current
+--         DESCRIPTION
+--           "The last sysUpTime that this neighbor has been updated."
+--         ::= { agentIpv6ServicePort2NbrEntry 4 }
+--
+--    agentIpv6ServicePort2NbrIsRouter OBJECT-TYPE
+--         SYNTAX     TruthValue
+--         MAX-ACCESS read-only
+--         STATUS     current
+--         DESCRIPTION
+--           "Returns true(1) if the neighbor machine is a router, 
+--           false(2) otherwise."
+--         ::= { agentIpv6ServicePort2NbrEntry 5 }
+--         
+--
+--    agentIpv6ServicePort2ConfigProtocol OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                     none(1),
+--                     dhcp6(2)
+--                  }
+--         MAX-ACCESS read-write
+--         STATUS     current
+--         DESCRIPTION
+--           "The switch's ServicePort 2 IPv6 config protocol"
+--         ::= { agentIpv6ServicePort2Group 4 }
+--         
+--    agentIpv6ServicePort2DhcpRestart OBJECT-TYPE
+--         SYNTAX     TruthValue
+--         MAX-ACCESS read-write
+--         STATUS     current
+--         DESCRIPTION
+--           "The switch's ServicePort 2 IPv6 DHCP Restart"
+--         ::= { agentIpv6ServicePort2Group 5 }
+         
+    --**************************************************************************************
+    -- agentIpv6NeighborGroup
+    --
+    --**************************************************************************************
+    
+    agentIpv6NeighborGroup            OBJECT IDENTIFIER ::= { agentIpv6Group 9 }
+    
+    -- IPv6 Neighbor Table
+    
+    agentIpv6NeighborTable OBJECT-TYPE
+         SYNTAX     SEQUENCE OF AgentIpv6NeighborEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "IPv6 Neighbor Table. This table contains an entry 
+            for each valid IPv6 Neighbor configured"
+         ::= { agentIpv6NeighborGroup 1 }
+      
+    agentIpv6NeighborEntry OBJECT-TYPE
+         SYNTAX     AgentIpv6NeighborEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+                 "An IPv6 Neighbor entry."
+         INDEX   { agentIpv6NeighborIfIndex,
+                   agentIpv6NeighborAddress }
+         ::= { agentIpv6NeighborTable 1 }
+      
+    AgentIpv6NeighborEntry ::= SEQUENCE {
+             agentIpv6NeighborIfIndex                Ipv6IfIndex,
+             agentIpv6NeighborAddress                Ipv6Address,
+             agentIpv6NeighborMacAddress             PhysAddress,
+             agentIpv6NeighborIsRouter               TruthValue,
+             agentIpv6NeighborState                  INTEGER,
+             agentIpv6NeighborLastUpdated            TimeStamp
+         }
+
+    agentIpv6NeighborIfIndex OBJECT-TYPE
+         SYNTAX     Ipv6IfIndex
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "A unique non-zero value identifying
+           the particular IPv6 interface."
+         ::= { agentIpv6NeighborEntry 1 }
+      
+    agentIpv6NeighborAddress OBJECT-TYPE
+         SYNTAX     Ipv6Address
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The Ipv6 Address of a neighbor switch visible"
+         ::= { agentIpv6NeighborEntry 2 }
+
+    agentIpv6NeighborMacAddress OBJECT-TYPE
+         SYNTAX     PhysAddress
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The MacAddress of the neighboring switch."
+         ::= { agentIpv6NeighborEntry 3 }
+
+    agentIpv6NeighborIsRouter OBJECT-TYPE
+         SYNTAX     TruthValue
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "Returns true(1) if the neighbor machine is a router, 
+           false(2) otherwise."
+         ::= { agentIpv6NeighborEntry 4 }
+
+    agentIpv6NeighborState OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     reachable(1), -- confirmed reachability
+                     stale(2),     -- unconfirmed reachability
+                     delay(3),     -- waiting for reachability
+                                   -- confirmation before entering
+                                   -- the probe state
+                     probe(4),     -- actively probing
+                     invalid(5),   -- an invalidated mapping
+                     unknown(6)    -- state can not be determined
+                                   -- for some reason.
+                    }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+           "The state of the neighboring switch:
+            reachable(1) - The neighbor is reachable by this switch.
+            stale(2)     - Information about the neighbor is scheduled for deletion.
+            delay(3)     - No information has been received from neighbor during delay period.
+            probe(4)     - Switch is attempting to probe for this neighbor.
+            unknown(6)   - Unknown status."
+         ::= { agentIpv6NeighborEntry 5 }
+
+    agentIpv6NeighborLastUpdated OBJECT-TYPE
+         SYNTAX      TimeStamp
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+           "The last sysUpTime that this neighbor has been updated."
+         ::= { agentIpv6NeighborEntry 6 }
+
+    -- IPv6 Static Neighbor Table
+    
+    agentIpv6StaticNeighbor OBJECT-TYPE
+         SYNTAX     SEQUENCE OF AgentIpv6StaticNeighborEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "IPv6 static Neighbor Table. This table contains an entry 
+            for each valid IPv6 static Neighbor configured"
+         ::= { agentIpv6NeighborGroup 2 }
+      
+    agentIpv6StaticNeighborEntry OBJECT-TYPE
+         SYNTAX     AgentIpv6StaticNeighborEntry
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+                 "An IPv6 static Neighbor entry."
+         INDEX   { agentIpv6StaticNeighborIfIndex }
+         ::= { agentIpv6StaticNeighbor 1 }
+      
+    AgentIpv6StaticNeighborEntry ::= SEQUENCE {
+             agentIpv6StaticNeighborIfIndex                Ipv6IfIndex,
+             agentIpv6StaticNeighborAddress                Ipv6Address,
+             agentIpv6StaticNeighborMacAddress             PhysAddress
+         }
+
+    agentIpv6StaticNeighborIfIndex OBJECT-TYPE
+         SYNTAX     Ipv6IfIndex
+         MAX-ACCESS not-accessible
+         STATUS     current
+         DESCRIPTION
+           "A unique non-zero value identifying
+           the particular IPv6 interface."
+         ::= { agentIpv6StaticNeighborEntry 1 }
+      
+    agentIpv6StaticNeighborAddress OBJECT-TYPE
+         SYNTAX     Ipv6Address
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The Ipv6 Address of a static neighbor switch visible"
+         ::= { agentIpv6StaticNeighborEntry 2 }
+
+    agentIpv6StaticNeighborMacAddress OBJECT-TYPE
+         SYNTAX     PhysAddress
+         MAX-ACCESS read-only
+         STATUS     current
+         DESCRIPTION
+           "The MacAddress of the static neighboring switch."
+         ::= { agentIpv6StaticNeighborEntry 3 }
+
+    -- IPv6 Static Add/Remove
+
+    agentIpv6StaticNeighborRowAddress OBJECT-TYPE
+         SYNTAX     OCTET STRING (SIZE (0..40))
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION
+           "The Ipv6 Address of a static neighbor switch visible"
+         ::= { agentIpv6NeighborGroup 3 }
+
+    agentIpv6StaticNeighborRowMacAddress OBJECT-TYPE
+         SYNTAX     PhysAddress
+         MAX-ACCESS read-write
+         STATUS     current
+         DESCRIPTION
+           "The MacAddress of the static neighboring switch."
+         ::= { agentIpv6NeighborGroup 4 }
+
+    agentIpv6StaticNeighborRowStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                 "Creates a new entry in the Neighbor table.
+                 Allowed values are:
+                 
+                 createAndGo(4)  - Creates an entry in this table.                                    
+                 destroy(6)      - Removes the associated address from the interface."
+         ::= { agentIpv6NeighborGroup 5 }
+
+
+    --**************************************************************************************
+    -- agentRouterRipngConfigGroup
+    --
+    --**************************************************************************************
+    
+    agentRouterRipngConfigGroup                 OBJECT IDENTIFIER ::= { routingIpv6 2 }
+    
+    agentRouterRipngAdminState OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Sets the administrative mode of RIPng in the router."
+         ::= { agentRouterRipngConfigGroup 1 }
+         
+    agentRouterRipngSplitHorizonMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     none(1),
+                     simple(2),
+                     poisonReverse(3)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Sets the RIPng split horizon operating mode in the router.
+		      A value of none(1) means split horizon processing is
+		      disabled.  When set to simple(2), the simple split 
+		      horizon technique is used.  When set to poisonReverse(3),
+		      the split horizon with poison reverse technique is used.
+		      The default split horizon mode is simple(2)."
+         DEFVAL { simple }
+         ::= { agentRouterRipngConfigGroup 2 }
+         
+--    agentRouterRipngAutoSummaryMode OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                     enable(1),
+--                     disable(2)
+--                  }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "Sets the RIPng auto summarization mode in the router.
+--		      A value of enable(1) means that routes advertized by
+--		      this RIPng router are combined, or summarized, whenever
+--		      possible into aggregates. When set to disable(2),
+--		      routes are not aggregated in RIPng updates generated
+--		      by this router.  The default auto summary mode is 
+--		      enable(1)."
+--         DEFVAL { enable }
+--         ::= { agentRouterRipngConfigGroup 3 }
+--         
+--    agentRouterRipngHostRoutesAcceptMode OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                     enable(1),
+--                     disable(2)
+--                  }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "Sets the RIPng host route acceptance mode in the router.
+--		      A value of enable(1) means that host routes advertized
+--		      to this RIPng router will be accepted (learned) into its
+--		      routing table.  When set to disable(2), host routes 
+--		      advertized in RIPng updates from neighboring routers
+--		      are ignored.  The default host routes accept mode is
+--		      enable(1)."
+--         DEFVAL { enable }
+--         ::= { agentRouterRipngConfigGroup 4 }
+--         
+         
+    --************************************************************************************  
+    agentRouterRipngDefaultMetric  OBJECT-TYPE
+       SYNTAX      Integer32 (0..15)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Default metric of redistributed routes, when RIPng redistributes 
+                from other protocols. {0} indicates that the parameter is not configured,
+                this value should not be set. Valid range for set is (1..15)."
+       DEFVAL { 0 }
+            ::= { agentRouterRipngConfigGroup 5 }
+
+    agentRouterRipngDefaultMetricConfigured OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Flag to determine whether RIPng default-metric is configured or not.
+                     Set to 'false' to unconfigure the default route metric. Set to 'true' is
+                     not allowed."
+         DEFVAL { false }
+         ::= { agentRouterRipngConfigGroup 6 } 
+                        
+    agentRouterRipngDefaultInfoOriginate  OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Flag to determine, whether RIPng can advertise a default-route learned
+                from another protocol." 
+       DEFVAL { false }
+            ::= { agentRouterRipngConfigGroup 7 }
+            
+    agentRouterRipngDistance  OBJECT-TYPE
+       SYNTAX      Integer32 (1..255)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Configure the distance value for RIPng routes." 
+       DEFVAL { 160 }
+            ::= { agentRouterRipngConfigGroup 8 }   
+                                
+    agentRouterRipngUpdateTime  OBJECT-TYPE
+       SYNTAX      Integer32 (5..2147483647)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Configure the Ripng update time."
+       DEFVAL { 30 }
+            ::= { agentRouterRipngConfigGroup 10 }
+
+    agentRouterRipngGarbageTime  OBJECT-TYPE
+       SYNTAX      Integer32 (5..2147483647)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Configure the Ripng garbage time."
+       DEFVAL { 180 }
+            ::= { agentRouterRipngConfigGroup 11 }
+
+    agentRouterRipngTimeoutTime  OBJECT-TYPE
+       SYNTAX      Integer32 (5..2147483647)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Configure the Ripng timeout time."
+       DEFVAL { 120 }
+            ::= { agentRouterRipngConfigGroup 12 }
+
+    -- Agent RIPng Route-redistribution table.  This table contains, one entry per
+    -- source(bgp, ospf, static, connected) from which BGP redistributes routes. 
+	
+    agentRipngRouteRedistTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentRipngRouteRedistEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     "This table contains the MIB objects required to configure 
+                      route-redistribution for RIPng. Here, RIPng is the Destination
+                      protocol and the source protocols can be any of : BGP, OSPF,
+                      Static, Connected."
+         ::= { agentRouterRipngConfigGroup 9 }
+
+    agentRipngRouteRedistEntry OBJECT-TYPE
+         SYNTAX      AgentRipngRouteRedistEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     ""
+         INDEX       { agentRipngRouteRedistSource }
+         ::= { agentRipngRouteRedistTable 1 }
+         
+    AgentRipngRouteRedistEntry ::= SEQUENCE {         
+          agentRipngRouteRedistSource
+              INTEGER,
+          agentRipngRouteRedistMode
+              INTEGER,
+          agentRipngRouteRedistMetric
+              Integer32,
+          agentRipngRouteRedistMetricConfigured
+              TruthValue
+--          agentRipngRouteRedistMatchInternal
+--              INTEGER,
+--          agentRipngRouteRedistMatchExternal1
+--              INTEGER,
+--          agentRipngRouteRedistMatchExternal2
+--              INTEGER,
+--          agentRipngRouteRedistMatchNSSAExternal1
+--              INTEGER,
+--          agentRipngRouteRedistMatchNSSAExternal2
+--              INTEGER,
+--          agentRipngRouteRedistDistList
+--              Unsigned32,
+--          agentRipngRouteRedistDistListConfigured
+--              TruthValue
+          } 
+         
+    agentRipngRouteRedistSource OBJECT-TYPE
+         SYNTAX      INTEGER{
+                     connected(1),
+                     static(2),                     
+                     ospf(3)
+--                     bgp(4)                                        
+                     }
+         
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Source route, from which RIPng can redistribute routes.
+                      This object also acts as the identifier for  the 
+                      RIP redistribution Table entry."
+         ::= { agentRipngRouteRedistEntry 1 }
+                                                   
+    agentRipngRouteRedistMode OBJECT-TYPE
+                 SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "User enabels/disables route-redistribution for a particular source
+                      protocol."
+         DEFVAL { disable }
+         ::= { agentRipngRouteRedistEntry 2 }
+     
+    agentRipngRouteRedistMetric OBJECT-TYPE
+         SYNTAX      Integer32 (0..15)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Metric used for redistributing a particular source protocol route
+                      into RIPng. {0} indicates that the parameter is not configured, this value
+                      should not be set. Valid range for set is (1..15)."
+         DEFVAL { 0 }
+         ::= { agentRipngRouteRedistEntry 3 } 
+         
+    agentRipngRouteRedistMetricConfigured OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Flag to determine whether RIPng redistribute-metric is configured
+                     or not. Set to 'false' to unconfigure redistribute metric. Set to 'true'
+                     is not allowed."
+         DEFVAL { false }
+         ::= { agentRipngRouteRedistEntry 4 } 
+
+         
+--    agentRipngRouteRedistMatchInternal OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                      true(1),
+--                      false(2),
+--                      not-applicable(3)
+--                     }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "If this flag is true, RIPng redistributes OSPF internal routes.
+--                      It will be non-applicable, when source protocol is other than ospf."
+--         ::= { agentRipngRouteRedistEntry 5 }
+
+--    agentRipngRouteRedistMatchExternal1 OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                      true(1),
+--                      false(2),
+--                      not-applicable(3)
+--                     }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "If this flag is true, RIPng redistributes OSPF External1 routes.
+--                      It will be non-applicable, when source protocol is other than ospf."
+--         ::= { agentRipngRouteRedistEntry 6 }
+
+--    agentRipngRouteRedistMatchExternal2 OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                      true(1),
+--                      false(2),
+--                      not-applicable(3)
+--                     }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "If this flag is true, RIPng redistributes OSPF External2 routes.
+--                      It will be non-applicable, when source protocol is other than ospf."
+--         ::= { agentRipngRouteRedistEntry 7 }
+
+--    agentRipngRouteRedistMatchNSSAExternal1 OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                      true(1),
+--                      false(2),
+--                      not-applicable(3)
+--                     }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "If this flag is true, RIPng redistributes OSPF NSSA-External1 routes.
+--                      It will be non-applicable, when source protocol is other than ospf."
+--         ::= { agentRipngRouteRedistEntry 8 }
+
+--    agentRipngRouteRedistMatchNSSAExternal2 OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                      true(1),
+--                      false(2),
+--                      not-applicable(3)
+--                     }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "If this flag is true, RIPng redistributes OSPF NSSA-External2 routes.
+--                      It will be non-applicable, when source protocol is other than ospf."
+--         ::= { agentRipngRouteRedistEntry 9 }
+
+--    agentRipngRouteRedistDistList OBJECT-TYPE
+--         SYNTAX      Unsigned32 (1..199)
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "Access-list number of the access-list, which filters routes received
+--                      from a source-protocol."
+--         ::= { agentRipngRouteRedistEntry 10 }
+
+--     agentRipngRouteRedistDistListConfigured OBJECT-TYPE
+--         SYNTAX      TruthValue
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "Flag to determine whether Access-list is configured or not."
+--         ::= { agentRipngRouteRedistEntry 11 }
+
+    --************************************************************************************
+
+    agentRipngIfTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF AgentRipngIfEntry
+        MAX-ACCESS   not-accessible
+         STATUS      current
+         DESCRIPTION
+           "The Ripng Interface Table describes the  inter-
+           faces from the viewpoint of Ripng."
+      ::= { agentRouterRipngConfigGroup 13 }
+         
+    agentRipngIfEntry OBJECT-TYPE
+        SYNTAX   AgentRipngIfEntry
+        MAX-ACCESS   not-accessible
+         STATUS      current
+         DESCRIPTION
+           "The Ripng Interface Entry describes one  inter-
+           face from the viewpoint of Ripng."
+        INDEX       { agentRipngIfIndex }
+       ::= { agentRipngIfTable 1 }
+         
+    AgentRipngIfEntry ::=
+        SEQUENCE {
+            agentRipngIfIndex
+                Integer32,
+            agentRipngIfAdminMode
+                INTEGER,
+            agentRipngIfPassiveMode
+                INTEGER
+                     }
+
+    agentRipngIfIndex OBJECT-TYPE
+         SYNTAX      Integer32 (0..2147483647)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The IfIndex associated with this instance."
+         ::= { agentRipngIfEntry 1 }
+         
+    agentRipngIfAdminMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures interface mode of Ripng."
+         DEFVAL { disable }
+         ::= { agentRipngIfEntry 2 }
+         
+     agentRipngIfPassiveMode  OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Flag to determine whether the interface is passive.
+                     A passive interface will not participate in the Ripng
+                     adjacency formation."
+         DEFVAL { disable }
+         ::= { agentRipngIfEntry 3 }
+
+    --**************************************************************************************
+    -- agentRouterOspfv3ConfigGroup
+    --
+    --**************************************************************************************
+    
+    agentRouterOspfv3ConfigGroup                 OBJECT IDENTIFIER ::= { routingIpv6 3 }
+    
+     --***********************************************************************        
+     agentOspfv3DefaultMetric  OBJECT-TYPE
+       SYNTAX      Integer32 (1..16777214)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Default metric of redistributed routes, when OSPFv3 redistributes 
+                from other protocols."
+            ::= { agentRouterOspfv3ConfigGroup 1 }
+
+     agentOspfv3DefaultMetricConfigured OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Flag to determine whether OSPFv3 default-metric is configured or not."
+         ::= { agentRouterOspfv3ConfigGroup 2 } 
+ 
+            
+     agentOspfv3DefaultInfoOriginate  OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Flag to determine, whether OSPFv3 can advertise a default-route learned
+                from another protocol."
+       DEFVAL { false }
+            ::= { agentRouterOspfv3ConfigGroup 3 }     
+            
+     agentOspfv3DefaultInfoOriginateAlways  OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "When this flag is true, the router advertises 0.0.0.0/0.0.0.0 always.
+                Without this option, OSPF will only advertise 0.0.0.0/0.0.0.0 if the
+                router's forwarding table contains a default route."
+       DEFVAL { false }
+            ::= { agentRouterOspfv3ConfigGroup 4 } 
+            
+     agentOspfv3DefaultInfoOriginateMetric  OBJECT-TYPE
+       SYNTAX      Integer32 (0..16777215)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Metric of the default route,which OSPF advertises when learned from
+                other protocol." 
+       DEFVAL { 10 }
+            ::= { agentRouterOspfv3ConfigGroup 5 } 
+            
+     agentOspfv3DefaultInfoOriginateMetricConfigured OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Flag to determine whether OSPF default-info originate metric 
+                      is configured or not."
+         ::= { agentRouterOspfv3ConfigGroup 6 }
+            
+     agentOspfv3DefaultInfoOriginateMetricType  OBJECT-TYPE
+       SYNTAX      INTEGER {
+                   externalType1(1),
+                   externalType2(2)
+                   }
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Metric Type of the default route,which OSPF advertises when learned from
+                other protocol. It can be 1(external type 1) or 2(external type 2)." 
+       DEFVAL { 2 }
+            ::= { agentRouterOspfv3ConfigGroup 7 } 
+            
+    -- Agent OSPF Route-redistribution table.  This table contains, one entry per
+    -- source(bgp, rip, static, connected) from which OSPF redistributes routes.
+    
+    agentOspfv3RouteRedistTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentOspfv3RouteRedistEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     "This table contains the MIB objects required to configure 
+                      route-redistribution for OSPF. Here, OSPF is the Destination
+                      protocol and the source protocols can be any of : BGP, RIP,
+                      Static, Connected."
+         ::= { agentRouterOspfv3ConfigGroup 8 }
+
+    agentOspfv3RouteRedistEntry OBJECT-TYPE
+         SYNTAX      AgentOspfv3RouteRedistEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     ""
+         INDEX       { agentOspfv3RouteRedistSource }
+         ::= { agentOspfv3RouteRedistTable 1 }
+         
+   AgentOspfv3RouteRedistEntry ::= SEQUENCE {  
+          
+          agentOspfv3RouteRedistSource
+              INTEGER,
+          agentOspfv3RouteRedistMode
+              INTEGER,
+          agentOspfv3RouteRedistMetric
+              Integer32,
+          agentOspfv3RouteRedistMetricConfigured
+              TruthValue,
+          agentOspfv3RouteRedistMetricType
+              INTEGER,
+          agentOspfv3RouteRedistTag
+              Unsigned32
+--          agentOspfv3RouteRedistSubnets
+--              TruthValue,
+--          agentOspfv3RouteRedistDistList
+--              Unsigned32,
+--          agentOspfv3RouteRedistDistListConfigured
+--              TruthValue
+              }
+              
+--  Blue : 2006/10/2
+              
+    agentOspfv3RouteRedistSource OBJECT-TYPE
+         SYNTAX      INTEGER{
+                     connected(1),
+                     static(2)
+--                     bgp(4)                                        
+                     }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Source protocol, from which OSPF can redistribute routes.
+                      This object also acts as the identifier for  the 
+                      OSPF redistribution Table entry."
+         ::= { agentOspfv3RouteRedistEntry 1 }
+                                                   
+    agentOspfv3RouteRedistMode OBJECT-TYPE
+                 SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "User enabels/disables route-redistribution for a particular source
+                      protocol." 
+         DEFVAL { disable }
+         ::= { agentOspfv3RouteRedistEntry 2 }
+     
+    agentOspfv3RouteRedistMetric OBJECT-TYPE
+         SYNTAX      Integer32 (0..16777214)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Metric used for redistributing a particular source protocol route
+                      into OSPF."
+         ::= { agentOspfv3RouteRedistEntry 3 } 
+
+    agentOspfv3RouteRedistMetricConfigured OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Flag to determine whether OSPF redistribute-metric is configured or not."
+         ::= { agentOspfv3RouteRedistEntry 4 } 
+
+         
+    agentOspfv3RouteRedistMetricType OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     externalType1(1),
+                     externalType2(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Metric Type of routes,which OSPF redistributes from other source protocols.
+                      It can be 1(external type 1) or 2(external type 2)."
+         DEFVAL { externalType2 }
+         ::= { agentOspfv3RouteRedistEntry 5 }
+         
+    agentOspfv3RouteRedistTag OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "It specifies the tag field in routes redistributed by OSPF."
+         ::= { agentOspfv3RouteRedistEntry 6 } 
+         
+--    agentOspfv3RouteRedistSubnets OBJECT-TYPE
+--         SYNTAX      TruthValue
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "If this value is false, then OSPF will not redistribute subnetted routes."
+--         DEFVAL { false }
+--         ::= { agentOspfv3RouteRedistEntry 7 }
+         
+--    agentOspfv3RouteRedistDistList OBJECT-TYPE
+--         SYNTAX      Unsigned32 (1..199) 
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "Access-list number of the access-list, which filters routes received
+--                      from a source-protocol."
+--         ::= { agentOspfv3RouteRedistEntry 8 } 
+         
+--    agentOspfv3RouteRedistDistListConfigured OBJECT-TYPE
+--         SYNTAX      TruthValue
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--                     "Flag to determine whether Access-list is configured or not."
+--         ::= { agentOspfv3RouteRedistEntry 9 }
+
+         
+    --  OSPF Interface Table (augmented information)
+
+    agentOspfv3IfTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF AgentOspfv3IfEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "The OSPF Interface Table describes the  inter-
+           faces from the viewpoint of OSPF.  Augments 
+	   ospfIfTable from the OSPF-MIB."
+      ::= { agentRouterOspfv3ConfigGroup 9 }
+
+    agentOspfv3IfEntry OBJECT-TYPE
+        SYNTAX   AgentOspfv3IfEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "The OSPF Interface Entry describes one  inter-
+           face from the viewpoint of OSPF.  Augments
+	   ospfIfEntry in OSPF-MIB."
+       AUGMENTS { ospfv3IfEntry }
+       ::= { agentOspfv3IfTable 1 }
+
+    AgentOspfv3IfEntry ::=
+        SEQUENCE {
+--            agentOspfv3IfAuthKeyId
+--                INTEGER,
+            agentOspfv3IfIpMtuIgnoreFlag
+                INTEGER,
+            agentOspfv3IfPassiveMode
+                TruthValue
+                  }
+
+--    agentOspfv3IfAuthKeyId OBJECT-TYPE
+--        SYNTAX   INTEGER (0..255)
+--        MAX-ACCESS   read-create
+--        STATUS   current
+--        DESCRIPTION
+--           "The identifier for the authentication key used
+--           on this interface.  This field is only meaningful 
+--           when the OSPF-MIB ospfIfAuthType is md5(2); 
+--	   otherwise, the value is not used."
+--      ::= { agentOspfv3IfEntry 1 }
+
+    agentOspfv3IfIpMtuIgnoreFlag OBJECT-TYPE
+         SYNTAX      INTEGER {
+                      enable(1),
+                      disable(2)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Configures the IP MTU Ignore Flag value for this OSPF interface."
+         ::= { agentOspfv3IfEntry 2 }
+
+     agentOspfv3IfPassiveMode  OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Flag to determine whether the interface is passive.
+                A passive interface will not participate in the OSPF
+                adjacency formation."
+       DEFVAL { false }
+            ::= { agentOspfv3IfEntry 3 }
+
+    agentOspfv3LsdbTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF AgentOspfv3LsdbEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "The OSPF Process's Link State Database."
+       REFERENCE
+          "OSPF Version 2, Section 12  Link  State  Adver-
+          tisements"
+      ::= { agentRouterOspfv3ConfigGroup 10 }
+
+
+    agentOspfv3LsdbEntry OBJECT-TYPE
+        SYNTAX   AgentOspfv3LsdbEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "A single Link State Advertisement."
+       INDEX { agentOspfv3LsdbAreaId, agentOspfv3LsdbType,
+               agentOspfv3LsdbLsid, agentOspfv3LsdbRouterId }
+       ::= { agentOspfv3LsdbTable 1 }
+
+    AgentOspfv3LsdbEntry ::= SEQUENCE {
+        agentOspfv3LsdbAreaId
+            AreaID,
+        agentOspfv3LsdbType
+            INTEGER,
+        agentOspfv3LsdbLsid
+            IpAddress,
+        agentOspfv3LsdbRouterId
+            RouterID,
+        agentOspfv3LsdbSequence
+            Unsigned32,
+        agentOspfv3LsdbAge
+            Integer32,
+        agentOspfv3LsdbChecksum
+            Unsigned32,
+        agentOspfv3LsdbAdvertisement
+            DisplayString
+              }
+
+
+
+
+
+    agentOspfv3LsdbAreaId OBJECT-TYPE
+        SYNTAX   AreaID
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The 32 bit identifier of the Area  from  which
+           the LSA was received."
+       REFERENCE
+          "OSPF Version 2, Appendix C.2 Area parameters"
+      ::= { agentOspfv3LsdbEntry 1 }
+
+-- External Link State Advertisements are permitted
+-- for backward compatibility, but should be displayed in
+-- the ospfExtLsdbTable rather than here.
+
+    agentOspfv3LsdbType OBJECT-TYPE
+        SYNTAX   INTEGER    {
+                    illegalLSA (0),
+                    routerLink (1),
+                    networkLink (2),
+                    interNetwork (3),
+                    interRouter (4),
+                    asExternal (5), -- but see ospfExtLsdbTable
+                    multicastGroup (6),
+                    nssaExternal (7),
+                    link (8),
+                    intraPrefix (9),
+                    unknownLink (10),
+                    unknownArea (11)
+                  }
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The type  of  the  link  state  advertisement.
+           Each  link state type has a separate advertise-
+           ment format."
+       REFERENCE
+          "OSPF Version 2, Appendix A.4.1 The  Link  State
+          Advertisement header"
+      ::= { agentOspfv3LsdbEntry 2 }
+
+    agentOspfv3LsdbLsid OBJECT-TYPE
+        SYNTAX   IpAddress
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The Link State ID is an LS Type Specific field
+           containing either a Router ID or an IP Address;
+           it identifies the piece of the  routing  domain
+           that is being described by the advertisement."
+       REFERENCE
+          "OSPF Version 2, Section 12.1.4 Link State ID"
+      ::= { agentOspfv3LsdbEntry 3 }
+
+
+
+
+
+    agentOspfv3LsdbRouterId OBJECT-TYPE
+        SYNTAX   RouterID
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The 32 bit number that uniquely identifies the
+           originating router in the Autonomous System."
+       REFERENCE
+          "OSPF Version 2, Appendix C.1 Global parameters"
+      ::= { agentOspfv3LsdbEntry 4 }
+
+--  Note that the OSPF Sequence Number is a 32 bit signed
+--  integer.  It starts with the value '80000001'h,
+--  or -'7FFFFFFF'h, and increments until '7FFFFFFF'h
+--  Thus, a typical sequence number will be very negative.
+
+    agentOspfv3LsdbSequence OBJECT-TYPE
+        SYNTAX   Unsigned32
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The sequence number field is a  signed  32-bit
+           integer.   It  is used to detect old and dupli-
+           cate link state advertisements.  The  space  of
+           sequence  numbers  is  linearly  ordered.   The
+           larger the sequence number the more recent  the
+           advertisement."
+       REFERENCE
+          "OSPF Version  2,  Section  12.1.6  LS  sequence
+          number"
+      ::= { agentOspfv3LsdbEntry 5 }
+
+
+    agentOspfv3LsdbAge OBJECT-TYPE
+        SYNTAX   Integer32 (0..2147483647) 
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "This field is the age of the link state adver-
+           tisement in seconds."
+       REFERENCE
+          "OSPF Version 2, Section 12.1.1 LS age"
+      ::= { agentOspfv3LsdbEntry 6 }
+
+    agentOspfv3LsdbChecksum OBJECT-TYPE
+        SYNTAX   Unsigned32
+        MAX-ACCESS   read-only
+        STATUS   current
+
+
+
+
+
+        DESCRIPTION
+           "This field is the  checksum  of  the  complete
+           contents  of  the  advertisement, excepting the
+           age field.  The age field is excepted  so  that
+           an   advertisement's  age  can  be  incremented
+           without updating the  checksum.   The  checksum
+           used  is  the same that is used for ISO connec-
+           tionless datagrams; it is commonly referred  to
+           as the Fletcher checksum."
+       REFERENCE
+          "OSPF Version 2, Section 12.1.7 LS checksum"
+      ::= { agentOspfv3LsdbEntry 7 }
+
+
+    agentOspfv3LsdbAdvertisement OBJECT-TYPE
+        SYNTAX   DisplayString
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The entire Link State Advertisement, including
+           its header."
+       REFERENCE
+          "OSPF Version 2, Section 12  Link  State  Adver-
+          tisements"
+      ::= { agentOspfv3LsdbEntry 8 }
+
+    --  OSPF Virtual Interface Table (augmented information)
+
+--    agentOspfv3VirtIfTable OBJECT-TYPE
+--        SYNTAX   SEQUENCE OF AgentOspfv3VirtIfEntry
+--        MAX-ACCESS   not-accessible
+--        STATUS   current
+--        DESCRIPTION
+--           "Information about this router's virtual inter-
+--           faces.  Augments ospfVirtIfTable from the OSPF-MIB."
+--      ::= { agentRouterOspfv3ConfigGroup 10 }
+--
+--    agentOspfv3VirtIfEntry OBJECT-TYPE
+--        SYNTAX   AgentOspfv3VirtIfEntry
+--        MAX-ACCESS   not-accessible
+--        STATUS   current
+--        DESCRIPTION
+--           "Information about a single Virtual Interface.
+--	   Augments ospfvVirtIfEntry in OSPF-MIB."
+--       AUGMENTS { ospfv3VirtIfEntry }
+--       ::= { agentOspfv3VirtIfTable 1 }
+--
+--    AgentOspfv3VirtIfEntry ::=
+--        SEQUENCE {
+--            agentOspfv3VirtIfAuthKeyId
+--                INTEGER
+--                  }
+--
+--    agentOspfv3VirtIfAuthKeyId OBJECT-TYPE
+--        SYNTAX   INTEGER (0..255)
+--        MAX-ACCESS   read-create
+--        STATUS   current
+--        DESCRIPTION
+--           "The identifier for the authentication key used
+--           on this virtual interface.  This field is only meaningful 
+--           when the OSPF-MIB ospfVirtIfAuthType is md5(2); 
+--	   otherwise, the value is not used."
+--      ::= { agentOspfv3VirtIfEntry 1 }
+
+
+    --**************************************************************************************
+    
+--    agentRouterOspfv3RFC1583CompatibilityMode OBJECT-TYPE
+--         SYNTAX      INTEGER {
+--                     enable(1),
+--                     disable(2)
+--                  }
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION
+--           "From RFC2328: 
+--            Controls the preference rules used in Section 16.4 when
+--            choosing among multiple AS-external-LSAs advertising the
+--            same destination. When set to 'enabled', the preference
+--            rules remain those specified by RFC 1583 ([Ref9]). When set
+--            to 'disabled', the preference rules are those stated in
+--
+--            Section 16.4.1, which prevent routing loops when AS-
+--            external-LSAs for the same destination have been originated
+--            from different areas. Set to 'enabled' by default.
+--
+--            In order to minimize the chance of routing loops, all OSPF
+--            routers in an OSPF routing domain should have
+--            RFC1583Compatibility set identically. When there are routers
+--            present that have not been updated with the functionality
+--            specified in Section 16.4.1 of this memo, all routers should
+--            have RFC1583Compatibility set to 'enabled'. Otherwise, all
+--            routers should have RFC1583Compatibility set to 'disabled',
+--            preventing all routing loops."
+--         DEFVAL { enable }
+--         ::= { agentRouterOspfv3ConfigGroup 11 }
+
+--    agentOspfv3SpfDelayTime OBJECT-TYPE
+--         SYNTAX   SpfTimerRange
+--         MAX-ACCESS   read-write
+--         STATUS   current
+--         DESCRIPTION
+--           "Delay time (in seconds) between when OSPF
+--            receives a topology change and when it
+--            starts an SPF calculation. It can be an
+--            integer from 0 to 65535. The default
+--            time is 5 seconds. A value of 0 means
+--            that there is no delay; that is, the
+--            SPF calculation is started immediately."
+--         DEFVAL { 5 }
+--         ::= {  agentRouterOspfv3ConfigGroup 12 }   
+
+--    agentOspfv3SpfHoldTime OBJECT-TYPE
+--         SYNTAX   SpfTimerRange
+--         MAX-ACCESS   read-write
+--         STATUS   current
+--         DESCRIPTION
+--           "Minimum time (in seconds) between two
+--            consecutive SPF calculations. It can
+--            be an integer from 0 to 65535. The
+--            default time is 10 seconds. A value
+--            of 0 means that there is no delay;
+--            that is, two SPF calculations can
+--            be done, one immediately after the
+--            other."
+--         DEFVAL { 10 }
+--         ::= { agentRouterOspfv3ConfigGroup  13 }   
+
+    agentOspfv3AutoCostRefBw OBJECT-TYPE
+         SYNTAX   AutoCostRefBw
+         MAX-ACCESS   read-write
+         STATUS   current
+         DESCRIPTION
+         "Auto cost refernece bandwidth of the 
+         router interafaces for ospf metric calculations.
+         It can be an integer from 1 to 4294967. The
+         default reference bandwidth is 100 Mbps."
+         DEFVAL { 100 }
+         ::= { agentRouterOspfv3ConfigGroup  14 }    
+
+     --**************************************************************************************
+     -- Following OSPF MIB general group objects/tables are added .
+     -- These contain opaque related tables and scalars.
+     --**************************************************************************************
+--    agentOspfv3OpaqueLsaSupport  OBJECT-TYPE 
+--         SYNTAX       TruthValue 
+--         MAX-ACCESS   read-write
+--         STATUS       current 
+--         DESCRIPTION 
+--           "The router's support for Opaque LSA types. 
+--            This object is persistent and when written 
+--            the entity SHOULD save the change to non-volatile
+--            storage." 
+--         REFERENCE 
+--           "The OSPF Opaque LSA Option" 
+--         ::= { agentRouterOspfv3ConfigGroup 15 } 
+
+
+         --  OSPF Type10 (Area Opaque) Link State Database 
+
+--    agentOspfv3AreaOpaqueLsdbTable OBJECT-TYPE 
+--         SYNTAX       SEQUENCE OF AgentOspfv3AreaOpaqueLsdbEntry 
+--         MAX-ACCESS   not-accessible 
+--         STATUS       current 
+--         DESCRIPTION 
+--           "The OSPF Process's Area Link State Database (LSDB). 
+--            The LSDB contains type-10 Link State Advertisements 
+--            from throughout the areas that the device is attached to." 
+--         REFERENCE 
+--           "OSPF Version 2, Section 12 Link State Advertisements" 
+--         ::= { agentRouterOspfv3ConfigGroup 16 } 
+--
+--    agentOspfv3AreaOpaqueLsdbEntry OBJECT-TYPE 
+--         SYNTAX   AgentOspfv3AreaOpaqueLsdbEntry 
+--         MAX-ACCESS   not-accessible 
+--         STATUS   current 
+--         DESCRIPTION 
+--           "A single AreaOpaque Link State Advertisement." 
+--         INDEX { agentOspfv3AreaOpaqueLsdbAreaId, agentOspfv3AreaOpaqueLsdbType, 
+--           agentOspfv3AreaOpaqueLsdbLsid, agentOspfv3AreaOpaqueLsdbRouterId } 
+--         ::= { agentOspfv3AreaOpaqueLsdbTable 1 } 
+--
+--    AgentOspfv3AreaOpaqueLsdbEntry ::= 
+--         SEQUENCE { 
+--             agentOspfv3AreaOpaqueLsdbAreaId 
+--               IpAddress, 
+--             agentOspfv3AreaOpaqueLsdbType 
+--               INTEGER, 
+--             agentOspfv3AreaOpaqueLsdbLsid 
+--               IpAddress, 
+--             agentOspfv3AreaOpaqueLsdbRouterId 
+--               IpAddress, 
+--             agentOspfv3AreaOpaqueLsdbSequence 
+--               Integer32, 
+--             agentOspfv3AreaOpaqueLsdbAge 
+--               Integer32, 
+--             agentOspfv3AreaOpaqueLsdbChecksum 
+--               Integer32, 
+--             agentOspfv3AreaOpaqueLsdbAdvertisement 
+--               OCTET STRING 
+--           } 
+--
+--    agentOspfv3AreaOpaqueLsdbAreaId OBJECT-TYPE 
+--         SYNTAX       IpAddress 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The 32 bit identifier of the Area from which 
+--              the LSA was received." 
+--         REFERENCE 
+--             "OSPF Version 2, Appendix C.2 Area parameters" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 1 } 
+--
+--    agentOspfv3AreaOpaqueLsdbType OBJECT-TYPE 
+--         SYNTAX       INTEGER { 
+--                       areaOpaqueLink (10) 
+--                     } 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The type of the link state advertisement. 
+--              Each link state type has a separate advertisement 
+--              format." 
+--         REFERENCE 
+--             "OSPF Version 2, Appendix A.4.1 The  Link  State 
+--              Advertisement header" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 2 } 
+--
+--    agentOspfv3AreaOpaqueLsdbLsid OBJECT-TYPE 
+--         SYNTAX       IpAddress 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The Link State ID is an LS Type Specific field 
+--              containing either a Router ID or an IP Address; 
+--              it identifies the piece of the routing domain 
+--              that is being described by the advertisement." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12.1.4 Link State ID" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 3 } 
+--
+--    agentOspfv3AreaOpaqueLsdbRouterId OBJECT-TYPE 
+--         SYNTAX       IpAddress 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The 32 bit number that uniquely identifies the 
+--              originating router in the Autonomous System." 
+--         REFERENCE 
+--             "OSPF Version 2, Appendix C.1 Global parameters" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 4 } 
+--
+--    agentOspfv3AreaOpaqueLsdbSequence OBJECT-TYPE 
+--         SYNTAX       Integer32 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The sequence number field is a signed 32-bit 
+--              integer. It starts with the value '80000001'h, 
+--              or -'7FFFFFFF'h, and increments until '7FFFFFFF'h. 
+--              Thus, a typical sequence number will be very negative. 
+--              It is used to detect old and duplicate link state 
+--              advertisements. The space of sequence numbers is linearly 
+--              ordered. The larger the sequence number the more recent 
+--              the advertisement." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12.1.6 LS sequence 
+--              number" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 5 } 
+--
+--    agentOspfv3AreaOpaqueLsdbAge OBJECT-TYPE 
+--         SYNTAX       Integer32
+--         UNITS        "seconds" 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "This field is the age of the link state advertisement 
+--              in seconds." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12.1.1 LS age" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 6 }
+--
+--    agentOspfv3AreaOpaqueLsdbChecksum OBJECT-TYPE
+--         SYNTAX       Integer32
+--         MAX-ACCESS   read-only
+--         STATUS       current
+--         DESCRIPTION
+--             "This field is the checksum of the complete contents of
+--              the advertisement, excepting the age field. The age field
+--              is excepted so that an advertisement's age can be 
+--              incremented without updating the checksum. The checksum
+--              used is the same that is used for ISO connectionless
+--              datagrams; it is commonly referred to as the Fletcher 
+--              checksum."
+--         REFERENCE 
+--             "OSPF Version 2, Section 12.1.7 LS checksum" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 7 }
+--
+--    agentOspfv3AreaOpaqueLsdbAdvertisement OBJECT-TYPE 
+--         SYNTAX       OCTET STRING (SIZE (1..65535)) 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The entire Link State Advertisement, including 
+--              its header. 
+--              Note that for variable length LSAs, SNMP agents 
+--              may not be able to return the largest string size" 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12 Link State Advertisements" 
+--         ::= { agentOspfv3AreaOpaqueLsdbEntry 8 }
+--
+   --  OSPF Link State Database, Link-Local for non-virtual links 
+--
+--
+--    agentOspfv3LocalLsdbTable OBJECT-TYPE 
+--         SYNTAX       SEQUENCE OF AgentOspfv3LocalLsdbEntry 
+--         MAX-ACCESS   not-accessible 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The OSPF Process's Link-Local Link State Database 
+--              for non-virtual links. 
+--              This table is identical to the OSPF LSDB Table 
+--              in format, but contains only Link-Local Link State 
+--              Advertisements for non-virtual links. The purpose is 
+--              to allow Link-Local LSAs to be displayed for each 
+--              non-virtual interface. This table is implemented to 
+--              support type-9 LSAs which are defined 
+--              in 'The OSPF Opaque LSA Option'." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12 Link State 
+--              Advertisements and The OSPF Opaque LSA Option" 
+--         ::= { agentRouterOspfv3ConfigGroup 17 }
+--
+--    agentOspfv3LocalLsdbEntry OBJECT-TYPE 
+--         SYNTAX       AgentOspfv3LocalLsdbEntry 
+--         MAX-ACCESS   not-accessible 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "A single Link State Advertisement." 
+--         INDEX { agentOspfv3LocalLsdbIpAddress, agentOspfv3LocalLsdbAddressLessIf, 
+--         agentOspfv3LocalLsdbType, agentOspfv3LocalLsdbLsid, agentOspfv3LocalLsdbRouterId 
+--               }
+--        ::= { agentOspfv3LocalLsdbTable 1 }
+--
+--   AgentOspfv3LocalLsdbEntry ::= 
+--        SEQUENCE {   
+--            agentOspfv3LocalLsdbIpAddress 
+--            IpAddress, 
+--            agentOspfv3LocalLsdbAddressLessIf 
+--              InterfaceIndexOrZero, 
+--            agentOspfv3LocalLsdbType 
+--              INTEGER, 
+--            agentOspfv3LocalLsdbLsid 
+--              IpAddress, 
+--            agentOspfv3LocalLsdbRouterId 
+--              RouterID, 
+--            agentOspfv3LocalLsdbSequence 
+--              Integer32, 
+--            agentOspfv3LocalLsdbAge 
+--              Integer32, 
+--            agentOspfv3LocalLsdbChecksum 
+--              Integer32, 
+--            agentOspfv3LocalLsdbAdvertisement 
+--              OCTET STRING 
+--            } 
+--
+--    agentOspfv3LocalLsdbIpAddress OBJECT-TYPE 
+--         SYNTAX       IpAddress 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The IP Address of the interface from 
+--              which the LSA was received if the interface is 
+--              numbered." 
+--         REFERENCE 
+--             "OSPF Version 2, Appendix C.3 Interface parameters" 
+--         ::= { agentOspfv3LocalLsdbEntry 1 } 
+--
+--    agentOspfv3LocalLsdbAddressLessIf OBJECT-TYPE 
+--         SYNTAX       InterfaceIndexOrZero 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The Interface Index of the interface from 
+--              which the LSA was received if the interface is 
+--              unnumbered." 
+--         REFERENCE 
+--             "OSPF Version 2, Appendix C.3 Interface parameters" 
+--         ::= { agentOspfv3LocalLsdbEntry 2 } 
+--
+--    agentOspfv3LocalLsdbType OBJECT-TYPE 
+--         SYNTAX       INTEGER { localOpaqueLink (9) } 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The type of the link state advertisement. 
+--              Each link state type has a separate advertise- 
+--              ment format." 
+--         REFERENCE 
+--             "OSPF Version 2, Appendix A.4.1 The  Link  State 
+--              Advertisement header and " 
+--         ::= { agentOspfv3LocalLsdbEntry 3 } 
+--
+--    agentOspfv3LocalLsdbLsid OBJECT-TYPE 
+--         SYNTAX       IpAddress 
+--         MAX-ACCESS   read-only
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The Link State ID is an LS Type Specific field 
+--              containing a 32 bit identifier in IP address format; 
+--              it identifies the piece of the routing domain 
+--              that is being described by the advertisement." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12.1.4 Link State ID" 
+--         ::= { agentOspfv3LocalLsdbEntry 4 } 
+--
+--    agentOspfv3LocalLsdbRouterId OBJECT-TYPE 
+--         SYNTAX       RouterID 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The 32 bit number that uniquely identifies the 
+--              originating router in the Autonomous System." 
+--         REFERENCE 
+--             "OSPF Version 2, Appendix C.1 Global parameters" 
+--         ::= { agentOspfv3LocalLsdbEntry 5 } 
+--
+--    agentOspfv3LocalLsdbSequence OBJECT-TYPE 
+--         SYNTAX       Integer32 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The sequence number field is a signed 32-bit 
+--              integer. It starts with the value '80000001'h, 
+--              or -'7FFFFFFF'h, and increments until '7FFFFFFF'h. 
+--              Thus, a typical sequence number will be very negative. 
+--              It is used to detect old and duplicate link state 
+--              advertisements. The space of sequence numbers is linearly 
+--              ordered. The larger the sequence number the more recent 
+--              the advertisement." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12.1.6 LS sequence 
+--              number" 
+--         ::= { agentOspfv3LocalLsdbEntry 6 } 
+--
+--    agentOspfv3LocalLsdbAge OBJECT-TYPE 
+--         SYNTAX       Integer32
+--         UNITS        "seconds" 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "This field is the age of the link state adver- 
+--              tisement in seconds." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12.1.1 LS age" 
+--         ::= { agentOspfv3LocalLsdbEntry 7 }
+--
+--    agentOspfv3LocalLsdbChecksum OBJECT-TYPE
+--         SYNTAX       Integer32 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "This field is the checksum of the complete 
+--             contents of the advertisement, excepting the 
+--             age field. The age field is excepted so that 
+--             an advertisement's age can be incremented 
+--             without updating the checksum. The checksum 
+--             used is the same that is used for ISO connec- 
+--             tionless datagrams; it is commonly referred  to 
+--             as the Fletcher checksum." 
+--        REFERENCE 
+--            "OSPF Version 2, Section 12.1.7 LS checksum" 
+--        ::= { agentOspfv3LocalLsdbEntry 8 }
+--
+--    agentOspfv3LocalLsdbAdvertisement OBJECT-TYPE 
+--         SYNTAX       OCTET STRING (SIZE (1..65535)) 
+--         MAX-ACCESS   read-only 
+--         STATUS       current 
+--         DESCRIPTION 
+--             "The entire Link State Advertisement, including 
+--             its header. 
+--
+--             Note that for variable length LSAs, SNMP agents 
+--             may not be able to return the largest string size." 
+--         REFERENCE 
+--             "OSPF Version 2, Section 12 Link State Adver- 
+--              tisements" 
+--         ::= { agentOspfv3LocalLsdbEntry 9 }
+--
+         --  OSPF Link State Database, AS-scope 
+
+    agentOspfv3AsLsdbTable OBJECT-TYPE 
+         SYNTAX       SEQUENCE OF AgentOspfv3AsLsdbEntry 
+         MAX-ACCESS   not-accessible 
+         STATUS       current 
+         DESCRIPTION 
+             "The OSPF Process's AS-scope LSA Link State Database. 
+             The Database contains the AS-scope Link State 
+             Advertisements from throughout the areas that 
+             the device is attached to. 
+
+             This table is identical to the OSPF LSDB Table 
+             in format, but contains only AS-scope Link State 
+             Advertisements.  The purpose is to allow AS-scope 
+             LSAs to be displayed once for the router rather 
+             than once in each non-stub area." 
+         REFERENCE 
+             "OSPF Version 2, Section 12 Link State Adver- 
+              tisements" 
+         ::= { agentRouterOspfv3ConfigGroup 18 } 
+
+    agentOspfv3AsLsdbEntry OBJECT-TYPE 
+         SYNTAX       AgentOspfv3AsLsdbEntry 
+         MAX-ACCESS   not-accessible 
+         STATUS       current 
+         DESCRIPTION 
+             "A single Link State Advertisement." 
+         INDEX { agentOspfv3AsLsdbType, agentOspfv3AsLsdbLsid, agentOspfv3AsLsdbRouterId } 
+         ::= { agentOspfv3AsLsdbTable 1 } 
+
+    AgentOspfv3AsLsdbEntry ::= 
+         SEQUENCE { 
+           agentOspfv3AsLsdbType 
+             INTEGER, 
+           agentOspfv3AsLsdbLsid 
+             IpAddress, 
+           agentOspfv3AsLsdbRouterId 
+             RouterID, 
+           agentOspfv3AsLsdbSequence 
+             Unsigned32, 
+           agentOspfv3AsLsdbAge 
+             Integer32, 
+           agentOspfv3AsLsdbChecksum 
+             Integer32, 
+           agentOspfv3AsLsdbAdvertisement 
+             OCTET STRING 
+         } 
+                  
+    agentOspfv3AsLsdbType OBJECT-TYPE 
+         SYNTAX      INTEGER { 
+                    illegalLSA (0),
+                    routerLink (1),
+                    networkLink (2),
+                    interNetwork (3),
+                    interRouter (4),
+                    asExternal (5), -- but see ospfExtLsdbTable
+                    multicastGroup (6),
+                    nssaExternal (7),
+                    link (8),
+                    intraPrefix (9),
+                    unknownLink (10),
+                    unknownArea (11)
+                       } 
+         MAX-ACCESS   read-only 
+         STATUS       current 
+         DESCRIPTION 
+             "The type of the link state advertisement. 
+              Each link state type has a separate advertise- 
+              ment format." 
+         REFERENCE 
+             "OSPF Version 2, Appendix A.4.1 The  Link  State 
+              Advertisement header" 
+         ::= { agentOspfv3AsLsdbEntry 1 } 
+
+    agentOspfv3AsLsdbLsid OBJECT-TYPE 
+         SYNTAX       IpAddress 
+         MAX-ACCESS   read-only 
+         STATUS       current 
+         DESCRIPTION 
+             "The Link State ID is an LS Type Specific field 
+             containing either a Router ID or an IP Address; 
+             it identifies the piece of the routing domain 
+             that is being described by the advertisement." 
+         REFERENCE 
+             "OSPF Version 2, Section 12.1.4 Link State ID" 
+         ::= { agentOspfv3AsLsdbEntry 2 } 
+
+    agentOspfv3AsLsdbRouterId OBJECT-TYPE 
+         SYNTAX       RouterID
+         MAX-ACCESS   read-only
+         STATUS       current 
+         DESCRIPTION 
+             "The 32 bit number that uniquely identifies the 
+              originating router in the Autonomous System." 
+         REFERENCE 
+             "OSPF Version 2, Appendix C.1 Global parameters" 
+         ::= { agentOspfv3AsLsdbEntry 3 } 
+
+    agentOspfv3AsLsdbSequence OBJECT-TYPE 
+         SYNTAX       Unsigned32 
+         MAX-ACCESS   read-only 
+         STATUS       current 
+         DESCRIPTION 
+             "The sequence number field is a signed 32-bit 
+             integer. It starts with the value '80000001'h, 
+             or -'7FFFFFFF'h, and increments until '7FFFFFFF'h. 
+             Thus, a typical sequence number will be very negative. 
+             It is used to detect old and duplicate link state 
+             advertisements. The space of sequence numbers is linearly 
+             ordered. The larger the sequence number the more recent 
+             the advertisement." 
+         REFERENCE 
+             "OSPF Version  2,  Section  12.1.6  LS  sequence 
+              number" 
+         ::= { agentOspfv3AsLsdbEntry 4 } 
+
+    agentOspfv3AsLsdbAge OBJECT-TYPE 
+         SYNTAX       Integer32 (0..2147483647)
+         UNITS        "seconds" 
+         MAX-ACCESS   read-only 
+         STATUS       current 
+         DESCRIPTION 
+             "This field is the age of the link state adver- 
+              tisement in seconds." 
+         REFERENCE 
+             "OSPF Version 2, Section 12.1.1 LS age" 
+         ::= { agentOspfv3AsLsdbEntry 5 } 
+
+    agentOspfv3AsLsdbChecksum OBJECT-TYPE 
+         SYNTAX       Integer32 (0..2147483647) 
+         MAX-ACCESS   read-only 
+         STATUS       current 
+         DESCRIPTION 
+             "This field is the checksum of the complete 
+             contents of the advertisement, excepting the 
+             age field. The age field is excepted so that 
+             an advertisement's age can be incremented 
+             without updating the checksum. The checksum 
+             used is the same that is used for ISO connec- 
+             tionless datagrams; it is commonly referred  to 
+             as the Fletcher checksum." 
+         REFERENCE 
+             "OSPF Version 2, Section 12.1.7 LS checksum" 
+         ::= { agentOspfv3AsLsdbEntry 6 }
+
+    agentOspfv3AsLsdbAdvertisement OBJECT-TYPE 
+         SYNTAX       OCTET STRING (SIZE (1..65535)) 
+         MAX-ACCESS   read-only 
+         STATUS       current 
+         DESCRIPTION 
+             "The entire Link State Advertisement, including 
+              its header." 
+         REFERENCE 
+             "OSPF Version 3, Section 12  Link  State  Adver- 
+              tisements. 
+              Note that for variable length LSAs, SNMP agents 
+              may not be able to return the largest string size." 
+         ::= { agentOspfv3AsLsdbEntry 7 }
+
+     agentOspfv3DefaultPassiveMode  OBJECT-TYPE
+       SYNTAX      TruthValue
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+               "Flag to determine, whether all the interfaces are passive interfaces
+                by default. A passive interface will not participate in the OSPFv3
+                adjacency formation."
+       DEFVAL { false }
+            ::= { agentRouterOspfv3ConfigGroup  19 }
+
+
+    --**************************************************************************************
+    -- agentIpv6IcmpGroup
+    --
+    --**************************************************************************************
+
+    agentIpv6IcmpControlGroup            OBJECT IDENTIFIER ::= { agentIpv6Group 10 }
+
+    agentIpv6IcmpRateLimitInterval OBJECT-TYPE
+       SYNTAX      Integer32 (0..2147483647)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+                   "Specifies the time interval between tokens being placed in the bucket for
+                    ICMP Ratelimit."
+       ::= { agentIpv6IcmpControlGroup 1 }
+
+  agentIpv6IcmpRateLimitBurstSize OBJECT-TYPE
+       SYNTAX      Integer32 (1..200)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+                   "Specifies the number of tokens to be placed after timeout."
+       ::= { agentIpv6IcmpControlGroup 2 }
+
+    --**************************************************************************************
+    -- agentDhcp6ClientParametersTable
+    --
+    --**************************************************************************************
+
+    agentDhcp6ClientParametersTable OBJECT-TYPE
+         SYNTAX      SEQUENCE OF AgentDhcp6ClientParametersEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "Information about the DHCPv6 Client parameters on the interfaces."
+         ::= { agentIpv6Group 11 }
+    
+    agentDhcp6ClientParametersEntry OBJECT-TYPE
+         SYNTAX      AgentDhcp6ClientParametersEntry
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION 
+                     "DHCPv6 Client information on an interface."
+         INDEX       { agentDhcp6ClientInterfaceIndex }
+         ::= { agentDhcp6ClientParametersTable 1 }
+         
+    AgentDhcp6ClientParametersEntry ::= SEQUENCE {
+         agentDhcp6ClientInterfaceIndex       Unsigned32,
+         agentDhcp6ClientPrefix               Ipv6AddressPrefix,
+         agentDhcp6ClientPrefixlength         INTEGER,
+         agentDhcp6ClientState                INTEGER,
+         agentDhcp6ClientServerDUID           DisplayString, 
+         agentDhcp6ClientT1Time               Unsigned32,
+         agentDhcp6ClientT2Time               Unsigned32,
+         agentDhcp6ClientIAID                 Unsigned32,
+         agentDhcp6ClientPreferredLifeTime    Unsigned32,
+         agentDhcp6ClientValidLifeTime        Unsigned32,
+         agentDhcp6ClientRenewTime            Unsigned32,
+         agentDhcp6ClientExpireTime           Unsigned32
+         }
+         
+    agentDhcp6ClientInterfaceIndex        OBJECT-TYPE
+         SYNTAX      Unsigned32 
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The Interface index on which the IPv6 address is leased by the DHCPv6 Server."
+         ::= { agentDhcp6ClientParametersEntry 1 }
+
+    agentDhcp6ClientPrefix                OBJECT-TYPE
+         SYNTAX      Ipv6AddressPrefix 
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The IPv6 Prefix leased by the DHCPv6 Server."
+         ::= { agentDhcp6ClientParametersEntry 2 }
+
+    agentDhcp6ClientPrefixlength          OBJECT-TYPE
+         SYNTAX      INTEGER 
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The Prefix length corresponding to the IPv6 Prefix leased by the DHCPv6 Server."
+         ::= { agentDhcp6ClientParametersEntry 3 }
+
+    agentDhcp6ClientState                 OBJECT-TYPE
+         SYNTAX      INTEGER{
+                     inactive(0),
+                     solicit(1),
+                     request(2),
+                     active(3),
+                     renew(4),
+                     rebind(5),
+                     release(6)
+                     }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The State of the DHCPv6 Client on this interface."
+         ::= { agentDhcp6ClientParametersEntry 4 }
+
+     agentDhcp6ClientServerDUID           OBJECT-TYPE
+         SYNTAX      DisplayString (SIZE(1..255)) 
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The DHCPv6 Unique Identifier of the DHCPv6 Server on this interface."
+         ::= { agentDhcp6ClientParametersEntry 5 }
+  
+    agentDhcp6ClientT1Time                OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                    "The T1 (in seconds) time as indicated by the DHCPv6 Server. T1 value indicates the time interval 
+                     after which the address is requested for renewal." 
+         ::= { agentDhcp6ClientParametersEntry 6 }
+
+    agentDhcp6ClientT2Time                OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The T2 (in seconds) time as indicated by the DHCPv6 Server.  T2 value indicates the time interval 
+                      after which the Client sends Rebind message to the Server incase there are no replies to the Renew messages."
+         ::= { agentDhcp6ClientParametersEntry 7 }
+
+    agentDhcp6ClientIAID                  OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "An identifier for an identity association chosen by this Client."
+         ::= { agentDhcp6ClientParametersEntry 8 }
+
+    agentDhcp6ClientPreferredLifeTime     OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The time (in seconds) that the IPv6 address is leased by the DHCPv6 Server."
+         ::= { agentDhcp6ClientParametersEntry 9 }
+
+
+    agentDhcp6ClientValidLifeTime         OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The time (in seconds) that the IPv6 address is leased by the DHCPv6 Server."
+         ::= { agentDhcp6ClientParametersEntry 10 }
+
+    agentDhcp6ClientRenewTime             OBJECT-TYPE
+         SYNTAX      Unsigned32 
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The time (in seconds) remaining to send a DHCPv6 Renew request to DHCPv6 Server for the leased address."
+         ::= { agentDhcp6ClientParametersEntry 11 }
+ 
+    agentDhcp6ClientExpireTime            OBJECT-TYPE
+         SYNTAX      Unsigned32 
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "The time (in seconds) when the DHCPv6 leased address expires."
+         ::= { agentDhcp6ClientParametersEntry 12 }
+
+
+END

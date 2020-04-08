@@ -1,0 +1,579 @@
+-- *****************************************************************
+-- MY-PRIVATE-VLAN-MIB 
+-- Copyright (c).
+-- All rights reserved.
+-- *****************************************************************
+
+MY-PRIVATE-VLAN-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, 
+    OBJECT-TYPE
+        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, 
+    TruthValue
+        FROM SNMPv2-TC
+    myMgmt
+        FROM MY-SMI
+    ifIndex
+        FROM IF-MIB
+    MODULE-COMPLIANCE, 
+    OBJECT-GROUP
+        FROM SNMPv2-CONF;
+
+myPrivateVlanMIB MODULE-IDENTITY
+    LAST-UPDATED "200903230000Z"
+    ORGANIZATION "D-Link Crop."
+    CONTACT-INFO
+            "
+            http://support.dlink.com"            
+    DESCRIPTION             "The MIB module to support Private VLAN feature on switching devices."
+    REVISION "200903010000Z"
+    DESCRIPTION            " The Initial version of this MIB module."
+    ::= { myMgmt 44 } 
+
+
+-- 
+-- Textual Conventions
+--
+
+PrivateVlanType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION            "The VLAN type as defined for Private VLAN feature.
+
+            'normal' -- this VLAN is a normal VLAN (i.e., not a 
+                        private VLAN or private group).
+
+            'primary' -- this VLAN is the primary VLAN as defined for
+                         Private VLAN feature.
+
+            'isolated' -- this VLAN is the isolated VLAN as
+                          defined for Private VLAN feature. All the 
+                          ports in the isolated VLAN can only talk 
+                          to the specifically designated ports 
+                          configured as promiscuous ports, i.e., 
+                          the ports even in the same isolated VLAN 
+                          can not talk to each other. 
+            
+            'community' -- this VLAN is the community VLAN as
+                           defined for Private VLAN feature. All the 
+                           ports in this community VLAN can behave 
+                           like ports in normal VLAN type except 
+                           that they can also receive egress packets 
+                           tagged with its associated primary VLAN 
+                           ID. 
+                           
+             A VLAN of isolated(3), community(4) type is also called a secondary VLAN."
+    SYNTAX     INTEGER {
+                       normal(1),
+                       primary(2),
+                       isolated(3),
+                       community(4)
+               }
+
+VlanIndexOrZero ::= TEXTUAL-CONVENTION
+    STATUS    current
+    DESCRIPTION            "The VLAN ID or zero as defined for Private VLAN
+            feature. If the value is between 1 and 4095
+            inclusive, it represents an IEEE 802.1Q VLAN-ID.
+            If the value is zero, it is object-specific and
+            must therefore be defined as part of the
+            description of any object which uses this syntax."
+    SYNTAX    INTEGER(0..4095)
+                 
+VlanIndexBitmap ::= TEXTUAL-CONVENTION
+    STATUS    current
+    DESCRIPTION            "A string of octets containing one bit per VLAN for a 
+            total of 1024 VLANs in the management domain.  
+            The most significant bit of the octet string is the 
+            lowest value VLAN of 1024 VLANs.
+
+            Refer to the description on the MIB object that
+            uses this textual convention to determine the meaning
+            of bits that are set ('1') or cleared ('0').
+
+            The most significant bit of the bitmap is transmitted 
+            first. Note that if the length of this string is less than
+            128 octets, any 'missing' octets are assumed to contain
+            the value zero. An NMS may omit any zero-valued octets
+            from the end of this string in order to reduce SetPDU
+            size, and the agent may also omit zero-valued trailing
+            octets, to reduce the size of GetResponse PDUs."
+
+    SYNTAX    OCTET STRING (SIZE (0..128))
+
+
+mypvlanMIBObjects OBJECT IDENTIFIER ::= { myPrivateVlanMIB 1 }
+
+mypvlanVlanObjects OBJECT IDENTIFIER ::= { mypvlanMIBObjects 1 }
+
+mypvlanPortObjects OBJECT IDENTIFIER ::= { mypvlanMIBObjects 2 }
+
+mypvlanSVIObjects  OBJECT IDENTIFIER ::= { mypvlanMIBObjects 3 }
+
+--
+-- VLAN tables for Private VLAN feature
+--
+
+mypvlanVlanTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyPvlanVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION             "A table containing Private VLAN information on the 
+            VLANs which currently exist."
+    ::= { mypvlanVlanObjects 1 }
+ 
+mypvlanVlanEntry OBJECT-TYPE
+    SYNTAX      MyPvlanVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION            "A conceptual row containing the Private VLAN 
+            information on the VLANs for a particular management 
+            domain."    
+    INDEX { mypvlanVlanIndex}
+    ::= { mypvlanVlanTable 1 }
+
+MyPvlanVlanEntry ::= SEQUENCE {
+    mypvlanVlanIndex VlanIndexOrZero,
+    mypvlanVlanPrivateVlanType PrivateVlanType,
+    mypvlanVlanAssociatedPrimaryVlan VlanIndexOrZero,
+    mypvlanIfAssociatedPrimaryVlan TruthValue
+}     
+
+mypvlanVlanIndex OBJECT-TYPE
+    SYNTAX     VlanIndexOrZero 
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION             "Indicated the VLAN id."
+    ::= { mypvlanVlanEntry 1 }
+
+mypvlanVlanPrivateVlanType OBJECT-TYPE
+    SYNTAX     PrivateVlanType 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION             "Indicated the VLAN type as defined for Private VLAN 
+            feature."
+    ::= { mypvlanVlanEntry 2 }
+
+mypvlanVlanAssociatedPrimaryVlan OBJECT-TYPE
+    SYNTAX     VlanIndexOrZero 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION             "The VLAN ID of The associated primary VLAN used for 
+            the Private VLAN feature if pvlanVlanPrivateVlanType 
+            has the value of isolated(3), community(4). If pvlanVlanPrivateVlanType 
+            has the value of normal(1) or primary(2), then this 
+            object has the value of 0.
+            The value should be 0 when configuring 'private-vlan type'.
+            When configuring 'private-vlan association',the value of 0 means deleting the association, otherwise means
+            configure association on this primary vlan."
+     ::= { mypvlanVlanEntry 3 }
+
+mypvlanIfAssociatedPrimaryVlan OBJECT-TYPE
+    SYNTAX     TruthValue 
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION             "It indicate if the vlan assiociate with primary vlan when get the mib, and
+                             indicate if setting the assiociate with primary vlan when set the mib, 0 means
+                             configure 'private-vlan type', not 0 means configure 'private-vlan association'."
+     ::= { mypvlanVlanEntry 4 }
+
+--
+-- Table for configuring host-association on host ports
+--
+
+mypvlanPrivatePortTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF MyPvlanPrivatePortEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION            "A table containing information of the configuration of 
+            VLAN on the host ports of the device."
+    ::= { mypvlanPortObjects 1 }
+
+mypvlanPrivatePortEntry OBJECT-TYPE
+    SYNTAX     MyPvlanPrivatePortEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION            "A conceptual row containing information of the 
+            configuration of VLAN for each host port. 
+            When pvlanPrivatePortSecondaryVlan and pvlanPrivatePortPrimaryVlan 
+            are both zero, it means deleting the configuration on the port, when they 
+            are both nonzero, it means configuring the host port, 
+            otherwise are invalid input. This table is valid only for host port."
+    INDEX      { ifIndex }
+    ::= { mypvlanPrivatePortTable 1 }
+
+MyPvlanPrivatePortEntry ::= SEQUENCE {
+    mypvlanPrivatePortPrimaryVlan  VlanIndexOrZero,
+    mypvlanPrivatePortSecondaryVlan  VlanIndexOrZero
+}
+
+mypvlanPrivatePortPrimaryVlan OBJECT-TYPE
+    SYNTAX     VlanIndexOrZero
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "The VLAN ID of the primary VLAN configured on this 
+            private port. If mypvlanPrivatePortPrimaryVlan and mypvlanPrivatePortSecondaryVlan
+            are both zero when set the mib, it means delete the private-vlan configuration on the host port."
+    ::= { mypvlanPrivatePortEntry 1 }    
+
+mypvlanPrivatePortSecondaryVlan OBJECT-TYPE
+    SYNTAX     VlanIndexOrZero
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "The VLAN ID of the secondary VLAN configured on this 
+            private port.If mypvlanPrivatePortPrimaryVlan and mypvlanPrivatePortSecondaryVlan
+            are both zero when set the mib, it means delete the private-vlan configuration on the host port."
+    ::= { mypvlanPrivatePortEntry 2 }    
+
+--
+-- Table for remapping secondary VLAN to primary VLAN on promiscuous 
+-- ports for Private VLAN feature 
+--
+
+mypvlanPromPortTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF MyPvlanPromPortEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION            "A table containing information of secondary VLAN to 
+            primary VLAN remapping on ports of the device."
+    ::= { mypvlanPortObjects 2 }
+
+mypvlanPromPortEntry OBJECT-TYPE
+    SYNTAX     MyPvlanPromPortEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION            "A conceptual row containing information of secondary 
+            VLAN to primary VLAN remapping for each port. An entry 
+            is created by the managed system for each interface
+            which can be configured as a promiscuous port for 
+            Private VLAN feature.This table is valid only for promiscuous port."
+    INDEX      { ifIndex }
+    ::= { mypvlanPromPortTable 1 }
+ 
+MyPvlanPromPortEntry ::= SEQUENCE {
+    mypvlanPrivatePortPrimaryVlanId     VlanIndexOrZero,
+    mypvlanPromPortSecondaryRemap       OCTET STRING,
+    mypvlanPromPortSecondaryRemap2k     OCTET STRING,
+    mypvlanPromPortSecondaryRemap3k     OCTET STRING,
+    mypvlanPromPortSecondaryRemap4k     OCTET STRING    
+} 
+
+mypvlanPrivatePortPrimaryVlanId OBJECT-TYPE
+    SYNTAX     VlanIndexOrZero
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "Primary Vlan Id configured on the promiscuous port, it is zero
+                            when delete the remapping on the port."
+    ::= { mypvlanPromPortEntry 1 } 
+
+mypvlanPromPortSecondaryRemap OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (0..128))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "A string of octets containing one bit per VLAN in the
+            management domain on this port.  The first octet
+            corresponds to VLANs with VlanIndexOrZero values of 0 
+            through 7; the second octet to VLANs 8 through 15; etc.  
+            The most significant bit of each octet corresponds to 
+            the lowest value VlanIndexOrZero in that octet.
+
+            A bit can only be set to '1' when the bit is 
+            corresponding to a VLAN of Private VLAN isolated, 
+            community type which has already 
+            been associated with a primary VLAN. 
+        
+            Note that if the length of this string is less than
+            128 octets, any 'missing' octets are assumed to contain
+            the value zero. An NMS may omit any zero-valued octets
+            from the end of this string in order to reduce SetPDU 
+            size, and the agent may also omit zero-valued trailing 
+            octets, to reduce the size of GetResponse PDUs."
+    ::= { mypvlanPromPortEntry 2 }
+
+mypvlanPromPortSecondaryRemap2k OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (0..128))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION             "A string of octets containing one bit per VLAN  for 
+            VLANs with VlanIndexOrZero values of 1024 through 2047 
+            in the management domain on this port.  The first octet 
+            corresponds to VLANs with VlanIndexOrZero values of 1024 
+            through 1031; the second octet to VLANs 1032 through 
+            1039; etc.  The most significant bit of each octet 
+            corresponds to the lowest value VlanIndexOrZero in 
+            that octet. 
+
+            A bit can only be set to '1' when the bit is 
+            corresponding to a VLAN of Private VLAN isolated or 
+            community type which has already been associated with a 
+            primary VLAN.  
+ 
+            Note that if the length of this string is less than
+            128 octets, any 'missing' octets are assumed to contain
+            the value zero. An NMS may omit any zero-valued octets
+            from the end of this string in order to reduce SetPDU 
+            size, and the agent may also omit zero-valued trailing 
+            octets, to reduce the size of GetResponse PDUs.
+
+            This object is only instantiated on devices which support
+            the range of VlanIndexOrZero up to 4095."
+    ::= { mypvlanPromPortEntry 3 }
+
+mypvlanPromPortSecondaryRemap3k OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (0..128))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "A string of octets containing one bit per VLAN  for 
+            VLANs with VlanIndexOrZero values of 2048 through 3071 
+            in the management domain on this port.  The first octet 
+            corresponds to VLANs with VlanIndexOrZero values of 2048 
+            through 2055; the second octet to VLANs 2056 through 
+            2063; etc.  The most significant bit of each octet 
+            corresponds to the lowest value VlanIndexOrZero in 
+            that octet.
+
+            A bit can only be set to '1' when the bit is 
+            corresponding to a VLAN of Private VLAN isolated or 
+            community type which has already been associated with a 
+            primary VLAN. 
+
+            Note that if the length of this string is less than
+            128 octets, any 'missing' octets are assumed to contain
+            the value zero. An NMS may omit any zero-valued octets
+            from the end of this string in order to reduce SetPDU 
+            size, and the agent may also omit zero-valued trailing 
+            octets, to reduce the size of GetResponse PDUs.
+
+            This object is only instantiated on devices which support
+            the range of VlanIndexOrZero up to 4095."
+    ::= { mypvlanPromPortEntry 4 }
+
+mypvlanPromPortSecondaryRemap4k OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (0..128))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "A string of octets containing one bit per VLAN  for 
+            VLANs with VlanIndexOrZero values of 3072 through 4095 
+            in the management domain on this port.  The first octet 
+            corresponds to VLANs with VlanIndexOrZero values of 3072 
+            through 3079; the second octet to VLANs 3080 through 
+            3087; etc.  The most significant bit of each octet 
+            corresponds to the lowest value VlanIndexOrZero in 
+            that octet.
+
+            A bit can only be set to '1' when the bit is 
+            corresponding to a VLAN of Private VLAN isolated or 
+            community type which has already been associated with a 
+            primary VLAN. 
+
+            Note that if the length of this string is less than
+            128 octets, any 'missing' octets are assumed to contain
+            the value zero. An NMS may omit any zero-valued octets
+            from the end of this string in order to reduce SetPDU 
+            size, and the agent may also omit zero-valued trailing 
+            octets, to reduce the size of GetResponse PDUs.
+
+            This object is only instantiated on devices which support
+            the range of VlanIndexOrZero up to 4095."
+    ::= { mypvlanPromPortEntry 5 }
+
+
+--
+-- Table for configuring port mode for Private VLAN feature
+--
+
+mypvlanPortModeTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF MyPvlanPortModeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION            "A table containing information of the configuration of
+            port mode for the Private VLAN feature."
+    ::= { mypvlanPortObjects 3 }
+
+mypvlanPortModeEntry OBJECT-TYPE
+    SYNTAX     MyPvlanPortModeEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION            "A conceptual row containing information of the
+            configuration of port mode on each port for the 
+            Private VLAN feature. An entry of this table is 
+            created by the managed system when the capability
+            to be a Private VLAN port is detected on an 
+            interface." 
+    INDEX      { ifIndex }
+    ::= { mypvlanPortModeTable 1 }
+
+MyPvlanPortModeEntry ::= SEQUENCE {
+    mypvlanPortMode INTEGER 
+}
+
+mypvlanPortMode OBJECT-TYPE
+    SYNTAX     INTEGER {
+                       nonPrivateVlan(1), 
+                       host(2),
+                       promiscuous(3)                       
+               }        
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "The Private VLAN port mode on this port.  
+
+            nonPrivateVlan(1) -- this port is configured to be a
+                                 non-Private-VLAN port.
+
+            host(2) -- this port is configured to be 
+                       a Private-VLAN host port, i.e., private 
+                       port.
+
+            promiscuous(3) -- this port is configured to be
+                              a Private-VLAN promiscuous port."
+    ::= { mypvlanPortModeEntry 1 }
+
+--
+-- Private VLAN mapping for the Switch Virtual Interfaces  
+--
+
+mypvlanSVIMappingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyPvlanSVIMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION            "A table containing the configuration of 
+            primary VLAN SVI (Switch Virtual Interfaces) 
+            mapping for the secondary VLANs for the Private 
+            VLAN feature."
+    ::= { mypvlanSVIObjects 1 }
+
+mypvlanSVIMappingEntry OBJECT-TYPE
+    SYNTAX      MyPvlanSVIMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION            "A conceptual row containing the Primary VLAN 
+            SVI mapping configuration for the existing 
+            secondary VLANs. An entry is created by the managed 
+            system for each VLAN with corresponding VLAN's 
+            pvlanVlanPrivateVlanType of isolated(3), community(4)."
+   INDEX      { mypvlanSVIMappingVlanIndex } 
+    ::= { mypvlanSVIMappingTable 1 }
+
+MyPvlanSVIMappingEntry ::= SEQUENCE {
+    mypvlanSVIMappingVlanIndex VlanIndexOrZero, 
+    mypvlanSVIMappingPrimarySVI VlanIndexOrZero 
+}
+
+mypvlanSVIMappingVlanIndex OBJECT-TYPE
+    SYNTAX        VlanIndexOrZero
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION             "An index value that uniquely identifies the
+            Virtual LAN associated with this information."
+    ::= { mypvlanSVIMappingEntry 1 }
+
+mypvlanSVIMappingPrimarySVI OBJECT-TYPE
+    SYNTAX     VlanIndexOrZero 
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION            "The Vlan ID of the primary VLAN SVI this secondary
+            VLAN is mapped to for the Private VLAN feature. 
+            This object has the value of zero if this secondary 
+            VLAN is not mapped to any primary VLAN SVI."  
+     ::= { mypvlanSVIMappingEntry 2 }
+
+--
+-- Conformance Information
+--
+
+mypvlanMIBConformance OBJECT IDENTIFIER ::= { myPrivateVlanMIB 2 }
+mypvlanMIBCompliances OBJECT IDENTIFIER ::= { mypvlanMIBConformance 1 }
+mypvlanMIBGroups      OBJECT IDENTIFIER ::= { mypvlanMIBConformance 2}
+
+--
+-- compliance statements
+--
+
+mypvlanMIBCompliance MODULE-COMPLIANCE
+    STATUS  current 
+    DESCRIPTION            "The compliance statement for Private VLAN feature 
+            implementation."
+    MODULE  -- this module
+             -- no MANDATORY-GROUPS
+
+        GROUP mypvlanVlanGroup
+        DESCRIPTION                 "This group must be implemented on devices which has 
+                Private VLAN feature support."
+                
+        GROUP mypvlanPrivatePortGroup
+        DESCRIPTION                 "This group must be implemented on devices which has 
+                Private VLAN feature support."
+                
+        GROUP mypvlanPromPortGroup
+        DESCRIPTION                "This group must be implemented on devices which has 
+                support for promiscuous port of Private VLAN feature."
+
+        GROUP mypvlanPortModeGroup
+        DESCRIPTION               "A collection of objects providing basic 
+            port mode configuration for Private VLAN feature."
+                
+        GROUP mypvlanSVIGroup
+        DESCRIPTION                "A collection of objects providing  
+            svi mapping configuration for Private VLAN feature."
+                
+    ::= { mypvlanMIBCompliances 1 }                             
+
+--
+-- units of conformance
+--
+mypvlanVlanGroup OBJECT-GROUP
+    OBJECTS { 
+            mypvlanVlanIndex,
+            mypvlanVlanPrivateVlanType,
+            mypvlanVlanAssociatedPrimaryVlan,           
+            mypvlanIfAssociatedPrimaryVlan 
+            }
+    STATUS  current
+    DESCRIPTION            "A collection of objects providing basic VLAN 
+            configuration for Private VLAN feature."
+    ::= { mypvlanMIBGroups 1 }
+    
+mypvlanPrivatePortGroup OBJECT-GROUP
+    OBJECTS { 
+            mypvlanPrivatePortPrimaryVlan,
+            mypvlanPrivatePortSecondaryVlan
+            }
+    STATUS  current
+    DESCRIPTION            "A collection of objects providing basic 
+            private port configuration for Private VLAN 
+            feature."
+    ::= { mypvlanMIBGroups 2 }
+    
+mypvlanPromPortGroup OBJECT-GROUP
+    OBJECTS {               
+            mypvlanPrivatePortPrimaryVlan,
+            mypvlanPromPortSecondaryRemap,
+            mypvlanPromPortSecondaryRemap2k,
+            mypvlanPromPortSecondaryRemap3k,
+            mypvlanPromPortSecondaryRemap4k
+            }
+    STATUS  current
+    DESCRIPTION            "A collection of objects providing basic 
+            promiscuous port configuration for Private 
+            VLAN feature."
+    ::= { mypvlanMIBGroups 3 }  
+
+mypvlanPortModeGroup OBJECT-GROUP
+    OBJECTS {               
+            mypvlanPortMode
+            }
+    STATUS  current
+    DESCRIPTION            "A collection of objects providing basic 
+            port mode configuration for Private VLAN feature."
+    ::= { mypvlanMIBGroups 4 }  
+
+mypvlanSVIGroup OBJECT-GROUP
+    OBJECTS {               
+            mypvlanSVIMappingPrimarySVI
+            }
+    STATUS  current
+    DESCRIPTION            "A collection of objects providing  
+            svi mapping configuration for Private VLAN feature."
+    ::= { mypvlanMIBGroups 5 } 
+END

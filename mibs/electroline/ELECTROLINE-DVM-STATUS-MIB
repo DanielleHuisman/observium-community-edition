@@ -1,0 +1,573 @@
+--**************************************************************************
+--                                                                          
+--    Copyright 2010 Electroline Equipment Inc.                                   
+--    All Rights Reserved                                                                          
+--                                                                          
+--                                                                          
+--                                                                          
+--**************************************************************************
+--    Filename: ELECTROLINE-DVM-STATUS.mib
+--    Author:   ALAIN LECLERC
+--    Creation Date: 2010-09-14
+--
+--**************************************************************************
+--    Description:
+--
+--	This file contains the MIB definition of the Status branch 
+--  for the DVM products.
+--		
+--**************************************************************************
+--    Revision History:
+--    2010-09-14    ALAIN LECLERC      First Release
+--**************************************************************************
+
+ELECTROLINE-DVM-STATUS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,OBJECT-TYPE,Integer32 FROM SNMPv2-SMI
+    RowStatus  FROM SNMPv2-TC        
+    dvmStatus, electrolineDVM FROM ELECTROLINE-DVM-ROOT-MIB
+    NetworkAddress FROM RFC1155-SMI
+    DisplayString  FROM RFC1213-MIB   
+    
+    ifIndex   FROM IF-MIB;            -- [RFC2863]
+
+
+-- Textual Conventions
+TenthdBmV ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d-1"
+        STATUS       current
+        DESCRIPTION
+            "This data type represents power levels that are normally
+             expressed in dBmV. Units are in tenths of a dBmV;
+             for example, 5.1 dBmV will be represented as 51."
+        SYNTAX       Integer32
+        
+-- Textual Conventions
+TenthdB ::= TEXTUAL-CONVENTION
+        DISPLAY-HINT "d-1"
+        STATUS       current
+        DESCRIPTION
+            "This data type represents the pad value that are normally
+             expressed in dB. Units are in tenths of a dB;
+             for example, 5.1 dB will be represented as 51."
+        SYNTAX       Integer32
+
+-- Textual Conventions
+HundredthsVolts ::= TEXTUAL-CONVENTION
+         DISPLAY-HINT "d-2"   
+         STATUS       current
+         DESCRIPTION
+            "suggests that a Hundredths value of 1234 be rendered as 12.34 Volts"
+         SYNTAX     INTEGER (0..65535)
+
+
+    
+-- **************************************************************************
+-- * ELECTROLINE MISC. Statuses
+-- * 
+-- **************************************************************************
+dvmNetworkAddress OBJECT-TYPE
+	SYNTAX NetworkAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"This is the RF IP address assigned by the DHCP."
+	::= { dvmStatus 1 }
+
+dvmInternalTemperature  OBJECT-TYPE
+     SYNTAX INTEGER (-60..130)
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+          "Measured temperature inside the NE's case/housing.
+          Units degrees Celsius."
+     ::= { dvmStatus 2 }
+
+--**************************************************************************
+--  Information on the hardware demodulator.
+--  The DVM has attenuator pad in the downstream path and has a fix
+--  attenuation pad also.  We need to take that in the account for
+--	downstream and upstream power repport.
+--**************************************************************************
+dvmIfDownstreamChannelTable OBJECT-TYPE
+     SYNTAX      SEQUENCE OF DvmIfDownstreamChannelEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "This table describes the attributes of downstream
+          channels (frequency bands) at Dvm's input."
+     ::= { dvmStatus 3 }
+
+dvmIfDownstreamChannelEntry OBJECT-TYPE
+     SYNTAX      DvmIfDownstreamChannelEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "An entry provides a list of attributes for a single
+          downstream channel."
+     INDEX { ifIndex }
+     ::= { dvmIfDownstreamChannelTable 1 }
+
+DvmIfDownstreamChannelEntry ::= SEQUENCE {
+         dvmIfDownChannelId               Integer32,
+         dvmIfDownChannelFrequency        Integer32,
+         dvmIfDownChannelWidth            Integer32,
+         dvmIfDownChannelModulation       INTEGER,
+         dvmIfDownChannelInterleave       INTEGER,
+         dvmIfDownChannelPower            TenthdBmV,
+         dvmIfDownChannelAnnex            INTEGER,
+         dvmIfDownChannelSymbolRate		  Integer32,	
+         dvmIfDownChannelTunerModule	  Integer32
+ }
+
+dvmIfDownChannelId OBJECT-TYPE
+     SYNTAX      Integer32 (0..255)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The Cable Modem Termination System identification of the
+          downstream channel within this particular MAC interface.
+          if the interface is down, the object returns the most
+          current value.  If the downstream channel ID is unknown,
+          this object returns a value of 0."
+     ::= { dvmIfDownstreamChannelEntry 1 }
+
+dvmIfDownChannelFrequency OBJECT-TYPE
+     SYNTAX      Integer32 (0..1000000000)
+     UNITS       "hertz"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The center of the downstream frequency associated with
+          this channel.  This object will return the current tuner
+          frequency."
+     ::= { dvmIfDownstreamChannelEntry 2 }
+
+dvmIfDownChannelWidth OBJECT-TYPE
+     SYNTAX      Integer32 (0..16000000)
+     UNITS       "hertz"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The bandwidth of this downstream channel.  Most
+          implementations are expected to support a channel width
+          of 6 MHz (North America) and/or 8 MHz (Europe).  See the
+          associated compliance object for a description of the
+          valid channel widths for this object."
+     ::= { dvmIfDownstreamChannelEntry 3 }
+
+dvmIfDownChannelModulation OBJECT-TYPE
+     SYNTAX      INTEGER {
+         unknown(1),
+         other(2),
+         qam64(3),
+         qam256(4)
+     }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The modulation type associated with this downstream
+          channel.  If the interface is down, this object either
+          returns the configured value (CMTS), the most current
+          value (CM), or the value of unknown(1).  See the
+          associated conformance object for write conditions and
+          limitations.  See the reference for specifics on the
+          modulation profiles implied by qam64 and qam256."
+     ::= { dvmIfDownstreamChannelEntry 4 }
+
+dvmIfDownChannelInterleave OBJECT-TYPE
+     SYNTAX      INTEGER {
+         unknown(1),
+         other(2),
+         taps8Increment16(3),
+         taps16Increment8(4),
+         taps32Increment4(5),
+         taps64Increment2(6),
+         taps128Increment1(7),
+         taps12increment17(8)
+     }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The Forward Error Correction (FEC) interleaving used
+          for this downstream channel.
+          Values are defined as follows:
+          taps8Increment16(3):   protection 5.9/4.1 usec,
+                                 latency .22/.15 msec
+          taps16Increment8(4):   protection 12/8.2 usec,
+                                 latency .48/.33 msec
+          taps32Increment4(5):   protection 24/16 usec,
+                                 latency .98/.68 msec
+          taps64Increment2(6):   protection 47/33 usec,
+                                 latency 2/1.4 msec
+          taps128Increment1(7):  protection 95/66 usec,
+                                 latency 4/2.8 msec
+          taps12increment17(8):  protection 18/14 usec,
+                                 latency 0.43/0.32 msec
+
+         The value 'taps12increment17' is supported by EuroDOCSIS
+         cable systems only, and the others by DOCSIS cable systems.
+
+          If the interface is down, this object either returns
+          the configured value (CMTS), the most current value (CM),
+          or the value of unknown(1).
+          The value of other(2) is returned if the interleave
+          is known but not defined in the above list.
+          See the associated conformance object for write
+          conditions and limitations.  See the reference for the FEC
+          configuration described by the setting of this object."
+     ::= { dvmIfDownstreamChannelEntry 5 }
+
+dvmIfDownChannelPower OBJECT-TYPE
+     SYNTAX      TenthdBmV
+     UNITS       "dBmV"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "At the DVM, the received power level at the RF front-end.
+          If the interface is down, the value of 0."
+     ::= { dvmIfDownstreamChannelEntry 6 }
+
+dvmIfDownChannelAnnex OBJECT-TYPE
+     SYNTAX      INTEGER {
+         unknown(1),
+         other(2),
+         annexA(3),
+         annexB(4),
+         annexC(5)
+     }
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The value of this object indicates the conformance of
+          the implementation to important regional cable standards.
+          annexA : Annex A from ITU-T J.83 is used.
+                   (equivalent to EN 300 429)
+          annexB : Annex B from ITU-T J.83 is used.
+          annexC : Annex C from ITU-T J.83 is used."
+     ::= { dvmIfDownstreamChannelEntry 7 }
+
+dvmIfDownChannelSymbolRate OBJECT-TYPE
+     SYNTAX      Integer32 (0..1000000000)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "This value indicates the channel rate in Symbol per second"
+     ::= { dvmIfDownstreamChannelEntry 8 } 
+
+dvmIfDownChannelTunerModule OBJECT-TYPE
+     SYNTAX      Integer32 (-1..6)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The value of this object indicates the tuner module number 
+          on which the hardware channel is mapped.
+          1 and 2 are wideband tuners internal to the BCM3380;
+          3 to 6 are external narrowband tuners
+          -1 unmapped"
+     ::= { dvmIfDownstreamChannelEntry 9 }
+
+
+dvmIfUpstreamChannelTable OBJECT-TYPE
+     SYNTAX      SEQUENCE OF DvmIfUpstreamChannelEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "This table describes the attributes of attached upstream
+          channels."
+     ::= { dvmStatus 4 }
+
+dvmIfUpstreamChannelEntry OBJECT-TYPE
+     SYNTAX      DvmIfUpstreamChannelEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "List of attributes for a single upstream channel."
+     INDEX { ifIndex }
+     ::= { dvmIfUpstreamChannelTable 1 }
+
+DvmIfUpstreamChannelEntry ::= SEQUENCE {
+         dvmIfUpChannelId                     Integer32,
+         dvmIfUpChannelFrequency              Integer32,
+         dvmIfUpChannelWidth                  Integer32,
+         dvmIfUpChannelTxPower				  TenthdBmV,
+         dvmIfUpChannelSymbolRate			  Integer32
+     }
+
+dvmIfUpChannelId OBJECT-TYPE
+     SYNTAX      Integer32 (0..255)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The CMTS identification of the upstream channel."
+     ::= { dvmIfUpstreamChannelEntry 1 }
+
+dvmIfUpChannelFrequency OBJECT-TYPE
+     SYNTAX      Integer32 (0..1000000000)
+     UNITS       "hertz"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The center of the frequency band associated with this
+          upstream interface.  This object returns 0 if the frequency
+          is undefined or unknown.  Minimum permitted upstream
+          frequency is 5,000,000 Hz for current technology.  See
+          the associated conformance object for write conditions
+          and limitations."
+     ::= { dvmIfUpstreamChannelEntry 2 }
+
+dvmIfUpChannelWidth OBJECT-TYPE
+     SYNTAX      Integer32 (0..64000000)
+     UNITS       "hertz"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The bandwidth of this upstream interface.  This object
+          returns 0 if the interface width is undefined or unknown.
+          Minimum permitted interface width is currently 200,000 Hz.
+          See the associated conformance object for write conditions
+          and limitations."
+     ::= { dvmIfUpstreamChannelEntry 3 }
+
+dvmIfUpChannelTxPower OBJECT-TYPE
+     SYNTAX      TenthdBmV
+     UNITS       "dBmV"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The operational transmit power for the attached upstream
+          channel at the output of the DVM.E"
+     ::= { dvmIfUpstreamChannelEntry 4 }
+
+
+dvmIfUpChannelSymbolRate OBJECT-TYPE
+     SYNTAX      Integer32 (0..1000000000)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "This value indicates the channel rate in kSymbol per second"
+     ::= { dvmIfUpstreamChannelEntry 5 } 
+ 
+
+dvmIfSignalQualityTable OBJECT-TYPE
+     SYNTAX      SEQUENCE OF DvmIfSignalQualityEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "At the CM, describes the PHY signal quality of downstream
+          channels."
+     ::= { dvmStatus 5 }
+
+dvmIfSignalQualityEntry OBJECT-TYPE
+     SYNTAX      DvmIfSignalQualityEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "At the CM, this object describes the PHY characteristics of
+          a downstream channel."
+     INDEX { ifIndex }
+     ::= { dvmIfSignalQualityTable 1 }
+
+DvmIfSignalQualityEntry ::= SEQUENCE {
+         dvmIfSigQUnerroreds          Counter32,
+         dvmIfSigQCorrecteds          Counter32,
+         dvmIfSigQUncorrectables      Counter32,
+         dvmIfSigQSignalNoise         TenthdB,
+         dvmIfSigQMicroreflections    Integer32
+}
+
+dvmIfSigQUnerroreds OBJECT-TYPE
+     SYNTAX      Counter32
+     UNITS       "codewords"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "Codewords received on this channel without error.
+          This includes all codewords, whether or not they
+          were part of frames destined for this device.
+          Discontinuities in the value of this counter can occur
+          at reinitialization of the managed system."
+     ::= { dvmIfSignalQualityEntry 1 }
+
+dvmIfSigQCorrecteds OBJECT-TYPE
+     SYNTAX      Counter32
+     UNITS       "codewords"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "Codewords received on this channel with correctable
+          errors.  This includes all codewords, whether or not
+          they were part of frames destined for this device.
+          Discontinuities in the value of this counter can occur
+          at reinitialization of the managed system."
+     ::= { dvmIfSignalQualityEntry 2 }
+
+dvmIfSigQUncorrectables OBJECT-TYPE
+     SYNTAX      Counter32
+     UNITS       "codewords"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "Codewords received on this channel with uncorrectable
+          errors.  This includes all codewords, whether or not
+          they were part of frames destined for this device.
+          Discontinuities in the value of this counter can occur
+          at reinitialization of the managed system."
+     ::= { dvmIfSignalQualityEntry 3 }
+
+dvmIfSigQSignalNoise OBJECT-TYPE
+     SYNTAX      TenthdB
+     UNITS       "TenthdB"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "Signal/Noise ratio as perceived for this channel.
+          At the CM, this object  describes the Signal/Noise of the
+          downstream channel."
+     ::= { dvmIfSignalQualityEntry 4 }
+     
+dvmIfSigQMicroreflections OBJECT-TYPE
+     SYNTAX      Integer32 (0..255)
+     UNITS       "-dBc"
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "Microreflections, including in-channel response
+          as perceived on this interface, measured in dBc below
+          the signal level.
+          This object is not assumed to return an absolutely
+          accurate value, but it gives a rough indication
+          of microreflections received on this interface.
+          It is up to the implementer to provide information
+          as accurately as possible."
+     ::= { dvmIfSignalQualityEntry 5 }
+
+
+dvmRxAttenuatorPad  OBJECT-TYPE
+     SYNTAX TenthdB
+     UNITS       "dB"
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+          "The Rx Attenuator pad value.
+           If value is -2,0 the pad sens technology is not connected.  Check the wiring inside the DVM
+           If value is -1,0 there is no pad connected.
+          "
+     ::= { dvmStatus 6 }
+
+dvmTxAttenuatorPad  OBJECT-TYPE
+     SYNTAX TenthdB
+     UNITS       "dB"
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+          "The Tx Attenuator pad value.
+           If value is -2,0 the pad sens technology is not connected.  Check the wiring inside the DVM
+           If value is -1,0 there is no pad connected.
+          "
+     ::= { dvmStatus 7 }
+
+dvmRxEqualyzerPlugin  OBJECT-TYPE
+     SYNTAX      INTEGER {
+         unknown(-2),
+         noEqualyzer(-1),
+         cableSim0ft(0),
+         cableSim75ft(1),
+         cableSim150ft(2),
+         equalyzer4dB(20),
+         equalyzer8dB(21)
+     }
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION 
+          "The Equalyzer plugin value.  Could be a cable simulator or a equilazer.
+           If value is -2,0 the pad sens technology is not connected.  Check the wiring inside the DVM
+           If value is -1,0 there is no pad connected."
+     ::= { dvmStatus 8 }
+
+dvmAcInputVoltage OBJECT-TYPE
+     SYNTAX INTEGER ( 0..65535 )
+     UNITS       "1VAC"
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION
+           "Returns the dvm Ac input voltage. Units 1VAC."
+     ::= { dvmStatus 9 }
+
+dvmNumberDCPowerSupply OBJECT-TYPE
+     SYNTAX INTEGER ( 0..16 )
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Number of entries in the internal DC power supply table
+          A zero entry means the table does not exist and the functional
+          area is not present in the device."
+     ::= { dvmStatus 10 }
+
+dvmTunerHeaterStatus OBJECT-TYPE
+	SYNTAX INTEGER {on(1), off(2)}
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"This mib shows the tuner heater block activation status."		
+	::= { dvmStatus 12 }
+
+
+dvmDCPowerTable OBJECT-TYPE
+     SYNTAX SEQUENCE OF DvmDCPowerEntry
+     ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+          "A table containing information about the Regulated Power."
+     ::= { dvmStatus 11 }
+
+dvmDCPowerEntry OBJECT-TYPE
+     SYNTAX DvmDCPowerEntry
+     ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+          "A list of information about the Regulated Power."
+     INDEX { dvmDCPowerIndex }
+     ::= { dvmDCPowerTable 1 }
+
+DvmDCPowerEntry ::=
+     SEQUENCE
+     {
+          dvmDCPowerIndex
+               INTEGER,
+          dvmDCPowerVoltage
+               INTEGER,
+          dvmDCPowerName
+               DisplayString
+     }
+
+dvmDCPowerIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the dvmDCPowerTable."
+     ::= { dvmDCPowerEntry 1 }
+
+dvmDCPowerVoltage OBJECT-TYPE
+     SYNTAX HundredthsVolts
+     UNITS       "0.01Vdc"
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Returns the regulated power voltage.  Units in 0.01 Volts."
+     ::= { dvmDCPowerEntry 2 }
+
+dvmDCPowerName OBJECT-TYPE
+     SYNTAX DisplayString
+     ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Identifies the Physical name of the Power Supply.  For example:
+     		3.3V Supply"
+     ::= { dvmDCPowerEntry 3 }
+
+
+
+END

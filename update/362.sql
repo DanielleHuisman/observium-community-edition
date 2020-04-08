@@ -1,0 +1,1 @@
+ALTER TABLE `ports` CHANGE `ifHighSpeed` `ifHighSpeed` INT UNSIGNED NULL DEFAULT NULL;

@@ -1,0 +1,1 @@
+CREATE TABLE `lb_snatpools` (`snatpool_id` int(11) NOT NULL AUTO_INCREMENT,`device_id` int(11) NOT NULL,`snatpool_name` varchar(128) COLLATE utf8_unicode_ci NOT NULL,`snatpool_conns` int(11) NOT NULL,PRIMARY KEY (`snatpool_id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;

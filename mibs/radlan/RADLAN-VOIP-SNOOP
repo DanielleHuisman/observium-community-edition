@@ -1,0 +1,317 @@
+RADLAN-VOIP-SNOOP DEFINITIONS ::= BEGIN
+
+-- Version:    7.43
+-- Date:       02-Apr-2006
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Unsigned32, IpAddress, Counter32                FROM SNMPv2-SMI
+    InterfaceIndex, ifIndex                         FROM IF-MIB
+    RowStatus, TEXTUAL-CONVENTION, MacAddress,
+    DisplayString, TruthValue                       FROM SNMPv2-TC
+    InetAddress, InetAddressType,
+    InetAddressPrefixLength,
+    InetVersion, InetZoneIndex                      FROM INET-ADDRESS-MIB
+    VlanId                                          FROM Q-BRIDGE-MIB
+    rnd                                             FROM RADLAN-MIB;
+
+rlVoipSnoop MODULE-IDENTITY
+        LAST-UPDATED "200604020000Z"
+        ORGANIZATION ""
+        CONTACT-INFO ""
+        DESCRIPTION
+                "The private MIB module definition for VOIP Snoop."
+        ::= { rnd  213}
+
+
+rlVoipMngSnoopEnableScalar OBJECT-TYPE
+    SYNTAX  TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "VOIP Global Enable/Disable."
+    ::= { rlVoipSnoop 1 }
+
+
+
+
+RlVoipQosType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Type of QoS: VPT or DSCP."
+    SYNTAX  INTEGER {
+        queue(1),
+        vpt(2),
+        dscp(3)
+}
+
+
+rlVoipMngSnoopQosTable OBJECT-TYPE
+   SYNTAX  SEQUENCE OF RlVoipMngSnoopQosEntry
+    MAX-ACCESS   not-accessible
+    STATUS   current
+    DESCRIPTION
+       "The (conceptual) table for configuration of VOIP QOS."
+    ::= {  rlVoipSnoop 2 }
+
+rlVoipMngSnoopQosEntry OBJECT-TYPE
+    SYNTAX      RlVoipMngSnoopQosEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry (conceptual row) in the rlVoipMngSnoopQosTable."
+    INDEX  { rlVoipMngSnoopQosType }
+    ::= { rlVoipMngSnoopQosTable 1 }
+
+RlVoipMngSnoopQosEntry::= SEQUENCE {
+   rlVoipMngSnoopQosType                                  RlVoipQosType,
+   rlVoipMngSnoopQosValue                                 INTEGER
+}
+
+
+rlVoipMngSnoopQosType OBJECT-TYPE
+    SYNTAX      RlVoipQosType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Current type of QoS of VOIP packets"
+    ::= { rlVoipMngSnoopQosEntry 1 }
+
+rlVoipMngSnoopQosValue OBJECT-TYPE
+    SYNTAX      INTEGER (0..63)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value depends on rlVoipMngSnoopQosType, that will be assigned to each VOIP packet.
+        The range of VPT value is 0..7. The range of DSCP value is 0..63.
+        The range of queue value is 0..7."
+    ::= { rlVoipMngSnoopQosEntry 2 }
+
+
+
+--
+--  VOIP Ports table
+--
+
+
+RlVoipMngSnoopIfIndexStatus ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "VOIP status of the port: enable or disable."
+    SYNTAX  INTEGER {
+        disable(0),
+        enable(1)
+}
+
+
+rlVoipMngSnoopIfIndexTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlVoipMngSnoopIfIndexEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "VOIP ports entry. The entry created when VOIP snooping
+        enabled on port."
+  ::= { rlVoipSnoop 3 }
+
+rlVoipMngSnoopIfIndexEntry OBJECT-TYPE
+   SYNTAX      RlVoipMngSnoopIfIndexEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "The row definition for this table."
+   INDEX {rlVoipMngSnoopIfIndex}
+::= { rlVoipMngSnoopIfIndexTable 1 }
+
+RlVoipMngSnoopIfIndexEntry ::= SEQUENCE {
+   rlVoipMngSnoopIfIndex             INTEGER,
+   rlVoipMngSnoopIfIndexStatus       RlVoipMngSnoopIfIndexStatus
+}
+
+rlVoipMngSnoopIfIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Interface Index."
+    ::= { rlVoipMngSnoopIfIndexEntry 1 }
+
+rlVoipMngSnoopIfIndexStatus OBJECT-TYPE
+   SYNTAX       RlVoipMngSnoopIfIndexStatus
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+       "Enable or Disable VOIP status on the ifIndex."
+  ::= { rlVoipMngSnoopIfIndexEntry  2 }
+
+
+
+
+--
+--  VOIP sessions table
+--
+
+
+RlVoipProtocolType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Type of protocol."
+    SYNTAX  INTEGER {
+        sip(1),
+        h323(2),
+        sccp(3)
+}
+
+RlVoipTcpUdpType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Type of IP protocol."
+    SYNTAX  INTEGER {
+        udp(1),
+        tcp(2)
+}
+
+
+rlVoipMngSnoopSessionTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlVoipMngSnoopSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "VOIP session entry. The entry created when VOIP snooping
+        creates the RTP session."
+  ::= { rlVoipSnoop 4 }
+
+rlVoipMngSnoopSessionEntry OBJECT-TYPE
+   SYNTAX      RlVoipMngSnoopSessionEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION        "The row definition for this table."
+   INDEX {rlVoipMngSnoopSessionDstIpAddrType,rlVoipMngSnoopSessionDstIpAddr,
+          rlVoipMngSnoopSessionSrcIpAddrType,rlVoipMngSnoopSessionSrcIpAddr,
+          rlVoipMngSnoopSessionDstUdpRtp,rlVoipMngSnoopSessionDstUdpRtcp,
+          rlVoipMngSnoopSessionSrcUdpRtp,rlVoipMngSnoopSessionSrcUdpRtcp}
+::= { rlVoipMngSnoopSessionTable 1 }
+
+RlVoipMngSnoopSessionEntry ::= SEQUENCE {
+   rlVoipMngSnoopSessionDstIpAddrType          InetAddressType,
+   rlVoipMngSnoopSessionDstIpAddr              InetAddress,
+   rlVoipMngSnoopSessionSrcIpAddrType          InetAddressType,
+   rlVoipMngSnoopSessionSrcIpAddr              InetAddress,
+   rlVoipMngSnoopSessionDstUdpRtp              INTEGER,
+   rlVoipMngSnoopSessionDstUdpRtcp             INTEGER,
+   rlVoipMngSnoopSessionSrcUdpRtp              INTEGER,
+   rlVoipMngSnoopSessionSrcUdpRtcp             INTEGER,
+   rlVoipMngSnoopSessionProtocolType           RlVoipProtocolType,
+   rlVoipMngSnoopSessionSessionId              INTEGER,
+   rlVoipMngSnoopSessionTcpUdpType             RlVoipTcpUdpType
+}
+
+rlVoipMngSnoopSessionDstIpAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "The address type of rlVoipMngSnoopSessionDstIpAddr."
+    ::= { rlVoipMngSnoopSessionEntry 1 }
+
+
+rlVoipMngSnoopSessionDstIpAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Destination IP address."
+    ::= { rlVoipMngSnoopSessionEntry 2 }
+
+
+rlVoipMngSnoopSessionSrcIpAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+           "The address type of rlVoipMngSnoopSessionSrcIpAddr."
+    ::= { rlVoipMngSnoopSessionEntry 3 }
+
+rlVoipMngSnoopSessionSrcIpAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Source IP address."
+    ::= { rlVoipMngSnoopSessionEntry 4 }
+
+
+rlVoipMngSnoopSessionDstUdpRtp OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Destination Udp RTP port."
+    ::= { rlVoipMngSnoopSessionEntry 5 }
+
+rlVoipMngSnoopSessionDstUdpRtcp OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Destination Udp RTCP port."
+    ::= { rlVoipMngSnoopSessionEntry 6 }
+
+rlVoipMngSnoopSessionSrcUdpRtp OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Source Udp RTP port."
+    ::= { rlVoipMngSnoopSessionEntry 7 }
+
+rlVoipMngSnoopSessionSrcUdpRtcp OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Source Udp RTCP port."
+    ::= { rlVoipMngSnoopSessionEntry 8 }
+
+rlVoipMngSnoopSessionProtocolType OBJECT-TYPE
+    SYNTAX      RlVoipProtocolType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Type of signalling protocol."
+    ::= { rlVoipMngSnoopSessionEntry 9 }
+
+rlVoipMngSnoopSessionSessionId OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Destination Udp RTCP port."
+    ::= { rlVoipMngSnoopSessionEntry 10 }
+
+
+rlVoipMngSnoopSessionTcpUdpType OBJECT-TYPE
+    SYNTAX      RlVoipTcpUdpType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "IP TCP or UDP protocol."
+    ::= { rlVoipMngSnoopSessionEntry 11 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+END
+

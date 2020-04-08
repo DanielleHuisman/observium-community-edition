@@ -1,0 +1,363 @@
+--MibName=rcDai
+-- *****************************************************************
+-- switch-dai-mib.mib:  Raisecom DAI MIB file
+--
+-- Jun 2008, yupeng
+--
+-- Copyright (c) 1994-2000, 2001 by Raisecom, Inc.
+-- All rights reserved.
+-- 01, 20110812, ROS00000394 change the default value of the node rcDaiProtectVlanList
+-- *****************************************************************
+
+SWITCH-DAI-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    Integer32     	 			FROM SNMPv2-SMI
+    MacAddress,RowStatus,TruthValue		FROM SNMPv2-TC 
+    PortList, Vlanset, EnableVar	FROM SWITCH-TC 
+    rcPortEntry                         FROM SWITCH-SYSTEM-MIB
+    iscomSwitch	            	FROM RAISECOM-BASE-MIB;
+         
+rcDai MODULE-IDENTITY
+    LAST-UPDATED "0806130000Z"
+    ORGANIZATION "raisecom Group"
+    CONTACT-INFO
+                "       Raise Systems
+                        
+                Postal: Beijing,
+                        China
+
+                   Tel: 86-010-82884499
+
+                E-mail: yupeng@raisecom.com"
+    DESCRIPTION
+            "The MIB module for dynamic arp inspection."
+    ::= { iscomSwitch 38}   
+    
+------------------------------------------------------------------------------
+--
+--  rcDai - Dynamic ARP Inspection
+--
+--  This group is used to instrument the dynamic ARP inspection support.
+--
+------------------------------------------------------------------------------    
+------------------------------------------------------------------------------
+rcDaiConfig			OBJECT IDENTIFIER ::= {	rcDai 1 }
+
+------------------------------------------------------------------------------
+--
+-- DAI Config
+--
+
+rcDaiStaticEnable OBJECT-TYPE
+	    SYNTAX      EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object controls whether the static DAI 
+               bind is enabled on the device. A disable(2) value 
+               will prevent the static DAI bind rule to write 
+               to hardware on the device."
+        DEFVAL { disable }
+        ::= { rcDaiConfig 1 }   
+        
+rcDaiDhcpSnoopEnable OBJECT-TYPE
+	    SYNTAX      EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object controls whether the dhcp snooping DAI 
+               bind is   enabled on the device. A disable(2) value 
+               will prevent the dhcp snooping DAI bind on the device."
+        DEFVAL { disable }
+        ::= { rcDaiConfig 2 }
+
+rcDaiBindCurrentRules OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "This object indicates the current DAI rule number on the device."
+        ::= { rcDaiConfig 3 }
+
+rcDaiBindMaxRules OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-only
+        STATUS     current
+        DESCRIPTION
+            "This object indicates the historical maximum DAI rule number on this device."
+        ::= { rcDaiConfig 4 }
+
+--
+-- DAI Port Config
+--
+
+rcDaiPortTrustTable	OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcDaiPortTrustEntry
+        MAX-ACCESS      not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table contains entries that identify the configured DAI trust
+            for each port."
+        ::= { rcDaiConfig 5 }
+
+rcDaiPortTrustEntry OBJECT-TYPE
+	    SYNTAX     RcDaiPortTrustEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "An entry (conceptual row) in the rcDaiPortStateTable.
+                The entry identify the configured DAI trust for the port."
+       AUGMENTS    { rcPortEntry }
+       ::= { rcDaiPortTrustTable 1 }
+
+RcDaiPortTrustEntry ::= 
+SEQUENCE {
+                rcDaiTrust			INTEGER
+         }
+
+rcDaiTrust OBJECT-TYPE
+        SYNTAX INTEGER { trust(1), untrust(2) }  
+        MAX-ACCESS read-write 
+        STATUS current
+        DESCRIPTION     
+                "This object indicates the whether trust arp packet on this port."   
+        DEFVAL { 2 }        
+        ::= { rcDaiPortTrustEntry 1 }
+
+--
+--  The DAI bind table
+--
+
+rcDaiBindTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcDaiBindEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION                   
+                "This table contains the list of DAI bind table."
+        ::= { rcDaiConfig 6 } 
+
+rcDaiBindEntry OBJECT-TYPE
+	    SYNTAX     RcDaiBindEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Each entry contains the list of DAI bind table."
+        INDEX      { rcDaiBindIp}
+        ::= { rcDaiBindTable 1 }
+
+RcDaiBindEntry ::= SEQUENCE {
+                rcDaiBindIp		    IpAddress,
+                rcDaiBindPortId		INTEGER,
+                rcDaiBindMac		MacAddress,
+                rcDaiBindVlan       INTEGER,
+                rcDaiBindMode       INTEGER,  
+                rcDaiBindInHw       INTEGER,
+                rcDaiBindRowStatus  RowStatus
+        }
+
+rcDaiBindIp OBJECT-TYPE
+        SYNTAX        IpAddress
+        MAX-ACCESS    not-accessible 
+        STATUS        current
+        DESCRIPTION
+		 "Index identifying this entry.The ip address of this bind rule."
+        ::= { rcDaiBindEntry 1 }
+        
+rcDaiBindPortId OBJECT-TYPE
+        SYNTAX        INTEGER
+        MAX-ACCESS    read-create 
+        STATUS        current
+        DESCRIPTION
+		 "This object specifies the port id of this rule."
+        ::= { rcDaiBindEntry 2 }
+        
+rcDaiBindMac OBJECT-TYPE
+        SYNTAX        MacAddress
+        MAX-ACCESS    read-create 
+        STATUS        current
+        DESCRIPTION
+		 "This object specifies the mac address of this rule."
+        ::= { rcDaiBindEntry 3 }
+
+rcDaiBindVlan OBJECT-TYPE
+        SYNTAX        INTEGER (1..4094)
+        MAX-ACCESS    read-create 
+        STATUS        current
+        DESCRIPTION
+                "This object specifies the vlan of this rule."
+        ::= { rcDaiBindEntry 4 }
+
+rcDaiBindMode OBJECT-TYPE
+        SYNTAX        INTEGER { static(1), dhcp-snooping(2) }
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+		 "This object specifies the mode of this rule.static(1) specifies 
+		 this rule is staticly configured.dhcp snooping(2) specifies this 
+		 rule is learned from dhcp snooping."
+        ::= { rcDaiBindEntry 5 }
+
+rcDaiBindInHw  OBJECT-TYPE
+        SYNTAX        INTEGER { inHw(1), notinHw(2) }
+        MAX-ACCESS    read-only 
+        STATUS        current
+        DESCRIPTION
+		 "This object specifies the state of this rule.InHw(1) specifies 
+		 this rule is in hardware.notInHw(1) specifies this rule is not in hardware."
+        ::= { rcDaiBindEntry 6 }     
+        
+rcDaiBindRowStatus OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-create 
+        STATUS        current
+        DESCRIPTION
+		 "The row status of this entry."
+        ::= { rcDaiBindEntry 7 }
+        
+
+--
+-- Arp Rate Limit port config
+--
+rcArpRLPortEnableTable	OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcArpRLPortEnableEntry
+        MAX-ACCESS      not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table contains entries that identify the configured arp rate limit enable
+            for each port."
+        ::= { rcDaiConfig 7 }
+
+rcArpRLPortEnableEntry OBJECT-TYPE
+	    SYNTAX     RcArpRLPortEnableEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "An entry (conceptual row) in the rcArpRLPortEnableTable.
+                The entry identify the configured arp rate limit enable for the port."
+       AUGMENTS    { rcPortEntry }
+       ::= { rcArpRLPortEnableTable 1 }
+
+RcArpRLPortEnableEntry ::= 
+SEQUENCE {
+                rcArpRLEnable			INTEGER
+         }
+
+rcArpRLEnable OBJECT-TYPE
+        SYNTAX EnableVar  
+        MAX-ACCESS read-write 
+        STATUS current
+        DESCRIPTION     
+                "This object indicates the whether enable arp rate limit on this port."   
+        DEFVAL { disable }        
+        ::= { rcArpRLPortEnableEntry 1 }
+
+
+rcArpRLPortRateTable	OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcArpRLPortRateEntry
+        MAX-ACCESS      not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table contains entries that identify the configured arp rate limit rate
+            for each port."
+        ::= { rcDaiConfig 8 }
+
+rcArpRLPortRateEntry OBJECT-TYPE
+	    SYNTAX     RcArpRLPortRateEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "An entry (conceptual row) in the rcArpRLPortRateTable.
+                The entry identify the configured arp rate limit rate for the port."
+       AUGMENTS    { rcPortEntry }
+       ::= { rcArpRLPortRateTable 1 }
+
+RcArpRLPortRateEntry ::= 
+SEQUENCE {
+                rcArpRLRate			INTEGER
+         }
+
+rcArpRLRate OBJECT-TYPE
+        SYNTAX INTEGER 
+        MAX-ACCESS read-write 
+        STATUS current
+        DESCRIPTION     
+                "This object indicates the rate of arp rate limit on this port."   
+        DEFVAL { 100 }
+        ::= { rcArpRLPortRateEntry 1 }
+
+rcArpRLPortStatusTable	OBJECT-TYPE
+        SYNTAX SEQUENCE OF RcArpRLPortStatusEntry
+        MAX-ACCESS      not-accessible
+        STATUS current
+        DESCRIPTION
+            "This table contains entries that identify the arp rate limit status
+            for each port."
+        ::= { rcDaiConfig 9 }
+
+rcArpRLPortStatusEntry OBJECT-TYPE
+	    SYNTAX     RcArpRLPortStatusEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "An entry (conceptual row) in the rcArpRLPortStatusTable.
+                The entry identify the arp rate limit status for the port."
+       AUGMENTS    { rcPortEntry }
+       ::= { rcArpRLPortStatusTable 1 }
+
+RcArpRLPortStatusEntry ::= 
+SEQUENCE {
+                rcArpRLStatus			INTEGER
+         }
+
+rcArpRLStatus OBJECT-TYPE
+        SYNTAX INTEGER { unoverload(0), overload(1) }
+        MAX-ACCESS read-only 
+        STATUS current
+        DESCRIPTION     
+                "This object indicates the status of arp rate limit on this port."   
+        ::= { rcArpRLPortStatusEntry 1 }
+
+--
+-- Arp Rate Limit config
+--
+rcArpRLRecoverEnable OBJECT-TYPE
+	    SYNTAX      EnableVar
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+               "This object controls whether the arp rate limit can auto recover 
+                after port's arp packets overload."
+        DEFVAL { disable }
+        ::= { rcDaiConfig 10 }   
+
+rcArpRLRecoverTime OBJECT-TYPE
+        SYNTAX     INTEGER
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "This object indicates the arp rate limit recover time."
+        DEFVAL { 30 }
+        ::= { rcDaiConfig 11 }
+
+---vlan based DAI config
+rcDaiIsVlanAll OBJECT-TYPE
+        SYNTAX      EnableVar
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+               "This object indicates if Dai protect all vlan."
+        DEFVAL { disable }
+        ::= { rcDaiConfig 12 }  
+
+rcDaiProtectVlanList OBJECT-TYPE
+        SYNTAX     Vlanset
+        MAX-ACCESS read-write
+        STATUS     current
+        DESCRIPTION
+            "This object indicates the protected vlanlist of Dai.
+            if not config the object, the Dai protect all vlan."
+        ::= { rcDaiConfig 13 }
+
+END

@@ -1,0 +1,768 @@
+--MibName=rcIpDhcpServer
+IPDHCP-SERVER-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY, TimeTicks, OBJECT-TYPE
+             FROM SNMPv2-SMI       
+        RowStatus,MacAddress FROM SNMPv2-TC 
+        EnableVar,Vlanset	 FROM SWITCH-TC       
+        iscomSwitch  FROM RAISECOM-BASE-MIB;
+
+    rcIpDhcpServer MODULE-IDENTITY
+          LAST-UPDATED "200907140000Z"  -- July 14, 2009
+          ORGANIZATION "raisecom."
+          CONTACT-INFO
+              "raisecom
+               E-mail: "
+
+          DESCRIPTION "dhcp module management."
+
+          REVISION    "200710150000Z"  -- Oct  15, 2007
+          DESCRIPTION "Version 1.1"
+          
+          REVISION    "200806240000Z"  -- Jun  24, 2008
+          DESCRIPTION "Version 1.2,revised for DHCP Server enhance development"
+
+          REVISION    "200907140000Z"  -- July 14, 2009
+          DESCRIPTION "Version 1.3,increase DHCP Server option size to 192"
+
+          REVISION    "200909020000Z"  -- Sep  02, 2009
+          DESCRIPTION "Version 1.4,verify index of rcIpDhcpIpVendorOptEntry table"
+          
+          REVISION    "200909090000Z"  -- Sep  09, 2009
+          DESCRIPTION "Version 1.5,change rcIpDhcpServerStartTime to read-only"
+
+          ::= { iscomSwitch 29 }
+          
+    rcIpDhcpServerConfig      OBJECT IDENTIFIER ::= { rcIpDhcpServer 1 }
+    rcIpDhcpServerStatistics  OBJECT IDENTIFIER ::= { rcIpDhcpServer 2 }        
+    rcIpDhcpIpLease           OBJECT IDENTIFIER ::= { rcIpDhcpServer 3 }
+
+                   
+--rcIpDhcpServerConfig--
+    
+          rcIpDhcpPropEnable OBJECT-TYPE
+              SYNTAX  EnableVar
+              MAX-ACCESS  read-write
+              STATUS  current
+              DESCRIPTION
+                      "The enabled/disabled status of the dhcp."
+              DEFVAL { disable }
+              ::= { rcIpDhcpServerConfig 1 }
+              
+          rcIpDhcpIpNextIndex OBJECT-TYPE
+              SYNTAX  INTEGER 
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "The next index of the dhcp server ip pool.
+                       It's range is 1..((MAX_SW_NUM-1)*4).
+                       MAX_SW_NUM is the max interface ip number of device"
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"
+              ::= { rcIpDhcpServerConfig 2 }
+
+          rcIpDhcpMaxLease OBJECT-TYPE
+              SYNTAX  INTEGER (30..10080) -- is caculated with minute.It is must be greater than 30.
+              MAX-ACCESS  read-write
+              STATUS  current
+              DESCRIPTION
+                      "The max Lease of Ip address(minute)."             
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"    
+              DEFVAL { 10080 }
+              ::= { rcIpDhcpServerConfig 3 }
+
+          rcIpDhcpMinLease OBJECT-TYPE
+              SYNTAX  INTEGER  (30..10080)-- is caculated with minute.It is must be greater than 30.
+              MAX-ACCESS  read-write
+              STATUS  current
+              DESCRIPTION
+                      "The min Lease of Ip address(minute)."             
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"   
+              DEFVAL { 30 }
+              ::= { rcIpDhcpServerConfig 4 }
+
+          rcIpDhcpDefLease OBJECT-TYPE
+              SYNTAX  INTEGER  (30..10080)-- is caculated with minute. It is must be greater than 30.
+              MAX-ACCESS  read-write
+              STATUS  current
+              DESCRIPTION
+                      "The default Lease of Ip address(minute)."              
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"      
+              DEFVAL { 30 }
+              ::= { rcIpDhcpServerConfig 5 }
+
+          rcIpDhcpVlanAuth OBJECT-TYPE
+              SYNTAX  Vlanset 
+              MAX-ACCESS  read-write
+              STATUS  current
+              DESCRIPTION
+                      "The enabled/disabled auth status of dhcp of vlan."
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"
+              ::= { rcIpDhcpServerConfig 6 }            
+
+          rcIpDhcpServerStartTime OBJECT-TYPE
+              SYNTAX  TimeTicks 
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "This read-only object displays the DHCP server startup time."
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"
+              ::= { rcIpDhcpServerConfig 7 }
+
+--IP Interface Table--                      
+          rcIpDhcpIpIfTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF RcDhcpIpIfEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A table that contains DHCP Server State information for ip interfaces."
+              ::= { rcIpDhcpServerConfig 8 }
+              
+          rcIpDhcpIpIfEntry OBJECT-TYPE
+              SYNTAX  RcDhcpIpIfEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "An entry that contains DHCP Server State information for ip interface."
+              INDEX   { rcIpDhcpIpIfIndex }
+              ::= { rcIpDhcpIpIfTable 1 }
+            
+          RcDhcpIpIfEntry ::=
+              SEQUENCE {
+                  rcIpDhcpIpIfIndex INTEGER,
+                  rcIpDhcpIpIfDhcpsEnable EnableVar
+                  }
+                  
+          rcIpDhcpIpIfIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "The index of IP Interface Table.
+                      Index 1 means IP Interface 0. The rest may be deduced by analogy. 
+                      It's range is 1..((MAX_SW_NUM-1)).
+                       MAX_SW_NUM is the max interface ip number of device"
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpIfEntry 1 }                  
+              
+          rcIpDhcpIpIfDhcpsEnable OBJECT-TYPE
+              SYNTAX  EnableVar
+              MAX-ACCESS  read-write
+              STATUS  current
+              DESCRIPTION
+                      "The state of dhcp server on ip interface. 
+ 	                   It also has two values,one is enable(1),which indicates that this ip interface 
+ 	                   start dhcp server; the other is disable(2) that means dhcp server is invalid on 
+ 	                   this ip interface. 
+ 	                   The default value is disable(2)."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpIfEntry 2 } 
+              
+--IP Pool Table--            
+          rcIpDhcpIpTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF RcDhcpIpEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A table that contains ip-pool information
+                      for the DHCP Server."
+              ::= { rcIpDhcpServerConfig 9 }
+              
+          rcIpDhcpIpEntry OBJECT-TYPE
+              SYNTAX  RcDhcpIpEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A entry that contains ip-pool information
+                      for the DHCP Server."
+              INDEX   { rcIpDhcpIpIndex }
+              ::= { rcIpDhcpIpTable 1 }
+            
+          RcDhcpIpEntry ::=
+              SEQUENCE {
+                  rcIpDhcpIpIndex		INTEGER,
+                  rcIpDhcpIpEntryName OCTET STRING,
+                  rcIpDhcpIpInterface INTEGER,
+                  rcIpDhcpIpStartIp 	IpAddress,
+                  rcIpDhcpIpEndIp   	IpAddress,
+                  rcIpDhcpIpNetmask   IpAddress,
+                  rcIpDhcpIpGateway   IpAddress,
+                  rcIpDhcpIpDnsServer IpAddress,
+                  rcIpDhcpIpSecondaryDnsServer IpAddress,
+                  rcIpDhcpIpTftpSvrAddress IpAddress,
+                  rcIpDhcpIpBootfileName OCTET STRING, 
+                  rcIpDhcpIpMaxLease  INTEGER,
+				  rcIpDhcpIpMinLease  INTEGER,
+				  rcIpDhcpIpDefLease  INTEGER,
+                  rcIpDhcpIpRowStatus RowStatus
+                  }
+               
+          rcIpDhcpIpIndex OBJECT-TYPE
+              SYNTAX  INTEGER 
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "index of Ip-pool row.
+                       It's range is 1..((MAX_SW_NUM-1)*4).
+                       MAX_SW_NUM is the max interface ip number of device"
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpEntry 1 }
+              
+          rcIpDhcpIpEntryName OBJECT-TYPE
+              SYNTAX  OCTET STRING (SIZE(1..16))
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "Name of Ip-pool row."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpEntry 2 }
+              
+          rcIpDhcpIpInterface OBJECT-TYPE
+              SYNTAX  INTEGER
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                       Ip interface.
+                       It's range is 0..((MAX_SW_NUM-2)).
+                       MAX_SW_NUM is the max interface ip number of device"
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 3 }
+              
+          rcIpDhcpIpStartIp OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      start ip address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 4 }
+              
+          rcIpDhcpIpEndIp OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      end ip address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 5 }              
+              
+          rcIpDhcpIpNetmask OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      netmask of ip address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 6 }   
+              
+          rcIpDhcpIpGateway OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      gateway of ip address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 7 }  
+              
+          rcIpDhcpIpDnsServer OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      dns of ip address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 8 }   
+                 
+          rcIpDhcpIpSecondaryDnsServer OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      dns of ip address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 9 }  
+
+          rcIpDhcpIpRowStatus OBJECT-TYPE
+              SYNTAX  RowStatus               
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      rowstatus of ip address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 10 }
+             
+          rcIpDhcpIpTftpSvrAddress OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The IP Address of TFTP Server configured by DHCP Server for Client. 
+                      DHCP Client downloads configuration files from the TFTP Server during 
+                      auto-configuration procedure. 
+                      No default TFTP Server was configured under DHCP Server IP pool."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpEntry 11 }   
+          
+          rcIpDhcpIpBootfileName OBJECT-TYPE
+              SYNTAX  OCTET STRING (SIZE(1..63))
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The boot-file name configured by DHCP Server for Client. 
+                      DHCP Client downloads this designated file from specified server 
+                      to complete auto-configuration. 
+                      No default boot file was configured under DHCP IP pool."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpEntry 12 } 
+
+           rcIpDhcpIpMaxLease OBJECT-TYPE
+              SYNTAX  INTEGER (30..10080) -- is caculated with minute.It is must be greater than 30.
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The max Lease of Ip address(minute)."             
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"    
+              DEFVAL { 10080 }
+              ::= { rcIpDhcpIpEntry 13 }       
+ 
+
+           rcIpDhcpIpMinLease OBJECT-TYPE
+              SYNTAX  INTEGER (30..10080) -- is caculated with minute.It is must be greater than 30.
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The max Lease of Ip address(minute)."             
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"    
+              DEFVAL { 30 }
+              ::= { rcIpDhcpIpEntry 14 }  
+
+
+
+           rcIpDhcpIpDefLease OBJECT-TYPE
+              SYNTAX  INTEGER (30..10080) -- is caculated with minute.It is must be greater than 30.
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The max Lease of Ip address(minute)."             
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"    
+              DEFVAL { 30 }
+              ::= { rcIpDhcpIpEntry 15 }  			  
+--dhcp relay table--  
+          rcIpDhcpRelayNextIndex OBJECT-TYPE
+              SYNTAX  INTEGER (1..8)
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "The next index of Relay server."
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"
+              ::= { rcIpDhcpServerConfig 10 }  
+                      
+          rcIpDhcpRelayTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF RcDhcpRelayEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A table that contains relay server information
+                      for the DHCP Server."
+              ::= { rcIpDhcpServerConfig 11 }
+              
+          rcIpDhcpRelayEntry OBJECT-TYPE
+              SYNTAX  RcDhcpRelayEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A entry that contains relay server information
+                      for the DHCP Server."
+              INDEX   { rcIpDhcpRelayIndex }
+              ::= { rcIpDhcpRelayTable 1 }
+            
+          RcDhcpRelayEntry ::=
+              SEQUENCE {
+                  rcIpDhcpRelayIndex INTEGER,
+                  rcIpDhcpRelayAddress IpAddress,
+                  rcIpDhcpRelayMask IpAddress,
+                  rcIpDhcpRelayRowStatus RowStatus                 
+                  }
+                  
+          rcIpDhcpRelayIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "index of relay server."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpRelayEntry 1 }                  
+              
+          rcIpDhcpRelayAddress OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "ip address of relay server."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpRelayEntry 2 } 
+              
+          rcIpDhcpRelayMask OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "ip mask of relay server."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpRelayEntry 3 }
+              
+          rcIpDhcpRelayRowStatus OBJECT-TYPE
+              SYNTAX    RowStatus            
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "DURABLE:
+                      rowstatus of relay server address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpRelayEntry 4 }    
+ 
+ 
+ --dhcp server vendor-specific option table--          
+          rcIpDhcpIpVendorOptTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF RcIpDhcpIpVendorOptEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A table that contains vendor-specific DHCP option which were
+                       configured on DHCP server by network administrator."
+              ::= { rcIpDhcpServerConfig 12 } 
+                   
+          rcIpDhcpIpVendorOptEntry OBJECT-TYPE
+              SYNTAX  RcIpDhcpIpVendorOptEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A entry that contains vendor-specific DHCP option defined on DHCP Server."
+              INDEX   { rcIpDhcpIpIndex, rcIpDhcpIpOptionCode }  
+              ::= { rcIpDhcpIpVendorOptTable 1 } 
+              
+          RcIpDhcpIpVendorOptEntry ::=
+              SEQUENCE {
+                  rcIpDhcpIpOptionCode INTEGER,
+                  rcIpDhcpIpOptionType INTEGER,
+                  rcIpDhcpIpOptionContents OCTET STRING,   
+                  rcIpDhcpIpOptionLength INTEGER,
+                  rcIpDhcpIpOptionRowStatus RowStatus                 
+                  } 
+              
+          rcIpDhcpIpOptionCode OBJECT-TYPE
+              SYNTAX  INTEGER(0..15)
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "The code of vendor-specified option."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpVendorOptEntry 1 }
+
+          rcIpDhcpIpOptionType OBJECT-TYPE
+              SYNTAX  INTEGER(0..31)
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The type of vendor-specified option contents. 
+                      AsciiString(1) stands for ASCII String, 
+                      HexString(2) for HEX String, IpAddress(3) for IP Address. 
+                      The default value is NULL."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpVendorOptEntry 2 }  
+              
+          rcIpDhcpIpOptionContents OBJECT-TYPE
+              SYNTAX  OCTET STRING(SIZE(1..192))
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The contents of vendor-specified option, which may consist of an ASCII string, 
+                      a HEX string or an IP address. The default value is ASCII string. 
+                      Network administrator can change this variable's value through SET operation. 
+                      When implement SET, a specified criteria which was depicted as follows should be
+                      conformed.
+                      Vendor-specified option contents consisted of a hex string should have a pre-0x 
+                      with it. For instance, administrator can set contents as fafb by inputting '0xfafb',
+                      and no space amid the string permitted.
+                      For ASCII string, administrator can input the string directly. E.g, user can set 
+                      the option contents as test by input 'test' in the column, then perform SET.
+                      As regards ip address, it's required to input '0# 0x14 0x20 0x20 0x30' in order to
+                      set contents as '20.32.32.48'."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpVendorOptEntry 3 }  
+          
+          rcIpDhcpIpOptionLength OBJECT-TYPE
+              SYNTAX  INTEGER(0..192)
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "The length of vendor-specified option contents. Default length is 0. 
+                      When vendor-specified option contents are consisted of ASCII and hex strings, 
+                      this variable indicates the byte number of option contents(omit 0x). 
+                      Or else, it indicates the length of an IP address (i.e. 4 bytes)."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpVendorOptEntry 4 } 
+         
+          rcIpDhcpIpOptionRowStatus OBJECT-TYPE
+              SYNTAX    RowStatus            
+              MAX-ACCESS  read-create
+              STATUS  current
+              DESCRIPTION
+                      "The row status of vendor-specified option table. This variable has three values 
+                      which are listed as follows: Active (1); createAndGo (4); Destroy(6). 
+                      The network administrator can delete a row in the vendor-specified option table 
+                      by setting this variable's value as destroy (6). Before create a new row, 
+                      administrator should set the row status as createAndGo (4). Once the row was created successfully,
+                      the row status will change to Active(1)"
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpVendorOptEntry 5 } 
+
+
+--rcIpDhcpServerConfig--      
+          rcIpDhcpIpRelayInformationOption OBJECT-TYPE
+              SYNTAX  EnableVar 
+              MAX-ACCESS  read-write
+              STATUS  current
+              DESCRIPTION
+                      "Variable indicates whether the DHCP Server supports Option 82 or not.
+                      This variable has two values, enable (1) and disable (2), 
+                      which stands for enable and disable, respectively. And the default value is 1."
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"
+              ::= { rcIpDhcpServerConfig 13 }
+              
+          rcIpDhcpIpOptionRowNumCurrent OBJECT-TYPE
+              SYNTAX  INTEGER(1..15) 
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "Current row number of the vendor-specified option table. Administrator can define at most 10 options under a specified IP address pool. 
+                      The maximum row number are (10 * 4* IP interface number supported)."
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"
+              ::= { rcIpDhcpServerConfig 14 }  
+              
+          rcIpDhcpIpOptionRowNumHistoryMax OBJECT-TYPE
+              SYNTAX  INTEGER(1..15) 
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "The maximum row number of the vendor-specific table ever since it was created. 
+                      The default value is also 0. The maximum row number are (10 * 4* IP interface number supported), 
+                      the IP interface number are determined by the device characteristic."
+              REFERENCE
+                      "DHCP SERVER SOUCE-CODE"
+              ::= { rcIpDhcpServerConfig 15 }              
+                                                                              
+--dhcp server statistics--
+    rcIpDhcpServerStatsBootps  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Bootps num."
+        ::= {rcIpDhcpServerStatistics 1 }  
+        
+    rcIpDhcpServerStatsDiscovers  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Discovers num."
+        ::= { rcIpDhcpServerStatistics 2 }        
+        
+    rcIpDhcpServerStatsRequests  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Requests num."
+        ::= { rcIpDhcpServerStatistics 3 }        
+
+    rcIpDhcpServerStatsReleases  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Releases num."
+        ::= { rcIpDhcpServerStatistics 4 }                
+
+    rcIpDhcpServerStatsOffers  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Offers num."
+        ::= { rcIpDhcpServerStatistics 5 }        
+
+    rcIpDhcpServerStatsAcks  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Acks num."
+        ::= { rcIpDhcpServerStatistics 6 }        
+
+    rcIpDhcpServerStatsNacks  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Nacks num."
+        ::= { rcIpDhcpServerStatistics 7 }     
+           
+    rcIpDhcpServerStatsDeclines  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Declines num."
+        ::= {rcIpDhcpServerStatistics 8 }  
+
+    rcIpDhcpServerStatsInformations  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the Informations num."
+        ::= {rcIpDhcpServerStatistics 9 }  
+                
+    rcIpDhcpServerStatsUnknows  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the unknowed packets num."
+        ::= {rcIpDhcpServerStatistics 10 }  
+                
+    rcIpDhcpServerStatsPackets  OBJECT-TYPE
+        SYNTAX Counter
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION
+            "This read-only object displays the DHCP Server receive the total packets num."
+        ::= {rcIpDhcpServerStatistics 11 }  
+                                                                                                                  
+---------------Lease IP Table--------------------------                      
+          rcIpDhcpIpLeaseTable OBJECT-TYPE
+              SYNTAX  SEQUENCE OF RcDhcpIpLeaseEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A table that contains Lease IP information
+                      for the DHCP Server."
+              ::= { rcIpDhcpIpLease 1 }
+              
+          rcIpDhcpIpLeaseEntry OBJECT-TYPE
+              SYNTAX  RcDhcpIpLeaseEntry
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "A entry that contains relay server information
+                      for the DHCP Server."
+              INDEX   { rcIpDhcpIpLeaseIndex }
+              ::= { rcIpDhcpIpLeaseTable 1 }
+            
+          RcDhcpIpLeaseEntry ::=
+              SEQUENCE {
+                  rcIpDhcpIpLeaseIndex INTEGER,
+                  rcIpDhcpIpLeaseIpAddres IpAddress,
+                  rcIpDhcpIpLeaseClientMacAddress MacAddress,
+                  rcIpDhcpIpLeaseExpiration INTEGER,
+                  rcIpDhcpIpLeaseIpInterface INTEGER
+                  }
+                  
+          rcIpDhcpIpLeaseIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              MAX-ACCESS  not-accessible
+              STATUS  current
+              DESCRIPTION
+                      "The index of bindlist."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpLeaseEntry 1 }                  
+              
+          rcIpDhcpIpLeaseIpAddres OBJECT-TYPE
+              SYNTAX  IpAddress
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "The IP address of client."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpLeaseEntry 2 } 
+              
+          rcIpDhcpIpLeaseClientMacAddress OBJECT-TYPE
+              SYNTAX  MacAddress
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "Client Mac Address."
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER"
+              ::= { rcIpDhcpIpLeaseEntry 3 }
+              
+          rcIpDhcpIpLeaseExpiration OBJECT-TYPE
+              SYNTAX    INTEGER           
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "Ip Lease Expiration£¨NPT UTC time,the seconds from 1/1/1970£©. will be 0 if lease expiration is infinate"
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpLeaseEntry 4 }  
+              
+          rcIpDhcpIpLeaseIpInterface OBJECT-TYPE
+              SYNTAX    INTEGER            
+              MAX-ACCESS  read-only
+              STATUS  current
+              DESCRIPTION
+                      "Ip Interface.   
+                      It's range is 0..((MAX_SW_NUM-2)).
+                       MAX_SW_NUM is the max interface ip number of device"
+              REFERENCE
+                      "SOUCE-CODE OF DHCP SERVER."
+              ::= { rcIpDhcpIpLeaseEntry 5 }    
+
+END

@@ -1,0 +1,3 @@
+ALTER TABLE `oids` ADD `oid_kibi` BOOLEAN NOT NULL DEFAULT FALSE AFTER `oid_symbol`;
+ALTER TABLE `oids` ADD `oid_logy` BOOLEAN NOT NULL DEFAULT FALSE AFTER `oid_symbol`;
+

@@ -1,0 +1,264 @@
+--*****************************************************************************
+--                                                                          
+--    Copyright 2014 Electroline Equipment Inc                                   
+--    All Rights Reserved       
+--                                                                          
+--                                                                          
+--                                                                          
+--*****************************************************************************
+--    Filename: ELECTROLINE-COMMON-CONFIG.mib
+--    Author:   Alain Leclerc
+--    Creation Date: 2013-01-14
+--*****************************************************************************
+--    Description:
+--
+--	This file contains the SNMPv2 MIB definition of the Configuration branch 
+--      for the electroline products.
+--		
+--*****************************************************************************
+--   Revision History:
+--   20013.01.14	Alain Leclerc			First Draft
+--*****************************************************************************
+
+ELECTROLINE-COMMON-CONFIG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    Integer32
+        FROM SNMPv2-SMI
+    RowStatus, TruthValue
+        FROM SNMPv2-TC        
+    commonConfiguration
+        FROM ELECTROLINE-COMMON-ROOT-MIB
+    DisplayString
+    	FROM RFC1213-MIB
+    NetworkAddress
+    	FROM RFC1155-SMI
+    InetAddress,
+    InetAddressType
+    	FROM INET-ADDRESS-MIB;     -- RFC 4001
+-- ****************************************************************************
+-- * Definition of Configuration Sub-groups
+-- ****************************************************************************
+				
+-- ****************************************************************************
+-- * GLOBAL CONFIGURATION DATA
+-- * 
+-- * These MIB objects control some functions of the DHT that cannot be set 
+-- * through HMS or DOCSIS MIBs.
+-- ****************************************************************************
+cfgResetToFactory OBJECT-TYPE
+	SYNTAX INTEGER {reset(1)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB can be used to remotely restore the factory default values, thus overwriting
+		any other setup values (HMS and internal transponder settings) that were stored 
+          in the DHT's non-volatile memory. The device must be reset following this 
+         command (commonReset or other reset function)."
+		
+	::= { commonConfiguration 5 }
+
+cfgLocalInterfaceMode OBJECT-TYPE
+	SYNTAX INTEGER {disable(0), cpe(1), craft(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB controls the behavior of the local interface port.  In craft mode, the USB port (if available on the unit)
+		 has a default MAC address which enables a PC to be connected locally to 
+		 any DHT with the same driver and network adapter settings.  
+		 In craft mode, read access to the DOCSIS MIBS and read/write access to the HMS is allowed. 
+		 In CPE mode, the USB/Ethernet port behaves like a normal cable modem USB/Ethernet port, 
+		 allowing access to the network if this access has been provisioned by the CMTS. 
+		 In CPE mode, access to the MIBs is as per DOCSIS specifications. As well, read-write 
+         access to the Electroline MIBs is permitted.
+         The device must be reset following this command (commonReset or other 
+         reset function) in order for the change to take effect.
+		 The value of this MIB is stored in non-volatile memory."		
+	::= { commonConfiguration 6 }   
+	
+cfgChannelBondingEnable  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enables or disables the support of channel bonding.
+         The value of this MIB is stored in non-volatile memory."
+    ::= { commonConfiguration 7 }
+
+
+-- ****************************************************************************
+-- * TIMING RELATED CONFIGURATION DATA
+-- *
+-- * This branch of the Electroline MIB allows configuration of certain timings
+-- * in the DHT's operation
+-- ****************************************************************************			
+cfgTimers OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION "Group of configuration objects related to DHT timing "
+	::= { commonConfiguration 1 }
+
+cfgCommonSnmpTimeout OBJECT-TYPE
+	SYNTAX INTEGER (0..10080)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB controls the SNMP activity watchdog period. The value is in minutes.
+		A value of zero deactivates the feature.  When the feature is active, if the DHT
+		does NOT receive any SNMP packets during the period, the DHT will reset.
+		The value of this MIB is stored in non-volatile memory. Default value is 0 (off)"		
+	::= { cfgTimers 1 }
+
+-- ****************************************************************************
+-- * Dual IP RELATED CONFIGURATION
+-- *
+-- * This branch of the Electroline MIB should be used to control the IP behavior
+-- * of the DHT, it controls if the monitoring part of the DHT will be accessible
+-- * from the DOCSIS SNMP agent or through a separate SNMP agent.
+-- ****************************************************************************
+cfgIpInterfaces OBJECT-IDENTITY
+	STATUS current
+    DESCRIPTION "This sections specifies IP behavior for the DHT monitoring interface."
+::= { commonConfiguration 2 }
+
+	
+cfgIpMode OBJECT-TYPE
+	SYNTAX INTEGER {singleIp(1), dualIp(2)}
+	MAX-ACCESS read-write
+	STATUS current	
+	DESCRIPTION 
+		"This object controls the IP interface behavior of the DHT 
+ 		
+ 		Set it to singleIp(1) to access HMS MIB objects through the DOCSIS management interface.
+ 	
+ 		Set it to dualIp(2) to instruct the DHT to manage a virtual CPE with a separate IP address
+ 		and a separate SNMP agent to access the HMS MIBs.
+ 	
+ 		The default value for this MIB is singleIp(1).
+ 	
+ 		A transponder reset after setting this MIB is necessary in order for the change to take effect.
+ 	
+ 		The value of this MIB is stored in non-volatile memory."
+
+	::= { cfgIpInterfaces 1 }
+
+cfgCommonHmsSnmpAgent OBJECT-IDENTITY
+	 STATUS current
+	 DESCRIPTION 
+		"This sections specifies controls for the agents." 
+	::= { cfgIpInterfaces 50 }
+			
+cfgCommonHmsSnmpManagerCommunity OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-write
+	STATUS current	
+	DESCRIPTION 
+		 "This MIB is used to specify the SNMP community string
+		 used for write access to the SNMP agent in Dual IP mode.
+		 
+		 The default value for this MIB is DhtHmsWriteSecret.
+		 
+		 The value of this MIB is stored in non-volatile memory."
+	::= { cfgCommonHmsSnmpAgent 1 }
+
+cfgCommonHmsSnmpMonitorCommunity OBJECT-TYPE
+	SYNTAX DisplayString
+	MAX-ACCESS read-write
+	STATUS current	
+	DESCRIPTION 
+		 "This MIB is used to specify the SNMP Read-only community string
+		 used to access the SNMP agent in Dual IP mode.
+		 
+		 The default value for this MIB is DhtHmsReadSecret.
+		 
+		 The value of this MIB is stored in non-volatile memory."
+	::= { cfgCommonHmsSnmpAgent 2 }
+
+cfgCommonHmsSnmpAccess OBJECT-IDENTITY
+	STATUS current
+	DESCRIPTION 
+		"This sub-tree contains configuration information for HMS SNMP access management."
+	::= { cfgCommonHmsSnmpAgent 3 }
+
+cfgCommonHmsSnmpAccessTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF CfgCommonHmsSnmpAccessEntry
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "This table allow access to SNMP objects by network management stations.  If the table
+        is empty, access to SNMP objects is unrestricted" 
+    ::= { cfgCommonHmsSnmpAccess 1 }
+
+cfgCommonHmsSnmpAccessEntry OBJECT-TYPE
+     SYNTAX CfgCommonHmsSnmpAccessEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     	"HMS SNMP Access entry definition"     
+     INDEX { cfgCommonHmsSnmpAccessIndex }
+     ::= { cfgCommonHmsSnmpAccessTable 1 }
+
+CfgCommonHmsSnmpAccessEntry ::=
+     SEQUENCE
+     {
+          cfgCommonHmsSnmpAccessIndex					INTEGER,
+          cfgCommonHmsSnmpAccessIP					IpAddress,
+          cfgCommonHmsSnmpAccessIPMask				IpAddress,
+     }
+
+cfgCommonHmsSnmpAccessIndex OBJECT-TYPE
+     SYNTAX INTEGER
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+          "Index into the HMS SNMP access table"
+     ::= { cfgCommonHmsSnmpAccessEntry 1 }                                      
+
+cfgCommonHmsSnmpAccessIP OBJECT-TYPE
+     SYNTAX IpAddress
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "IPv4 address of the network management station"
+     ::= { cfgCommonHmsSnmpAccessEntry 2 }
+
+cfgCommonHmsSnmpAccessIPMask OBJECT-TYPE
+     SYNTAX IpAddress
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+          "IPv4 subnet mask of the network management station"
+     ::= { cfgCommonHmsSnmpAccessEntry 3 }     
+     
+-- ****************************************************************************
+-- * GLOBAL CONFIGURATION DATA
+-- * 
+-- * These MIB objects control some functions of the DHT that cannot be set 
+-- * through HMS or DOCSIS MIBs.
+-- ****************************************************************************
+cfgVendorInfo OBJECT-TYPE
+	SYNTAX OCTET STRING (SIZE(0..255))
+	ACCESS read-write
+	STATUS current
+	DESCRIPTION
+          "Vendor-specific information in human-readable format. When set, it mirrors and 
+          overrides the mib commonVendorInfo from the SCTE tree."
+	::= { commonConfiguration 3 }
+    
+cfgHmsTimeReference OBJECT-TYPE
+	SYNTAX INTEGER {local(1), utc(2)}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"This MIB controls the time reference that is applied in the SCTE HMS
+		tree. It affects how commonTime and alarmLogInformation time reference
+		are represented.
+		
+		Set local(1) to represent these values as the number of seconds since
+		Epoch (00:00:00 UTC, January 1, 1970) adjusted with local time offset. 
+		
+		Set utc(2) to represent these values as the number of seconds since
+		Epoch (00:00:00 UTC, January 1, 1970)."		
+	::= { commonConfiguration 4 }
+END

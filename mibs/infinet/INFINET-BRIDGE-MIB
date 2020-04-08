@@ -1,0 +1,1562 @@
+INFINET-BRIDGE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        wanflex
+                FROM INFINET-MIB
+        TEXTUAL-CONVENTION,
+        DisplayString,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Unsigned32,
+        Counter32,
+        Gauge32,
+        Integer32,
+        TimeTicks
+                FROM SNMPv2-SMI
+        InterfaceIndex
+                FROM IF-MIB
+        OBJECT-GROUP
+                FROM SNMPv2-CONF;
+
+iwBrMIB MODULE-IDENTITY
+        LAST-UPDATED "201101080937Z"
+        ORGANIZATION "Infinet Wireless Ltd."
+        CONTACT-INFO
+                "Anthony Berzin
+
+                Postal: Infinet Wireless,
+                        Russia, Ekaterinburg,
+                        Serafimi Deryabinoi st, 24
+
+                Phone:  +7 343 253 1533
+                Email:  aberzin@infinetwireless.com"
+        DESCRIPTION
+                "The mib module for Infinet bridge."
+        REVISION "201403130718Z"
+        DESCRIPTION
+		        "Added iwBrDbGroupOrder to iwBrDbTable"
+        ::= { wanflex 8 }
+
+
+BridgeId ::= TEXTUAL-CONVENTION
+       STATUS      current
+       DESCRIPTION
+           "The Bridge-Identifier, as used in the Spanning Tree
+           Protocol, to uniquely identify a bridge.  Its first two
+           octets (in network byte order) contain a priority value,
+           and its last 6 octets contain the MAC address used to
+           refer to a bridge in a unique fashion (typically, the
+           numerically smallest MAC address of all ports on the
+           bridge)."
+       SYNTAX      OCTET STRING (SIZE (8))
+
+
+Timeout ::= TEXTUAL-CONVENTION
+       DISPLAY-HINT "d"
+       STATUS      current
+       DESCRIPTION
+           "A Spanning Tree Protocol (STP) timer in units of 1/100
+           seconds.  Several objects in this MIB module represent
+           values of timers used by the Spanning Tree Protocol.
+           In this MIB, these timers have values in units of
+           hundredths of a second (i.e., 1/100 secs).
+
+           These timers, when stored in a Spanning Tree Protocol's
+           BPDU, are in units of 1/256 seconds.  Note, however, that
+           802.1D-1998 specifies a settable granularity of no more
+           than one second for these timers.  To avoid ambiguity,
+           a conversion algorithm is defined below for converting
+           between the different units, which ensures a timer's
+           value is not distorted by multiple conversions.
+
+           To convert a Timeout value into a value in units of
+           1/256 seconds, the following algorithm should be used:
+
+               b = floor( (n * 256) / 100)
+
+           where:
+               floor   =  quotient [ignore remainder]
+               n is the value in 1/100 second units
+               b is the value in 1/256 second units
+
+           To convert the value from 1/256 second units back to
+           1/100 seconds, the following algorithm should be used:
+
+               n = ceiling( (b * 100) / 256)
+
+           where:
+               ceiling = quotient [if remainder is 0], or
+                         quotient + 1 [if remainder is nonzero]
+               n is the value in 1/100 second units
+               b is the value in 1/256 second units
+
+           Note: it is important that the arithmetic operations are
+           done in the order specified (i.e., multiply first,
+           divide second)."
+       SYNTAX      Integer32
+
+
+BridgeGroupIdOrZero ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+            "This textual convention is introduced to
+            define a greater than zero value for any
+            configured bridge group in the managed
+            switch. Special zero value in groupId
+            context is used to identify kernel bridge
+            group which is always present in a running
+            bridge entity. The zero value in in-trunk
+            groupId context just means the group is
+            NOT in-trunk."
+    SYNTAX       Integer32 (0..4094)
+
+
+iwBrMIBObjects OBJECT IDENTIFIER ::= { iwBrMIB 1 }
+
+iwBrBase OBJECT IDENTIFIER ::= { iwBrMIBObjects 1 }
+
+iwBrBaseAddress OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "The MAC address used by this bridge when it must be
+                 referred to in a unique fashion."
+        ::= { iwBrBase 1 }
+
+iwBrBasePorts OBJECT-TYPE
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "The number of ports controlled by this bridging
+                 entity."
+        ::= { iwBrBase 2 }
+
+iwBrBaseType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unknown(1),
+                        transparent-only(2),
+                        sourceroute-only(3),
+                        srt(4) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Indicates what type of bridging this bridge can
+                 perform."
+        ::= { iwBrBase 3 }
+
+iwBrLocalTag OBJECT-TYPE
+        SYNTAX  Integer32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "VLAN tag for packets originated from this
+                 bridging entity."
+        ::= { iwBrBase 4 }
+
+
+iwBrStp OBJECT IDENTIFIER ::= { iwBrMIBObjects 2 }
+
+iwBrStpProtoSpec OBJECT-TYPE
+       SYNTAX      INTEGER {
+                       unknown(1),
+                       decLb100(2),
+                       ieee8021d(3)
+                   }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "An indication of what version of the Spanning Tree
+           Protocol is being run. IEEE 802.1D implementations
+           will return 'ieee8021d(3)'."
+       ::= { iwBrStp 1 }
+
+iwBrStpPriority OBJECT-TYPE
+       SYNTAX      Integer32 (0..65535)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The value of the write-able portion of the Bridge ID
+           (i.e., the first two octets of the (8 octet long) Bridge
+           ID).  The other (last) 6 octets of the Bridge ID are
+           given by the value of iwBrBaseAddress."
+       ::= { iwBrStp 2 }
+
+iwBrStpTimeSinceTopoChange OBJECT-TYPE
+       SYNTAX      TimeTicks
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The time (in hundredths of a second) since the
+           last time a topology change was detected by the
+           bridge entity.
+           For RSTP, this reports the time since the tcWhile
+           timer for any port on this Bridge was nonzero."
+       ::= { iwBrStp 3 }
+
+iwBrStpTopChanges OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The total number of topology changes detected by
+           this bridge since the management entity was last
+           reset or initialized."
+       ::= { iwBrStp 4 }
+
+iwBrStpMaxAge OBJECT-TYPE
+       SYNTAX      Timeout
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The maximum age of Spanning Tree Protocol information
+           learned from the network on any port before it is
+           discarded, in units of hundredths of a second.  This is
+           the actual value that this bridge is currently using."
+       ::= { iwBrStp 5 }
+
+iwBrStpHelloTime OBJECT-TYPE
+       SYNTAX      Timeout
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The amount of time between the transmission of
+           Configuration bridge PDUs by this node on any port when
+           it is the root of the spanning tree, or trying to become
+           so, in units of hundredths of a second.  This is the
+           actual value that this bridge is currently using."
+       ::= { iwBrStp 6 }
+
+iwBrStpHoldTime OBJECT-TYPE
+       SYNTAX      Integer32
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "This time value determines the interval length
+           during which no more than two Configuration bridge
+           PDUs shall be transmitted by this node, in units
+           of hundredths of a second."
+       ::= { iwBrStp 7 }
+
+iwBrStpForwardDelay OBJECT-TYPE
+       SYNTAX      Timeout
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "This time value, measured in units of hundredths of a
+           second, controls how fast a port changes its spanning
+           state when moving towards the Forwarding state.  The
+           value determines how long the port stays in each of the
+           Listening and Learning states, which precede the
+           Forwarding state.  This value is also used when a
+           topology change has been detected and is underway, to
+           age all dynamic entries in the Forwarding Database.
+           [Note that this value is the one that this bridge is
+           currently using, in contrast to
+           iwBrStpBridgeForwardDelay, which is the value that
+           this bridge and all others would start using if/when
+           this bridge were to become the root.]"
+       ::= { iwBrStp 8 }
+
+iwBrStpBridgeMaxAge OBJECT-TYPE
+       SYNTAX      Timeout (600..4000)
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The value that all bridges use for MaxAge when this
+           bridge is acting as the root.  Note that the range
+           for this parameter is related to the value of
+           iwBrStpBridgeHelloTime. The granularity of this timer
+           is 1 second. An agent may return a badValue error if
+           a set is attempted to a value that is not a whole
+           number of seconds."
+       ::= { iwBrStp 9 }
+
+iwBrStpBridgeHelloTime OBJECT-TYPE
+       SYNTAX      Timeout (100..1000)
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The value that all bridges use for HelloTime when this
+           bridge is acting as the root.  The granularity of this
+           timer is 1 second.  An agent may return a badValue error
+           if a set is attempted to a value that is not a whole
+           number of seconds."
+       ::= { iwBrStp 10 }
+
+iwBrStpBridgeForwardDelay OBJECT-TYPE
+       SYNTAX      Timeout (400..3000)
+       UNITS       "centi-seconds"
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The value that all bridges use for ForwardDelay when
+           this bridge is acting as the root.  Note that the range
+           for this parameter is related to the value of
+           iwBrStpBridgeMaxAge.  The granularity of this timer is
+           1 second.  An agent may return a badValue error if a
+           set is attempted to a value that is not a whole number
+           of seconds."
+       ::= { iwBrStp 11 }
+
+
+iwBrPorts OBJECT IDENTIFIER ::= { iwBrMIBObjects 3 }
+
+
+--- Bridge ports Table ---------------------------------
+
+iwBrPortTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF IwBrPortEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "A table that contains information related to
+                 bridge ports sorted by switch groups they
+                 participate in. Any physical interface can
+                 participate in multiple switch groups and then
+                 it will have multiple port instances (one per
+                 group)."
+        ::= { iwBrPorts 1 }
+
+
+iwBrPortEntry OBJECT-TYPE
+        SYNTAX  IwBrPortEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "Information about a specific bridge port."
+        INDEX {
+                iwBrPortGrpId,
+                iwBrPortId }
+        ::= { iwBrPortTable 1 }
+
+
+IwBrPortEntry ::= SEQUENCE {
+
+        iwBrPortGrpId             BridgeGroupIdOrZero,
+        iwBrPortId                InterfaceIndex,
+        iwBrPortStpPrio           Integer32,
+        iwBrPortStpState          INTEGER,
+        iwBrPortStpRole           INTEGER,
+        iwBrPortStpDesCost        Integer32,
+        iwBrPortStpDesBridge      BridgeId,
+        iwBrPortStpDesPort        Integer32,
+        iwBrPortStpFwdTransitions Counter32,
+        iwBrPortStpPathCost32     Integer32,
+        iwBrPortVlanAlteration    Integer32 }
+
+
+iwBrPortGrpId OBJECT-TYPE
+        SYNTAX  BridgeGroupIdOrZero
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Configured switch group Id. The zero
+                value is special value to identify
+                kernel bridge group which is always
+                present in a running bridge entity.
+                'Next to' relationship between group
+                Ids is based upon group order numbers."
+        ::= { iwBrPortEntry 1 }
+
+
+iwBrPortId OBJECT-TYPE
+        SYNTAX  InterfaceIndex
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Interface index of physical interface
+                which participates in switch group given
+                by iwBrPortGrpId. Index pair of
+                iwBrPortGrpId and iwBrPortId points to
+                unique switch port instance."
+        ::= { iwBrPortEntry 2 }
+
+
+iwBrPortStpPrio OBJECT-TYPE
+       SYNTAX      Integer32 (0..255)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The value of the port priority."
+       ::= { iwBrPortEntry 3 }
+
+
+iwBrPortStpState OBJECT-TYPE
+       SYNTAX      INTEGER {
+                       disabled(1),
+                       blocking(2),
+                       listening(3),
+                       learning(4),
+                       forwarding(5),
+                       broken(6)
+                   }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The port's current state, as defined by application of
+           the Spanning Tree Protocol.  This state controls what
+           action a port takes on reception of a frame.  If the
+           bridge has detected a port that is malfunctioning, it
+           will place that port into the broken(6) state.  For
+           ports that are disabled, this object will have a value
+           of disabled(1)."
+       ::= { iwBrPortEntry 4 }
+
+
+iwBrPortStpRole OBJECT-TYPE
+       SYNTAX      INTEGER {
+                       disabled(1),
+                       root(2),
+                       designated(3),
+                       alternate(4),
+                       backup(5)
+                   }
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The port's current role, as defined by application of
+           the Spanning Tree Protocol."
+       ::= { iwBrPortEntry 5 }
+
+
+iwBrPortStpDesCost OBJECT-TYPE
+       SYNTAX      Integer32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The path cost of the Designated Port of the segment
+           connected to this port.  This value is compared to the
+           Root Path Cost field in received bridge PDUs."
+       ::= { iwBrPortEntry 6 }
+
+
+iwBrPortStpDesBridge OBJECT-TYPE
+       SYNTAX      BridgeId
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The Bridge Identifier of the bridge that this
+           port considers to be the Designated Bridge for
+           this port's segment."
+       ::= { iwBrPortEntry 7 }
+
+
+iwBrPortStpDesPort OBJECT-TYPE
+       SYNTAX      Integer32 (0..65535)
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The Port Identifier of the port on the Designated
+           Bridge for this port's segment."
+       ::= { iwBrPortEntry 8 }
+
+
+iwBrPortStpFwdTransitions OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The number of times this port has transitioned
+           from the Learning state to the Forwarding state."
+       ::= { iwBrPortEntry 9 }
+
+
+iwBrPortStpPathCost32 OBJECT-TYPE
+       SYNTAX      Integer32 (1..200000000)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "The contribution of this port to the path cost of
+           paths towards the spanning tree root which include
+           this port.  802.1D-1998 recommends that the default
+           value of this parameter be in inverse proportion to
+           the speed of the attached LAN."
+       ::= { iwBrPortEntry 10 }
+
+
+iwBrPortVlanAlteration OBJECT-TYPE
+       SYNTAX      Integer32 (-1..4095)
+       MAX-ACCESS  read-write
+       STATUS      current
+       DESCRIPTION
+           "VLAN alteration algorithm for this port. If the
+           value is -1, any VLAN tag will be stripped if present.
+           If the value is (1..4095), then VLAN tag will be added
+           or changed to have this value. If the value is zero,
+           no actions on VLAN tag should be done."
+       ::= { iwBrPortEntry 11 }
+
+
+iwBrDb OBJECT IDENTIFIER ::= { iwBrMIBObjects 4 }
+
+iwBrDbEntryDiscards OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "The total number of Forwarding Database entries that
+                 have been or would have been learned, but have been
+                 discarded due to a lack of storage space in the
+                 Forwarding Database."
+        ::= { iwBrDb 1 }
+
+iwBrDbAgingTime OBJECT-TYPE
+        SYNTAX  Integer32 (10..1000000)
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "The timeout period in seconds for aging out
+                 dynamically-learned forwarding information."
+        ::= { iwBrDb 2 }
+
+
+--- Forwarding Database Table --------------------------------
+
+iwBrDbTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF IwBridgeDbEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "A table that contains information about unicast
+                 entries for which the bridge has forwarding and/or
+                 filtering information.  This information is used
+                 by the transparent bridging function in
+                 determining how to propagate a received frame."
+        ::= { iwBrDb 3 }
+
+
+iwBrDbEntry OBJECT-TYPE
+        SYNTAX  IwBridgeDbEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "Information about a specific unicast MAC address
+                 for which the bridge has some forwarding and/or
+                 filtering information."
+        INDEX {
+                iwBrDbGroupId,
+                iwBrDbAddress }
+        ::= { iwBrDbTable 1 }
+
+
+IwBridgeDbEntry ::= SEQUENCE {
+
+        iwBrDbGroupId       BridgeGroupIdOrZero,
+        iwBrDbAddress       MacAddress,
+        iwBrDbPort          InterfaceIndex,
+        iwBrDbStatus        INTEGER,
+        iwBrDbGwMac         MacAddress,
+        iwBrDbGwType        INTEGER,
+        iwBrDbCost          Integer32,
+        iwBrDbUseCnt        Counter32,
+        iwBrDbDead          Gauge32,
+        iwBrDbTrunkVLANId   BridgeGroupIdOrZero,
+        iwBrDbGroupOrder    Integer32 }
+
+
+iwBrDbGroupId OBJECT-TYPE
+        SYNTAX  BridgeGroupIdOrZero
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Id of a switch group whose rules were
+                applied for bridging. The special value
+                of zero is used for kernel group.
+                 'Next to' relationship between group
+                Ids is based upon group order numbers."
+        ::= { iwBrDbEntry 1 }
+
+
+iwBrDbAddress OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Learned source MAC address."
+        ::= { iwBrDbEntry 2 }
+
+
+iwBrDbPort OBJECT-TYPE
+        SYNTAX  InterfaceIndex
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Index of an interface the frame with
+                learned source MAC address was received
+                from. This is an instance of ifIndex
+                object defined in IF-MIB."
+        ::= { iwBrDbEntry 3 }
+
+
+iwBrDbStatus OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        learned(3),
+                        self(4) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Source MAC address status -
+                learned or self."
+        ::= { iwBrDbEntry 4 }
+
+
+iwBrDbGwMac OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "MAC address of MINT gateway which
+                delivered a frame with learned
+                source MAC address."
+        ::= { iwBrDbEntry 5 }
+
+
+iwBrDbGwType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unknown(0),
+                        broadcast(1),
+                        gateway(2) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Gateway type - unknown, broadcast
+                or gateway."
+        ::= { iwBrDbEntry 6 }
+
+
+iwBrDbCost OBJECT-TYPE
+        SYNTAX  Integer32 (0..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Path cost for learned source MAC
+                address."
+        ::= { iwBrDbEntry 7 }
+
+
+iwBrDbUseCnt OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Usage count for this database record."
+        ::= { iwBrDbEntry 8 }
+
+
+iwBrDbDead OBJECT-TYPE
+        SYNTAX  Gauge32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Seconds before this database record
+                lifetime expires."
+        ::= { iwBrDbEntry 9 }
+
+
+iwBrDbTrunkVLANId OBJECT-TYPE
+        SYNTAX  BridgeGroupIdOrZero
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "For trunk groups, VLAN from which the
+                record was learned from. For not trunk
+                groups this value is zero."
+        ::= { iwBrDbEntry 10 }
+
+
+iwBrDbGroupOrder OBJECT-TYPE
+        SYNTAX  Integer32 (1..4095)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "The order in which this whole group
+                will be applied for packet forwarding."
+        ::= { iwBrDbEntry 11 }
+
+
+iwBrGrp OBJECT IDENTIFIER ::= { iwBrMIBObjects 5 }
+
+
+--- Switch Groups Table --------------------------------
+
+iwBrGrpTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF IwBridgeGrpEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "A table which contains base
+                configuration info for switch groups."
+        ::= { iwBrGrp 1 }
+
+
+iwBrGrpEntry OBJECT-TYPE
+        SYNTAX  IwBridgeGrpEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "Each entry contains base configuration
+                info for one switch group."
+        INDEX {
+                iwBrGrpId }
+        ::= { iwBrGrpTable 1 }
+
+
+IwBridgeGrpEntry ::= SEQUENCE {
+
+        iwBrGrpId                 BridgeGroupIdOrZero,
+        iwBrGrpType               INTEGER,
+        iwBrGrpUsChan             INTEGER,
+        iwBrGrpDsChan             INTEGER,
+        iwBrGrpInTrunk            BridgeGroupIdOrZero,
+        iwBrGrpUncoupled          INTEGER,
+        iwBrGrpFlgSTP             INTEGER,
+        iwBrGrpFlgIGMP            INTEGER,
+        iwBrGrpFlgRptr            INTEGER,
+        iwBrGrpFlgAdmin           INTEGER,
+        iwBrGrpFlgAct             INTEGER,
+        iwBrGrpFlgOper            INTEGER,
+        iwBrGrpInfo               DisplayString,
+        iwBrGrpForwarded          Counter32,
+        iwBrGrpFlooded            Counter32,
+        iwBrGrpDropSTPL           Counter32,
+        iwBrGrpDropUNRD           Counter32,
+        iwBrGrpDropFWRL           Counter32,
+        iwBrGrpDropLOOP           Counter32,
+        iwBrGrpDropNOBG           Counter32,
+        iwBrGrpDropLCNA           Counter32,
+        iwBrGrpDropJOIN           Counter32,
+        iwBrGrpDropSDPS           Counter32,
+        iwBrGrpStpRoot            BridgeId,
+        iwBrGrpStpRootPort        Integer32,
+        iwBrPortStpPVer           INTEGER,
+	iwBrGrpDefaultAction      INTEGER,
+	iwBrGrpXVlan              INTEGER,
+	iwBrGrpPermittedVLAN      Integer32 }
+
+
+iwBrGrpId OBJECT-TYPE
+        SYNTAX  BridgeGroupIdOrZero
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Configured switch group Id. The zero
+                value is special value to identify
+                kernel bridge group which is always
+                present in a running bridge entity.
+                'Next to' relationship between group
+                Ids is based upon group order numbers."
+        ::= { iwBrGrpEntry 1 }
+
+
+iwBrGrpType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        normal(0),
+                        trunk(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "Bridge group type - normal or trunk."
+        ::= { iwBrGrpEntry 2 }
+
+
+iwBrGrpUsChan OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unset(0),
+                        chan1(1),
+                        chan2(2) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Upstream channel number."
+        ::= { iwBrGrpEntry 3 }
+
+
+iwBrGrpDsChan OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unset(0),
+                        chan1(1),
+                        chan2(2) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Downstream channel number."
+        ::= { iwBrGrpEntry 4 }
+
+
+iwBrGrpInTrunk OBJECT-TYPE
+        SYNTAX  BridgeGroupIdOrZero
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "If switch group is configured as trunk
+                group then this value is the same as
+                iwBrGrpId, otherwise it is zero."
+        ::= { iwBrGrpEntry 5 }
+
+
+iwBrGrpUncoupled OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        normal(0),
+                        uncoupled(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "This flag is set when switch group
+                is uncoupled."
+        ::= { iwBrGrpEntry 6 }
+
+
+iwBrGrpFlgSTP OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unset(0),
+                        stp(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "This flag is set when switch group
+                participates in STP."
+        ::= { iwBrGrpEntry 7 }
+
+
+iwBrGrpFlgIGMP OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unset(0),
+                        igmp(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "This flag is set when IGMP-snooping
+                is on for switch group."
+        ::= { iwBrGrpEntry 8 }
+
+
+iwBrGrpFlgRptr OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unset(0),
+                        repeater(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "This flag is set for repeater group."
+        ::= { iwBrGrpEntry 9 }
+
+
+iwBrGrpFlgAdmin OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        unset(0),
+                        admin(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "This flag is set for admin group."
+        ::= { iwBrGrpEntry 10 }
+
+
+iwBrGrpFlgAct OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        inactive(0),
+                        active(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "This flag is set when group is
+                active."
+        ::= { iwBrGrpEntry 11 }
+
+
+iwBrGrpFlgOper OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        not-operative(0),
+                        operative(1) }
+        MAX-ACCESS read-write
+        STATUS  current
+        DESCRIPTION
+                "This flag is set when group is
+                operative."
+        ::= { iwBrGrpEntry 12 }
+
+
+iwBrGrpInfo OBJECT-TYPE
+        SYNTAX  DisplayString (SIZE (1..16))
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Textual description for switch group."
+        ::= { iwBrGrpEntry 13 }
+
+
+iwBrGrpForwarded OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames forwarded by switch group."
+        ::= { iwBrGrpEntry 14 }
+
+
+iwBrGrpFlooded OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames flooded by switch group."
+        ::= { iwBrGrpEntry 15 }
+
+
+iwBrGrpDropSTPL OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to STP lock."
+        ::= { iwBrGrpEntry 16 }
+
+
+iwBrGrpDropUNRD OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to unreachable destination."
+        ::= { iwBrGrpEntry 17 }
+
+
+iwBrGrpDropFWRL OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to firewall rules."
+        ::= { iwBrGrpEntry 18 }
+
+
+iwBrGrpDropLOOP OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to possible loop."
+        ::= { iwBrGrpEntry 19 }
+
+
+iwBrGrpDropNOBG OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to no bridge group
+                 accepted them. The value of this counter is always 0
+                 for all groups except kernel group."
+        ::= { iwBrGrpEntry 20 }
+
+
+iwBrGrpDropLCNA OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to forwarding frame
+                 to kernel by non-admin group in 'strict-admin' mode."
+        ::= { iwBrGrpEntry 21 }
+
+
+iwBrGrpDropJOIN OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to ports are joined
+                 by MINT."
+        ::= { iwBrGrpEntry 22 }
+
+
+iwBrGrpDropSDPS OBJECT-TYPE
+        SYNTAX  Counter32
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Counter of frames dropped due to frame source port is
+                 same as destination port."
+        ::= { iwBrGrpEntry 23 }
+
+
+iwBrGrpStpRoot OBJECT-TYPE
+       SYNTAX      BridgeId
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The unique Bridge Identifier of the Bridge
+           recorded as the Root in the Configuration BPDUs
+           transmitted by the Designated Bridge for the
+           segment to which the port is attached."
+       ::= { iwBrGrpEntry 24 }
+
+
+iwBrGrpStpRootPort OBJECT-TYPE
+       SYNTAX      Integer32 (0..2147483647)
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "ifIndex of root port for this Bridge entity
+           participating in STP or RSTP protocol.
+           The special value of zero is used when
+           this Bridge entity assumes it is STP root."
+       ::= { iwBrGrpEntry 25 }
+
+
+iwBrPortStpPVer OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        stp(1),
+                        rstp(2) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Version of STP protocol used by this
+                Bridge entity."
+        ::= { iwBrGrpEntry 26 }
+
+
+iwBrGrpDefaultAction OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        permit(1),
+                        deny(2) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Default rule for switch group which is
+		applied	when no one rule (if any) for
+		this group was matched."
+        ::= { iwBrGrpEntry 27 }
+
+
+iwBrGrpXVlan OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        xvlan(1),
+                        unset(2) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Primary rule for switch group which should
+		be applied for any frame without VLAN tag.
+		If the value is 1, then for any frame without
+		VLAN tag other rules are ignored and the frame
+		is permitted. Either this value is 2 or the
+		frame has VLAN tag, the frame should be checked
+		against	iwBrGrpPermittedVLAN.
+		Only if iwBrGrpPermittedVLAN is zero, the frame
+		should also be checked against all the rules
+		for this group."
+        ::= { iwBrGrpEntry 28 }
+
+
+iwBrGrpPermittedVLAN OBJECT-TYPE
+        SYNTAX  Integer32 (-4095..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Primary list for switch group which should
+		be applied for any frame which was not permitted
+		by iwBrGrpXVlan rule. If the value is negative
+		and equal by modulus to VLAN tag of a tagged frame,
+		then the frame is permitted, otherwise it is denied.
+
+		Otherwise, if the value is positive, it is used as
+		iwBrListId to select just one conceptual row in
+		iwBrListTable. The frame is checked against list of
+		numranges, contained in	iwBrListValues of this row.
+		If VLAN tag of the frame falls into these numranges,
+		the grame is permitted, otherwise it is denied.
+
+		Otherwise, only if iwBrGrpPermittedVLAN is zero,
+		the frame should be checked against all the rules
+		for this group."
+        ::= { iwBrGrpEntry 29 }
+
+
+iwBrRules OBJECT IDENTIFIER    ::= { iwBrMIBObjects 6 }
+
+--- Switch Rules Table --------------------------------
+
+iwBrRuleTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF IwBrRuleEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "A table which contains filtering rules
+                for switch groups."
+        ::= { iwBrRules 1 }
+
+
+iwBrRuleEntry OBJECT-TYPE
+        SYNTAX  IwBrRuleEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "Each entry contains one filtering rule
+                for a switch group. Any frame is checked
+		only against the rules for the group it
+		falls into. The rule with the least
+		iwBrRulePriority is applied first.
+		If no rules were matched, then default
+		group rule iwBrGrpDefaultAction is applied."
+        INDEX {
+                iwBrRuleGrpId,
+                iwBrRulePriority }
+        ::= { iwBrRuleTable 1 }
+
+
+IwBrRuleEntry ::= SEQUENCE {
+
+        iwBrRuleGrpId     Integer32,
+        iwBrRulePriority  Integer32,
+        iwBrRuleAction    INTEGER,
+        iwBrRuleMatchList Integer32,
+        iwBrRuleVlanList  Integer32,
+	iwBrRuleIfaceList Integer32,
+	iwBrRuleSrcList   Integer32,
+	iwBrRuleDstList   Integer32,
+	iwBrRuleProtoList Integer32 }
+
+
+iwBrRuleGrpId OBJECT-TYPE
+        SYNTAX  Integer32(1..4095)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Configured switch group Id.
+                'Next to' relationship between group
+                Ids is based upon group order numbers."
+        ::= { iwBrRuleEntry 1 }
+
+iwBrRulePriority OBJECT-TYPE
+        SYNTAX  Integer32 (1..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Configured rule priority. The less
+                the priority, the earlier the rule
+                will be used for frame bridging
+                decision."
+        ::= { iwBrRuleEntry 2 }
+
+iwBrRuleAction OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        permit(1),
+                        deny(2) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Configured rule action."
+        ::= { iwBrRuleEntry 3 }
+
+iwBrRuleMatchList OBJECT-TYPE
+        SYNTAX  Integer32 (0..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Index in the iwBrListTable to locate
+		conceptual row containing the list
+                of values used for the rule. The special
+		value of zero denotes that there is no
+		conceptual row in iwBrListTable with the
+		list of values specifying matches for
+		this rule.
+		If this index is not zero, then the
+		conceptual row in iwBrListTable which
+		is referenced by this index must have
+		Displaystring value in iwBrListValues
+		column in pcap capture format,
+		specifying the match which triggers
+		the rule ."
+        ::= { iwBrRuleEntry 4 }
+
+iwBrRuleVlanList OBJECT-TYPE
+        SYNTAX  Integer32 (0..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Index in the iwBrListTable to locate
+		conceptual row containing the list
+                of values used for the rule. The special
+		value of zero denotes that there is no
+		conceptual row in iwBrListTable with the
+		list of values specifying VLAN numbers for
+		this rule.
+		If this index is not zero, then the
+		conceptual row in iwBrListTable which
+		is referenced by this index must have
+		Displaystring value in iwBrListValues
+		column, defining values for VLAN numbers
+		which trigger the rule, e.g.:
+		10-20 30 4095 "
+        ::= { iwBrRuleEntry 5 }
+
+iwBrRuleIfaceList OBJECT-TYPE
+        SYNTAX  Integer32 (0..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Index in the iwBrListTable to locate
+		conceptual row containing the list
+                of values used for the rule. The special
+		value of zero denotes that there is no
+		conceptual row in iwBrListTable with the
+		list of values specifying interface names
+		for this rule.
+		If this index is not zero, then the
+		conceptual row in iwBrListTable which
+		is referenced by this index must have
+		Displaystring value in iwBrListValues column,
+		defining values for interface names which
+		trigger the rule, e.g.:
+		eth0 rf5.0 "
+        ::= { iwBrRuleEntry 6 }
+
+iwBrRuleSrcList OBJECT-TYPE
+        SYNTAX  Integer32 (0..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Index in the iwBrListTable to locate
+		conceptual row containing the list
+                of values used for the rule. The special
+		value of zero denotes that there is no
+		conceptual row in iwBrListTable with the
+		list of values specifying frame source
+		MAC addresses for this rule.
+		If this index is not zero, then the
+		conceptual row in iwBrListTable which
+		is referenced by this index must have
+		Displaystring value in iwBrListValues column,
+		defining values for frame source MAC
+		addresses which trigger the rule, e.g.:
+		00:01:02:03:04:05 00:11:12:13:14:15 "
+        ::= { iwBrRuleEntry 7 }
+
+iwBrRuleDstList OBJECT-TYPE
+        SYNTAX  Integer32 (0..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Index in the iwBrListTable to the list
+                of values used for the rule. The special
+		value of zero denotes that there is no
+		conceptual row in iwBrListTable with the
+		list of values specifying frame destination
+		MAC addresses for this rule.
+		If this index is not zero, then the
+		conceptual row in iwBrListTable which
+		is referenced by this index must have
+		Displaystring value in iwBrListValues column,
+		defining space-separated values for frame
+		destination MAC addresses which trigger
+		the rule, e.g.:
+		00:01:02:03:04:05 00:11:12:13:14:15 "
+        ::= { iwBrRuleEntry 8 }
+
+iwBrRuleProtoList OBJECT-TYPE
+        SYNTAX  Integer32 (0..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Index in the iwBrListTable to the list
+                of values used for the rule. The special
+		value of zero denotes that there is no
+		conceptual row in iwBrListTable with the
+		list of values specifying Ethernet protocol
+		numbers for this rule.
+		If this index is not zero, then the
+		conceptual row in iwBrListTable which
+		is referenced by this index must have
+		Displaystring value in iwBrListValues column,
+		defining [numranges of] decimal values
+		of Ethernet protocol numbers which trigger
+		the rule, e.g. for PPPoE Discovery/Session
+		Stages (0x8863 0x8864) these values are:
+		34915-34916 "
+        ::= { iwBrRuleEntry 9 }
+
+
+--- Switch Lists Table --------------------------------
+
+iwBrListTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF IwBrListEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "A table which contains lists of values
+                or value ranges to trigger a switch rule.
+		The existence of separate tables for switch
+		rules and value ranges gives possibility to
+		reuse (often the same) value ranges for
+		multiple switch rules."
+        ::= { iwBrRules 2 }
+
+
+iwBrListEntry OBJECT-TYPE
+        SYNTAX  IwBrListEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "Each entry contains a list of values
+		applicable to trigger a rule from
+		iwBrRuleTable."
+        INDEX {
+                iwBrListId }
+        ::= { iwBrListTable 1 }
+
+
+IwBrListEntry ::= SEQUENCE {
+
+        iwBrListId        Integer32,
+        iwBrListType      INTEGER,
+        iwBrListName      DisplayString,
+        iwBrListValues    DisplayString }
+
+
+iwBrListId OBJECT-TYPE
+        SYNTAX  Integer32 (1..2147483647)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "iwBrListId index value is used to
+                refer to iwBrListValues for particular
+                rule from iwBrRuleTable."
+        ::= { iwBrListEntry 1 }
+
+iwBrListType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                        iface(1),
+                        mac(2),
+                        numrange(3),
+                        match(4) }
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "iwBrListType determines the way
+                to interpret value ranges given in
+                iwBrListValues."
+        ::= { iwBrListEntry 2 }
+
+iwBrListName OBJECT-TYPE
+        SYNTAX   DisplayString (SIZE (1..16))
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Any human-readable name of the list.
+                The list names which are indirectly created
+                by system appear as LST1, LST2, etc. These
+                names can be then deliberately owerriten
+                through command-line interface."
+        ::= { iwBrListEntry 3 }
+
+iwBrListValues OBJECT-TYPE
+        SYNTAX  DisplayString
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "The list of values or decimal numranges
+		used to trigger a switch rule.
+		The content of this DisplayString varies:
+		-----------------------------------------------------
+		when referenced by	iwBrListValues contains
+		-----------------------------------------------------
+                iwBrRuleMatchList	string in pcap capture format
+                iwBrRuleVlanList	decimal values/numranges
+	        iwBrRuleIfaceList	space-separated iface names
+	        iwBrRuleSrcList  	space-separated MAC addresses
+	        iwBrRuleDstList   	space-separated MAC addresses
+	        iwBrRuleProtoList	decimal values/numranges
+		-----------------------------------------------------"
+        ::= { iwBrListEntry 4 }
+
+
+iwBrBlackList OBJECT IDENTIFIER    ::= { iwBrMIBObjects 7 }
+
+--- Switch Blacklist Table --------------------------------
+
+iwBrBlackListTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF IwBrBlackListEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "A table which contains blacklisted
+                MAC addresses by groups."
+        ::= { iwBrBlackList 1 }
+
+
+iwBrBlackListEntry OBJECT-TYPE
+        SYNTAX  IwBrBlackListEntry
+        MAX-ACCESS not-accessible
+        STATUS  current
+        DESCRIPTION
+                "Each entry contains one src/dst MAC
+                address pair."
+        INDEX {
+                iwBrBlackListGrpId,
+                iwBrBlackListDstMac }
+        ::= { iwBrBlackListTable 1 }
+
+
+IwBrBlackListEntry ::= SEQUENCE {
+
+        iwBrBlackListGrpId  Integer32,
+        iwBrBlackListDstMac MacAddress,
+        iwBrBlackListSrcMac MacAddress,
+        iwBrBlackListTime   Unsigned32 }
+
+
+iwBrBlackListGrpId OBJECT-TYPE
+        SYNTAX  Integer32(1..4095)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Configured switch group Id for the
+                group which owns this black list entry.
+                'Next to' relationship between group
+                Ids is based upon group order numbers."
+        ::= { iwBrBlackListEntry 1 }
+
+iwBrBlackListDstMac OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Destination MAC address of blacklist
+                entry."
+        ::= { iwBrBlackListEntry 2 }
+
+iwBrBlackListSrcMac OBJECT-TYPE
+        SYNTAX  MacAddress
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Source MAC address of blacklist entry."
+        ::= { iwBrBlackListEntry 3 }
+
+iwBrBlackListTime OBJECT-TYPE
+        SYNTAX  Unsigned32 (0..7)
+        MAX-ACCESS read-only
+        STATUS  current
+        DESCRIPTION
+                "Lifetime of this black list entry in seconds.
+                In spite of the entry exists, frames are still
+                flooded till lifetime reaches 3s; then frames
+		which match such 'mature' black list entry are
+		dropped. When the lifetime reaches its maximum,
+		it wraps to zero and the whole cycle is repeated."
+        ::= { iwBrBlackListEntry 4 }
+
+
+iwBrMIBNotificationsPrefix OBJECT IDENTIFIER    ::= { iwBrMIB 2 }
+
+iwBrMIBNotifications OBJECT IDENTIFIER  ::= { iwBrMIBNotificationsPrefix 0 }
+
+
+iwBrMIBConformance OBJECT IDENTIFIER    ::= { iwBrMIB 3 }
+
+iwBrMIBGroup OBJECT-GROUP
+        OBJECTS {
+                iwBrBaseAddress,
+                iwBrBasePorts,
+                iwBrBaseType,
+                iwBrLocalTag,
+                iwBrStpProtoSpec,
+                iwBrStpPriority,
+                iwBrStpTimeSinceTopoChange,
+                iwBrStpTopChanges,
+                iwBrStpMaxAge,
+                iwBrStpHelloTime,
+                iwBrStpHoldTime,
+                iwBrStpForwardDelay,
+                iwBrStpBridgeMaxAge,
+                iwBrStpBridgeHelloTime,
+                iwBrStpBridgeForwardDelay,
+                iwBrPortGrpId,
+                iwBrPortId,
+                iwBrPortStpPrio,
+                iwBrPortStpState,
+                iwBrPortStpRole,
+                iwBrPortStpDesCost,
+                iwBrPortStpDesBridge,
+                iwBrPortStpDesPort,
+                iwBrPortStpFwdTransitions,
+                iwBrPortStpPathCost32,
+                iwBrPortVlanAlteration,
+                iwBrDbEntryDiscards,
+                iwBrDbAgingTime,
+                iwBrDbGroupId,
+                iwBrDbAddress,
+                iwBrDbPort,
+                iwBrDbStatus,
+                iwBrDbGwMac,
+                iwBrDbGwType,
+                iwBrDbCost,
+                iwBrDbUseCnt,
+                iwBrDbDead,
+                iwBrDbTrunkVLANId,
+                iwBrDbGroupOrder,
+                iwBrGrpId,
+                iwBrGrpType,
+                iwBrGrpUsChan,
+                iwBrGrpDsChan,
+                iwBrGrpInTrunk,
+                iwBrGrpUncoupled,
+                iwBrGrpFlgSTP,
+                iwBrGrpFlgIGMP,
+                iwBrGrpFlgRptr,
+                iwBrGrpFlgAdmin,
+                iwBrGrpFlgAct,
+                iwBrGrpFlgOper,
+                iwBrGrpInfo,
+                iwBrGrpForwarded,
+                iwBrGrpFlooded,
+                iwBrGrpDropSTPL,
+                iwBrGrpDropUNRD,
+                iwBrGrpDropFWRL,
+                iwBrGrpDropLOOP,
+                iwBrGrpDropNOBG,
+                iwBrGrpDropLCNA,
+                iwBrGrpDropJOIN,
+                iwBrGrpDropSDPS,
+                iwBrGrpStpRoot,
+                iwBrGrpStpRootPort,
+                iwBrPortStpPVer,
+		iwBrGrpDefaultAction,
+		iwBrGrpXVlan,
+		iwBrGrpPermittedVLAN,
+                iwBrRuleGrpId,
+                iwBrRulePriority,
+                iwBrRuleAction,
+                iwBrRuleMatchList,
+                iwBrRuleVlanList,
+		iwBrRuleIfaceList,
+	        iwBrRuleSrcList,
+	        iwBrRuleDstList,
+	        iwBrRuleProtoList,
+                iwBrListId,
+                iwBrListType,
+                iwBrListName,
+                iwBrListValues,
+                iwBrBlackListGrpId,
+                iwBrBlackListDstMac,
+                iwBrBlackListSrcMac,
+                iwBrBlackListTime }
+        STATUS  current
+        DESCRIPTION ""
+        ::= { iwBrMIBConformance 2 }
+
+END

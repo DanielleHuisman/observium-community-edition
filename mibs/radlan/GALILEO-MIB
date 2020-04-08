@@ -1,0 +1,1889 @@
+    GALILEO-MIB DEFINITIONS ::= BEGIN
+
+-- Title:      RADLAN ROS
+--             This Private MIB supports the ROS
+-- Version:    7.30
+-- Date:       20 Apr 2001
+-- By:         Michael Indenbaum
+-- E-mail:     michael@radlan.com
+--
+IMPORTS
+    IpAddress                                    FROM SNMPv2-SMI
+    InterfaceIndexOrZero, InterfaceIndex         FROM IF-MIB
+    PortList                                     FROM Q-BRIDGE-MIB
+    rlGalileo                                    FROM RADLAN-MIB
+    TEXTUAL-CONVENTION, DisplayString, TruthValue,
+    RowStatus                                    FROM SNMPv2-TC;
+
+rlGalMibVersion OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "MIB's version, the current version is 1."
+    ::= { rlGalileo 1 }
+
+rlGalMode OBJECT-TYPE
+    SYNTAX  INTEGER {
+        base(1),
+        extended(2)
+    }
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Current mode supported by the device."
+    ::= { rlGalileo 2 }
+
+rlGalModeAfterReset OBJECT-TYPE
+    SYNTAX  INTEGER {
+        base(1),
+        extended(2)
+    }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "New mode supported by the device after the next reset."
+    DEFVAL { base }
+    ::= { rlGalileo 3 }
+
+rlPolicyGalileoDebugTuning OBJECT IDENTIFIER ::= { rlGalileo 4 }
+
+rlPolicyGalileoTuningOverProvisioning OBJECT-TYPE
+    SYNTAX INTEGER {
+        overProvisioning(1),
+        minorOverProvisioning(2),
+        underProvisioning(3)
+    }
+    ACCESS read-write
+    STATUS mandatory
+    DESCRIPTION
+        "For non-quantitative flows:
+          Defines the function that is used to devide the aggregate rate
+          (dependent on the number of flows using the specific meterId).
+          The options for this mib variables are:
+            - overProvisioning is 1/n -> may cause severe exceeding from
+              permitted bw.
+            - minorOverProvisioning is 1/(n+1)-> may cause minor exceeding
+              from permitted bw.
+            - underProvisioning is 1/(2^n) -> usaully causes to be under
+              the permitted bw.
+          where n is the number of flows using the specific meterId, initial
+          value = 1."
+    ::= { rlPolicyGalileoDebugTuning 1 }
+
+rlPolicyGalileoTuningExtremConditionBurstSize  OBJECT-TYPE
+    SYNTAX INTEGER {
+        zero(1),
+        maxMtu(2)
+    }
+    ACCESS read-write
+    STATUS mandatory
+    DESCRIPTION
+        "This variable indicates the value of a new burst size, when the given
+         aggregate burst size has reached the following extreme condition:
+         (aggregateBurstSize/n) < 1536    (smaller than max MTU).
+         The options for this mib variables are:
+               - new burst = 0 bytes
+               - new burst = 1536 bytes
+         where n is the number of flows using the specific meterId."
+    ::= { rlPolicyGalileoDebugTuning 2 }
+
+rlPolicyGalileoTuningOverrideOutOfProfileDropPrecedence  OBJECT-TYPE
+    SYNTAX TruthValue
+    ACCESS read-write
+    STATUS mandatory
+    DESCRIPTION
+        "This mib variable is used only when the
+         rlPolicyGalileoTuningExtremConditionBurstSize is 0 bytes.
+         The options for this mib variables are:
+            - TRUE  => out of profile Drop Precedence = High Drop Precedence.
+                       This value will override the rule's out of profile
+                       Drop Precedence.
+            - FALSE => out of profile Drop Precedence is set according to
+                       the rule's decision."
+    ::= { rlPolicyGalileoDebugTuning 3 }
+
+rlCosFftAgingTimeout OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The aging timeout of the CoS FFT Tables."
+    ::= { rlGalileo 5 }
+
+rlCosFftPollingInterval OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The polling interval for dynamic CoS FFTs support in seconds."
+    ::= { rlGalileo 6 }
+
+rlPolicyGalileoDebug OBJECT IDENTIFIER  ::= { rlGalileo 7 }
+
+RlPolicyGalileoDebugGroupType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies one of 3 types for which offset bytes can
+         be specified. For Ip,bridge and Ipx"
+    SYNTAX  INTEGER {
+        bridged(1),
+        routedIp(2),
+        routedIpx(3)
+}
+
+rlPolicyGalileoDebugFcogTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicyGalileoDebugFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "Indecate the instance of the fcog for hash_fnc calc per group type"
+    ::= { rlPolicyGalileoDebug 1 }
+
+rlPolicyGalileoDebugFcogEntry OBJECT-TYPE
+    SYNTAX  RlPolicyGalileoDebugFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "the entry per groupType indicate the offsets for hash_func calc."
+    INDEX  { rlPolicyGalileoDebugFcogType }
+    ::= { rlPolicyGalileoDebugFcogTable 1 }
+
+RlPolicyGalileoDebugFcogEntry ::= SEQUENCE  {
+    rlPolicyGalileoDebugFcogType         RlPolicyGalileoDebugGroupType,
+    rlPolicyGalileoDebugL2SrcAddr        TruthValue,
+    rlPolicyGalileoDebugL2DstAddr        TruthValue,
+    rlPolicyGalileoDebugVlanId           TruthValue,
+    rlPolicyGalileoDebugInport           TruthValue,
+    rlPolicyGalileoDebugIpxDstNet        TruthValue,
+    rlPolicyGalileoDebugIpxDstNode       TruthValue,
+    rlPolicyGalileoDebugIpSrcAddr        TruthValue,
+    rlPolicyGalileoDebugIpDstAddr        TruthValue,
+    rlPolicyGalileoDebugIpProtocol       TruthValue,
+    rlPolicyGalileoDebugIpSrcPort        TruthValue,
+    rlPolicyGalileoDebugIpDstPort        TruthValue,
+    rlPolicyGalileoDebugStatus           RowStatus
+}
+
+rlPolicyGalileoDebugFcogType  OBJECT-TYPE
+    SYNTAX  RlPolicyGalileoDebugGroupType
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Specifies a the Group type for which Fcog bytes specified."
+    ::= { rlPolicyGalileoDebugFcogEntry 1 }
+
+rlPolicyGalileoDebugL2SrcAddr  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the L2 SrcAddr defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 2 }
+
+rlPolicyGalileoDebugL2DstAddr  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the L2DstAddr defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 3 }
+
+rlPolicyGalileoDebugVlanId  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the VlanId defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 4 }
+
+rlPolicyGalileoDebugInport  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the Inport defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 5 }
+
+rlPolicyGalileoDebugIpxDstNet  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the IpxDstNet defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 6 }
+
+rlPolicyGalileoDebugIpxDstNode  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the IpxDstNode defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 7 }
+
+rlPolicyGalileoDebugIpSrcAddr  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the IpSrcAddr defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 8 }
+
+rlPolicyGalileoDebugIpDstAddr  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the IpDstAddr defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 9 }
+
+rlPolicyGalileoDebugIpProtocol  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the IpProtocol defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 10 }
+
+rlPolicyGalileoDebugIpSrcPort  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the IpSrcPort defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 11 }
+
+rlPolicyGalileoDebugIpDstPort  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "indecate if the IpDstPort defined for fcog."
+    DEFVAL { false }
+    ::= { rlPolicyGalileoDebugFcogEntry 12 }
+
+rlPolicyGalileoDebugStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The status of a table entry.
+         It is used to delete an entry from this table."
+    ::= { rlPolicyGalileoDebugFcogEntry 13 }
+
+rlPolicyGalileoDebugFlowTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicyGalileoDebugFlowTableEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This table will allow us to request variables from specific entry at the
+        flowTable. only get and getNext will be supported (getNext will return alyaws
+        EndOfMibTable)"
+    ::= { rlPolicyGalileoDebug 2 }
+
+rlPolicyGalileoDebugFlowTableEntry OBJECT-TYPE
+    SYNTAX  RlPolicyGalileoDebugFlowTableEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "all the input fileds has a default val except from the groupType, request of an entry
+        should be based on the fcog definition."
+    INDEX  {     rlPolicyGalileoDebugFlowType,
+                 rlPolicyGalileoDebugFlowRxIfIndex,
+                 rlPolicyGalileoDebugFlowL2SrcAddr,
+                 rlPolicyGalileoDebugFlowL2DstAddr,
+                 rlPolicyGalileoDebugFlowVlanId,
+                 rlPolicyGalileoDebugFlowIpxDstNet,
+                 rlPolicyGalileoDebugFlowIpxDstNode,
+                 rlPolicyGalileoDebugFlowIpSrcAddr,
+                 rlPolicyGalileoDebugFlowIpDstAddr,
+                 rlPolicyGalileoDebugFlowIpProtocol,
+                 rlPolicyGalileoDebugFlowIpSrcPort,
+                 rlPolicyGalileoDebugFlowIpDstPort
+     }
+    ::= { rlPolicyGalileoDebugFlowTable 1 }
+
+RlPolicyGalileoDebugFlowTableEntry ::= SEQUENCE  {
+    rlPolicyGalileoDebugFlowType             RlPolicyGalileoDebugGroupType,
+    rlPolicyGalileoDebugFlowRxIfIndex        INTEGER,
+    rlPolicyGalileoDebugFlowL2SrcAddr        OCTET STRING,
+    rlPolicyGalileoDebugFlowL2DstAddr        OCTET STRING,
+    rlPolicyGalileoDebugFlowVlanId           INTEGER,
+    rlPolicyGalileoDebugFlowIpxDstNet        OCTET STRING,
+    rlPolicyGalileoDebugFlowIpxDstNode       OCTET STRING,
+    rlPolicyGalileoDebugFlowIpSrcAddr        OCTET STRING,
+    rlPolicyGalileoDebugFlowIpDstAddr        OCTET STRING,
+    rlPolicyGalileoDebugFlowIpProtocol       INTEGER,
+    rlPolicyGalileoDebugFlowIpSrcPort        OCTET STRING,
+    rlPolicyGalileoDebugFlowIpDstPort        OCTET STRING,
+    rlPolicyGalileoDebugFlowRetValid         TruthValue,
+    rlPolicyGalileoDebugFlowRetStatic        TruthValue,
+    rlPolicyGalileoDebugFlowRetAging         TruthValue,
+    rlPolicyGalileoDebugFlowRetCmd           INTEGER,
+    rlPolicyGalileoDebugFlowRetPrio          INTEGER,
+    rlPolicyGalileoDebugFlowRetInProfileDis  INTEGER,
+    rlPolicyGalileoDebugFlowRetVpt           INTEGER,
+    rlPolicyGalileoDebugFlowRetChangeTos     TruthValue,
+    rlPolicyGalileoDebugFlowRetNewTos        INTEGER,
+    rlPolicyGalileoDebugFlowRetVlanId        INTEGER,
+    rlPolicyGalileoDebugFlowRetInIfIndex     INTEGER,
+    rlPolicyGalileoDebugFlowRetEnableMeter   TruthValue,
+    rlPolicyGalileoDebugFlowRetOutProfileDis INTEGER
+    }
+
+rlPolicyGalileoDebugFlowType  OBJECT-TYPE
+    SYNTAX  RlPolicyGalileoDebugGroupType
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Specifies a the Group type."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 1 }
+
+rlPolicyGalileoDebugFlowRxIfIndex OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Specifies a the IfIndex the packet arrived (for the calculation
+         of the relevant cosTable."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 2 }
+
+rlPolicyGalileoDebugFlowL2SrcAddr  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the L2SrcAddr for the requsted entry."
+    DEFVAL { "" }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 3 }
+
+rlPolicyGalileoDebugFlowL2DstAddr  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the L2DstAddr for the requsted entry."
+    DEFVAL { "" }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 4 }
+
+rlPolicyGalileoDebugFlowVlanId  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the VlanId for the requsted entry."
+    DEFVAL { 0 }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 5 }
+
+rlPolicyGalileoDebugFlowIpxDstNet  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..4))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the IPX DstNet for the requsted entry."
+    DEFVAL { "" }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 6 }
+
+rlPolicyGalileoDebugFlowIpxDstNode  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the IPX DstNode for the requsted entry."
+    DEFVAL { "" }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 7 }
+
+rlPolicyGalileoDebugFlowIpSrcAddr  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..4))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the IP SrcAddr for the requsted entry."
+    DEFVAL { "" }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 8 }
+
+rlPolicyGalileoDebugFlowIpDstAddr  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..4))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the IP DstAddr for the requsted entry."
+    DEFVAL { ""  }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 9 }
+
+rlPolicyGalileoDebugFlowIpProtocol  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the IP Protocol for the requsted entry."
+    DEFVAL { 0 }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 10 }
+
+rlPolicyGalileoDebugFlowIpSrcPort  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..2))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the IP SrcPort for the requsted entry."
+    DEFVAL { "" }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 11 }
+
+rlPolicyGalileoDebugFlowIpDstPort  OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..2))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the IP DstPort for the requsted entry."
+    DEFVAL { "" }
+    ::= { rlPolicyGalileoDebugFlowTableEntry 12 }
+
+rlPolicyGalileoDebugFlowRetValid  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the requsted entry is valid (exist) or not."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 13 }
+
+rlPolicyGalileoDebugFlowRetStatic  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the requsted entry is a static entry or not."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 14 }
+
+rlPolicyGalileoDebugFlowRetAging  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the Aging bit of the requested entry is set or not."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 15 }
+
+rlPolicyGalileoDebugFlowRetCmd  OBJECT-TYPE
+    SYNTAX  INTEGER {
+            drop(1),
+            dropAndTrap(2),
+            permit(3),
+            permitAndTrap(4)
+    }
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the CMD of the requested entry ."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 16 }
+
+rlPolicyGalileoDebugFlowRetPrio  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the Pri/Sc of the requested entry ."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 17 }
+
+rlPolicyGalileoDebugFlowRetInProfileDis  OBJECT-TYPE
+    SYNTAX  INTEGER {
+            low(1),
+            high(2),
+            drop(3)
+    }
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the inProfile Discardability of the requested entry ."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 18 }
+
+rlPolicyGalileoDebugFlowRetVpt  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the Vpt of the requested entry ."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 19 }
+
+rlPolicyGalileoDebugFlowRetChangeTos  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the Change Tos of the requested entry is set or not."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 20 }
+
+rlPolicyGalileoDebugFlowRetNewTos  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the New Tos of the requested entry."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 21 }
+
+rlPolicyGalileoDebugFlowRetVlanId  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the VlanId of the requested entry."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 22 }
+
+rlPolicyGalileoDebugFlowRetInIfIndex  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if the InIfindex of the requested entry."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 23 }
+
+rlPolicyGalileoDebugFlowRetEnableMeter  OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate if Meter of the requested entry is enbled or not."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 24 }
+
+rlPolicyGalileoDebugFlowRetOutProfileDis  OBJECT-TYPE
+    SYNTAX  INTEGER {
+            low(1),
+            high(2),
+            drop(3)
+    }
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the outProfile Discardability of the requested entry ."
+    ::= { rlPolicyGalileoDebugFlowTableEntry 25 }
+
+---
+---
+rlPolicyGalileoFcuFwdCpuCounter OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Count the number of packets that forward from the Flow
+        Classification Unit to the CPU"
+    ::= { rlGalileo 8 }
+
+---
+-- rlPolicySimpleGalMib / Galileo simple MIB
+---
+rlPolicySimpleGalMib OBJECT IDENTIFIER  ::= { rlGalileo 9 }
+
+RlPolicySimpleGalMibProfileType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies one of 4 services the device can support"
+    SYNTAX  INTEGER {
+        minBandwidth(1),
+        bandwidthGuarantee(2),
+        minDelay(3),
+        minDelayPerSession(4)
+}
+
+RlPolicySimpleGalMibPortType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "Specifies the port type"
+    SYNTAX  INTEGER {
+        boundary(1),
+        interior(2)
+}
+
+rlPolicySimpleGalMibVersion     OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "MIB's version, the current version is 1."
+    ::= { rlPolicySimpleGalMib 1 }
+
+rlPolicySimpleGalMibPortTypeSupport OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(1))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "return a bit mask that indicates the supported port type:
+          ----------
+          |87654321|
+          ----------
+          1 - BoundaryType
+          2 - InteriorType
+          "
+    ::= { rlPolicySimpleGalMib 2 }
+
+rlPolicySimpleGalMibRecalculateRules OBJECT-TYPE
+    SYNTAX  INTEGER {
+                     recalculate(1)
+                     }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Setting any value will cause recalculation of all the rules."
+    DEFVAL {recalculate}
+    ::= { rlPolicySimpleGalMib 3 }
+
+rlPolicySimpleGalMibPolicyEnable OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Enables or disables the policy feature "
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMib 4 }
+
+--
+-- rlPolicySimpleGalMibProfileTable
+--
+rlPolicySimpleGalMibProfileTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibProfileEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "The table defines all the profiles."
+    ::= { rlPolicySimpleGalMib 5 }
+
+rlPolicySimpleGalMibProfileEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibProfileEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "The entry define one profile."
+    INDEX  { rlPolicySimpleGalMibIndex }
+    ::= { rlPolicySimpleGalMibProfileTable 1 }
+
+
+RlPolicySimpleGalMibProfileEntry ::= SEQUENCE  {
+    rlPolicySimpleGalMibIndex           INTEGER,
+    rlPolicySimpleGalMibDescription     DisplayString,
+    rlPolicySimpleGalMibProfileType     RlPolicySimpleGalMibProfileType,
+    rlPolicySimpleGalMibRate            INTEGER,
+    rlPolicySimpleGalMibBurstSize       INTEGER,
+    rlPolicySimpleGalMibMaxSession      INTEGER,
+    rlPolicySimpleGalMibNewVpt          INTEGER,
+    rlPolicySimpleGalMibChangeTosOrDscp TruthValue,
+    rlPolicySimpleGalMibNewTosOrDscp    INTEGER,
+    rlPolicySimpleGalMibStatus          RowStatus
+}
+
+rlPolicySimpleGalMibIndex OBJECT-TYPE
+    SYNTAX  INTEGER(1..2147483647)
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "This enumerates the table entry."
+    ::= { rlPolicySimpleGalMibProfileEntry 1 }
+
+rlPolicySimpleGalMibDescription OBJECT-TYPE
+    SYNTAX  DisplayString(SIZE(0..40))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Informational text given by the user to describe the profile."
+    DEFVAL{""}
+    ::= { rlPolicySimpleGalMibProfileEntry 2 }
+
+rlPolicySimpleGalMibProfileType OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibProfileType
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Specifies a profile type."
+    ::= { rlPolicySimpleGalMibProfileEntry 3 }
+
+rlPolicySimpleGalMibRate OBJECT-TYPE
+    SYNTAX  INTEGER(1..2147483647)
+--    UNITS   "kbps"
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The rate in kilobytes/second for the specified profile,
+         or in the case of minDelay per session profile type the rate will
+         indicate the rate per individual session"
+    ::= { rlPolicySimpleGalMibProfileEntry 4 }
+
+rlPolicySimpleGalMibBurstSize OBJECT-TYPE
+    SYNTAX  INTEGER(0..2147483647)
+--    UNITS   "bytes"
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The burst size parameter.  A value of 0 means that
+         the device should choose the Burst Size
+         that is most suitable for the profile."
+     DEFVAL { 0 }
+     ::= { rlPolicySimpleGalMibProfileEntry 5 }
+
+rlPolicySimpleGalMibMaxSession OBJECT-TYPE
+    SYNTAX  INTEGER(1..2147483647)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Relevant only for the minDelay per session.
+         Indicate the maximum number of sessions for this profile."
+    DEFVAL{1}
+    ::= { rlPolicySimpleGalMibProfileEntry 6 }
+
+rlPolicySimpleGalMibNewVpt OBJECT-TYPE
+    SYNTAX  INTEGER (0..7)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the new VPT to assign to the packet."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibProfileEntry 7 }
+
+rlPolicySimpleGalMibChangeTosOrDscp OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the TOS or DSCP should be remarked with
+         a new value"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibProfileEntry 8 }
+
+rlPolicySimpleGalMibNewTosOrDscp OBJECT-TYPE
+    SYNTAX  INTEGER (0..255)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the new value for the TOS or DSCP. Relevant only if
+        rlPolicySimpleGalMibChangeTosOrDscp is true."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibProfileEntry 9 }
+
+rlPolicySimpleGalMibStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The status of a table entry.
+         It is used to delete an entry from this table."
+    ::= { rlPolicySimpleGalMibProfileEntry 10 }
+
+--
+-- rlPolicySimpleGalMibIpFcogTable
+--
+
+rlPolicySimpleGalMibIpFcogTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibIpFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This table defines the used fields for ip classification,
+         per port type (interior/boundary)"
+    ::= { rlPolicySimpleGalMib 6 }
+
+rlPolicySimpleGalMibIpFcogEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibIpFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "the entry define the used fields for classification"
+    INDEX  { rlPolicySimpleGalMibIpFcogPortType }
+    ::= { rlPolicySimpleGalMibIpFcogTable 1 }
+
+
+RlPolicySimpleGalMibIpFcogEntry ::= SEQUENCE  {
+
+    rlPolicySimpleGalMibIpFcogPortType          RlPolicySimpleGalMibPortType,
+    rlPolicySimpleGalMibIpFcogTosOrDscp         TruthValue,
+    rlPolicySimpleGalMibIpFcogProtocol          TruthValue,
+    rlPolicySimpleGalMibIpFcogSrcIpMask         INTEGER,
+    rlPolicySimpleGalMibIpFcogDstIpMask         INTEGER,
+    rlPolicySimpleGalMibIpFcogSrcPort           TruthValue,
+    rlPolicySimpleGalMibIpFcogDstPort           TruthValue,
+    rlPolicySimpleGalMibIpFcogInIfIndex         TruthValue
+}
+
+rlPolicySimpleGalMibIpFcogPortType OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibPortType
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "The port type (interior/boundary) to which this entry applies."
+    ::= { rlPolicySimpleGalMibIpFcogEntry 1 }
+
+rlPolicySimpleGalMibIpFcogTosOrDscp OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the IP TOS or DSCP field will be used in
+         classifiers or not."
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpFcogEntry 2 }
+
+rlPolicySimpleGalMibIpFcogProtocol OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the IP L4 protocol field will be used in
+         classifiers or not."
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpFcogEntry 3 }
+
+rlPolicySimpleGalMibIpFcogSrcIpMask OBJECT-TYPE
+    SYNTAX  INTEGER (0..32)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the number of most significant bits of the Ip Address
+        that are used in specifying IP source addresses in classifiers."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpFcogEntry 4 }
+
+rlPolicySimpleGalMibIpFcogDstIpMask OBJECT-TYPE
+    SYNTAX  INTEGER (0..32)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+       "Indicates the number of most significant bits of the Ip Address
+        that are used in specifying IP destination addresses in classifiers."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpFcogEntry 5 }
+
+rlPolicySimpleGalMibIpFcogSrcPort OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the IP L4 protocol source port field will be used in
+         classifiers or not."
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpFcogEntry 6 }
+
+rlPolicySimpleGalMibIpFcogDstPort OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the IP L4 protocol destination port field will be
+        used in classifiers or not."
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpFcogEntry 7 }
+
+rlPolicySimpleGalMibIpFcogInIfIndex OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether ifIndex of input ports will be used in
+         classifiers or not."
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpFcogEntry 8 }
+
+--
+-- rlPolicySimpleGalMibIpRulesTable
+--
+
+rlPolicySimpleGalMibIpRulesTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibIpRulesEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This table contains the policy rules defined by the user. The order
+        of the entries in the table is important, since the first rule that
+        applies to the incoming packet will be acted upon, ignoring any
+        further rules that may apply as well."
+    ::= { rlPolicySimpleGalMib 7 }
+
+rlPolicySimpleGalMibIpRulesEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibIpRulesEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This entry defines one policy rule."
+    INDEX  {    rlPolicySimpleGalMibIpRulesPortType,
+                rlPolicySimpleGalMibIpRulesIndex }
+    ::= { rlPolicySimpleGalMibIpRulesTable 1 }
+
+
+RlPolicySimpleGalMibIpRulesEntry ::= SEQUENCE  {
+    rlPolicySimpleGalMibIpRulesPortType         RlPolicySimpleGalMibPortType,
+    rlPolicySimpleGalMibIpRulesIndex            INTEGER,
+    rlPolicySimpleGalMibIpRulesDescription      DisplayString,
+    rlPolicySimpleGalMibIpRulesTosOrDscp        INTEGER,
+    rlPolicySimpleGalMibIpRulesProtocol         INTEGER,
+    rlPolicySimpleGalMibIpRulesSrcIp            IpAddress,
+    rlPolicySimpleGalMibIpRulesSrcIpMask        INTEGER,
+    rlPolicySimpleGalMibIpRulesDstIp            IpAddress,
+    rlPolicySimpleGalMibIpRulesDstIpMask        INTEGER,
+    rlPolicySimpleGalMibIpRulesSrcPort          INTEGER,
+    rlPolicySimpleGalMibIpRulesDstPort          INTEGER,
+    rlPolicySimpleGalMibIpRulesInIfIndexList    PortList,
+    rlPolicySimpleGalMibIpRulesCondition        INTEGER,
+    rlPolicySimpleGalMibIpRulesAction           INTEGER,
+    rlPolicySimpleGalMibIpRulesProfilePointer   INTEGER,
+    rlPolicySimpleGalMibIpRulesOutIfIndexList   PortList,
+    rlPolicySimpleGalMibIpRulesBitsUsed         OCTET STRING,
+    rlPolicySimpleGalMibIpRulesErrorDescrip     DisplayString,
+    rlPolicySimpleGalMibIpRulesStatus           RowStatus
+}
+
+
+rlPolicySimpleGalMibIpRulesPortType OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibPortType
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+       "The port type (interior/boundary) to which this rule applies."
+    ::= { rlPolicySimpleGalMibIpRulesEntry 1 }
+
+rlPolicySimpleGalMibIpRulesIndex OBJECT-TYPE
+    SYNTAX  INTEGER(1..2147483647)
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "This enumerates the table. The user should assign indices in such a
+        way that there will be a gap big enough between one rule and the next
+        to allow insertion of additional rules in between (a gap of 1000 is
+        recommended). "
+    ::= { rlPolicySimpleGalMibIpRulesEntry 2 }
+
+rlPolicySimpleGalMibIpRulesDescription OBJECT-TYPE
+    SYNTAX  DisplayString(SIZE(0..40))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Informational text given by the user to describe the rule."
+    DEFVAL{""}
+    ::= { rlPolicySimpleGalMibIpRulesEntry 3 }
+
+rlPolicySimpleGalMibIpRulesTosOrDscp OBJECT-TYPE
+    SYNTAX  INTEGER(0..255)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the TOS or DSCP to compare with."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpRulesEntry 4 }
+
+rlPolicySimpleGalMibIpRulesProtocol OBJECT-TYPE
+    SYNTAX  INTEGER(0..255)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the L4 protocol to compare with."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpRulesEntry 5 }
+
+rlPolicySimpleGalMibIpRulesSrcIp OBJECT-TYPE
+    SYNTAX  IpAddress
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the source IP address to compare with."
+    DEFVAL {'00000000'H}
+    ::= { rlPolicySimpleGalMibIpRulesEntry 6 }
+
+rlPolicySimpleGalMibIpRulesSrcIpMask OBJECT-TYPE
+    SYNTAX  INTEGER (0..32)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the number of most significant bits of the Ip Address
+        that are used in specifying IP source addresses in classifiers."
+    DEFVAL { 0 }
+    ::= {  rlPolicySimpleGalMibIpRulesEntry 7 }
+
+rlPolicySimpleGalMibIpRulesDstIp OBJECT-TYPE
+    SYNTAX  IpAddress
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the destination IP address to compare with."
+    DEFVAL {'00000000'H}
+    ::= { rlPolicySimpleGalMibIpRulesEntry 8 }
+
+rlPolicySimpleGalMibIpRulesDstIpMask OBJECT-TYPE
+    SYNTAX  INTEGER (0..32)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the number of most significant bits of the Ip Address
+        that are used in specifying IP destination addresses in classifiers."
+    DEFVAL { 0 }
+    ::= {  rlPolicySimpleGalMibIpRulesEntry 9 }
+
+rlPolicySimpleGalMibIpRulesSrcPort OBJECT-TYPE
+    SYNTAX  INTEGER(0..65535)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the source L4 port to compare with."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpRulesEntry 10 }
+
+rlPolicySimpleGalMibIpRulesDstPort OBJECT-TYPE
+    SYNTAX  INTEGER(0..65535)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the destination L4 port to compare with."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpRulesEntry 11 }
+
+rlPolicySimpleGalMibIpRulesInIfIndexList OBJECT-TYPE
+    SYNTAX  PortList
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the list of input ports to which this rule applies."
+
+    ::= { rlPolicySimpleGalMibIpRulesEntry 12 }
+
+rlPolicySimpleGalMibIpRulesCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+            equal(1),
+            notEqual(2),
+            bigger(3),
+            smaller(4)
+    }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the relation that should hold for each relevant field of
+         the rule in comparison to the packet's field."
+    DEFVAL { equal }
+    ::= { rlPolicySimpleGalMibIpRulesEntry 13 }
+
+rlPolicySimpleGalMibIpRulesAction OBJECT-TYPE
+    SYNTAX  INTEGER {
+            block(1),
+            blockAndTrap(2),
+            permitAndTrap(3),
+            permit(4)
+    }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the action to be performed if there is a match with the rule."
+    DEFVAL { permit }
+    ::= { rlPolicySimpleGalMibIpRulesEntry 14 }
+
+rlPolicySimpleGalMibIpRulesProfilePointer OBJECT-TYPE
+    SYNTAX  INTEGER(0..2147483647)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the profile attached to the rule. The
+        value is the index in the profile table of the attached profile.
+        Value 0 means that no profile is attached to the rule and is valid only
+        in case of action block."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpRulesEntry 15 }
+
+rlPolicySimpleGalMibIpRulesOutIfIndexList OBJECT-TYPE
+    SYNTAX  PortList
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the list of output ports to on which bandwidth should be
+         allocated for this rule."
+    ::= { rlPolicySimpleGalMibIpRulesEntry 16 }
+
+rlPolicySimpleGalMibIpRulesBitsUsed OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(1))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "a bit mask that indicates the the used fields for the entry:
+         (the implemention is identical to BITS implementation,from MSB to LSB)
+          ----------
+          |87654321|
+          ----------
+          8 - tosOrDscp
+          7 - Protocol
+          6 - SrcIp
+          5 - DstIp
+          4 - SrcIpPort
+          3 - DstIpPort
+          "
+    DEFVAL {""}
+    ::= { rlPolicySimpleGalMibIpRulesEntry 17 }
+
+rlPolicySimpleGalMibIpRulesErrorDescrip OBJECT-TYPE
+    SYNTAX  DisplayString (SIZE(0..20))
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "A description error indicate the user about the specific error.
+        The error can cause by one of the following reasons:
+        1. if the profile was asign to the rule could not be perform
+        2. if the operation of QoS portLock failed"
+    ::= { rlPolicySimpleGalMibIpRulesEntry 18 }
+
+rlPolicySimpleGalMibIpRulesStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The status of a table entry.
+         It is used to delete an entry from this table.
+         notInService is used to disable an entry.
+         notReady will be assigned by the device to indicate that the rule
+         can not be active because some ports in the output ports list are not
+         in a state allowing bandwidth allocation guarantee."
+    ::= { rlPolicySimpleGalMibIpRulesEntry 19 }
+
+--
+-- rlPolicySimpleGalMibIpxFcogTable
+--
+
+rlPolicySimpleGalMibIpxFcogTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibIpxFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This table defines the used fields for ipx classification"
+    ::= { rlPolicySimpleGalMib 8 }
+
+
+rlPolicySimpleGalMibIpxFcogEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibIpxFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "the entry defines the used fields for classification"
+    INDEX  { rlPolicySimpleGalMibIpxFcogIndex }
+    ::= { rlPolicySimpleGalMibIpxFcogTable 1 }
+
+
+RlPolicySimpleGalMibIpxFcogEntry ::= SEQUENCE  {
+
+   rlPolicySimpleGalMibIpxFcogIndex            INTEGER,
+   rlPolicySimpleGalMibIpxFcogDstNet           OCTET STRING,
+   rlPolicySimpleGalMibIpxFcogDstNode          OCTET STRING,
+   rlPolicySimpleGalMibIpxFcogDstSocket        TruthValue,
+   rlPolicySimpleGalMibIpxFcogSrcNet           OCTET STRING,
+   rlPolicySimpleGalMibIpxFcogSrcNode          OCTET STRING,
+   rlPolicySimpleGalMibIpxFcogSrcSocket        TruthValue,
+   rlPolicySimpleGalMibIpxFcogInIfIndex        TruthValue
+}
+
+rlPolicySimpleGalMibIpxFcogIndex OBJECT-TYPE
+    SYNTAX  INTEGER (1)
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "the table index - only one entry exist"
+    ::= {  rlPolicySimpleGalMibIpxFcogEntry 1 }
+
+
+rlPolicySimpleGalMibIpxFcogDstNet OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..4))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the parts of the field in use in the rules"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxFcogEntry 2 }
+
+rlPolicySimpleGalMibIpxFcogDstNode OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the parts of the field in use in the rules"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxFcogEntry 3 }
+
+rlPolicySimpleGalMibIpxFcogDstSocket OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpxFcogEntry 4 }
+
+rlPolicySimpleGalMibIpxFcogSrcNet OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..4))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the parts of the field in use in the rules"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxFcogEntry 5 }
+
+rlPolicySimpleGalMibIpxFcogSrcNode OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the parts of the field in use in the rules"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxFcogEntry 6 }
+
+rlPolicySimpleGalMibIpxFcogSrcSocket OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpxFcogEntry 7 }
+
+rlPolicySimpleGalMibIpxFcogInIfIndex OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibIpxFcogEntry 8 }
+
+
+--
+-- rlPolicySimpleGalMibIpxRulesTable
+--
+
+rlPolicySimpleGalMibIpxRulesTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibIpxRulesEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This table contains the policy rules defined by the user. The order
+        of the entries in the table is important, since the first rule that
+        matches the incoming packet will be acted upon, ignoring any
+        further rules that may match as well."
+    ::= { rlPolicySimpleGalMib 9 }
+
+rlPolicySimpleGalMibIpxRulesEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibIpxRulesEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This entry defines one policy rule."
+    INDEX  {   rlPolicySimpleGalMibIpxRulesIndex }
+    ::= { rlPolicySimpleGalMibIpxRulesTable 1 }
+
+
+RlPolicySimpleGalMibIpxRulesEntry ::= SEQUENCE  {
+
+    rlPolicySimpleGalMibIpxRulesIndex           INTEGER,
+    rlPolicySimpleGalMibIpxRulesDescription     DisplayString,
+    rlPolicySimpleGalMibIpxRulesDstNet          OCTET STRING,
+    rlPolicySimpleGalMibIpxRulesDstNode         OCTET STRING,
+    rlPolicySimpleGalMibIpxRulesDstSocket       INTEGER,
+    rlPolicySimpleGalMibIpxRulesSrcNet          OCTET STRING,
+    rlPolicySimpleGalMibIpxRulesSrcNode         OCTET STRING,
+    rlPolicySimpleGalMibIpxRulesSrcSocket       INTEGER,
+    rlPolicySimpleGalMibIpxRulesInIfIndexList   PortList,
+    rlPolicySimpleGalMibIpxRulesCondition       INTEGER,
+    rlPolicySimpleGalMibIpxRulesAction          INTEGER,
+    rlPolicySimpleGalMibIpxRulesProfilePointer  INTEGER,
+    rlPolicySimpleGalMibIpxRulesOutIfIndexList  PortList,
+    rlPolicySimpleGalMibIpxRulesStatus          RowStatus
+}
+
+
+
+rlPolicySimpleGalMibIpxRulesIndex OBJECT-TYPE
+    SYNTAX  INTEGER(1..2147483647)
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "This enumerates the table. The user should assign indices in such a
+        way that there will be a gap big enough between one rule and the next
+        to allow insertion of additional rules in between (a gap of 1000 is
+        recommended). "
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 1 }
+
+rlPolicySimpleGalMibIpxRulesDescription OBJECT-TYPE
+    SYNTAX  DisplayString(SIZE(0..40))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Informational text given by the user to describe the rule."
+    DEFVAL{""}
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 2 }
+
+rlPolicySimpleGalMibIpxRulesDstNet OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..4))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the ipxDst Net to compare to"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 3 }
+
+rlPolicySimpleGalMibIpxRulesDstNode OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the ipxDstNode to compare to"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 4 }
+
+rlPolicySimpleGalMibIpxRulesDstSocket OBJECT-TYPE
+    SYNTAX  INTEGER(0..65535)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the ipx DstSocket to compare to"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 5 }
+
+rlPolicySimpleGalMibIpxRulesSrcNet OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..4))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the ipxSrc Net to compare to"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 6 }
+
+rlPolicySimpleGalMibIpxRulesSrcNode OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the ipxSrcNode to compare to"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 7 }
+
+rlPolicySimpleGalMibIpxRulesSrcSocket OBJECT-TYPE
+    SYNTAX  INTEGER(0..65535)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the ipx SrcSocket to compare to"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 8 }
+
+
+rlPolicySimpleGalMibIpxRulesInIfIndexList OBJECT-TYPE
+    SYNTAX  PortList
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the list of input ports to which this rule applies."
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 9 }
+
+rlPolicySimpleGalMibIpxRulesCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+            equal(1),
+            notEqual(2),
+            bigger(3),
+            smaller(4)
+    }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the relation that should hold for each relevant field of
+         the rule in comparison to the packet's."
+    DEFVAL { equal }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 10 }
+
+rlPolicySimpleGalMibIpxRulesAction OBJECT-TYPE
+    SYNTAX  INTEGER {
+            block(1),
+            blockAndTrap(2),
+            permitAndTrap(3),
+            permit(4)
+    }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the action to be performed if the rule matches."
+    DEFVAL { permit }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 11 }
+
+rlPolicySimpleGalMibIpxRulesProfilePointer OBJECT-TYPE
+    SYNTAX  INTEGER(0..2147483647)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the profile attached to the rule. The
+        value is the index in the profile table of the attached profile.
+        Value 0 means that no profile is attached to the rule and is valid only
+        in case of action block."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 12 }
+
+rlPolicySimpleGalMibIpxRulesOutIfIndexList OBJECT-TYPE
+    SYNTAX  PortList
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the list of output ports on which bandwidth should be
+         allocated for this rule."
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 13 }
+
+
+rlPolicySimpleGalMibIpxRulesStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The status of a table entry.
+         It is used to delete an entry from this table.
+         notInService is used to disable an entry.
+         notReady will be assigned by the device to indicate that the rule
+         can not be active because some ports in the output ports list are not
+         in a state allowing bandwidth allocation guarantee."
+    ::= { rlPolicySimpleGalMibIpxRulesEntry 14 }
+
+--
+-- rlPolicySimpleGalMibBridgeFcogTable
+--
+
+rlPolicySimpleGalMibBridgeFcogTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibBridgeFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "The table defines the used fields for Bridge classification"
+    ::= { rlPolicySimpleGalMib 10 }
+
+rlPolicySimpleGalMibBridgeFcogEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibBridgeFcogEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "the entry defines the used fields for classification"
+    INDEX  { rlPolicySimpleGalMibBridgeFcogIndex }
+    ::= { rlPolicySimpleGalMibBridgeFcogTable 1 }
+
+
+RlPolicySimpleGalMibBridgeFcogEntry ::= SEQUENCE  {
+
+   rlPolicySimpleGalMibBridgeFcogIndex          INTEGER,
+   rlPolicySimpleGalMibBridgeFcogDstMac         OCTET STRING,
+   rlPolicySimpleGalMibBridgeFcogSrcMac         OCTET STRING,
+   rlPolicySimpleGalMibBridgeFcogVid            TruthValue,
+   rlPolicySimpleGalMibBridgeFcogInIfIndex      TruthValue,
+   rlPolicySimpleGalMibBridgeFcogEthType        TruthValue,
+   rlPolicySimpleGalMibBridgeFcogIpTosOrDscp    TruthValue,
+   rlPolicySimpleGalMibBridgeFcogIpProtocol     TruthValue,
+   rlPolicySimpleGalMibBridgeFcogIpSrcIpMask    INTEGER,
+   rlPolicySimpleGalMibBridgeFcogIpDstIpMask    INTEGER,
+   rlPolicySimpleGalMibBridgeFcogIpSrcPort      TruthValue,
+   rlPolicySimpleGalMibBridgeFcogIpDstPort      TruthValue
+}
+
+
+rlPolicySimpleGalMibBridgeFcogIndex OBJECT-TYPE
+    SYNTAX  INTEGER (1)
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "the table index - only one entry exist"
+    ::= {  rlPolicySimpleGalMibBridgeFcogEntry 1 }
+
+rlPolicySimpleGalMibBridgeFcogDstMac OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the use of the field in the rules"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 2 }
+
+rlPolicySimpleGalMibBridgeFcogSrcMac OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the use of the field in the rules"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 3 }
+
+rlPolicySimpleGalMibBridgeFcogVid OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 4 }
+
+rlPolicySimpleGalMibBridgeFcogInIfIndex OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 5 }
+
+rlPolicySimpleGalMibBridgeFcogEthType OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 6 }
+
+rlPolicySimpleGalMibBridgeFcogIpTosOrDscp OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 7 }
+
+rlPolicySimpleGalMibBridgeFcogIpProtocol OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 8 }
+
+rlPolicySimpleGalMibBridgeFcogIpSrcIpMask OBJECT-TYPE
+    SYNTAX  INTEGER (0..32)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the number of used bits of the Ip Address from the left"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 9 }
+
+rlPolicySimpleGalMibBridgeFcogIpDstIpMask OBJECT-TYPE
+    SYNTAX  INTEGER (0..32)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the number of used bits of the Ip Address from the left"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 10 }
+
+rlPolicySimpleGalMibBridgeFcogIpSrcPort OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 11 }
+
+rlPolicySimpleGalMibBridgeFcogIpDstPort OBJECT-TYPE
+    SYNTAX  TruthValue
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate whether the field is in use in the rules"
+    DEFVAL { false }
+    ::= { rlPolicySimpleGalMibBridgeFcogEntry 12 }
+
+
+--
+-- rlPolicySimpleGalMibBridgeRulesTable
+--
+
+rlPolicySimpleGalMibBridgeRulesTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibBridgeRulesEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This table contains the policy rules defined by the user. The order
+        of the entries in the table is important, since the first rule that
+        applies to the incoming packet will be acted upon, ignoring any
+        further rules that may apply as well."
+    ::= { rlPolicySimpleGalMib 11 }
+
+rlPolicySimpleGalMibBridgeRulesEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibBridgeRulesEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "This entry defines one policy rule."
+    INDEX  {   rlPolicySimpleGalMibBridgeRulesIndex }
+    ::= { rlPolicySimpleGalMibBridgeRulesTable 1 }
+
+
+RlPolicySimpleGalMibBridgeRulesEntry ::= SEQUENCE  {
+
+    rlPolicySimpleGalMibBridgeRulesIndex                INTEGER,
+    rlPolicySimpleGalMibBridgeRulesDescription          DisplayString,
+    rlPolicySimpleGalMibBridgeRulesDstMac               OCTET STRING,
+    rlPolicySimpleGalMibBridgeRulesSrcMac               OCTET STRING,
+    rlPolicySimpleGalMibBridgeRulesVid                  INTEGER,
+    rlPolicySimpleGalMibBridgeRulesInIfIndexList        PortList,
+    rlPolicySimpleGalMibBridgeRulesEthType              INTEGER,
+    rlPolicySimpleGalMibBridgeRulesIpTosOrDscp          INTEGER,
+    rlPolicySimpleGalMibBridgeRulesIpProtocol           INTEGER,
+    rlPolicySimpleGalMibBridgeRulesIpSrcIp              IpAddress,
+    rlPolicySimpleGalMibBridgeRulesIpDstIp              IpAddress,
+    rlPolicySimpleGalMibBridgeRulesIpSrcPort            INTEGER,
+    rlPolicySimpleGalMibBridgeRulesIpDstPort            INTEGER,
+    rlPolicySimpleGalMibBridgeRulesCondition            INTEGER,
+    rlPolicySimpleGalMibBridgeRulesAction               INTEGER,
+    rlPolicySimpleGalMibBridgeRulesProfilePointer       INTEGER,
+    rlPolicySimpleGalMibBridgeRulesOutIfIndexList       PortList,
+    rlPolicySimpleGalMibBridgeRulesStatus               RowStatus
+}
+
+
+
+rlPolicySimpleGalMibBridgeRulesIndex OBJECT-TYPE
+    SYNTAX  INTEGER(1..2147483647)
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "This enumerates the table. The user should assign indices in such a
+        way that there will be a gap big enough between one rule and the next
+        to allow insertion of additional rules in between (a gap of 1000 is
+        recommended). "
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 1 }
+
+rlPolicySimpleGalMibBridgeRulesDescription OBJECT-TYPE
+    SYNTAX  DisplayString(SIZE(0..40))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Informational text given by the user to describe the rule."
+    DEFVAL{""}
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 2 }
+
+
+rlPolicySimpleGalMibBridgeRulesDstMac OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the Dst mac to compare"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 3 }
+
+rlPolicySimpleGalMibBridgeRulesSrcMac OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..6))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the source mac to compare"
+    DEFVAL { "" }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 4 }
+
+
+rlPolicySimpleGalMibBridgeRulesVid OBJECT-TYPE
+    SYNTAX  INTEGER(0..4095)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the vlanId to compare"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 5 }
+
+
+rlPolicySimpleGalMibBridgeRulesInIfIndexList OBJECT-TYPE
+    SYNTAX  PortList
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the list of input ports to which this rule applies."
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 6 }
+
+
+rlPolicySimpleGalMibBridgeRulesEthType OBJECT-TYPE
+    SYNTAX  INTEGER(0..65535)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the Ethernet type of the packet"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 7 }
+
+
+rlPolicySimpleGalMibBridgeRulesIpTosOrDscp OBJECT-TYPE
+    SYNTAX  INTEGER(0..255)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the tos or dscp to compare"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 8 }
+
+rlPolicySimpleGalMibBridgeRulesIpProtocol OBJECT-TYPE
+    SYNTAX  INTEGER(0..255)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the protocol to compare"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 9 }
+
+rlPolicySimpleGalMibBridgeRulesIpSrcIp OBJECT-TYPE
+    SYNTAX  IpAddress
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the srcIp to compare"
+    DEFVAL {'00000000'H}
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 10 }
+
+rlPolicySimpleGalMibBridgeRulesIpDstIp OBJECT-TYPE
+    SYNTAX  IpAddress
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the DstIp to compare"
+    DEFVAL {'00000000'H}
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 11 }
+
+rlPolicySimpleGalMibBridgeRulesIpSrcPort OBJECT-TYPE
+    SYNTAX  INTEGER(0..65535)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the Src port to compare"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 12 }
+
+rlPolicySimpleGalMibBridgeRulesIpDstPort OBJECT-TYPE
+    SYNTAX  INTEGER(0..65535)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the Src port to compare"
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 13 }
+
+
+rlPolicySimpleGalMibBridgeRulesCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+            equal(1),
+            notEqual(2),
+            bigger(3),
+            smaller(4)
+    }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicate the relation that should hold for each relevant field of
+         the rule in comparison to the packet's field."
+    DEFVAL { equal }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 14 }
+
+rlPolicySimpleGalMibBridgeRulesAction OBJECT-TYPE
+    SYNTAX  INTEGER {
+            block(1),
+            blockAndTrap(2),
+            permitAndTrap(3),
+            permit(4)
+    }
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the action to be performed if there is a match with the rule."
+    DEFVAL { permit }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 15 }
+
+rlPolicySimpleGalMibBridgeRulesProfilePointer OBJECT-TYPE
+    SYNTAX  INTEGER(0..2147483647)
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the profile attached to the rule. The
+        value is the index in the profile table of the attached profile.
+        Value 0 means that no profile is attached to the rule and is valid only
+        in case of action block."
+    DEFVAL { 0 }
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 16 }
+
+rlPolicySimpleGalMibBridgeRulesOutIfIndexList OBJECT-TYPE
+    SYNTAX  PortList
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates the list of output ports to on which bandwidth should be
+         allocated for this rule."
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 17 }
+
+
+rlPolicySimpleGalMibBridgeRulesStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The status of a table entry.
+         It is used to delete an entry from this table.
+         notInService is used to disable an entry.
+         notReady will be assigned by the device to indicate that the rule
+         can not be active because some ports in the output ports list are not
+         in a state allowing bandwidth allocation guarantee."
+    ::= { rlPolicySimpleGalMibBridgeRulesEntry 18 }
+
+--
+-- rlPolicySimpleGalMibPortTable
+--
+
+rlPolicySimpleGalMibPortTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RlPolicySimpleGalMibPortEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "The table defines all of the ports types"
+    ::= { rlPolicySimpleGalMib 12 }
+
+rlPolicySimpleGalMibPortEntry OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibPortEntry
+    ACCESS  not-accessible
+    STATUS  mandatory
+    DESCRIPTION
+        "An entry defines a port's type"
+    INDEX  {   rlPolicySimpleGalMibPortIfIndex }
+    ::= { rlPolicySimpleGalMibPortTable 1 }
+
+
+RlPolicySimpleGalMibPortEntry ::= SEQUENCE  {
+
+    rlPolicySimpleGalMibPortIfIndex             INTEGER,
+    rlPolicySimpleGalMibPortType                RlPolicySimpleGalMibPortType
+}
+
+
+rlPolicySimpleGalMibPortIfIndex OBJECT-TYPE
+    SYNTAX  INTEGER(1..2147483647)
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "This enumerates the table entry."
+    ::= { rlPolicySimpleGalMibPortEntry 1 }
+
+
+rlPolicySimpleGalMibPortType OBJECT-TYPE
+    SYNTAX  RlPolicySimpleGalMibPortType
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "Defines the port type"
+    DEFVAL { boundary }
+    ::= { rlPolicySimpleGalMibPortEntry 2 }
+
+
+rlGalPolicyMode OBJECT-TYPE
+    SYNTAX  INTEGER {
+        bridged(1),
+        routedIp(2)
+    }
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "Indicates whether the QoS is for:
+         -All Bridged packets; or
+         -All routed IP packets.
+         The value cannot change after system init"
+    ::= { rlGalileo 10 }
+
+END
