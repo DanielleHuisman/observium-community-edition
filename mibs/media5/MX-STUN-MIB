@@ -1,0 +1,327 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+--
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-STUN-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxIpHostName,
+        MxIpPort
+    FROM MX-TC
+        mediatrixConfig,
+        ipAddressStatus,
+        ipAddressConfig
+    FROM MX-SMI;
+
+stunMIB MODULE-IDENTITY
+    LAST-UPDATED "200412100000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION  "This MIB provides information to configure the STUN client
+                  of the unit."
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "200412100000Z"
+    DESCRIPTION "Addition of the following MIB variables: stunQueryTimeout,
+                 stunKeepAliveInterval, stunNatBindingQueryInterval.
+
+                 Replace variable stunEstimatedNatBindingDuration  by 
+                 stunQueryCacheDuration."
+    REVISION    "200411160000Z"
+    DESCRIPTION "Addition of stunIndex and stunStaticIndex"
+    REVISION    "200411090000Z"
+    DESCRIPTION "Creation"
+    ::= { mediatrixConfig 200 }
+
+stunMIBObjects  OBJECT IDENTIFIER ::= { stunMIB 1 }
+stunConformance OBJECT IDENTIFIER ::= { stunMIB 2 }
+
+    -- ************************************************************************
+    -- Enable/Disable Stun functionality
+    -- ************************************************************************
+    stunEnable OBJECT-TYPE
+        SYNTAX        MxEnableState
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Enables/Disables the STUN client."
+        DEFVAL         { disable }
+        ::= { stunMIBObjects 50 }
+
+    stunQueryCacheDuration  OBJECT-TYPE
+        SYNTAX  Unsigned32 (0..3600)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION "Indicates the amount of time the unit should keep a STUN
+                     query result in its internal cache.  
+
+                     Keeping a query in a cache helps reduce the amount of 
+                     unnecessary STUN queries.
+
+                     When set to 0, the cache is disabled.  The unit will do a 
+                     STUN query each time a socket needs to be used.
+
+                     This value is expressed in seconds (s).
+                     "
+        DEFVAL { 0 }
+        ::=  {  stunMIBObjects 100}
+
+    stunQueryTimeout OBJECT-TYPE
+        SYNTAX  Unsigned32 (500..10000)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION "Indicates the maximum amount of time the unit should
+                     wait for an answer to a STUN query sent to a STUN
+                     server.
+
+                     This variable only applies when stunEnable is set
+                     to enable.
+
+                     Caution is advised in setting long timeouts.
+                     In the advent of an unresponsive STUN server, the
+                     unit may end up waiting a long time before it
+                     determines that a call cannot be made due to the 
+                     STUN server failure.
+
+                     This value is expressed in milliseconds (ms).
+                     "
+        DEFVAL { 1000 }
+        ::=  {  stunMIBObjects 150}
+
+    stunKeepAliveInterval OBJECT-TYPE
+        SYNTAX  Unsigned32 (0..120)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION "Indicates the interval at which blank keepalive
+                     messages are sent by the unit to keep a firewall
+                     hole opened.
+                     
+                     Keepalive messages are used by both the signaling
+                     protocol socket and the RTP socket to keep those 
+                     connections opened through a firewall.
+
+                     When set to 0, no keep alive packet is sent. 
+
+                     This value is expressed in seconds (s).
+                     "
+        DEFVAL { 30 }
+        ::=  {  stunMIBObjects 200}
+
+    stunNatBindingQueryInterval OBJECT-TYPE
+        SYNTAX  Unsigned32 (2..600)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION "Indicates the frequency at which a unit should
+                     do NAT binding discovery for its signaling protocol
+                     socket.
+
+                     This is only used with units that do not register
+                     their ports.
+
+                     Units that register their ports do their NAT binding
+                     discovery just before registering.  
+
+                     This value is expressed in seconds (s).
+                     "
+        DEFVAL { 300 }
+        ::=  {  stunMIBObjects 250}
+
+
+-- Add the STUN IP addresses specifics parameters
+
+    ipAddressStatusStun OBJECT IDENTIFIER ::= { ipAddressStatus 200 }
+    ipAddressConfigStun OBJECT IDENTIFIER ::= { ipAddressConfig 200 }
+
+-- Add the STUN status information
+
+    -- ************************************************************************
+    -- IP Address Status Stun server Table
+    -- ************************************************************************
+    stunTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF StunEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of STUN servers."
+        ::= { ipAddressStatusStun 50 }
+
+        stunEntry OBJECT-TYPE
+            SYNTAX      StunEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the stunTable used to specify a STUN server."
+            INDEX       {
+                         stunIndex
+                        }
+            ::= { stunTable 50 }
+
+            StunEntry ::= SEQUENCE
+            {
+                stunIndex                       Unsigned32,
+                stunHost                      MxIpHostName,
+                stunPort                          MxIpPort,
+            }
+
+        stunIndex OBJECT-TYPE
+            SYNTAX  Unsigned32 (1..1)
+            MAX-ACCESS  read-only
+            STATUS      current
+            DESCRIPTION "STUN index for this row."
+            ::= { stunEntry 10 }
+
+            stunHost OBJECT-TYPE
+                SYNTAX      MxIpHostName
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "STUN server IP address or domain name."
+                DEFVAL      { "192.168.0.10" }
+                ::= { stunEntry 50 }
+
+            stunPort OBJECT-TYPE
+                SYNTAX      MxIpPort
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "STUN server IP port number."
+                DEFVAL      { 3478 }
+                ::= { stunEntry 100 }
+
+-- Add the STUN configuration information
+
+    ipAddressConfigStunStatic OBJECT IDENTIFIER ::= { ipAddressConfigStun 50 }
+    
+    -- Add the static parameters
+    
+    -- ************************************************************************
+    -- IP Address Config Stun server Table
+    -- ************************************************************************
+    stunStaticTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF StunStaticEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of STUN servers."
+        ::= { ipAddressConfigStunStatic 50 }
+
+        stunStaticEntry OBJECT-TYPE
+            SYNTAX      StunStaticEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the stunStaticTable used to specify a STUN server."
+            INDEX       {
+                         stunStaticIndex
+                        }
+            ::= { stunStaticTable 50 }
+
+            StunStaticEntry ::= SEQUENCE
+            {
+                stunStaticIndex                    Unsigned32,
+                stunStaticHost                   MxIpHostName,
+                stunStaticPort                       MxIpPort,
+            }
+
+        stunStaticIndex OBJECT-TYPE
+            SYNTAX  Unsigned32 (1..1)
+            MAX-ACCESS  read-only
+            STATUS      current
+            DESCRIPTION "STUN index for this row."
+            ::= { stunStaticEntry 10 }
+
+            stunStaticHost OBJECT-TYPE
+                SYNTAX      MxIpHostName
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Static STUN server IP address or domain name."
+                DEFVAL      { "192.168.0.10" }
+                ::= { stunStaticEntry 50 }
+
+            stunStaticPort OBJECT-TYPE
+                SYNTAX      MxIpPort
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Static STUN server IP port number."
+                DEFVAL      { 3478 }
+                ::= { stunStaticEntry 100 }
+
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    stunCompliances OBJECT IDENTIFIER ::= { stunConformance 1 }
+
+    stunComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "Minimal parameters definitions to support STUN."
+        MODULE -- This Module
+            MANDATORY-GROUPS {
+                                 stunBasicGroupVer1,
+                                 stunServerGroupVer1
+                             }
+        ::= { stunCompliances 1 }
+
+    -- ************************************************************************
+    -- MIB variable grouping
+    -- ************************************************************************
+    stunGroups OBJECT IDENTIFIER ::= { stunConformance 2 }
+
+    stunBasicGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                    stunEnable,
+                    stunQueryCacheDuration,
+                    stunQueryTimeout,
+                    stunKeepAliveInterval,
+                    stunNatBindingQueryInterval
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the minimal set of objects to configure the STUN
+             service."
+        ::= { stunGroups 1 }
+
+    stunServerGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                    stunHost,
+                    stunPort,
+                    stunStaticHost,
+                    stunStaticPort
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the minimal set of objects that defines 
+             STUN server."
+        ::= { stunGroups 2 }
+
+END
+

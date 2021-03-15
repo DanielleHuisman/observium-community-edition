@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,11 +6,11 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-/// FIXME. Rewrite (clean), add discovery module with check ospf exist on device, clean stale entries (after disable)
+/// FIXME. Rewrite (clean), clean stale entries (after disable)
 // Pre-polling checks
 if (!$config['enable_ospf'] || !is_device_mib($device, 'OSPF-MIB'))
 {

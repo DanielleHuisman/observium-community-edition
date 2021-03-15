@@ -2,12 +2,11 @@
 
 /**
  * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
  *
  * @package    observium
- * @subpackage webui
+ * @subpackage web
  * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -52,7 +51,7 @@ foreach (dbFetchRows("SELECT * FROM `ports` WHERE `port_descr_type` = 'cust' GRO
            <tr>
              <td style="width: 250px;"><span style="font-weight: bold;" class="interface">'.$customer_name.'</span></td>
              <td style="width: 150px;">' . generate_device_link($device) . '</td>
-             <td style="width: 100px;">' . generate_port_link($port, $port['port_label_short']) . '</td>
+             <td style="width: 100px;">' . generate_port_link_short($port) . '</td>
              <td style="width: 100px;">'.$port['port_descr_speed'].'</td>
              <td style="width: 100px;">'.$port['port_descr_circuit'].'</td>
              <td>'.$port['port_descr_notes'].'</td>
@@ -68,7 +67,7 @@ foreach (dbFetchRows("SELECT * FROM `ports` WHERE `port_descr_type` = 'cust' GRO
 
     $graph_array['type']   = "customer_bits";
     $graph_array['to']     = $config['time']['now'];
-    $graph_array['id']     = $customer['port_descr_descr'];
+    $graph_array['id']     = '"' . $customer['port_descr_descr'] . '"'; // use double quotes for prevent split var by commas
 
     print_graph_row($graph_array);
 

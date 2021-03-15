@@ -50,7 +50,7 @@ switch ($vars['view'])
     include($config['html_dir']."/pages/device/wifi/".$vars['view'].".inc.php");
     break;
   default:
-    echo('<h2>Error. No section '.$vars['view'].'.<br /> Please report this to observium developers.</h2>');
+    echo('<h2>Error. No section '.escape_html($vars['view']).'.<br /> Please report this to observium developers.</h2>');
     break;
 }
 

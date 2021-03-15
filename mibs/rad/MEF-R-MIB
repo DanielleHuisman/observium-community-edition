@@ -1,0 +1,1939 @@
+MEF-R-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+       OBJECT-TYPE, Integer32, Unsigned32, 
+       Counter32, IpAddress, MODULE-IDENTITY, 
+       Gauge32     FROM  SNMPv2-SMI
+       TruthValue, RowStatus, MacAddress, 
+       TEXTUAL-CONVENTION, TimeStamp, RowPointer     FROM  SNMPv2-TC
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       ifIndex, InterfaceIndexOrZero     FROM  IF-MIB
+       radExperimental     FROM  RAD-SMI-MIB; 
+
+
+    mefMIBR MODULE-IDENTITY
+        LAST-UPDATED "201608041731Z"  -- August 04, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "MEF MIB."
+    ::= { radExperimental 8 }
+--mefMIBR OBJECT IDENTIFIER  ::= { iso (1) org (3) dod (6) internet (1) private (4) enterprises (1) rad (164) radExperimental (20) 8}
+
+
+--==========================================================
+--
+-- Textual Conventions
+--
+
+
+-- VLAN ID definitions
+
+TCVlanId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "A 12-bit VLAN ID used in the VLAN Tag header."
+    SYNTAX      Unsigned32 (0..4095)
+
+
+-- Burst Size
+TCBurstSizeV2 ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+      "The number of octets that the stream may send back-to-back."
+    SYNTAX       Unsigned32
+
+
+-- User Priority for IEEE 802.1Q type frames (VLAN)
+
+TCV2DefaultUserPriority     ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The default priority set by the user."
+    SYNTAX      Unsigned32 (0..63)
+
+
+-- Ethernet frame handling options in ingress and egress
+
+TCEthFrameHandling ::= TEXTUAL-CONVENTION
+   STATUS      current
+   DESCRIPTION
+           "The Ethernet frame handling options in ingress and egress."
+    SYNTAX    INTEGER {
+                        untagged(1),
+                        noChange(2),
+                        changeVlan(3),
+                        addVlan(4),
+                        removeVlan(5),
+                        rangeVlan(6)    -- Added by RAD
+                       }
+
+-- SLA priority Source
+
+TCSLAPrioritySource ::= TEXTUAL-CONVENTION
+   STATUS      current
+   DESCRIPTION
+     "This TC defines how frame priority should be determined.
+
+      - defUserPrio: denotes a user priority. This is a fixed priority that is applied to all frames.
+
+      - ieee802dot1p: denotes the use of the priority bits as defined by IEEE 802.1Q (former IEEE 802.1p) standard
+
+      - tos: denotes the use of the priority bits as defined in the IP header (i.e. TOS or DiffServ), for all Eth II
+        based packets. The differentiation between TOS and DiffServ classification is done at the priority profile table
+        level i.e. there could be different tables for TOS and DiffServ.
+
+      - fromTable: denotes that the priority of the egress frame will be determined by a user defined
+        table, that maps each ingress priority to egress priority
+     ."
+SYNTAX   INTEGER  {
+                    defUserPrio         (1),
+                    ieee802dot1p        (2),
+                    tos                 (3),
+                    diffServ            (4),    -- DSCP (note added by RAD)
+                    ieee802dot1q        (5),    -- Added by RAD
+                    copy                (6),    -- Added by RAD
+                    userMarkingTable    (7),    -- Added by RAD
+                    spVlanId            (8),    -- Added by RAD
+                    spVlanIdAndPBit     (9)     -- Added by RAD
+                   }
+
+
+-- Defines the EVC ID
+TCEvcId ::= TEXTUAL-CONVENTION
+   DISPLAY-HINT "d"
+   STATUS      current
+   DESCRIPTION
+     "This TC defines the EVC identifier."
+SYNTAX   Unsigned32 (1..4095)
+
+-- VT Id
+TCVTIdV2 ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS       current
+    DESCRIPTION
+      "This object points to the BW Profile."
+    SYNTAX       Unsigned32
+
+--============================================================
+
+-- Top-level components of this MIB
+
+-- Tables, Scalars
+
+mefObjects OBJECT IDENTIFIER ::= {  mefMIBR 1 }
+
+-- conformance information
+
+-- mefConformance OBJECT IDENTIFIER ::=   {  mefMIBR 2 }
+
+--
+-- MIB components
+--
+
+
+--
+-- MIB Scalars
+--
+mefrScalarObjects OBJECT IDENTIFIER ::= {  mefObjects 1 }
+
+mefrBwRoundUp   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object designates whether the device services bandwidth are
+     rounded up or down.
+     true:   Set the CIR & EIR to the closest higher granular value.
+     false:  Set the CIR & EIR to the closest lower  granular value.
+    "
+    DEFVAL { false }
+    ::= { mefrScalarObjects 1 }
+
+mefrEnvelopeRanks   OBJECT-TYPE
+    SYNTAX          Unsigned32 (4 | 8)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+    "The maximum number of ranks (CoS) that are allocated for an envelope
+     policer."
+    DEFVAL { 4 }
+    ::= { mefrScalarObjects 2 }
+
+hsQBlockMapping     OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+    slot1  (1),
+    slot4  (4)
+    }
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+    "Slot supporting high scale queue blocks in ETX-220."
+    DEFVAL {slot4 }
+    ::= { mefrScalarObjects 3 }
+--
+-- MIB Tables
+--
+
+------------------------
+--  Profiles Definitions
+------------------------
+
+
+
+-- Bandwidth (BW) Profile Attributes
+bwProfileObjects OBJECT IDENTIFIER ::= {  mefObjects 3 }
+
+bwProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF  BwProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This table defines the MEF BW profile attributes. The profile can be
+       defined either directly to an entity i.e. UNI or EVC or per EVC.CoS as
+       follows:
+
+       UNI
+       When the BW profile is applied to a UNI, the ' CoSProfileIndex'
+       attribute's value must be set to 'none'.
+
+       EVC
+       When the BW profile is applied to an EVC, the ' nCoSProfileIndex'
+       attribute's value must be set to 'none'.
+
+       EVC.CoS
+       When the BW profile is applied to an EVC and CoS, the ' CoSProfileIndex'
+       attribute's value must be set to the
+       correct CoS ID.
+
+       A bandwidth profile outlines the service guarantees that the SP will provide
+       by defining traffic types and amounts of each traffic type that subscribers
+       can send into the SP's network."
+   ::= {  bwProfileObjects 1 }
+
+bwProfileEntry OBJECT-TYPE
+    SYNTAX      BwProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "A conceptual row where each row contains one BW profile attributes. "
+    INDEX {  bwProfileID,
+             bwProfileIndex      }
+    ::= {  bwProfileTable 1 }
+
+BwProfileEntry ::= SEQUENCE {
+    bwProfileID                      TCVTIdV2,
+    bwProfileIndex                   Unsigned32,
+    bwProfileRowStatus               RowStatus,
+    bwProfileCIR                     Unsigned32,
+    bwProfileCBS                     TCBurstSizeV2,
+    bwProfileEIR                     Unsigned32,
+    bwProfileEBS                     TCBurstSizeV2,
+    bwProfileColorAware                    TruthValue,
+    bwProfileColorAwareAdmissionOption     TruthValue,
+    bwProfileName                    SnmpAdminString,
+    bwProfileGranularity             INTEGER,
+    bwProfilePolicedTraffic          INTEGER,
+    bwProfileCompensation            Unsigned32 
+ }
+
+bwProfileID  OBJECT-TYPE
+    SYNTAX      TCVTIdV2
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the BW Profile ID. The BW profile ID must be
+       greater than '0'. "
+    ::= {  bwProfileEntry 1 }
+
+bwProfileIndex  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the BW Profile index. The BW profile index is a
+       'running index' denoting more than one profile e.g. High & Low, specified
+        for this BW profile. The BW profile index must be greater than '0'."
+    ::= {  bwProfileEntry 2 }
+
+bwProfileRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing row
+       in the table."
+    ::= {  bwProfileEntry 3 }
+
+bwProfileCIR  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS  "Kbps"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the Committed Information Rate (CIR) BW.
+       CIR is the average rate up to which packets are marked Green."
+    ::= {  bwProfileEntry 4 }
+
+bwProfileCBS  OBJECT-TYPE
+    SYNTAX     TCBurstSizeV2
+    UNITS  "Octets"
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the Committed Burst Size (CBS) for the  CoS.
+      CBS is the maximum number of bytes allowed for incoming packets to burst above CIR,
+      but still marked Green."
+    ::= {  bwProfileEntry 5 }
+
+--    ::= {  bwProfileEntry 6 }
+
+--    ::= {  bwProfileEntry 7 }
+
+bwProfileEIR  OBJECT-TYPE
+   SYNTAX     Unsigned32
+   UNITS  "Kbps"
+   MAX-ACCESS read-create
+   STATUS     current
+   DESCRIPTION
+     "This attribute defines the Excessive Information Rate (EIR) BW.
+     The EIR is greater or equal to CIR. Packets that exceed the CIR
+     but are below the EIR are marked Yellow."
+   ::= {  bwProfileEntry 8 }
+
+bwProfileEBS  OBJECT-TYPE
+   SYNTAX      TCBurstSizeV2
+   UNITS  "Octets"
+   MAX-ACCESS read-create
+   STATUS     current
+   DESCRIPTION
+     "This attribute defines the Excessive Burst Size (EBS) for the CoS.
+     EBS is the maximum number of bytes allowed for incoming packets to burst above EIR,
+      but still marked Yellow."
+   ::= {  bwProfileEntry 9 }
+
+-- 10..11 reserved
+
+bwProfileColorAware  OBJECT-TYPE
+   SYNTAX          TruthValue
+   MAX-ACCESS read-create
+   STATUS     current
+    DESCRIPTION
+      "This attribute defines whether the policing function assumes ingress
+       frames are already colored and must be treated, or not. This attribute
+       implements the MEF's Color Mode (CM) attribute.
+
+       true
+       Frames are already colored and hence the policing function must be aware
+       of the color information which is set in the ingress frames.
+
+      false
+      Frames are not colored and hence the policing function ignores any color
+      information which is set in the ingress frames.
+
+      ."
+    DEFVAL { false }
+    ::= { bwProfileEntry 12 }
+
+bwProfileColorAwareAdmissionOption  OBJECT-TYPE
+    SYNTAX     TruthValue
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the admission options for Yellow Colored Frames.
+       A service may be defined to admit more yellow frames into the network
+       when the volume of the green frames does not consume all available CIR
+       bandwidth. In this case, the additional yellow frames are allowed to
+       consume the unused green frame bandwidth.
+       This attribute implements the MEF's Coupling Flag (CF) attribute. This
+       capability is configured through traffic conditioning options.  The two
+       options applied to the Token Bucket Rate Adaptation Algorithm (TBRA) are:
+
+       true
+       The states of TBRA(CBS, CIR) and TBRA(EBS, EIR) are correlated.  That is,
+       the service is defined to admit more yellow frames into the network when
+       the volume of the green frames does not consume all available CIR
+       bandwidth. With this option when the content of the first token bucket
+       TBRA(CBS, CIR) reach its maximum value,
+       CBS, the overflow of tokens is allowed to the second bucket, TBRA(EBS,
+       EIR), up to a maximum value of EBS.
+
+       false
+
+       The states of TBRA(CBS, CIR) and TBRA(EBS, EIR) are not correlated.  That
+       is, the service is defined NOT to admit more yellow frames into the network
+       when the volume of the green frames does not consume all available
+       CIR bandwidth. With this option the contents of one token bucket are
+       updated independently from the contents of the other token bucket.
+      ."
+    DEFVAL { false }
+    ::= { bwProfileEntry 13 }
+
+-- 14 and up - Added by RAD
+
+bwProfileName   OBJECT-TYPE
+   SYNTAX     SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the name assigned to BW profile."
+    ::= {  bwProfileEntry 14 }
+
+
+bwProfileGranularity  OBJECT-TYPE
+   SYNTAX     INTEGER
+                {
+                  r64kbps  (2),
+                  r1Mbps   (3),
+                  r10Mbps  (4),
+                  r100Mbps (5)   }
+
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines BW profile Granularity."
+    ::= {  bwProfileEntry 15 }
+
+bwProfilePolicedTraffic  OBJECT-TYPE
+   SYNTAX      INTEGER
+        {
+        all                                    (2),
+        broadcast                              (3),
+        multicast                              (4),
+        unknownUnicast                         (5),
+        broadcastAndMulticast                  (6),
+        broadcastAndMulticastAndUnknownUnicast (7)
+        }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the policed traffic type."
+    ::= {  bwProfileEntry 16 }
+
+bwProfileCompensation  OBJECT-TYPE
+   SYNTAX  Unsigned32
+   UNITS  "Octets"
+   MAX-ACCESS read-create
+   STATUS     current
+   DESCRIPTION
+       "This attribute defines the layer1 overhead (preamble and IFG) and the
+        overhead for the added VLAN header in case of stacking.
+        The compensation enable the policer to charge the bucket also for these overheads.
+        Using this attribute,the rate that will be configured in the policer will be
+        the actual rate."
+     ::= {  bwProfileEntry 17 }
+
+
+-- --------------------------
+-- Envelope BW Profile Table
+-- --------------------------
+
+envelopeBwProfileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EnvelopeBwProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains envelope bandwidth profiles as defined in
+     MEF 10.3 section 12."
+    ::= { bwProfileObjects 2 }
+
+envelopeBwProfileEntry OBJECT-TYPE
+    SYNTAX      EnvelopeBwProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in envelope BW profile table.
+
+     A row cannot be deleted if the profile is associated to a flow.
+
+     When a row is deleted all the corresponding rows in the
+     envelopeBwProfileCoSTable are automatically deleted as well."
+    INDEX {  envelopeBwProfileIndex }
+    ::= { envelopeBwProfileTable 1 }
+
+EnvelopeBwProfileEntry ::= SEQUENCE {
+    envelopeBwProfileIndex                    Unsigned32,
+    envelopeBwProfileName                     SnmpAdminString,
+    envelopeBwProfileRowStatus                RowStatus,
+    envelopeBwProfileCouplingFlagPolicy       INTEGER,
+    envelopeBwProfileCouplingFlag0            Unsigned32,
+    envelopeBwProfileColorMode                INTEGER,
+    envelopeBwProfileCompensation             Unsigned32 
+ }
+
+envelopeBwProfileIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as profile identifier."
+    ::= { envelopeBwProfileEntry 1 }
+
+envelopeBwProfileName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable profile name."
+    ::= { envelopeBwProfileEntry 2 }
+
+envelopeBwProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of profiles."
+    ::= { envelopeBwProfileEntry 3 }
+
+envelopeBwProfileCouplingFlagPolicy    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    manual              (1),
+    sharingExcessBw     (2),
+    uncoupledBwSharing  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Overall policy for the coupling flags.
+
+     When set to sharingExcessBw(2) or to uncoupledBwSharing(3) the
+     object envelopeBwProfileCouplingFlag0 is ignored and the object/s
+     envelopeBwProfileCosCouplingFlag are ignored."
+    DEFVAL      { sharingExcessBw }
+    ::= { envelopeBwProfileEntry 4 }
+
+envelopeBwProfileCouplingFlag0     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0 | 1)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This parameter determines whether or not overflow tokens not used for
+     service frames declared Green can be used as Yellow tokens.
+
+     When set to 1 - Green tokens that are unconsumed by any CoS are
+     passed to the Yellow bucket of the highest priority CoS.
+     When set to 0 - Green tokens that are unconsumed by any CoS are lost.
+
+     This object is relevant only when envelopeBwProfileCouplingFlagPolicy
+     is set to manual(1)."
+    DEFVAL      { 0 }
+    ::= { envelopeBwProfileEntry 5 }
+
+envelopeBwProfileColorMode     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    colorAware  (1),
+    colorBlind  (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The color mode that is used for the service."
+    DEFVAL      { colorBlind }
+    ::= { envelopeBwProfileEntry 6 }
+
+envelopeBwProfileCompensation     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..63)
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute allows to take into consideration the overhead added
+     to transmitted frames e.g preamble, IFG, VLAN stacking.
+
+     The compensation enables the policer to charge the bucket also for
+     these overheads.
+     Using this attribute,the rate that is configured in the policer is
+     the actual rate."
+    DEFVAL      { 0 }
+    ::= { envelopeBwProfileEntry 7 }
+
+
+-- ------------------------------
+-- Envelope BW Profile CoS Table
+-- ------------------------------
+
+envelopeBwProfileCosTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EnvelopeBwProfileCosEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains envelope bandwidth profiles, at the CoS level."
+    ::= { bwProfileObjects 3 }
+
+envelopeBwProfileCosEntry OBJECT-TYPE
+    SYNTAX      EnvelopeBwProfileCosEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in envelope BW profile CoS table.
+
+     When a row is created, the envelopeBwProfileIndex must point to an
+     already existing row of envelopeBwProfileTable.
+
+     A row cannot be deleted if the profile is associated to a flow.
+
+     When a row in envelopeBwProfileTable is deleted all the corresponding
+     rows in this table are automatically deleted as well."
+    INDEX {  envelopeBwProfileIndex,
+             envelopeBwProfileCosIndex }
+    ::= { envelopeBwProfileCosTable 1 }
+
+EnvelopeBwProfileCosEntry ::= SEQUENCE {
+    envelopeBwProfileCosIndex                 Unsigned32,
+    envelopeBwProfileCosRowStatus             RowStatus,
+    envelopeBwProfileCosCir                   Gauge32,
+    envelopeBwProfileCosCirMax                Gauge32,
+    envelopeBwProfileCosCbs                   Gauge32,
+    envelopeBwProfileCosEir                   Gauge32,
+    envelopeBwProfileCosEirMax                Gauge32,
+    envelopeBwProfileCosEbs                   Gauge32,
+    envelopeBwProfileCoSCouplingFlag          Unsigned32 
+ }
+
+envelopeBwProfileCosIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The CoS to which the configuration in this table applies."
+    ::= { envelopeBwProfileCosEntry 1 }
+
+envelopeBwProfileCosRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of CoS profiles."
+    ::= { envelopeBwProfileCosEntry 2 }
+
+envelopeBwProfileCosCir     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the average rate of service frames that are
+     declared Green by the BW profile."
+    DEFVAL      { 0 }
+    ::= { envelopeBwProfileCosEntry 3 }
+
+envelopeBwProfileCosCirMax     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute limits the rate of tokens added to the committed
+     token bucket (Green bucket).
+
+     The value of this object must be equal or greater than
+     envelopeBwProfileCosCir."
+    DEFVAL      { 10000000 }
+    ::= { envelopeBwProfileCosEntry 4 }
+
+envelopeBwProfileCosCbs     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the maximum number of bytes available for a
+     burst of service frames sent at the UNI line rate that are declared
+     Green by the BW profile."
+    DEFVAL      { 0 }
+    ::= { envelopeBwProfileCosEntry 5 }
+
+envelopeBwProfileCosEir     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the average rate of service frames that are
+     declared Yellow by the BW profile."
+    DEFVAL      { 0 }
+    ::= { envelopeBwProfileCosEntry 6 }
+
+envelopeBwProfileCosEirMax     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute limits the rate of tokens added to the excess
+     token bucket (Yellow bucket).
+
+     The value of this object must be equal or greater than
+     envelopeBwProfileCosEir."
+    DEFVAL      { 10000000 }
+    ::= { envelopeBwProfileCosEntry 7 }
+
+envelopeBwProfileCosEbs     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the maximum number of bytes available for a
+     burst of service frames sent at the UNI line rate that are declared
+     Yellow by the BW profile."
+    DEFVAL      { 0 }
+    ::= { envelopeBwProfileCosEntry 8 }
+
+envelopeBwProfileCoSCouplingFlag     OBJECT-TYPE
+     SYNTAX      Unsigned32 (0 | 1)
+     MAX-ACCESS  read-create
+     STATUS      current
+    DESCRIPTION
+    "This parameter determines whether or not overflow tokens not used for
+     service frames declared Green can be used as Yellow tokens.
+
+     When set to 1 - unconsumed tokens are passed from the Green bucket to
+     the Yellow bucket of the same CoS.
+     When set to 0 - unconsumed tokens are passed from the Green bucket to
+     the Green bucket of the next CoS.
+
+     This object is relevant only when envelopeBwProfileCouplingFlagPolicy
+     is set to manual(1)."
+    DEFVAL      { 1 }
+    ::= { envelopeBwProfileCosEntry 9 }
+
+
+
+-- Control Protocols (CP) Profile Attributes
+cPObjects OBJECT IDENTIFIER ::= { mefObjects 4 }
+
+cPProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF CPProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This table defines the MEF CP attributes and behavior. It defines whether
+       a specific Control Protocol MAC address must be discarded, peered (i.e.
+       processed) or tunneled i.e. pushed forward). Note that a profile can
+       apply to either a UNI or an EVC and hence not all attributes apply to
+       both cases."
+   ::= { cPObjects 1 }
+
+cPProfileEntry OBJECT-TYPE
+    SYNTAX     CPProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "A conceptual row where each row contains one CP attributes. "
+    INDEX { cPProfileIndex,
+            cPProfileRunningIndex
+      }
+    ::= { cPProfileTable 1 }
+
+CPProfileEntry ::= SEQUENCE {
+    cPProfileIndex             Integer32,
+    cPProfileRunningIndex      Integer32,
+    cPProfileRowStatus         RowStatus,
+    cPProfileMacAddress        MacAddress,
+    cPProfileMacProcessing     INTEGER,
+    cPProfileName              SnmpAdminString,
+    cPProfileProtocol          INTEGER 
+ }
+
+cPProfileIndex  OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the CP Profile ID."
+    ::= { cPProfileEntry 1 }
+
+cPProfileRunningIndex OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines a running index for each CP MAC address.
+       From value 0x4000001 (except 0x7FFFFFFF which indicates a default
+       entry in the CP Profile)this profile will be used for Layer 2 protocol
+       data units (PDUs)that are tunneled through a network."
+    ::= { cPProfileEntry 2 }
+
+cPProfileRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing row
+       in the table."
+    ::= { cPProfileEntry 3 }
+
+cPProfileMacAddress  OBJECT-TYPE
+    SYNTAX     MacAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the CP MAC address.
+       When cPProfileMacProcessing equals to macChangeTunnel(5),
+       this attribute defines the  MAC address that replaces the
+       MAC address of the original protocols (default MAC Address
+       in such case is 1:00:0c:cd:cd:d0)."
+    ::= { cPProfileEntry 4 }
+
+cPProfileMacProcessing  OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        ignore (1),
+                        discard(2),
+                        peer(3),
+                        tunnel(4),
+                        macChangeTunnel (5)
+                        }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the CP MAC address processing:
+
+        ignore
+        Ignore the MAC address since this MAC address will be processed by
+        another 'rule' specified by e.g 'ceVlanId2EvcIngressMapMac'.
+
+        discard
+        Discard the frame
+
+        peer
+        participate (process) the frame e.g. in case of STP. This enumerated
+        type can only be applied to UNIs
+
+        tunnel
+        Either pass the frame to a specific EVC from a UNI or within EVC -
+        forward the frame.
+
+        macChangeTunnel
+        Replacing the destination MAC address before entering the network
+        and replacing it back at the other side.
+        Relevant only when cPProfileProtocol is different than none(1).
+      "
+    ::= { cPProfileEntry 5 }
+
+cPProfileName    OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+      "The name of the CP Profile."
+    ::= { cPProfileEntry 6 }
+
+cPProfileProtocol  OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        none        (1),
+                        efmOam      (2),
+                        portAuthentication(3),
+                        lacp        (4),
+                        garp        (5),
+                        stp         (6),
+                        cdp         (7),
+                        vtp         (8),
+                        lldp        (9),
+                        pvstp       (10),
+                        pagp        (11),-- Port aggregation protocol by Cisco
+                        -- reserved (12)
+                        -- reserved (13)
+                        udld        (14),-- Unidirectional Link Detection by Cisco
+                        dtp         (15),-- Dynamic Trunking Protocol by Cisco
+                        loopback    (16) -- Test loopback frames by Cisco
+                        
+
+                        }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the Layer 2 protocol data units (PDUs)
+       that are tunneled through a network.Values that are different than
+       none(1) are relevant only for cPProfileRunningIndex greater than 0x4000000
+       (except 0x7FFFFFFF)."
+    ::= { cPProfileEntry 7 }
+
+--------------------------------
+-- l2cpStatTable -added by RAD
+--------------------------------
+l2cpStatTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF L2cpStatEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "This table shows L2CP statistics .Some protocols can be
+        distinguished by MAC,and some need parsing of other fields in addition to the MAC,
+        when more than one protocol uses the same MAC."
+       ::= { cPObjects 2}
+
+l2cpStatEntry OBJECT-TYPE
+       SYNTAX L2cpStatEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+       "An entry in the L2CP Statistics Table."
+       INDEX   { l2cpStatPortIndex, l2cpStatProtocol,l2cpStatMacAddress}
+            ::= { l2cpStatTable 1 }
+
+L2cpStatEntry ::= SEQUENCE {
+    l2cpStatPortIndex                  Integer32,
+    l2cpStatProtocol                   INTEGER,
+    l2cpStatMacAddress                 MacAddress,
+    l2cpStatEncapsulatedFrames         Counter32,
+    l2cpStatDecapsulatedFrames         Counter32 
+ }
+
+l2cpStatPortIndex OBJECT-TYPE
+ SYNTAX  Integer32 (0..2147483647)
+ MAX-ACCESS  not-accessible
+ STATUS current
+ DESCRIPTION
+ "This object is an index of the specific port or interface.
+  For an interface, ifIndex will be used."
+ ::= {l2cpStatEntry 1}
+
+
+l2cpStatProtocol  OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        none(1),
+                        other(2),
+                        all(3),
+                        efmOam (4),
+                        portAuthentication(5),
+                        lacp    (6),
+                        garp    (7),
+                        stp     (8),
+                        cdp     (9),
+                        vtp     (10),
+                        lldp    (11),
+                        pvstp   (12),
+                        pagp    (13),   -- Port aggregation protocol by Cisco
+                        udld    (14),   -- Unidirectional Link Detection by Cisco
+                        dtp     (15)    -- Dynamic Trunking Protocol by Cisco
+
+                         }
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This object defines the Layer 2 protocol that is monitored .
+        none(1) means Not Applicable .
+        all(3) means total count of all the protocols that are transferred through
+        a specific port(l2cpStatPortIndex)."
+    ::= {l2cpStatEntry 2}
+
+l2cpStatMacAddress  OBJECT-TYPE
+    SYNTAX     MacAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This object defines the MAC Address of the protocol that is monitored.
+       The address 00:00:00:00:00:00 means  Not Applicable."
+    ::= {l2cpStatEntry 3}
+
+l2cpStatEncapsulatedFrames  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted encapsulated Frames,
+       before transferred via the provider's edge."
+    ::= {l2cpStatEntry 4}
+
+l2cpStatDecapsulatedFrames  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted decapsulated Frames.
+       These frames are retrieved to the original MAC after being encapsulated
+       at the other customer side they were sent from."
+    ::= {l2cpStatEntry 5}
+
+------------------------
+--  UNI Definitions
+------------------------
+
+
+-- UNI Attributes
+uniObjects   OBJECT IDENTIFIER ::= {  mefObjects 5 }
+
+--Added by RAD
+
+
+uniTable OBJECT-TYPE
+   SYNTAX     SEQUENCE OF  UniEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+     "This table defines the MEF UNI attributes."
+  ::= {  uniObjects 1 }
+
+uniEntry OBJECT-TYPE
+   SYNTAX       UniEntry
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+            "A conceptual row where each row contains one UNI interface's
+            attributes.
+            Each row binds an Interface to a UNI."
+    INDEX       { ifIndex,      --  ifIndex of the bottom xNI interface
+                uniRunningIndex}
+    ::= {  uniTable 1 }
+
+UniEntry ::= SEQUENCE {
+    uniRunningIndex                    Unsigned32,
+    uniRowStatus                       RowStatus,
+    uniLayer2CPProcessingProfile       Integer32,
+    uniPerUniBWprofile                 TCVTIdV2,
+    uniSpTagProtocolIdentifier         Integer32,
+    uniPacketColoring                  INTEGER,
+    uniPerUniEgressAction              INTEGER,
+    uniQueueGroupName                  SnmpAdminString,
+    uniClassifierKey                   BITS 
+ }
+
+uniRunningIndex  OBJECT-TYPE
+     SYNTAX     Unsigned32
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+       "This attribute defines a running (UNI)
+       index at the xNNI level. "
+       -- There's a 1:1 association of running index and UNI ifIndex.
+     ::= {  uniEntry 1 }
+
+uniRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing row
+       in the table."
+    ::= {  uniEntry 2 }
+
+uniLayer2CPProcessingProfile  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the Layer 2 Control Protocol Processing profile
+       assigned to this UNI. If set to '0', no  profile is assigned to this UNI."
+    ::= { uniEntry 12 }
+
+uniPerUniBWprofile  OBJECT-TYPE
+    SYNTAX      TCVTIdV2
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the BW profile assigned to this UNI. If set to '0',
+       no  profile is assigned to this UNI."
+    ::= {  uniEntry 13 }
+
+uniSpTagProtocolIdentifier    OBJECT-TYPE
+    SYNTAX         Integer32
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION
+      "Determines the Tag Protocol Identifier.
+      Values:
+      8100 C-TAG
+      88a8 S-TAG.
+      "
+    ::= {  uniEntry 22 }
+
+
+uniPacketColoring    OBJECT-TYPE
+    SYNTAX            INTEGER
+    {
+        disabled             (1),
+        deiColoring          (2),
+        priorityLsbColoring  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "Determines whether the packet's computed color will be marked on Egress TAG,
+       and if coloring will use DEI bit OR coloring will be based on
+       CoS+color --> SP-Priority conversion table."
+    ::= {  uniEntry 23 }
+
+uniPerUniEgressAction   OBJECT-TYPE
+    SYNTAX         INTEGER
+    {
+      none     (1),
+      addSpTag (2)
+    }
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION
+      "This attribute defines the action that should be taken
+      at the Egress side of this UNI."
+    ::= {  uniEntry 27 }
+
+uniQueueGroupName   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute points to a queueGroupName of queueGroupTable. "
+    ::= {  uniEntry 33 }
+
+uniClassifierKey OBJECT-TYPE
+    SYNTAX      BITS {
+        vlan            (0),
+        innerVlan       (1),
+        pBit            (2),
+        ipPrecedence    (3),
+        ipDscp          (4),
+        srcIpAddr       (5),
+        destIpAddr      (6),
+        legacy          (7),
+        dscp            (8),
+        macSrcAddr      (9),
+        macDestAddr     (10),
+        etherType       (11),
+        myMac           (12),
+        untagged        (13)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This bit map defines port classifier capabilities."
+    ::= { uniEntry 36 }
+
+
+------------------------
+--  EVC Definitions
+------------------------
+
+
+-- EVC Attributes
+evcObjects OBJECT IDENTIFIER ::= {  mefObjects 6 }
+
+--------------------------------
+-- flow table -added by RAD
+--------------------------------
+
+flowTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF  FlowEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This table defines the MEF Flow attributes."
+   ::= {  evcObjects 3 }
+
+flowEntry OBJECT-TYPE
+    SYNTAX      FlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+      "A conceptual row where each row contains one flow attributes."
+    INDEX { flowIdx1,flowIdx2 }
+    ::= {  flowTable 1 }
+
+FlowEntry ::= SEQUENCE {
+    flowIdx1                      Unsigned32,
+    flowIdx2                      Unsigned32,
+    flowName                      SnmpAdminString,
+    flowRowStatus                 RowStatus,
+    flowBWprofile                 TCVTIdV2,
+    flowFixedCos                  Unsigned32,
+    flowCOSProfile                Unsigned32,
+    flowQBlock                    OBJECT IDENTIFIER,
+    flowMappingProfile            Unsigned32,
+    flowFixedMarking              Unsigned32,
+    flowMarkingProfile            Unsigned32,
+    flowOuterVlanTagging          INTEGER,
+    flowOuterVlan                 Unsigned32,
+    flowInnerVlanTagging          INTEGER,
+    flowInnerVlan                 Unsigned32,
+    flowEgressPort                Unsigned32,
+    flowIngressPort               Unsigned32,
+    flowInnerFixedMarking         Unsigned32,
+    flowInnerMarkingProfile       Unsigned32,
+    flowDropAction                INTEGER,
+    flowPriority                  Unsigned32,
+    flowMarkOuterFixedMarking     Unsigned32,
+    flowMarkOuterMarkingProfile   Unsigned32,
+    flowMarkInnerFixedMarking     Unsigned32,
+    flowMarkInnerMarkingProfile   Unsigned32,
+    flowMarkOuterVlanTagging      BITS,
+    flowMarkOuterVlan             Unsigned32,
+    flowMarkInnerVlanTagging      BITS,
+    flowMarkInnerVlan             Unsigned32,
+    flowPolicerAggregate          Unsigned32,
+    flowMarkMacTagging            BITS,
+    flowMarkIpTagging             BITS,
+    flowLayer2CPProcessingProfile Unsigned32,
+    flowIngressColorMapping       INTEGER,
+    flowIngressColorProfile       Unsigned32,
+    flowCosMapping                Unsigned32,
+    flowCosMappingProfile         Unsigned32,
+    flowStatus                    BITS,
+    flowServiceIdName             SnmpAdminString,
+    flowPolicerType               INTEGER,
+    flowMultiCosCounters          BITS,
+    flowClassifierType            INTEGER,
+    flowIngressPortClassifier     InterfaceIndexOrZero,
+    flowDscpMarkingProfile        Unsigned32 
+ }
+
+flowIdx1 OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        " This attribute defines a unique Flow."
+    ::= { flowEntry 1 }
+
+flowIdx2 OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        " This attribute defines the type of the Bidirectional flow
+        1  -  not in use (default - base flow)
+        201 - reverse flow
+        301 - via-1 flow
+        302 - via-2 flow
+        401 - Mirror-1
+        402 - Mirror-2
+        403 - Mirror-3
+        404 - Mirror-4
+                        "
+    ::= { flowEntry 2 }
+
+flowName   OBJECT-TYPE
+   SYNTAX     SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines a unique name assigned to the flow."
+    ::= {flowEntry 3 }
+
+flowRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create/delete rows of the table."
+    ::= {  flowEntry 4 }
+
+flowBWprofile  OBJECT-TYPE
+    SYNTAX      TCVTIdV2
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the BW profile(s) assigned to this flow. If set to
+       '0', no  profile is assigned to this flow. "
+        ::= { flowEntry 5 }
+
+flowFixedCos      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the queue mapping that will be assigned to the flow
+    in case it does not use the Marking profile assigned to the Uni.
+    A value of 255 means that the flow will use the marking value according
+    to the Marking profile."
+     ::= { flowEntry 6 }
+
+flowCOSProfile   OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the CoS profile assigned to this flow."
+     ::= { flowEntry 7 }
+
+flowQBlock   OBJECT-TYPE
+    SYNTAX       OBJECT IDENTIFIER
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the QBlock assigned to this flow. It can also
+     be used as a pointer to a row of qProfileTable."
+     ::= { flowEntry 8 }
+
+flowMappingProfile   OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the Mapping profile assigned to this flow."
+     ::= { flowEntry 9 }
+
+flowFixedMarking   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "This attribute defines the Marking value (0..63)
+     that will be assigned to the flow in case it does not use the
+     Marking profile.It is used only when add/push action is performed.
+     A value of 255 means that the flow will use the marking profile that was set
+     in flowMarkingProfile."
+     ::= { flowEntry 10 }
+
+flowMarkingProfile OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the Marking profile assigned to this flow.
+    It is used only when add/push action is performed.
+    In case of 'Copy',the value will be 2^32-1."
+     ::= { flowEntry 11 }
+
+flowOuterVlanTagging OBJECT-TYPE
+    SYNTAX   INTEGER
+    {
+       add       (1),
+       overwrite (2),--  Deprecated; supported by flowMarkOuterVlanTagging
+       preserve  (3),
+       remove    (4)
+    }
+    MAX-ACCESS  read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute determines the behavior of the flow regarding it's
+     Outer VLAN (the first after MAC Address):
+     add - add VLAN to the frame at the Egress
+     preserve - use the VLAN of the frame as the SP VLAN at the Egress
+     remove - remove VLAN from the frame at the Egress."
+     ::= { flowEntry 12 }
+
+flowOuterVlan    OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the VLAN ID that is assigned in case that
+     flowOuterVlanTagging value is add(1)."
+     ::= { flowEntry 13 }
+
+flowInnerVlanTagging OBJECT-TYPE
+    SYNTAX   INTEGER
+    {
+       add       (1),
+       overwrite (2),--  Deprecated; supported by flowMarkInnerVlanTagging
+       preserve  (3),
+       remove    (4)
+    }
+    MAX-ACCESS  read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute determines the behavior of the flow regarding it's
+     Inner VLAN (the second after MAC Address):
+     add - add VLAN to the frame at the Egress
+     preserve - use the VLAN of the frame as the SP VLAN at the Egress.
+     remove - remove VLAN from the frame at the Egress. "
+     ::= { flowEntry 14 }
+
+flowInnerVlan        OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the VLAN ID that is assigned to the frame in
+     case that flowInnerVlanTagging value is add(1)."
+     ::= { flowEntry 15 }
+
+flowEgressPort   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "This attribute defines the egress port that is assigned to this flow.
+     This value can represent also the slot/port in relevant devices."
+     ::= { flowEntry 16 }
+
+flowIngressPort   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "This attribute defines the ingress port that is assigned to this flow.
+     This value can represent also the slot/port in relevant devices.
+
+     For a port-classifier flow i.e. when the value of flowClassiferType is
+     portClassifier(2), this object is not relevant and should contain the
+     value zero."
+     ::= { flowEntry 17 }
+
+flowInnerFixedMarking   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "This attribute defines the Inner Marking value (0..63)
+     that will be assigned to the flow in case it does not use the
+     Marking profile.It is used only when add/push action is performed.
+     A value of 255 means that the flow will use the marking profile that was set
+     in flowInnerMarkingProfile."
+     ::= { flowEntry 18 }
+
+flowInnerMarkingProfile OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the Inner Marking profile assigned to this flow.
+     It is used only when add/push action is performed.
+     In case of 'Copy',the value will be 2^32-1."
+     ::= { flowEntry 19}
+
+flowDropAction OBJECT-TYPE
+    SYNTAX  INTEGER {
+       notApplicable (1),
+       disable       (2),
+       enable        (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS current
+    DESCRIPTION
+    "This attribute defines whether All the frames classified to this flow will be dropped.
+     enable(3)=Drop Action."
+     ::= { flowEntry 20 }
+
+flowPriority   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "This attribute defines the priority of the flow in case that more than one flow
+     is associated with same specific Ingress Port.
+     0-Lowest priority."
+     ::= { flowEntry 21 }
+
+flowMarkOuterFixedMarking   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+     "This attribute defines the outer Marking value (0..63)
+     that will be assigned to the flow in case it does not use the
+     Marking profile.It is used only when mark=swap action is performed.
+     A value of 255 means that the flow will use the marking profile that was set
+     in flowMarkOuterMarkingProfile.Applicable only when flowMarkOuterVlanTagging
+     value is overwritePbit(0)."
+     ::= { flowEntry 22 }
+
+flowMarkOuterMarkingProfile OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the outer Marking profile assigned to this flow.
+     It is used only when mark=swap action is performed.
+     In case of 'Copy',the value will be 2^32-1.
+     Applicable only when flowMarkOuterVlanTagging
+     value is overwritePbit(0)."
+     ::= { flowEntry 23 }
+
+flowMarkInnerFixedMarking   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "This attribute defines the Inner Marking value (0..63)
+     that will be assigned to the flow in case it does not use the
+     Inner Marking profile.It is  used only when mark=swap action is performed.
+     A value of 255 means that the flow will use the marking profile that was set
+     in flowMarkInnerMarkingProfile.Applicable only when flowMarkInnerVlanTagging
+     value is overwritePbit(0)."
+     ::= { flowEntry 24 }
+
+flowMarkInnerMarkingProfile OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the Inner Marking profile assigned to this flow.
+     It is used only when mark=swap action is performed.
+     In case of 'Copy',the value will be 2^32-1.Applicable only when flowMarkInnerVlanTagging
+     value is overwritePbit(0)."
+     ::= { flowEntry 25}
+
+flowMarkOuterVlanTagging OBJECT-TYPE
+    SYNTAX BITS {
+        overwritePbit      (0),
+        overwriteVlan      (1),
+        overwriteEtherType (2)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute determines the marking action of the flow
+            regarding its Outer VLAN (the first after MAC Address)."
+    ::= { flowEntry 26 }
+
+flowMarkOuterVlan    OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the VLAN ID that is assigned in case that
+     flowMarkOuterVlanTagging value is overwriteVlan(1)."
+     ::= { flowEntry 27 }
+
+flowMarkInnerVlanTagging OBJECT-TYPE
+    SYNTAX BITS {
+        overwritePbit       (0),
+        overwriteVlan       (1),
+        overwriteEtherType  (2)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute determines the marking action of the flow
+            regarding it's Inner VLAN (the second after MAC Address)."
+    ::= { flowEntry 28 }
+
+flowMarkInnerVlan        OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the VLAN ID that is assigned in case that
+     flowMarkInnerVlanTagging value is overwriteVlan(1)."
+     ::= { flowEntry 29 }
+
+flowPolicerAggregate    OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This parameter defines the group of the Policer Aggregate
+     (agnGroupIdx from agnGroupTable when agnGroupCnfgIdx=2 and agnGroupComponentIdx=0xFFFF ).
+     The value 0 means that no group/policer aggregate is connected to the flow."
+     ::=  {flowEntry 30}
+
+flowMarkMacTagging OBJECT-TYPE
+    SYNTAX BITS {
+     swapMacSrcAndDst(0),
+     overwriteSrcMac(1),
+     overwriteDstMac(2)
+
+    }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+    "This attribute determines the behavior (marking action)of the flow regarding its
+     MAC Address."
+     ::= { flowEntry 32 }
+
+flowMarkIpTagging OBJECT-TYPE
+    SYNTAX BITS {
+     swapIpSrcAndDst(0),
+     overwriteSrcIp(1),
+     overwriteDstIp(2)
+
+    }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+    "This attribute determines the behavior (marking action)of flow regarding its
+     IP Address."
+     ::= { flowEntry 33 }
+
+flowLayer2CPProcessingProfile  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines the L2CP Processing profile assigned
+            to this flow. If set to '0', no profile is assigned."
+    ::= { flowEntry 38 }
+
+flowIngressColorMapping OBJECT-TYPE
+    SYNTAX      INTEGER {
+        green           (1),
+        yellow          (2),
+        colorProfile    (255)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines the flow ingress color mapping:
+            'green' and 'yellow' defines color directly
+            'colorProfile' defines color profile according to the
+            ."
+    ::= { flowEntry 39 }
+
+flowIngressColorProfile  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines the ingress color profile assigned
+            to this flow. If set to '0', no profile is assigned."
+    ::= { flowEntry 40 }
+
+flowCosMapping OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines flow CoS mapping.
+            
+            The value 0..7 indicates fixed CoS selection.
+            
+            The value 255 defines using of flowCosMappingProfile
+            OBJECT belonging to this table (see below).
+            
+            The value 254 indicates flow CoS mapping is 'not in use': 
+            Neither Fixed CoS is defined, nor Profile"
+    ::= { flowEntry 41 }
+
+flowCosMappingProfile  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines CoS mapping profile assigned
+            to this flow."
+    ::= { flowEntry 42 }
+
+flowStatus OBJECT-TYPE
+    SYNTAX      BITS {
+        operStat             (0),
+        adminStatDown        (1),
+        ingressOperStatNotUp (2),
+        egressOperStatNotUp  (3),
+        test                 (4),
+        lackOfResources      (5),
+        cfmOamFailure        (6),
+        y1564Test            (7),
+        rfc2544Test          (8),
+        mef46Loop            (9)
+        }
+    MAX-ACCESS read-only
+    STATUS      current
+    DESCRIPTION
+            "This object displays the flow status.
+            Bit 0 = '1' denotes that operational state of the flow is OK.
+                    This bit duplicates the flow ifOperStatus. It allows to
+                    get all status information by one access.
+            Bit 1 = '1' denotes that the administrative state of the flow is
+                    'down'.
+            Bit 2 = '1' denotes that ifOperStatus of the flow ingress
+                    port is not 'up'.
+            Bit 3 = '1' denotes that ifOperStatus of the flow egress
+                    port is not 'up'.
+            Bit 4 = '1' denotes that loopback test of the flow is activate.
+            Bit 5 = '1' denotes that flow was not set up due to lack
+                    of internal resources.
+            Bit 6 = '1' denotes that the device is not receiving CFM OAM
+                    messages on this flow.
+            Bit 7 = '1' denotes that the flow is under Y.1564 test.
+            Bit 8 = '1' denotes that the flow is under RFC2544 test.
+            Bit 9 = '1' denotes that the flow is under MEF46 Latching
+                    Loopback."
+    ::= { flowEntry 47 }
+
+flowServiceIdName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString  (SIZE (0..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the Service ID name of this flow,
+     if the flow is not associated with a Service the value is null.
+     Upon setting a value, the agent creates an entry in
+     serviceIdTable table."
+    ::= { flowEntry 49 }
+
+flowPolicerType OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    none                  (1),
+    regular               (2),
+    aggregate             (3),
+    envelope              (4),
+    regularAccountingOnly (5)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the type of the policer (i.e. BW profile type)
+     that is attached to the flow.
+
+     regular(2)   - the BW profile is indicated by flowBWprofile that
+                    points to an entry in bwProfileTable.
+     aggregate(3) - the BW profile is indicated by flowPolicerAggregate
+                    that points to an entry in agnGroupTable.
+     envelope(4)  - the BW profile is indicated by flowBWprofile that
+                    points to an entry in envelopeBwProfileTable.
+     regularAccountingOnly(5) - same as regular(2) but without any effect
+                    on packet passing through the policer: 
+                    no remark of the color in DEI bit, 
+                    no drop of red packets."
+    DEFVAL      { none }
+    ::= { flowEntry 51 }
+
+flowMultiCosCounters OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    cos0        (0),
+    cos1        (1),
+    cos2        (2),
+    cos3        (3),
+    cos4        (4),
+    cos5        (5),
+    cos6        (6),
+    cos7        (7)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines a list of CoS values to which flow counters
+     are allocated.
+
+     This object is relevant only when flowPolicerType is set to none(1)."
+    DEFVAL      { { cos0 } }
+    ::= { flowEntry 52 }
+
+flowClassifierType OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    flowClassifier  (1),
+    portClassifier  (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the type of the classifier used."
+    DEFVAL      { flowClassifier }
+    ::= { flowEntry 53 }
+
+flowIngressPortClassifier OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This attribute indicates the ingress port that is indirectly assigned
+     to this flow (via a corresponding rule in a port classifier).
+
+     When the ingress port is not known the value zero is returned.
+
+     This object is relevant only for a port-classifier flow i.e. when the
+     value of flowClassifierType is portClassifier(2)."
+    ::= { flowEntry 54 }
+
+flowDscpMarkingProfile OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the DSCP marking profile assigned to this flow."
+    DEFVAL      { 0 }
+    ::= { flowEntry 55 }
+
+
+--**********************
+-- Flow mapping objects
+--**********************
+
+flowMapping OBJECT IDENTIFIER ::= { evcObjects 4 }
+
+-- serviceIdTable
+
+serviceIdTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ServiceIdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table map flows to a service (EVC).
+     Rows in this table are created by agent when:
+     flowServiceId is set, or
+     erpVlanServiceIdName is set, or
+     for each entry in serviceIdCmdTable."
+   ::= { flowMapping 2 }
+
+serviceIdEntry OBJECT-TYPE
+    SYNTAX      ServiceIdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Entry in the serviceIdTable."
+    INDEX { serviceIdName, IMPLIED serviceIdRowPointer }
+    ::= { serviceIdTable 1 }
+
+ServiceIdEntry ::= SEQUENCE {
+    serviceIdName          SnmpAdminString,
+    serviceIdRowPointer    RowPointer,
+    serviceIdEntityType    INTEGER,
+    serviceIdRowStatus     RowStatus 
+ }
+
+serviceIdName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString  (SIZE (0..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines a unique service identification."
+    ::= { serviceIdEntry 1 }
+
+serviceIdRowPointer   OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This attribute holds the OID of the entity that associate.
+     with the Service.
+     For the flowTable the serviceIdRowPointer shall point to agnStringToIndexTable."
+    ::= { serviceIdEntry 2 }
+
+serviceIdEntityType     OBJECT-TYPE
+    SYNTAX      INTEGER   {
+      flow     (1),
+      erpVlan  (2),
+      ma       (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This attribute specify the type of the entity in a service."
+    ::= { serviceIdEntry 3 }
+
+serviceIdRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing row
+       in the table."
+    ::= {  serviceIdEntry 5 }
+
+----------------------------
+-- service ID CMD Table
+----------------------------
+
+serviceIdCmdTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ServiceIdCmdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table display the configuration parameters of
+     the Service automatic command.
+     for each entry in this table the agent shall create
+     an entry in serviceIdTable."
+   ::= { flowMapping 3 }
+
+serviceIdCmdEntry OBJECT-TYPE
+    SYNTAX      ServiceIdCmdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Entry in the serviceIdCfmTable."
+    INDEX { serviceIdName }
+    ::= { serviceIdCmdTable 1 }
+
+ServiceIdCmdEntry ::= SEQUENCE {
+    serviceIdCmdRowStatus   RowStatus,
+    serviceIdCmdVlan        Unsigned32,
+    serviceIdCmdInnerVlan   Unsigned32,
+    serviceIdCmdPortIdx     Unsigned32 
+ }
+
+serviceIdCmdRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This RowStatus is used to create a row in the table
+     possible value of the RowStatus are active(1), createAndGo(4)."
+    ::= { serviceIdCmdEntry 1 }
+
+serviceIdCmdVlan   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute represent the (outer) VLAN of the Service."
+    ::= { serviceIdCmdEntry 2 }
+
+serviceIdCmdInnerVlan   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute represent the (inner) VLAN of the Service."
+    ::= { serviceIdCmdEntry 3 }
+
+serviceIdCmdPortIdx         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute represent the port (ifIndex) of the Service."
+    ::= { serviceIdCmdEntry 4 }
+
+
+ pmFlowCmdTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF  PmFlowCmdEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+       "Table that holds a set of scalars as columns."
+    ::= {  evcObjects  6 }
+
+ pmFlowCmdEntry OBJECT-TYPE
+     SYNTAX      PmFlowCmdEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+       "An entry in table."
+     INDEX { pmFlowCmdIndex }
+     ::= {  pmFlowCmdTable 1 }
+
+PmFlowCmdEntry ::= SEQUENCE {
+    pmFlowCmdIndex            Unsigned32,
+    pmFlowCmdWithOAMTraffic   INTEGER 
+ }
+
+pmFlowCmdIndex  OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+         "This object used as index value=1."
+      ::= { pmFlowCmdEntry 1 }
+
+pmFlowCmdWithOAMTraffic    OBJECT-TYPE
+      SYNTAX   INTEGER
+          {
+            yes(2),
+            no (3)
+          }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+       "This command is related to flow counters behavior.
+        the action will be at the device level for all flows measurements to
+        include or exclude the OAM traffic from the service traffic.
+         yes(2) - command to include the OAM traffic measurements together with
+         the service flow traffic measurements. This is the default value.
+         no(3)  - command to exclude the OAM traffic measurements together with
+         the service flow traffic measurements.
+
+         This command is persistent. When this object is written, the agent
+         SHOULD save the change to non-volatile storage.
+         "
+    ::= { pmFlowCmdEntry 2 }
+
+
+END
+

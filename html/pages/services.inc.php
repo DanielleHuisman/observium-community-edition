@@ -42,30 +42,6 @@ unset($navbar);
 
 register_html_title("Services");
 
-print_optionbar_start();
-
-echo("<span style='font-weight: bold;'>Services</span> &#187; ");
-
-$menu_options = array('basic' => 'Basic',
-                      'details' => 'Details');
-
-if (!$vars['view']) { $vars['view'] = "basic"; }
-
-$sep = "";
-foreach ($menu_options as $option => $text)
-{
-  if (empty($vars['view'])) { $vars['view'] = $option; }
-  echo($sep);
-  if ($vars['view'] == $option) { echo("<span class='pagemenu-selected'>"); }
-  echo(generate_link($text, $vars, array('view'=>$option)));
-  if ($vars['view'] == $option) { echo("</span>"); }
-  $sep = " | ";
-}
-
-unset($sep);
-
-print_optionbar_end();
-
 if ($_GET['status'] == '0') { $where = " AND service_status = '0'"; } else { unset ($where); }
 
 if ($vars['view'] == "details") { $stripe_class = "table-striped-two"; } else { $stripe_class = "table-striped"; }

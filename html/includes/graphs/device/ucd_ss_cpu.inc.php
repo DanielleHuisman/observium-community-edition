@@ -48,8 +48,6 @@ if ($width > "500")
 $i = 0;
 $colours = "mixed-10b";
 
-//$rrd_filename = get_rrd_path($device, "netscaler-stats-tcp.rrd"); // CLEANME, Hrm, what this do here?
-
 $device_state = unserialize($device['device_state']);
 
 $cpu_oids = array('ssCpuRawUser' => array('colour' => 'c02020'),
@@ -59,7 +57,7 @@ $cpu_oids = array('ssCpuRawUser' => array('colour' => 'c02020'),
                   'ssCpuRawInterrupt' => array(),
                   'ssCpuRawSoftIRQ' => array(),
                   'ssCpuRawKernel' => array(),
-                  'ssCpuRawIdle' => array('colour' => 'f5f5e5'),
+                  'ssCpuRawIdle' => array('colour' => 'f5f5e500'),
                   );
 $bstack = '';
 foreach ($cpu_oids as $stat => $data)
@@ -78,8 +76,9 @@ foreach ($cpu_oids as $stat => $data)
     }
 
     $rrd_filename = get_rrd_path($device, "ucd_".$stat.".rrd");
+    $rrd_filename_escape = rrdtool_escape($rrd_filename);
 
-    $rrd_options .= " DEF:". $stat . "=".$rrd_filename.":value:AVERAGE";
+    $rrd_options .= " DEF:". $stat . "=".$rrd_filename_escape.":value:AVERAGE";
     $totals[]  = $stat;
     $rrd_options_b .= " CDEF:". $stat . "_perc=".$stat.",total,/,100,*";
 

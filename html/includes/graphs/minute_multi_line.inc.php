@@ -53,7 +53,7 @@ foreach ($rrd_list as $i => $rrd)
   $colour=$config['graph_colours'][$colours][$iter];
 
   $ds = $rrd['ds'];
-  $filename = $rrd['filename'];
+  $filename = rrdtool_escape($rrd['filename']);
 
   $descr = rrdtool_escape($rrd['descr'], $descr_len);
 

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 

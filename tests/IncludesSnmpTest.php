@@ -3,6 +3,8 @@
 $base_dir = realpath(dirname(__FILE__) . '/..');
 $config['install_dir'] = $base_dir;
 
+//define('OBS_DEBUG', 2);
+
 include(dirname(__FILE__) . '/../includes/defaults.inc.php');
 //include(dirname(__FILE__) . '/../config.php'); // Do not include user editable config here
 include(dirname(__FILE__) . '/../includes/functions.inc.php');
@@ -157,14 +159,14 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
   * @dataProvider providerSnmpFixNumeric
   * @group numbers
   */
-  public function testSnmpFixNumeric($value, $result)
+  public function testSnmpFixNumeric($value, $result, $unit)
   {
-    $this->assertSame($result, snmp_fix_numeric($value));
+    $this->assertSame($result, snmp_fix_numeric($value, $unit));
   }
 
   public function providerSnmpFixNumeric()
   {
-    return array(
+    $array = array(
       array(         0,           0),
       array(  '-65000',      -65000),
       array(        '',          ''),
@@ -181,13 +183,32 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       array('"36 C/96 F"', 36),
       array('"8232W"', 8232),
       array('"1628W (+/- 3.0%)"', 1628),
+      array('3.09(W-)', 3.09),
+      array('-26.02(A-)', -26.02),
+      array('-0.00(A-)', 0.0),
+      // Convert some passed units
+      array('512 MB', 512),
+      array('512 MB', 536870912, 'bytes'),
+      array('119.1 GB', 119.1),
+      array('119.1 GB', 127882651238.4, 'bytes'),
       // More complex
       array('CPU Temperature-Ctlr B: 58 C 136.40F',   58),
       array('Capacitor Cell 1 Voltage-Ctlr B: 2.04V', 2.04),
       array('Voltage 12V Rail Loc: left-PSU: 12.22V', 12.22),
       array('Current 12V Rail Loc: right-PSU: 9.53A', 9.53),
       array('Capacitor Charge-Ctlr B: 100%',          100),
+      array('Spinning at 5160 RPM',                   5160),
     );
+
+    foreach ($array as $index => $entry)
+    {
+      if (!isset($entry[2]))
+      {
+        $array[$index][] = NULL;
+      }
+    }
+
+    return $array;
   }
 
   /**
@@ -223,9 +244,22 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
     return array(
       array("42 6C 61 63 6B 20 43 61 72 74 72 69 64 67 65 20", "Black Cartridge "),
       array("42 6C 61 63 6B 20 43 61 72 74 72 69 64 67 65 20 38 31 58 20 48 50 20 43 46 32 38 31 58 00 ", "Black Cartridge 81X HP CF281X"),
-      array("Maintenance Kit HP 110V-F2G76A, 220V-F2G77A.", "Maintenance Kit HP 110V-F2G76A, 220V-F2G77A."),
+      array("Maintenance Kit HP 110V-F2G76A, 220V-F2G77A.",    "Maintenance Kit HP 110V-F2G76A, 220V-F2G77A."),
+      array('4A 7D 34 3D',                                     'J}4='),
+      array('73 70 62 2D    6F 66 66 2D 67 77',                'spb-off-gw'),
+      array('32 35 00 ',                                       '25'),
+      // UTF-8
+      array("44 61 74 61 3A 20 41 20 41 64 64 72 65 73 73 3A 20 32 32 35 2E 35 2E 31 2E 36 20 41 6C 69 61 73 3A 20 D0 94 D1 80 D0 B0 D0 B9 D0 B2 20 62 75 66 66 65 72 20 61 64 64 72 65 73 73 20 63 68 61 6E 67 65 64 20 31 31 30 34", 'Data: A Address: 225.5.1.6 Alias: Драйв buffer address changed 1104'),
+      array("C3 9C 62 65 72 74 72 61 67 75 6E 67 73 77 61 6C 7A 65 2C 20 50 4E 20 31 31 35 52 30 30 31 32 36", "Übertragungswalze, PN 115R00126"),
       // Multiline string
       array("67 6F 6F 67 6C 65 2E 73 65 00 6E 61 6D 65 2D 73 65 72 76 65 72 00 31 37 32 2E 31 37 2E 32 30 34 2E 31 30 00", "google.se\nname-server\n172.17.204.10"),
+      //Incorrect HEX strings
+      array('496E707574203100',         '496E707574203100'), // HEX string without spaces (not SNMP HEX STRING)
+      array('49 6E 70 75 74 20 31 0',   '49 6E 70 75 74 20 31 0'),
+      array('Simple String',            'Simple String'),
+      array('49 6E 70 75 74 20 31 0R ', '49 6E 70 75 74 20 31 0R '),
+      array('10',                       '10'),
+      array('99',                       '99'),
     );
   }
 
@@ -262,6 +296,7 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
 
   /**
   * @dataProvider providerSnmpParseLine
+  * @group index
   */
   public function testSnmpParseLine($flags, $value, $result)
   {
@@ -280,6 +315,16 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
                   'index_parts' => array('l2Circuit', 'ge-0/1/1.0', '621'),
                   'index_count' => 3,
                   'index'     => 'l2Circuit.ge-0/1/1.0.621',
+            ),
+      ),
+      array($flags | OBS_SNMP_INDEX_PARTS,
+            'jnxVpnPwLocalSiteId.l2Circuit."ge-0/1/1.0".621 = "some"',
+            array('oid'       => 'jnxVpnPwLocalSiteId.l2Circuit."ge-0/1/1.0".621',
+                  'value'     => 'some',
+                  'oid_name'  => 'jnxVpnPwLocalSiteId',
+                  'index_parts' => array('l2Circuit', 'ge-0/1/1.0', '621'),
+                  'index_count' => 3,
+                  'index'     => 'l2Circuit->ge-0/1/1.0->621',
             ),
       ),
       array($flags,
@@ -380,6 +425,26 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
                   'index_parts' => array('6:20:c:c8:39:b', '96', 'qkd dj'),
                   'index_count' => 3,
                   'index'     => '6:20:c:c8:39:b.96.qkd dj',
+            ),
+      ),
+      array($flags | OBS_SNMP_TABLE | OBS_SNMP_INDEX_PARTS,
+            'rlIpAddressPrefixLength[ipv6z]["fe:80:00:00:00:00:00:00:86:78:ac:ff:fe:a3:3f:49%100000"] = 64',
+            array('oid'       => 'rlIpAddressPrefixLength[ipv6z]["fe:80:00:00:00:00:00:00:86:78:ac:ff:fe:a3:3f:49%100000"]',
+                  'value'     => '64',
+                  'oid_name'  => 'rlIpAddressPrefixLength',
+                  'index_parts' => array('ipv6z', 'fe:80:00:00:00:00:00:00:86:78:ac:ff:fe:a3:3f:49%100000'),
+                  'index_count' => 2,
+                  'index'     => 'ipv6z->fe:80:00:00:00:00:00:00:86:78:ac:ff:fe:a3:3f:49%100000',
+            ),
+      ),
+      array($flags | OBS_SNMP_TABLE | OBS_SNMP_INDEX_PARTS,
+            'wcAccessPointMac[6:20:c:c8:39:b].96."qkd dj" = 20:c:c8:39:b:60',
+            array('oid'       => 'wcAccessPointMac[6:20:c:c8:39:b].96."qkd dj"',
+                  'value'     => '20:c:c8:39:b:60',
+                  'oid_name'  => 'wcAccessPointMac',
+                  'index_parts' => array('6:20:c:c8:39:b', '96', 'qkd dj'),
+                  'index_count' => 3,
+                  'index'     => '6:20:c:c8:39:b->96->qkd dj',
             ),
       ),
       array($flags | OBS_SNMP_NUMERIC,

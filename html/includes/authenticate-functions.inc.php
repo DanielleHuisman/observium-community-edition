@@ -141,6 +141,7 @@ function auth_user_level($username)
 // DOCME needs phpdoc block
 function auth_user_level_permissions($user_level)
 {
+
   $user = array('level' => -1, 'permission' => 0); // level -1 equals "not exist" user
 
   if (is_numeric($user_level))
@@ -214,10 +215,40 @@ function auth_user_list()
 
   if (function_exists($config['auth_mechanism'] . '_auth_user_list'))
   {
-    return call_user_func($config['auth_mechanism'] . '_auth_user_list');
+    $user_list_sort = call_user_func($config['auth_mechanism'] . '_auth_user_list');
   } else {
-    return call_user_func('mysql_auth_user_list');
+    $user_list_sort = call_user_func('mysql_auth_user_list');
   }
+
+    // Process the user list here to provide all of the additional data used elsewhere in the UI
+    // This prepares user_ids for LDAP to be used in AJAX and other places
+
+    $user_list_sort = array_sort_by($user_list_sort, 'level', SORT_DESC, SORT_NUMERIC, 'username', SORT_ASC, SORT_STRING);
+    $user_list = array();
+    foreach ($user_list_sort as $entry)
+    {
+        humanize_user($entry);
+        /*
+        if (isset($user_list[$entry['user_id']]))
+        {
+          r($user_list[$entry['user_id']]);
+          r($entry);
+          break;
+        }
+        */
+        $user_list[$entry['user_id']]            = $entry;
+        $user_list[$entry['user_id']]['name']    = escape_html($entry['username']);
+        if ($entry['row_class'])
+        {
+            $user_list[$entry['user_id']]['class']   = 'bg-'.$entry['row_class'];
+        }
+        $user_list[$entry['user_id']]['group']   = $entry['level_label'];
+        $user_list[$entry['user_id']]['subtext'] = $entry['realname'];
+    }
+    unset($user_list_sort);
+
+    return $user_list;
+
 }
 
 // DOCME needs phpdoc block

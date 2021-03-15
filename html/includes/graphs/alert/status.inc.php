@@ -19,8 +19,8 @@ include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $rrd_options .= " COMMENT:'                       Min     Last    Max\\n'";
 
-$rrd_options .= " DEF:status=".$rrd_filename.":status:AVERAGE";
-$rrd_options .= " DEF:code=".$rrd_filename.":code:AVERAGE";
+$rrd_options .= " DEF:status=".$rrd_filename_escape.":status:AVERAGE";
+$rrd_options .= " DEF:code=".$rrd_filename_escape.":code:AVERAGE";
 
 $rrd_options .= " CDEF:percent=status,UN,UNKN,status,IF,100,* ";
 

@@ -13,7 +13,6 @@
 
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-
 $rrd_options .= " -l 0 -E ";
 
 $iter = 0;
@@ -46,13 +45,18 @@ foreach ($rows as $supply)
     $colour['left'] = $config['graph_colours'][$colours][$iter];
   }
 
-  $hostname = get_device_by_device_id($supply['device_id']);
+  // Not sure for what this used
+  //$hostname = get_device_hostname_by_device_id($supply['device_id']);
+  $hostname = $device['hostname'];
 
   $descr = rrdtool_escape($supply['supply_descr'], 16);
   $rrd_filename = get_rrd_path($device, "toner-" . $supply['supply_index'] . ".rrd");
+
+  $rrd_filename_escape = rrdtool_escape($rrd_filename);
+
   $supply_id = $supply['supply_id'];
 
-  $rrd_options .= " DEF:level$supply_id=$rrd_filename:level:AVERAGE";
+  $rrd_options .= " DEF:level$supply_id=$rrd_filename_escape:level:AVERAGE";
   $rrd_options .= " LINE2:level$supply_id#".$colour['left'].":'" . $descr . "'";
   $rrd_options .= " GPRINT:level$supply_id:LAST:'%5.0lf%%'";
   $rrd_options .= " GPRINT:level$supply_id:MIN:'%5.0lf%%'";

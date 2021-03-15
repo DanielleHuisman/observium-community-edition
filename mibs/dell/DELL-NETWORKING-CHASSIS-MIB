@@ -372,7 +372,7 @@
          MAX-ACCESS    read-only
          STATUS        current
          DESCRIPTION
-             "Temperature of the card."
+             "Temperature of the card. If a value is not available, it will return -273."
          ::= { dellNetCardEntry 6 }
         
         dellNetCardVendorId    OBJECT-TYPE
@@ -533,13 +533,13 @@
          DESCRIPTION
              "A list of units entries containing information
               for each stacked unit."
-         INDEX    { dellNetStackUnitIndex }
+         INDEX    { dellNetStackUnitNumber }
          ::= { dellNetStackUnitTable 1 }
 
         DellNetStackUnitEntry    ::=
          SEQUENCE {
-           dellNetStackUnitIndex               Integer32,
            dellNetStackUnitNumber              Integer32,
+           dellNetStackUnitIndex               Integer32,
            dellNetStackUnitMgmtStatus          INTEGER,
            dellNetStackUnitHwMgmtPreference    INTEGER,
            dellNetStackUnitAdmMgmtPreference   Integer32,
@@ -564,21 +564,14 @@
            dellNetStackUnitNumOfPorts          Integer32,
            dellNetStackUnitNumFanTrays         Integer32,
            dellNetStackUnitNumPowerSupplies    Integer32,
-           dellNetStackUnitNumPluggableModules Integer32
+           dellNetStackUnitNumPluggableModules Integer32,
+           dellNetStackUnitIOMMode             DisplayString,
+           dellNetStackUnitBladeSlotId         Integer32
         }
-
-        dellNetStackUnitIndex         OBJECT-TYPE
-         SYNTAX        Integer32
-         MAX-ACCESS    not-accessible
-         STATUS        current
-         DESCRIPTION
-              "The unique index for this entry.
-              Refer to the object dellNetStackUnitIndexNext."
-         ::= { dellNetStackUnitEntry 1 }
 
         dellNetStackUnitNumber        OBJECT-TYPE
          SYNTAX        Integer32 (0|1..12)
-         MAX-ACCESS    read-only
+         MAX-ACCESS    not-accessible
          STATUS        current
          DESCRIPTION
               "The unit number associated with this unit.
@@ -600,6 +593,15 @@
               and stays in the Initialization state.
               - The max number of stackable units allowed on this chassis
               is found from the object chNumMaxStackableUnits."
+         ::= { dellNetStackUnitEntry 1 }
+
+        dellNetStackUnitIndex         OBJECT-TYPE
+         SYNTAX        Integer32
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+              "The unique index for this entry.
+              Refer to the object dellNetStackUnitIndexNext."
          ::= { dellNetStackUnitEntry 2 }
 
         dellNetStackUnitMgmtStatus    OBJECT-TYPE
@@ -836,6 +838,24 @@
              in the stack unit."
          ::= { dellNetStackUnitEntry 28 }
 
+        dellNetStackUnitIOMMode OBJECT-TYPE
+         SYNTAX        DisplayString (SIZE (0..64))
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+         "The IOM Mode in which the stack
+         unit is currently operating."
+         ::= { dellNetStackUnitEntry 29 }
+
+        dellNetStackUnitBladeSlotId OBJECT-TYPE
+         SYNTAX        Integer32
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+         "The blade chassis slot id in which the
+         stack unit is inserted."
+         ::= { dellNetStackUnitEntry 30 }
+
 
     -- ## Stack Port Table
 
@@ -990,6 +1010,13 @@
               will return 0."
          ::= { dellNetStackPortEntry 11 }
 
+        dellNetWebUIURL OBJECT-TYPE
+         SYNTAX        DisplayString
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+         "The Web UI URL."
+         ::= { dellNetStackObject 6 }
 
     -- ### System Component ###
 
@@ -1310,7 +1337,9 @@
             dellNetProcessorIndex          Integer32,
             dellNetProcessorModule         DellNetProcessorModuleType,
             dellNetProcessorUpTime         TimeTicks,
-            dellNetProcessorMemSize        Integer32
+            dellNetProcessorMemSize        Integer32,
+            dellNetProcessorResetReason    DisplayString,
+            dellNetProcessorResetTime      DateAndTime
          }
 
         dellNetProcessorDeviceType        OBJECT-TYPE
@@ -1366,6 +1395,24 @@
               "The size of the RAM in Mb."
          ::= { dellNetProcessorEntry 6 }
 
+        dellNetProcessorResetReason     OBJECT-TYPE
+         SYNTAX        DisplayString
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+             "Last reset reason
+              of this Processor."
+         ::= { dellNetProcessorEntry 7 }
+
+        dellNetProcessorResetTime     OBJECT-TYPE
+         SYNTAX        DateAndTime
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+             "Last reset time
+              of this Processor."
+         ::= { dellNetProcessorEntry 8 }
+
 
     -- ## Processor and Memory Utilization Table
 
@@ -1396,7 +1443,7 @@
             dellNetCpuUtil1Min          Gauge32,
             dellNetCpuUtil5Min          Gauge32,
             dellNetCpuUtilMemUsage      Gauge32,
-            dellNetCpuFlashUsageUtil    Gauge32
+            dellNetCpuFlashUsage        Gauge32
          }
 
         dellNetCpuUtil5Sec    OBJECT-TYPE
@@ -1435,7 +1482,7 @@
              "Total Memory usage in percentage."
          ::= { dellNetCpuUtilEntry 6 }
 
-        dellNetCpuFlashUsageUtil  OBJECT-TYPE
+        dellNetCpuFlashUsage  OBJECT-TYPE
         SYNTAX              Gauge32(0..100)
         UNITS               "percent"
         MAX-ACCESS          read-only
@@ -1490,7 +1537,7 @@
          ::= { dellNetSwModuleEntry 1 }
 
         dellNetSwModuleRuntimeImgDate    OBJECT-TYPE
-         SYNTAX        DellNetSwDate (SIZE (0..10))
+         SYNTAX        DellNetSwDate
          MAX-ACCESS    read-only
          STATUS        current
          DESCRIPTION
@@ -1800,6 +1847,86 @@
          DESCRIPTION
              "The fan tray's express service code."
          ::= { dellNetFanTrayEntry 8 }
+
+ -- ## Disk Info Table
+
+        dellNetFlashStorageTable    OBJECT-TYPE
+         SYNTAX        SEQUENCE OF DellNetFlashEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+              "Stores the list of partitions and the 
+	      usage info regarding the partitions present on disk" 
+              
+         ::= { dellNetSystemComponent 8 }
+
+        dellNetFlashEntry    OBJECT-TYPE
+         SYNTAX        DellNetFlashEntry
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+             "Table to display the flash disk usage"
+         INDEX    { dellNetFlashPartitionNumber }
+         ::= { dellNetFlashStorageTable 1 }
+
+        DellNetFlashEntry    ::=
+         SEQUENCE {
+            dellNetFlashPartitionNumber        Integer32,		 
+            dellNetFlashPartitionName          DisplayString,
+            dellNetFlashPartitionSize          Integer32,
+            dellNetFlashPartitionUsed          Integer32,
+            dellNetFlashPartitionFree          Integer32, 
+	    dellNetFlashPartitionMountPoint    DisplayString
+         }
+
+        dellNetFlashPartitionNumber      OBJECT-TYPE
+         SYNTAX        Integer32
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                "Partition number."
+        ::= { dellNetFlashEntry 1 }
+
+        dellNetFlashPartitionName         OBJECT-TYPE
+         SYNTAX        DisplayString (SIZE (0..32))
+         MAX-ACCESS    read-only 
+         STATUS        current
+         DESCRIPTION
+              "The partition name on the flash."
+         ::= { dellNetFlashEntry 2 }
+
+        dellNetFlashPartitionSize         OBJECT-TYPE
+         SYNTAX        Integer32
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+              "The size of the parition."
+         ::= { dellNetFlashEntry 3 }
+
+        dellNetFlashPartitionUsed         OBJECT-TYPE
+         SYNTAX        Integer32
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+              "The used space on the specified parition."
+         ::= { dellNetFlashEntry 4 }
+
+        dellNetFlashPartitionFree         OBJECT-TYPE
+         SYNTAX        Integer32
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+              "The free space on the specified parition"
+         ::= { dellNetFlashEntry 5 }
+
+        dellNetFlashPartitionMountPoint   OBJECT-TYPE
+         SYNTAX        DisplayString (SIZE (0..32))
+         MAX-ACCESS    read-only
+         STATUS        current
+         DESCRIPTION
+              "The mount point for the partition on the flash."
+         ::= { dellNetFlashEntry 6 }	 
+
    
     -- ## Software Cores Table
 
@@ -1968,31 +2095,48 @@
         SYNTAX        DellNetHundredthdB
         UNITS         "dB"
         MAX-ACCESS    read-only
-        STATUS        current
+        STATUS        deprecated
         DESCRIPTION
             "
-            The power signal strength (dB) received for
+            ******** THIS OBJECT IS DEPRECATED ********
+
+            The power signal strength (dB) received for	
             1G/10G/40G Ethernet/802.3 interface.
+
+            This object has been deprecated and replaced by dellNetIfTransReceivePower
+            in DELL-NETWORKING-IF-EXTENSION-MIB::dellNetIfTransceiverDataTable.
             "
         ::= { dellNetSysIfEntry 5 }
 
        dellNetSysIfXfpRecvTemp    OBJECT-TYPE
-       SYNTAX        Integer32
-       MAX-ACCESS    read-only
-       STATUS        current
-       DESCRIPTION
-           "The temperature value received for the optics."
-       ::= { dellNetSysIfEntry 6 }
+        SYNTAX        Integer32
+        MAX-ACCESS    read-only
+        STATUS        deprecated
+        DESCRIPTION
+            "
+            ******** THIS OBJECT IS DEPRECATED ********
 
-        dellNetSysIfXfpTxPower    OBJECT-TYPE
+            The temperature value received for the optics.
+
+            This object has been deprecated and replaced by dellNetIfTransReceiveTemp
+            in DELL-NETWORKING-IF-EXTENSION-MIB::dellNetIfTransceiverDataTable.
+            "
+        ::= { dellNetSysIfEntry 6 }
+
+       dellNetSysIfXfpTxPower    OBJECT-TYPE
         SYNTAX        DellNetHundredthdB
         UNITS         "dB"
         MAX-ACCESS    read-only
-        STATUS        current
+        STATUS        deprecated
         DESCRIPTION
             "
+            ******** THIS OBJECT IS DEPRECATED ********
+
             The power signal strength (dB) Transmitted for
             1G/10G/40G Ethernet/802.3 interface.
+
+            This object has been deprecated and replaced by dellNetIfTransTransmitPower
+            in DELL-NETWORKING-IF-EXTENSION-MIB::dellNetIfTransceiverDataTable.
             "
         ::= { dellNetSysIfEntry 7 }
 
@@ -2762,6 +2906,42 @@
              is no longer the master and has entered non-operational state."
         ::= { dellNetSysAlarmMibNotifications 45 }
 
+    dellNetSysAlarmStackUnitRoleChanged  NOTIFICATION-TYPE
+        OBJECTS         { dellNetStackUnitMgmtStatus,
+                          dellNetSysAlarmVarString
+                        }
+        STATUS          current
+        DESCRIPTION
+            "The driver/agent generate this trap when a stack unit role is changed."
+        ::= { dellNetSysAlarmMibNotifications 46 }
+
+
+    dellNetSysAlarmCpuCLkDegraded  NOTIFICATION-TYPE
+        OBJECTS         {   dellNetSysAlarmVarInteger,
+                            dellNetSysAlarmVarString,
+                            dellNetSysAlarmVarChassisId,
+                            dellNetSysAlarmVarSlot,
+                            dellNetSysAlarmVarPort,
+                            dellNetSysAlarmVarPeId
+                        }
+        STATUS          current
+        DESCRIPTION
+            "The agent generates this trap when a CPU clock degradation is
+             deteced."
+        ::= { dellNetSysAlarmMibNotifications 47 }
+
+    dellNetSysAlarmDynamicFanout NOTIFICATION-TYPE
+        OBJECTS         {   dellNetSysAlarmVarInteger,
+                            dellNetSysAlarmVarString,
+                            dellNetSysAlarmVarChassisId,
+                            dellNetSysAlarmVarSlot,
+                            dellNetSysAlarmVarPort,
+                            dellNetSysAlarmVarPeId
+                        }
+        STATUS          current
+        DESCRIPTION
+            "The agent generates this trap when a port has been fanned out or fanned in."
+        ::= { dellNetSysAlarmMibNotifications 48 }
 
     -- ### conformance information ###
     dellNetChassisMibConformance    OBJECT IDENTIFIER ::= { dellNetChassisMib 2 }
@@ -2876,7 +3056,9 @@
         dellNetSysAlarmSRAMParityErrorDetect,
         dellNetSysAlarmAcDcMixedPowerSupplyDetect,
 	dellNetSysAlarmVrrpGoMaster,
-	dellNetSysAlarmVrrpGiveupMaster
+	dellNetSysAlarmVrrpGiveupMaster,
+	dellNetSysAlarmStackUnitRoleChanged,
+        dellNetSysAlarmCpuCLkDegraded
 	}
         STATUS    current
         DESCRIPTION

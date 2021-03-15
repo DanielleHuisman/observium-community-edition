@@ -20,7 +20,9 @@ EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorType.1.0 = INTEGER: fix
 EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorType.1.1 = INTEGER: fixed(1)
 EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorTemperature.1.0 = INTEGER: 50
 EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempSensorTemperature.1.1 = INTEGER: 33
+EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempUnitIndex.1 = Gauge32: 1
 EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempUnitState.1 = INTEGER: normal(1)
+EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesTempUnitTemperature.1 = INTEGER: 52
 */
 
 $oids = snmpwalk_cache_multi_oid($device, 'boxServicesTempSensorsTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
@@ -37,14 +39,18 @@ if (count(explode('.', $first_key)) === 1)
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesNormalTempRangeMin.0 = INTEGER: -5
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesNormalTempRangeMax.0 = INTEGER: 85
 
-$boxServicesNormalTempRangeMin = snmp_get($device, 'boxServicesNormalTempRangeMin.0', '-Ovq', 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
-$boxServicesNormalTempRangeMax = snmp_get($device, 'boxServicesNormalTempRangeMax.0', '-Ovq', 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
+$boxServicesNormalTempRangeMin = snmp_get_oid($device, 'boxServicesNormalTempRangeMin.0', 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
+$boxServicesNormalTempRangeMax = snmp_get_oid($device, 'boxServicesNormalTempRangeMax.0', 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
 
 foreach ($oids as $index => $entry)
 {
   $boxServicesStackTempSensorsTable = TRUE;
 
-  $descr = (count($oids) > 1 ? 'Unit ' . $entry['boxServicesUnitIndex'] . ' ' : '') . 'Internal Sensor ' . $entry['boxServicesTempSensorIndex'];
+  $descr = 'Internal Sensor ' . $entry['boxServicesTempSensorIndex'];
+  if ($entry['boxServicesUnitIndex'] > 1)
+  {
+    $descr .= ' (Unit '.$entry['boxServicesUnitIndex'].')';
+  }
   $oid = ".1.3.6.1.4.1.4413.1.1.43.1.8.1.5.$index";
   $value = $entry['boxServicesTempSensorTemperature'];
 
@@ -56,7 +62,8 @@ foreach ($oids as $index => $entry)
 
   if ($value != 0)
   {
-    discover_sensor('temperature', $device, $oid, "boxServicesTempSensorTemperature.$index", 'edgeswitch-boxservices-private-mib', $descr, 1, $value, $options);
+    $options['rename_rrd'] = "edgeswitch-boxservices-private-mib-boxServicesTempSensorTemperature.$index";
+    discover_sensor_ng($device, 'temperature', $mib, 'boxServicesTempSensorTemperature', $oid, $index, NULL, $descr, 1, $value, $options);
   }
 }
 
@@ -68,16 +75,27 @@ foreach ($oids as $index => $entry)
 {
   $oid = ".1.3.6.1.4.1.4413.1.1.43.1.15.1.2.$index";
   $value = $entry['boxServicesTempUnitState'];
-  $descr = (count($oids) > 1 ? 'Stack Unit ' . $entry['index'] . ' ' : '') . 'Temperature Status';
+  $descr = 'Temperature Status';
+  if (count($oids) > 1)
+  {
+    $descr .= ' (Unit '.$entry['index'].')';
+  }
 
-  discover_status($device, $oid, $index, 'edgeswitch-boxServicesTempSensorState', $descr, $value, array('entPhysicalClass' => 'chassis'));
+  discover_status_ng($device, $mib, 'boxServicesTempUnitState', $oid, $index, 'edgeswitch-boxServicesTempSensorState', $descr, $value, array('entPhysicalClass' => 'chassis', 'rename_rrd' => 'edgeswitch-boxServicesTempSensorState-%index%'));
 }
 
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFansIndex.0 = INTEGER: 0
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanItemType.0 = INTEGER: removable(2)
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanItemState.0 = INTEGER: operational(2)
-//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanSpeed.0 = Wrong Type (should be OCTET STRING): INTEGER: 7938
-//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.0 = Wrong Type (should be OCTET STRING): INTEGER: 32
+//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanSpeed.0 = INTEGER: 7938
+//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.0 = INTEGER: 32
+// or
+// EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFansIndex.1.0 = INTEGER: 0
+// EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanItemType.1.0 = INTEGER: fixed(1)
+// EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanItemState.1.0 = INTEGER: operational(2)
+// EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanSpeed.1.0 = INTEGER: 3765
+// EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanDutyLevel.1.0 = INTEGER: 56
+// EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesFanUnitIndex.1.0 = Gauge32: 1
 
 $oids = snmpwalk_cache_multi_oid($device, 'boxServicesFansTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
 
@@ -85,7 +103,11 @@ foreach ($oids as $index => $entry)
 {
   if ($entry['boxServicesFanItemState'] == 'notpresent') { continue; }
 
-  $descr = ucfirst($entry['boxServicesFanItemType']) . ' Fan ' . $index;
+  $descr = ucfirst($entry['boxServicesFanItemType']) . ' Fan ' . $entry['boxServicesFansIndex'];
+  if ($entry['boxServicesFanUnitIndex'] > 1)
+  {
+    $descr .= ' (Unit '.$entry['boxServicesFanUnitIndex'].')';
+  }
 
   $oid_name = 'boxServicesFanSpeed';
   $oid_num  = ".1.3.6.1.4.1.4413.1.1.43.1.6.1.4.{$index}";
@@ -95,7 +117,7 @@ foreach ($oids as $index => $entry)
 
   if ($value != 0)
   {
-    discover_sensor('fanspeed', $device, $oid_num, $index, $type, $descr, $scale, $value);
+    discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
 
     $oid_name = 'boxServicesFanDutyLevel';
     $oid_num  = ".1.3.6.1.4.1.4413.1.1.43.1.6.1.5.{$index}";
@@ -103,7 +125,7 @@ foreach ($oids as $index => $entry)
     $scale    = 1;
     $value    = $entry[$oid_name];
 
-    discover_sensor('load', $device, $oid_num, $index, $type, $descr, $scale, $value);
+    discover_sensor_ng($device, 'load', $mib, $oid_name, $oid_num, $index, NULL, $descr, $scale, $value);
   }
 
   $oid_name = 'boxServicesFanItemState';
@@ -111,12 +133,17 @@ foreach ($oids as $index => $entry)
   $type     = 'edgeswitch-boxServicesItemState';
   $value    = $entry[$oid_name];
 
-  discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, array('entPhysicalClass' => 'fan'));
+  discover_status_ng($device, $mib, 'boxServicesFanItemState', $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'fan', 'rename_rrd' => 'edgeswitch-boxServicesItemState-boxServicesFanItemState.%index%'));
 }
 
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyIndex.0 = INTEGER: 0
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemType.0 = INTEGER: fixed(1)
 //EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemState.0 = INTEGER: operational(2)
+// or:
+//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyIndex.1.0 = INTEGER: 0
+//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemType.1.0 = INTEGER: fixed(1)
+//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowSupplyItemState.1.0 = INTEGER: operational(2)
+//EdgeSwitch-BOXSERVICES-PRIVATE-MIB::boxServicesPowerSuppUnitIndex.1.0 = Gauge32: 1
 
 $oids = snmpwalk_cache_multi_oid($device, 'boxServicesPowSuppliesTable', array(), 'EdgeSwitch-BOXSERVICES-PRIVATE-MIB');
 
@@ -124,13 +151,17 @@ foreach ($oids as $index => $entry)
 {
   if ($entry['boxServicesPowSupplyItemType'] == 0 && $entry['boxServicesPowSupplyItemState'] == 'failed') { continue; } // This sensor not really exist
 
-  $descr = ucfirst($entry['boxServicesPowSupplyItemType'] . ' Power Supply ' ) . $index;
+  $descr = ucfirst($entry['boxServicesPowSupplyItemType']) . ' Power Supply ' . $entry['boxServicesPowSupplyIndex'];
+  if ($entry['boxServicesPowerSuppUnitIndex'] > 1)
+  {
+    $descr .= ' (Unit '.$entry['boxServicesPowerSuppUnitIndex'].')';
+  }
   $oid   = ".1.3.6.1.4.1.4413.1.1.43.1.7.1.3.$index";
   $value = $entry['boxServicesPowSupplyItemState'];
 
   if ($value != 'notpresent')
   {
-    discover_status($device, $oid, "boxServicesPowSupplyItemState.$index", 'edgeswitch-boxServicesItemState', $descr, $value, array('entPhysicalClass' => 'powerSupply'));
+    discover_status_ng($device, $mib, 'boxServicesPowSupplyItemState', $oid, $index, 'edgeswitch-boxServicesItemState', $descr, $value, array('entPhysicalClass' => 'powerSupply', 'rename_rrd' => 'edgeswitch-boxServicesItemState-boxServicesPowSupplyItemState.%index%'));
   }
 }
 

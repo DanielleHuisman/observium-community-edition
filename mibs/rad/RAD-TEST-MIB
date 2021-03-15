@@ -1,0 +1,5829 @@
+RAD-TEST-MIB DEFINITIONS ::= BEGIN
+
+-- Test Network Element Performance and Report
+-- according to IETF RFC 2544 or following ITU-T Y.1564
+-- TWAMP according to RFC 5357
+
+
+IMPORTS
+
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       sysName     FROM  SNMPv2-MIB
+       TimeTicks, Gauge32, Unsigned32, 
+       OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE, 
+       Counter64, Counter32     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, RowStatus, DateAndTime, 
+       RowPointer, TruthValue, MacAddress     FROM  SNMPv2-TC
+       dot1agCfmMdIndex, dot1agCfmMaIndex, dot1agCfmMepIdentifier     FROM  IEEE8021-CFM-MIB
+       InetAddressType, InetAddress, InetPortNumber     FROM  INET-ADDRESS-MIB
+       systems     FROM  RAD-SMI-MIB
+       InterfaceIndexOrZero     FROM  IF-MIB
+       RadTestPbitValues, RadTestResult     FROM  RAD-TC
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+    radTest MODULE-IDENTITY
+        LAST-UPDATED "201608041527Z"  -- August 04, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+     
+         Email:  mibs@rad.com    
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+         "Test MIB." 
+    ::= { systems 15 }
+
+
+
+radTestPrefRepEvents          OBJECT IDENTIFIER ::= {radTest 0}    -- Notifications
+radTestPrefRepProfile         OBJECT IDENTIFIER ::= {radTest 1}
+radTestPrefRepTest            OBJECT IDENTIFIER ::= {radTest 2}
+radTestPerfRepResults         OBJECT IDENTIFIER ::= {radTest 3}
+
+-- Textual Conventions    
+
+RadTestPerfRepFrameSize    ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TC indicates the size of the frames to be tested."
+    SYNTAX      BITS
+    {
+    s64         (0),
+    s128        (1),
+    s256        (2),
+    s512        (3),
+    s1024       (4),
+    s1280       (5),
+    s1518       (6),
+    s1700       (7),
+    s1900       (8),
+    s2000       (9),
+    s2048       (10),
+    s4096       (11),
+    s9600       (12),
+    custom     (13)
+    }
+
+RadTestPerfresultFrameSize   ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TC indicates the size of the frames for the reports only."
+    SYNTAX      INTEGER
+    { 
+    s64         (1),
+    s128        (2),
+    s256        (3),
+    s512        (4),
+    s1024       (5),
+    s1280       (6),
+    s1518       (7),
+    s1700       (8),
+    s1900       (9),
+    s2000       (10),
+    s2048       (11),
+    s4096       (12),
+    s9600       (13),
+    custom     (14)
+    }
+
+RadTestPbitIndex   ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TC is used to index a table according to the range of P-bit
+     values."
+    SYNTAX      INTEGER
+    {
+    pbit0       (0), 
+    pbit1       (1),
+    pbit2       (2),
+    pbit3       (3),
+    pbit4       (4),
+    pbit5       (5),
+    pbit6       (6),
+    pbit7       (7)
+    }
+
+        
+        
+-- ========================================================
+-- ==                   RFC2544 Tables                   ==
+-- ========================================================
+
+
+-- ------------------    
+-- Test Profile Table    
+-- ------------------
+    
+tstNePerfRepProfileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TstNePerfRepProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes the profiles for 'Test Network Element
+     Performance'."
+    ::= { radTestPrefRepProfile 1 }
+
+tstNePerfRepProfileEntry OBJECT-TYPE
+    SYNTAX      TstNePerfRepProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  tstNePerfRepProfileId }
+    ::= { tstNePerfRepProfileTable 1 }
+
+TstNePerfRepProfileEntry ::= SEQUENCE {
+    tstNePerfRepProfileId                      Unsigned32,
+    tstNePerfRepProfileName                    SnmpAdminString,
+    tstNePerfRepProfileRowStatus               RowStatus,
+    tstNePerfRepProfileFrameSize               RadTestPerfRepFrameSize,
+    tstNePerfRepProfilePattern                 INTEGER,
+    tstNePerfRepProfileDirection               INTEGER,
+    tstNePerfRepProfileTlv                     INTEGER,
+    tstNePerfRepProfileNumberOfFramesInOneBurst    Unsigned32,
+    tstNePerfRepProfileFrameLossTolerance      Unsigned32,
+    tstNePerfRepProfileBinarySearchResolution  Unsigned32,
+    tstNePerfRepProfileNumberOfTrials          Unsigned32,
+    tstNePerfRepProfileLearningFramesMode      INTEGER,
+    tstNePerfRepProfileLearningFrames          Unsigned32,
+    tstNePerfRepProfileCustomSize              Unsigned32,
+    tstNePerfRepProfileTransmitLck             TruthValue 
+ }
+
+tstNePerfRepProfileId         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The profile ID index"
+    ::= { tstNePerfRepProfileEntry 1 }
+
+tstNePerfRepProfileName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile Name"
+    ::= { tstNePerfRepProfileEntry 2 }
+
+
+tstNePerfRepProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of Profiles "
+    ::= { tstNePerfRepProfileEntry 3 }
+
+tstNePerfRepProfileFrameSize    OBJECT-TYPE
+    SYNTAX      RadTestPerfRepFrameSize
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Frame size in Bytes units."
+    ::= {tstNePerfRepProfileEntry 4 }
+
+tstNePerfRepProfilePattern    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable               (1),
+    allOnes                     (2),
+    allZerosWithoutCrc          (3),
+    allZerosWithCrc             (4),
+    alternate                   (5),
+    prbsWithCrc                 (6),
+    prbsWithoutCrc              (7)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The pattern at the test frame payload. "
+    ::= { tstNePerfRepProfileEntry 5 }
+
+tstNePerfRepProfileDirection    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable     (1),
+    uniDirectional    (2),
+    biDirectional     (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The direction of the test"
+    ::= {tstNePerfRepProfileEntry 6  }
+
+tstNePerfRepProfileTlv    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    test     (1),
+    data     (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of date to test.
+    test - The NE shall check if the frame exist
+    data - The NE shall check the frames was damaged."
+    ::= {tstNePerfRepProfileEntry 7  }    
+    
+tstNePerfRepProfileNumberOfFramesInOneBurst     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The number of frames that shall be send in one burst."
+    ::= {tstNePerfRepProfileEntry  8 }
+
+tstNePerfRepProfileFrameLossTolerance    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Frame Loss Tolerance in thousandth (1/1000)"
+    ::= {tstNePerfRepProfileEntry 9  }
+
+tstNePerfRepProfileBinarySearchResolution    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Binary Search Resolution in thousandth (1/1000) the minimal 
+    step in the binary search (for throughput test) "
+    ::= {tstNePerfRepProfileEntry 10 }
+
+tstNePerfRepProfileNumberOfTrials    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Number of repetition of the test "
+    ::= {tstNePerfRepProfileEntry 11 }
+
+tstNePerfRepProfileLearningFramesMode    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    none             (2),
+    once             (3),
+    oncePerTrial     (4)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Learning Frames Mode "
+    ::= {tstNePerfRepProfileEntry 12 }
+
+tstNePerfRepProfileLearningFrames    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Number of learning frames "
+    ::= {tstNePerfRepProfileEntry 13 }
+
+tstNePerfRepProfileCustomSize    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A user configurable frame size to be used in the tests.
+    Relevant only when the scustom (13) bit is set to
+    tstNePerfRepProfileFrameSize."
+    ::= {tstNePerfRepProfileEntry 14 }
+
+tstNePerfRepProfileTransmitLck    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This Object determines whether Lock indication will be
+    sent in user direction during the test."
+    DEFVAL      { true }
+    ::= {tstNePerfRepProfileEntry 15 }    
+
+    
+-- -----------------
+-- MEP to Flow Table
+-- -----------------
+
+tstMepFlowTable   OBJECT-TYPE
+    SYNTAX  SEQUENCE OF TstMepFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "This is an helping table that defines the flows that are associated 
+     to a MEP having same MEP's classification characteristics."
+    ::= {  radTestPrefRepProfile 2 }
+    
+tstMepFlowEntry OBJECT-TYPE
+    SYNTAX  TstMepFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION  
+    "The agent is creating entries in this table."
+    INDEX {  dot1agCfmMdIndex,
+             dot1agCfmMaIndex,
+             dot1agCfmMepIdentifier,
+             tstMepFlowIndex
+          }
+    ::= { tstMepFlowTable 1 }
+
+TstMepFlowEntry ::= SEQUENCE {
+    tstMepFlowIndex         Unsigned32,
+    tstMepFlowFlowIdx       RowPointer 
+ }
+    
+tstMepFlowIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A running index."
+    ::= { tstMepFlowEntry 1 }    
+    
+tstMepFlowFlowIdx OBJECT-TYPE
+    SYNTAX RowPointer
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "This attribute defines a unique Flow.
+     The value points to MEF-R.flowIdx1 and MEF-R.flowIdx2 indices."
+    ::= { tstMepFlowEntry 2 }
+
+    
+-- ----------
+--  Test Table
+-- ----------
+
+tstNePerfRepTestTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF TstNePerfRepTestEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "This table contains configuration for RFC2544 tests. "
+    ::= { radTestPrefRepTest 1 }
+
+tstNePerfRepTestEntry OBJECT-TYPE
+    SYNTAX  TstNePerfRepTestEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  tstNePerfRepTestId }
+    ::= { tstNePerfRepTestTable 1 }
+
+TstNePerfRepTestEntry ::= SEQUENCE {
+    tstNePerfRepTestId                           Unsigned32,
+    tstNePerfRepTestRowStatus                    RowStatus,
+    tstNePerfRepTestType                         BITS,
+    tstNePerfRepTestProfileId                    Unsigned32,
+    tstNePerfRepTestEntity                       RowPointer,
+    tstNePerfRepTestActivation                   INTEGER,
+    tstNePerfRepTestStatus                       INTEGER,
+    tstNePerfRepTestActivationDateAndTime        DateAndTime,
+    tstNePerfRepTestActivationRecurrenceTime     Unsigned32,
+    tstNePerfRepTestMaxRate                      Unsigned32,
+    tstNePerfRepTestElapsedTime                  TimeTicks,
+    tstNePerfRepTestResetResults                 INTEGER,
+    tstNePerfRepTestRateConvention               INTEGER,
+    tstNePerfRepTestFrameCompensation            Unsigned32,
+    tstNePerfRepTestMaxTestDuration              Unsigned32,
+    tstNePerfRepTestAssociatedFlow               RowPointer 
+ }
+
+
+tstNePerfRepTestId         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Test ID "
+    ::= { tstNePerfRepTestEntry 1 }
+
+tstNePerfRepTestRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of entries. "
+    ::= { tstNePerfRepTestEntry 2 }
+
+
+tstNePerfRepTestType    OBJECT-TYPE
+    SYNTAX        BITS
+    {
+        throughput   (0),
+        frameloss    (1),
+        latency      (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of the test. "
+    ::= { tstNePerfRepTestEntry  3 }
+
+
+tstNePerfRepTestProfileId OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The index of the test Profile."
+    ::= { tstNePerfRepTestEntry  4 }
+
+tstNePerfRepTestEntity    OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The OID number of the fifth index from ethOamDestNeTable
+    that the test shall run on." 
+    ::= { tstNePerfRepTestEntry  5 }
+
+
+tstNePerfRepTestActivation            OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    off               (1),
+    now               (2),
+    dateAndTime       (3),
+    daily             (4),
+    cancelTest        (255)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The cmd to run the test.
+    The test can be activate in future time using the 
+     parameter dateAndTime (3) or daily (4)."
+    ::= { tstNePerfRepTestEntry  6 }
+
+    
+tstNePerfRepTestStatus      OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        adminOff    (1),
+        inProgress  (2),
+        pending     (3),
+        completed   (4),
+        timeOut     (5)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of the test: 
+    adminOff - Canceled by the user.
+    inProgress - The test is in progress.
+    pending - The test will be run according to the dateAndTime or daily.
+    completed  - The test was completed.
+    timeOut    - The test was not completed."
+    ::= { tstNePerfRepTestEntry  7 }    
+    
+tstNePerfRepTestActivationDateAndTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Date And Time in which Test will be carried."
+    ::= { tstNePerfRepTestEntry  8 }
+
+tstNePerfRepTestActivationRecurrenceTime    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Time of Day in which test will be recurrence.
+    Date fields (Year/Month/Date) may be discarded"
+    ::= { tstNePerfRepTestEntry  9 }
+
+tstNePerfRepTestMaxRate                OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The maximal theoretical FPS (Frames per second) for this run,
+    set by the user to reflect the limitation on this Channel."
+    ::= { tstNePerfRepTestEntry  10 }
+    
+tstNePerfRepTestElapsedTime     OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of hundredths of seconds that have elapsed since
+     the beginning of the Test."
+    ::= { tstNePerfRepTestEntry  11 } 
+    
+tstNePerfRepTestResetResults         OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+       off  (2),
+       on   (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Reset all test's iteration results."
+    ::= { tstNePerfRepTestEntry 12 }
+
+tstNePerfRepTestRateConvention         OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+       lineRate  (2),
+       dataRate  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Indicates whether the tstNePerfRepTestMaxRate is expressed in
+      line-rate or in data-rate.
+      Default value is dataRate(3)."
+    ::= { tstNePerfRepTestEntry 13 }
+
+tstNePerfRepTestFrameCompensation                OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The number of bytes to add to the actual transmitted frame size.
+     This addition is not taken into consideration in the throughput bit
+     rate result.
+     Default value is zero."
+    ::= { tstNePerfRepTestEntry  14 } 
+
+tstNePerfRepTestMaxTestDuration                OBJECT-TYPE
+    SYNTAX      Unsigned32 (2..60)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "An upper limit to the test duration in minutes."
+    ::= { tstNePerfRepTestEntry  15 }
+
+tstNePerfRepTestAssociatedFlow                OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The OID number of the 2 indexes of the flow associated with the test.
+     The BW profile and QoS of this flow is taken into account in the test.
+     Default value is zero i.e. no flow configured for the test."
+    ::= { tstNePerfRepTestEntry  16 }
+
+
+-- --------------------------
+-- Per Iteration Status Table
+-- --------------------------
+
+tstNePerfRepStatusTable      OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TstNePerfRepStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes the status of each iteration of test x.
+     An entry in this table will be created upon activating a test
+     and shall be removed upon deleting a test."
+    ::= { radTestPerfRepResults 5 }
+
+tstNePerfRepStatusEntry OBJECT-TYPE
+    SYNTAX      TstNePerfRepStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  tstNePerfRepTestId , tstNePerfRepIteration }
+    ::= { tstNePerfRepStatusTable 1 }
+
+TstNePerfRepStatusEntry ::= SEQUENCE {
+    tstNePerfRepIteration      Unsigned32,
+    tstNePerfRepStartTime      DateAndTime,
+    tstNePerfRepDuration       TimeTicks,
+    tstNePerfRepStatus         INTEGER,
+    tstNePerfRepType           INTEGER,
+    tstNePerfRepIterationNum   Unsigned32,
+    tstNePerfRepTrial          Unsigned32,
+    tstNePerfRepAttemptNum     Unsigned32,
+    tstNePerfRepFrameSize      Unsigned32,
+    tstNePerfRepLatencyNum     Unsigned32 
+ }
+        
+tstNePerfRepIteration         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The iteration index is used to distinguish between the tests iterations.
+     i.e. if the user activates 'test 1' twice, the NE shall the store the results
+     of both tests where 1 is the most recent test.
+     This table holds the status of the test (all the iterations together) when 
+     tstNePerfRepIteration = 2^32-1"
+    ::= { tstNePerfRepStatusEntry 1 }
+
+tstNePerfRepStartTime         OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The object indicate the Date And Time of the iteration."
+    ::= { tstNePerfRepStatusEntry 2 }
+    
+tstNePerfRepDuration         OBJECT-TYPE
+    SYNTAX      TimeTicks
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The object indicate the duration of the test."
+    ::= { tstNePerfRepStatusEntry 3 }
+
+tstNePerfRepStatus         OBJECT-TYPE
+    SYNTAX      INTEGER
+    { 
+     idle                        (1),
+     inProgress                  (2),
+     success                     (3),
+     fail                        (4),
+     oamConnectivityFailure      (5),
+     other                       (6),
+     timeOut                     (7),
+     pending                     (8)
+    }    
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The status of the test."
+    ::= { tstNePerfRepStatusEntry 4 }
+
+tstNePerfRepType         OBJECT-TYPE
+    SYNTAX        INTEGER
+    {
+        notApplicable  (1),
+        throughput     (2),
+        frameloss      (3),
+        latency        (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The type of the current running test."
+    ::= { tstNePerfRepStatusEntry 5 }
+        
+tstNePerfRepIterationNum         OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of iteration in the current running test
+    Use only if tstNePerfRepIteration = 0."
+    ::= { tstNePerfRepStatusEntry 6 }
+
+tstNePerfRepTrial            OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of trial in iteration in the current running test."
+    ::= { tstNePerfRepStatusEntry 7 }
+    
+tstNePerfRepAttemptNum        OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The attempt number in the current running test."
+    ::= { tstNePerfRepStatusEntry 8 }
+    
+tstNePerfRepFrameSize         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Frame Size in the current running test."
+    ::= { tstNePerfRepStatusEntry 9 }
+     
+tstNePerfRepLatencyNum      OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The actual number of Latency iterations that were performed."
+    ::= { tstNePerfRepStatusEntry 10 }
+
+
+-- ---------------------
+-- General Results Table
+-- ---------------------
+
+tstNePerfRepGeneralResultsTable      OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TstNePerfRepGeneralResultsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes the general status of each trial.
+     An entry in this table will be created upon activating a test
+     and shall be removed upon deleting a test."
+    ::= { radTestPerfRepResults 1 }
+
+tstNePerfRepGeneralResultsEntry OBJECT-TYPE
+    SYNTAX      TstNePerfRepGeneralResultsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION  
+    "An entry in table."
+    INDEX { tstNePerfRepTestId ,tstNePerfRepIteration, 
+           tstNePerfRepGeneralResultsTestType ,tstNePerfRepGeneralResultsTrialNumber}
+    ::= { tstNePerfRepGeneralResultsTable 1 }
+
+TstNePerfRepGeneralResultsEntry ::= SEQUENCE {
+    tstNePerfRepGeneralResultsTestType         INTEGER,
+    tstNePerfRepGeneralResultsTrialNumber      Unsigned32,
+    tstNePerfRepGeneralResultsStatus           INTEGER,
+    tstNePerfRepGeneralResultsDuration         TimeTicks 
+ }
+        
+tstNePerfRepGeneralResultsTestType         OBJECT-TYPE
+    SYNTAX        INTEGER
+    {
+        throughput   (1),
+        frameloss    (2),
+        latency      (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The type of the test. The value of this object shall be populated
+     by the NE according to tstNePerfRepTestType"
+    ::= { tstNePerfRepGeneralResultsEntry 1 }
+    
+    
+tstNePerfRepGeneralResultsTrialNumber         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The test trail number."
+    ::= { tstNePerfRepGeneralResultsEntry 2 }
+
+tstNePerfRepGeneralResultsStatus         OBJECT-TYPE
+    SYNTAX      INTEGER
+    { 
+     success                     (1),
+     fail                        (2),
+     linkDown                    (3),
+     oamConnectivityFailure      (4),
+     timeOut                     (5),
+     notApplicable               (255)
+    }    
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The status of the trial."
+    ::= { tstNePerfRepGeneralResultsEntry 3 }
+
+tstNePerfRepGeneralResultsDuration         OBJECT-TYPE
+    SYNTAX      TimeTicks 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The duration of the trial (hundredths of seconds).  "
+    ::= { tstNePerfRepGeneralResultsEntry 4 }
+
+    
+    
+-- --------------------------------
+-- Throughput Report Table    
+-- ---------------------------------
+ 
+throughputReportTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF ThroughputReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "This table indicates the throughput Report.
+     An entry in this table will be created upon activating the test and only
+     if the tstNePerfRepTestType = throughput (0)
+     
+     The throughput test find out the maximum frame or bits
+     rate without lost frames the DUT can manage. The test
+     begins at 100% frame rate. If any frames are lost, the test
+     is repeated at a lower frame rate. This process continues
+     until the maximum throughput is determined."
+    ::= { radTestPerfRepResults 2 }
+
+throughputReportEntry OBJECT-TYPE
+    SYNTAX  ThroughputReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION  
+    "An entry in table."
+    INDEX { tstNePerfRepTestId ,tstNePerfRepIteration, 
+    throughputReportTrialNumber, throughputReportPacketSize }
+    ::= { throughputReportTable 1 }
+
+ThroughputReportEntry ::= SEQUENCE {
+    throughputReportTrialNumber                 Unsigned32,
+    throughputReportPacketSize                  RadTestPerfresultFrameSize,
+    throughputReportThroughputTheoretical       Gauge32,
+    throughputReportResults                     Gauge32,
+    throughputReportDataPattern                 INTEGER,
+    throughputReportResultsBps                  Gauge32,
+    throughputReportCustomPacketSize            Unsigned32 
+ }
+
+throughputReportTrialNumber         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The test trail number."
+    ::= { throughputReportEntry 1 }     
+    
+throughputReportPacketSize         OBJECT-TYPE
+    SYNTAX      RadTestPerfresultFrameSize 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The packet size that was tested."
+    ::= { throughputReportEntry 2 }    
+
+throughputReportThroughputTheoretical       OBJECT-TYPE
+    SYNTAX      Gauge32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The max theoretical Throughput (FPS) on this media."
+    ::= { throughputReportEntry 3 }     
+
+throughputReportResults      OBJECT-TYPE
+    SYNTAX      Gauge32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The actual measured Throughput (FPS)."
+    ::= { throughputReportEntry 4 }   
+
+
+throughputReportDataPattern      OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+        notApplicable               (1),    
+        allOnes                     (2),
+        allZerosWithoutCrc          (3),
+        allZerosWithCrc             (4),
+        alternate                   (5),
+        prbsWithCrc                 (6),
+        prbsWithoutCrc              (7)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The pattern at the test frame payload."
+    ::= { throughputReportEntry 5 }    
+
+throughputReportResultsBps      OBJECT-TYPE
+    SYNTAX      Gauge32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The actual measured Throughput (BPS).
+     Note, the conversion between PPS to BPS depends on the value of
+     tstNePerfRepTestRateConvention."
+    ::= { throughputReportEntry 6 }
+
+throughputReportCustomPacketSize      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A user configurable frame size to be used in the tests.
+    Relevant only when the scustom (14) is set to
+    RadTestPerfresultFrameSize."
+    ::= {throughputReportEntry 7 }
+
+
+-- --------------------------------
+-- Latency Report Table    
+-- ---------------------------------
+
+latencyReportTable   OBJECT-TYPE
+    SYNTAX  SEQUENCE OF LatencyReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "This table indicates the throughput Report.
+     An entry in this table will be created upon activating the test and only
+     if the tstNePerfRepTestType = latency (2)
+     
+     The latency test runs the traffic at the throughput 
+     rate result for each tested frame size for two minutes 
+     and measure the latency of a single tagged frame sent 
+     after one minute into test. 
+     The latency report is the average of 20 tests."
+    ::= { radTestPerfRepResults 3 }
+
+latencyReportEntry OBJECT-TYPE
+    SYNTAX  LatencyReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION  
+    "An entry in table."
+    INDEX { tstNePerfRepTestId, tstNePerfRepIteration ,
+            latencyReportTrialNumber , 
+            latencyReportPacketSize  }
+    ::= { latencyReportTable 1 }
+
+LatencyReportEntry ::= SEQUENCE {
+    latencyReportTrialNumber       Unsigned32,
+    latencyReportPacketSize        RadTestPerfresultFrameSize,
+    latencyReportType              INTEGER,
+    latencyReportResult            Gauge32,
+    latencyReportCustomPacketSize  Unsigned32 
+ }
+
+latencyReportTrialNumber         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The test trail number."
+    ::= { latencyReportEntry 1 }    
+    
+latencyReportPacketSize         OBJECT-TYPE
+    SYNTAX      RadTestPerfresultFrameSize 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The packet size that was tested. "
+    ::= { latencyReportEntry 2 }    
+
+latencyReportType     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    storeAndForward         (1),
+    bitForwarding           (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "RFC1245 definition:
+    
+    store and forward devices:
+        The time interval starting when the last bit of the
+        input frame reaches the input port and ending when
+        the first bit of the output frame is seen on the
+        output port.
+
+     bit forwarding devices:
+        The time interval starting when the end of the first
+        bit of the input frame reaches the input port and
+        ending when the start of the first bit of the output
+        frame is seen on the output port. "
+    ::= { latencyReportEntry 3 }   
+
+latencyReportResult    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Latency result in microseconds. "
+    ::= { latencyReportEntry 4 }
+
+latencyReportCustomPacketSize      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A user configurable frame size to be used in the tests.
+    Relevant only when the scustom (14) is set to
+    RadTestPerfresultFrameSize."
+    ::= {latencyReportEntry 5 }
+
+
+-- --------------------------------
+-- Frame loss Rate Report Table    
+-- ---------------------------------
+
+framelossRateReportTable   OBJECT-TYPE
+    SYNTAX  SEQUENCE OF FramelossRateReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "This table indicates the Frame loss result.
+     An entry in this table will be created upon activating the test and only
+     if the tstNePerfRepTestType = frameloss (1).
+
+     
+     The Frame loss test is based on the test begins at 100% frame 
+     rate by sending a specific number of frames and recording 
+     the percentage of the lost frames. The rate is reduced by 10% on 
+     each circle and the test is repeated until there are 2 successive 
+     trials in which no frame loss."
+    ::= { radTestPerfRepResults 4 }
+
+framelossRateReportEntry OBJECT-TYPE
+    SYNTAX  FramelossRateReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION  
+    "An entry in table."
+    INDEX { tstNePerfRepTestId,tstNePerfRepIteration , framelossRateReportTrialNumber , 
+            framelossRateReportPacketSize , framelossRateReportInputRate}
+    ::= { framelossRateReportTable 1 }
+
+FramelossRateReportEntry ::= SEQUENCE {
+    framelossRateReportTrialNumber           Unsigned32,
+    framelossRateReportPacketSize            RadTestPerfresultFrameSize,
+    framelossRateReportInputRate             Unsigned32,
+    framelossRateReportResults               Gauge32,
+    framelossRateReportCustomPacketSize      Unsigned32 
+ }
+
+framelossRateReportTrialNumber         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The test trail number."
+    ::= { framelossRateReportEntry 1 }        
+    
+framelossRateReportPacketSize         OBJECT-TYPE
+    SYNTAX      RadTestPerfresultFrameSize 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The packet size that was tested."
+    ::= { framelossRateReportEntry 2 }    
+
+framelossRateReportInputRate     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The input frame rate (in percentage) of the theoretical rate
+    at the specific frame size. "
+    ::= { framelossRateReportEntry 3 }   
+
+framelossRateReportResults    OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of error frames."
+    ::= { framelossRateReportEntry 4 }
+
+framelossRateReportCustomPacketSize      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A user configurable frame size to be used in the tests.
+    Relevant only when the scustom (14) is set to
+    RadTestPerfresultFrameSize."
+    ::= {framelossRateReportEntry 5 }
+
+
+    
+-- 2544 Attempt Results Table
+
+tstNeThroughputIterationTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TstNeThroughputIterationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains an information about the number of 
+    loss packets in each attempt of throughput rate repetition."
+    ::= { radTestPerfRepResults 12 }
+
+tstNeThroughputIterationEntry OBJECT-TYPE
+    SYNTAX      TstNeThroughputIterationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the table."
+    INDEX { tstNePerfRepTestId, throughputReportTrialNumber, 
+            throughputReportPacketSize, tstNeThroughputIteration
+     }
+    ::= { tstNeThroughputIterationTable 1 }
+
+TstNeThroughputIterationEntry ::= SEQUENCE {
+    tstNeThroughputIteration            Gauge32,
+    tstNeThroughputIterationBPS         Unsigned32,
+    tstNeThroughputLossPacket           Gauge32 
+ }
+
+tstNeThroughputIteration         OBJECT-TYPE
+    SYNTAX      Gauge32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The ."
+    ::= { tstNeThroughputIterationEntry 1 }
+
+tstNeThroughputIterationBPS         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The tested measured Throughput (in BPS) ."
+    ::= { tstNeThroughputIterationEntry 2 }
+
+tstNeThroughputLossPacket         OBJECT-TYPE
+    SYNTAX      Gauge32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of Lost Frames in the repetition."
+    ::= { tstNeThroughputIterationEntry 3 }
+
+
+
+-- ========================================================
+-- ==                   Y.1564 Tables                    ==
+-- ========================================================
+
+
+-- ----------------------
+-- Y.1564 Profile Table
+-- ----------------------
+
+ituSatProfileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains configuration profiles to be used in Y.1564 tests.
+
+     In general a profile is suitable for both generators and responders,
+     however a few attributes are relevant only for one of the functions.
+     The exceptions are indicated in the description clause of the respective
+     objects."
+    ::= { radTestPrefRepProfile 3 }
+
+ituSatProfileEntry OBJECT-TYPE
+    SYNTAX      ItuSatProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 profile table.
+     
+     A row cannot be deleted if the profile is associated to a test.
+     A row cannot be modified if the profile is associated to a test that
+     is currently in progress.
+     
+     When a row is deleted all the corresponding rows in the
+     ituSatProfilePbitTable are automatically deleted as well."
+    INDEX {  ituSatProfileIndex }
+    ::= { ituSatProfileTable 1 }
+
+ItuSatProfileEntry ::= SEQUENCE {
+    ituSatProfileIndex                       Unsigned32,
+    ituSatProfileName                        SnmpAdminString,
+    ituSatProfileRowStatus                   RowStatus,
+    ituSatProfileEtherType                   OCTET STRING,
+    ituSatProfileFrameSize                   Unsigned32,
+    ituSatProfileUniFlrThreshold             Unsigned32,
+    ituSatProfileUniFtdThreshold             Unsigned32,
+    ituSatProfileUniFdvThreshold             Unsigned32,
+    ituSatProfileUniAvailThreshold           Unsigned32,
+    ituSatProfileBiFlrThreshold              Unsigned32,
+    ituSatProfileBiFtdThreshold              Unsigned32,
+    ituSatProfileBiFdvThreshold              Unsigned32,
+    ituSatProfileBiAvailThreshold            Unsigned32,
+    ituSatProfileScope                       BITS,
+    ituSatProfileDirection                   INTEGER,
+    ituSatProfileColorMode                   INTEGER,
+    ituSatProfileTrafficPolicing             INTEGER,
+    ituSatProfileCirSteps                    OCTET STRING,
+    ituSatProfileConfDuration                Unsigned32,
+    ituSatProfilePerfDuration                Unsigned32,
+    ituSatProfileRateConvention              INTEGER,
+    ituSatProfileResponderType               INTEGER 
+ }
+
+ituSatProfileIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as profile identifier."
+    ::= { ituSatProfileEntry 1 }
+
+ituSatProfileName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable profile name."
+    ::= { ituSatProfileEntry 2 }
+
+ituSatProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of profiles."
+    ::= { ituSatProfileEntry 3 }
+
+ituSatProfileEtherType    OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(2))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The EtherType of the test frames."
+    DEFVAL      { '22E8'H }
+    ::= { ituSatProfileEntry 4 }
+
+ituSatProfileFrameSize     OBJECT-TYPE
+    SYNTAX      Unsigned32 (64..12000)
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The size of test frames.
+    
+     This size refers to the total number of bytes in the frame including
+     the header and trailer of the frame but excluding the tag structure.
+     C-tag and S-tag, if present, shall augment the frame size.
+    
+     This object is relevant only for generators."
+    DEFVAL      { 512 }
+    ::= { ituSatProfileEntry 5 }
+
+ituSatProfileUniFlrThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "ppm"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Frame Loss Ratio.
+
+     This object is relevant only for generators."
+    DEFVAL      { 100 }
+    ::= { ituSatProfileEntry 6 }
+
+ituSatProfileUniFtdThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Frame Transfer
+     Delay.
+
+     This object is relevant only for generators."
+    DEFVAL      { 13000 }
+    ::= { ituSatProfileEntry 7 }
+
+ituSatProfileUniFdvThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Frame Delay
+     Variation.
+
+     This object is relevant only for generators."
+    DEFVAL      { 8000 }
+    ::= { ituSatProfileEntry 8 }
+
+ituSatProfileUniAvailThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "hundredth of percent"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Availability.
+
+     This object is relevant only for generators."
+    DEFVAL      { 9990 }
+    ::= { ituSatProfileEntry 9 }
+
+ituSatProfileBiFlrThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "ppm"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Frame Loss Ratio.
+
+     This object is relevant only for generators."
+    DEFVAL      { 200 }
+    ::= { ituSatProfileEntry 10 }
+
+ituSatProfileBiFtdThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Frame Transfer
+     Delay.
+
+     This object is relevant only for generators."
+    DEFVAL      { 26000 }
+    ::= { ituSatProfileEntry 11 }
+
+ituSatProfileBiFdvThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Frame Delay
+     Variation.
+
+     This object is relevant only for generators."
+    DEFVAL      { 11000 }
+    ::= { ituSatProfileEntry 12 }
+
+ituSatProfileBiAvailThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "hundredth of percent"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Availability.
+
+     This object is relevant only for generators."
+    DEFVAL      { 9990 }
+    ::= { ituSatProfileEntry 13 }
+
+ituSatProfileScope     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    configuration     (0),
+    performance       (1)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The scope of the test: configuration test, performance test, or both
+     phases.
+
+     This object is relevant only for generators."
+    DEFVAL      { { configuration, performance } }
+    ::= { ituSatProfileEntry 14 }
+
+ituSatProfileDirection     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    unidirectional    (1),
+    bidirectional     (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The direction in which the test is performed."
+    DEFVAL      { bidirectional }
+    ::= { ituSatProfileEntry 15 }
+
+ituSatProfileColorMode     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    colorAware  (1),
+    colorBlind  (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The color mode that is used for the test."
+    DEFVAL      { colorAware }
+    ::= { ituSatProfileEntry 16 }
+
+ituSatProfileTrafficPolicing     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    enabled     (1),
+    disabled    (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Allows to include or exclude the traffic policing sub-test from the
+     configuration phase."
+    DEFVAL      { enabled }
+    ::= { ituSatProfileEntry 17 }
+
+ituSatProfileCirSteps     OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(4))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The transmission rate in each step of the CIR sub-test, configurable
+     as percentage of CIR.
+     
+     The last transmission rate must be 100% CIR therefore only up to 3
+     additional rates are configurable.
+     Unused steps must have a corresponding value of 0%.
+     The default shall be 4 steps of 25%, 50%, 75% and 100% of CIR.
+     
+     Examples:
+     1 step of 100% - '64000000'H
+     3 steps of 30% ,60%, 100% - '1E3C6400'H
+     
+     This object is relevant only for generators."
+    DEFVAL      { '19324B64'H }  -- 25%, 50%, 75%, 100%
+    ::= { ituSatProfileEntry 18 }
+
+ituSatProfileConfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (18..360)
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The duration of the configuration test.
+     This duration is used for each tested P-bit.
+
+     This object is relevant only for generators."
+    DEFVAL      { 60 }
+    ::= { ituSatProfileEntry 19 }
+
+ituSatProfilePerfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..7200)
+    UNITS       "minutes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The duration of the performance test.
+
+     This object is relevant only for generators."
+    DEFVAL      { 120 }
+    ::= { ituSatProfileEntry 20 }
+
+ituSatProfileRateConvention     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    dataRate    (1),
+    lineRate    (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Indicates whether rate measurements are be shown in the test report
+     as 'data-rate' (IR) or converted to 'line rate' (ULR).
+
+     This object is relevant only for generators."
+    DEFVAL      { dataRate }
+    ::= { ituSatProfileEntry 21 }
+
+ituSatProfileResponderType     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    y1564             (1),
+    macSwapLoopback   (2),
+    mef46Ll           (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of the responder.
+    
+     This object is relevant only for generators."
+    DEFVAL      { y1564 }
+    ::= { ituSatProfileEntry 22 }
+    
+    
+-- ----------------------------
+-- Y.1564 Profile P-bit Table
+-- ----------------------------
+
+ituSatProfilePbitTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatProfilePbitEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains configuration profiles, at the P-bit level, to be
+     used in Y.1564 tests.
+     
+     The values in a row of this table override the values of the
+     corresponding row of ituSatProfileTable.
+
+     This table is relevant only for generators."
+    ::= { radTestPrefRepProfile 4 }
+
+ituSatProfilePbitEntry OBJECT-TYPE
+    SYNTAX      ItuSatProfilePbitEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 profile P-bit table.
+
+     When a row is created, the ituSatProfileIndex must point to an
+     already existing row of ituSatProfileTable.
+     
+     A row cannot be deleted if the profile is associated to a test.
+     A row cannot be modified if the profile is associated to a test that
+     is currently in progress.
+     
+     When a row in ituSatProfileTable is deleted all the corresponding
+     rows in this table are automatically deleted as well."
+    INDEX {  ituSatProfileIndex,
+             ituSatProfilePbitIndex }
+    ::= { ituSatProfilePbitTable 1 }
+
+ItuSatProfilePbitEntry ::= SEQUENCE {
+    ituSatProfilePbitIndex                       RadTestPbitIndex,
+    ituSatProfilePbitRowStatus                   RowStatus,
+    ituSatProfilePbitFrameSize                   Unsigned32,
+    ituSatProfilePbitUniFlrThreshold             Unsigned32,
+    ituSatProfilePbitUniFtdThreshold             Unsigned32,
+    ituSatProfilePbitUniFdvThreshold             Unsigned32,
+    ituSatProfilePbitUniAvailThreshold           Unsigned32,
+    ituSatProfilePbitBiFlrThreshold              Unsigned32,
+    ituSatProfilePbitBiFtdThreshold              Unsigned32,
+    ituSatProfilePbitBiFdvThreshold              Unsigned32,
+    ituSatProfilePbitBiAvailThreshold            Unsigned32 
+ }
+
+ituSatProfilePbitIndex         OBJECT-TYPE
+    SYNTAX      RadTestPbitIndex 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A single P-bit to which the configuration in this table applies."
+    ::= { ituSatProfilePbitEntry 1 }
+
+ituSatProfilePbitRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of P-bit profiles."
+    ::= { ituSatProfilePbitEntry 2 }
+
+ituSatProfilePbitFrameSize     OBJECT-TYPE
+    SYNTAX      Unsigned32 (64..12000)
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The size of test frames.
+    
+     This size refers to the total number of bytes in the frame including
+     the header and trailer of the frame but excluding the tag structure.
+     C-tag and S-tag, if present, shall augment the frame size."
+    DEFVAL      { 512 }
+    ::= { ituSatProfilePbitEntry 3 }
+
+ituSatProfilePbitUniFlrThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "ppm"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Frame Loss Ratio."
+    DEFVAL      { 100 }
+    ::= { ituSatProfilePbitEntry 4 }
+
+ituSatProfilePbitUniFtdThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Frame Transfer
+     Delay."
+    DEFVAL      { 13 }
+    ::= { ituSatProfilePbitEntry 5 }
+
+ituSatProfilePbitUniFdvThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Frame Delay
+     Variation."
+    DEFVAL      { 8 }
+    ::= { ituSatProfilePbitEntry 6 }
+
+ituSatProfilePbitUniAvailThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "hundredth of percent"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for unidirectional Availability."
+    DEFVAL      { 9990 }
+    ::= { ituSatProfilePbitEntry 7 }
+
+ituSatProfilePbitBiFlrThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "ppm"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Frame Loss Ratio."
+    DEFVAL      { 200 }
+    ::= { ituSatProfilePbitEntry 8 }
+
+ituSatProfilePbitBiFtdThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Frame Transfer
+     Delay."
+    DEFVAL      { 26 }
+    ::= { ituSatProfilePbitEntry 9 }
+
+ituSatProfilePbitBiFdvThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Frame Delay
+     Variation."
+    DEFVAL      { 11 }
+    ::= { ituSatProfilePbitEntry 10 }
+
+ituSatProfilePbitBiAvailThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "hundredth of percent"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for bidirectional Availability."
+    DEFVAL      { 9990 }
+    ::= { ituSatProfilePbitEntry 11 }
+
+
+-- ------------------------
+-- Y.1564 Generator Table
+-- ------------------------
+
+ituSatGeneratorTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatGeneratorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of generator entities used in Y.1564 tests.
+     The table allows creation, configuration and activation of test
+     sessions.
+     For each test that was actually performed, the table also holds basic
+     information and a summary report."
+    ::= { radTestPrefRepTest 2 }
+
+ituSatGeneratorEntry OBJECT-TYPE
+    SYNTAX      ItuSatGeneratorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 generator table.
+     
+     A row cannot be modified or deleted while the test is running
+     (indicated by ituSatGeneratorStatus = inProgress(3)).
+     
+     When a row is deleted all the corresponding rows in the
+     ituSatGeneratorPolicerTable, ituSatGeneratorFlowTable,
+     ituSatConfPbitTable, ituSatReportTable and ituSatBurstReportTable are
+     automatically deleted as well."
+    INDEX {  ituSatGeneratorIndex }
+    ::= { ituSatGeneratorTable 1 }
+
+ItuSatGeneratorEntry ::= SEQUENCE {
+    ituSatGeneratorIndex                       Unsigned32,
+    ituSatGeneratorName                        SnmpAdminString,
+    ituSatGeneratorRowStatus                   RowStatus,
+    ituSatGeneratorServicePointer              RowPointer,
+    ituSatGeneratorProvisionedPbits            RadTestPbitValues,
+    ituSatGeneratorProfile                     Unsigned32,
+    ituSatGeneratorCmd                         INTEGER,
+    ituSatGeneratorConfChanged                 TruthValue,
+    ituSatGeneratorStatus                      INTEGER,
+    ituSatGeneratorTimeRemaining               Unsigned32,
+    ituSatGeneratorCurrentPhase                INTEGER,
+    ituSatGeneratorDestination                 MacAddress,
+    ituSatGeneratorSource                      MacAddress,
+    ituSatGeneratorInnerTag                    Unsigned32,
+    ituSatGeneratorOuterTag                    Unsigned32,
+    ituSatGeneratorTestedPbits                 RadTestPbitValues,
+    ituSatGeneratorStartTime                   DateAndTime,
+    ituSatGeneratorEndTime                     DateAndTime,
+    ituSatGeneratorTimeElapsed                 Unsigned32,
+    ituSatGeneratorConfResult                  RadTestResult,
+    ituSatGeneratorPerfResult                  RadTestResult,
+    ituSatGeneratorConfDuration                Unsigned32,
+    ituSatGeneratorPerfDuration                Unsigned32,
+    ituSatGeneratorScope                       BITS,
+    ituSatGeneratorServiceBinding              INTEGER,
+    ituSatGeneratorServiceName                 SnmpAdminString,
+    ituSatGeneratorEgressPort                  InterfaceIndexOrZero,
+    ituSatGeneratorProvisionedDestination      MacAddress 
+ }
+
+ituSatGeneratorIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as generator identifier."
+    ::= { ituSatGeneratorEntry 1 }
+
+ituSatGeneratorName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable generator name."
+    ::= { ituSatGeneratorEntry 2 }
+
+ituSatGeneratorRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of Y.1564 generators."
+    ::= { ituSatGeneratorEntry 3 }
+
+ituSatGeneratorServicePointer    OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service under test.
+     The service can be represented by:
+     1. An MA that contains one or more MEPs
+     2. A single multi-CoS flow
+     3. Mutiple single-CoS flows
+     4. Service name + egress port
+     
+     When MA is used, the object must point to the first accessible column
+     of dot1agCfmMaNetTable i.e. it must contain the OID of the
+     corresponding dot1agCfmMaNetFormat.
+     
+     When a single multi-CoS flow is used, the object must point to the
+     first accesible column of flowTable i.e. it must contain the OID of
+     the corresponding flowName.
+     
+     When multiple single-CoS flows are used, the object must be null i.e.
+     contain zeroDotZero. The flows that represent the service shall be
+     listed in ituSatSingleCosFlowTable.
+     
+     When a service name+egress port is used, the object must be null i.e.
+     contain zeroDotZero. The service name and egress port shall be
+     indicated by ituSatGeneratorServiceName and ituSatGeneratorEgressPort,
+     respectively."
+    DEFVAL      { zeroDotZero }
+    ::= { ituSatGeneratorEntry 4 }
+
+ituSatGeneratorProvisionedPbits    OBJECT-TYPE
+    SYNTAX      RadTestPbitValues
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A list of the P-bit values that are requested to be tested.
+     
+     When no P-bits where specified all the P-bits that were pre-configured
+     for the service are tested (the found P-bits are listed in
+     ituSatGeneratorTestedPbits).
+     
+     To test an entire EVC (no EVC.CoS granularity) a value of zero must be
+     set.
+     
+     When the value of ituSatGeneratorServiceBinding is
+     multipleSingleCosFlows(3) the value of this object must be zero."
+    DEFVAL      { {} }
+    ::= { ituSatGeneratorEntry 5 }
+
+ituSatGeneratorProfile    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile used in the test."
+    DEFVAL      { 0 }
+    ::= { ituSatGeneratorEntry 6 }
+
+ituSatGeneratorCmd    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    stop        (1),
+    start       (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A command to activate or de-activate the test at the generator side.
+
+     If sanity checks prevent the test activation then a set to start(1)
+     shall be rejected with an SNMP error.
+    
+     Upon successful activation of a test:
+     - Existing corresponding rows in the ituSatReportTable and
+       ituSatBurstReportTable shall be automatically deleted.
+     - Corresponding rows shall be automatically created/re-created in
+       the ituSatReportTable and ituSatBurstReportTable.
+     - The value of the object ituSatGeneratorConfChanged shall be set
+       to false(2).
+    
+     This object is volatile i.e. it returns to default value after NE reset."
+    DEFVAL      { stop }
+    ::= { ituSatGeneratorEntry 7 }
+
+ituSatGeneratorConfChanged    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indication whether the configuration of the test was changed after
+     the test was completed.
+     
+     If the configuration was changed then threshold values should not be
+     shown in a detailed report (there is no tracking whether the exact
+     change within a profile was of a threshold or not).
+     
+     The configuration of the test, in this context, includes the
+     following:
+     - The object ituSatGeneratorProfile.
+     - All the objects in ituSatProfileTable & ituSatProfilePbitTable
+       of the associated profile.
+     - The corresponding rows in ituSatGeneratorPolicerTable.
+     
+     The initial value is false(2). The value is changed to true(1) upon
+     modification of the above objects after a test was completed. The
+     value is changed back to false(2) upon re-activation of the test."
+    ::= { ituSatGeneratorEntry 8 }
+
+ituSatGeneratorStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    idle            (1),
+    ready           (2),
+    inProgress      (3),
+    passed          (4),
+    failed          (5),
+    userAborted     (6),
+    systemAborted   (7),
+    llFailure       (8)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of the test (generator):
+     Idle           - some of the mandatory attributes were not configured
+                      yet.
+     Ready          - all the mandatory configurations were done.
+     In progress    - the test is currently running.
+     Passed         - the test completed successfully.
+     Failed         - the test failed i.e. the results were not within the
+                      SAC limits.
+     userAborted    - the test was stopped by the operator.
+     systemAborted  - the test was autonomously stopped by the system
+                      e.g. due to protection switchover.
+     llFailure      - the test was stopped due to Latching Loopback issues.
+     
+     The value passed(4) is returned only in the following cases:
+     1. The scope included only the configuration test and
+        ituSatGeneratorConfResult=passed(2).
+     2. The scope included the performance test (w/ or w/o configuration
+        test) and ituSatGeneratorPerfResult=passed(2).
+
+     The value userAborted(6) is returned if
+     ituSatGeneratorConfResult=userAborted(4) or
+     ituSatGeneratorPerfResult=userAborted(4).
+
+     The value systemAborted(7) is returned if
+     ituSatGeneratorConfResult=systemAborted(5) or
+     ituSatGeneratorPerfResult=systemAborted(5).
+
+     The value llFailure(8) is returned if
+     ituSatGeneratorConfResult=llFailure(6) or
+     ituSatGeneratorPerfResult=llFailure(6).
+     
+     The value failed(5) is returned if ituSatGeneratorConfResult=failed(3)
+     or ituSatGeneratorPerfResult=failed(3). If one of these result objects
+     is userAborted(4)/systemAborted(5) then the value returned for
+     ituSatGeneratorStatus is userAborted(4)/systemAborted(5),
+     respectively."
+    ::= { ituSatGeneratorEntry 9 }
+
+ituSatGeneratorTimeRemaining    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The time remaining till the end of the test.
+    
+     If the test is not in progress a value of zero is returned."
+    ::= { ituSatGeneratorEntry 10 }
+
+ituSatGeneratorCurrentPhase    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    idle              (1),
+    configuration     (2),
+    performance       (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current phase of the test.
+
+     If the test is not in progress the value idle(1) is returned."
+    ::= { ituSatGeneratorEntry 11 }
+
+ituSatGeneratorDestination    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "A MAC address that identifies the responder side.
+
+     Is equal to the provisioned destination when the value of
+     ituSatGeneratorProvisionedDestination is not zero.
+
+     If the MAC is unknown a value of '000000000000'H is returned."
+    ::= { ituSatGeneratorEntry 12 }
+
+ituSatGeneratorSource    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The MAC address of the local MEP.
+    
+     If the MAC is unknown a value of '000000000000'H is returned."
+    ::= { ituSatGeneratorEntry 13 }
+
+ituSatGeneratorInnerTag    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4095)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The value of the inner VLAN (usually C-Tag).
+    
+     If there is no inner tag or its value is not known, a value of zero
+     is returned."
+    ::= { ituSatGeneratorEntry 14 }
+
+ituSatGeneratorOuterTag    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4095)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The value of the outer VLAN (usually S-Tag).
+    
+     If there is no outer tag or its value is not known, a value of zero
+     is returned."
+    ::= { ituSatGeneratorEntry 15 }
+
+ituSatGeneratorTestedPbits    OBJECT-TYPE
+    SYNTAX      RadTestPbitValues
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "A list of the P-bit values that were actually tested.
+     
+     For untagged EVC a value of zero is returned.
+     
+     If the P-bit values are not known a value of zero is returned."
+    ::= { ituSatGeneratorEntry 16 }
+
+ituSatGeneratorStartTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time at the last test activation.
+    
+     If the test was never activated a null value is returned."
+    ::= { ituSatGeneratorEntry 17 }
+
+ituSatGeneratorEndTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time when the last test was ended (regardless of the end
+     result passed/failed/aborted).
+     
+     If the test is in progress or was never activated a null value is
+     returned."
+    ::= { ituSatGeneratorEntry 18 }
+
+ituSatGeneratorTimeElapsed    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "For an in progress test - the elapsed time of the current test.
+     For a completed test - the duration of the last test.
+     
+     If the test was never activated a zero value is returned."
+    ::= { ituSatGeneratorEntry 19 }
+
+ituSatGeneratorConfResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the last configuration test.
+
+     The value notApplicable(1) is returned in the following cases:
+     - The configuration test was not performed in the last test.
+     - The configuration test is currently in progress.
+     - The test was never activated.
+
+     The value passed(2) is returned if and only if the results of all
+     the configuration sub-tests (ituSatReportResult and
+     ituSatBurstReportResult), that were actually performed, for all the
+     tested P-bits, are passed(2).
+     
+     The value userAborted(4) is returned if the configuration test was
+     pre-maturely stopped by the operator.
+
+     The value systemAborted(5) is returned if the configuration test was
+     autonomously stopped by the system.
+     
+     The value llFailure(6) is returned if the configuration test was stopped
+     due to Latching Loopback issues.
+     
+     The value failed(3) is returned in all other cases."
+    ::= { ituSatGeneratorEntry 20 }
+
+ituSatGeneratorPerfResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the last performance test.
+
+     The value notApplicable(1) is returned in the following cases:
+     - The performance test was not performed in the last test.
+     - The performance test is currently in progress.
+     - The test was never activated.
+
+     The value passed(2) is returned if and only if the performance
+     sub-test was passed(2) (ituSatReportResult and ituSatBurstReportResult)
+     for all the tested P-bits.
+     
+     The value userAborted(4) is returned if the performance test was
+     pre-maturely stopped by the operator.
+
+     The value systemAborted(5) is returned if the performance test was
+     autonomously stopped by the system.
+     
+     The value llFailure(6) is returned if the performance test was stopped
+     due to Latching Loopback issues.
+     
+     The value failed(3) is returned in all other cases."
+    ::= { ituSatGeneratorEntry 21 }
+
+ituSatGeneratorConfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (18..360)
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The duration of the configuration test.
+
+     This object is a copy of the corresponding object in the profile.
+     The duplication is done to keep the report valid even if the profile
+     was modified after the test completion."
+    ::= { ituSatGeneratorEntry 22 }
+
+ituSatGeneratorPerfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (5..7200)
+    UNITS       "minutes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The duration of the performance test.
+
+     This object is a copy of the corresponding object in the profile and
+     is used for availability calculation.
+     The duplication is done to keep the report valid even if the profile
+     was modified after the test completion."
+    ::= { ituSatGeneratorEntry 23 }
+
+ituSatGeneratorScope     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    configuration     (0),
+    performance       (1)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The scope of the test: configuration test, performance test, or both
+     phases.
+     This object is a copy of the corresponding object in the profile.
+     The duplication is done to keep the report valid even if the profile
+     was modified after the test completion."
+    ::= { ituSatGeneratorEntry 24 }
+    
+ituSatGeneratorServiceBinding    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    ma                        (1),
+    singleMultiCosFlow        (2),
+    multipleSingleCosFlows    (3),
+    serviceNameAndEgressPort  (4)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The method used to associate the EVC to the test.
+
+     The EVC can be represented by:
+     1. An MA that contains one or more MEPs
+     2. A single multi-CoS flow
+     3. Mutiple single-CoS flows
+     4. Service name + egress port"
+    DEFVAL      { ma }
+    ::= { ituSatGeneratorEntry 25 }
+
+ituSatGeneratorServiceName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The name of the tested service.
+    
+     The combined values of this object, the ituSatGeneratorEgressPort and
+     ituSatGeneratorProvisionedPbits are used to find the corresponding
+     flows in the flowTable.
+     
+     This object is only relevant when ituSatGeneratorServiceBinding is
+     serviceNameAndEgressPort(4). Otherwise the value shall be a null
+     string."
+    DEFVAL      { "" }
+    ::= { ituSatGeneratorEntry 26 }
+
+ituSatGeneratorEgressPort    OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The physical or logical port through which the tested service is
+     transmitted towards the network.
+
+     The combined values of this object, the ituSatGeneratorServiceName and
+     ituSatGeneratorProvisionedPbits are used to find the corresponding
+     flows in the flowTable.
+
+     This object is only relevant when ituSatGeneratorServiceBinding is
+     serviceNameAndEgressPort(4). Otherwise the value shall be zero."
+    DEFVAL      { 0 }
+    ::= { ituSatGeneratorEntry 27 }
+
+ituSatGeneratorProvisionedDestination    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A configurable MAC address that identifies the responder side.
+    
+     Either this object or ituSatGeneratorRemoteMep may be set to a value
+     different than zero, but not both."
+    DEFVAL {'000000000000'H }
+    ::= { ituSatGeneratorEntry 28 }
+
+
+-- ------------------------------
+-- Y.1564 Single CoS Flow Table
+-- ------------------------------
+
+ituSatSingleCosFlowTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatSingleCosFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table specifies the flows that should be used in Y.1564 tests.
+     The flows that are pointed by this table must be single CoS flows.
+
+     The table is relevant for both generators and responders."
+    ::= { radTestPrefRepTest 15 }
+
+ituSatSingleCosFlowEntry OBJECT-TYPE
+    SYNTAX      ItuSatSingleCosFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 single CoS flow table.
+
+     When a row is created, if the value of ituSatSingleCosFlowFunction is
+     generator(1):
+     1. The ituSatSingleCosFlowFunctionIndex must point to an already
+     existing row of ituSatGeneratorTable.
+     2. The value of the corresponding instance of
+     ituSatGeneratorServiceBinding must be multipleSingleCosFlows(3).
+
+     When a row is created, if the value of ituSatSingleCosFlowFunction is
+     responder(2):
+     1. The ituSatSingleCosFlowFunctionIndex must point to an already
+     existing row of ituSatResponderTable.
+     2. The value of the corresponding instance of
+     ituSatResponderServiceBinding must be multipleSingleCosFlows(3).
+
+     If the value of ituSatSingleCosFlowFunction is generator(1):
+     1. A row cannot be deleted or modified while the ituSatGeneratorStatus
+     is inProgress(3).
+     2. A row is automatically deleted when the corresponding generator in
+     the ituSatGeneratorTable is deleted.
+
+     If the value of ituSatSingleCosFlowFunction is responder(2):
+     1. A row cannot be deleted or modified while the ituSatResponderStatus
+     is inProgress(3).
+     2. A row is automatically deleted when the corresponding responder in
+     the ituSatResponderTable is deleted."
+    INDEX {  ituSatSingleCosFlowFunction,
+             ituSatSingleCosFlowFunctionIndex,
+             ituSatSingleCosFlowIdx1,
+             ituSatSingleCosFlowIdx2 }
+    ::= { ituSatSingleCosFlowTable 1 }
+
+ItuSatSingleCosFlowEntry ::= SEQUENCE {
+    ituSatSingleCosFlowFunction              INTEGER,
+    ituSatSingleCosFlowFunctionIndex         Unsigned32,
+    ituSatSingleCosFlowIdx1                  Unsigned32,
+    ituSatSingleCosFlowIdx2                  Unsigned32,
+    ituSatSingleCosFlowRowStatus             RowStatus 
+ }
+
+ituSatSingleCosFlowFunction         OBJECT-TYPE
+    SYNTAX      INTEGER 
+    {
+    generator   (1),
+    responder   (2)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The type of the Y.1564 function.
+    
+     This inex object allows to define a single common table that can be
+     used by both generators and responders."
+    ::= { ituSatSingleCosFlowEntry 1 }
+
+ituSatSingleCosFlowFunctionIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The identifier of the generator or responder."
+    ::= { ituSatSingleCosFlowEntry 2 }
+
+ituSatSingleCosFlowIdx1    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The value of rad.flowIdx1 of the associated flow."
+    ::= { ituSatSingleCosFlowEntry 3 }
+
+ituSatSingleCosFlowIdx2    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The value of rad.flowIdx2 of the associated flow."
+    ::= { ituSatSingleCosFlowEntry 4 }
+
+ituSatSingleCosFlowRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables addition and deletion of single CoS flows to/from
+     the Y.1564 test."
+    ::= { ituSatSingleCosFlowEntry 5 }
+
+
+-- ------------------------------
+-- Y.1564 Generator Policer Table
+-- ------------------------------
+
+ituSatGeneratorPolicerTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatGeneratorPolicerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains bandwidth profiles, at the P-bit level, to be
+     used in Y.1564 tests.
+
+     A bandwidth profile defined in this table overrides the policer
+     configuration at the corresponding flow.
+
+     This table is relevant only for generators."
+    ::= { radTestPrefRepTest 5 }
+
+ituSatGeneratorPolicerEntry OBJECT-TYPE
+    SYNTAX      ItuSatGeneratorPolicerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 policer profile P-bit table.
+
+     When a row is created, the ituSatGeneratorIndex must point
+     to an already existing row of ituSatGeneratorTable.
+
+     There is no coupling between ituSatGeneratorProvisionedPbits and
+     ituSatGeneratorPolicerPbitIndex. In other words, entries may be
+     created for P-bits not included in ituSatGeneratorProvisionedPbits
+     and there may be P-bits included in ituSatGeneratorProvisionedPbits
+     w/o corresponding entries in this table.
+     
+     A row cannot be deleted or modified while the ituSatGeneratorStatus
+     is inProgress(3).
+     
+     A row is automatically deleted when the corresponding generator in the
+     ituSatGeneratorTable is deleted."
+    INDEX {  ituSatGeneratorIndex,
+             ituSatGeneratorPolicerPbitIndex }
+    ::= { ituSatGeneratorPolicerTable 1 }
+
+ItuSatGeneratorPolicerEntry ::= SEQUENCE {
+    ituSatGeneratorPolicerPbitIndex          RadTestPbitIndex,
+    ituSatGeneratorPolicerRowStatus          RowStatus,
+    ituSatGeneratorPolicerCir                Gauge32,
+    ituSatGeneratorPolicerCbs                Gauge32,
+    ituSatGeneratorPolicerEir                Gauge32,
+    ituSatGeneratorPolicerEbs                Gauge32,
+    ituSatGeneratorPolicerProfile            Unsigned32 
+ }
+
+ituSatGeneratorPolicerPbitIndex         OBJECT-TYPE
+    SYNTAX      RadTestPbitIndex 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A single P-bit to which the configuration in this table applies."
+    ::= { ituSatGeneratorPolicerEntry 1 }
+
+ituSatGeneratorPolicerRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of per P-bit bandwidth
+     profiles."
+    ::= { ituSatGeneratorPolicerEntry 2 }
+
+ituSatGeneratorPolicerCir     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the Committed Information Rate for the
+     EVC.CoS.
+     
+     Ignored when the value of ituSatGeneratorPolicerProfile is not zero."
+    DEFVAL      { 0 }
+    ::= { ituSatGeneratorPolicerEntry 3 }
+
+ituSatGeneratorPolicerCbs     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the Committed Burst Size for the EVC.CoS.
+    
+     Ignored when the value of ituSatGeneratorPolicerProfile is not zero."
+    DEFVAL      { 0 }
+    ::= { ituSatGeneratorPolicerEntry 4 }
+
+ituSatGeneratorPolicerEir     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the Excessive Information Rate for the
+     EVC.CoS.
+     
+     Ignored when the value of ituSatGeneratorPolicerProfile is not zero."
+    DEFVAL      { 0 }
+    ::= { ituSatGeneratorPolicerEntry 5 }
+
+ituSatGeneratorPolicerEbs     OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the Excessive Burst Size for the EVC.CoS.
+    
+     Ignored when the value of ituSatGeneratorPolicerProfile is not zero."
+    DEFVAL      { 0 }
+    ::= { ituSatGeneratorPolicerEntry 6 }
+
+ituSatGeneratorPolicerProfile    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "An optional pre-defined policer profile to be used in the test.
+    
+     May be set to the value of an existing instance of bwProfileIndex in
+     MEF-R.bwProfileTable. In this case the values of
+     ituSatGeneratorPolicerCir, ituSatGeneratorPolicerCbs,
+     ituSatGeneratorPolicerEir and ituSatGeneratorPolicerEbs are ignored."
+    DEFVAL      { 0 }
+    ::= { ituSatGeneratorPolicerEntry 7 }
+
+
+-- ----------------------------
+-- Y.1564 Generator Flow Table
+-- ----------------------------
+
+ituSatGeneratorFlowTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatGeneratorFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains information about pre-configured flows and MEPs
+     that are used by each Y.1564 generator."
+    ::= { radTestPrefRepTest 3 }
+
+ituSatGeneratorFlowEntry OBJECT-TYPE
+    SYNTAX      ItuSatGeneratorFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 generator flow table.
+     
+     Rows are automatically created when the status of the corresponding
+     generator in the ituSatGeneratorTable changes to ready(2).
+
+     When a generator in the ituSatGeneratorTable is successfully
+     re-activated, the corresponding rows in this table are automatically
+     updated (refresh of  the values) or deleted (e.g. a certain P-bit is
+     not used in the re-run).
+          
+     A row is automatically deleted when the corresponding generator in the
+     ituSatGeneratorTable is deleted."
+    INDEX {  ituSatGeneratorIndex,
+             ituSatGeneratorFlowPbitIndex }
+    ::= { ituSatGeneratorFlowTable 1 }
+
+ItuSatGeneratorFlowEntry ::= SEQUENCE {
+    ituSatGeneratorFlowPbitIndex                   RadTestPbitIndex,
+    ituSatGeneratorFlowNameTx                      SnmpAdminString,
+    ituSatGeneratorFlowNameRx                      SnmpAdminString,
+    ituSatGeneratorFlowCir                         Unsigned32,
+    ituSatGeneratorFlowEir                         Unsigned32,
+    ituSatGeneratorFlowAssociatedMEP               Unsigned32,
+    ituSatGeneratorFlowAssociatedService           Unsigned32,
+    ituSatGeneratorFlowBwpInUse                    INTEGER 
+ }
+
+ituSatGeneratorFlowPbitIndex         OBJECT-TYPE
+    SYNTAX      RadTestPbitIndex 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This index allows to show flow/MEP per P-bit.
+     
+     One entry for each set P-bit in the ituSatGeneratorTestedPbits.
+     If the ituSatGeneratorTestedPbits is zero i.e. untagged EVC, then
+     there is a single entry with an index value of zero."
+    ::= { ituSatGeneratorFlowEntry 1 }
+
+ituSatGeneratorFlowNameTx    OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The name of the egress flow."
+    ::= { ituSatGeneratorFlowEntry 2 }
+
+ituSatGeneratorFlowNameRx    OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The name of the ingress flow."
+    ::= { ituSatGeneratorFlowEntry 3 }
+
+ituSatGeneratorFlowCir    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Committed Information Rate provisioned for the egress flow.
+    
+     The value is taken from the associated bandwith profile."
+    ::= { ituSatGeneratorFlowEntry 4 }
+
+ituSatGeneratorFlowEir    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Excessive Information Rate provisioned for the egress flow.
+
+     The value is taken from the associated bandwith profile."
+    ::= { ituSatGeneratorFlowEntry 5 }
+
+ituSatGeneratorFlowAssociatedMEP    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..8191)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The identifier of the MEP that is associated with the generator and
+     specific P-bit."
+    ::= { ituSatGeneratorFlowEntry 6 }
+
+ituSatGeneratorFlowAssociatedService    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..8)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The identifier of the service that is associated with the generator
+     and specific P-bit.
+     
+     A value of zero is reserved for the case of automatic CoS completion."
+    ::= { ituSatGeneratorFlowEntry 7 }
+    
+ituSatGeneratorFlowBwpInUse     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    flow        (1),
+    test        (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indicates what is the origin of the associated bandwidth profile for
+     the EVC.CoS."
+    ::= { ituSatGeneratorFlowEntry 8 }
+    
+    
+-- ------------------------
+-- Y.1564 Responder Table
+-- ------------------------
+
+ituSatResponderTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of responder entities used in Y.1564 tests.
+     The table allows creation, configuration and activation of test
+     responders."
+    ::= { radTestPrefRepTest 4 }
+
+ituSatResponderEntry OBJECT-TYPE
+    SYNTAX      ItuSatResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 responder table.
+     
+     A row cannot be modified while the test is enabled
+     (indicated by ituSatResponderStatus = inProgress(3)).
+     
+     When a row is deleted all the corresponding rows in the
+     ituSatResponderPerfTable are automatically deleted as well."
+    INDEX {  ituSatResponderIndex }
+    ::= { ituSatResponderTable 1 }
+
+ItuSatResponderEntry ::= SEQUENCE {
+    ituSatResponderIndex                       Unsigned32,
+    ituSatResponderName                        SnmpAdminString,
+    ituSatResponderRowStatus                   RowStatus,
+    ituSatResponderServicePointer              RowPointer,
+    ituSatResponderProfile                     Unsigned32,
+    ituSatResponderCmd                         INTEGER,
+    ituSatResponderStatus                      INTEGER,
+    ituSatResponderServiceBinding              INTEGER,
+    ituSatResponderServiceName                 SnmpAdminString,
+    ituSatResponderEgressPort                  InterfaceIndexOrZero 
+ }
+
+ituSatResponderIndex         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as responder identifier."
+    ::= { ituSatResponderEntry 1 }
+
+ituSatResponderName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable responder name."
+    ::= { ituSatResponderEntry 2 }
+
+ituSatResponderRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of Y.1564 responders."
+    ::= { ituSatResponderEntry 3 }
+
+ituSatResponderServicePointer    OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service under test.
+     The service can be represented by:
+     1. An MA that contains one or more MEPs
+     2. A single multi-CoS flow
+     3. Mutiple single-CoS flows
+     4. Service name + egress port
+     
+     When MA is used, the object must point to the first accessible column
+     of dot1agCfmMaNetTable i.e. it must contain the OID of the
+     corresponding dot1agCfmMaNetFormat.
+     
+     When a single multi-CoS flow is used, the object must point to the
+     first accesible column of flowTable i.e. it must contain the OID of
+     the corresponding flowName.
+     
+     When multiple single-CoS flows are used, the object must be null i.e.
+     contain zeroDotZero. The flows that represent the service shall be
+     listed in ituSatSingleCosFlowTable.
+     
+     When a service name+egress port is used, the object must be null i.e.
+     contain zeroDotZero. The service name and egress port shall be
+     indicated by ituSatResponderServiceName and ituSatResponderEgressPort,
+     respectively."
+    DEFVAL      { zeroDotZero }
+    ::= { ituSatResponderEntry 4 }
+
+ituSatResponderProfile    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile used in the test."
+    DEFVAL      { 0 }
+    ::= { ituSatResponderEntry 5 }
+
+ituSatResponderCmd    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    stop        (1),
+    start       (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A command to activate or de-activate the test at the responder side.
+
+     If sanity checks prevent the test activation then a set to start(1)
+     shall be rejected with an SNMP error.
+    
+     Upon successful enabling of a test:
+     - Existing corresponding rows in the ituSatResponderPerfTable shall
+       be automatically deleted.
+     - Corresponding rows shall be automatically created/re-created in
+       the ituSatResponderPerfTable.
+     This object is volatile i.e. it returns to default value after NE reset."
+    DEFVAL      { stop }
+    ::= { ituSatResponderEntry 6 }
+
+ituSatResponderStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    idle              (1),
+    ready             (2),
+    inProgress        (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of the test (responder):
+     Idle          - some of the mandatory attributes were not configured
+                     yet.
+     Ready         - all the mandatory configurations were done.
+     In progress   - the test is currently running."
+    ::= { ituSatResponderEntry 7 }
+
+ituSatResponderServiceBinding    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    ma                        (1),
+    singleMultiCosFlow        (2),
+    multipleSingleCosFlows    (3),
+    serviceNameAndEgressPort  (4)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The method used to associate the EVC to the test.
+
+     The EVC can be represented by:
+     1. An MA that contains one or more MEPs
+     2. A single multi-CoS flow
+     3. Mutiple single-CoS flows
+     4. Service name + egress port"
+    DEFVAL      { ma }
+    ::= { ituSatResponderEntry 8 }
+
+ituSatResponderServiceName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The name of the tested service.
+    
+     The combined values of this object and ituSatResponderEgressPort are
+     used to find the corresponding flows in the flowTable.
+     
+     This object is only relevant when ituSatResponderServiceBinding is
+     serviceNameAndEgressPort(4). Otherwise the value shall be a null
+     string."
+    DEFVAL      { "" }
+    ::= { ituSatResponderEntry 9 }
+
+ituSatResponderEgressPort    OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The physical or logical port through which the tested service is
+     transmitted towards the network.
+
+     The combined values of this object and ituSatResponderServiceName are
+     used to find the corresponding flows in the flowTable.
+
+     This object is only relevant when ituSatResponderServiceBinding is
+     serviceNameAndEgressPort(4). Otherwise the value shall be zero."
+    DEFVAL      { 0 }
+    ::= { ituSatResponderEntry 10 }
+
+
+-- -----------------------------
+-- Y.1564 Report Table
+-- -----------------------------
+
+ituSatReportTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table holds the measurements and results for each Y.1564 test
+     that was performed."
+    ::= { radTestPerfRepResults 6 }
+
+ituSatReportEntry OBJECT-TYPE
+    SYNTAX      ItuSatReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 report table.
+     
+     Rows are automatically created when the corresponding generator in the
+     ituSatGeneratorTable is successfully activated - for details, see
+     below the description of the index objects.
+
+     When a generator in the ituSatGeneratorTable is successfully
+     re-activated, the corresponding rows in this table are automatically
+     modified (reset measurement values and results) or deleted (e.g. a
+     certain P-bit or sub-test is not used in the re-run).
+          
+     A row is automatically deleted when the corresponding generator in the
+     ituSatGeneratorTable is deleted."
+    INDEX {  ituSatGeneratorIndex,
+             ituSatReportPbitIndex,
+             ituSatReportTestTypeIndex,
+             ituSatReportDirectionIndex }
+    ::= { ituSatReportTable 1 }
+
+ItuSatReportEntry ::= SEQUENCE {
+    ituSatReportPbitIndex                   RadTestPbitIndex,
+    ituSatReportTestTypeIndex               INTEGER,
+    ituSatReportDirectionIndex              INTEGER,
+    ituSatReportResult                      RadTestResult,
+    ituSatReportTxRate                      Gauge32,
+    ituSatReportIrMin                       Gauge32,
+    ituSatReportIrAverage                   Gauge32,
+    ituSatReportIrMax                       Gauge32,
+    ituSatReportTxFrames                    Counter64,
+    ituSatReportLostFrames                  Counter64,
+    ituSatReportFtdMin                      Gauge32,
+    ituSatReportFtdAverage                  Gauge32,
+    ituSatReportFtdMax                      Gauge32,
+    ituSatReportFtdStd                      Gauge32,
+    ituSatReportFdvAverage                  Gauge32,
+    ituSatReportFdvMax                      Gauge32,
+    ituSatReportUas                         Counter32,
+    ituSatReportAvailability                Unsigned32,
+    ituSatReportTotalTxRate                 Gauge32,
+    ituSatReportTotalIrAverage              Gauge32,
+    ituSatReportTotalTxFrames               Counter64,
+    ituSatReportTotalLostFrames             Counter64 
+ }
+
+ituSatReportPbitIndex         OBJECT-TYPE
+    SYNTAX      RadTestPbitIndex 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The P-bit index of the report.
+     Allows holding measurements and result per P-bit.
+     
+     One entry for each set P-bit in the ituSatGeneratorTestedPbits.
+     If the ituSatGeneratorTestedPbits is zero i.e. untagged EVC, then
+     there is a single entry with an index value of zero."
+    ::= { ituSatReportEntry 1 }
+
+ituSatReportTestTypeIndex    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    cirStep1    (1),
+    cirStep2    (2),
+    cirStep3    (3),
+    cirStep4    (4),
+    eir         (5),
+    policing    (6),
+    performance (7)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The sub-test type index of the report.
+     Allows holding measurements and result per sub-test type.
+     
+     Entries are created according to the associated configuration in the
+     profile e.g. number of CIR steps, traffic policing enabled/disabled,
+     test scope includes performance or not, etc.
+     There are no entries for sub-tests that are not included in the last
+     test.
+     For example if the configuration test consists of 2 CIR steps then
+     there are no entries for cirStep3(3) and cirStep4(4)."
+    ::= { ituSatReportEntry 2 }
+
+ituSatReportDirectionIndex    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    forward     (1),
+    backward    (2),
+    roundTrip   (3)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The direction index of the report.
+     Allows holding measurements per direction.
+     
+     For unidirectional test only the forward(1) entry is created.
+     For bidirectional test the roundtrip(3) entry must exist and support
+     for the two other entries, forward(1) & backward(2), is implementation
+     dependant."
+    ::= { ituSatReportEntry 3 }
+
+ituSatReportResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the sub-test.
+    
+     The initial value is notApplicable(1).
+     Upon completion of the sub-test the value changes to passed(2) or
+     failed(3).
+     If the test is stopped by the operator before the completion of the
+     sub-test the value is userAborted(4).
+     If the test is autonomously stopped by the system before the completion
+     of the sub-test the value is systemAborted(5).
+     If the test is stopped due to Latching Loopback issues before the
+     completion of the sub-test the value is llFailure(6)."
+    ::= { ituSatReportEntry 4 }
+
+ituSatReportTxRate    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "Kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The transmission rate that the generator was configured to in the
+     sub-test."
+    ::= { ituSatReportEntry 5 }
+
+ituSatReportIrMin    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "Kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured information rate.
+     
+     The initial value is zero."    
+    ::= { ituSatReportEntry 6 }
+
+ituSatReportIrAverage    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "Kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated information rate.
+
+     The initial value is zero."
+    ::= { ituSatReportEntry 7 }
+
+ituSatReportIrMax    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "Kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured information rate.
+
+     The initial value is zero."
+    ::= { ituSatReportEntry 8 }
+
+ituSatReportTxFrames    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "frames"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of transmitted frames.
+    
+     The initial value is one."
+    ::= { ituSatReportEntry 9 }
+
+ituSatReportLostFrames    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "frames"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of frames lost.
+    
+     The FLR is calculated by:
+     (ituSatReportLostFrames / ituSatReportTxFrames)
+    
+     The initial value is zero."
+    ::= { ituSatReportEntry 10 }
+
+ituSatReportFtdMin    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured frame transfer delay.
+    
+     The initial value is zero."
+    ::= { ituSatReportEntry 11 }
+
+ituSatReportFtdAverage    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated frame transfer delay.
+    
+     The initial value is zero."
+    ::= { ituSatReportEntry 12 }
+
+ituSatReportFtdMax    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured frame transfer delay.
+    
+     The initial value is zero."
+    ::= { ituSatReportEntry 13 }
+
+ituSatReportFtdStd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated standard deviation of the frame transfer delay.
+    
+     The initial value is zero."
+    ::= { ituSatReportEntry 14 }
+
+ituSatReportFdvAverage    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated frame delay variation.
+    
+     The initial value is zero."
+    ::= { ituSatReportEntry 15 }
+
+ituSatReportFdvMax    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum calculated frame delay variation.
+    
+     The initial value is zero."
+    ::= { ituSatReportEntry 16 }
+
+ituSatReportUas    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of unavailable seconds.
+
+     This object is relevant only for the performance test. For the other
+     test type entries the value is zero.
+
+     The initial value is zero."
+    ::= { ituSatReportEntry 17 }
+
+ituSatReportAvailability    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "hundredth of percent"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The percentage of available time.
+
+     The availability is calculated by:
+     (ituSatGeneratorPerfDuration - ituSatReportUas) * 10000 / ituSatGeneratorPerfDuration
+
+     This object is relevant only for the performance test. For the other
+     test type entries the value is zero.
+
+     The initial value is zero."
+    ::= { ituSatReportEntry 18 }
+
+ituSatReportTotalTxRate    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The total transmission rate (i.e. green and yellow frames) that the
+     generator was configured to in the sub-test.
+
+     This object is relevant only for the color-aware EIR and color-aware
+     traffic policing test types. For the other test type entries the
+     value is zero."
+    ::= { ituSatReportEntry 19 }
+    
+ituSatReportTotalIrAverage    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated total information rate (i.e. green and yellow
+     frames).
+     
+     This object is relevant only for the color-aware EIR and color-aware
+     traffic policing test types. For the other test type entries the
+     value is zero.
+     
+     The initial value is zero."
+    ::= { ituSatReportEntry 20 }
+ituSatReportTotalTxFrames    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "frames"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The total number of transmitted frames (i.e. green and yellow frames).
+    
+     This object is relevant only for the color-aware EIR and color-aware
+     traffic policing test types. For the other test type entries the
+     value is zero.
+
+     The initial value is one."
+    ::= { ituSatReportEntry 21 }
+
+ituSatReportTotalLostFrames    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "frames"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The total number of frames lost (i.e. green and yellow frames).
+    
+     The total FLR is calculated by:
+     (ituSatReportTotalLostFrames / ituSatReportTotalTxFrames)
+
+     This object is relevant only for the color-aware EIR and color-aware
+     traffic policing test types. For the other test type entries the
+     value is zero.
+
+     The initial value is zero."
+    ::= { ituSatReportEntry 22 }
+
+
+-- ----------------------------------
+-- Y.1564 Responder Performance Table
+-- ------------------------------------
+
+ituSatResponderPerfTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatResponderPerfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table holds packet counters for Y.1564 test responders."
+    ::= { radTestPerfRepResults 7 }
+
+ituSatResponderPerfEntry OBJECT-TYPE
+    SYNTAX      ItuSatResponderPerfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 responder performance table.
+     
+     Rows are automatically created when the corresponding responder in the
+     ituSatResponderTable is successfully enabled - for details, see
+     below the description of the index object.
+
+     When a responder in the ituSatResponderTable is successfully
+     re-enabled, the corresponding rows in this table are automatically
+     modified (reset counters) or deleted (e.g. a certain P-bit is not used
+     in the re-run).
+          
+     A row is automatically deleted when the corresponding responder in the
+     ituSatResponderTable is deleted."
+    INDEX {  ituSatResponderIndex,
+             ituSatResponderPerfPbitIndex }
+    ::= { ituSatResponderPerfTable 1 }
+
+ItuSatResponderPerfEntry ::= SEQUENCE {
+    ituSatResponderPerfPbitIndex                   RadTestPbitIndex,
+    ituSatResponderPerfRxFrames                    Counter64,
+    ituSatResponderPerfTxFrames                    Counter64,
+    ituSatResponderPerfAssociatedMEP               Unsigned32,
+    ituSatResponderPerfAssociatedService           Unsigned32 
+ }
+
+ituSatResponderPerfPbitIndex         OBJECT-TYPE
+    SYNTAX      RadTestPbitIndex 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The P-bit index of the responder performance.
+     Allows holding counts per P-bit.
+     
+     One entry for each P-bit that participates in the test at the
+     responder side.
+
+     For an untagged EVC there is a single entry with an index value of
+     zero."
+    ::= { ituSatResponderPerfEntry 1 }
+
+ituSatResponderPerfRxFrames    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of frames received by the responder."
+    ::= { ituSatResponderPerfEntry 2 }
+
+ituSatResponderPerfTxFrames    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of frames transmitted by the responder."
+    ::= { ituSatResponderPerfEntry 3 }
+
+ituSatResponderPerfAssociatedMEP    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..8191)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The identifier of the MEP that is associated with the responder and
+     specific P-bit."
+    ::= { ituSatResponderPerfEntry 4 }
+    
+ituSatResponderPerfAssociatedService    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..8)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The identifier of the service that is associated with the responder
+     and specific P-bit.
+     
+     A value of zero is reserved for the case of automatic CoS completion."
+    ::= { ituSatResponderPerfEntry 5 }
+    
+
+-- --------------------------------------
+-- Y.1564 Configuration Test P-bit Table
+-- --------------------------------------
+
+ituSatConfPbitTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ItuSatConfPbitEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table holds the results of the configuration test per generator,
+     P-bit and direction.
+     
+     Note:
+     ituSatReportResult and ituSatBurstReportResult hold results per
+     configuration sub-test.
+     ituSatGeneratorConfResult holds the combined result for all the
+     P-bits."
+    ::= { radTestPerfRepResults 8 }
+
+ituSatConfPbitEntry OBJECT-TYPE
+    SYNTAX      ItuSatConfPbitEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in Y.1564 configuration test P-bit table.
+     
+     Rows are automatically created when the corresponding generator in the
+     ituSatGeneratorTable is successfully activated.
+
+     When a generator in the ituSatGeneratorTable is successfully
+     re-activated, the corresponding rows in this table are automatically
+     modified (reset results) or deleted (e.g. a certain P-bit or sub-test
+     is not used in the re-run).
+          
+     A row is automatically deleted when the corresponding generator in the
+     ituSatGeneratorTable is deleted."
+    INDEX {  ituSatGeneratorIndex,
+             ituSatConfPbitIndex,
+             ituSatConfPbitDirectionIndex }
+    ::= { ituSatConfPbitTable 1 }
+
+ItuSatConfPbitEntry ::= SEQUENCE {
+    ituSatConfPbitIndex                      RadTestPbitIndex,
+    ituSatConfPbitDirectionIndex             INTEGER,
+    ituSatConfPbitResult                     RadTestResult 
+ }
+
+ituSatConfPbitIndex         OBJECT-TYPE
+    SYNTAX      RadTestPbitIndex 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The P-bit index of the configuration test.
+     Allows holding configuration test results per P-bit.
+     
+     One entry for each P-bit that participates in the test at the
+     generator side.
+
+     For an untagged EVC there is a single entry with an index value of
+     zero."
+    ::= { ituSatConfPbitEntry 1 }
+
+ituSatConfPbitDirectionIndex    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    forward     (1),
+    backward    (2),
+    roundTrip   (3)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The direction index of the configuration test.
+     Allows holding configuration test results per direction.
+     
+     For unidirectional test only the forward(1) entry is created.
+     For bidirectional test the roundtrip(3) entry must exist and support
+     for the two other entries, forward(1) & backward(2), is implementation
+     dependant."
+    ::= { ituSatConfPbitEntry 2 }
+
+ituSatConfPbitResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the last configuration test.
+    
+     The value notApplicable(1) is returned in the following cases:
+     - The configuration test was not performed in the last test.
+     - The configuration test is currently in progress.
+     - The test was never activated.
+
+     The value passed(2) is returned if and only if the results of all
+     the configuration sub-tests (ituSatReportResult and
+     ituSatBurstReportResult), that were actually performed for the specific
+     P-bit, are passed(2).
+     
+     The value userAborted(4) is returned if the configuration test was
+     pre-maturely stopped by the operator.
+
+     The value systemAborted(5) is returned if the configuration test was
+     autonomously stopped by the system.
+     
+     The value llFailure(6) is returned if the configuration test was stopped
+     due to Latching Loopback issues.
+     
+     The value failed(3) is returned in all other cases."     
+    ::= { ituSatConfPbitEntry 3 }
+
+
+
+-- ========================================================
+-- ==                   TWAMP Tables                     ==
+-- ========================================================
+
+
+-- ----------------------------
+-- TWAMP test profile table
+-- ----------------------------
+
+twampTestProfileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampTestProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes the profiles for TWAMP test sessions."
+    ::= { radTestPrefRepProfile 5 }
+
+twampTestProfileEntry OBJECT-TYPE
+    SYNTAX      TwampTestProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampTestProfileId }
+    ::= { twampTestProfileTable 1 }
+
+TwampTestProfileEntry ::= SEQUENCE {
+    twampTestProfileId                          Unsigned32,
+    twampTestProfileRowStatus                   RowStatus,
+    twampTestProfileName                        SnmpAdminString,
+    twampTestProfilePayloadLength               Unsigned32,
+    twampTestProfileTxRate                      Unsigned32,
+    twampTestProfileLossTimeout                 Unsigned32,
+    twampTestProfileLossRatioThreshold          Unsigned32,
+    twampTestProfileDelayThreshold              Unsigned32,
+    twampTestProfileDelayVarThreshold           Unsigned32,
+    twampTestProfileDelayVarEventType           INTEGER 
+ }
+
+
+twampTestProfileId         OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as test profile identifier."
+    ::= { twampTestProfileEntry 1 }
+
+twampTestProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of Profiles."
+    ::= { twampTestProfileEntry 2 }
+
+twampTestProfileName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile Name and the profile index."
+    ::= { twampTestProfileEntry 3 }
+
+twampTestProfilePayloadLength    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Test session packets payload size in Bytes units."
+    ::= { twampTestProfileEntry 4 }
+
+twampTestProfileTxRate    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Test session packets transmit rate in PPS."
+    ::= { twampTestProfileEntry 5 }
+
+twampTestProfileLossTimeout    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Test session loss timeout in micro-sec."
+    ::= { twampTestProfileEntry 6 }
+
+twampTestProfileLossRatioThreshold    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Test session loss timeout in PPM."
+    ::= { twampTestProfileEntry 7}
+    
+twampTestProfileDelayThreshold    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Test session delay threshold loss in micro-sec."
+    ::= { twampTestProfileEntry 8 }
+
+twampTestProfileDelayVarThreshold    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Test session delay thresholdloss in micro-sec."
+    ::= { twampTestProfileEntry 9 }
+
+twampTestProfileDelayVarEventType    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        pdvMax          (2),
+        ipdvMax         (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Delay variation event type to define on which metric the delay
+     threshold will be operated.
+    Event options:
+    pdvMax      - pdv value.
+    ipdvMax     - ipdv max value."
+    ::= { twampTestProfileEntry 10 }    
+
+
+-- ------------------------
+-- TWAMP controller table
+-- ------------------------
+
+twampControllerTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampControllerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes controller parameters."
+    ::= { radTestPrefRepTest 6 }
+
+twampControllerEntry OBJECT-TYPE
+    SYNTAX      TwampControllerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampControllerId }
+    ::= { twampControllerTable 1 }
+
+TwampControllerEntry ::= SEQUENCE {
+    twampControllerId                           Unsigned32,
+    twampControllerRowStatus                    RowStatus,
+    twampControllerName                         SnmpAdminString,
+    twampControllerStatus                       INTEGER,
+    twampControllerType                         INTEGER,
+    twampControllerL2Probe                      INTEGER,
+    twampControllerIngressEgressPort            InterfaceIndexOrZero,
+    twampControllerOuterVlan                    Unsigned32,
+    twampControllerInnerVlan                    Unsigned32,
+    twampControllerOuterPbit                    Unsigned32,
+    twampControllerInnerPbit                    Unsigned32,
+    twampControllerRouterEntity                 Unsigned32,
+    twampControllerLocalAddrType                InetAddressType,
+    twampControllerLocalAddr                    InetAddress,
+    twampControllerAssociatedRI                 InterfaceIndexOrZero,
+    twampControllerTodStatus                    INTEGER 
+ }
+
+twampControllerId    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as controller identifier."
+    ::= { twampControllerEntry 1 }
+
+twampControllerRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of Controllers"
+    ::= { twampControllerEntry 2 }
+
+twampControllerName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The controller Name and the controller index"
+    ::= { twampControllerEntry 3 }
+
+twampControllerStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        adminOff    (1),
+        idle        (2),
+        ready       (3),
+        inProgress  (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of a controller.
+    Status options:
+    adminOff    - Cancelled by the user.
+    idle        - some of the mandatory attributes were not configured
+                  yet.
+    ready       - all the mandatory configurations were done.
+    inProgress  - at least one test session related to the controller
+                  is currently running."
+    ::= { twampControllerEntry  4 }    
+
+twampControllerType    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        twamp       (2),
+        twampLight  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Indicates twamp controller's type."
+    DEFVAL      { twamp }
+    ::= { twampControllerEntry 5 }
+
+twampControllerL2Probe    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        off         (1),
+        on          (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Enables L2 probe mode."
+    DEFVAL      { off }
+    ::= { twampControllerEntry 6 }
+
+twampControllerIngressEgressPort    OBJECT-TYPE
+    SYNTAX       InterfaceIndexOrZero
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "Ingress and egress port ifIndex for layer 2 service definition in
+     L2-probe mode."
+     ::= { twampControllerEntry 7 }
+
+twampControllerOuterVlan    OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "Outer VLAN definition for layer 2 service definition in
+     L2-probe mode.
+      Value 4294967295 (0xFFFFFFFF) = Not Applicable."
+    DEFVAL      { 4294967295 }
+     ::= { twampControllerEntry 8 }
+
+twampControllerInnerVlan    OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "Inner VLAN definition for layer 2 service definition in
+     L2-probe mode.
+     Value 4294967295 (0xFFFFFFFF) = Not Applicable."
+    DEFVAL      { 4294967295 }
+     ::= { twampControllerEntry 9 }
+
+twampControllerOuterPbit    OBJECT-TYPE
+    SYNTAX Unsigned32 (0..7)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+    "Outer VLAN Pbit definition for layer 2 service definition
+     in L2-probe mode.
+     Values (0..7) represents a different 802.1 fixed P-bit value."
+    ::= { twampControllerEntry 10 }
+
+twampControllerInnerPbit    OBJECT-TYPE
+    SYNTAX Unsigned32 (0..7)
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+    "Inner VLAN Pbit definition for layer 2 service definition
+     in L2-probe mode.
+     Values (0..7) represents a different 802.1 fixed P-bit value."
+    ::= { twampControllerEntry 11 }
+
+twampControllerRouterEntity    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The router entity which the controller belongs to."
+    ::= { twampControllerEntry 12 }
+
+twampControllerLocalAddrType    OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "The address type of IP Address associated to twamp controller."
+    ::= { twampControllerEntry 13 }
+
+twampControllerLocalAddr    OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "The IP Address associated to twamp controller."
+    ::= { twampControllerEntry 14 }
+
+twampControllerAssociatedRI    OBJECT-TYPE
+    SYNTAX       InterfaceIndexOrZero
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+    "The ifIndex of the Router Interface associated with TWAMP
+     controller."
+    ::= { twampControllerEntry 15 }
+
+twampControllerTodStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        unknown         (1),
+        outOfSync       (2),
+        sync            (3),
+        notApplicable   (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The TOD (Time Of Day) status of the controller in one-way
+    calculation mode.
+    Status options:
+    outOfSync   - TOD is out of sync.
+    sync        - TOD is sync.
+    unknown     - TOD status is unknown.
+    notApplicable   - TOD source is not applicable."
+    ::= { twampControllerEntry  16 }    
+
+
+-- ----------------------------
+-- TWAMP peer table
+-- ----------------------------
+
+twampPeerTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes controller's peer parameters."
+    ::= { radTestPrefRepTest 7 }
+
+twampPeerEntry OBJECT-TYPE
+    SYNTAX      TwampPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampControllerId,
+             twampPeerAddrType,
+             twampPeerAddr }
+    ::= { twampPeerTable 1 }
+
+TwampPeerEntry ::= SEQUENCE {
+    twampPeerAddrType                       InetAddressType,
+    twampPeerAddr                           InetAddress,
+    twampPeerRowStatus                      RowStatus,
+    twampPeerActivateCmd                    INTEGER,
+    twampPeerActivateDuration               Unsigned32,
+    twampPeerStartDateAndTime               DateAndTime,
+    twampPeerCalcMode                       INTEGER,
+    twampPeerResponderSeqNum                INTEGER,
+    twampPeerResponderTodStatus             INTEGER,
+    twampPeerElapsedTime                    Unsigned32,
+    twampPeerDescr                          SnmpAdminString,
+    twampPeerLastCalcMode                   INTEGER,
+    twampPeerLastResponderSeqNum            INTEGER 
+ }
+
+twampPeerAddrType    OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "The address type of IP Address associated to twamp peer responder and
+     an entry index."
+    ::= { twampPeerEntry 1 }
+
+twampPeerAddr    OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "The IP Address associated to twamp peer responder and and an entry
+     index."
+    ::= { twampPeerEntry 2 }
+
+twampPeerRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of Controller's peers."
+    ::= { twampPeerEntry 3 }
+
+twampPeerActivateCmd    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        off         (2),
+        on          (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Command to activate all Peer's test sessions.
+
+     off   - initial mode, peer's tests are not active.
+     on    - peer's tests are active."
+    DEFVAL      { off }
+    ::= { twampPeerEntry 4 }
+
+twampPeerActivateDuration    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    UNITS       "minutes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Duration test sessions in minutes.
+     Zero value presents for ever test duration.
+     Duration parameter value distinguish between test in
+     continuous or non-continuous mode."
+    ::= { twampPeerEntry 5 }
+    
+twampPeerStartDateAndTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time when peer activation had started.
+     If the peer was never activated a null value is returned."
+   ::= { twampPeerEntry 6 }
+
+twampPeerCalcMode    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        roundTrip   (1),
+        oneWay      (2),
+        oneWayRadm  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Peer metrics calculation mode - round-trip, one-way or one-way - Responder Agnostic 
+     Delay Measurements. This parameter is not relevant when using ICMP-Echo protocol."
+    DEFVAL      { roundTrip }
+    ::= { twampPeerEntry 7 }
+
+twampPeerResponderSeqNum    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        off         (1),
+        on          (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Peer metrics calculation awareness to a responder that transmits
+     independent sequence number.
+     This parameter is not relevant when using ICMP-Echo protocol."
+    DEFVAL      { off }
+    ::= { twampPeerEntry 8 }
+
+twampPeerResponderTodStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        unknown     (1),
+        outOfSync   (2),
+        sync        (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The TOD (Time Of Day) status of the peer's responder in one-way
+    calculation mode.
+    Status options:
+    outOfSync   - TOD is out of sync.
+    sync        - TOD is sync.
+    unknown     - TOD status is unknown."
+    ::= { twampPeerEntry  9 }    
+
+twampPeerElapsedTime    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds that have elapsed since activation of 
+     the peer."
+    ::= { twampPeerEntry 10 }
+
+twampPeerDescr    OBJECT-TYPE
+   SYNTAX       SnmpAdminString(SIZE (1..64))
+   MAX-ACCESS   read-create
+   STATUS       current
+   DESCRIPTION
+   "Description of the current peer entry.
+    Default description will be: '' (peer's ipv4/ipv6 address)"
+    ::= { twampPeerEntry 11 }
+
+twampPeerLastCalcMode    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        roundTrip   (1),
+        oneWay      (2),
+        oneWayRadm  (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Peer's calculation mode configuration for last active sessions. Copy of
+     twampPeerCalcMode on peer activation."
+    ::= { twampPeerEntry 12 }
+
+twampPeerLastResponderSeqNum    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        off         (1),
+        on          (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Peer's 'responder sequence number' configuration for last active
+     sessions.
+     copy of twampPeerResponderSeqNum on peer activation."
+    ::= { twampPeerEntry 13 }
+    
+
+-- --------------------------------
+-- TWAMP controller session table
+-- --------------------------------
+
+twampContSessionTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampContSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes controller's test session parameters."
+    ::= { radTestPrefRepTest 8 }
+
+twampContSessionEntry OBJECT-TYPE
+    SYNTAX      TwampContSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampControllerId,
+             twampPeerAddrType,
+             twampPeerAddr,
+             twampContSessionId }
+    ::= { twampContSessionTable 1 }
+
+TwampContSessionEntry ::= SEQUENCE {
+    twampContSessionId                          Unsigned32,
+    twampContSessionRowStatus                   RowStatus,
+    twampContSessionName                        SnmpAdminString,
+    twampContSessionStartDateAndTime            DateAndTime,
+    twampContSessionStatus                      INTEGER,
+    twampContSessionLocalL4PortNumber           InetPortNumber,
+    twampContSessionPeerL4PortNumber            InetPortNumber,
+    twampContSessionPeerDscp                    Unsigned32,
+    twampContSessionTestProfileId               Unsigned32,
+    twampContSessionTxPackets                   Counter64,
+    twampContSessionRxPackets                   Counter64,
+    twampContSessionResult                      BITS,
+    twampContSessionConfChanged                 TruthValue,
+    twampContSessionConvertedIndex              Unsigned32,
+    twampContSessionResultFwd                   BITS,
+    twampContSessionResultBck                   BITS 
+ }
+
+twampContSessionId    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as controller test session identifier."
+    ::= { twampContSessionEntry 1 }
+
+twampContSessionRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of test session
+     (controller side)."
+    ::= { twampContSessionEntry 2 }
+
+twampContSessionName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The test session Name and and an entry index (controller
+     side)."
+    ::= { twampContSessionEntry 3 }
+
+twampContSessionStartDateAndTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time when test session had started.
+     If the test was never activated a null value is returned."
+   ::= { twampContSessionEntry 4 }
+
+twampContSessionStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        idle            (2),
+        ready           (3),
+        inProgress      (4),
+        completed       (5),
+        userAborted     (6),
+        systemAborted   (7)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+     "The current status of a test session.
+    
+      Status options:
+      idle       - the controller which the test session related to 
+                   is in 'notReady' status.
+      ready      - all the mandatory configurations were done.
+      inProgress     - the test is currently running.
+      completed  - the test completed.
+      userAbort  - the test was stopped by the operator.
+      systemAbort - the test was autonomously stopped by the system."
+    ::= { twampContSessionEntry  5 }    
+
+twampContSessionLocalL4PortNumber    OBJECT-TYPE
+    SYNTAX     InetPortNumber
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+    "The layer 4 source port number associated to twamp controller.
+     This parameter is not relevant when using ICMP-Echo protocol."
+    ::= { twampContSessionEntry 6 }
+
+    twampContSessionPeerL4PortNumber    OBJECT-TYPE
+    SYNTAX     InetPortNumber
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "The layer 4 port number associated to twamp peer responder.
+     This parameter is not relevant when using ICMP-Echo protocol.
+     In case TWAMP control protocol is used, port value is negotiated
+     with TWAMP server and the actual value is reflected in 
+     twampContSessionPeerActualL4PortNumber."
+    ::= { twampContSessionEntry 7 }
+
+twampContSessionPeerDscp    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..63)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The DSCP value to be use in the test session packets."
+    ::= { twampContSessionEntry 8 }
+
+twampContSessionTestProfileId    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The identifier of test profile to be use by the test session."
+    ::= { twampContSessionEntry 9 }
+
+twampContSessionTxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number packets related to the test session that where
+     transmitted successfully (controller side)."
+    ::= { twampContSessionEntry 10 }
+
+twampContSessionRxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number packets related to the test session that where
+     received successfully (controller side)."
+    ::= { twampContSessionEntry 11 }
+    
+twampContSessionResult     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+       lossTca      (0),
+       delayTca     (1),
+       dvTca        (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Bit map representing current interval test results related to
+     Threshold Crossing Alerts (TCA).
+     A bit is set when specific test has crossed its threshold."
+    ::= { twampContSessionEntry 12 }
+        
+twampContSessionConfChanged    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indication whether the configuration of the test was changed
+     after the test was completed."
+    ::= { twampContSessionEntry 13 }
+
+twampContSessionConvertedIndex     OBJECT-TYPE
+    SYNTAX                      Unsigned32    
+    MAX-ACCESS                  read-only
+    STATUS                      current
+    DESCRIPTION
+    "This attribute defines the converted index assigned to this TWAMP
+     Session."
+    ::= { twampContSessionEntry 14}
+
+twampContSessionResultFwd     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+       lossTca      (0),
+       delayTca     (1),
+       dvTca        (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Bit map representing current interval forward path test results
+     related to Threshold Crossing Alerts (TCA).
+     A bit is set when specific test has crossed its threshold."
+    ::= { twampContSessionEntry 15 }
+        
+twampContSessionResultBck     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+       lossTca      (0),
+       delayTca     (1),
+       dvTca        (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Bit map representing current interval backward path test results
+     related to Threshold Crossing Alerts (TCA).
+     A bit is set when specific test has crossed its threshold."
+    ::= { twampContSessionEntry 16 }
+
+    
+-- ------------------------
+-- TWAMP responder table
+-- ------------------------
+
+twampResponderTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes responder parameters."
+    ::= { radTestPrefRepTest 9 }
+
+twampResponderEntry OBJECT-TYPE
+    SYNTAX      TwampResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampResponderId }
+    ::= { twampResponderTable 1 }
+
+TwampResponderEntry ::= SEQUENCE {
+    twampResponderId                    Unsigned32,
+    twampResponderRowStatus             RowStatus,
+    twampResponderName                  SnmpAdminString,
+    twampResponderStatus                INTEGER,
+    twampResponderType                  INTEGER,
+    twampResponderL2Probe               INTEGER,
+    twampResponderIngressEgressPort     InterfaceIndexOrZero,
+    twampResponderOuterVlan             Unsigned32,
+    twampResponderInnerVlan             Unsigned32,
+    twampResponderOuterPbit             Unsigned32,
+    twampResponderInnerPbit             Unsigned32,
+    twampResponderRouterEntity          Unsigned32,
+    twampResponderLocalAddrType         InetAddressType,
+    twampResponderLocalAddr             InetAddress,
+    twampResponderAssociatedRI          InterfaceIndexOrZero,
+    twampResponderTxSeqNum              INTEGER,
+    twampResponderTxExtendedInfo        INTEGER 
+ }
+
+twampResponderId    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as responder identifier."
+    ::= { twampResponderEntry 1 }
+
+twampResponderRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of Responders"
+    ::= { twampResponderEntry 2 }
+
+twampResponderName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The responder Name and the responder index"
+    ::= { twampResponderEntry 3 }
+
+twampResponderStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        adminOff    (1),
+        idle        (2),
+        ready       (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of a responder.
+    Status options:
+    adminOff    - Cancelled by the user.
+    notReady    - some of the mandatory attributes were not configured
+                  yet.
+    idle        - all the mandatory configurations were done. Responder
+                  is activate."
+    ::= { twampResponderEntry  4 }
+
+twampResponderType    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        twamp       (2),
+        twampLight  (3),
+        udpEchoPlus (4)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Indicates twamp responder's type."
+    DEFVAL      { twamp }
+    ::= { twampResponderEntry 5 }
+
+twampResponderL2Probe    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        off         (1),
+        on          (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Enables L2 probe mode."
+    DEFVAL      { off }
+    ::= { twampResponderEntry 6 }
+
+twampResponderIngressEgressPort    OBJECT-TYPE
+    SYNTAX       InterfaceIndexOrZero
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "Ingress and egress port for layer 2 service definition in
+     L2-probe mode."
+    ::= { twampResponderEntry 7 }
+
+twampResponderOuterVlan    OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "Outer VLAN definition for layer 2 service definition in
+     L2-probe mode.
+     Value 4294967295 (0xFFFFFFFF) = Not Applicable."
+    DEFVAL      { 4294967295 }
+    ::= { twampResponderEntry 8}
+
+twampResponderInnerVlan    OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "Inner VLAN definition for layer 2 service definition in
+     L2-probe mode.
+     Value 4294967295 (0xFFFFFFFF) = Not Applicable."
+    DEFVAL      { 4294967295 }
+    ::= { twampResponderEntry 9}
+
+twampResponderOuterPbit    OBJECT-TYPE
+    SYNTAX Unsigned32 (0..7 | 254 )
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+    "Outer VLAN Pbit definition for layer 2 service definition
+     in L2-probe mode.
+     Values (0..7) represents a different 802.1 fixed P-bit value. 
+     Value 254 represents copy original P-bit option."
+    ::= { twampResponderEntry 10 }
+
+twampResponderInnerPbit    OBJECT-TYPE
+    SYNTAX Unsigned32 (0..7 | 254 )
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+    "Inner VLAN Pbit definition for layer 2 service definition
+     in L2-probe mode.
+     Values (0..7) represents a different 802.1 fixed P-bit value. 
+     Value 254 represents copy original P-bit option."
+    ::= { twampResponderEntry 11 }
+
+twampResponderRouterEntity    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The router entity which the responder belongs to."
+    ::= { twampResponderEntry 12 }
+
+twampResponderLocalAddrType    OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "The address type of IP Address associated to twamp responder."
+    ::= { twampResponderEntry 13 }
+
+twampResponderLocalAddr    OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "The IP Address associated to twamp responder."
+    ::= { twampResponderEntry 14 }
+
+twampResponderAssociatedRI    OBJECT-TYPE
+    SYNTAX       InterfaceIndexOrZero
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The ifIndex of the Router Interface associated with TWAMP responder."
+    ::= { twampResponderEntry 15 }
+
+twampResponderTxSeqNum    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        off         (1),
+        on          (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Responder definition to transmit independent sequence number."
+    DEFVAL      { off }
+    ::= { twampResponderEntry 16 }
+
+twampResponderTxExtendedInfo    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        off         (1),
+        on          (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Responder definition to interop mode. A responder with enabled
+     interop mode sends proprietary information in TWAMP payload."
+    DEFVAL      { off }
+    ::= { twampResponderEntry 17 }
+
+
+-- ------------------------------
+-- TWAMP responder session table
+-- ------------------------------
+
+twampResSessionTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampResSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table includes responder's test session parameters."
+    ::= { radTestPrefRepTest 10 }
+
+twampResSessionEntry OBJECT-TYPE
+    SYNTAX      TwampResSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampResponderId,
+             twampResSessionId }
+    ::= { twampResSessionTable 1 }
+
+TwampResSessionEntry ::= SEQUENCE {
+    twampResSessionId                       Unsigned32,
+    twampResSessionRowStatus                RowStatus,
+    twampResSessionName                     SnmpAdminString,
+    twampResSessionLocalL4PortNumber        InetPortNumber,
+    twampResSessionTxPackets                Counter64,
+    twampResSessionRxPackets                Counter64 
+ }
+
+twampResSessionId    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A unique number as responder test session identifier."
+    ::= { twampResSessionEntry 1 }
+
+twampResSessionRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of responder's test session."
+    ::= { twampResSessionEntry 2 }
+
+twampResSessionName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The responder test session Name and and an entry index."
+    ::= { twampResSessionEntry 3 }
+
+twampResSessionLocalL4PortNumber    OBJECT-TYPE
+    SYNTAX     InetPortNumber
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "The layer 4 port number associated to twamp responder.
+    This object is not relevant in case twampResponderType is 
+    configured to 'twamp', where session layer 4 port number is negotiated, 
+    set by the TWAMP server and is reflected through 
+    twampResSessionActualL4PortNumber."
+    ::= { twampResSessionEntry 4 }
+
+twampResSessionTxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number packets related to the test session that where
+     transmitted successfully (responder side)."
+    ::= { twampResSessionEntry 5 }
+
+twampResSessionRxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number packets related to the test session that where
+     received successfully (responder side)."
+    ::= { twampResSessionEntry 6 }
+
+
+-- --------------------------
+-- TWAMP report current table
+-- --------------------------
+
+twampReportCurrentTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampReportCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "TWAMP report table to show current interval."
+    ::= { radTestPerfRepResults 9 }
+
+twampReportCurrentEntry OBJECT-TYPE
+    SYNTAX      TwampReportCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampControllerId,
+             twampPeerAddrType,
+             twampPeerAddr,
+             twampContSessionId }
+    ::= { twampReportCurrentTable 1 }
+
+TwampReportCurrentEntry ::= SEQUENCE {
+    twampReportCurrentStartDateAndTime          DateAndTime,
+    twampReportCurrentElapsedTime               Unsigned32,
+    twampReportCurrentTxPackets                 Counter64,
+    twampReportCurrentRxValidPackets            Counter64,
+    twampReportCurrentLossPackets               Counter64,
+    twampReportCurrentAvailableSeconds          Counter32,
+    twampReportCurrentDelayMin                  Counter32,
+    twampReportCurrentDelayMax                  Counter32,
+    twampReportCurrentDelaySum                  Counter64,
+    twampReportCurrentDelayAverage              Counter32,
+    twampReportCurrentDelayedPackets            Counter32,
+    twampReportCurrentPdvMax                    Counter32,
+    twampReportCurrentIpdvMax                   Counter32,
+    twampReportCurrentIpdvSum                   Counter64,
+    twampReportCurrentIpdvValidResults          Counter64,
+    twampReportCurrentIpdvFwdMax                Counter64,
+    twampReportCurrentIpdvFwdSum                Counter64,
+    twampReportCurrentIpdvFwdValidResults       Counter64,
+    twampReportCurrentIpdvBckMax                Counter64,
+    twampReportCurrentIpdvBckSum                Counter64,
+    twampReportCurrentIpdvBckValidResults       Counter64,
+    twampReportCurrentReorderedFwd              Counter32,
+    twampReportCurrentReorderedBck              Counter32,
+    twampReportCurrentDuplicateFwd              Counter32,
+    twampReportCurrentDuplicateBck              Counter32,
+    twampReportCurrentFragmentedFwd             Counter32,
+    twampReportCurrentFragmentedBck             Counter32,
+    twampReportCurrentDelayFwdMin               Counter32,
+    twampReportCurrentDelayFwdMax               Counter32,
+    twampReportCurrentDelayFwdSum               Counter64,
+    twampReportCurrentDelayBckMin               Counter32,
+    twampReportCurrentDelayBckMax               Counter32,
+    twampReportCurrentDelayBckSum               Counter64,
+    twampReportCurrentDelayedPacketsFwd         Counter32,
+    twampReportCurrentDelayedPacketsBck         Counter32,
+    twampReportCurrentPdvMaxFwd                 Counter32,
+    twampReportCurrentPdvMaxBck                 Counter32,
+    twampReportCurrentTxPacketsFwd              Counter64,
+    twampReportCurrentTxPacketsBck              Counter64,
+    twampReportCurrentRxValidPacketsFwd         Counter64,
+    twampReportCurrentRxValidPacketsBck         Counter64,
+    twampReportCurrentLossPacketsFwd            Counter64,
+    twampReportCurrentLossPacketsBck            Counter64,
+    twampReportCurrentAvailableSecondsFwd       Counter32,
+    twampReportCurrentAvailableSecondsBck       Counter32,
+    twampReportCurrentRxSyncValidPacketsFwd     Counter64,
+    twampReportCurrentRxSyncValidPacketsBck     Counter64,
+    twampReportCurrentSyncSeconds               Counter32 
+ }
+
+twampReportCurrentStartDateAndTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time when current interval had started."
+   ::= { twampReportCurrentEntry 1 }
+
+twampReportCurrentElapsedTime     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds that have elapsed since
+     the beginning of current interval of the test session."
+    ::= { twampReportCurrentEntry 2 } 
+    
+twampReportCurrentTxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where
+     transmitted successfully."
+    ::= { twampReportCurrentEntry 3 }
+
+twampReportCurrentRxValidPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that are
+     valid (e.g. their delay less than 'loss timeout')."
+    ::= { twampReportCurrentEntry 4 }
+
+twampReportCurrentLossPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where loss."
+    ::= { twampReportCurrentEntry 5 }
+
+twampReportCurrentAvailableSeconds    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of available seconds in current interval.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 6 }
+
+twampReportCurrentDelayMin    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured delay of all received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 7 }
+
+twampReportCurrentDelayMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured delay of all received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 8 }
+
+twampReportCurrentDelaySum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of delay of all valid packets for current interval.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 9 }
+
+twampReportCurrentDelayAverage    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated delay of all received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 10 }
+
+twampReportCurrentDelayedPackets    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of received valid packets with delay more than 
+     delay threshold.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 11 }
+
+twampReportCurrentPdvMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated PDV of received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 12 }
+    
+twampReportCurrentIpdvMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated IPDV max of received valid packets.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 13 }
+    
+twampReportCurrentIpdvSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of  calculated IPDV max of all received valid packets.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 14 }
+    
+twampReportCurrentIpdvValidResults    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of valid calculated IPDV results (result is valid only 
+     when IPDV is calculated between 2 valid packets)."
+    ::= { twampReportCurrentEntry 15 }
+
+twampReportCurrentIpdvFwdMax    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated IPDV forward max (one way) of received valid packets.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 16 }
+    
+twampReportCurrentIpdvFwdSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of calculated IPDV forward max (one way) of all
+     received valid packets.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 17 }
+    
+twampReportCurrentIpdvFwdValidResults    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of valid calculated IPDV Fwd results (result is valid only 
+     when IPDV is calculated between 2 valid packets)."
+    ::= { twampReportCurrentEntry 18 }
+
+twampReportCurrentIpdvBckMax    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated IPDV backwards max (one way) of received valid
+     packets.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 19 }
+    
+twampReportCurrentIpdvBckSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of calculated IPDV backwards max (one way) of all
+     received valid packets.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 20 }
+
+twampReportCurrentIpdvBckValidResults    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of valid calculated IPDV Bck results (result is valid only 
+     when IPDV is calculated between 2 valid packets)."
+    ::= { twampReportCurrentEntry 21 }
+
+twampReportCurrentReorderedFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     reordered during the forward path. A reordered packet means a 
+     'late' arrived packet with sequence number smaller than expected."
+    ::= { twampReportCurrentEntry 22 }
+
+twampReportCurrentReorderedBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     reordered during the backward path. A reordered packet means a 
+     'late' arrived packet with sequence number smaller than expected."
+    ::= { twampReportCurrentEntry 23 }
+
+twampReportCurrentDuplicateFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     duplicated during the forward path."
+    ::= { twampReportCurrentEntry 24 }
+
+twampReportCurrentDuplicateBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     duplicated during the backward path."
+    ::= { twampReportCurrentEntry 25 }
+
+twampReportCurrentFragmentedFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     fragmented during the forward path."
+    ::= { twampReportCurrentEntry 26 }
+
+twampReportCurrentFragmentedBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     fragmented during the backward path."
+    ::= { twampReportCurrentEntry 27 }
+
+twampReportCurrentDelayFwdMin    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured delay on the forward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 28 }
+
+twampReportCurrentDelayFwdMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured delay on the forward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 29 }
+
+twampReportCurrentDelayFwdSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of delay on the forward path of all valid packets for 
+     current interval.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 30 }
+
+twampReportCurrentDelayBckMin    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured delay on the backward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 31 }
+
+twampReportCurrentDelayBckMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured delay on the backward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 32 }
+
+twampReportCurrentDelayBckSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of delay on the backward path of all valid packets for 
+     current interval.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 33 }
+
+twampReportCurrentDelayedPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of received valid packets on the forward path with
+     delay more than delay threshold.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 34 }
+
+twampReportCurrentDelayedPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of received valid packets on the backward path with
+     delay more than delay threshold.
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 35 }
+
+twampReportCurrentPdvMaxFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated PDV of received valid packets for the forward path .
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 36 }
+    
+twampReportCurrentPdvMaxBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated PDV of received valid packets for the backward path .
+    
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 37 }
+    
+twampReportCurrentTxPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the forward path of the test
+     session that where transmitted successfully.
+     Forward direction counter is based on twampReportCurrentTxPackets
+     counter."
+    ::= { twampReportCurrentEntry 38 }
+
+twampReportCurrentTxPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the backward path of the test
+     session that where transmitted successfully.
+     Backward direction counter is based on responder's independent
+     sequence number when exists. While not exist - backward counter 
+     shall be zero."
+    ::= { twampReportCurrentEntry 39 }
+
+twampReportCurrentRxValidPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the forward path of the test
+     session that are valid (e.g. their delay less than 'loss
+     timeout')."
+    ::= { twampReportCurrentEntry 40 }
+
+twampReportCurrentRxValidPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the backward path of the test
+     session that are valid (e.g. their delay less than 'loss
+     timeout')."
+    ::= { twampReportCurrentEntry 41 }
+
+twampReportCurrentLossPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where
+     loss during the forward path."
+    ::= { twampReportCurrentEntry 42 }
+
+twampReportCurrentLossPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where
+     loss during the backward path."
+    ::= { twampReportCurrentEntry 43 }
+
+twampReportCurrentAvailableSecondsFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of available seconds for the forward path in current
+     interval.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 44 }
+
+twampReportCurrentAvailableSecondsBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of available seconds for the backward path in current
+     interval.
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 45 }
+
+twampReportCurrentRxSyncValidPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the forward path of the test
+     session during sync period (synchronization of date-and-time
+     between controller and responder)."
+    ::= { twampReportCurrentEntry 46 }
+
+twampReportCurrentRxSyncValidPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the backward path of the test
+     session during sync period (synchronization of date-and-time
+     between controller and responder)."
+    ::= { twampReportCurrentEntry 47 }
+
+twampReportCurrentSyncSeconds    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of sync seconds of test session in current interval 
+     (synchronization of date-and-time between controller and responder).
+     The initial value is zero."
+    ::= { twampReportCurrentEntry 48 }
+
+    
+-- ----------------------------
+-- TWAMP report interval table
+-- ----------------------------
+
+twampReportIntervalTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF TwampReportIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "TWAMP report table to show intervals."
+    ::= { radTestPerfRepResults 10 }
+
+twampReportIntervalEntry OBJECT-TYPE
+    SYNTAX      TwampReportIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in table."
+    INDEX {  twampControllerId,
+             twampPeerAddrType,
+             twampPeerAddr,
+             twampContSessionId,
+             twampReportIntervalNumber }
+    ::= { twampReportIntervalTable 1 }
+
+TwampReportIntervalEntry ::= SEQUENCE {
+    twampReportIntervalNumber                   Unsigned32,
+    twampReportIntervalStartDateAndTime         DateAndTime,
+    twampReportIntervalElapsedTime              Unsigned32,
+    twampReportIntervalTxPackets                Counter64,
+    twampReportIntervalRxValidPackets           Counter64,
+    twampReportIntervalLossPackets              Counter64,
+    twampReportIntervalAvailableSeconds         Counter32,
+    twampReportIntervalDelayMin                 Counter32,
+    twampReportIntervalDelayMax                 Counter32,
+    twampReportIntervalDelaySum                 Counter64,
+    twampReportIntervalDelayAverage             Counter32,
+    twampReportIntervalDelayedPackets           Counter32,
+    twampReportIntervalPdvMax                   Counter32,
+    twampReportIntervalIpdvMax                  Counter32,
+    twampReportIntervalIpdvSum                  Counter64,
+    twampReportIntervalIpdvValidResults         Counter64,
+    twampReportIntervalIpdvFwdMax               Counter64,
+    twampReportIntervalIpdvFwdSum               Counter64,
+    twampReportIntervalIpdvFwdValidResults      Counter64,
+    twampReportIntervalIpdvBckMax               Counter64,
+    twampReportIntervalIpdvBckSum               Counter64,
+    twampReportIntervalIpdvBckValidResults      Counter64,
+    twampReportIntervalReorderedFwd             Counter32,
+    twampReportIntervalReorderedBck             Counter32,
+    twampReportIntervalDuplicateFwd             Counter32,
+    twampReportIntervalDuplicateBck             Counter32,
+    twampReportIntervalFragmentedFwd            Counter32,
+    twampReportIntervalFragmentedBck            Counter32,
+    twampReportIntervalDelayFwdMin              Counter32,
+    twampReportIntervalDelayFwdMax              Counter32,
+    twampReportIntervalDelayFwdSum              Counter64,
+    twampReportIntervalDelayBckMin              Counter32,
+    twampReportIntervalDelayBckMax              Counter32,
+    twampReportIntervalDelayBckSum              Counter64,
+    twampReportIntervalDelayedPacketsFwd        Counter32,
+    twampReportIntervalDelayedPacketsBck        Counter32,
+    twampReportIntervalPdvMaxFwd                Counter32,
+    twampReportIntervalPdvMaxBck                Counter32,
+    twampReportIntervalTxPacketsFwd             Counter64,
+    twampReportIntervalValidData                TruthValue,
+    twampReportIntervalTxPacketsBck             Counter64,
+    twampReportIntervalRxValidPacketsFwd        Counter64,
+    twampReportIntervalRxValidPacketsBck        Counter64,
+    twampReportIntervalLossPacketsFwd           Counter64,
+    twampReportIntervalLossPacketsBck           Counter64,
+    twampReportIntervalAvailableSecondsFwd      Counter32,
+    twampReportIntervalAvailableSecondsBck      Counter32,
+    twampReportIntervalRxSyncValidPacketsFwd    Counter64,
+    twampReportIntervalRxSyncValidPacketsBck    Counter64,
+    twampReportIntervalSyncSeconds              Counter32 
+ }
+
+twampReportIntervalNumber    OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Interval index, which is actualy the Interval number, 
+     where 1 is the most recently completed interval, and
+     MAX_Number_OF_INTERVALS is the least recently completed
+     interval (assuming that all intervals exist)."
+    ::= { twampReportIntervalEntry 1 }
+
+twampReportIntervalStartDateAndTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time when the interval had started."
+   ::= { twampReportIntervalEntry 2 }
+
+twampReportIntervalElapsedTime     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds that have elapsed since
+     the beginning of the interval."
+    ::= { twampReportIntervalEntry 3 } 
+    
+twampReportIntervalTxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where
+     transmitted successfully."
+    ::= { twampReportIntervalEntry 4 }
+
+twampReportIntervalRxValidPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that are
+     valid (e.g. their delay less than 'loss timeout')."
+    ::= { twampReportIntervalEntry 5 }
+
+twampReportIntervalLossPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where
+     loss."
+    ::= { twampReportIntervalEntry 6 }
+
+twampReportIntervalAvailableSeconds    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of available seconds in an interval.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 7}
+
+twampReportIntervalDelayMin    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured delay of all received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 8}
+
+twampReportIntervalDelayMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured delay of all received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 9 }
+
+twampReportIntervalDelaySum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of delay of all valid packets for the interval.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 10 }
+
+twampReportIntervalDelayAverage    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated delay of all received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 11 }
+
+twampReportIntervalDelayedPackets    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of received valid packets with delay more than 
+     delay threshold.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 12 }
+
+twampReportIntervalPdvMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated PDV of received valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 13 }
+
+-- Place holder for one way PDv parameters
+   
+twampReportIntervalIpdvMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated IPDV max of received valid packets.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 14 }
+    
+twampReportIntervalIpdvSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of calculated IPDV max of all received valid packets.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 15 }
+    
+twampReportIntervalIpdvValidResults    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+     "The number of valid calculated IPDV results (result is valid only 
+      when IPDV is calculated between 2 valid packets)."
+    ::= { twampReportIntervalEntry 16 }
+
+twampReportIntervalIpdvFwdMax    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated IPDV forward max (one way) of received valid packets.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 17 }
+    
+twampReportIntervalIpdvFwdSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of calculated IPDV forward max (one way) of all
+     received valid packets.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 18 }
+    
+twampReportIntervalIpdvFwdValidResults    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of valid calculated IPDV Fwd results (result is valid only 
+     when IPDV is calculated between 2 valid packets)."
+    ::= { twampReportIntervalEntry 19 }
+
+twampReportIntervalIpdvBckMax    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated IPDV backwards max (one way) of received valid
+     packets.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 20 }
+    
+twampReportIntervalIpdvBckSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of calculated IPDV backwards max (one way) of all
+     received valid packets.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 21 }
+    
+twampReportIntervalIpdvBckValidResults    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of valid calculated IPDV Bck results (result is valid only 
+     when IPDV is calculated between 2 valid packets)."
+    ::= { twampReportIntervalEntry 22 }
+
+twampReportIntervalReorderedFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     reordered during the forward path. A reordered packet means a 
+     'late' arrived packet with sequence number smaller than expected."
+    ::= { twampReportIntervalEntry 23 }
+
+twampReportIntervalReorderedBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     reordered during the backward path. A reordered packet means a 
+     'late' arrived packet with sequence number smaller than expected."
+    ::= { twampReportIntervalEntry 24 }
+
+twampReportIntervalDuplicateFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     duplicated during the forward path."
+    ::= { twampReportIntervalEntry 25 }
+
+twampReportIntervalDuplicateBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     duplicated during the backward path."
+    ::= { twampReportIntervalEntry 26 }
+
+twampReportIntervalFragmentedFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     fragmented during the forward path."
+    ::= { twampReportIntervalEntry 27 }
+
+twampReportIntervalFragmentedBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to a test session that where 
+     fragmented during the backward path."
+    ::= { twampReportIntervalEntry 28 }
+
+twampReportIntervalDelayFwdMin    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured delay on the forward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 29 }
+
+twampReportIntervalDelayFwdMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured delay on the forward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 30 }
+
+twampReportIntervalDelayFwdSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of delay on the forward path of all valid packets for 
+     this interval.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 31 }
+
+twampReportIntervalDelayBckMin    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured delay on the backward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 32 }
+
+twampReportIntervalDelayBckMax    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured delay on the backward path of all received 
+     valid packets.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 33 }
+
+twampReportIntervalDelayBckSum    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The sum of delay on the backward path of all valid packets for 
+     this interval.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 34 }
+
+twampReportIntervalDelayedPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of received valid packets on the forward path with
+     delay more than delay threshold.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 35 }
+
+twampReportIntervalDelayedPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of received valid packets on the backward path with
+     delay more than delay threshold.
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 36 }
+
+twampReportIntervalPdvMaxFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated PDV of received valid packets for the forward path .
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 37 }
+    
+twampReportIntervalPdvMaxBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated PDV of received valid packets for the backward path .
+    
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 38 }
+    
+twampReportIntervalTxPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the forward path of the test
+     session that where transmitted successfully.
+     Forward direction counter is based on twampReportIntervalTxPackets
+     counter."
+    ::= { twampReportIntervalEntry 39 }
+
+twampReportIntervalValidData OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "This variable indicates if the data for this interval is valid."
+    ::= { twampReportIntervalEntry 40 }
+
+twampReportIntervalTxPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the backward path of the test
+     session that where transmitted successfully.
+     Backward direction counter is based on responder's independent
+     sequence number when exists. While not exist - backward counter 
+     shall be zero."
+    ::= { twampReportIntervalEntry 41 }
+
+twampReportIntervalRxValidPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the forward path of the test
+     session that are valid (e.g. their delay less than 'loss
+     timeout')."
+    ::= { twampReportIntervalEntry 42 }
+
+twampReportIntervalRxValidPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the backward path of the test
+     session that are valid (e.g. their delay less than 'loss
+     timeout')."
+    ::= { twampReportIntervalEntry 43 }
+
+twampReportIntervalLossPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where
+     loss during the forward path."
+    ::= { twampReportIntervalEntry 44 }
+
+twampReportIntervalLossPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the test session that where
+     loss during the backward path."
+    ::= { twampReportIntervalEntry 45 }
+
+twampReportIntervalAvailableSecondsFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of available seconds for the forward path in this
+     interval.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 46 }
+
+twampReportIntervalAvailableSecondsBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of available seconds for the backward path in this
+     interval.
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 47 }
+
+twampReportIntervalRxSyncValidPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the forward path of the test
+     session during sync period (synchronization of date-and-time
+     between controller and responder)."
+    ::= { twampReportIntervalEntry 48 }
+
+twampReportIntervalRxSyncValidPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets related to the backward path of the test
+     session during sync period (synchronization of date-and-time
+     between controller and responder)."
+    ::= { twampReportIntervalEntry 49 }
+
+twampReportIntervalSyncSeconds    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of sync seconds of test session in this interval 
+     (synchronization of date-and-time between controller and responder).
+     The initial value is zero."
+    ::= { twampReportIntervalEntry 50 }
+
+systemRfc2544TestStart                NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, tstNePerfRepTestType } 
+    STATUS  current
+    DESCRIPTION
+    "This Trap Indicates that the test was started.
+     The Test Id (tstNePerfRepTestId) shall be taken from the 
+     tstNePerfRepTestType OID."    
+    ::= { radTestPrefRepEvents 2 }
+
+
+systemRfc2544TestEnd    NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, tstNePerfRepTestType } 
+    STATUS  current
+    DESCRIPTION
+    "This Trap Indicates that the test was ended.
+     The Test Id (tstNePerfRepTestId) shall be taken from the 
+     tstNePerfRepTestType OID." 
+    ::= { radTestPrefRepEvents 3 }
+
+systemItuSatTestStart                NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, ituSatGeneratorStatus, ituSatGeneratorName } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a Y.1564 test was started.
+     The generator ID (ituSatGeneratorIndex) shall be taken from the
+     ituSatGeneratorStatus OID."
+    ::= { radTestPrefRepEvents 4 }
+
+systemItuSatConfigurationTestEnd                NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, ituSatGeneratorConfResult, ituSatGeneratorName } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a Y.1564 configuration test has ended.
+     The generator ID (ituSatGeneratorIndex) shall be taken from the
+     ituSatGeneratorConfResult OID."
+    ::= { radTestPrefRepEvents 5 }
+
+systemItuSatPerformanceTestEnd                NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, ituSatGeneratorPerfResult, ituSatGeneratorName } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a Y.1564 performance test has ended.
+     The generator ID (ituSatGeneratorIndex) shall be taken from the
+     ituSatGeneratorPerfResult OID."
+    ::= { radTestPrefRepEvents 6 }
+
+systemItuSatResponderActivated                NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, ituSatResponderStatus, ituSatResponderName } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a Y.1564 responder was activated.
+     The responder ID (ituSatResponderIndex) shall be taken from the
+     ituSatResponderStatus OID."
+    ::= { radTestPrefRepEvents 7 }
+
+systemItuSatResponderDeactivated                NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, ituSatResponderStatus, ituSatResponderName } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a Y.1564 responder was deactivated (either by
+     the operator or by the device due to external conditions).
+     The responder ID (ituSatResponderIndex) shall be taken from the
+     ituSatResponderStatus OID."
+    ::= { radTestPrefRepEvents 8 }
+
+twampPeerTestStarted                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampPeerDescr } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates that a test started."
+    ::= { radTestPrefRepEvents 9 }
+
+twampPeerTestStopped                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampPeerDescr } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates that a test stopped."
+    ::= { radTestPrefRepEvents 10 }
+
+twampSessionLossRatioTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a Loss Ratio threshold crossing alert."
+    ::= { radTestPrefRepEvents 11 }
+
+twampSessionDelayTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a delay threshold crossing alert."
+    ::= { radTestPrefRepEvents 12 }
+
+twampSessionDelayVarTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus, twampTestProfileDelayVarEventType } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a delay variation threshold crossing alert."
+    ::= { radTestPrefRepEvents 13 }
+
+twampSessionUnavailable                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampControllerName } 
+    STATUS  current
+    DESCRIPTION
+    "This alarm indicates that TWAMP session is unavailable.
+     TWAMP session is considered as unavailable when last Rollup Period
+     has more than 75% packet loss ratio.
+     TWAMP session is considered as available when a Rollup Period
+     packet loss ratio is less or equal to 75%."
+    ::= { radTestPrefRepEvents 14 } 
+
+twampSessionForwardUnavailable                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampControllerName } 
+    STATUS  current
+    DESCRIPTION
+    "This alarm indicates that TWAMP session is unavailable in the forward
+     direction.
+     TWAMP session is considered as unavailable when last Rollup Period
+     has more than 75% packet loss ratio.
+     TWAMP session is considered as available when a Rollup Period
+     packet loss ratio is less or equal to 75%."
+    ::= { radTestPrefRepEvents 15 } 
+
+twampSessionBackwardUnavailable                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampControllerName } 
+    STATUS  current
+    DESCRIPTION
+    "This alarm indicates that TWAMP session is unavailable in the backward
+     direction.
+     TWAMP session is considered as unavailable when last Rollup Period
+     has more than 75% packet loss ratio.
+     TWAMP session is considered as available when a Rollup Period
+     packet loss ratio is less or equal to 75%."
+    ::= { radTestPrefRepEvents 16 } 
+    
+twampSessionForwardLossRatioTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a Loss Ratio threshold crossing alert 
+     in the forward direction."
+    ::= { radTestPrefRepEvents 17 }
+
+twampSessionForwardDelayTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a delay threshold crossing alert
+     in the forward direction."
+    ::= { radTestPrefRepEvents 18 }    
+    
+twampSessionForwardDelayVarTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus, twampTestProfileDelayVarEventType } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a delay variation threshold crossing alert 
+     in the Forward direction."
+    ::= { radTestPrefRepEvents 19 }    
+    
+twampSessionBackwardLossRatioTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a Loss Ratio threshold crossing alert 
+     in the backward direction."
+    ::= { radTestPrefRepEvents 20 }
+
+twampSessionBackwardDelayTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a delay threshold crossing alert
+     in the backward direction."
+    ::= { radTestPrefRepEvents 21 }
+
+twampSessionBackwardDelayVarTca                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampContSessionName, twampContSessionStatus, twampTestProfileDelayVarEventType } 
+    STATUS  current
+    DESCRIPTION
+    "This event indicates a delay variation threshold crossing alert
+     in the backward direction."
+    ::= { radTestPrefRepEvents 22 }
+    
+twampPeerTodAccuracyOutOfLimit                  NOTIFICATION-TYPE      
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     twampPeerDescr } 
+    STATUS  current
+    DESCRIPTION
+    "This alarm indicates that TWAMP responder TOD is out of sync.
+     TWAMP peer is considered as 'responder TOD out of sync' when a
+     controller get out-of-sync indication from a responder during Rollup
+     Period.
+     TWAMP peer is considered as 'responder TOD sync' when a controller
+     didn't get out-of-sync indication from a responder during last Rollup
+     Period."
+    ::= { radTestPrefRepEvents 37 } 
+    
+
+
+END

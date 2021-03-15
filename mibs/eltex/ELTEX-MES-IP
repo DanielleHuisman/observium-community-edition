@@ -6,11 +6,15 @@ ELTEX-MES-IP DEFINITIONS ::= BEGIN
 
 IMPORTS
     eltMes                                                  FROM ELTEX-MES
-    rlInetRoutingDistanceEntry                              FROM RADLAN-IPv6
-    OBJECT-TYPE                                             FROM SNMPv2-SMI
-    TruthValue                                              FROM SNMPv2-TC
-    ifIndex                                                 FROM IF-MIB;
-
+    rlInetRoutingDistanceEntry, rlInetStaticRouteEntry      FROM RADLAN-IPv6
+    OBJECT-TYPE, Unsigned32                                 FROM SNMPv2-SMI
+    TruthValue, DisplayString, RowStatus                    FROM SNMPv2-TC
+    ifIndex                                                 FROM IF-MIB
+    EltexBgpAsSize, EltexBgpOriginCode, 
+    EltexBgpRouteMapAsPathAction                            FROM ELTEX-BGP-MIB
+    rlRouteMapPbrEntry                                      FROM MARVELL-ROUTEMAP-MIB
+    InetAddress, InetAddressType                            FROM INET-ADDRESS-MIB
+    RlRedistDstProtocol                                     FROM RADLAN-Redistribute;
 
 eltMesIpSpec MODULE-IDENTITY
        LAST-UPDATED "201402120000Z"
@@ -24,40 +28,17 @@ eltMesIpSpec MODULE-IDENTITY
             "Initial version of this MIB."
        ::= { eltMes 91 }
 
+EltMesRouteMapPermitOrDeny ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Whether the behavior is to permit or deny."
+    SYNTAX      INTEGER {
+                  permit(1),        -- Unmatched routes are permitted
+                  deny(2)           -- Unmatched routes are denied
+                }
+
 
 eltMesOspf OBJECT IDENTIFIER ::=  { eltMesIpSpec 1 }
 -- see eltIpRouter.mib
-
-eltMesIcmpSpec OBJECT IDENTIFIER ::= { eltMesIpSpec 2 }
-
-eltIpIcmpPacketTable OBJECT-TYPE
-    SYNTAX      SEQUENCE  OF EltIpIcmpPacketEntry
-    MAX-ACCESS  read-write
-    STATUS      current
-    DESCRIPTION
-       "This table controls the ability to send ICMP packets."
-    ::=  { eltMesIcmpSpec 1 }
-
-eltIpIcmpPacketEntry OBJECT-TYPE
-    SYNTAX      EltIpIcmpPacketEntry
-    MAX-ACCESS  not-accessible
-    STATUS      current
-    DESCRIPTION
-       "This entry controls the ability of interface to send ICMP packets."
-    INDEX  {ifIndex}
-    ::=  { eltIpIcmpPacketTable 1 }
-
-EltIpIcmpPacketEntry ::= SEQUENCE {
-    eltIpIcmpPacketUnreachableSendEnable        TruthValue
-}
-
-eltIpIcmpPacketUnreachableSendEnable OBJECT-TYPE
-  SYNTAX        TruthValue
-  MAX-ACCESS    read-write
-  STATUS        current
-  DESCRIPTION
-    "ICMP Destination Unreachable packets sending is enabled or not on this interface."
-  ::= { eltIpIcmpPacketEntry 2 }
 
 eltMesArpSpec OBJECT IDENTIFIER ::=  { eltMesIpSpec 3 }
 -- see eltArpInterfaceTable.mib
@@ -106,6 +87,567 @@ eltInetRoutingDistanceBgpExternal OBJECT-TYPE
     STATUS      current
     DESCRIPTION "The administrative distance used for external BGP routes."
     ::= { eltInetRoutingDistanceEntry 2 }
+
+
+eltInetStaticRouteTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltInetStaticRouteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "This table defines administrative distances for
+                 different protocol routes that are inserted into
+                 the routing table.
+
+                 The table augments rlInetStaticRouteTable."
+    ::= { eltMesInetRouting 2 }
+
+eltInetStaticRouteEntry OBJECT-TYPE
+    SYNTAX      EltInetStaticRouteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "A particular Static(user configured) route to a particular destination."
+    AUGMENTS    { rlInetStaticRouteEntry }
+    ::= { eltInetStaticRouteTable 1 }
+
+EltInetStaticRouteEntry ::= SEQUENCE {
+    eltInetStaticRouteName                  DisplayString
+}
+
+eltInetStaticRouteName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The name assigned to the static route."
+    ::= { eltInetStaticRouteEntry 1 }
+
+  eltMesRouteMap       OBJECT IDENTIFIER ::= { eltMesIpSpec 5 }
+
+--
+-- BGP Route Map Augment.
+--
+-- This is the top-level MIB for the BGP Router feature. It controls
+-- creation and global configuration of the protocol.
+--
+
+eltMesRouteMapTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltMesRouteMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The table of BGP Route Maps.  If a particular match or set
+                 category does not apply to a route map then do not define the
+                 corresponding field in the MIB row."
+    ::= { eltMesRouteMap 1 }
+
+eltMesRouteMapEntry OBJECT-TYPE
+    SYNTAX      EltMesRouteMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry represents a filter consisting of Match and Set
+                 entries."
+    AUGMENTS { rlRouteMapPbrEntry }
+    ::= { eltMesRouteMapTable 1 }
+
+EltMesRouteMapEntry ::= SEQUENCE {
+    eltMesRouteMapMatchAddrPrefixListName       DisplayString,
+    eltMesRouteMapMatchNextPrefixListName       DisplayString,
+    eltMesRouteMapMatchSourcePrefixListName     DisplayString,
+    eltMesRouteMapMatchLocPref                  Unsigned32,
+    eltMesRouteMapMatchLocPrefDef               TruthValue,
+    eltMesRouteMapMatchMed                      Unsigned32,
+    eltMesRouteMapMatchMedDef                   TruthValue,
+    eltMesRouteMapMatchOrigin                   EltexBgpOriginCode,
+    eltMesRouteMapMatchOriginDef                TruthValue,
+    eltMesRouteMapMatchAnd                      TruthValue,
+    eltMesRouteMapActionAS                      Unsigned32,
+    eltMesRouteMapActionASOperation             EltexBgpRouteMapAsPathAction,
+    eltMesRouteMapActionASLimUpper              Unsigned32,
+    eltMesRouteMapActionASLimUpperDef           TruthValue,
+    eltMesRouteMapActionAsPrependCount          Unsigned32,
+    eltMesRouteMapActionAsPrependSize           EltexBgpAsSize,
+    eltMesRouteMapActionAsPrependAsVals         OCTET STRING,
+    eltMesRouteMapActionAsRemove                DisplayString,
+    eltMesRouteMapActionLocPref                 Unsigned32,
+    eltMesRouteMapActionLocPrefDef              TruthValue,
+    eltMesRouteMapActionMed                     Unsigned32,
+    eltMesRouteMapActionMedDef                  TruthValue,
+    eltMesRouteMapActionOrigin                  EltexBgpOriginCode,
+    eltMesRouteMapActionOriginDef               TruthValue,
+    eltMesRouteMapActionWeight                  Unsigned32,
+    eltMesRouteMapActionWeightDef               TruthValue,
+    eltMesRouteMapActionNextHopPeer             TruthValue,
+    eltMesRouteMapType                          EltMesRouteMapPermitOrDeny,
+    eltMesRouteMapContinue                      Unsigned32
+}
+
+
+eltMesRouteMapMatchAddrPrefixListName OBJECT-TYPE
+    SYNTAX       DisplayString
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "The name of the IP Prefix access list used to match
+                  the NLRI attribute against."
+    DEFVAL       { "" }
+    ::= { eltMesRouteMapEntry 1 }
+
+eltMesRouteMapMatchNextPrefixListName OBJECT-TYPE
+    SYNTAX       DisplayString
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "The name of the IP Prefix access list used to match
+                  the Next Hop attribute against."
+    DEFVAL       { "" }
+    ::= { eltMesRouteMapEntry 2 }
+
+eltMesRouteMapMatchSourcePrefixListName OBJECT-TYPE
+    SYNTAX       DisplayString
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "The name of the IP Prefix access list used to match
+                  the source address against."
+    DEFVAL       { "" }
+    ::= { eltMesRouteMapEntry 3 }
+
+eltMesRouteMapMatchLocPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value to match the Local Preference attribute against.
+                 This value is only used if eltMesRouteMapMatchLocPrefDef is TRUE.
+
+                 If a route does not contain a local preference attribute, this
+                 match rule is ignored."
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 4 }
+
+eltMesRouteMapMatchLocPrefDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapMatchLocPref should be
+                 used for matching."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 5 }
+
+eltMesRouteMapMatchMed OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value to match the Multiple Exit Descriminator attribute
+                 against.  A value of 0 indicates a match on no MED or a MED
+                 of 0.  This value is only used if eltMesRouteMapMatchMedDef is
+                 TRUE."
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 6 }
+
+eltMesRouteMapMatchMedDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapMatchMed should be used
+                 for matching."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 7 }
+
+eltMesRouteMapMatchOrigin OBJECT-TYPE
+    SYNTAX      EltexBgpOriginCode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value to match the Origin attribute against.  This
+                 value is only used if eltMesRouteMapMatchOriginDef is TRUE."
+    DEFVAL { originIncomplete }
+    ::= { eltMesRouteMapEntry 8 }
+
+eltMesRouteMapMatchOriginDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapMatchOrigin should be
+                 used for matching."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 9 }
+
+eltMesRouteMapMatchAnd OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Indicates that the match statements in this route map
+                 should be logically ANDed with the match statements in the
+                 route map indicated by eltMesRouteMapContinue.  This field is
+                 only relevant for policy route maps.
+
+                 If the route map indicated by eltMesRouteMapContinue is not
+                 found then the match will fail.
+
+                 All route maps in a series must have the same
+                 eltMesRouteMapType.
+
+                 If this field is set then no set statements can be
+                 configured in the row.
+
+                 This field can only be updated if the row is not active."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 10 }
+
+eltMesRouteMapActionAS OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The number of times the local AS number is prepended to
+                 the AS path if there is a match.  This is only relevant if
+                 the route map is being used for exporting routes, or for
+                 setting attributes for an aggregate route which does not
+                 have the AS_SET option set.  This value is only used if
+                 the value of eltMesRouteMapActionASOperation is SET"
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 11 }
+
+eltMesRouteMapActionASOperation OBJECT-TYPE
+    SYNTAX      EltexBgpRouteMapAsPathAction
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in rlRouteMapPbrActionAS should be used
+                 for updating attributes.  The possible action values are:
+
+                 none - Ignore eltMesRouteMapActionAS and do nothing.
+
+                 set - Prepend the local AS number the number
+                 of times specified by eltMesRouteMapActionAS."
+    DEFVAL { none }
+    ::= { eltMesRouteMapEntry 12 }
+
+eltMesRouteMapActionASLimUpper OBJECT-TYPE
+    SYNTAX       Unsigned32  (0..255)
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "If there is a match this will cause the AS_PATHLIMIT
+                  attribute to be added if it does not already exist.  If
+                  it does exist then it will be replaced.  In either case the
+                  specified limit and the local AS will be set.  This can be
+                  used for traffic engineering purposes in association with a
+                  less specific prefix.  A value of zero is permissible and
+                  restricts advertisement of locally generated routes to IBGP
+                  peers.  However, an AS_PATHLIMIT with an upper bound value of
+                  0 will not be externally visible.  That is, it will not be
+                  included in UPDATEs.
+
+                  This value is only used if eltMesRouteMapActionASLimUpperDef is TRUE."
+    DEFVAL { 1 }
+    ::= { eltMesRouteMapEntry 13 }
+
+eltMesRouteMapActionASLimUpperDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapActionASLimUpper should be
+                 used for updating attributes."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 14 }
+
+eltMesRouteMapActionAsPrependCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "To prepend AS numbers to the AS-Path, set
+                 eltMesRouteMapActionAsPrependCount to the count of the AS numbers
+                 to prepend, set eltMesRouteMapActionAsPrependSize to indicate
+                 whether the values are 2 or 4 octet AS numbers and fill in
+                 eltMesRouteMapActionAsPrependAsVals with the AS numbers themselves.
+
+                 When exporting routes to EBGP, BGP applies the AS-prepend
+                 rule before prepending the local AS number as required by
+                 the BGP specification.  This ensures that the local AS
+                 number is always the first AS number in the AS path in this
+                 case.
+
+                 This field can only be updated if the row is not active."
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 15 }
+
+eltMesRouteMapActionAsPrependSize OBJECT-TYPE
+    SYNTAX      EltexBgpAsSize
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The size of AS numbers in the field
+                 eltMesRouteMapActionAsPrependAsVals to prepend to the AS path if
+                 there is a match.  This field is only used if
+                 eltMesRouteMapActionAsPrependCount is non-zero.
+
+                 This field can only be updated if the row is not active."
+    DEFVAL { fourOctet }
+    ::= { eltMesRouteMapEntry 16 }
+
+eltMesRouteMapActionAsPrependAsVals OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..128))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "An array containing the AS numbers to prepend to the AS
+                 path if there is a match.  The length of each AS number is
+                 given by eltMesRouteMapActionAsPrependSize.  This field is only
+                 used if eltMesRouteMapActionAsPrependCount is non-zero.
+
+                 The count of AS numbers is given by
+                 eltMesRouteMapActionAsPrependCount.
+
+                 This field can only be updated if the row is not active."
+    ::= { eltMesRouteMapEntry 17 }
+
+eltMesRouteMapActionAsRemove OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..127))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Contains the regular expression to use to remove AS
+                 numbers from an AS-Path for a route.
+
+                 This is stored here in ASCII format.  AS numbers are
+                 matched as decimal numbers.  For example, the AS number
+                 '0x0123' should be represented in the regular expression
+                 string as '291'.  The string is not NULL-terminated.  A
+                 NULL string or an se_as_remove_exp_len value of zero
+                 indicates that the field is not in use."
+    ::= { eltMesRouteMapEntry 18 }
+
+eltMesRouteMapActionLocPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value to set the Local Pref to if there is a match.  This
+                 value is only used if eltMesRouteMapActionLocPrefDef is TRUE."
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 19 }
+
+eltMesRouteMapActionLocPrefDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapActionLocPref should be
+                 used for updating attributes."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 20 }
+
+eltMesRouteMapActionMed OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value to set the MED to if there is a match.  A value of
+                 0 indicates that the MED should be removed.  This value is
+                 only used if eltMesRouteMapActionMedDef is TRUE."
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 21 }
+
+eltMesRouteMapActionMedDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapActionMed should be
+                 used for updating attributes."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 22 }
+
+eltMesRouteMapActionOrigin OBJECT-TYPE
+    SYNTAX      EltexBgpOriginCode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value to set the Origin to if there is a match.  This
+                 value is only used if eltMesRouteMapActionOriginDef is TRUE."
+    DEFVAL { originIncomplete }
+    ::= { eltMesRouteMapEntry 23 }
+
+eltMesRouteMapActionOriginDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapActionOrigin should be
+                 used for updating attributes."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 24 }
+
+eltMesRouteMapActionWeight OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value to set the Weight to if there is a match.  This
+                 value is only used if eltMesRouteMapActionWeightDef is TRUE."
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 25 }
+
+eltMesRouteMapActionWeightDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether or not the value in eltMesRouteMapActionWeight should be
+                 used for updating attributes."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 26 }
+
+eltMesRouteMapActionNextHopPeer OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "If set to 'true' in an import route map, then routes matching
+                 this route-map will have their Next Hop set to the peer's
+                 address.  This field has no effect on route maps used for
+                 anything other than import.  This field overrides
+                 rlRouteMapPbrActionNextHopPeer if set to 'true'.  This field is not
+                 applied to VPNv4 or VPNv6 routes."
+    DEFVAL { false }
+    ::= { eltMesRouteMapEntry 27 }
+
+eltMesRouteMapType OBJECT-TYPE
+    SYNTAX      EltMesRouteMapPermitOrDeny
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The type of route map entry.  This is only relevant for
+                 policy filtering route maps.  It indicates the action
+                 which should apply to a route which matches the route map
+                 entry.  This field is ignored for route maps used for
+                 aggregation."
+    DEFVAL { permit }
+    ::= { eltMesRouteMapEntry 28 }
+
+eltMesRouteMapContinue OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Field containing the number of the route map clause to
+                 continue processing at.
+
+                 For a series of eltMesRouteMapTable rows that are ANDed
+                 together (that is, the eltMesRouteMapMatchAnd field is set to
+                 TRUE for all of the series except the last),
+                 eltMesRouteMapContinue can be used irrespective of the
+                 eltMesRouteMapType.  That is, eltMesRouteMapType can be permit
+                 or deny for the series.
+
+                 For a series of route attribute changes (that is, a series
+                 of eltMesRouteMapTable rows that modify the route attributes
+                 of a permitted route, where the rows are linked with the
+                 eltMesRouteMapContinue field), all of the rows must have
+                 eltMesRouteMapType permit.
+
+                 If the route map matches, the set commands for the
+                 matching clause will be applied, and filtering will then
+                 continue from the route map clause specified in this
+                 field.
+
+                 If no continue clause is specified (value of 0), or the
+                 referenced route map clause does not exist, then
+                 processing for the given route will be complete.
+
+                 The continue field references the rlRouteMapPbrRouteMapSectionId field
+                 of the desired clause.  In order to prevent processing
+                 loops, the continue clause must have a higher number than
+                 the current clause."
+    DEFVAL { 0 }
+    ::= { eltMesRouteMapEntry 29 }
+
+--  Summary Address Table.
+--
+--  This table is used to reduce the number of similar routes
+--  that are advertised to routing protocol managers.
+--
+
+eltInetSummAddrTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltInetSummAddrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The table of summary address entries.
+
+                 This table is used to reduce the number of similar routes
+                 that are advertised to routing protocol managers."
+    ::= { eltMesInetRouting 3 }
+
+eltInetSummAddrEntry OBJECT-TYPE
+    SYNTAX      EltInetSummAddrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "A particular entry in the Summary Address table."
+    INDEX {
+            eltInetSummAddrTargetProtocol,
+            eltInetSummAddrTargetInstance,
+            eltInetSummAddrAddrType,
+            eltInetSummAddrAddress,
+            eltInetSummAddrAddrPfxLen
+          }
+    ::= { eltInetSummAddrTable 1 }
+
+EltInetSummAddrEntry ::= SEQUENCE {
+      eltInetSummAddrTargetProtocol      RlRedistDstProtocol,
+      eltInetSummAddrTargetInstance      Unsigned32,
+      eltInetSummAddrAddrType            InetAddressType,
+      eltInetSummAddrAddress             InetAddress,
+      eltInetSummAddrAddrPfxLen          Unsigned32,
+      eltInetSummAddrRowStatus           RowStatus,
+      eltInetSummAddrAdvertise           TruthValue
+    }
+
+eltInetSummAddrTargetProtocol OBJECT-TYPE
+    SYNTAX      RlRedistDstProtocol
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The protocol to which the summary address
+                 specified in this row is exported to."
+    ::= { eltInetSummAddrEntry 1 }
+
+eltInetSummAddrTargetInstance OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The instance ID of a protocol specified in
+                 the eltInetSummAddrTargetProtocol field."
+    ::= { eltInetSummAddrEntry 2 }
+
+eltInetSummAddrAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The type of the summary address prefix."
+    ::= { eltInetSummAddrEntry 3 }
+
+eltInetSummAddrAddress OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE(4|16))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Summary IP address prefix value.  This is the address that
+                 is used in combination with eltInetSummAddrAddrPfxLen to
+                 specify the prefix used to summarize any equal or
+                 more-specific routes to the target protocol."
+    ::= { eltInetSummAddrEntry 4 }
+
+eltInetSummAddrAddrPfxLen OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..128)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Summary IP address prefix length (in bits).  This is used
+                 in combination with eltInetSummAddrAddress to specify the
+                 prefix used to summarize any equal or more-specific routes
+                 to the target protocol.  The prefix length may not be
+                 zero."
+    ::= { eltInetSummAddrEntry 5 }
+
+eltInetSummAddrRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Used to create and delete a summary address table
+                 entry."
+    ::= { eltInetSummAddrEntry 6 }
+
+eltInetSummAddrAdvertise OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "If this is set to TRUE, then when any routes matching
+                 the summary address prefix (after filtering) would be 
+                 advertised to the target protocol instance, those routes are 
+                 suppressed and a summary address prefix is advertised instead.
+
+                 If this is set to FALSE, then any matching routes are
+                 suppressed (as in the TRUE case), but the summary
+                 address prefix is not advertised to the target instance
+                 either."
+    DEFVAL { true }
+    ::= { eltInetSummAddrEntry 7 }
 
 END
 

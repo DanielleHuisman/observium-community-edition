@@ -232,7 +232,7 @@ function print_status_table_header($vars)
   $cols = array(
                      array(NULL, 'class="state-marker"'),
     'device'      => array('Device', 'style="width: 250px;"'),
-                     array(NULL, 'class="no-width"'), // Measure entity link
+                     //array(NULL, 'class="no-width"'), // Measure entity link
     'descr'       => array('Description'),
     'mib'         => array('MIB::Object'),
     'class'       => array('Physical&nbsp;Class', 'style="width: 100px;"'),
@@ -297,6 +297,7 @@ function generate_status_row($status, $vars)
   }
 
   // Measured link & icon
+  /* Disabled because it breaks the overview table layout
   $row .= '        <td style="padding-right: 0px;" class="no-width vertical-align">'; // minify column if empty
   if ($status['measured_entity'] &&
       (!isset($vars['measured_icon']) || $vars['measured_icon'])) // hide measured icon if not required
@@ -305,6 +306,7 @@ function generate_status_row($status, $vars)
   }
   $row .= '</td>';
   $table_cols++;
+  */
 
   $row .= '<td class="entity">' . generate_entity_link('status', $status) . '</td>';
 

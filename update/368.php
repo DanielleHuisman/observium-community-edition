@@ -6,7 +6,6 @@ echo ' Migrating groups to new format ';
 
 foreach($groups['group'] as $group)
 {
-
   if(!$group['group_assoc']) {
 
     $ruleset = migrate_assoc_rules($group);
@@ -28,7 +27,5 @@ foreach($groups['group'] as $group)
 
     dbUpdate(array('group_assoc' => json_encode($ruleset)), 'groups', '`group_id` = ?', array($group['group_id']));
     //dbDelete('groups_assoc', '`group_id` = ?', array($group['group_id']));
-
   }
-
 }

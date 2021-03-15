@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -21,7 +20,7 @@ if ($vars['editing'])
 
     if ($vars['wmi_override'])         { set_dev_attrib($device, 'wmi_override', $vars['wmi_override']); } else { del_dev_attrib($device, 'wmi_override'); }
     if (!empty($vars['wmi_hostname'])) { set_dev_attrib($device, 'wmi_hostname', $vars['wmi_hostname']); } else { del_dev_attrib($device, 'wmi_hostname'); }
-    if (!empty($vars['wmi_domain']))   { set_dev_attrib($device, 'wmi_domain',   $vars['wmi_domain']); } else { del_dev_attrib($device, 'wmi_domain'); }
+    if (!empty($vars['wmi_domain']))   { set_dev_attrib($device, 'wmi_domain',   $vars['wmi_domain']);   } else { del_dev_attrib($device, 'wmi_domain'); }
     if (!empty($vars['wmi_username'])) { set_dev_attrib($device, 'wmi_username', $vars['wmi_username']); } else { del_dev_attrib($device, 'wmi_username'); }
     if (!empty($vars['wmi_password'])) { set_dev_attrib($device, 'wmi_password', $vars['wmi_password']); } else { del_dev_attrib($device, 'wmi_password'); }
 
@@ -44,79 +43,88 @@ if ($vars['editing'])
   }
 }
 
+if (!is_executable($config['wmic']))
+{
+  if ($config['wmic'] === '/bin/wmic' && is_executable('/usr/bin/wmic'))
+  {
+    // This path already fixed in poller wmi
+  } else {
+    print_warning("The wmic binary was not found at the configured path (" . $config['wmic'] . "). WMI polling will not work.");
+  }
+}
+
 ?>
 
-<script type="text/javascript">
-  $(document).ready(function() {
-    toggleDisable();
-    $("#wmi_override").change(function() {
-      toggleDisable();
-    });
-  });
-
-  function toggleDisable() {
-    if (!$("#wmi_override").is(":checked"))
-    {
-      $('#edit input[type=text], #edit input[type=password]').prop("disabled", true);
-    }
-    else
-    {
-      $('#edit input[type=text], #edit input[type=password]').prop("disabled", false);
-    }
-  }
-</script>
 <div class="row">
   <div class="col-md-6">
-    <div class="box box-solid">
-    <div class="box-header with-border">
-      <h3 class="box-title">WMI Authentication</h3>
-    </div>
-    <div class="box-body" style="padding-top: 10px;">
-      <form id="edit" name="edit" method="post" action="" class="form-horizontal">
-        <fieldset>
-          <input type="hidden" name="editing" value="yes">
-          <div class="control-group">
-            <label class="control-label" for="wmi_override">Override WMI Config</label>
-            <div class="controls">
-              <input type="checkbox" id="wmi_override" name="wmi_override" <?php if (get_dev_attrib($device,'wmi_override')) { echo(' checked="1"'); } ?> />
-            </div>
-          </div>
 
-          <div class="control-group">
-            <label class="control-label" for="wmi_hostname">WMI Hostname</label>
-            <div class="controls">
-              <input name="wmi_hostname" type="text" size="32" value="<?php echo(escape_html(get_dev_attrib($device,'wmi_hostname'))); ?>" />
-            </div>
-          </div>
+    <?php
+    $wmi_override = get_dev_attrib($device, 'wmi_override');
+    $form = array('type'      => 'horizontal',
+                  'id'        => 'edit',
+                  //'space'     => '20px',
+                  'title'     => 'WMI Settings',
+                  //'icon'      => 'oicon-gear',
+                  //'class'     => 'box box-solid',
+                  'fieldset'  => array('edit' => ''),
+    );
 
-          <div class="control-group">
-            <label class="control-label" for="wmi_domain">WMI Domain</label>
-            <div class="controls">
-              <input name="wmi_domain" type="text" size="32" value="<?php echo(escape_html(get_dev_attrib($device,'wmi_domain'))); ?>" />
-            </div>
-          </div>
+    $form['row'][0]['editing'] = [
+      'type'        => 'hidden',
+      'value'       => 'yes'
+    ];
+    $form['row'][1]['wmi_override'] = [
+      'type'        => 'toggle',
+      'name'        => 'Override WMI Config',
+      'readonly'    => $readonly,
+      'onchange'    => "toggleAttrib('disabled', [ 'wmi_hostname', 'wmi_domain', 'wmi_username', 'wmi_password' ])",
+      'value'       => $wmi_override
+    ];
+    $form['row'][2]['wmi_hostname'] = [
+      'type'        => 'text',
+      'name'        => 'WMI Hostname',
+      'width'       => '250px',
+      'readonly'    => $readonly,
+      'disabled'    => !$wmi_override,
+      'value'       => get_dev_attrib($device, 'wmi_hostname')
+    ];
+    $form['row'][3]['wmi_domain'] = [
+      'type'        => 'text',
+      'name'        => 'WMI Domain',
+      'width'       => '250px',
+      'readonly'    => $readonly,
+      'disabled'    => !$wmi_override,
+      'value'       => get_dev_attrib($device, 'wmi_domain')
+    ];
+    $form['row'][4]['wmi_username'] = [
+      'type'        => 'text',
+      'name'        => 'WMI Username',
+      'width'       => '250px',
+      'readonly'    => $readonly,
+      'disabled'    => !$wmi_override,
+      'value'       => get_dev_attrib($device, 'wmi_username')
+    ];
+    $form['row'][5]['wmi_password'] = [
+      'type'        => 'password',
+      'name'        => 'WMI Password',
+      'width'       => '250px',
+      'readonly'    => $readonly,
+      'disabled'    => !$wmi_override,
+      'show_password' => !$readonly,
+      'value'       => get_dev_attrib($device, 'wmi_password')
+    ];
 
-          <div class="control-group">
-            <label class="control-label" for="wmi_username">WMI Username</label>
-            <div class="controls">
-              <input name="wmi_username" type="text" size="32" value="<?php echo(escape_html(get_dev_attrib($device,'wmi_username'))); ?>" />
-            </div>
-          </div>
-
-          <div class="control-group">
-            <label class="control-label" for="wmi_password">WMI Password</label>
-            <div class="controls">
-              <input name="wmi_password" type="password" size="32" value="<?php echo(escape_html(get_dev_attrib($device,'wmi_password'))); // FIXME. For passwords we should use filter instead escape! ?>" />
-            </div>
-          </div>
-
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary" name="submit" value="save"><i class="icon-ok icon-white"></i> Save Changes</button>
-          </div>
-        </fieldset>
-      </form>
-    </div>
-  </div>
+    $form['row'][7]['submit'] = [
+      'type'        => 'submit',
+      'name'        => 'Save Changes',
+      'icon'        => 'icon-ok icon-white',
+      'class'       => 'btn-primary',
+      'readonly'    => $readonly,
+      'value'       => 'save'
+    ];
+    print_form($form);
+    unset($form);
+    ?>
   </div>
   <div class="col-md-6">
     <div class="box box-solid">

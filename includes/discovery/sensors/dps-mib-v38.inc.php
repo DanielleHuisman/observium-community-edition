@@ -43,7 +43,7 @@ foreach ($oids as $index => $entry)
   // Detect class by description
   foreach (array('temperature', 'humidity', 'voltage', 'current', 'power') as $class)
   {
-    if (str_icontains($descr, $class))
+    if (str_iexists($descr, $class))
     {
       discover_sensor($class, $device, $oid_num, $index, $type, $descr, 1, $value);
       break; // stop foreach

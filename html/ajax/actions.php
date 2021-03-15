@@ -25,35 +25,73 @@ if (!$_SESSION['authenticated'])
   exit;
 }
 
-$vars = get_vars();
-
-$json = json_decode(trim(file_get_contents("php://input")), TRUE);
-if (isset($json['action']))
-{
-  $vars = $json;
-} // Got a JSON payload. Replace $var.
+$vars = get_vars(['JSON', 'POST']); // Got a JSON payload. Replace $var.
 
 switch ($vars['action'])
 {
-
+  case "theme":
+    if(is_array($config['themes'][$vars['value']])) {
+        session_set_var("theme", $vars['value']);
+        session_commit();
+        header('Content-Type: application/json');
+        print json_encode(array('status' => 'ok', 'message' => 'Theme set.'));
+    } else {
+        print json_encode(array('status' => 'fail', 'message' => 'Invalid theme.'));
+    }
+    break;
+  case "big_graphs":
+    session_set_var("big_graphs", TRUE);
+    session_commit();
+    header('Content-Type: application/json');
+    print json_encode(array('status' => 'ok', 'message' => 'Big graphs set.'));
+    break;
+  case "small_graphs":
+    session_unset_var("big_graphs");
+    session_commit();
+    header('Content-Type: application/json');
+    print json_encode(array('status' => 'ok', 'message' => 'Small graphs set.'));
+    break;
+  case "touch_on":
+    session_set_var("touch", TRUE);
+    session_commit();
+    header('Content-Type: application/json');
+    print json_encode(array('status' => 'ok', 'message' => 'Touch mode enabled.'));
+    break;
+  case "touch_off":
+    session_unset_var("touch");
+    session_commit();
+    header('Content-Type: application/json');
+    print json_encode(array('status' => 'ok', 'message' => 'Touch mode disabled.'));
+    break;
+  case "set_refresh":
+    session_set_var("dark_mode", TRUE);
+    session_commit();
+    header('Content-Type: application/json');
+    print json_encode(array('status' => 'ok', 'message' => 'Dark mode set.'));
+    break;
   case "group_edit":
+
+    if ($readonly = $_SESSION['userlevel'] < 10) { break; }  // Currently edit allowed only for Admins
 
     if (dbFetchRow("SELECT * FROM `groups` WHERE `group_id` = ?", array($vars['group_id'])))
     {
 
       $rows_updated = dbUpdate(array('group_descr' => $vars['group_descr'], 'group_name' => $vars['group_name'], 'group_assoc' => $vars['group_assoc']),
                                'groups', '`group_id` = ?',
-                               array($vars['group_id']));
+                               array($vars['group_id'])
+      );
       if ($rows_updated)
       {
         update_group_table($vars['group_id']);
         print json_encode(array('id' => $group_id, 'status' => 'ok', 'redirect' => generate_url(array('page' => 'group', 'group_id' => $vars['group_id']))));
-      } else
+      }
+      else
       {
         header('Content-Type: application/json');
         print json_encode(array('status' => 'failed'));
       }
-    } else
+    }
+    else
     {
       print json_encode(array('status' => 'failed'));
     }
@@ -61,28 +99,38 @@ switch ($vars['action'])
 
   case "alert_assoc_edit":
 
-    if (dbFetchRow("SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?", array($vars['alert_test_id'])))
+      if ($readonly = $_SESSION['userlevel'] < 10) { break; }  // Currently edit allowed only for Admins
+
+      if (dbFetchRow("SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?", array($vars['alert_test_id'])))
     {
 
       $rows_updated = dbUpdate(array('alert_assoc' => $vars['alert_assoc']), 'alert_tests', '`alert_test_id` = ?',
-                               array($vars['alert_test_id']));
+                               array($vars['alert_test_id'])
+      );
 
       if ($rows_updated)
       {
         update_alert_table($vars['alert_test_id']);
-        print json_encode(array('id' => $vars['alert_test_id'], 'status' => 'ok', 'redirect' => generate_url(array('page' => 'alert_check', 'alert_test_id' => $vars['alert_test_id']))));
-      } else
+        print json_encode(array('id'       => $vars['alert_test_id'],
+                                'status'   => 'ok',
+                                'redirect' => generate_url(array('page' => 'alert_check', 'alert_test_id' => $vars['alert_test_id'])))
+        );
+      }
+      else
       {
         header('Content-Type: application/json');
         print json_encode(array('status' => 'failed', 'message' => 'Database was not updated.'));
       }
-    } else
+    }
+    else
     {
       print json_encode(array('status' => 'failed', 'message' => 'Alert Checker does not exist: [' . $vars['alert_test_id'] . ']'));
     }
     break;
 
   case "alert_check_add":
+
+    if ($readonly = $_SESSION['userlevel'] < 10) { break; }  // allowed only for Admins
 
     //print json_encode(array($vars));
 
@@ -91,7 +139,7 @@ switch ($vars['action'])
     {
       if (!isset($vars[$var]) || strlen($vars[$var]) == '0')
       {
-        $ok = FALSE;
+        $ok       = FALSE;
         $failed[] = $var;
       }
     }
@@ -107,17 +155,17 @@ switch ($vars['action'])
         list($condition['metric'], $condition['condition'], $condition['value']) = explode(" ", trim($cond), 3);
         $conditions[] = $condition;
       }
-      $check_array['conditions'] = json_encode($conditions);
-      $check_array['alert_assoc'] = $vars['alert_assoc'];
-      $check_array['entity_type'] = $vars['entity_type'];
-      $check_array['alert_name'] = $vars['alert_name'];
-      $check_array['alert_message'] = $vars['alert_message'];
-      $check_array['severity'] = $vars['alert_severity'];
+      $check_array['conditions']        = json_encode($conditions);
+      $check_array['alert_assoc']       = $vars['alert_assoc'];
+      $check_array['entity_type']       = $vars['entity_type'];
+      $check_array['alert_name']        = $vars['alert_name'];
+      $check_array['alert_message']     = $vars['alert_message'];
+      $check_array['severity']          = $vars['alert_severity'];
       $check_array['suppress_recovery'] = ($vars['alert_send_recovery'] == '1' || $vars['alert_send_recovery'] == 'on' ? 0 : 1);
-      $check_array['alerter'] = NULL;
-      $check_array['and'] = $vars['alert_and'];
-      $check_array['delay'] = $vars['alert_delay'];
-      $check_array['enable'] = '1';
+      $check_array['alerter']           = NULL;
+      $check_array['and']               = $vars['alert_and'];
+      $check_array['delay']             = $vars['alert_delay'];
+      $check_array['enable']            = '1';
 
       $check_id = dbInsert('alert_tests', $check_array);
 
@@ -129,25 +177,31 @@ switch ($vars['action'])
         header('Content-Type: application/json');
         print json_encode(array('id' => $check_id, 'status' => 'ok', 'redirect' => generate_url(array('page' => 'alert_check', 'alert_test_id' => $check_id))));
 
-      } else
+      }
+      else
       {
         header('Content-Type: application/json');
         print json_encode(array('status' => 'failed', 'message' => 'Alert creation failed. Please note that the alert name <b>must</b> be unique.'));
       }
-    } else
+    }
+    else
     {
       header('Content-Type: application/json');
-      print json_encode(array('status' => 'failed', 'message' => 'Missing required data. (' . implode(", ",
-                                                                                                      $failed) . ')'));
+      print json_encode(array('status'  => 'failed',
+                              'message' => 'Missing required data. (' . implode(", ",
+                                                                                $failed
+                                ) . ')')
+      );
     }
 
     break;
 
   case "add_group":
 
-    $ok = TRUE;
-    $group_array = array();
+    if ($readonly = $_SESSION['userlevel'] < 10) { break; }  // Currently edit allowed only for Admins
 
+    $ok          = TRUE;
+    $group_array = array();
     $missing_data = array();
 
     foreach (array('entity_type', 'group_name', 'group_descr', 'group_assoc') as $var)
@@ -158,7 +212,8 @@ switch ($vars['action'])
 
         $missing_data[] = $var;
 
-      } else
+      }
+      else
       {
         $group_array[$var] = $vars[$var];
       }
@@ -175,10 +230,14 @@ switch ($vars['action'])
       update_group_table($group_id);
       header('Content-Type: application/json');
       print json_encode(array('id' => $group_id, 'status' => 'ok', 'redirect' => generate_url(array('page' => 'group', 'group_id' => $group_id))));
-    } else
+    }
+    else
     {
 
-      if(count($missing_data)) { $message = "Missing data: ".implode($missing_data, ', '); }
+      if (count($missing_data))
+      {
+        $message = "Missing data: " . implode(', ', $missing_data);
+      }
 
       header('Content-Type: application/json');
       print json_encode(array('status' => 'failed', 'message' => ''));
@@ -188,32 +247,41 @@ switch ($vars['action'])
 
   case "save_grid": // Save current layout of dashboard grid
 
+    if ($readonly = $_SESSION['userlevel'] < 7) { break; }  // Currently edit allowed only for Admins
+
     foreach ($vars['grid'] as $w)
     {
       dbUpdate(array('x' => $w['x'], 'y' => $w['y'], 'width' => $w['width'], 'height' => $w['height'],), 'dash_widgets',
-               '`widget_id` = ?', array($w['id']));
+               '`widget_id` = ?', array($w['id'])
+      );
     }
     break;
 
   case "add_widget": // Add widget of 'widget_type' to dashboard 'dash_id'
 
+    if ($readonly = $_SESSION['userlevel'] < 7) { break; }  // Currently edit allowed only for Admins
+
     if (isset($vars['dash_id']) && isset($vars['widget_type']))
     {
       $widget_id = dbInsert(array('dash_id' => $vars['dash_id'], 'widget_config' => json_encode(array()), 'widget_type' => $vars['widget_type']),
-                            'dash_widgets');
+                            'dash_widgets'
+      );
     }
 
     if ($widget_id)
     {
       header('Content-Type: application/json');
       print json_encode(array('id' => $widget_id));
-    } else
+    }
+    else
     {
       //print_r($vars); // For debugging
     }
     break;
 
   case "delete_ap":
+
+    if ($readonly = $_SESSION['userlevel'] < 7) { break; }  // Currently edit allowed only for Admins
 
     if (is_numeric($vars['id']))
     {
@@ -230,7 +298,10 @@ switch ($vars['action'])
 
   case "del_widget":
 
-    if (is_numeric($vars['widget_id']))
+      if ($readonly = $_SESSION['userlevel'] < 7) { break; }  // Currently edit allowed only for Admins
+
+
+      if (is_numeric($vars['widget_id']))
     {
       $rows_deleted = dbDelete('dash_widgets', '`widget_id` = ?', array($vars['widget_id']));
     }
@@ -244,12 +315,15 @@ switch ($vars['action'])
 
   case "dash_rename":
 
+    if ($readonly = $_SESSION['userlevel'] < 7) { break; }  // Currently edit allowed only for Admins
+
     header('Content-Type: application/json');
 
     if (is_numeric($vars['dash_id']))
     {
       $rows_updated = dbUpdate(array('dash_name' => $vars['dash_name']), 'dashboards', '`dash_id` = ?', array($vars['dash_id']));
-    } else
+    }
+    else
     {
       print json_encode(array('status' => 'error', 'message' => 'Invalid Dashboard ID'));
     }
@@ -257,7 +331,8 @@ switch ($vars['action'])
     if ($rows_updated)
     {
       print json_encode(array('status' => 'ok', 'id' => $vars['dash_id'], 'message' => 'Dashboard Name Updated'));
-    } else
+    }
+    else
     {
       print json_encode(array('status' => 'fail', 'message' => 'Update Failed.'));
     }
@@ -266,13 +341,16 @@ switch ($vars['action'])
 
   case "dash_delete":
 
+    if ($readonly = $_SESSION['userlevel'] < 7) { break; }  // Currently edit allowed only for Admins
+
     header('Content-Type: application/json');
 
     if (is_numeric($vars['dash_id']))
     {
       $rows_deleted = dbDelete('dash_widgets', '`dash_id` = ?', array($vars['dash_id']));
       $rows_deleted = dbDelete('dashboards', '`dash_id` = ?', array($vars['dash_id']));
-    } else
+    }
+    else
     {
       print json_encode(array('status' => 'error', 'message' => 'Invalid Dashboard ID'));
     }
@@ -280,7 +358,8 @@ switch ($vars['action'])
     if ($rows_deleted)
     {
       print json_encode(array('status' => 'ok', 'id' => $vars['dash_id'], 'message' => 'Dashboard Deleted'));
-    } else
+    }
+    else
     {
       print json_encode(array('status' => 'fail', 'message' => 'Deletion Failed.'));
     }
@@ -288,35 +367,46 @@ switch ($vars['action'])
     break;
 
   case "edit_widget":
-    include("actions/edit_widget.inc.php");
+
+      if ($readonly = $_SESSION['userlevel'] < 10) { break; }  // Currently edit allowed only for Admins
+
+      include("actions/edit_widget.inc.php");
     break;
 
   case "update_widget_config":
 
     //print_r($vars);
 
-    $widget = dbFetchRow("SELECT * FROM `dash_widgets` WHERE widget_id = ?", array($vars['widget_id']));
+    if ($readonly = $_SESSION['userlevel'] < 7) { break; }  // Currently edit allowed only for Admins
+
+
+      $widget                  = dbFetchRow("SELECT * FROM `dash_widgets` WHERE widget_id = ?", array($vars['widget_id']));
     $widget['widget_config'] = json_decode($widget['widget_config'], TRUE);
 
     // Verify config value applies to this widget here
 
-    if(isset($vars['config_field']) && isset($vars['config_value']))
+    if (isset($vars['config_field']) && isset($vars['config_value']))
     {
-      if(empty($vars['config_value'])) {
+      if (empty($vars['config_value']))
+      {
         unset($widget['widget_config'][$vars['config_field']]);
-      } else
+      }
+      else
       {
         $widget['widget_config'][$vars['config_field']] = $vars['config_value'];
       }
 
       dbUpdate(array('widget_config' => json_encode($widget['widget_config'])), 'dash_widgets',
-               '`widget_id` = ?', array($widget['widget_id']));
+               '`widget_id` = ?', array($widget['widget_id'])
+      );
 
       echo dbError();
 
       print json_encode(array('status' => 'ok', 'message' => 'Widget Updated.'));
 
-    } else {
+    }
+    else
+    {
       print json_encode(array('status' => 'fail', 'message' => 'Update Failed.'));
     }
 

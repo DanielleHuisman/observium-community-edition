@@ -1,0 +1,2519 @@
+RAD-LanRger-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       ifAlias, ifIndex, InterfaceIndexOrZero     FROM  IF-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Integer32, Counter32, IpAddress, 
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE, OBJECT-IDENTITY     FROM  SNMPv2-SMI
+       DisplayString, RowStatus, RowPointer, 
+       MacAddress, TEXTUAL-CONVENTION, TruthValue     FROM  SNMPv2-TC
+       radBridges     FROM  RAD-SMI-MIB
+       InetAddressIPv4, InetAddressIPv6     FROM  INET-ADDRESS-MIB
+       pppLinkStatusEntry, pppLinkConfigEntry     FROM  PPP-LCP-MIB
+       agnLed, alarmEventLogSourceName, alarmEventLogAlarmOrEventId, 
+       alarmEventLogDescription, alarmEventLogSeverity, alarmEventLogDateAndTime, 
+       alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+    lanranger MODULE-IDENTITY
+        LAST-UPDATED "201606081802Z"  -- June 08, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Lanragner MIB."
+    ::= { radBridges 2 }
+
+
+-- the lanrangerConfig group defines configurable parameters that are specific to the LANRANger
+-- product line
+
+lanrangerConfig OBJECT IDENTIFIER ::= { lanranger 1 }
+
+lanrangerLoc   OBJECT-TYPE 
+    SYNTAX  INTEGER { 
+       main(1),
+       remote(2)
+    }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	"lanrangerLoc is set to main if the LANRANger is located on the main LAN and it is set to
+		 remote if it is located on a LAN at a remote site."
+    ::= {  lanrangerConfig 1  }
+
+lanrangerBurnAddress   OBJECT-TYPE 
+    SYNTAX  MacAddress 
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	"This is the burned-in MacAddress on the LANRANger."
+    ::= {  lanrangerConfig 2  }
+
+lanrangerLocAddress   OBJECT-TYPE 
+    SYNTAX  MacAddress 
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"This is a locally administered address.  If a zero value appears, the network administrator 
+	did  not set a locally administered address."
+    ::= {  lanrangerConfig 3 }
+
+lanrangerActiveAddress OBJECT-TYPE
+     SYNTAX INTEGER {burnedIn(1), locallyAdministered(2) }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+	 "The MAC address that is in use on the LANRANger. 
+	  The address selected will appear in ifPhysAddress."
+     ::= { lanrangerConfig 4 }
+
+
+lanrangerLearningStationTopology OBJECT-TYPE
+     SYNTAX INTEGER { dynamic             (1),
+                      permanent           (2),
+                      permanentAndDynamic (3)
+                    }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "The Learning station topology defines for the 
+          LANRANger which type of station will be inserted 
+          in the station list. 
+          The default value is permanentAndDynamic(3).
+ 
+             dynamic(1)   - Learning lan station only. 
+             permanent(2) - 
+             permanentAndDynamic(3)-
+             
+          Setting this parameter will reset the LANRANger . 
+                                      -----                "
+     ::= { lanrangerConfig 5 }
+
+
+lanrangerIpRouterInfo OBJECT IDENTIFIER
+     ::= { lanrangerConfig 6 }
+
+  lanrangerIpDefaultLink  OBJECT-TYPE
+       SYNTAX Integer32 
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+        "The default selected link, having the numbering system of ifIndex. 
+         The valid values range is: 1..ifIndex.
+         The value must remain constant at least from one
+         re-initialization of the network management agent to
+         the next.
+         notSupported = 255 "
+       ::= { lanrangerIpRouterInfo 1 }
+
+  lanrangerIpFastReTxLevel  OBJECT-TYPE
+       SYNTAX Integer32 
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         " The maximum buffer depth (queue length) for which lanranger 
+           will accept retransmission (for each station; the level
+           is the same for all the stations).
+           The valid values range is: 1..255 .    "
+       ::= { lanrangerIpRouterInfo 2 }
+
+  lanrangerIpAgingTimeout OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+         " Ip aging time for a station - in min. "
+       ::= { lanrangerIpRouterInfo 3 }
+
+--BOOT-P parameters; are relevant only for routers 
+
+   lanrangerIpBootP OBJECT IDENTIFIER
+       ::= { lanrangerIpRouterInfo 4 }
+
+    lanrangerBootPAction  OBJECT-TYPE
+       SYNTAX INTEGER { 
+       disable (2),
+       enable (3)
+       }
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+           "Activating (disable/enable) the BootP operation."
+       ::= { lanrangerIpBootP 1 }
+
+    lanrangerBootPAvailableEntries OBJECT-TYPE
+       SYNTAX  Integer32
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+         "The number of available entries in the BootP table."
+       ::= { lanrangerIpBootP 2 }
+
+    lanrangerBootPCurrentEntries OBJECT-TYPE
+       SYNTAX  Integer32
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+         "The current number of BootP entries in the BootP table."
+       ::= { lanrangerIpBootP 3 }
+
+    lanrangerBootPTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF LanrangerBootPEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "A list of BootP entries.  The number of entries is up to
+           BootP current entries, according to the LANRANger model."
+       ::= { lanrangerIpBootP 4 }
+
+    lanrangerBootPEntry OBJECT-TYPE
+       SYNTAX  LanrangerBootPEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "BootP parameters per entry of the BootP table."
+       INDEX   { lanrangerBootPIpAddress }
+       ::= { lanrangerBootPTable 1 }
+
+    LanrangerBootPEntry ::=
+       SEQUENCE {
+              lanrangerBootPIpAddress
+                 IpAddress,
+              lanrangerBootPIfIndex
+                 INTEGER,
+              lanrangerBootPOperation
+                 INTEGER
+          }
+
+    lanrangerBootPIpAddress OBJECT-TYPE
+        SYNTAX  IpAddress
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+             "BootP Ip Address."
+        ::= { lanrangerBootPEntry 1 }
+
+    lanrangerBootPIfIndex OBJECT-TYPE
+        SYNTAX  INTEGER	 {notAllocated (255)}
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+             "The number is the same as the ifIndex of the link."
+        ::= { lanrangerBootPEntry 2 }
+
+   lanrangerBootPOperation OBJECT-TYPE
+      SYNTAX  INTEGER {
+                     active (1),
+                     delete (2)
+             }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+             "This object indicates the status of this entry.
+                active(1) - this entry is currently in use
+                            and will remain so even after the next
+                            reset of the LANRANger.
+                delete(2) - writing this value to the object,
+                            removes the corresponding entry from the
+                            table. "
+      ::= { lanrangerBootPEntry 3 }
+
+
+lanrangerSpoofingInfo OBJECT IDENTIFIER
+     ::= { lanrangerConfig 7 }
+
+  lanrangerSpoofingAction  OBJECT-TYPE
+       SYNTAX Integer32 
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+	"Spoofing action is applied by bit code:
+         enable        :  bit 0 set (disable: bit 0 is 0)
+         keepAlive     :  bit 1
+            ...        :  bit 2
+         and so on.
+         For the above example, to set spoofing to keepAlive action,
+         the object's value will be 3 = [ 2**0 + 2**1 ] 
+         Only the Remote LANRANger will accept this object !
+                  -------                                  "
+       ::= { lanrangerSpoofingInfo 1 }
+
+  lanrangerSpoofingAgingStation  OBJECT-TYPE
+       SYNTAX Integer32 
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+         " Aging time of stations list, in min. The agent 'translates'
+           the time entered in minutes, to 10 min. resolution, as
+		   follows: 
+		   1..10  min - 10 min
+		   11..20 min - 20 min
+		   and so on...
+		   0 is not a valid value.
+           Only the Remote LANRANger will accept this object !
+                    ----------------                          "
+       ::= { lanrangerSpoofingInfo 2 }
+
+
+
+--    The variables in the lanrangerInterface group define LANRANger-specific and other
+--    link parameters and information
+
+lanrangerInterface OBJECT IDENTIFIER ::= { lanranger 2 }
+
+lanrangerLinkTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF LanrangerLinkEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+	  "A list of link entries.  The number of entries is
+	   up to 8, according to the LANRANger model."
+      ::= { lanrangerInterface 1 }
+
+lanrangerLinkEntry OBJECT-TYPE
+    SYNTAX LanrangerLinkEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+	"LANRANger-specific parameter values for a link."
+    INDEX {lanrangerLinkIndex }
+    ::= { lanrangerLinkTable 1 }
+
+LanrangerLinkEntry ::=
+    SEQUENCE {
+	lanrangerLinkIndex
+	    Integer32,
+	lanrangerLinkType
+	    INTEGER ,
+	lanrangerLinkState
+	    INTEGER,
+	lanrangerLinkDTRMode
+	    INTEGER,
+	lanrangerLinkStatus
+	    INTEGER,
+	lanrangerLinkConnectionStatus
+	    INTEGER,
+	lanrangerLinkNumOfLogLinks
+	    Integer32,
+	lanrangerLinkReset
+	    INTEGER,
+    lanrangerLinkRxMaskedFrames
+	    Counter32,
+    lanrangerLinkLayer2Type
+        INTEGER,
+    lanrangerLinkLayer3Type
+        INTEGER,
+	lanrangerBackupLink
+	    Integer32,
+    wrWanThrottle
+        Integer32,
+	wrIpTransparentMode
+		INTEGER,
+	wrIpTransparentGateway
+		IpAddress,
+	lanrangerLinkProtocolType
+        INTEGER
+    }
+
+lanrangerLinkIndex OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+	"A unique value for each link, equal to the value of ifIndex. 
+	 The value for each link must remain constant at least 
+	 from one re-initialization of the network management agent to
+	 the next."
+    ::= { lanrangerLinkEntry 1 }
+
+lanrangerLinkType OBJECT-TYPE
+     SYNTAX INTEGER { 
+         synchronous    (1),
+         asynchronous   (2),
+         x25FRconfig    (3),
+         x25FRchannel   (4),
+         isdn           (5),
+         frameRelay     (6),
+         pcmcia         (7),
+         dm2wire        (8),
+         notExist       (254),
+		 unknown        (255)
+         }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+	 "The link type ."
+     ::= { lanrangerLinkEntry 2 }
+
+lanrangerLinkState OBJECT-TYPE
+     SYNTAX INTEGER {      
+     disable(2),
+     enable (3),
+	 backup (4)
+      }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+	 "The link is  disabled, enabled or backup."
+     ::= { lanrangerLinkEntry 3 }
+
+lanrangerLinkDTRMode OBJECT-TYPE
+     SYNTAX INTEGER {  off(2), on(3), unknown(255)  }
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+	 "The link DTR mode."
+     ::= { lanrangerLinkEntry 4 }
+
+lanrangerLinkStatus OBJECT-TYPE
+     SYNTAX INTEGER { 
+     ok         (1), 
+     fail       (2), 
+     rxNoClock  (3), 
+     txProblem  (4),
+     noCarrierD (5),
+	 unknown    (255)
+      }
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+	 "The link  physical status ."
+     ::= { lanrangerLinkEntry 5 }
+
+lanrangerLinkConnectionStatus OBJECT-TYPE
+     SYNTAX INTEGER { 
+     fail      (1), 
+     disconnect(2), 
+     connect   (3),
+     wait      (4),
+     down      (5),
+	 trying    (6),
+	 testing   (7),
+	 unknown   (255)
+     }
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+	 "The link connection status."
+     ::= { lanrangerLinkEntry 6 }
+
+lanrangerLinkNumOfLogLinks OBJECT-TYPE
+     SYNTAX Integer32	
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+	 "The number of logical links on this physical link.
+	  0 = noLogicalLink "
+     ::= { lanrangerLinkEntry 7 }
+
+lanrangerLinkReset OBJECT-TYPE
+     SYNTAX   INTEGER {     
+     off(2),
+     on (3)  
+     }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+	 "Setting this attribute to ON will reset the link . Upon completion the value will be set to OFF"
+     ::= { lanrangerLinkEntry 8 }
+
+lanrangerLinkRxMaskedFrames OBJECT-TYPE
+     SYNTAX  Counter32
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+	 "The number of masked frames received on this physical link."
+     ::= { lanrangerLinkEntry 9 }
+
+lanrangerLinkLayer2Type OBJECT-TYPE
+     SYNTAX INTEGER {
+              unknown         (1),
+              bridge          (2),
+              ipRouter        (3),
+              ipxRouter       (4),
+              ipAndIpxRouter  (5),
+              bRouter         (6),
+			  ipBrouter       (7),
+			  ipxBrouter      (8),
+			  ipAndIpxBrouter (9),
+			  bridgeAndStp    (10)
+              }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "The link layer 2 type indicates whether the link is Bridge 
+          or Router	and specifies the Router's type."
+     ::= { lanrangerLinkEntry 10 }
+
+lanrangerLinkLayer3Type OBJECT-TYPE
+     SYNTAX INTEGER {
+              unknown        (1),
+              proprietary    (2),
+			  terminalServer (3),
+              slip          (30),
+              cSlip         (31),
+              ppp           (40),
+			  rfc1490       (41),
+			  hdlcFraming   (42),
+			  mlPpp         (43)
+              }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+         "The link layer 3 type indicates the protocol type."
+     ::= { lanrangerLinkEntry 11 }
+
+lanrangerBackupLink OBJECT-TYPE
+     SYNTAX   Integer32
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+	 "The backup link interface index located in the two LSB bytes. 
+	  If the link is FR type, the two MSB will contain a DLCi number. 
+	  For other link types the two MSB will equal to 0."
+     ::= { lanrangerLinkEntry 12 }
+
+wrWanThrottle OBJECT-TYPE
+     SYNTAX   Integer32
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+	 "Throttle controls the baud rate of the WAN.
+      For example if we have a WAN rate of 2M but we want only 1/2 M as 
+      the baud rate we set the Wan Throttle to 512k.
+      
+      These are the values:
+      Full (2),
+      1M (3),
+      512k (4),
+      128k (5),
+      64k (6)
+      
+      Full throttle option (2) means  the LAN rate."
+     ::= { lanrangerLinkEntry 13 }
+
+wrIpTransparentMode OBJECT-TYPE
+     SYNTAX INTEGER {
+     notApplicable  (1),
+     disable        (2),
+	 enableAll      (3)
+     }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+     "This parameter shows whether the IP Transparent mode is enabled.
+      When this mode is enabled, all frames (including broadcast and multicast frames)
+      are forwarded from E1/T1 to LAN and from LAN to E1/T1."
+     ::= { lanrangerLinkEntry 14 }
+
+wrIpTransparentGateway OBJECT-TYPE
+     SYNTAX  IpAddress
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+     "The gateway used for transparent IP."
+     ::= { lanrangerLinkEntry 15 }
+
+lanrangerLinkProtocolType OBJECT-TYPE
+     SYNTAX INTEGER {
+     notApplicable  	(1),
+     noRoutingProtocol  (2),
+	 rip1      			(3),
+	 rip2				(4),
+	 rip1OrRip2 		(5),
+	 ospf				(6)
+     }
+     MAX-ACCESS read-write
+     STATUS current
+     DESCRIPTION
+     "This parameter indicates the routing protocol running on this Interface."
+     ::= { lanrangerLinkEntry 16}
+
+
+--Link Connections
+
+lanrangerLinkConnection OBJECT IDENTIFIER
+     ::= { lanrangerInterface 2 }
+
+   lanrangerConnMaxEntries OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+        "The maximum number of entries in the Connection table."
+      ::= { lanrangerLinkConnection 1 }
+
+   lanrangerConnCurrentEntries OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+        "The current number of entries in the Connection table."
+      ::= { lanrangerLinkConnection 2 }
+
+   lanrangerLinkConnTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF LanrangerLinkConnEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+         "A list of Connection entries.  The number of entries is
+          up to Max entries, according to the LANRANger model."
+      ::= { lanrangerLinkConnection 3 }
+
+   lanrangerLinkConnEntry OBJECT-TYPE
+     SYNTAX LanrangerLinkConnEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+        "Information about LANRANger Connection."
+     INDEX {lanrangerLinkConnPhysLink, lanrangerLinkConnAid,
+            lanrangerLinkConnMacAddr }
+     ::= { lanrangerLinkConnTable 1 }
+
+   LanrangerLinkConnEntry ::=
+       SEQUENCE {
+           lanrangerLinkConnPhysLink
+               Integer32 ,
+           lanrangerLinkConnAid
+               Integer32,
+           lanrangerLinkConnMacAddr
+               MacAddress,  
+           lanrangerLinkConnStatus
+               INTEGER,
+           lanrangerLinkConnDeviceType
+               INTEGER,
+           lanrangerLinkConnDeviceName
+               DisplayString,
+           lanrangerLinkConnDeviceSWVer
+               DisplayString,
+           lanrangerLinkConnNumLanStation
+               Integer32,
+           lanrangerLinkSyncStatus
+               INTEGER
+   	}
+   
+   lanrangerLinkConnPhysLink OBJECT-TYPE
+        SYNTAX Integer32  
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The lanrangerLinkIndex for the physical link with which this logical link is associated."
+         ::= { lanrangerLinkConnEntry 1 }
+           
+   lanrangerLinkConnAid OBJECT-TYPE
+       SYNTAX Integer32 
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+           "A unique value for each logical link.  The maximum number 
+            of logical links is 256, according to the LANRANger model.  
+            The value for each logical link must remain constant at least 
+            from one re-initialization of the network management agent to
+            the next.  This index is the SPS address of the logical link.
+            noLogicLink = 65535"
+       ::= { lanrangerLinkConnEntry 2 }
+   
+   lanrangerLinkConnMacAddr OBJECT-TYPE
+       SYNTAX  MacAddress
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+           "The MAC address of the device that the logical link is connected to
+            on the remote LAN."
+     ::= { lanrangerLinkConnEntry 3 }
+   
+   lanrangerLinkConnStatus OBJECT-TYPE
+     SYNTAX INTEGER { 
+              unknown        (1), -- for router link
+              none           (2), -- no connection
+              fail           (3),
+              connect        (4),
+              wait           (5),
+              down           (6)
+             }
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+         "The link connection status."
+     ::= { lanrangerLinkConnEntry 4 }
+   
+   lanrangerLinkConnDeviceType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                      tre1      (1),
+                      tre8      (2),
+                      tre1D     (3),
+                      tre8D     (4),
+                      tre8M     (5),
+                      rrTre     (6),
+                      rrTre1D   (7),
+                      rrTre8D   (8),
+                      iTre1     (9),
+                      iTre2     (10),
+                      mpTre8    (11),
+                      kTre8     (12),
+                      treRasA   (13),
+                      treRasS   (14),
+                      trePCAsync(15),
+                      trePCSync (16),
+                      mbe1      (17),
+                      mbe8      (18),
+                      mbe1D     (19),
+                      mbe8D     (20),
+                      ete8M     (21),
+                      iEre1     (22),
+                      iEe2      (23),
+                      mpMbe8    (24),
+                      kMbe8     (25),
+                      mbePCAsync(26),
+                      mbePCSync (27),
+                      mbeRasA   (28),
+                      mbeRasS   (29),
+   	        other(255)  
+                   }
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+               "The type of device that the logical link is connected to on the remote LAN."
+       ::= { lanrangerLinkConnEntry 5 }
+   
+   lanrangerLinkConnDeviceName  OBJECT-TYPE
+       SYNTAX  DisplayString  
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+            "The logical name of the device that the logical link is connected to on the remote LAN."
+       ::= { lanrangerLinkConnEntry 6 }
+
+   lanrangerLinkConnDeviceSWVer  OBJECT-TYPE
+       SYNTAX  DisplayString  
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+            "SW Version of the device that the logical link is 
+             connected to, on the remote LAN."
+       ::= { lanrangerLinkConnEntry 7 }
+
+   lanrangerLinkConnNumLanStation OBJECT-TYPE
+     SYNTAX Integer32 
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+         "The number of stations of the remote LAN."
+     ::= { lanrangerLinkConnEntry 8 }
+
+lanrangerLinkSyncStatus OBJECT-TYPE
+     SYNTAX INTEGER { 
+              synchronized        (1), 
+              syncNotObtained     (2), 
+              waitForSync         (3),
+              codDisconnected     (4),
+              lcp                 (5),
+              ip                  (6),
+              ipvj                (7),
+              ipx                 (8),
+              ipIpx               (9),
+              ipvj-ipx            (10),
+              mlPpp               (11),
+              mlPpp-ip            (12),
+              mlPpp-ip-ipvj       (13),
+              mlPpp-ip-ipx        (14),
+              mlPpp-ipvj-ipx      (15),
+              mlPpp-ipx           (16),
+              frUp                (17),
+              frDown              (18),
+              dlciUp              (19),
+              dlciDown            (20),
+              extLoop             (21),
+              ipcp                (22),
+              lcpIpcp             (23),
+			  redAlarm            (24),
+			  yellowAlarm         (26),
+			  localSyncLoss       (27),
+			  remoteSyncLoss      (28),
+			  networkLoop         (29),
+			  networkLoopRedAlarm (30),
+			  networkLoopYelAlarm (31),
+			  networkLocSyncLoss  (32),
+			  networkRemSyncLoss  (33),
+			  fdlLoop             (34),
+			  fdlLoopRedAlarm     (35),
+			  fdlLoopYellowAlarm  (36),
+			  fdlLoopLocSyncLoss  (37),
+			  fdlLoopRemSyncLoss  (38),
+			  loopback            (39),  -- User Loop
+			  loopbackLocSyncLoss (40),
+			  loopbackRemSyncLoss (41)			  
+             }
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+         "The Sync link status."
+     ::= { lanrangerLinkConnEntry 9 }
+
+
+--Modem Table
+
+lanrangerModemTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF LanrangerModemEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "A list of Modem entries.  The number of entries is
+           up to ifIndex."
+      ::= { lanrangerInterface 3 }
+
+lanrangerModemEntry OBJECT-TYPE
+    SYNTAX LanrangerModemEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "LANRANger-specific parameter values for a Modem."
+    INDEX {lanrangerModemLinkIndex }
+    ::= { lanrangerModemTable 1 }
+
+LanrangerModemEntry ::=
+    SEQUENCE {
+        lanrangerModemLinkIndex
+            Integer32,
+        lanrangerModemName
+            DisplayString,
+        lanrangerModemSettingString
+            DisplayString,
+        lanrangerModemAutobaudingSpeed
+            INTEGER,
+        lanrangerModemResetBeforeSetup
+            INTEGER,
+        lanrangerModemAnalyzeAnswers
+            INTEGER,
+        lanrangerModemSpeaker
+            INTEGER,
+        lanrangerModemDialingNumber
+            DisplayString,
+        lanrangerModemDialRetries             
+            Integer32,
+        wrLocalDialBackNumber
+            DisplayString,
+        wrRingsBeforeAnswer
+            Integer32
+   }
+
+lanrangerModemLinkIndex OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A list of asynchronous ports of the link, according to 
+         ifIndex. 
+         Synchronous ports will not appear in this table. Their
+         port number will be skipped."
+    ::= { lanrangerModemEntry 1 }
+
+
+lanrangerModemName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The Modem Name identifier for MBE/TRE.
+         Up to 50 characters."
+    ::= { lanrangerModemEntry 2 }
+
+lanrangerModemSettingString OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Modem setting String.
+         Up to 80 characters."
+    ::= { lanrangerModemEntry 3 }
+
+
+lanrangerModemAutobaudingSpeed OBJECT-TYPE
+     SYNTAX  INTEGER {
+                 disable(2),
+                 enable (3)
+             }
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+         "Enable or disable autobauding.
+          When the Autobauding feature is enabled, the MBE/TRE 
+          automatically ranges over various Baud rates, starting 
+          with 115.2 Kbps, until the correct Baud rate of the modem 
+          is detected. "
+    ::= { lanrangerModemEntry 4 }
+
+
+lanrangerModemResetBeforeSetup OBJECT-TYPE
+     SYNTAX  INTEGER {
+                 no (2),
+                 yes(3)
+             }
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+         "Reset the modem before setup is performed.
+          It is recommended to reset the modem before  modem setup 
+          session.     "
+    ::= { lanrangerModemEntry 5 }
+
+
+lanrangerModemAnalyzeAnswers OBJECT-TYPE
+     SYNTAX  INTEGER {
+                 disable(2),
+                 enable (3)
+             }
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+         "Enable this option if a modem using non-standard answering is used.
+          When this mode is enabled, the MBE/TRE awaits modem answers
+          'CONNECT', 'CARRIER', or 'OK', after it transmits a modem command.
+          Modem answers acknowledge, that a specific command has been executed.
+          If this option is not enabled, the MBE/TRE waits for a modem answer
+          for three seconds. If no answer has been received during this period,
+          the MBE/TRE continues functioning as if the modem command was successfully
+          executed. However, when dialing out, the MBE/TRE waits for one minute 
+          for connection."
+    ::= { lanrangerModemEntry 6 }
+
+lanrangerModemSpeaker OBJECT-TYPE
+     SYNTAX  INTEGER {
+                 off (2),
+                 on  (3)
+             }
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+         "Toggle the Modem Speaker On or Off . "
+    ::= { lanrangerModemEntry 7 }
+
+
+lanrangerModemDialingNumber OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        " Various command switches listed in Modem Dialing Number Menu
+          allows selection of tone, pulse-dialing, or various wait states.
+          P - Set Pulse dialing number .
+          T - Set Tone  dialing number .
+          W - Wait for dialing tone before proceeding.
+          ' - Pause for 2 seconds .
+          @ - Wait for silence, one ring, followed by 5 sec. of silence .
+
+          The Dialing Number will include both digits and letter/s 
+          of the command switches. The order and validity will be 
+          on user's responsibility.   
+          The DisplayString can have up to 40 characters."
+    ::= { lanrangerModemEntry 8 }
+
+
+wrLocalDialBackNumber OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        " This is the number that the Remote Modem will use to call the local
+          Modem at Dial Back.
+
+          Various command switches listed in Modem Dialing Number Menu
+          allows selection of tone, pulse-dialing, or various wait states.
+          P - Set Pulse dialing number .
+          T - Set Tone  dialing number .
+          W - Wait for dialing tone before proceeding.
+          ' - Pause for 2 seconds .
+          @ - Wait for silence, one ring, followed by 5 sec. of silence .
+
+          The Dialing Number will include both digits and letter/s 
+          of the command switches. The order and validity will be 
+          on user's responsibility.   
+          The DisplayString can have up to 40 characters."
+    ::= { lanrangerModemEntry 9 }
+
+
+wrRingsBeforeAnswer  OBJECT-TYPE
+     SYNTAX  Integer32 
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+            "Determines which ring the modem will wait to answer the
+            phone on."
+    ::= { lanrangerModemEntry 10 }          
+                  
+
+
+lanrangerModemDialRetries OBJECT-TYPE
+      SYNTAX  Integer32  (0..8)
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+           "The number of dialing retries requested.
+            Default = 0"
+      ::= { lanrangerModemEntry 11}
+
+--Packet Switch Table
+
+lanrangerLinkPktSwTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF LanrangerLinkPktSwEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "A list of X.25/FR modules entries.  The number of entries is
+           up to ifIndex."
+      ::= { lanrangerInterface 4 }
+
+lanrangerLinkPktSwEntry OBJECT-TYPE
+    SYNTAX LanrangerLinkPktSwEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "LANRANger-specific parameter values for  X.25/FR modules."
+    INDEX {lanrangerLinkPktSwIndex }
+    ::= { lanrangerLinkPktSwTable 1 }
+
+LanrangerLinkPktSwEntry ::=
+    SEQUENCE {
+        lanrangerLinkPktSwIndex
+            Integer32,
+        lanrangerLinkPktSwType
+            INTEGER,
+        lanrangerLinkPktSwControlSignal
+            INTEGER,
+        lanrangerLinkPktSwSpeed
+            Integer32,
+        lanrangerLinkPktSwConfigParity
+            INTEGER,
+        lanrangerLinkPktSwConfigStopBit
+            INTEGER,
+        lanrangerLinkPktSwResetModule
+            INTEGER
+       }
+
+lanrangerLinkPktSwIndex OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "A unique value for each X.25/FR of the link, according to 
+         numbering system of ifIndex. The maximum number of links is 
+         ifIndex. The value for each link must remain constant at 
+         least from one re-initialization of the network management 
+         agent to the next."
+    ::= { lanrangerLinkPktSwEntry 1 }
+
+lanrangerLinkPktSwType OBJECT-TYPE
+    SYNTAX INTEGER {
+            x25FRChannel (1),
+            x25FRConfig  (2)
+            }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Packet Switch Type."
+    ::= { lanrangerLinkPktSwEntry 2 }
+
+lanrangerLinkPktSwControlSignal OBJECT-TYPE
+    SYNTAX INTEGER {
+            off(2),
+            on (3)
+            }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Packet Switch control command. "
+    ::= { lanrangerLinkPktSwEntry 3 }
+
+lanrangerLinkPktSwSpeed OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The Pkt Switch  port's speed in bits per second.
+         Range: 1200bps .. 1544000bps"
+    ::= { lanrangerLinkPktSwEntry 4 }
+
+lanrangerLinkPktSwConfigParity OBJECT-TYPE
+    SYNTAX INTEGER { none(1), odd(2), even(3), notApplicable(255)}
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The Pkt Switch Config port's character parity bit.
+         Applicable only for x25FRConfigChannel. For x25FRChannel
+         the value notApplicable applies."
+    ::= { lanrangerLinkPktSwEntry 5 }
+
+lanrangerLinkPktSwConfigStopBit OBJECT-TYPE
+    SYNTAX INTEGER { one(1), two(2), notApplicable(255) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "The Pkt Switch Config port's number of stop bits.
+         Applicable only for x25FRConfigChannel. For x25FRChannel
+         the value notApplicable applies."
+    ::= { lanrangerLinkPktSwEntry 6 }
+
+lanrangerLinkPktSwResetModule OBJECT-TYPE
+    SYNTAX INTEGER { 
+    off(2),
+    on (3) 
+    }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Reset command to Pkt Switch module. 
+         Applicable only for x25FRChannel.
+         The command will have no effect on x25FRConfigChannel."
+    ::= { lanrangerLinkPktSwEntry 7 }
+
+
+
+-- lanrangerStation group contains a list of remote workstations and related information
+
+lanrangerStation OBJECT IDENTIFIER ::= {lanranger 3}
+
+lanrangerStationTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF LanrangerStationEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+		      "A table that contains information about the stations 
+		       on the remote LAN(s).
+		       A remote LANRANger contains a list of stations on its 
+		       LAN, while a main LANRANger contains a list of 
+		       stations at all the remote sites it is connected to."
+      ::= { lanrangerStation 1 }
+
+lanrangerStationEntry OBJECT-TYPE
+     SYNTAX LanrangerStationEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+	      "Information about a specific station, that the LANRANger 
+	       lists as being on a remote LAN."
+ INDEX { lanrangerStationPhysLink, lanrangerStationLogLink,	lanrangerStationAddress}
+    ::= { lanrangerStationTable 1 }
+
+LanrangerStationEntry ::=
+      SEQUENCE {
+	lanrangerStationPhysLink
+	      Integer32,
+	lanrangerStationLogLink
+	      Integer32,
+	lanrangerStationAddress
+	      MacAddress,
+	lanrangerStationStatus
+	      INTEGER,
+	lanrangerStationSpoofingStatus
+	      INTEGER
+      }
+
+lanrangerStationPhysLink OBJECT-TYPE
+     SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	    "The number of the physical link that is connected to the 
+	     remote LAN on which the station with the associated 
+	     instance of lanrangerStationAddress is located. The number 
+	     is the same as the ifIndex of the link. The value will be 
+	     zero on a remote LANRANger"
+    ::= { lanrangerStationEntry 1 }
+
+lanrangerStationLogLink OBJECT-TYPE
+     SYNTAX  Integer32 
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+	   "The number of the logical link that is connected
+	    to the remote LAN on which the station with the associated 
+	    instance of lanrangerStationAddress	is located.  The value 
+	    will be zero on a remote LANRANger.
+	    noLogicLink = 65535"
+     ::= { lanrangerStationEntry 2 }
+
+lanrangerStationAddress OBJECT-TYPE
+     SYNTAX  MacAddress
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+	     "The unicast MAC address  of a station that the LANRANger 
+	     lists as being on a remote LAN."
+     ::= { lanrangerStationEntry 3 }
+
+lanrangerStationStatus OBJECT-TYPE
+     SYNTAX  INTEGER {
+		 unknown(1),
+		 learned(2),
+		 self   (3),
+		 static (4)
+	     }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+	 "The status of this entry.  The meanings of the
+      values are:
+		unknown(1) : 
+	    learned(2) : the value of the corresponding 
+		       	   instance of lanrangerStationAddress was
+			       learned and is being used.
+
+		self(3)    : the value of the corresponding
+			         instance of lanrangerStationAddress
+			         represents the LANRANger's address.
+			           
+
+		static(4)  : the value of the corresponding
+			         instance of lanrangerStationAddress is
+			         also the value of an existing
+			         instance of lanrangerStaticAddress."
+      ::= { lanrangerStationEntry 4 }
+
+lanrangerStationSpoofingStatus OBJECT-TYPE
+   SYNTAX  INTEGER { 
+   off(2),
+   on (3) 
+   }
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+     "The spoofing status of this entry."
+     ::= { lanrangerStationEntry 5 }
+
+
+
+lanrangerLanMaxStations OBJECT-TYPE
+   SYNTAX  Integer32
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+     "The maximum number of stations in the station table."
+     ::= { lanrangerStation 2 }
+
+lanrangerLanCurrentStations OBJECT-TYPE
+   SYNTAX  Integer32
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+     "The current number of stations in the station table."
+     ::= { lanrangerStation 3 }
+
+--Permanent Stations
+
+
+lanrangerPermanentStation OBJECT IDENTIFIER
+     ::= { lanrangerStation 4 }
+
+   lanrangerPermanentMaxEntries OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+        "The maximum number of entries in the permanent stations table."
+      ::= { lanrangerPermanentStation 1 }
+
+   lanrangerPermanentCurrentEntries OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+        "The current number of entries in the permanent stations table."
+      ::= { lanrangerPermanentStation 2 }
+
+
+   lanrangerPermanentTable OBJECT-TYPE
+      SYNTAX  SEQUENCE OF LanrangerPermanentEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+          "A table containing address information
+           configured into the LANRANger by (local or network)
+           management, specifying addresses on a remote LAN. 
+           This table objects can be set only on a Remote LANRANger."
+      ::= { lanrangerPermanentStation 3 }
+
+   lanrangerPermanentEntry OBJECT-TYPE
+      SYNTAX  LanrangerPermanentEntry
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+            "Address information configured into the remote LANRANger
+             by (local or network) management specifying addresses 
+             on a remote LAN."
+      INDEX   { lanrangerPermanentIfIndex, lanrangerPermanentLogLink, 
+                lanrangerPermanentAddress }
+      ::= { lanrangerPermanentTable 1 }
+
+   LanrangerPermanentEntry ::=
+      SEQUENCE {
+        lanrangerPermanentIfIndex 
+   	  	Integer32,
+        lanrangerPermanentLogLink 
+		Integer32,
+        lanrangerPermanentAddress
+        MacAddress,
+        lanrangerPermanentOperation
+        INTEGER
+         }
+   lanrangerPermanentIfIndex OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+            "The number of the physical link that is connected to 
+             the remote LAN, on which the station with the 
+             associated instance of lanrangerStationAddress is 
+             located.
+             The number is the same as the ifIndex of the link.
+             This data is interesting for main LANRANger only."
+      ::= { lanrangerPermanentEntry 1 }
+
+   lanrangerPermanentLogLink OBJECT-TYPE
+      SYNTAX  Integer32 
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+           "The number of the logical link that is connected to the
+            remote LAN, on which the station with the associated 
+            instance of lanrangerPermanentAddress is located.
+            The value will be noLogicLink on a remote LANRANger.
+            This data is interesting for main LANRANger only.
+            noLogicLink = 65535"
+      ::= { lanrangerPermanentEntry 2 }
+
+   lanrangerPermanentAddress OBJECT-TYPE
+      SYNTAX  MacAddress
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+             "The  MAC address  entered by management to this entry. 
+              Only the remote LANRANger will accept Set for this object !
+                       ----------------                          "
+      ::= { lanrangerPermanentEntry 3 }
+
+   lanrangerPermanentOperation OBJECT-TYPE
+      SYNTAX  INTEGER {
+                     active (1),
+                     delete (2)
+             }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+             "This object indicates the status of this entry.
+                active(1) - this entry is currently in use
+                            and will remain so even after the next
+                            reset of the LANRANger.
+                delete(2) - writing this value to the object
+                            removes the corresponding entry. 
+              Only the remote LANRANger will accept Set for this object !
+                       ----------------               "
+      ::= { lanrangerPermanentEntry 4 }
+
+
+--IP Stations
+
+lanrangerIpStation OBJECT IDENTIFIER
+     ::= { lanrangerStation 5 }
+
+   lanrangerIpPermanentAvailableEntries OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+        "The available number of entries in the IP permanent stations 
+         table."
+      ::= { lanrangerIpStation 1 }
+
+   lanrangerIpPermanentCurrentEntries OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+        "The current number of entries in the IP permanent station table."
+      ::= { lanrangerIpStation 2 }
+
+
+-- The IP Permanent Stations table will be supported via the 
+-- IP Forward table of RFC1354.MIB.
+
+
+  lanrangerSpoofingStation  OBJECT IDENTIFIER
+       ::= {lanrangerStation 6}
+
+  lanrangerSpoofingMaxEntries OBJECT-TYPE
+	   SYNTAX Integer32
+	   MAX-ACCESS read-only
+	   STATUS current
+	   DESCRIPTION
+	      "The maximum number of entries in the Spoofing station
+		   table."
+	   ::= {lanrangerSpoofingStation 1}
+
+  lanrangerSpoofingCurrentEntries OBJECT-TYPE
+	   SYNTAX Integer32
+	   MAX-ACCESS read-only
+	   STATUS current
+	   DESCRIPTION
+	      "The current number of entries in the Spoofing station
+		   table."
+	   ::= {lanrangerSpoofingStation 2}
+
+  lanrangerSpoofingTable OBJECT-TYPE
+       SYNTAX SEQUENCE OF LanrangerSpoofingEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "A list of Spoofing entries. The number of entries is 
+           up to the current number of entries, according to the 
+           LANRANger model. 
+           Only the LOCAL LANRANger will show this table !
+                    ---------------                          "
+
+       ::= { lanrangerSpoofingStation 3 }
+
+    lanrangerSpoofingEntry OBJECT-TYPE
+       SYNTAX  LanrangerSpoofingEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Spoofing parameters per entry of the Spoofing table."
+       INDEX   {lanrangerSpoofingGroup,  lanrangerSpoofingMacAddress }
+       ::= { lanrangerSpoofingTable 1 }
+
+    LanrangerSpoofingEntry ::=
+       SEQUENCE {
+              lanrangerSpoofingGroup
+			  Integer32,
+              lanrangerSpoofingMacAddress
+               MacAddress ,
+              lanrangerSpoofingAging
+               Integer32,
+			  lanrangerSpoofingTimeLeft
+			   Integer32
+          }
+
+      lanrangerSpoofingGroup   OBJECT-TYPE 
+          SYNTAX  Integer32 
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+             " 	The spoofing group.
+                Only the LOCAL Lanranger will show this table !   "
+          ::= {  lanrangerSpoofingEntry 1 }
+
+
+      lanrangerSpoofingMacAddress   OBJECT-TYPE 
+          SYNTAX  MacAddress 
+          MAX-ACCESS  read-only
+          STATUS  current
+          DESCRIPTION
+             " 	MAC Address of the Remote Lanrangers.
+                Only the LOCAL Lanranger will show this table !   "
+          ::= {  lanrangerSpoofingEntry 2 }
+
+      lanrangerSpoofingAging OBJECT-TYPE
+           SYNTAX Integer32 
+           MAX-ACCESS read-only
+           STATUS current
+           DESCRIPTION
+              " Aging time defined for a whole group, in minutes.      
+                Only the LOCAL Lanranger will show this table !   "
+           ::= { lanrangerSpoofingEntry 3 }
+
+      lanrangerSpoofingTimeLeft OBJECT-TYPE
+           SYNTAX Integer32 
+           MAX-ACCESS read-only
+           STATUS current
+           DESCRIPTION
+              " Time until aging expires, per station, in minutes.      
+                Only the LOCAL Lanranger will show this table !   "
+           ::= { lanrangerSpoofingEntry 4 }
+
+
+--PPP Table for the WebRanger
+
+wrPPPTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF WrPPPEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "This table contains only parameters that do not exist in the PPP
+           standard MIBS.
+           The table contains a list of PPP entries.  
+           The number of entries is up to ifIndex."
+      ::= { lanrangerInterface 5 }
+      
+wrPPPEntry OBJECT-TYPE
+    SYNTAX WrPPPEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "LANRANger-specific parameter values for a PPP."
+    INDEX {ifIndex }
+    ::= { wrPPPTable 1 }
+
+WrPPPEntry ::=
+    SEQUENCE {
+        wrPPPCompressionHeaderField				INTEGER,
+        wrPPPCompressionProtocolFields			INTEGER,
+        wrPPPSTACCompressionType				INTEGER,
+	    wrPPPAuthProtocol						INTEGER,
+	    wrPPPSecurityType						INTEGER,
+	    wrPPPUserName							SnmpAdminString,
+	    wrPPPPassword							SnmpAdminString,
+	    wrPPPLinkActiveTime						Integer32,
+        wrPPPIPCPSubnetMaskNegotiation			InterfaceIndexOrZero,
+		wrPPPLinkControlProtocolStatus			INTEGER,
+		wrPPPAuthenticationStatus				INTEGER,
+		wrPPPIpcpStatus							INTEGER,
+		wrPPPAssignedIPAddress					IpAddress,
+	    wrPPPActualAuthProtocol					INTEGER,
+		wrPPPIpTranslationMode					INTEGER,
+		wrPPPTranslatedIpAddr					IpAddress
+         }
+
+wrPPPCompressionHeaderField OBJECT-TYPE
+    SYNTAX INTEGER
+	    { compressionOff (2),
+		  compressionOn (3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION "This configuration option provides a method to negotiate the
+                 compression of the Data Link Layer Address and Control fields.
+                 This configuration option is sent to inform the peer that the
+                 implementation can receive compressed Address and Control fields."
+    ::= { wrPPPEntry 1 }
+
+wrPPPCompressionProtocolFields OBJECT-TYPE
+    SYNTAX INTEGER
+	    { compressionOff (2),
+		  compressionOn (3) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION "This configuration option provides a method to negotiate the
+                 compression of the PPP Protocol field. This configuration option
+                 is sent to inform the peer that the implementation can receive
+                 such single octet Protocol fields. "
+    ::= { wrPPPEntry 2 }
+
+wrPPPSTACCompressionType OBJECT-TYPE
+    SYNTAX INTEGER
+	    { disable (1),
+		  noHistory (2),
+		  lCB (3),
+		  sequence (4),
+		  extended (5) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION "The PPP compression control protocol provides a method to negotiate
+                 and utilize compression protocol over PPP encapsulated links. 
+                 These are Different types of data compression algorithm for PPP
+                 encapsulated packets. "
+    ::= { wrPPPEntry 3 }
+
+wrPPPAuthProtocol OBJECT-TYPE
+    SYNTAX INTEGER
+            { 
+		noneNone (1), 
+		chapNone (2), 
+		chapPap (3), 
+		chapChap (4), 
+		papNone (5), 
+		papPap (6)
+		 }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+	"The type of authentication protocol being used. The left parameter
+         is the maximum authentication, the right parameter is minimum authentication."
+    ::= { wrPPPEntry 4 }
+
+wrPPPSecurityType OBJECT-TYPE
+    SYNTAX INTEGER
+            { 
+		host (1),
+		guest (2) 
+		}
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+	"Type of unit."
+    ::= { wrPPPEntry 5 }
+
+
+wrPPPUserName OBJECT-TYPE
+    SYNTAX SnmpAdminString (SIZE (0..36))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+	"PPP User name."
+    ::= { wrPPPEntry 6 }
+
+wrPPPPassword OBJECT-TYPE
+    SYNTAX SnmpAdminString (SIZE (0..36))
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+	"PPP Password ."
+    ::= { wrPPPEntry 7 }
+
+wrPPPLinkActiveTime OBJECT-TYPE
+    SYNTAX Integer32 
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+	"PPP link active time in seconds 
+	Values range: 2 - 900.
+	Default value = 2     "
+    ::= { wrPPPEntry 8 }
+
+wrPPPIPCPSubnetMaskNegotiation OBJECT-TYPE
+    SYNTAX InterfaceIndexOrZero
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+	"This object indicates the ifIndex of the link (LAN port)
+	 through which IPCP Subnet Mask negotiation is allowed.
+	 The distinguished value of zero may be used if no link
+	 is enabled for IPCP Subnet Mask negotiation.
+	   
+	 For LA-110, IPCP Subnet Mask support allows Customer Premises 
+	 Equipment (CPE) to connect to a Broadband Access Server (BAS)
+	 and obtain an IP address and subnet range that the CPE can
+	 use to populate the DHCP server database. The IP address
+     is also used to configure an IP interface over the LAN port.
+     The IP Address is dynamically allocated by the DHCP Server,
+     using the DHCP Pool that was allocated over the PPP connection.
+     In order to connect one of the LANs to Subnet Mask Negotiation, 
+     its IP Address should be 0.0.0.0. When the IP Address is allocated
+     from the PPP, the 0.0.0.0 IP Address is replaced in the data base 
+     by the allocated IP Address. Only one Subnet Mask Negotiation on WAN
+     interface can be enabled at the same time in order to avoid 
+     allocating the LAN IP address according to a few WAN
+     interfaces (a one-on-one connection). 
+     The linked LAN interface can be deleted only after disabling the
+     Subnet Mask Negotiation on the PPP connection."
+    ::= { wrPPPEntry 9 }
+
+ wrPPPLinkControlProtocolStatus   OBJECT-TYPE
+    SYNTAX INTEGER
+            { 
+		notApplicable (1),
+		close         (2),
+		open          (3) 
+		}
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+	"PPP Link Control Protocol(LCP) Status"
+    ::= { wrPPPEntry 10 }	
+    	
+wrPPPAuthenticationStatus   OBJECT-TYPE
+    SYNTAX INTEGER
+        { 
+		notApplicable (1),
+		failed        (2),
+		passed        (3) 
+		}
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+	"PPP Authentication status."
+    ::= { wrPPPEntry 11 }
+
+wrPPPIpcpStatus       OBJECT-TYPE
+    SYNTAX INTEGER
+        { 
+		notApplicable (1),
+		close         (2),
+		open          (3) 
+		}
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+	"IPCP (IP Control Protocol) status."
+    ::= { wrPPPEntry 12}
+
+wrPPPAssignedIPAddress       OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+	"IP Address assigned by PPP."
+    ::= { wrPPPEntry 13} 
+
+wrPPPActualAuthProtocol OBJECT-TYPE
+    SYNTAX INTEGER
+	{ 
+		none		(1), 
+		pap			(2), 
+		chap		(3)
+	}
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+	"The Actual type of Authentication Protocol that is used."
+    ::= { wrPPPEntry 14 }
+
+wrPPPIpTranslationMode OBJECT-TYPE
+	SYNTAX		INTEGER
+	{ 
+		disable		(2),
+		enable 		(3)
+	}
+	MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION
+   	"This object enables the IP Translation Mode."
+    ::= { wrPPPEntry 15 }
+
+wrPPPTranslatedIpAddr OBJECT-TYPE
+	SYNTAX		IpAddress
+	MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION
+   	"This object represents the Translated IP Address.
+   	 It is relevant only when IP Translation Mode is 'enable'."
+    ::= { wrPPPEntry 16 }
+
+
+-- ML-PPP (Multilink PPP) Table
+
+wrMLPPPTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF WrMLPPPEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+          "This table contains a list of ML-PPP entries."
+      ::= { lanrangerInterface 6 }
+      
+wrMLPPPEntry OBJECT-TYPE
+    SYNTAX WrMLPPPEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Specific parameter values for a ML-PPP."
+    INDEX {ifIndex }
+    ::= { wrMLPPPTable 1 }
+
+WrMLPPPEntry ::=
+    SEQUENCE {
+        wrMLPPPEpDiscriminatorEnable  INTEGER,
+		wrMLPPPReorderingEnable       INTEGER,
+		wrMLPPPTxQueueSize            Unsigned32
+         }
+
+wrMLPPPEpDiscriminatorEnable OBJECT-TYPE
+	SYNTAX INTEGER {
+    	no	(2),
+    	yes	(3)
+	}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+    	"Indicates whether the Endpoint Discriminator Option is enabled.
+    	 
+    	 The Endpoint Discriminator Option represents identification of the
+		 system transmitting the packet.  This option advises a system that
+		 the peer on this link could be the same as the peer on another
+		 existing link.  If the option distinguishes this peer from all
+		 others, a new bundle MUST be established from the link being
+		 negotiated.  If this option matches the class and address of some
+		 other peer of an existing link, the new link MUST be joined to the
+		 bundle containing the link to the matching peer or MUST establish a
+		 new bundle.
+		 
+		 For more information about the Endpoint Discriminator Option -
+		 see RFC-1990 (The PPP Multilink Protocol)."
+	::= { wrMLPPPEntry 1 }
+
+wrMLPPPReorderingEnable OBJECT-TYPE
+	SYNTAX INTEGER {
+		notApplicable (1),
+    	no            (2),
+    	yes           (3)
+                    }
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+	"Indicates whether packets reordering option is enabled.
+    	 yes - packets received from MLPPP not in order are 
+    	       reordered, according to sequence number, 
+    	       before being transmitted to egress port.
+    	 no -  received packets are transmitted in the 
+    	       same order as they arrived."
+	::= { wrMLPPPEntry 2 }
+
+wrMLPPPTxQueueSize OBJECT-TYPE
+	SYNTAX Unsigned32
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+	"Indicates the number of frames in the Tx Queue."
+	::= { wrMLPPPEntry 3 }
+
+-- PPPoE (Point-to-Point Protocol over Ethernet)
+
+pPPoE       OBJECT IDENTIFIER ::= { lanrangerInterface 7 }
+
+pPPoETable OBJECT-TYPE
+    SYNTAX SEQUENCE OF PPPoEEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The PPPoE (Point-to-Point Protocol over Ethernet) Table."
+    ::= { pPPoE 1 }
+
+pPPoEEntry OBJECT-TYPE
+    SYNTAX      PPPoEEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the PPPoE Table."
+    INDEX { pPPoECnfgIdx, pPPoEID }
+    ::= { pPPoETable 1 }
+
+PPPoEEntry ::= SEQUENCE {
+    pPPoECnfgIdx                        Unsigned32,
+    pPPoEID                             Unsigned32,
+    pPPoERowStatus                      RowStatus,
+    pPPoEACName                         SnmpAdminString,
+    pPPoEServiceName                    SnmpAdminString,
+		pPPoEEntityPointer					RowPointer,
+	    pPPoESessionStatus			 		INTEGER,
+	    pPPoESessionID				 		Unsigned32,
+	    pPPoERemoteMacAddr			 		MacAddress,
+        pPPoENoOfUsages		   				Unsigned32,
+	    pPPoESchedRestartMode		 		INTEGER,
+	    pPPoESchedRestartTime		 		DisplayString,
+        pPPoESchedRestartRandomRange		Unsigned32,
+	    pPPoESchedRestartActualTime	 		DisplayString,
+		pPPoEInitDelayRandomRange			Unsigned32,
+		pPPoEInitActualDelay				Unsigned32,
+		pPPoEVlanTagging					INTEGER,
+		pPPoEVlanId							Unsigned32,
+		pPPoEVlanPriority					Unsigned32
+ }
+
+pPPoECnfgIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Usually the ifIndex of the PPP link the PPPoE session is on.
+        Some applications may use this index otherwise."
+    ::= { pPPoEEntry 1 }
+
+pPPoEID OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "PPPoE session unique identifier."
+    ::= { pPPoEEntry 2 }
+
+pPPoERowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables the user to create/delete entries in this table."
+    ::= { pPPoEEntry 3 }
+
+pPPoEACName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The access concentrator
+         the PPPoE session should be established with."
+    ::= { pPPoEEntry 4 }
+
+pPPoEServiceName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The service requested on the PPPoE session."
+    ::= { pPPoEEntry 5 }
+
+pPPoEEntityPointer OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This parameter represents the entity (interface/port etc)
+     that is connected to this PPPoE.
+
+	 The value of this parameter is a pointer to an existing row of a table,
+	 where the entity connected to this PPPoE is defined.
+		
+	 Example:
+
+	 In case of an interface (from 2863.ifTable):
+		points to 'ifEntry' of corresponding row
+		= <ifEntry OID>.<ifIndex>
+     ."
+    ::= { pPPoEEntry 6 }
+
+pPPoESessionStatus OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            notApplicable   (1),
+            down            (2),
+            up              (3),
+            lowerLayerDown  (4),
+            adminDisabled   (5)
+        }
+    MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+        "notApplicable - none of the other states applies
+        down - session not established
+        up - session established
+        lowerLayerDown - session not established due to lower layer failure
+        adminDisabled - a user has disabled the session"
+    ::= { pPPoEEntry 7 }
+
+pPPoESessionID OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION
+    	"This object represents PPPoE Session ID."
+    ::= { pPPoEEntry 8 }
+
+pPPoERemoteMacAddr OBJECT-TYPE
+	SYNTAX		MacAddress
+	MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION
+    	"This object represents the MAC Address of the Access Concentrator,
+    	 with which the PPPoE session is established."
+    ::= { pPPoEEntry 9 }
+
+pPPoENoOfUsages OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION
+    	"This object represents the number of times this PPPoE is used."
+    ::= { pPPoEEntry 10 }
+
+pPPoESchedRestartMode OBJECT-TYPE
+	SYNTAX		INTEGER
+		{ 
+			notApplicable	(1),
+			disable			(2),
+			enable			(3) 
+		}
+	MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+    	"This object represents Scheduled Restart Mode."
+    ::= { pPPoEEntry 11 }
+
+pPPoESchedRestartTime OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+    	"This object represents Scheduled Restart Time.
+    	 It is relevant only when Scheduled Restart Mode is 'enable'."
+    ::= { pPPoEEntry 12 }
+
+pPPoESchedRestartRandomRange OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+    	"This object represents Scheduled Restart Random Range (in seconds).
+		 It is relevant only when Scheduled Restart Mode is 'enable'.
+
+		 A scheduled restart Random VALUE (number of seconds) is selected
+		 within this Random Range.
+		 
+		 This VALUE is added to configured Scheduled Restart Time, so that
+		 Actual Restart Time = Configured Restart Time + VALUE,
+		 in order to create a differentiation between all PPPoE entities
+		 with the same configured Scheduled Restart Time.
+
+		 Note:
+		 When Random Range is 0 -->
+		 Random VALUE must be 0 -->
+		 Actual Restart Time = Configured Restart Time."
+    ::= { pPPoEEntry 13 }
+
+pPPoESchedRestartActualTime OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION
+    	"This object represents Scheduled Restart Actual Time.
+		 It is relevant only when Scheduled Restart Mode is 'enable'.
+		 For calculation of this time - see pPPoESchedRestartRandomRange."
+    ::= { pPPoEEntry 14 }
+
+pPPoEInitDelayRandomRange  OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+    	"This object represents the Initialization Delay Random Range (in seconds).
+		 An initialization DELAY (number of seconds) is selected within this Random Range.
+		 
+		 This DELAY is used to delay the initialization of every PPPoE session,
+		 meaning that whenever a PPPoE session is reestablished,
+		 the device will send the first PPPoE initialization packet (PADI)
+		 only after this DELAY (in seconds).
+		 
+		 Note:
+		 When Random Range = 0 -->
+		 there will be no delay in the initialization process."
+    ::= { pPPoEEntry 15 }
+
+pPPoEInitActualDelay OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION
+    	"This object represents Initialization Delay (in seconds),
+		 as selected within Initialization Delay Random Range (pPPoEInitDelayRandomRange)."
+    ::= { pPPoEEntry 16 }
+
+pPPoEVlanTagging OBJECT-TYPE
+	SYNTAX		INTEGER
+		{ 
+			notApplicable	(1),
+			untag			(2),
+			tag				(3)
+		}
+	MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+    	"This object represents the VLAN Tagging."
+    ::= { pPPoEEntry 17 }
+
+pPPoEVlanId OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+    	"This object represents the VLAN ID."
+    ::= { pPPoEEntry 18 }
+
+pPPoEVlanPriority OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+    	"This object represents the VLAN Priority."
+    ::= { pPPoEEntry 19 }
+
+
+
+pppoeClientReceivedTagsTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF  PppoeClientReceivedTagsEntry
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+        "This table contains the PPPoE tags
+        received in the offer (PADO packet) of the access concentrator
+        with which a PPPoE session has been established."
+    ::= { pPPoE 2 }
+
+pppoeClientReceivedTagsEntry OBJECT-TYPE
+    SYNTAX      PppoeClientReceivedTagsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry contains the details of one PPPoE tag."
+    INDEX { pPPoECnfgIdx, pPPoEID, pppoeClientReceivedTagNumber }
+    ::= { pppoeClientReceivedTagsTable 1 }
+
+PppoeClientReceivedTagsEntry ::= SEQUENCE {
+    pppoeClientReceivedTagNumber  Unsigned32,
+    pppoeClientReceivedTagType    Unsigned32,
+    pppoeClientReceivedTagValue   SnmpAdminString 
+ }
+
+pppoeClientReceivedTagNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A running index. 1 for the first tag received
+        in the PADO packet, 2 for the second, and so on."
+    ::= { pppoeClientReceivedTagsEntry 1 }
+
+pppoeClientReceivedTagType OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The TAG_TYPE of the PPPoE tag in the received packet."
+    ::= { pppoeClientReceivedTagsEntry 2 }
+
+pppoeClientReceivedTagValue OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The TAG_VALUE of the PPPoE tag in the received packet."
+    ::= { pppoeClientReceivedTagsEntry 3 }
+
+
+
+
+PppAuthMethod  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "Methods used in the PPP authentication phase.
+    noAuth is used if authentication is not required."
+    SYNTAX  INTEGER {
+        noAuth  (1),
+        chap    (2),
+        pap     (3)
+        }
+
+PppAuthStatus  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "States of the PPP authentication phase.
+    notApplicable is used if authentication is not required."
+    SYNTAX      INTEGER {
+        notApplicable  (1),
+        initial        (2),
+        completed      (3),
+        inProgress     (4),
+        failed         (5)
+        }
+
+PppState  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "States of the state machine used in some PPP phases (rfc 1661, 4.2)."
+    SYNTAX      INTEGER {
+        initial      (1),
+        starting     (2),
+        closed       (3),
+        stopped      (4),
+        closing      (5),
+        stopping     (6),
+        requestSent  (7),
+        ackReceived  (8),
+        ackSent      (9),
+        opened       (10)
+        }
+
+pppSecurityTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF  PppSecurityEntry
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+        "This table contains user credentials
+        used by various methods (CHAP, PAP...)
+        during the PPP authentication phase."
+    ::= { lanrangerInterface 8 }
+
+pppSecurityEntry OBJECT-TYPE
+    SYNTAX      PppSecurityEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry contains one authentication parameter or more,
+        depending of the entry's type."
+    INDEX { ifIndex, pppSecurityType, pppSecurityPriority }
+    ::= { pppSecurityTable 1 }
+
+PppSecurityEntry ::= SEQUENCE {
+    pppSecurityType       INTEGER,
+    pppSecurityPriority   Unsigned32,
+    pppSecurityRowStatus  RowStatus,
+    pppSecurityDirection  INTEGER,
+    pppSecurityIdentity   SnmpAdminString,
+    pppSecuritySecret     SnmpAdminString,
+    pppSecuritySecretType INTEGER 
+ }
+
+pppSecurityType OBJECT-TYPE
+    SYNTAX      INTEGER {
+        chapHostname  (1),
+        chapPassword  (2),
+        papUsername   (3)
+        }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The type of the credentials in this entry.
+        chapHostname - hostname to send to the authenticator in CHAP
+            authentication, instead of the (by default) device sysName
+        chapPassword - default password to use in CHAP authentication,
+            if the authenticator does not appear in the user database
+        papUsername - userrname and password to use in PAP authentication."
+    ::= { pppSecurityEntry 1 }
+
+pppSecurityPriority OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "If there are multiple entries of the same type, one with
+        lower priority has precedence over one with higher priority."
+    ::= { pppSecurityEntry 2 }
+
+pppSecurityRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "User credentials are added and removed by users using this object."
+    ::= { pppSecurityEntry 3 }
+
+pppSecurityDirection OBJECT-TYPE
+    SYNTAX      INTEGER {
+            localToRemote  (1),
+            remoteToLocal  (2)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The direction in which the credentials in this entry are used.
+        localToRemote - the device is authenticated by a peer
+        RemoteToLocal - The device authenticates a peer"
+    ::= { pppSecurityEntry 4 }
+
+pppSecurityIdentity OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A string representing name, such as hostname or username,
+        to be used in the PPP authentication phase."
+    ::= { pppSecurityEntry 5 }
+
+pppSecuritySecret OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A password to be used in the PPP authentication phase.
+        The password is always saved in an encrypted form; if a
+        user sets a clear password, the device must encrypt it before
+        saving it in this object.
+        This object always returns an empty string when read."
+    ::= { pppSecurityEntry 6 }
+
+pppSecuritySecretType OBJECT-TYPE
+    SYNTAX      INTEGER {
+        off       (1),
+        clear     (2),
+        encrypted (3)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object is used by users to denote whether the string set
+        in pppSecuritySecret is a clear or encrypted password. The device
+        sets it to 'off' after saving the password in pppSecuritySecret."
+    DEFVAL { off }
+    ::= { pppSecurityEntry 7 }
+
+pppLinkStatusXTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PppLinkStatusXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains PPP monitoring objects.
+            It augments the standard pppLinkStatusTable (rfc 1471)."
+    ::= { lanrangerInterface 9 }
+
+pppLinkStatusXEntry OBJECT-TYPE
+    SYNTAX      PppLinkStatusXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry contains monitoring objects of one PPP link."
+    AUGMENTS    { pppLinkStatusEntry }
+    ::= { pppLinkStatusXTable 1 }
+
+PppLinkStatusXEntry ::= SEQUENCE {
+    pppLinkStatusXLcpState                PppState,
+    pppLinkStatusXUsAuthProtocol          PppAuthMethod,
+    pppLinkStatusXUsAuthState             PppAuthStatus,
+    pppLinkStatusXUsAuthIdentity          SnmpAdminString,
+    pppLinkStatusXPeerAuthProtocol        PppAuthMethod,
+    pppLinkStatusXPeerAuthState           PppAuthStatus,
+    pppLinkStatusXPeerAuthIdentity        SnmpAdminString,
+    pppLinkStatusXIpcpState               PppState,
+    pppLinkStatusXIpcpLocalIp             InetAddressIPv4,
+    pppLinkStatusXIpcpLocalIpNegotiated   TruthValue,
+    pppLinkStatusXIpcpRemoteIp            InetAddressIPv4,
+    pppLinkStatusXIpv6cpState             PppState,
+    pppLinkStatusXIpv6cpLocalIp           InetAddressIPv6,
+    pppLinkStatusXIpv6cpLocalIpNegotiated TruthValue,
+    pppLinkStatusXIpv6cpRemoteIp          InetAddressIPv6 
+ }
+
+pppLinkStatusXLcpState OBJECT-TYPE
+    SYNTAX      PppState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "LCP phase state."
+    ::= { pppLinkStatusXEntry 1 }
+
+pppLinkStatusXUsAuthProtocol OBJECT-TYPE
+    SYNTAX      PppAuthMethod
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The method used by the peer to authenticate the device."
+    ::= { pppLinkStatusXEntry 2 }
+
+pppLinkStatusXUsAuthState OBJECT-TYPE
+    SYNTAX      PppAuthStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The state of the process of the peer authenticating the device."
+    ::= { pppLinkStatusXEntry 3 }
+
+pppLinkStatusXUsAuthIdentity OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The identity used in the process of the peer authenticating the
+        device, or empty string if the peer does not authenticate the device."
+    ::= { pppLinkStatusXEntry 4 }
+
+pppLinkStatusXPeerAuthProtocol OBJECT-TYPE
+    SYNTAX      PppAuthMethod
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The method used to authenticate the peer."
+    ::= { pppLinkStatusXEntry 5 }
+
+pppLinkStatusXPeerAuthState OBJECT-TYPE
+    SYNTAX      PppAuthStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The state of the process of authenticating the peer."
+    ::= { pppLinkStatusXEntry 6 }
+
+pppLinkStatusXPeerAuthIdentity OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The identity used in the process of authenticating the peer,
+        or empty string if the peer is not required to be authenticated."
+    ::= { pppLinkStatusXEntry 7 }
+
+pppLinkStatusXIpcpState OBJECT-TYPE
+    SYNTAX      PppState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "IPCP phase state."
+    ::= { pppLinkStatusXEntry 8 }
+
+pppLinkStatusXIpcpLocalIp OBJECT-TYPE
+    SYNTAX      InetAddressIPv4
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Address of this device, used for encapsulating IPv4 packets
+        in the PPP session.
+        If no IP address is used or if IPCP negotiation was not completed
+        this object is set to 0."
+    ::= { pppLinkStatusXEntry 9 }
+
+pppLinkStatusXIpcpLocalIpNegotiated OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is true if the IPv4 address in pppLinkStatusXIpcpLocalIp
+        was negotiated with the peer, and false oterwise."
+    ::= { pppLinkStatusXEntry 10 }
+
+pppLinkStatusXIpcpRemoteIp OBJECT-TYPE
+    SYNTAX      InetAddressIPv4
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Address of remote device, used for encapsulating IPv4 packets
+        in the PPP session.
+        If no IP address is used or if IPCP negotiation was not completed
+        this object is set to 0."
+    ::= { pppLinkStatusXEntry 11 }
+
+pppLinkStatusXIpv6cpState OBJECT-TYPE
+    SYNTAX      PppState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "IPV6CP phase state."
+    ::= { pppLinkStatusXEntry 12 }
+
+pppLinkStatusXIpv6cpLocalIp OBJECT-TYPE
+    SYNTAX      InetAddressIPv6
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Address of this device, used for encapsulating IPv6 packets
+        in the PPP session.
+        If no IP address is used or if IPV6CP negotiation was not completed
+        this object is set to 0."
+    ::= { pppLinkStatusXEntry 13 }
+
+pppLinkStatusXIpv6cpLocalIpNegotiated OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is true if the IPv6 address in pppLinkStatusXIpv6cpLocalIp
+        was negotiated with the peer, and false oterwise."
+    ::= { pppLinkStatusXEntry 14 }
+
+pppLinkStatusXIpv6cpRemoteIp OBJECT-TYPE
+    SYNTAX      InetAddressIPv6
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Address of remote device, used for encapsulating IPv6 packets
+        in the PPP session.
+        If no IP address is used or if IPV6CP negotiation was not completed
+        this object is set to 0."
+    ::= { pppLinkStatusXEntry 15 }
+
+
+pppLinkConfigXTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF  PppLinkConfigXEntry
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+        "This table is used to configure PPP sessions.
+        It augments the standard pppLinkConfigTable (rfc 1471)."
+    ::= { lanrangerInterface 10 }
+
+pppLinkConfigXEntry OBJECT-TYPE
+    SYNTAX      PppLinkConfigXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry contains configuration of one PPP link."
+    AUGMENTS    { pppLinkConfigEntry }
+    ::= { pppLinkConfigXTable 1 }
+
+PppLinkConfigXEntry ::= SEQUENCE {
+    pppLinkConfigXLowerLayer   Unsigned32,
+    pppLinkConfigXRefuseChap   TruthValue,
+    pppLinkConfigXRefuseNoAuth TruthValue,
+    pppLinkConfigXRefusePap    TruthValue 
+ }
+
+pppLinkConfigXLowerLayer OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "ifIndex of the lower layer (e.g. Ethernet) the PPP link is bound to,
+        or 0 if the PPP link is not bound to a lower layer."
+    ::= { pppLinkConfigXEntry 1 }
+
+pppLinkConfigXRefuseChap OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If true, the device will not accept being authenticated by CHAP."
+    DEFVAL { false }
+    ::= { pppLinkConfigXEntry 2 }
+
+pppLinkConfigXRefuseNoAuth OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If true, the device will not accept not being authenticated."
+    DEFVAL { true }
+    ::= { pppLinkConfigXEntry 3 }
+
+pppLinkConfigXRefusePap OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If true, the device will not accept being authenticated by PAP."
+    DEFVAL { true }
+    ::= { pppLinkConfigXEntry 4 }
+
+
+-- Traps for use by the LANRANger
+
+--NOTIFICATIONS
+
+lanrangerEvents OBJECT-IDENTITY
+    STATUS  current
+	DESCRIPTION
+	"The events for the LANRANger."
+	::= { lanranger 0 }
+
+lanrangerLogLinkUp NOTIFICATION-TYPE
+    OBJECTS  { lanrangerLinkConnPhysLink, lanrangerLinkConnAid }
+    STATUS  current
+    DESCRIPTION
+            "The lanrangerLogLinkUp trap indicates that the indicated logical link is connected."
+	::= { lanrangerEvents 1 }
+
+lanrangerLogLinkDown NOTIFICATION-TYPE
+    OBJECTS  { lanrangerLinkConnPhysLink, lanrangerLinkConnAid }
+    STATUS  current
+    DESCRIPTION
+            "The lanrangerLogLinkDown trap indicates that the indicated logical link is disconnected."
+	::= { lanrangerEvents 2 }
+
+lanrangerLanTableOverflow NOTIFICATION-TYPE
+    STATUS  current
+    DESCRIPTION
+            "The station table has the maximum number of addresses for the LANRANger."
+	::= { lanrangerEvents 3 }
+
+lanrangerStatusChanged NOTIFICATION-TYPE
+    OBJECTS  { agnLed }
+    STATUS  current
+    DESCRIPTION
+            "The trap indicates changes in the device status ."
+	::= { lanrangerEvents 4 }
+
+END
+

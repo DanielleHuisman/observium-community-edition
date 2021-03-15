@@ -6,8 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
- *
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -66,6 +65,13 @@ function get_state_array($type, $value, $mib = '', $event_map = NULL, $poller_ty
           // Normal static events
           $state_array['event'] = $config['mibs'][$mib]['states'][$type][$state]['event']; // Event type
         }
+
+        // Force discovery by event
+        if (isset($config['mibs'][$mib]['states'][$type][$state]['discovery']))
+        {
+          $state_array['discovery'] = $config['mibs'][$mib]['states'][$type][$state]['discovery'];
+        }
+
         $state_array['mib']   = $mib; // MIB name
       }
   }
@@ -162,7 +168,7 @@ function discover_status_definition($device, $mib, $entry)
   echo($entry['oid']. ' [');
 
   // Check that types listed in skip_if_valid_exist have already been found
-  if (discovery_check_if_type_exist($GLOBALS['valid'], $entry, 'status')) { echo '!]'; return; }
+  if (discovery_check_if_type_exist($entry, 'status')) { echo '!]'; return; }
 
   // Check array requirements list
   if (discovery_check_requires_pre($device, $entry, 'status')) { echo '!]'; return; }
@@ -185,7 +191,7 @@ function discover_status_definition($device, $mib, $entry)
   {
     $options = array();
 
-    $dot_index = '.' . $index;
+    $dot_index = strlen($index) ? '.' . $index : '';
     $oid_num   = $entry['oid_num'] . $dot_index;
 
     //echo PHP_EOL; print_vars($entry); echo PHP_EOL; print_vars($status); echo PHP_EOL; print_vars($descr); echo PHP_EOL;
@@ -214,6 +220,10 @@ function discover_status_definition($device, $mib, $entry)
 
     $status['class'] = nicecase($class); // Class in descr
     $status['index'] = $index;           // Index in descr
+    foreach (explode('.', $index) as $k => $i)
+    {
+      $status['index'.$k] = $i;          // Index parts
+    }
     $status['i']     = $i;               // i++ counter in descr
 
     // Check array requirements list
@@ -325,13 +335,13 @@ function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status
     print_debug("Skipped by unknown state value: $value, $status_descr ");
     return FALSE;
   }
-  else if ($state_array['event'] == 'exclude')
+  elseif ($state_array['event'] === 'exclude')
   {
     print_debug("Skipped by 'exclude' event value: ".$config['status_states'][$type][$state]['name'].", $status_descr ");
     return FALSE;
   }
   $value = $state;
-  $index = strval($index); // Convert to string, for correct compare
+  $index = (string)$index; // Convert to string, for correct compare
 
   print_debug("Discover status: [device: ".$device['hostname'].", oid: $oid, index: $index, type: $type, descr: $status_descr, CURRENT: $value, $entPhysicalIndex, $entPhysicalClass]");
 
@@ -340,7 +350,7 @@ function discover_status_ng($device, $mib, $object, $oid, $index, $type, $status
   foreach ($config['ignore_sensor_string'] as $bi) { if (stripos($status_descr, $bi) !== FALSE) { print_debug("Skipped by strpos: $bi, $status_descr "); return FALSE; } }
   foreach ($config['ignore_sensor_regexp'] as $bi) { if (preg_match($bi, $status_descr) > 0)    { print_debug("Skipped by regexp: $bi, $status_descr "); return FALSE; } }
 
-  $new_definition = $poller_type == 'snmp' && strlen($mib) && strlen($object);
+  $new_definition = $poller_type === 'snmp' && strlen($mib) && strlen($object);
   if ($new_definition)
   {
     $where  = ' WHERE `device_id` = ? AND `status_mib` = ? AND `status_object` = ? AND `status_type` = ? AND `status_index` = ? AND `poller_type`= ?';
@@ -477,7 +487,13 @@ function check_valid_status($device, $valid, $poller_type = 'snmp')
     {
       $index = $entry['status_index'];
       $type  = $entry['status_type'];
-      $mib   = strlen($entry['status_mib']) ? $entry['status_mib'] : '__';
+      if ($poller_type == 'snmp')
+      {
+        $mib = strlen($entry['status_mib']) ? $entry['status_mib'] : '__';
+      } else {
+        // For ipmi and unix-agent
+        $mib = 'state';
+      }
       if (!$valid[$mib][$type][$index])
       {
         echo("-");
@@ -514,7 +530,7 @@ function poll_status($device, &$oid_cache)
 
     // $status_poll = $status_db;    // Cache non-humanized status array for use as new status state
 
-    if ($status_db['poller_type'] == "snmp")
+    if ($status_db['poller_type'] === "snmp")
     {
       $status_db['status_oid'] = '.' . ltrim($status_db['status_oid'], '.'); // Fix first dot in oid for caching
 
@@ -536,7 +552,7 @@ function poll_status($device, &$oid_cache)
         //$status_value = snmp_fix_numeric($status_value); // Do not use fix, this broke not-enum (string) statuses
       }
     }
-    else if ($status_db['poller_type'] == "agent")
+    elseif ($status_db['poller_type'] === "agent")
     {
       if (isset($agent_sensors['state']))
       {
@@ -546,7 +562,7 @@ function poll_status($device, &$oid_cache)
         continue;
       }
     }
-    else if ($status_db['poller_type'] == "ipmi")
+    elseif ($status_db['poller_type'] === "ipmi")
     {
       if (isset($ipmi_sensors['state']))
       {
@@ -574,6 +590,20 @@ function poll_status($device, &$oid_cache)
       $status_poll['status_event'] = $state_array['event'];
     }
 
+    // Force ignore state if measured entity is in Shutdown state
+    $measured_class = $status_db['measured_class'];
+    if ($status_poll['status_event'] === 'alert' && is_numeric($status_db['measured_entity']) &&
+        isset($config['sensors'][$measured_class]['ignore_shutdown']) && $config['sensors'][$measured_class]['ignore_shutdown'])
+    {
+      $measured_entity = get_entity_by_id_cache($measured_class, $status_db['measured_entity']);
+      print_debug_vars($measured_entity);
+      // Currently only for ports
+      if (isset($measured_entity['ifAdminStatus']) && $measured_entity['ifAdminStatus'] === 'down')
+      {
+        $status_poll['status_event']  = 'ignore';
+      }
+    }
+
     // If last change never set, use current time
     if (empty($status_db['status_last_change']))
     {
@@ -585,11 +615,11 @@ function poll_status($device, &$oid_cache)
       // Status event changed, log and set status_last_change
       $status_poll['status_last_change'] = $status_polled_time;
 
-      if ($status_poll['status_event'] == 'ignore')
+      if ($status_poll['status_event'] === 'ignore')
       {
         print_message("[%ystatus Ignored%n]", 'color');
       }
-      else if ($status_db['status_event'] != '')
+      elseif ($status_db['status_event'] != '')
       {
         // If old state not empty and new state not equals to new state
         $msg = 'Status ' . ucfirst($status_poll['status_event']) . ': ' . $device['hostname'] . ' ' . $status_db['status_descr'] .
@@ -604,6 +634,14 @@ function poll_status($device, &$oid_cache)
         }
         log_event($msg, $device, 'status', $status_db['status_id'], $severity);
 
+        // Trick for fast rediscover sensors if associated status changed
+        // See in MIKROTIK-MIB::mtxrPOEStatus definition
+        $old_state_array = get_state_array($status_db['status_type'], $status_db['status_value'], $status_db['status_mib'], $status_db['status_map'], $status_db['poller_type']);
+        if (isset($old_state_array['discovery']) && is_module_enabled($device, $old_state_array['discovery'], 'discovery'))
+        {
+          force_discovery($device, $old_state_array['discovery']);
+          print_debug("Module ${old_state_array['discovery']} force for discovery by changed status type ${status_db['status_mib']}::${status_db['status_object']}");
+        }
       }
     } else {
       // If status not changed, leave old last_change
@@ -674,17 +712,22 @@ function get_status_rrd($device, $status)
   global $config;
 
   # For IPMI, sensors tend to change order, and there is no index, so we prefer to use the description as key here.
-  if ($config['os'][$device['os']]['status_descr'] || ($status['poller_type'] != "snmp" && $status['poller_type'] != ''))
+  if ((isset($config['os'][$device['os']]['sensor_descr']) && $config['os'][$device['os']]['sensor_descr']) ||                     // per os definition
+      (isset($config['mibs'][$status['status_mib']]['sensor_descr']) && $config['mibs'][$status['status_mib']]['sensor_descr']) || // per mib definition
+      ($status['poller_type'] != "snmp" && $status['poller_type'] != ''))
   {
-    $rrd_file = "status-" . $status['status_type'] . "-" . $status['status_descr'] . ".rrd";
+    $index = $status['status_descr'];
+  } else {
+    $index = $status['status_index'];
   }
-  elseif (strlen($status['status_mib']) && strlen($status['status_object']))
+
+  if (strlen($status['status_mib']) && strlen($status['status_object']))
   {
     // for discover_status_ng(), note here is just status index
-    $rrd_file = "status-" . $status['status_mib'] . "-" . $status['status_object'] . "-" . $status['status_index'] . ".rrd";
+    $rrd_file = "status-" . $status['status_mib'] . "-" . $status['status_object'] . "-" . $index . ".rrd";
   } else {
     // for discover_status(), note index == "%object%.%index%"
-    $rrd_file = "status-".$status['status_type']."-".$status['status_index'] . ".rrd";
+    $rrd_file = "status-" . $status['status_type'] . "-" . $index . ".rrd";
   }
 
   return($rrd_file);

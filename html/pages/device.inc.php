@@ -98,7 +98,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || count($permit_tabs))
   $attribs = get_dev_attribs($device['device_id']);
 
   // Populate the entityPhysical state array for this device
-  $entity_state = get_dev_entity_state($device['device_id']);
+  $entity_state = get_device_entphysical_state($device['device_id']);
 
   // Populate the device state array from the serialized entry
   $device_state = unserialize($device['device_state']);
@@ -432,14 +432,21 @@ if (isset($cache['devices']['id'][$vars['device']]) || count($permit_tabs))
       $navbar['options']['packages'] = array('text' => 'Pkgs', 'icon' => $config['icon']['packages']);
     }
 
+    // Print the Windows Services tab if there are matching entries in the winservices table
+    //if (dbFetchCell('SELECT COUNT(*) FROM `winservices` WHERE `device_id` = ?', array($device['device_id'])) > 0)
+    if (dbExist('winservices', '`device_id` = ?', array($device['device_id'])))
+    {
+      $navbar['options']['winservices'] = array('text' => 'Windows Services', 'icon' => $config['icon']['processes']);
+    }
+
     // Print the inventory tab if inventory is enabled and either entphysical or hrdevice tables have entries
     //if (dbFetchCell('SELECT COUNT(*) FROM `entPhysical` WHERE `device_id` = ?', array($device['device_id'])) > 0)
-    if (dbExist('entPhysical', '`device_id` = ?', array($device['device_id'])))
+    if (dbExist('entPhysical', '`device_id` = ? AND `deleted` IS NULL', [ $device['device_id'] ]))
     {
       $navbar['options']['entphysical'] = array('text' => 'Inventory', 'icon' => $config['icon']['inventory']);
     }
     //elseif (dbFetchCell('SELECT COUNT(*) FROM `hrDevice` WHERE `device_id` = ?', array($device['device_id'])) > 0)
-    else if (dbExist('hrDevice', '`device_id` = ?', array($device['device_id'])))
+    elseif (dbExist('hrDevice', '`device_id` = ?', array($device['device_id'])))
     {
       $navbar['options']['hrdevice'] = array('text' => 'Inventory', 'icon' => $config['icon']['inventory']);
     }
@@ -449,14 +456,13 @@ if (isset($cache['devices']['id'][$vars['device']]) || count($permit_tabs))
       $navbar['options']['processes'] = array('text' => 'Processes', 'icon' => $config['icon']['processes']);
     }
 
-    // Print service tab if show_services enabled and there are entries in the services table
-    ## DEPRECATED
-    if ($config['show_services'] &&
-        //dbFetchCell('SELECT COUNT(*) FROM services WHERE device_id = ?', array($device['device_id'])) > 0)
-        dbExist('services', '`device_id` = ?', array($device['device_id'])))
+    // Print probes tab if there are entries in the probes table
+    if (
+        dbExist('probes', '`device_id` = ?', array($device['device_id'])))
     {
-      $navbar['options']['services'] = array('text' => 'Services', 'icon' => $config['icon']['service']);
+      $navbar['options']['probes'] = array('text' => 'Probes', 'icon' => $config['icon']['status']);
     }
+
 
     // Print printing tab if there are entries in the printersupplies table
     //if (dbFetchCell('SELECT COUNT(*) FROM `printersupplies` WHERE device_id = ?', array($device['device_id'])) > 0)
@@ -512,7 +518,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || count($permit_tabs))
 
 
     // If the user has global write permissions, show them the edit tab
-    if ($_SESSION['userlevel'] >= "10")
+    if (is_entity_write_permitted($device['device_id'], 'device'))
     {
       $navbar['options']['tools']                             = array('text' => '', 'icon' => $config['icon']['tools'], 'url' => '#', 'right' => TRUE, 'class' => "dropdown-toggle");
       $navbar['options']['tools']['suboptions']['data']       = array('text' => 'Device Data', 'icon' => $config['icon']['device-data']);
@@ -627,7 +633,7 @@ if (isset($cache['devices']['id'][$vars['device']]) || count($permit_tabs))
   // Delete device modal
 
       $form = array('type'      => 'horizontal',
-                    'userlevel'  => 10,          // Minimum user level for display form
+                    'entity_write_permit' => array('entity_type' => 'device', 'entity_id' => $device['device_id']),
                     'id'        => 'modal-delete_device',
                     'title'      => 'Delete Device "' . $device['hostname'] . '"',
                     'icon'      => $config['icon']['device-delete'],
@@ -701,7 +707,7 @@ Please wait 5-10 minutes for graphs to draw correctly.');
         if ($poller_start)
         {
           print_success('<h4>Device poller in progress</h4>
-  This device is polling now. Poller started '.format_unixtime($poller_start).' ('.format_uptime(time() - $poller_start).' ago).');
+This device is being polled now. Poller started '.format_unixtime($poller_start).' ('.format_uptime(time() - $poller_start).' ago).');
         }
       }
     }
@@ -720,7 +726,7 @@ This device should be automatically discovered within 10 minutes.');
       if ($discovery_start)
       {
         print_success('<h4>Device discovery in progress</h4>
-This device is discover now. Discovery started '.format_unixtime($discovery_start).' ('.format_uptime(time() - $discovery_start).' ago).');
+This device is being discovered now. Discovery started '.format_unixtime($discovery_start).' ('.format_uptime(time() - $discovery_start).' ago).');
       }
     }
 

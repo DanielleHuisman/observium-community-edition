@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -30,7 +29,7 @@ $check = dbFetchRow("SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?", arr
 if (!$readonly && $vars['action'])
 {
   // We are editing. Lets see what we are editing.
-  if ($vars['action'] == "check_conditions")
+  if ($vars['action'] === "check_conditions")
   {
     $conds = array(); $cond_array = array();
     foreach (explode("\n", trim($vars['check_conditions'])) as $cond)
@@ -41,16 +40,22 @@ if (!$readonly && $vars['action'])
     $conds = json_encode($conds);
     $rows_updated = dbUpdate(array('conditions' => $conds, 'and' => $vars['alert_and']), 'alert_tests', '`alert_test_id` = ?', array($vars['alert_test_id']));
   }
-  else if ($vars['action'] == "alert_details")
+  elseif ($vars['action'] === "alert_details")
   {
     if ($entry = dbFetchRow('SELECT * FROM `alert_tests` WHERE `alert_test_id` = ?', array($vars['alert_test_id'])))
     {
       //print_vars($entry);
-      $update_array = array('alert_name'        => $vars['alert_name'],
-                            'alert_message'     => $vars['alert_message'],
-                            'severity'          => $vars['alert_severity'],
-                            'delay'             => $vars['alert_delay'],
-                            'suppress_recovery' => isset($vars['alert_send_recovery']) ? 0 : 1);
+      $update_array = [
+        'alert_name'        => $vars['alert_name'],
+        'alert_message'     => $vars['alert_message'],
+        'severity'          => $vars['alert_severity'],
+        'delay'             => $vars['alert_delay'],
+        'suppress_recovery' => isset($vars['alert_send_recovery']) ? 0 : 1
+      ];
+      if ($vars['entity_type'] && isset($config['entities'][$vars['entity_type']]))
+      {
+        $update_array['entity_type'] = $vars['entity_type'];
+      }
       //print_vars($update_array);
       foreach ($update_array as $column => $value)
       {
@@ -63,7 +68,7 @@ if (!$readonly && $vars['action'])
       unset($entry, $update_array);
     }
   }
-  else if ($vars['action'] == "assoc_add")
+  elseif ($vars['action'] === "assoc_add")
   {
     $d_conds = array(); $cond_array = array();
     foreach (explode("\n", trim($vars['assoc_device_conditions'])) AS $cond)
@@ -83,11 +88,11 @@ if (!$readonly && $vars['action'])
     $rows_id = dbInsert('alert_assoc', array('alert_test_id' => $vars['alert_test_id'], 'entity_type' => $check['entity_type'], 'device_attribs' => $d_conds, 'entity_attribs' => $e_conds));
     if ($rows_id) { $rows_updated++; }
   }
-  else if ($vars['action'] == "delete_assoc" && $vars['assoc_id'] && $vars['confirm_'.$vars['assoc_id']])
+  elseif ($vars['action'] === "delete_assoc" && $vars['assoc_id'] && $vars['confirm_'.$vars['assoc_id']])
   {
     $rows_updated = dbDelete('alert_assoc', '`alert_assoc_id` = ?', array($vars['assoc_id']));
   }
-  else if ($vars['action'] == "assoc_conditions" && $vars['assoc_id'])
+  elseif ($vars['action'] === "assoc_conditions" && $vars['assoc_id'])
   {
     $d_conds = array(); $cond_array = array();
     foreach (explode("\n", trim($vars['assoc_device_conditions_'.$vars['assoc_id']])) as $cond)
@@ -106,13 +111,12 @@ if (!$readonly && $vars['action'])
     $e_conds = json_encode($e_conds);
     $rows_updated = dbUpdate(array('device_attribs' => $d_conds, 'entity_attribs' => $e_conds), 'alert_assoc', '`alert_assoc_id` = ?', array($vars['assoc_id']));
   }
-  else if ($vars['action'] == "delete_alert_checker" && $vars['alert_test_id'] && $vars['confirm'])
+  elseif ($vars['action'] === "delete_alert_checker" && $vars['alert_test_id'] && $vars['confirm'])
   {
     // Maybe expand this to output more info.
 
     dbDelete('alert_tests', '`alert_test_id` = ?', array($vars['alert_test_id']));
     dbDelete('alert_table', '`alert_test_id` = ?', array($vars['alert_test_id']));
-    //dbDelete('alert_table-state', '`alert_test_id` = ?', array($vars['alert_test_id']));
     dbDelete('alert_assoc', '`alert_test_id` = ?', array($vars['alert_test_id']));
     dbDelete('alert_contacts_assoc', '`alert_checker_id` = ?', array($vars['alert_test_id']));
 
@@ -126,7 +130,7 @@ if (!$readonly && $vars['action'])
     $update_type = 'success';
     set_obs_attrib('alerts_require_rebuild', '1');
   }
-  else if ($rows_updated = '-1')
+  elseif ($rows_updated = '-1')
   {
     $update_message = "Record(s) unchanged. No update necessary.";
     $update_type = '';
@@ -189,22 +193,43 @@ humanize_alert_check($check);
 
   echo '</td>';
 
+  //r($check);
   $conditions = json_decode($check['conditions'], TRUE);
 
   $condition_text_block = array();
+  $suggest_entity_types = [ $check['entity_type'] => [ 'name' => $config['entities'][$check['entity_type']]['name'],
+                                                       'icon' => $config['entities'][$check['entity_type']]['icon'] ] ];
   foreach ($conditions as $condition)
   {
-    $condition_text_block[] = escape_html($condition['metric'].' '.$condition['condition'].' ') .
-                              str_replace(',', ',&#x200B;', escape_html($condition['value'])); // Add hidden space char (&#x200B;) for wrap long lists
+    // Detect incorrect metric used
+    if (!isset($config['entities'][$check['entity_type']]['metrics'][$condition['metric']]))
+    {
+      print_error("Unknown condition metric '".$condition['metric']."' for Entity type '".$check['entity_type']."'");
+
+      foreach (array_keys($config['entities']) as $suggest_entity)
+      {
+        if (isset($config['entities'][$suggest_entity]['metrics'][$condition['metric']]))
+        {
+          print_warning("Suggested Entity type: '$suggest_entity'. Change Entity in Edit Alert below.");
+          $suggest_entity_types[$suggest_entity] = [ 'name' => $config['entities'][$suggest_entity]['name'],
+                                                     'icon' => $config['entities'][$suggest_entity]['icon'] ];
+        }
+      }
+    }
+    $condition_text_block[] = $condition['metric'] .' '. $condition['condition'] .' ' .
+                              str_replace(',', ',&#x200B;', $condition['value']); // Add hidden space char (&#x200B;) for wrap long lists
   }
 
   echo '<td>';
-  echo '<code style="white-space: pre-wrap;">' . implode($condition_text_block, '<br />') . '</code>';
+  echo '<code style="white-space: pre-wrap;">' . implode('<br />', array_map('escape_html', $condition_text_block)) . '</code>';
   echo '</td>';
 
 
   echo('
             <td>');
+
+  // Show used Severity
+  echo('<span class="label label-'.$config['alert']['severity'][$check['severity']]['label-class'].'" title="Severity">'.$config['alert']['severity'][$check['severity']]['name'].'</span><br />');
 
   if ($check['suppress_recovery'])
   {
@@ -308,6 +333,13 @@ humanize_alert_check($check);
     $form_params['alert_and'][0] = array('name' => 'Require any condition',  'icon' => $config['icon']['or-gate']);
     $form_params['alert_and'][1] = array('name' => 'Require all conditions', 'icon' => $config['icon']['and-gate']);
 
+    $metrics_list = [];
+    foreach ($config['entities'][$check['entity_type']]['metrics'] as $metric => $entry)
+    {
+      $metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
+    }
+    $form_params['metrics'] = implode(',<br/>', $metrics_list);
+
     $form['row'][5]['alert_and'] = array(
                                       'type'        => 'select',
                                       'fieldset'    => 'body',
@@ -327,7 +359,14 @@ humanize_alert_check($check);
                                       //'offset'      => FALSE, // Do not add 'controls' class, disable 180px margin for form element
                                       'rows'        => 3,
                                       //'placeholder' => 'sysReboots.0',
-                                      'value'       => implode($condition_text_block, PHP_EOL));
+                                      'value'       => implode(PHP_EOL, $condition_text_block));
+
+    $form['row'][7]['metrics'] = array(
+                                      'type'        => 'html',
+                                      'fieldset'    => 'body',
+                                      'class'       => 'col-md-5',
+                                      'name'        => 'List of known metrics:',
+                                      'html'        => '<div class="col-md-12">' . $form_params['metrics'] . '</div>');
 
     $form['row'][99]['close'] = array(
                                     'type'        => 'submit',
@@ -369,7 +408,7 @@ humanize_alert_check($check);
                   'id'         => 'modal-edit_alert',
                   'title'      => 'Edit Checker Details',
                   //'modal_args' => $modal_args, // !!! This generate modal specific form
-                  //'class'      => '',          // Clean default box class!
+                  //'class'      => 'modal-lg',          // Clean default box class!
                   //'help'       => 'Please exercise care when editing here.',
                   //'url'        => generate_url(array('page' => 'alert_check')),
                   );
@@ -378,10 +417,16 @@ humanize_alert_check($check);
     //$form['fieldset']['footer'] = array('class' => 'modal-footer'); // Required this class for modal footer!
 
     $form_params = array();
-    $form_params['alert_severity']['crit'] = array('name' => 'Critical',      'icon' => $config['icon']['exclamation']);
-    //$form_params['alert_severity']['warn'] = array('name' => 'Warning',       'icon' => $config['icon']['error']);
-    //$form_params['alert_severity']['info'] = array('name' => 'Informational', 'icon' => $config['icon']['info']);
+    $form_params['alert_severity'] = $config['alert']['severity'];
 
+    $form['row'][3]['entity_type'] = array(
+                                      'type'        => 'select',
+                                      'fieldset'    => 'body',
+                                      'name'        => 'Entity Type',
+                                      'width'       => '320px',
+                                      'readonly'    => count($suggest_entity_types) <= 1, // Do not change without suggested types
+                                      'value'       => $check['entity_type'],
+                                      'values'      => $suggest_entity_types);
     $form['row'][4]['alert_test_id'] = array(
                                       'type'        => 'hidden',
                                       'fieldset'    => 'body',
@@ -412,15 +457,13 @@ humanize_alert_check($check);
                                       'placeholder' => "&#8470; of checks to delay alert",
                                       'value'       => escape_html($check['delay']));
     $form['row'][8]['alert_send_recovery'] = array(
-                                      'type'        => 'switch',
+                                      'type'        => 'toggle',
                                       'fieldset'    => 'body',
                                       'name'        => 'Send recovery notification',
-                                      //'class'       => 'input-xlarge',
-                                      'size'        => 'small',
-                                      'on-text'     => 'Yes',
-                                      'off-text'    => 'No',
-                                      //'on-color'    => 'primary',
-                                      //'off-color'   => 'danger',
+                                      'class'       => 'text-nowrap',
+                                      'view'        => 'toggle',
+                                      'size'        => 'big',
+                                      'palette'     => 'blue',
                                       'value'       => !$check['suppress_recovery']);
     /* There is no database field for this, so we hardcode this */
     $form['row'][9]['alert_severity'] = array(
@@ -430,7 +473,7 @@ humanize_alert_check($check);
                                       'width'       => '320px',
                                       'live-search' => FALSE,
                                       'values'      => $form_params['alert_severity'],
-                                      'value'       => 'crit');
+                                      'value'       => $check['severity']);
 
     $form['row'][99]['close'] = array(
                                     'type'        => 'submit',
@@ -1209,7 +1252,7 @@ echo generate_box_close(array('footer_content' => $footer_content));
 </div>';
 
 }
-else if ($vars['view'] == 'entries')
+elseif ($vars['view'] == 'entries')
 {
   echo '
 <div class="row" style="margin-top: 10px;">

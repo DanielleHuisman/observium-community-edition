@@ -71,9 +71,17 @@ foreach ($oid_data as $ip_address => $entry)
     $entry['ipAdEntNetMask'] = '255.255.255.255';
   }
 
+  /*
   $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
                                                        'ip'      => $ip_address,
                                                        'mask'    => $entry['ipAdEntNetMask']);
+  */
+  $data = [
+    'ifIndex' => $ifIndex,
+    'ip'      => $ip_address,
+    'mask'    => $entry['ipAdEntNetMask']
+  ];
+  discover_add_ip_address($device, $mib, $data);
 }
 
 // Get IP addresses from IP-MIB (new table, both IPv4/IPv6)
@@ -111,11 +119,21 @@ if (!count($ip_data[$ip_version]))
     $tmp_prefix = explode('.', $entry['ipAddressPrefix']);
     $entry['ipAddressPrefix'] = end($tmp_prefix);
 
+    /*
     $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
                                                          'ip'      => $ip_address,
                                                          'prefix'  => $entry['ipAddressPrefix'],
                                                          'type'    => $entry['ipAddressType'],
                                                          'origin'  => $entry['ipAddressOrigin']);
+    */
+    $data = [
+      'ifIndex' => $ifIndex,
+      'ip'      => $ip_address,
+      'prefix'  => $entry['ipAddressPrefix'],
+      'type'    => $entry['ipAddressType'],
+      'origin'  => $entry['ipAddressOrigin']
+    ];
+    discover_add_ip_address($device, $mib, $data);
   }
 
 }
@@ -149,11 +167,21 @@ foreach ($oid_data[$ip_version] as $ip_snmp => $entry)
   $tmp_prefix = explode('.', $entry['ipAddressPrefix']);
   $entry['ipAddressPrefix'] = end($tmp_prefix);
 
+  /*
   $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
                                                        'ip'     => $ip_address,
                                                        'prefix' => $entry['ipAddressPrefix'],
                                                        'type'   => $entry['ipAddressType'],
                                                        'origin' => $entry['ipAddressOrigin']);
+  */
+  $data = [
+    'ifIndex' => $ifIndex,
+    'ip'      => $ip_address,
+    'prefix'  => $entry['ipAddressPrefix'],
+    'type'    => $entry['ipAddressType'],
+    'origin'  => $entry['ipAddressOrigin']
+  ];
+  discover_add_ip_address($device, $mib, $data);
 }
 
 unset($ifIndex, $ip_address, $tmp_prefix, $oid_data);

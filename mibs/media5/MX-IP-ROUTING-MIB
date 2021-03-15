@@ -1,0 +1,587 @@
+-- **SDOC***********************************************************************
+-- *****************************************************************************
+--
+--              Copyright(c) 2003-2005 Mediatrix Telecom, Inc.
+--              Copyright(c) 2008 Media5 Corporation ("Media5")
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary to
+--   Media5.
+--
+--   Media5 reserves all rights to this document as well as to the Intellectual
+--   Property of the document and the technology and know-how that it includes
+--   and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in any
+--   form whatsoever without prior written approval by Media5.
+--
+--   Media5 reserves the right to revise this publication and make changes at
+--   any time and without the obligation to notify any person and/or entity of
+--   such revisions and/or changes.
+--
+-- *****************************************************************************
+-- **EDOC***********************************************************************
+
+
+MX-IP-ROUTING-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxIpAddress,
+        MxIpSubnetMask
+    FROM MX-TC
+        ipAddressConfig,
+        mediatrixConfig,
+        mediatrixMgmt
+    FROM MX-SMI;
+
+
+ipRoutingMIB MODULE-IDENTITY
+    LAST-UPDATED "200807030000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749"
+    DESCRIPTION  "This MIB is used to customize IP routing properties."
+
+
+    -- *************************************************************************
+    -- Revision history
+    -- *************************************************************************
+    REVISION    "201105090000Z"
+    DESCRIPTION "Added always option in variable lanStaticAddressActivation."
+    REVISION    "200807030000Z"
+    DESCRIPTION "Add the new variable lanStaticAddressActivation and modify
+                 the descriptions of lanStaticAddress and lanStaticNetworkMask."
+    REVISION    "200603060000Z"
+    DESCRIPTION "Corrected several descriptions."
+    REVISION    "200509160000Z"
+    DESCRIPTION "Added description to ipRoutingMode."
+    REVISION    "200508120000Z"
+    DESCRIPTION "Added ipRoutingDhcpServerDnsFallbackEnable.
+                 Added ipRoutingDhcpServerNoWanLeaseEnable.
+                 Added ipRoutingDhcpServerNoWanLeaseTime."
+    REVISION    "200505200000Z"
+    DESCRIPTION "Modify description of ipRoutingEnable.
+                 Added normal option in ipRoutingMode and modify description.
+                 Added ipRoutingDhcpServerEnable.
+                 Modify description of ipRoutingDhcpServerLeaseTime.
+                 Added ipRoutingDhcpIpLeaseRangeStart.
+                 Added ipRoutingDhcpIpLeaseRangeEnd."
+    REVISION    "200504220000Z"
+    DESCRIPTION "Add TAS and NAT selection variable (ipRoutingMode)"
+    REVISION    "200409280000Z"
+    DESCRIPTION "Added Bandwidth management MIB variables"
+    REVISION    "200407140000Z"
+    DESCRIPTION "Corrected the description of ipRoutingMacSpoofAddress"
+    REVISION    "200402130000Z"
+    DESCRIPTION "Added MAC address spoofing"
+    REVISION    "200310240000Z"
+    DESCRIPTION "Added variables lanStaticAddress and lanStaticNetworkMask."
+    REVISION    "200310010000Z"
+    DESCRIPTION "Changed default value of ipRoutingQosDiffServSubstitution
+                 and clarified description of diffserv-related objects."
+    REVISION    "200309150000Z"
+    DESCRIPTION "Creation."
+    ::= { mediatrixConfig 110 }
+
+ipRoutingMIBObjects  OBJECT IDENTIFIER ::= { ipRoutingMIB 1 }
+ipRoutingConformance OBJECT IDENTIFIER ::= { ipRoutingMIB 2 }
+ipAddressConfigLanInterface OBJECT IDENTIFIER ::= { ipAddressConfig 100 }
+
+
+    -- *************************************************************************
+    -- IP routing MIB objects
+    -- *************************************************************************
+    ipRoutingEnable OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates if the routing service is active. The ipRoutingMode variable indicates
+                     the behavior of the routing service.
+
+                     enable  : The routing service is activated.
+
+                     disable : The routing service is deactivated.
+
+                     This variable's semantics are different depending on the protocol and the
+                     hardware platform.
+                     Please refer to the documentation shipped with your device for more
+                     details."
+        DEFVAL      { disable }
+        ::= { ipRoutingMIBObjects 5 }
+
+    ipRoutingMode OBJECT-TYPE
+        SYNTAX      INTEGER {
+                               tas(0),
+                               nat(1),
+                               normal(2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates what type of routing service is selected.
+                     It is only used if ipRoutingEnable is set to enable.
+
+                     tas(0) :    Indicates that the routing service is in TAS mode.
+                                 Transparent Address Sharing assigns the WAN IP address to a
+                                 computer or device on the LAN side.
+                     nat(1) :    Indicates that the routing service is in NAT mode.
+                                 Network Address Translation makes it possible to share a single
+                                 WAN IP address between multiple computers on the LAN.
+                     normal(2) : Indicates that the routing service is in normal mode.
+                                 In this mode, the computers on the LAN side use a public IP address.
+
+                     This variable's semantics are different depending on the hardware platform.
+                     Please refer to the documentation shipped with your device for more
+                     details."
+        DEFVAL      { tas }
+        ::= { ipRoutingMIBObjects 7 }
+
+
+    -- *************************************************************************
+    -- IP routing DHCP
+    -- *************************************************************************
+    ipRoutingDhcp OBJECT IDENTIFIER ::= { ipRoutingMIBObjects 10 }
+
+        ipRoutingDhcpServerEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates if the DHCP server service is active.
+
+                         The DHCP service allocates IP addresses to the PC or IP equipment
+                         located on the LAN. The DHCP server behavior depends on the routing
+                         mode (ipRoutingMode) selected.
+
+                         TAS routing mode:
+                          - The DHCP server is always enable, even if this variable is set to disable.
+                          - The DHCP server allocates only one lease and all other DHCP request are
+                            silently rejected.
+                          - The DHCP server allocates the value of localHostWanAddress as IP address.
+                          - The DHCP server allocates the value of localHostDefaultRouter as default router.
+                          - The DHCP server allocates the value of localHostSubnetMask as subnet mask.
+                          - The DHCP server allocates the value of localHostPrimaryDns and
+                            localHostSecondaryDns as DNS.
+
+                         NAT and Normal routing mode:
+                          - The DHCP server can allocate one lease for each IP address in the range.
+                          - The DHCP server allocates a free lease in the range defined by
+                            ipRoutingDhcpIpLeaseRangeStart to ipRoutingDhcpIpLeaseRangeEnd as IP address.
+                          - The DHCP server allocates the value of lanStaticAddress as default router.
+                          - The DHCP server allocates the value of lanStaticNetworkMask as subnet mask.
+                          - The DHCP server allocates the value of localHostPrimaryDns and
+                            localHostSecondaryDns as DNS.
+
+                         enable(1)  : The DHCP server service is activated.
+
+                         disable(0) : The DHCP server service is deactivated.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+            DEFVAL { enable }
+            ::=  { ipRoutingDhcp 3 }
+
+        ipRoutingDhcpServerLeaseTime OBJECT-TYPE
+            SYNTAX      Unsigned32 (10..172800)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The duration, in seconds, of the lease offered by the DHCP server.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+            DEFVAL { 30 }
+            ::=  { ipRoutingDhcp 5 }
+
+        ipRoutingDhcpIpLeaseRangeStart OBJECT-TYPE
+            SYNTAX      MxIpAddress
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The first address in the range of IP addresses offered by the DHCP server.
+                         This address cannot exceed the one entered into variable
+                         ipRoutingDhcpIpLeaseRangeEnd.
+
+                         It is not used when the IP routing mode (ipRoutingMode) is TAS.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+            DEFVAL { "192.168.10.2" }
+            ::=  { ipRoutingDhcp 50 }
+
+        ipRoutingDhcpIpLeaseRangeEnd OBJECT-TYPE
+            SYNTAX      MxIpAddress
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The last address in the range of IP addresses offered by the DHCP server.
+                         This address cannot be lower than the one entered into variable
+                         ipRoutingDhcpIpLeaseRangeStart.
+
+                         It is not used when the IP routing mode (ipRoutingMode) is TAS.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+            DEFVAL { "192.168.10.254" }
+            ::=  { ipRoutingDhcp 100 }
+
+        ipRoutingDhcpServerDnsFallbackEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "enable(1): If the ipRoutingDhcpServerDnsFallbackEnable variable is
+                        enabled and the WAN link is down, the DHCP server will return
+                        localHostStaticPrimaryDns and localHostStaticSecondaryDns values
+                        as DNS server.
+
+                        disable(0): If the ipRoutingDhcpServerDnsFallbackEnable is disabled,
+                        the variable localHostSelectConfigSource indicates the provisioning
+                        source for the localHost objects: localHostPrimaryDns and
+                        localHostSecondaryDns.
+
+                        The DNS fallback feature is only available in NAT and Normal IP routing
+                        mode (defined in the variable ipRoutingMode) and when DHCP server is
+                        enabled (defined in the variable ipRoutingDhcpServerEnable).
+
+                        This variable's semantics are different depending on protocol and/or
+                        hardware platforms.
+                        Please refer to the documentation shipped with your device for more details."
+            DEFVAL       { disable }
+            ::=  { ipRoutingDhcp 150 }
+
+        ipRoutingDhcpServerNoWanLeaseEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "enable(1): The lease time used for DHCP server is the one defined
+                         in the variable ipRoutingDhcpServerNoWanLeaseTime when the WAN
+                         link is down.
+
+                         disable(0): The lease time used is the one defined in the
+                         ipRoutingDhcpServerLeaseTime variable for the DHCP server.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+            DEFVAL { disable }
+            ::=  { ipRoutingDhcp 200 }
+
+        ipRoutingDhcpServerNoWanLeaseTime OBJECT-TYPE
+            SYNTAX      Unsigned32 (10..172800)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The duration, in seconds, of the lease offered by the DHCP server
+                         when the WAN link is down and the variable
+                         ipRoutingDhcpServerNoWanLeaseEnable is enabled.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+
+            DEFVAL { 180 }
+            ::=  { ipRoutingDhcp 250 }
+
+    -- *************************************************************************
+    -- IP routing QoS
+    -- *************************************************************************
+    ipRoutingQos OBJECT IDENTIFIER ::= { ipRoutingMIBObjects 15 }
+
+        ipRoutingQosDiffServSubstitutionEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Governs whether the content of the QoS Differentiated Services field
+                         of IP packets routed from the LAN to the WAN interface is replaced
+                         by the value assigned to the ipRoutingQosDiffServSubstitution variable.
+
+                         enable  : The DiffServ field of IP packets originating from the equipment
+                                   connected to the LAN interface and routed to the WAN is
+                                   modified as explained above.
+
+                         disable : The DiffServ field of IP packets originating from the equipment
+                                   connected to the LAN interface and routed to the WAN is left
+                                   intact.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+            DEFVAL { disable }
+            ::=  { ipRoutingQos 5 }
+
+        ipRoutingQosDiffServSubstitution OBJECT-TYPE
+            SYNTAX      Unsigned32 (0..255)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Substitution value used to fill the QoS Differentiated Services
+                         field of IP packets originating from the equipment connected to the
+                         LAN interface and routed to the WAN.
+
+                         This variable's semantics are different depending on protocol and/or
+                         hardware platforms.
+                         Please refer to the documentation shipped with your device for more details."
+            DEFVAL { 0 }
+            ::=  { ipRoutingQos 10 }
+
+    -- *************************************************************************
+    -- IP routing MAC address spoofing
+    -- *************************************************************************
+    ipRoutingMacSpoof OBJECT IDENTIFIER ::= { ipRoutingMIBObjects 20 }
+
+        ipRoutingMacSpoofEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates whether or not to spoof the unit's MAC address on the WAN side:
+
+                         enable: The unit's MAC address used on the WAN side is
+                                 the configured MAC address.
+
+                         disable: The unit's MAC address used on the WAN side is
+                                  the actual unit's MAC address.
+
+                         It is useful in the case of ISPs that use the MAC address of the device
+                         connected to the Computer interface of the unit (e.g. a PC) to identify the
+                         connection. When the ISP rather encounters the actual unit’s MAC address, it refuses
+                         the connection. Spoofing the unit’s MAC address with the one of the device
+                         connected to the Computer interface permits to be properly connected via the ISP."
+
+            DEFVAL { disable }
+            ::=  { ipRoutingMacSpoof 10 }
+
+        ipRoutingMacSpoofAddress OBJECT-TYPE
+            SYNTAX      OCTET STRING (SIZE (0|12))
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The MAC address used to spoof the unit's actual MAC
+                         address.
+
+                         An empty character string means that the spoofing is
+                         considered disabled, even though
+                         ipRoutingMacSpoofEnable is at 'enable'.
+
+                         A valid MAC address is a series of 12 hexadecimal digits (without colons)."
+            DEFVAL { "" }
+            ::=  { ipRoutingMacSpoof 20 }
+
+
+        ipRoutingStatus OBJECT IDENTIFIER ::= { mediatrixMgmt 70 }
+
+        ipRoutingMacAddress OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (0|12))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Current MAC address of the online device in the Computer port."
+        DEFVAL      { "" }
+        ::=  { ipRoutingStatus 25 }
+
+
+
+
+    -- *************************************************************************
+    -- IP routing LAN Interface
+    -- *************************************************************************
+
+        lanStaticAddressActivation OBJECT-TYPE
+        SYNTAX      INTEGER {
+                               ipRouting(0),
+                               vlanSubstitution(1),
+                               always(2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Allows to use the LAN static IP address according to IP routing, VLAN substitution or always enabled configuration.
+
+                     ipRouting:
+                     To set the lanStaticAddress as the Local Area Network (LAN) IP address used by
+                     the router's computer interface set the variable ipRoutingEnable to enable.
+
+                     vlanSubstitution:
+                     To set the lanStaticAddress as the Local Area Network (LAN) IP address used by
+                     the router's computer interface set the variable qosVlanIeee8021qSubstitutionEnable to enable.
+
+                     always:
+                     Sets the lanStaticAddress as the Local Area Network (LAN) IP address used by the router's computer interface.
+
+                     This variable's semantics are different depending on protocol and/or
+                     hardware platforms.
+                     Please refer to the documentation shipped with your device for more details."
+        DEFVAL      { ipRouting }
+        ::= { ipAddressConfigLanInterface 3 }
+
+        lanStaticAddress OBJECT-TYPE
+
+            SYNTAX      MxIpAddress
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "When the ipRoutingEnable variable is set to enable and lanStaticAddressActivation to ipRouting
+                         Or
+                         the qosVlanIeee8021qSubstitutionEnable variable is set to enable and lanStaticAddressActivation to vlanSubstitution
+                         Or
+                         lanStaticAddressActivation is set to always:
+
+                         The lanStaticAddress is the Local Area Network (LAN) IP address used by the router's computer interface."
+            DEFVAL      { "192.168.10.1" }
+            ::=  {  ipAddressConfigLanInterface  5  }
+
+        lanStaticNetworkMask OBJECT-TYPE
+
+            SYNTAX      MxIpSubnetMask
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "When the ipRoutingEnable variable is set to enable and lanStaticAddressActivation to ipRouting
+                         Or
+                         the qosVlanIeee8021qSubstitutionEnable variable is set to enable and lanStaticAddressActivation to vlanSubstitution:
+
+                         The lanStaticNetworkMask is the Local Area Network (LAN) subnet mask used by the router's computer interface."
+            DEFVAL      { "255.255.255.0" }
+            ::=  {  ipAddressConfigLanInterface  10  }
+
+
+    -- *************************************************************************
+    -- IP routing BandWidth Management
+    -- *************************************************************************
+    ipRoutingBandwidthControl OBJECT IDENTIFIER ::= { ipRoutingMIBObjects 30 }
+
+        ipRoutingBandwidthControlEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates whether the unit should limit the outgoing throughput
+                         on the WAN interface. The MIB variable ipRoutingEnable must be
+                         enabled for this feature to take effect.
+
+                         enable  : Packets, sent from the PC or IP equipment to
+                                   the WAN, are limited in bandwidth.  The maximum
+                                   bandwidth is determined by the ipRoutingWanUpstreamBandwidth
+                                   MIB variable.
+
+                                   Excess packets coming from the LAN interface will
+                                   be dropped. The unit uses the priorities set in MIB
+                                   the folder qosIeee8021q to determine which packets
+                                   to drop first, even when 8021q tagging is disabled.
+
+                         disable :  Bandwidth from the PC or IP equipment to
+                                   the WAN, is not limited."
+            DEFVAL { disable }
+            ::=  { ipRoutingBandwidthControl 5 }
+
+        ipRoutingWanUpstreamBandwidth OBJECT-TYPE
+            SYNTAX      Unsigned32 (64..4096)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Maximum outgoing amount of data transferred (throughput) from the
+                         PC or IP equipment to the WAN interface. The value is expressed
+                         in kilobits per seconds.
+
+
+                         This variable applies only when the ipRoutingBandwidthControlEnable
+                         MIB variable is set to enable."
+            DEFVAL { 512 }
+            ::=  { ipRoutingBandwidthControl 10 }
+
+
+
+    -- *************************************************************************
+    -- Conformance information
+    -- *************************************************************************
+    ipRoutingCompliances OBJECT IDENTIFIER ::= { ipRoutingConformance 1 }
+
+        ipRoutingComplVer1 MODULE-COMPLIANCE
+            STATUS      current
+            DESCRIPTION "List of groups required to configure the IP routing service."
+            MODULE      -- This Module
+            MANDATORY-GROUPS {
+                                ipRoutingGroupVer1,
+                                ipRoutingDhcpGroupVer1,
+                                ipRoutingQosGroupVer1,
+                                ipRoutingLanInterfaceGroupVer1,
+                                ipRoutingMacSpoofGroupVer1,
+                                ipRoutingBandwidthControlGroupVer1
+                             }
+            ::= { ipRoutingCompliances 1 }
+
+
+
+
+    -- *************************************************************************
+    -- MIB variable grouping
+    -- *************************************************************************
+    ipRoutingGroups OBJECT IDENTIFIER ::= { ipRoutingConformance 5 }
+
+        ipRoutingGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                        ipRoutingEnable,
+                        ipRoutingMode
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the IP routing service."
+            ::= { ipRoutingGroups 5 }
+
+        ipRoutingDhcpGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                        ipRoutingDhcpServerEnable,
+                        ipRoutingDhcpServerLeaseTime,
+                        ipRoutingDhcpIpLeaseRangeStart,
+                        ipRoutingDhcpIpLeaseRangeEnd,
+                        ipRoutingDhcpServerDnsFallbackEnable,
+                        ipRoutingDhcpServerNoWanLeaseEnable,
+                        ipRoutingDhcpServerNoWanLeaseTime
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the DHCP server for the IP routing
+                         service."
+            ::= { ipRoutingGroups 10 }
+
+        ipRoutingQosGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                        ipRoutingQosDiffServSubstitutionEnable,
+                        ipRoutingQosDiffServSubstitution
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure QoS attributes for the IP routing
+                         service."
+            ::= { ipRoutingGroups 15 }
+
+        ipRoutingLanInterfaceGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                        lanStaticAddress,
+                        lanStaticNetworkMask
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the LAN interface for the IP routing
+                         service."
+            ::= { ipRoutingGroups 20 }
+
+        ipRoutingMacSpoofGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                        ipRoutingMacSpoofEnable,
+                        ipRoutingMacSpoofAddress
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the MAC address spoofing."
+
+            ::= { ipRoutingGroups 25 }
+
+        ipRoutingBandwidthControlGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                        ipRoutingBandwidthControlEnable,
+                        ipRoutingWanUpstreamBandwidth
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the WAN upstream bandwidth control."
+
+            ::= { ipRoutingGroups 30 }
+
+END

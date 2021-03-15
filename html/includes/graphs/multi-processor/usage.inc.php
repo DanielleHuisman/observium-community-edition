@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -30,7 +29,7 @@ foreach ($vars['id'] as $port_id)
   $rrd_filename  = get_rrd_path($device, "processor-" . $processor['processor_type'] . "-" . $processor['processor_index'] . ".rrd");
 
   $rrd_list[$i]['filename'] = $rrd_filename;
-  $rrd_list[$i]['descr'] = $processor['processor_descr'];
+  $rrd_list[$i]['descr'] = rewrite_entity_name($processor['processor_descr'], 'processor');
   $rrd_list[$i]['ds'] = 'usage';
 
   $i++;

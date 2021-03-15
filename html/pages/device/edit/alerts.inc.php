@@ -22,7 +22,7 @@ if ($vars['editing'])
     $disable_notify  = $vars['disable_notify'];
 
     if ($override_sysContact_bool) { set_dev_attrib($device, 'override_sysContact_bool', '1'); } else { del_dev_attrib($device, 'override_sysContact_bool'); }
-    if (isset($override_sysContact_string)) { set_dev_attrib($device, 'override_sysContact_string', $override_sysContact_string); };
+    if (isset($override_sysContact_string)) { set_dev_attrib($device, 'override_sysContact_string', $override_sysContact_string); }
     if ($disable_notify) { set_dev_attrib($device, 'disable_notify', '1'); } else { del_dev_attrib($device, 'disable_notify'); }
 
     // 2019-12-05 23:30:00
@@ -102,7 +102,7 @@ $disable_notify = get_dev_attrib($device,'disable_notify');
                                       'width'       => '250px',
                                       'readonly'    => $readonly,
                                       'disabled'    => !$override_sysContact_bool,
-                                      'value'       => escape_html($override_sysContact_string));
+                                      'value'       => $override_sysContact_string);
       $form['row'][5]['disable_notify'] = array(
                                       'type'        => 'toggle',
                                       'view'        => 'toggle',

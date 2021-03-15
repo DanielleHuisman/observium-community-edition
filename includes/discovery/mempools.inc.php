@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage discovery
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -25,7 +24,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
       echo("$mib ");
       foreach ($config['mibs'][$mib]['mempool'] as $entry_name => $entry)
       {
-         if (discovery_check_if_type_exist($valid, $entry, 'mempool')) { continue; }
+         if (discovery_check_if_type_exist($entry, 'mempool')) { continue; }
 
          $entry['found'] = FALSE;
 
@@ -40,6 +39,10 @@ foreach (get_device_mibs_permitted($device) as $mib)
          } else {
             $scale = 1;
          }
+
+         // Convert strings '3.40 TB' to value
+         // See QNAP NAS-MIB or HIK-DEVICE-MIB
+         $unit = isset($entry['unit']) ? $entry['unit'] : NULL;
 
          if ($entry['type'] == 'table' || !isset($entry['type']))
          {
@@ -89,13 +92,13 @@ foreach (get_device_mibs_permitted($device) as $mib)
                $descr = entity_descr_definition('mempool', $entry, $mempool_entry, $mempools_count);
 
                // Fetch used, total, free and percentage values, if OIDs are defined for them
-               if ($entry['oid_used'] != '')      { $used = snmp_fix_numeric($mempool_entry[$entry['oid_used']]); }
-               if ($entry['oid_free'] != '')      { $free = snmp_fix_numeric($mempool_entry[$entry['oid_free']]); }
+               if ($entry['oid_used'] != '')      { $used = snmp_fix_numeric($mempool_entry[$entry['oid_used']], $unit); }
+               if ($entry['oid_free'] != '')      { $free = snmp_fix_numeric($mempool_entry[$entry['oid_free']], $unit); }
                if ($entry['oid_perc'] != '')      { $perc = snmp_fix_numeric($mempool_entry[$entry['oid_perc']]); }
 
                // Prefer hardcoded total over SNMP OIDs
                if     ($entry['total'] != '')     { $total = $entry['total']; }
-               elseif ($entry['oid_total'] != '') { $total = snmp_fix_numeric($mempool_entry[$entry['oid_total']]); }
+               elseif ($entry['oid_total'] != '') { $total = snmp_fix_numeric($mempool_entry[$entry['oid_total']], $unit); }
 
                // Extrapolate all values from the ones we have.
                $mempool = calculate_mempool_properties($scale, $used, $total, $free, $perc, $options);
@@ -111,7 +114,8 @@ foreach (get_device_mibs_permitted($device) as $mib)
                {
                   //print_r(array($valid['mempool'], $device, $index, $mib, $descr, $scale, $mempool['total'], $mempool['used'], $index, array('table' => $entry_name)));
 
-                  discover_mempool($valid['mempool'], $device, $index, $mib, $descr, $scale, $mempool['total'], $mempool['used'], $index, array('table' => $entry_name)); // FIXME mempool_hc = ??
+                  $mempool_hc = 0; //  // FIXME mempool_hc = ?? currently keep as 0
+                  discover_mempool($valid['mempool'], $device, $index, $mib, $descr, $scale, $mempool['total'], $mempool['used'], $mempool_hc, array('table' => $entry_name));
                   $entry['found'] = TRUE;
                }
                $i++;
@@ -136,7 +140,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
             // Fetch used, total, free and percentage values, if OIDs are defined for them
             if ($entry['oid_used'] != '')
             {
-               $used = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_used'], $mib));
+               $used = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_used'], $mib), $unit);
             }
 
             // Prefer hardcoded total over SNMP OIDs
@@ -147,13 +151,13 @@ foreach (get_device_mibs_permitted($device) as $mib)
                // No hardcoded total, fetch OID if defined
                if ($entry['oid_total'] != '')
                {
-                  $total = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_total'], $mib));
+                  $total = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_total'], $mib), $unit);
                }
             }
 
             if ($entry['oid_free'] != '')
             {
-               $free = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_free'], $mib));
+               $free = snmp_fix_numeric(snmp_get_oid($device, $entry['oid_free'], $mib), $unit);
             }
 
             if ($entry['oid_perc'] != '')
@@ -175,7 +179,8 @@ foreach (get_device_mibs_permitted($device) as $mib)
                   unset($old_rrd, $new_rrd);
                }
 
-               discover_mempool($valid['mempool'], $device, $index, $mib, $descr, $scale, $mempool['total'], $mempool['used'], $index, array('table' => $entry_name)); // FIXME mempool_hc = ??
+               $mempool_hc = 0; //  // FIXME mempool_hc = ?? currently keep as 0
+               discover_mempool($valid['mempool'], $device, $index, $mib, $descr, $scale, $mempool['total'], $mempool['used'], $mempool_hc, array('table' => $entry_name));
                $entry['found'] = TRUE;
             }
          }

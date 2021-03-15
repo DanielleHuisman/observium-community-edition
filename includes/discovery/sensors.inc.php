@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,30 +6,17 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
+$cache_snmp = array();
 $valid['sensor'] = array();
 $valid['status'] = array();
 $valid['counter'] = array();
 
 // Sensor, Status and Counter entities are discovered together since they are often in the same MIBs.
-
-// Run sensor discovery scripts (also discovers state sensors as status entities)
-$include_dir = "includes/discovery/sensors";
-include($config['install_dir']."/includes/include-dir-mib.inc.php");
-
-// Run status-specific discovery scripts
-$include_dir = "includes/discovery/status";
-include($config['install_dir']."/includes/include-dir-mib.inc.php");
-
-// Run counter-specific discovery scripts
-$include_dir = "includes/discovery/counter";
-include($config['install_dir']."/includes/include-dir-mib.inc.php");
-
-$cache_snmp = array();
+// Definitions discovery first
 
 foreach (get_device_mibs_permitted($device) as $mib)
 {
@@ -65,6 +51,46 @@ foreach (get_device_mibs_permitted($device) as $mib)
       discover_counter_definition($device, $mib, $oid_data);
     }
     print_cli(PHP_EOL);
+  }
+}
+
+// Run sensor discovery scripts (also discovers state sensors as status entities)
+$include_dir = "includes/discovery/sensors";
+include($config['install_dir']."/includes/include-dir-mib.inc.php");
+
+// Run status-specific discovery scripts
+$include_dir = "includes/discovery/status";
+include($config['install_dir']."/includes/include-dir-mib.inc.php");
+
+// Run counter-specific discovery scripts
+$include_dir = "includes/discovery/counter";
+include($config['install_dir']."/includes/include-dir-mib.inc.php");
+
+// Detect static sensors
+
+if(is_array($config['sensors']['static']))
+{
+
+  print_cli_data_field('STATIC SENSORS');
+
+  foreach($config['sensors']['static'] AS $sensor)
+  {
+    if ($sensor['device_id'] == $device['device_id'])
+    {
+      $value = snmp_get_oid($device, $sensor['oid']);
+      if (isset($value))
+      {
+        $options[$limit] = snmp_fix_numeric($value);
+        if (is_numeric($value))
+        {
+          $options = array();
+          $fields = array('limit', 'limit_low', 'limit_warn', 'limit_low_warn');
+          foreach($fields AS $field) { if (isset($sensor[$field])) { $options[$field] = $sensor[$field]; } }
+
+          discover_sensor_ng($device, $sensor['class'], 'STATIC', 'static', $sensor['oid'], $sensor['oid'], 'static', $sensor['descr'], $sensor['multiplier'], $value, $options);
+        }
+      }
+    }
   }
 }
 

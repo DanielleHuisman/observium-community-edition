@@ -1,0 +1,1694 @@
+RAD-RadBgp-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       InetAddressType, InetAddress, InetAddressPrefixLength, 
+       InetPortNumber     FROM  INET-ADDRESS-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Integer32, Gauge32, Unsigned32, 
+       OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, DisplayString, RowStatus     FROM  SNMPv2-TC
+       radSysRtrEvents, alarmEventLogSourceName, alarmEventLogAlarmOrEventId, 
+       alarmEventLogDescription, alarmEventLogSeverity, alarmEventLogDateAndTime, 
+       alarmEventReason     FROM  RAD-GEN-MIB
+       TruthValue     FROM  SNMPv2-TC
+       radRouter, RtrSafi, rtrConfigRoutingName     FROM  RAD-SubRtr-MIB; 
+
+
+
+rtrBgp MODULE-IDENTITY
+    LAST-UPDATED "201503121308Z"  -- March 12, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+         "Router BGP MIB."
+    ::= { radRouter 4 }
+
+
+
+-- ************************************************
+-- Interfaces Group
+-- Link Layer (layer 2) Configuration MIB
+-- ************************************************
+
+-- The following MIB group is used by the Management/Configuration
+-- station to configure the device interfaces,
+-- physicals as well as virtuals.
+-- Each entry in the rtrDynamicIfConfigTable should have one of
+-- the extended rtType.
+-- It will also have a corresponding entry in the standard iftable.
+-- The implementation uses these inputs to build the interface
+-- layer of the device. The output is reflected in the
+-- ifTable and ifStackTable which are implementation dependent.
+
+-- rtrBgp OBJECT IDENTIFIER ::=  { radRouter 4 }
+
+BgpAutonomousSystemNumber ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "An autonomous System Number.  If bgpAsSize is
+        two-octet, the range is 0..65535.  If it is
+        four-octet, it is the full range of Unsigned32."
+    SYNTAX Unsigned32
+
+  BgpIdentifier ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "4x"
+    STATUS     current
+    DESCRIPTION
+        "The representation of a BGP Identifier."
+    SYNTAX OCTET STRING (SIZE (4))
+
+BgpPeerStates ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The current state of a connection to a BGP peer."
+    SYNTAX      INTEGER {
+                  idle(1),
+                  connect(2),
+                  active(3),
+                  opensent(4),
+                  openconfirm(5),
+                  established(6)
+                }
+
+BgpCapabilities ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The capabilities advertised by a BGP instance."
+    SYNTAX      BITS {
+                  reserved0(0),                 --  reserved
+				  mpIpv4Unicast(1),             -- multiprotocol BGP support
+                                                --  for IPv4 unicast routes
+                  mpIpv4Multicast(2),           -- multiprotocol BGP support
+                                                --  for IPv4 multicast routes
+                  mpIpv4Vpn(3),                 -- multiprotocol BGP support
+                                                --  for IPv4 VPN routes
+                  reserved4(4),                 --  reserved
+				  mpIpv6Unicast(5),             -- multiprotocol BGP support
+                                                --  for IPv6 unicast routes
+                  mpIpv6Multicast(6),           -- multiprotocol BGP support
+                                                --  for IPv6 multicast routes
+                  mpIpv6Vpn(7),                 -- multiprotocol BGP support
+                                                --  for IPv6 VPN routes
+                  reserved8(8),                 --  reserved
+				  routeRefresh(9),              -- support for Route Refresh
+                                                --  messages
+                  gracefulRestart(10),          -- support for graceful restart
+                                                --  processing
+                  routeRefreshCisco(11),        -- support for pre-standard
+                                                --  (Cisco) Route Refresh
+                                                --  messages
+                  outboundRouteFilter(12),      -- support for Outbound Route
+                                                --  Filtering, for one or more
+                                                --  AFI/SAFI types
+                  outboundRouteFilterCisco(13), -- support for pre-standard
+                                                --  (Cisco) Outbound Route
+                                                --  Filtering, for one or more
+                                                --  AFI/SAFI types
+                  fourOctetAs(14)               -- support for four-octet AS
+                                                --  numbers
+                }
+
+
+BgpPermitOrDeny ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Whether the behavior is to permit or deny."
+    SYNTAX      INTEGER {
+                  permit(1),        -- Unmatched routes are permitted
+                  deny(2)           -- Unmatched routes are denied
+                }
+
+BgpSafi ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "The representation of a BGP Safi (Sub-Address Family Identifier)"
+    SYNTAX      INTEGER {
+                  unicast(1),
+                  multicast(2),
+                  both(3),
+                  mplsBgpVpn(128)
+                }
+
+BgpCommunity ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "4x"
+    STATUS       current
+    DESCRIPTION "The representation of a BGP Community."
+    SYNTAX OCTET STRING (SIZE(4))
+
+BgpCommunityAction ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "How to handle adding a community attribute."
+    SYNTAX      INTEGER {
+                  none(0),      -- No action is carried out
+                  removeAll(1),  -- Current community list is cleared
+                  removeSpecific(2),  -- The community is removed from the list
+                  setSpecific(3),    -- The community is added to the list
+                  removeAllAndSet(4) -- The community replaces the current list
+                }
+
+ BgpIpMatchType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The type of match carried out by the route map for this IP
+                 prefix list."
+    SYNTAX      INTEGER {
+                  nlriAddr(1),
+                  sourceAddr(2),
+                  nextHopAddr(3)
+                }
+
+BgpAsSize ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The size of the AS number."
+    SYNTAX      INTEGER {
+                  twoOctet(1),
+                  fourOctet(2)
+                }
+
+
+  bgpRibManagerTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BgpRibManagerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry in this table represents a RIB Manager
+                 entity."
+    ::= { rtrBgp 1 }
+
+  bgpRibManagerEntry OBJECT-TYPE
+    SYNTAX      BgpRibManagerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry represents a RIB Manager entity."
+    INDEX { bgpRibManagerIndex }
+    ::= { bgpRibManagerTable 1 }
+
+BgpRibManagerEntry ::= SEQUENCE {
+    bgpRibManagerIndex                   Unsigned32,
+    bgpRibManagerRowStatus               RowStatus,
+    bgpRibManagerLocalAs                 BgpAutonomousSystemNumber,
+    bgpRibManagerLocalIdentifier         BgpIdentifier 
+ }
+
+  bgpRibManagerIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies a RIB Manager entity."
+    ::= { bgpRibManagerEntry 1 }
+
+  bgpRibManagerRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this RIB Manager Entity Table entry,
+                 used to create and destroy table entries."
+    ::= { bgpRibManagerEntry 2 }
+
+  bgpRibManagerLocalAs OBJECT-TYPE
+    SYNTAX      BgpAutonomousSystemNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The local autonomous system number.
+                 If the bgpAsSize is twoOctet, then the range is
+                 constrained to be 0-65535.  A non-mappable 4-octet AS number
+                 should only be used when all BGP speakers within the AS
+                 support 4-octet AS numbers.  This field can only be
+                 changed when the BGP entity is not active."
+    ::= { bgpRibManagerEntry 3 }
+
+  bgpRibManagerLocalIdentifier OBJECT-TYPE
+    SYNTAX      BgpIdentifier
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The BGP Identifier of the local system. This is a generic
+                 identifier and not necessarily an IP address.  This field
+                 can only be changed when the BGP entity is not active."
+    ::= { bgpRibManagerEntry 4 }
+
+-------------------------------------------------------------------------------
+
+
+
+  -- BGP Peer Data Table
+
+  -- This table contains all the information required for each peer including
+  -- protocol parameters, statistics and policy configuration.  A row in this
+  -- table is created for each peer the RIB Manager knows about.
+
+
+  bgpPeerTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BgpPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "BGP peer table.
+                 This table contains, one entry per BGP peer,
+                 and information about the connections with BGP
+                 peers."
+    ::= { rtrBgp 2 }
+
+  bgpPeerEntry OBJECT-TYPE
+    SYNTAX      BgpPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry containing information about the connection with
+                 a BGP peer."
+    INDEX { bgpPeerRemoteAddrType,
+            bgpPeerRemoteAddr }
+    ::= { bgpPeerTable 1 }
+
+BgpPeerEntry ::= SEQUENCE {
+    bgpPeerRemoteAddrType               InetAddressType,
+    bgpPeerRemoteAddr                   InetAddress,
+    bgpPeerFsmState                     BgpPeerStates,
+    bgpPeerRowStatus                    RowStatus,
+    bgpPeerLocalAddrType                InetAddressType,
+    bgpPeerLocalAddr                    InetAddress,
+    bgpPeerRemoteAs                     BgpAutonomousSystemNumber,
+    bgpPeerLastError                    OCTET STRING,
+    bgpPeerFsmEstablishedTime           Gauge32,
+    bgpPeerHoldTimeConfig               Unsigned32,
+    bgpPeerKeepAliveConfig              Unsigned32,
+    bgpPeerHoldTime                     Integer32,
+    bgpPeerKeepAlive                    Integer32,
+    bgpPeerConfigMaxPrefix              Integer32,
+    bgpPeerPassword                     OCTET STRING,
+    bgpPeerCapabilitySent               BgpCapabilities,
+    bgpPeerCapabilityRcv                BgpCapabilities,
+    bgpPeerCapabilityNegotiated         BgpCapabilities,
+    bgpPeerSelectedLocalAddr            InetAddress,
+    bgpPeerSelectedLocalPort            InetPortNumber,
+    bgpPeerSelectedRemotePort           InetPortNumber,
+    bgpPeerClearCmd                     INTEGER,
+    bgpPeerDescr                        SnmpAdminString 
+ }
+
+  bgpPeerRemoteAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address family of the remote end of the peering session."
+    ::= { bgpPeerEntry 1 }
+
+  bgpPeerRemoteAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address of the remote end of the peering session."
+    ::= { bgpPeerEntry 2 }
+
+  bgpPeerFsmState OBJECT-TYPE
+
+    SYNTAX      BgpPeerStates
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The BGP peer's FSM state."
+    ::= { bgpPeerEntry 3 }
+
+  bgpPeerRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "This object type reflects the status of the row within the
+                agent.  An instance of this row is returned by the agent to
+				reflect the validity of the current state of this row."
+    ::= { bgpPeerEntry 4 }
+
+  bgpPeerLocalAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The address family of the local end of the peering session."
+    ::= { bgpPeerEntry 5 }
+
+  bgpPeerLocalAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The address of the local end of the peering session.
+				 If a zero length address is
+                 used, DC-BGP will not bind a specific address but use whatever
+                 is available.  In this case the
+                 bgpPeerSelectedLocalAddr field shows which local address is
+                 actually used.  If a specific local address is configured,
+                 then outbound socket connections will be bound to this
+                 address."
+    ::= { bgpPeerEntry 6 }
+
+
+  bgpPeerRemoteAs OBJECT-TYPE
+    SYNTAX      BgpAutonomousSystemNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The remote autonomous system number.  This field can only be
+                 changed when the BGP peer entry is not active."
+    ::= { bgpPeerEntry 7 }
+
+  bgpPeerLastError OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (2))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The last error code and subcode sent or received on this
+                 connection.  If no error has occurred, this field is zero.
+                 Otherwise, the first byte of this two byte OCTET STRING
+                 contains the error code, and the second byte contains the
+                 subcode."
+    ::= { bgpPeerEntry 8 }
+  bgpPeerFsmEstablishedTime OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This timer indicates how long this peer has been in the
+                 Established state or how long since this peer was last in the
+                 Established state.  It is set to zero when a new peer is
+                 configured or the router is booted."
+    ::= { bgpPeerEntry 9 }
+
+  bgpPeerHoldTimeConfig OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the Hold Time configured
+                for this BGP speaker with this peer.  This value
+                is placed in an OPEN message sent to this peer by
+                this BGP speaker, and is compared with the Hold
+                Time field in an OPEN message received from the
+                peer when determining the Hold Time (bgpPeerHoldTime)
+                with the peer.  This value must not be less than
+                three seconds if it is not zero (0) in which case
+                the Hold Time is NOT to be established with the
+                peer.  The suggested value for this timer is 90
+                seconds."
+    ::= { bgpPeerEntry 10 }
+
+  bgpPeerKeepAliveConfig OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the KeepAlive
+                configured for this BGP speaker with this
+                peer. The value of this object will only
+                determine the KEEPALIVE messages' frequency
+                relative to the value specified in
+                bgpPeerHoldTimeConfigd; the actual time
+                interval for the KEEPALIVE messages is
+                indicated by bgpPeerKeepAlive.  A
+                reasonable maximum value for this timer
+                would be configured to be one third
+                of that of bgpPeerHoldTimeConfigd.
+                If the value of this object is zero (0),
+                no periodical KEEPALIVE messages are sent to
+                the peer after the BGP connection has been
+                established.
+                The suggested value for this timer is 30
+                seconds."
+    ::= { bgpPeerEntry 11 }
+
+  bgpPeerHoldTime OBJECT-TYPE
+    SYNTAX      Integer32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the Hold Timer
+                established with the peer.  The value of this
+                is calculated by this BGP speaker by using the
+                smaller of the value in bgpPeerHoldTimeConfigd
+                and the Hold Time received in the OPEN message.
+                This value must be at least three seconds if it is
+                not zero (0) in which case the Hold Timer has not
+                been established with the peer, or, the value of
+                bgpPeerHoldTimeConfigd is zero (0)."
+    ::= { bgpPeerEntry 12 }
+
+  bgpPeerKeepAlive OBJECT-TYPE
+    SYNTAX      Integer32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the KeepAlive timer
+                established with the peer.  The value of this
+                is calculated by this BGP speaker such that, when
+                compared with bgpPeerHoldTime, it has the same
+                proportion as what bgpPeerKeepAliveConfig has
+                when compared with bgpPeerHoldTimeConfig.  If
+                the value of this object is zero (0), it indicates
+                that the KeepAlive timer has not been established
+                with the peer, or, the value of
+                bgpPeerKeepAliveConfig is zero (0)."
+    ::= { bgpPeerEntry 13 }
+
+  bgpPeerConfigMaxPrefix OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "This object is used to limit the number of
+                 prefixes that can be accepted from this peer.
+
+                 Setting bgpPeerConfigMaxPrfx to a non-zero value sets the
+                 maximum number of prefixes (totalled across all supported
+                 address families) that can be accepted from this peer."
+    ::= { bgpPeerEntry 14 }
+
+  bgpPeerPassword OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..256))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The password used by this peer."
+    ::= { bgpPeerEntry 15 }
+
+  bgpPeerCapabilitySent OBJECT-TYPE
+    SYNTAX      BgpCapabilities
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The capabilities announced to the peer on the most recent
+                 Open message sent to the peer.  This field is set to zero
+                 before the first Open message is sent to the peer, and
+                 is unchanged if the session comes down."
+    ::= { bgpPeerEntry 16 }
+
+  bgpPeerCapabilityRcv OBJECT-TYPE
+    SYNTAX      BgpCapabilities
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The capabilities received on the most recent Open message
+                 received from the peer.  This field is set to zero before
+                 the first Open message is received from the peer, and is
+                 unchanged if the session comes down.
+
+                 In the event that the peer signals a capability that DC-BGP
+                 does not recognize, this field will only contain those
+                 capabilities that DC-BGP recognizes.  A user should walk the
+                 bgpPeerCapsRcvdTable to confirm the full list of
+                 capabilities received from the peer."
+    ::= { bgpPeerEntry 17 }
+
+  bgpPeerCapabilityNegotiated OBJECT-TYPE
+    SYNTAX      BgpCapabilities
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The capabilities negotiated for the session with the peer.
+                 This field is set to zero before Open messages have been
+                 exchanged with the peer, and is unchanged if the session
+                 comes down."
+    ::= { bgpPeerEntry 18 }
+
+  bgpPeerSelectedLocalAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The address selected for the local end of the peering
+                 session.  If a connection exists and bgpPeerLocalAddr is
+                 specified then these two fields will be identical."
+    ::= { bgpPeerEntry 19 }
+
+   bgpPeerSelectedLocalPort OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local port selected for transport connection between the
+                 BGP peers.  A value of zero implies that there is currently
+				 no connection to this peer."
+    ::= { bgpPeerEntry 20 }
+
+   bgpPeerSelectedRemotePort OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote port selected for the transport connection between
+                 the BGP peers.  A value of zero implies that there is
+				 currently no connection to this peer."
+   ::= { bgpPeerEntry 21 }
+
+   bgpPeerClearCmd  OBJECT-TYPE
+    SYNTAX   INTEGER
+	      {
+    		off  (2),
+	    	on	 (3),
+			soft (4)
+	      }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+	"Reset action to be performed on BGP session."
+	DEFVAL  { off }
+    ::= { bgpPeerEntry 22 }
+
+   bgpPeerDescr        OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "This object is used as a varbind in the BGP Traps
+                the value of this object should be the IP address
+                contained in the remote peer 'bgpPeerRemoteAddr'"
+
+	::= { bgpPeerEntry 23}
+  --
+  -- Peer <AFI, SAFI> configuration table.
+  --
+
+  bgpPeerAfiSafiTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BgpPeerAfiSafiEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Peer <AFI, SAFI> configuration table.
+                 This table allows a user to configure peer characteristics
+                 on a per AFI/SAFI basis.
+                 Rows in this table cannot be created or destroyed manually.
+                 A table entry for each supported address family is created
+                 automatically when an entry in the bgpPeerTable is created.
+                 The entries are destroyed when the bgpPeerTable entry
+                 is destroyed."
+    ::= { rtrBgp 3 }
+
+  bgpPeerAfiSafiEntry OBJECT-TYPE
+    SYNTAX      BgpPeerAfiSafiEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Peer <AFI, SAFI> configuration table entry."
+    INDEX { bgpPeerRemoteAddrType,
+            bgpPeerRemoteAddr,
+            bgpPeerAfiSafiAfiType,
+            bgpPeerAfiSafiSafi }
+    ::= { bgpPeerAfiSafiTable 1 }
+
+BgpPeerAfiSafiEntry ::= SEQUENCE {
+    bgpPeerAfiSafiAfiType               InetAddressType,
+    bgpPeerAfiSafiSafi                  RtrSafi,
+    bgpPeerAfiSafiStatus                INTEGER 
+ }
+
+  bgpPeerAfiSafiAfiType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The AFI index into the peer <AFI, SAFI> table."
+    ::= { bgpPeerAfiSafiEntry 1 }
+
+  bgpPeerAfiSafiSafi OBJECT-TYPE
+    SYNTAX      RtrSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The SAFI index into the peer <AFI, SAFI> table."
+    ::= { bgpPeerAfiSafiEntry 2 }
+
+  bgpPeerAfiSafiStatus OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    	disable (1),
+        enable (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "When bgpPeerAfiSafiStatus is 'Disable', BGP will not advertise
+                 Multiprotocol support to the peer for this address family.
+                 When bgpPeerAfiSafiStatus is 'Enable', BGP will advertise
+                 Multiprotocol support to the peer.
+                 Any update to this object will take effect the next time
+                 that the bgpPeerTable entry is activated (BGP Peer entity
+				 activation).
+		 Default = disable (1)."
+    ::= { bgpPeerAfiSafiEntry 3 }
+
+  --
+  -- BGP Network Layer Reachability Information (NLRI) Data
+  --
+  -- This table contains per route information including routes, attributes
+  -- and flap statistics if the route is being damped.
+
+  bgpNlriTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BgpNlriEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BGP-4 Received Path Attribute Table contains information
+                 about paths to destination networks received from all BGP4
+                 peers.  It is equivalent to the bgpM2NlriTable, with
+                 additional fields from the bgpM2PathAttrTable, and fields
+                 to monitor the Route Flap damping state of the NLRI.
+
+                 This table must contain an identical set of fields to the
+                 bgpNlriPrefixTable.  All non-index fields must be in the same
+                 order in this table and the bgpNlriPrefixTable."
+    ::= { rtrBgp 4 }
+
+  bgpNlriEntry OBJECT-TYPE
+    SYNTAX      BgpNlriEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Information about a path to a network."
+    INDEX { bgpPeerRemoteAddrType,
+            bgpPeerRemoteAddr,
+			bgpNlriAfiType,
+            bgpNlriSafi,
+            bgpNlriPerfixAddress,
+            bgpNlriPrefixLen }
+    ::= { bgpNlriTable 1 }
+
+BgpNlriEntry ::= SEQUENCE {
+    bgpNlriAfiType                   InetAddressType,
+    bgpNlriSafi                      RtrSafi,
+    bgpNlriPerfixAddress             InetAddress,
+    bgpNlriPrefixLen                 InetAddressPrefixLength,
+    bgpNlriASPathStr                 OCTET STRING,
+    bgpNlriNextHop                InetAddress,
+    bgpNlriAsSize                    BgpAsSize,
+    bgpNlriPathAttrMultiExitDisc     Unsigned32,
+    bgpNlriPathAttrLocalPref         Unsigned32,
+    bgpNlriBest                      TruthValue,
+    bgpNlriPathAttrMEDPrsnt          TruthValue 
+ }
+
+  bgpNlriAfiType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address family of the prefix for this NLRI."
+    ::= { bgpNlriEntry 1 }
+
+  bgpNlriSafi OBJECT-TYPE
+    SYNTAX      RtrSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The subsequent address family of the prefix for this NLRI."
+    ::= { bgpNlriEntry 2 }
+
+  bgpNlriPerfixAddress   OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "An  address prefix in the Network Layer Reachability
+                 Information field.  This object is an address containing
+                 the prefix with length specified by bgpNlriPrfxLen.  Any bits
+                 beyond the length specified by bgpNlriPrfxLen are zeroed."
+    ::= { bgpNlriEntry 3 }
+
+  bgpNlriPrefixLen    OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Length in bits of the IP address prefix in the Network Layer
+                 Reachability Information field."
+    ::= { bgpNlriEntry 4 }
+
+  bgpNlriASPathStr OBJECT-TYPE
+    SYNTAX      OCTET STRING  (SIZE (0..128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This is a string depicting the autonomous system path to this
+                 network which was received from the peer which advertised it.
+                 If bgpRibManagerAsSize is four-octet and the peer does not support
+                 four octet AS numbers this string represents the AS_PATH
+                 formed by combining the AS_PATH and AS4_PATH attributes as
+                 detailed in RFC 4893.  Two-octet AS numbers appear as
+                 four-octet numbers by adding two bytes of zero padding.  The
+                 format of the string is simply the AS_PATH attribute.  It can
+                 be converted to a more readable format by the management
+                 agent."
+    ::= { bgpNlriEntry 5 }
+
+  bgpNlriNextHop OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The address of the border router that should be used to access
+                 the destination network.  This address is the nexthop address
+                 received in the UPDATE packet.  The address family of this
+                 object will be the same as that of the prefix in this row."
+    ::= { bgpNlriEntry 6 }
+
+  bgpNlriAsSize OBJECT-TYPE
+    SYNTAX      BgpAsSize
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether the bgpNlriASPathStr field contains two or four byte
+                 AS numbers."
+    ::= { bgpNlriEntry 7 }
+
+  bgpNlriPathAttrMultiExitDisc OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This metric is used to discriminate between multiple exit
+                 points to an adjacent autonomous system.
+                 Valid only if bgpNlriPathAttrMEDPrsnt is TRUE."
+    ::= { bgpNlriEntry 8 }
+
+  bgpNlriPathAttrLocalPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The originating BGP4 speaker's degree of preference for an
+                 advertised route."
+    ::= { bgpNlriEntry 9 }
+
+  bgpNlriBest OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "An indication of whether or not this route was chosen as the
+                 best BGP4 route."
+    ::= { bgpNlriEntry 10 }
+
+  bgpNlriPathAttrMEDPrsnt OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If true, then the route has an associated MED attribute,
+                 whose value is given in bgpNlriPathAttrMultiExitDisc. If false,
+                 the route has no MED attribute, and the value of
+                 bgpNlriPathAttrMultiExitDisc is undefined."
+    ::= { bgpNlriEntry 11 }
+
+  --
+  -- BGP Adj-RIB Out Table
+  --
+  -- This table contains the set of routes advertised to each peer.
+
+  bgpAdjRibOutTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BgpAdjRibOutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BGP Adjacent Routing Information Base (Adj-RIB-Out) Table
+              	contains the set of routes advertised to each peer."
+    ::= { rtrBgp 5 }
+
+  bgpAdjRibOutEntry OBJECT-TYPE
+    SYNTAX      BgpAdjRibOutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Information about a path to a network that has been
+                 advertised to a peer.  The route has been
+                 explicitly advertised in an UPDATE message sent to the
+                 peer."
+    INDEX { bgpPeerRemoteAddrType,
+            bgpPeerRemoteAddr,
+            bgpAdjRibOutAfiType,
+            bgpAdjRibOutSafi,
+            bgpAdjRibOutPrefix,
+            bgpAdjRibOutPrefixLen }
+    ::= { bgpAdjRibOutTable 1 }
+
+BgpAdjRibOutEntry ::= SEQUENCE {
+    bgpAdjRibOutAfiType              InetAddressType,
+    bgpAdjRibOutSafi                 RtrSafi,
+    bgpAdjRibOutPrefix               InetAddress,
+    bgpAdjRibOutPrefixLen            InetAddressPrefixLength,
+    bgpAdjRibOutAdvertStatus         INTEGER,
+    bgpAdjRibOutASPathStr            OCTET STRING,
+    bgpAdjRibOutNextHop              InetAddress,
+    bgpAdjRibOutAsSize               BgpAsSize,
+    bgpAdjRibOutMultiExitDisc        Unsigned32,
+    bgpAdjRibOutLocalPref            Unsigned32,
+    bgpAdjRibOutMEDPrsnt             TruthValue 
+ }
+
+  bgpAdjRibOutAfiType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address family of the prefix for this Adj-RIB Out
+                 route."
+    ::= { bgpAdjRibOutEntry 1 }
+
+  bgpAdjRibOutSafi OBJECT-TYPE
+    SYNTAX      RtrSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The subsequent address family of the prefix for
+                 this Adj-RIB Out route."
+    ::= { bgpAdjRibOutEntry 2 }
+
+  bgpAdjRibOutPrefix OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address prefix of this Adj-RIB Out route.  The
+                 length is specified by bgpAdjRibOutPrefixLen.  Any bits
+                 beyond the length specified by bgpAdjRibOutPrefixLen are
+                 set to zero."
+    ::= { bgpAdjRibOutEntry 3 }
+
+  bgpAdjRibOutPrefixLen OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Length in bits of the address prefix contained in the
+                 bgpAdjRibOutPrefix object."
+    ::= { bgpAdjRibOutEntry 4 }
+
+  bgpAdjRibOutAdvertStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  advertised(1),
+                  suppressed(2),
+                  pendingWithdrawal(3),
+                  withdrawn(4)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This object indicates the current state of
+                 advertisement of the route to the peer.
+                 A value of advertised(1) indicates that the route has
+                 been advertised to the peer.
+                 A value of suppressed(2) indicates that the route is
+                 not currently advertised to the peer, but will be
+                 advertised when a minimum advertisement interval timer
+                 expires.
+                 A value of pendingWithdrawal(3) indicates that the
+                 route is currently advertised to the peer, but will be
+                 withdrawn when the timer expires.
+                 A value of withdrawn(4) indicates that the route has
+                 been withdrawn from the peer, and this entry will be
+                 removed from the Adj-RIB-Out on the expiry of the
+                 timer."
+    ::= { bgpAdjRibOutEntry 5 }
+
+  bgpAdjRibOutASPathStr OBJECT-TYPE
+    SYNTAX      OCTET STRING  (SIZE (0..128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This is a string containing the autonomous system path sent to
+                 this peer in the AS_PATH attribute for this Adj-RIB-Out route.
+                 If this path contains four-octet AS numbers and the peer does
+                 not support these a two-octet AS_PATH attribute and associated
+                 AS4_PATH attribute will be advertised to the peer instead as
+                 detailed in RFC 4893.  However, this field will report the
+                 four-octet AS_PATH that would  have been advertised to the
+                 peer if it had supported four-byte AS numbers.  Two-octet AS
+                 numbers appear as four-octet numbers by adding two bytes of
+                 zero padding.  The format of the string is simply the AS_PATH
+                 attribute.  This can be converted to a more readable format by
+                 the management agent."
+    ::= { bgpAdjRibOutEntry 6 }
+
+  bgpAdjRibOutNextHop OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The next hop address transmitted in the UPDATE packet.
+                 The address family of this object is the same as that
+                 of bgpAdjRibOutPrfx."
+    ::= { bgpAdjRibOutEntry 7 }
+
+  bgpAdjRibOutAsSize OBJECT-TYPE
+    SYNTAX      BgpAsSize
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether the bgpAdjRibOutASPathStr object contains
+                 two or four byte AS numbers."
+    ::= { bgpAdjRibOutEntry 8}
+
+  bgpAdjRibOutMultiExitDisc OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This metric is used to discriminate between multiple
+                 exit points to an adjacent autonomous system.
+                 Valid only if bgpAdjRibOutMEDPrsnt is TRUE."
+    ::= { bgpAdjRibOutEntry 9 }
+
+  bgpAdjRibOutLocalPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local preference for this Adj-RIB-Out route, as
+                 transmitted in the UPDATE message sent to the peer."
+    ::= { bgpAdjRibOutEntry 10 }
+
+  bgpAdjRibOutMEDPrsnt OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If true, then the route has an associated MED attribute,
+                 whose value is given in bgpAdjRibOutMultiExitDisc.  If false,
+                 the route has no MED attribute, and the value of
+                 bgpAdjRibOutMultiExitDisc is undefined."
+    ::= { bgpAdjRibOutEntry 11 }
+
+
+  --
+  -- Network prefix to announce via BGP configuration table.
+  --
+
+  bgpNetworkTable     OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BgpNetworkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Network prefix to announce via BGP configuration table.
+                 This table allows a user to configure network prefixes to
+				 announce via BGP on a per AFI/SAFI basis."
+    ::= { rtrBgp 6 }
+
+  bgpNetworkEntry OBJECT-TYPE
+    SYNTAX      BgpNetworkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Network prefix to announce via BGP configuration table entry."
+    INDEX { bgpNetworkAfiType,
+            bgpNetworkSafi,
+            bgpNetworkAddrType,
+            bgpNetworkPrefixAddr,
+			bgpNetworkPrefixLen }
+    ::= { bgpNetworkTable 1 }
+
+BgpNetworkEntry ::= SEQUENCE {
+    bgpNetworkAfiType                   InetAddressType,
+    bgpNetworkSafi                      RtrSafi,
+    bgpNetworkAddrType                  InetAddressType,
+    bgpNetworkPrefixAddr                InetAddress,
+    bgpNetworkPrefixLen                 Integer32,
+    bgpNetworkRowStatus                 RowStatus 
+ }
+
+  bgpNetworkAfiType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The AFI index into the network table."
+    ::= { bgpNetworkEntry 1 }
+
+  bgpNetworkSafi OBJECT-TYPE
+    SYNTAX      RtrSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The SAFI index into the network table."
+    ::= { bgpNetworkEntry 2 }
+
+  bgpNetworkAddrType OBJECT-TYPE
+       SYNTAX       InetAddressType
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The type of the address used as the network prefix."
+       ::= { bgpNetworkEntry 3 }
+
+  bgpNetworkPrefixAddr OBJECT-TYPE
+       SYNTAX       InetAddress
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "Destination IP address filter.  Do not match the source routing
+          information to this entry if one of these fails:
+
+          -  the destination IP address in the source routing information,
+             with the IP address filter prefix length applied, matches the
+             IP address filter with the IP address filter prefix length
+             applied
+
+          -  the destination IP address prefix length is greater than or equal
+             to the IP address filter prefix length.
+
+          If the IP address filter prefix length is L, then applying the
+          length to an address means taking the first L bits of the address.
+
+          To avoid having any destination IP address filtering, set the IP
+          address filter to all zeroes and the IP address filter prefix length
+          to zero."
+       ::= { bgpNetworkEntry 4 }
+
+  bgpNetworkPrefixLen OBJECT-TYPE
+       SYNTAX       Integer32
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "Destination IP address filter prefix length (in bits).  Do not
+          match the source routing information to this entry if one of these
+          fails:
+          -  the destination IP address in the source routing information,
+             with the IP address filter prefix length applied, matches the
+             IP address filter with the IP address filter prefix length
+             applied
+          -  the destination IP address prefix length is greater than or equal
+             to the IP address filter prefix length.
+          If the IP address filter prefix length is L, then applying the
+          length to an address means taking the first L bits of the address.
+          To avoid having any destination IP address filtering, set the IP
+          address filter to all zeroes and the IP address filter prefix length
+          to zero."
+       DEFVAL { 0 }
+       ::= { bgpNetworkEntry 5 }
+
+  bgpNetworkRowStatus OBJECT-TYPE
+       SYNTAX       RowStatus
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+          "Used to create and delete a network table entry to announce via BGP."
+       ::= { bgpNetworkEntry 6 }
+
+
+
+-- ------------------
+-- bgpRouteMap
+-- ------------------
+
+bgpRouteMapTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF BgpRouteMapEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "Policy Rule BGP Table."
+       ::= { rtrBgp 7 }
+
+bgpRouteMapEntry OBJECT-TYPE
+       SYNTAX BgpRouteMapEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "BGP policy route map table (match criteria and set options)"
+       INDEX   { bgpRouteMapIndex,
+				 bgpRouteMapNumber }
+       ::= { bgpRouteMapTable 1 }
+
+BgpRouteMapEntry ::= SEQUENCE {
+    bgpRouteMapIndex              Unsigned32,
+    bgpRouteMapNumber             Unsigned32,
+    bgpRouteMapType               BgpPermitOrDeny,
+    bgpRouteMapMaComm             DisplayString,
+    bgpRouteMapSeComm             DisplayString,
+    bgpRouteMapSeCommAct          BgpCommunityAction,
+    bgpRouteMapSeLocPref          Integer32,
+    bgpRouteMapSeLocPrefDef       TruthValue,
+    bgpRouteMapSeMed                Unsigned32,
+    bgpRouteMapSeMedDef             TruthValue,
+    bgpRouteMapSeAsPrependCount     Unsigned32,
+    bgpRouteMapSeAsPrependSize      BgpAsSize,
+    bgpRouteMapSeAsPrependAsVals OCTET STRING,
+    bgpRouteMapMaPrefixListName  SnmpAdminString,
+    bgpRouteMapMaAsExp    SnmpAdminString 
+ }
+
+
+  bgpRouteMapIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4278190079)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The index of this bgpRouteMapEntry.  This is the Index used by
+                 Neighbors to reference the Route Map.  Route map indexes
+                 0xFFnnnnnn, are reserved for representing ORFs advertised by
+                 peers with bgpPeerIdentifier nnnnnn."
+    ::= { bgpRouteMapEntry 1 }
+
+  bgpRouteMapNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The index of this bgpRouteMapEntry.  This is a number used to
+                 reference more than one filter per route map index."
+    ::= { bgpRouteMapEntry 2 }
+
+  bgpRouteMapType OBJECT-TYPE
+    SYNTAX      BgpPermitOrDeny
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The type of route map entry.  This is only relevant for
+                 policy filtering route maps.  It indicates the action
+                 which should apply to a route which matches the route map
+                 entry.  This field is ignored for route maps used for
+                 aggregation."
+    DEFVAL { permit }
+    ::= { bgpRouteMapEntry 3 }
+
+  bgpRouteMapMaComm OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..127))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "If not representing one or more ORF entries this contains the
+                 regular expression to use when matching elements of the
+                 community list for a route.  If representing ORF entries then
+                 instead of a regular expression this contains a simple comma
+                 separated list of communities which are or-ed together when
+                 matching.  In both cases this is stored here in ASCII format.
+                 Communities are matched using new-format decimal notation.
+                 For example, the community '0x00120101' should be represented
+                 in the string as '18:257'.  The string is not NULL-terminated.
+                 A NULL string or a ma_comm_exp_len of zero indicates that the
+                 field is not in use."
+    ::= { bgpRouteMapEntry 4 }
+
+  bgpRouteMapSeComm OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..127))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Contains the regular expression used when executing the
+                 action defined by bgpRouteMapSeCommAct.  Allowed values
+                 depend on the value of bgpRouteMapSeCommAct - see the
+                 comment for bgpRouteMapSeCommAct."
+    ::= { bgpRouteMapEntry 5 }
+
+  bgpRouteMapSeCommAct OBJECT-TYPE
+    SYNTAX      BgpCommunityAction
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The action to take on the community list if this route map
+                 matches the route.  Note that if the action is
+                 AMB_BGP_SET_SPECIFIC or AMB_BGP_REMOVE_ALL_AND_SET, the
+                 field bgpRouteMapSeComm must only contain a string
+                 representation of a single specific community value, which
+                 will be added to the route.  If the action is
+                 AMB_BGP_REMOVE_SPECIFIC, then the bgpRouteMapSeComm field
+                 must contain a regular expression string that matches the
+                 community (or communities) to be removed.  The possible
+                 action values are:
+
+                 AMB_BGP_NONE - Ignore the value of bgpRouteMapSeComm and
+                 do nothing.
+                 AMB_BGP_REMOVE_ALL - Ignore the value of bgpRouteMapSeComm
+                 and remove all communities from the route.
+                 AMB_BGP_REMOVE_SPECIFIC - Remove from the route all
+                 communities that match the regular expression in
+                 bgpRouteMapSeComm.
+                 AMB_BGP_SET_SPECIFIC - Append the community in
+                 bgpRouteMapSeComm to the communities list.
+                 AMB_BGP_REMOVE_ALL_AND_SET - Remove all communities from
+                 the route and replace them with the community in
+                 bgpRouteMapSeComm."
+    DEFVAL { none }
+    ::= { bgpRouteMapEntry 6 }
+
+  bgpRouteMapSeLocPref OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The value to set the Local Pref to if there is a match.  This
+                 value is only used if bgpRouteMapSeLocPrefDef is TRUE."
+    DEFVAL { 0 }
+    ::= { bgpRouteMapEntry 7 }
+
+  bgpRouteMapSeLocPrefDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Whether or not the value in bgpRouteMapSeLocPref should be
+                 used for updating attributes."
+    DEFVAL { false }
+    ::= { bgpRouteMapEntry 8 }
+
+  bgpRouteMapSeMed OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The value to set the MED to if there is a match.  A value of
+                 0 indicates that the MED should be removed.  This value is
+                 only used if bgpRouteMapSeMedDef is TRUE."
+    DEFVAL { 0 }
+    ::= { bgpRouteMapEntry 9 }
+
+  bgpRouteMapSeMedDef OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Whether or not the value in bgpRouteMapSeMed should be
+                 used for updating attributes."
+    DEFVAL { false }
+    ::= { bgpRouteMapEntry 10 }
+
+ bgpRouteMapSeAsPrependCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "To prepend AS numbers to the AS-Path, set
+                 bgpRouteMapSeAsPrependCount to the count of the AS numbers
+                 to prepend, set bgpRouteMapSeAsPrependSize to indicate
+                 whether the values are 2 or 4 octet AS numbers and fill in
+                 bgpRouteMapSeAsPrependAsVals with the AS numbers themselves.
+
+                 When exporting routes to EBGP, BGP applies the AS-prepend
+                 rule before prepending the local AS number as required by
+                 the BGP specification.  This ensures that the local AS
+                 number is always the first AS number in the AS path in this
+                 case.
+
+                 This field can only be updated if the row is not active."
+    DEFVAL { 0 }
+    ::= { bgpRouteMapEntry 11 }
+
+  bgpRouteMapSeAsPrependSize OBJECT-TYPE
+    SYNTAX      BgpAsSize
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The size of AS numbers in the field
+                 bgpRouteMapSeAsPrependAsVals to prepend to the AS path if
+                 there is a match.  This field is only used if
+                 bgpRouteMapSeAsPrependCount is non-zero.
+
+                 This field can only be updated if the row is not active."
+    DEFVAL { twoOctet }
+    ::= { bgpRouteMapEntry 12 }
+
+  bgpRouteMapSeAsPrependAsVals OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (0..127))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "An array containing the AS numbers to prepend to the AS
+                 path if there is a match.  The length of each AS number is
+                 given by bgpRouteMapSeAsPrependSize.  This field is only
+                 used if bgpRouteMapSeAsPrependCount is non-zero.
+
+                 The count of AS numbers is given by
+                 bgpRouteMapSeAsPrependCount.
+
+                 This field can only be updated if the row is not active."
+    ::= { bgpRouteMapEntry 13 }
+
+bgpRouteMapMaPrefixListName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..80))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The name of prefix-list profile that includes network
+		 prefixes to be matched in a route-map policy rule."
+    ::= { bgpRouteMapEntry 14 }
+
+bgpRouteMapMaAsExp OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..127))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "Contains the regular expression to use when matching the
+				 AS-Path for a route.  This is stored here in ASCII format.
+				 AS numbers are matched as decimal numbers.  For example,
+				 the AS number '0x0123' should be represented in the regular
+				 expression string as '291'.
+				 A NULL string indicates that the field is not in use.
+				 This field is readable and writeable.
+				 The range of valid lengths for this field is 0 - 127. "
+                 ::= { bgpRouteMapEntry 15 }
+
+
+-- ------------------
+-- bgpIpPre
+-- ------------------
+
+bgpIpPreTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF BgpIpPreEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "Policy Rule BGP IP Prefix Table."
+       ::= { rtrBgp 8 }
+
+bgpIpPreEntry OBJECT-TYPE
+       SYNTAX BgpIpPreEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "BGP policy IP prefix table"
+       INDEX   { bgpRouteMapIndex,
+				 bgpRouteMapNumber,
+				 bgpIpPreMatch,
+				 bgpIpPreNumber }
+       ::= { bgpIpPreTable 1 }
+
+BgpIpPreEntry ::= SEQUENCE {
+    bgpIpPreMatch         BgpIpMatchType,
+    bgpIpPreNumber        Unsigned32,
+    bgpIpPreAfi           InetAddressType,
+    bgpIpPreSafi          BgpSafi,
+    bgpIpPreAddr          InetAddress,
+    bgpIpPreLen           InetAddressPrefixLength,
+    bgpIpPreGe            Integer32,
+    bgpIpPreLe            Integer32,
+    bgpIpPreType          BgpPermitOrDeny 
+ }
+
+
+  bgpIpPreMatch OBJECT-TYPE
+    SYNTAX      BgpIpMatchType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The index of this bgpIpPreEntry.  This decides what match
+                 command is used by the route map this list is tied to."
+    ::= { bgpIpPreEntry 1 }
+
+  bgpIpPreNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The index of this bgpIpPreEntry.  This number is used to
+                 reference more than one filter per route map index."
+    ::= { bgpIpPreEntry 2 }
+
+  bgpIpPreAfi OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The AFI of the address prefix."
+    DEFVAL { ipv4 }
+    ::= { bgpIpPreEntry 3 }
+
+  bgpIpPreSafi OBJECT-TYPE
+    SYNTAX      BgpSafi
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The SAFI of the address prefix."
+    DEFVAL { unicast }
+    ::= { bgpIpPreEntry 4 }
+
+  bgpIpPreAddr OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE(0..32))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The Address part of the prefix."
+    DEFVAL { '00'h }
+    ::= { bgpIpPreEntry 5 }
+
+  bgpIpPreLen OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The Length (in bits) part of the prefix (as in the 16 in a
+                 128.128/16 prefix)."
+    DEFVAL { 0 }
+    ::= { bgpIpPreEntry 6 }
+
+  bgpIpPreGe OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The GE value of the prefix.  GE and LE allow the range of the
+                 prefix length to be matched on to be varied.  The range is
+                 assumed to be from ge-value to the address length of the
+                 family if only the ge attribute is specified, and from len to
+                 le-value if only the le attribute is specified.
+
+                 A specified ge-value and/or le-value must satisfy the
+                 following condition:
+
+                 len < ge-value <= le-value <= address length of family."
+    DEFVAL { 0 }
+    ::= { bgpIpPreEntry 7 }
+
+  bgpIpPreLe OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The LE value of the prefix.  GE and LE allow the range of the
+                 prefix length to be matched on to be varied.  The range is
+                 assumed to be from ge-value to the address length of the
+                 family if only the ge attribute is specified, and from len to
+                 le-value if only the le attribute is specified.
+
+                 A specified ge-value and/or le-value must satisfy the
+                 following condition:
+
+                 len < ge-value <= le-value <= address length of family."
+    DEFVAL { 0 }
+    ::= { bgpIpPreEntry 8 }
+
+  bgpIpPreType OBJECT-TYPE
+    SYNTAX       BgpPermitOrDeny
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION  "The type of this prefix.  This is only applicable if this
+                  prefix is linked to a route map with an ORF association and
+                  allows the entry to override the action of the route map.
+                  This field is ignored otherwise."
+    DEFVAL { permit }
+    ::= { bgpIpPreEntry 9 }
+
+
+-- ----------------------
+-- bgpPolicyBind
+-- ----------------------
+
+bgpPolicyBindTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF BgpPolicyBindEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "BGP policy profile Bind to BGP peer, AFI, SAFI Entitity."
+       ::= { rtrBgp 9 }
+
+bgpPolicyBindEntry OBJECT-TYPE
+       SYNTAX BgpPolicyBindEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "Entry defines BGP policy profile bind to BGP peer, AFI, SAFI entity"
+       INDEX { bgpPeerRemoteAddrType,
+			   bgpPeerRemoteAddr,
+			   bgpPeerAfiSafiAfiType,
+			   bgpPeerAfiSafiSafi,
+			   bgpPolicyBindDirection,
+			   bgpPolicyBindType,
+			   bgpPolicyBindNumber
+			   }
+       ::= { bgpPolicyBindTable 1 }
+
+BgpPolicyBindEntry ::= SEQUENCE {
+    bgpPolicyBindDirection        INTEGER,
+    bgpPolicyBindType                INTEGER,
+    bgpPolicyBindNumber     INTEGER,
+    bgpPolicyBindName     SnmpAdminString (SIZE (1..252)),
+    bgpPolicyBindClearStatisticsCmd  INTEGER,
+    bgpPolicyBindRowStatus     RowStatus 
+ }
+
+ bgpPolicyBindDirection     OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	inbound		(2),
+	outbound	(3)
+	}
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This object indicates the direction on which the bgp policy works,
+	which may be either inbound (for traffic entering the entity)
+   	or outbound (for traffic transmitted out of the entity)."
+    ::= { bgpPolicyBindEntry 1 }
+
+ bgpPolicyBindType	OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	bgpPrefixListIpv4   (2),
+	bgpPrefixListIpv6	(3),
+	bgpRouteMap			(4)
+	}
+    MAX-ACCESS not-accessible
+    STATUS      current
+    DESCRIPTION
+    "BGP policy profile type."
+    ::= { bgpPolicyBindEntry 2 }
+
+ bgpPolicyBindNumber OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The index of this bgp policy profile.  This is a number used to
+                 reference more than one bgp policy profile per same
+				 peer-afi-safi-direction-type entity."
+    ::= { bgpPolicyBindEntry 3 }
+
+ bgpPolicyBindName		OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the name of BGP policy profile bound to this entity."
+    ::= { bgpPolicyBindEntry 4 }
+
+ bgpPolicyBindClearStatisticsCmd     OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	off (1),
+	on (2)
+	}
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Clear statistics command. All Matches counters (of all policy rules)
+        of policy profile bound to entity are cleared."
+    ::= { bgpPolicyBindEntry 5}
+
+ bgpPolicyBindRowStatus     OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Create or delete BGP policy profile bind to entity"
+    ::= { bgpPolicyBindEntry 6}
+
+
+-- ----------------------
+-- bgpPolicyRuleStats
+-- ----------------------
+
+bgpPolicyRuleStatsTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF BgpPolicyRuleStatsEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "Statistics table"
+       ::= { rtrBgp 10 }
+
+bgpPolicyRuleStatsEntry OBJECT-TYPE
+       SYNTAX BgpPolicyRuleStatsEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "Statistics entry"
+       INDEX { bgpPeerRemoteAddrType,
+			   bgpPeerRemoteAddr,
+			   bgpPeerAfiSafiAfiType,
+			   bgpPeerAfiSafiSafi,
+			   bgpPolicyBindDirection,
+			   bgpPolicyBindType,
+			   bgpPolicyBindNumber,
+			   bgpRouteMapIndex,
+			   bgpRouteMapNumber }
+       ::= { bgpPolicyRuleStatsTable 1 }
+
+BgpPolicyRuleStatsEntry ::= SEQUENCE {
+    bgpPolicyRuleStatsMatches  Gauge32,
+    bgpPolicyRuleStatsClearCmd  INTEGER 
+ }
+
+ bgpPolicyRuleStatsMatches     OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Counts the number of packets that matched a policy rule which is bound
+ 		  to specific peer, address family (afi) and sub address family (safi)
+		  with direction and type."
+    ::= { bgpPolicyRuleStatsEntry 1 }
+
+bgpPolicyRuleStatsClearCmd         OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	off (1),
+	on (2),
+	softClear (3)
+	}
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Clear statistics command. Rule Matches counter (bgpPolicyRuleStatsMatches)
+        is cleared.
+		Soft Clear option (3) is to update Policy without BGP session
+		re-establishment."
+    ::= { bgpPolicyRuleStatsEntry 2}
+
+
+-- -----------------------------------------------------------------------------
+-- Path Attribute Extensions
+-- -----------------------------------------------------------------------------
+
+  bgpPathAttrExtensions OBJECT IDENTIFIER ::= { rtrBgp 11 }
+
+  
+-- --------------------------------------------------------------------------------
+-- BGP Communities
+-- This table holds information on the communities the indexed route belongs to.
+-- --------------------------------------------------------------------------------
+
+  bgpPathAttrCommTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME BGP_CMM
+    SYNTAX      SEQUENCE OF BgpPathAttrCommEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "The BGP-4 Path Attribute Community Table contains the per
+      network path (NLRI) data on the community membership
+      advertised with a route.  The absence of row data for a given
+      network path indicates a lack of this attribute information
+      for the indicated network path."
+    ::= { bgpPathAttrExtensions 1 }
+
+  bgpPathAttrCommEntry OBJECT-TYPE
+    SYNTAX      BgpPathAttrCommEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "Information about a community association provided with a path
+      to a network."
+    INDEX { bgpPeerRemoteAddrType,
+            bgpPeerRemoteAddr,
+            bgpNlriAfiType,
+            bgpNlriSafi,
+            bgpNlriPerfixAddress,
+            bgpNlriPrefixLen,
+            bgpPathAttrCommIndex }
+    ::= { bgpPathAttrCommTable 1 }
+
+BgpPathAttrCommEntry ::= SEQUENCE {
+    bgpPathAttrCommIndex      Unsigned32,
+    bgpPathAttrCommValue      BgpCommunity 
+ }
+
+  bgpPathAttrCommIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "An integer index for a row in this table."
+    ::= { bgpPathAttrCommEntry 1 }
+
+  bgpPathAttrCommValue  OBJECT-TYPE
+    SYNTAX      BgpCommunity
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+     "A value representing a community. There are certain
+      4-octet long values which could be returned in this
+      columnar row data that carry additional semantics."
+    ::= { bgpPathAttrCommEntry 2 }
+
+-- Traps
+
+bgpSessionFailure       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     bgpPeerDescr, rtrConfigRoutingName } 
+      STATUS  current
+      DESCRIPTION
+	  "The trap is sent when the BGP session fail."
+      ::= { radSysRtrEvents 3 }
+
+bgpTcpSessionAuthFailure       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     bgpPeerDescr, rtrConfigRoutingName } 
+      STATUS  current
+      DESCRIPTION
+	  "The trap is sent when BGP TCP session authentication fail."
+      ::= { radSysRtrEvents 4 }
+
+bgpSessionPrefixOverflow     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     bgpPeerDescr, rtrConfigRoutingName } 
+      STATUS  current
+      DESCRIPTION
+	  "The trap is sent when BGP session received prefix
+      list reached 90% of its maximum ."
+      ::= { radSysRtrEvents 5 }
+
+
+
+
+
+
+
+END
+

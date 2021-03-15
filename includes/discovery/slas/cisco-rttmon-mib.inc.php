@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,11 +6,11 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-$oids = snmpwalk_cache_multi_oid($device, "rttMonCtrl", array(), 'CISCO-RTTMON-MIB');
+$oids = snmpwalk_cache_multi_oid($device, "rttMonCtrl", [], 'CISCO-RTTMON-MIB', NULL, OBS_SNMP_ALL_HEX);
 
 // Add extended source/target info
 //CISCO-RTTMON-IP-EXT-MIB::crttMonIPEchoAdminTargetAddrType.44 = INTEGER: ipv4(1)
@@ -23,7 +22,7 @@ $oids = snmpwalk_cache_multi_oid($device, "rttMonCtrl", array(), 'CISCO-RTTMON-M
 //CISCO-RTTMON-IP-EXT-MIB::crttMonIPEchoAdminSourceAddress.44 = Hex-STRING: D9 4F 06 9C
 //CISCO-RTTMON-IP-EXT-MIB::crttMonIPEchoAdminSourceAddress.66 = ""
 //$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminTargetAddrType", $oids, 'CISCO-RTTMON-IP-EXT-MIB');
-$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminTargetAddress",  $oids, 'CISCO-RTTMON-IP-EXT-MIB');
+$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminTargetAddress",  $oids, 'CISCO-RTTMON-IP-EXT-MIB', NULL, OBS_SNMP_ALL_HEX);
 //$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminSourceAddrType", $oids, 'CISCO-RTTMON-IP-EXT-MIB');
 //$oids = snmpwalk_cache_multi_oid($device, "crttMonIPEchoAdminSourceAddress",  $oids, 'CISCO-RTTMON-IP-EXT-MIB');
 
@@ -47,8 +46,8 @@ foreach ($oids as $sla_index => $entry)
     'device_id'  => $device['device_id'],
     'sla_mib'    => 'CISCO-RTTMON-MIB',
     'sla_index'  => $sla_index,
-    'sla_owner'  => $entry['rttMonCtrlAdminOwner'],
-    'sla_tag'    => $entry['rttMonCtrlAdminTag'],
+    'sla_owner'  => trim(snmp_hexstring($entry['rttMonCtrlAdminOwner'])),
+    'sla_tag'    => trim(snmp_hexstring($entry['rttMonCtrlAdminTag'])),
     'rtt_type'   => $entry['rttMonCtrlAdminRttType'], // Possible: echo, pathEcho, fileIO, script, udpEcho, tcpConnect, http, dns, jitter, dlsw, dhcp,
                                                       // ftp, voip, rtp, lspGroup, icmpjitter, lspPing, lspTrace, ethernetPing, ethernetJitter,
                                                       // lspPingPseudowire, video, y1731Delay, y1731Loss, mcastJitter,
@@ -70,10 +69,10 @@ foreach ($oids as $sla_index => $entry)
   {
     case 'http':
     case 'ftp':
-      $data['sla_target'] = $entry['rttMonEchoAdminURL'];
+      $data['sla_target'] = trim(snmp_hexstring($entry['rttMonEchoAdminURL']));
       break;
     case 'dns':
-      $data['sla_target'] = $entry['rttMonEchoAdminTargetAddressString'];
+      $data['sla_target'] = trim(snmp_hexstring($entry['rttMonEchoAdminTargetAddressString']));
       break;
     case 'echo':
     case 'jitter':

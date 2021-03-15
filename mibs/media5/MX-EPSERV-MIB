@@ -1,0 +1,4347 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-EPSERV-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxActivationState,
+        MxIpHostName,
+        MxIpAddress,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpSubnetMask,
+        MxDigitMap
+    FROM MX-TC
+        MxUInt64,
+        MxFloat32,
+        MxIpHostNamePort,
+        MxIpAddr,
+        MxIpAddrPort,
+        MxIpAddrMask,
+        MxUri,
+        MxUrl
+    FROM MX-TC2
+        mediatrixServices
+    FROM MX-SMI2;
+
+epServMIB MODULE-IDENTITY
+ LAST-UPDATED   "1910210000Z"
+ ORGANIZATION " Mediatrix Telecom, Inc. "
+ CONTACT-INFO " Mediatrix Telecom, Inc.
+                4229, Garlock Street
+                Sherbrooke (Quebec)
+                Canada
+                Phone: (819) 829-8749
+                "
+ DESCRIPTION  " Endpoint Services
+
+                The Endpoint Services (EpServ) service manages the telephony
+                services of each endpoint.
+                "
+ ::= { mediatrixServices 1700 }
+
+epServMIBObjects OBJECT IDENTIFIER ::= { epServMIB 1 }
+
+-- ****************************************************************************
+
+-- Group:Call Services Group
+
+-- ****************************************************************************
+
+callGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 100 }
+ -- Scalar:Default Call Hook Flash Processing
+
+ defaultCallHookFlashProcessing OBJECT-TYPE
+  SYNTAX        INTEGER { processLocally(100) , transmitUsingSignalingProtocol
+                (200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Call Hook Flash Processing
+
+                Selects how to process hook-flash detection.
+
+                When a call is in progress, the user can normally put the call
+                on hold, transfer the call, or even initiate a conference
+                call. DefaultCallHookFlashProcessing defines whether these
+                subscriber services are handled by the unit or delegated to a
+                remote party.
+
+                  * ProcessLocally: Hook-flash is processed locally. The
+                    actual behavior of the 'flash' button depends on which
+                    subscriber services are enabled for this endpoint.
+                  * TransmitUsingSignalingProtocol: Hook-flash is processed by
+                    a remote party. The hook-flash event is carried by a
+                    signaling protocol message. The actual behavior of the
+                    'flash' button depends on the remote party. This option
+                    also enables the unit to receive call waiting events with
+                    caller ID via the signaling protocol.
+
+                If a specific configuration is set in the
+                EpSpecificCall.HookFlashProcessing parameter and the
+                EpSpecificCall.EnableConfig parameter is set to 'Enable', then
+                it overrides the current default configuration.
+
+                "
+  DEFVAL        { processLocally }
+  ::= { callGroup 200 }
+
+ -- Scalar:Default Enable/Disable Direct IP Call
+
+ defaultCallAllowDirectIp OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Direct IP Call
+
+                Enables/Disables the direct IP address call service.
+
+                This service allows a user to make a call without the help of
+                a server.
+
+                When this service is enabled, the user can dial an IP address
+                and enter an optional phone number. Note that the optional
+                phone number will be checked by using the same DTMF maps as
+                for a normal call.
+
+                This method bypasses any server configuration found in the
+                unit.
+
+                To make an IP address call:
+
+                 1. Dial '**'.
+                 2. Dial the numerical DTMFs of the IP address. For the dot
+                    '.', use the star '*' sign.
+                 3. Terminate the IP call without specifying a phone number by
+                    using the star '*' or continue with a phone number by
+                    using the pound '#' sign.
+                 4. Optionally, dial the phone number.
+
+                Example IP calls to a unit at IP address '1.2.3.4':
+
+                  * If the phone number is not required, the user dials the
+                    following DTMFs: **1*2*3*4*.
+                  * To reach the phone number '3330001', the user dials the
+                    following DTMFs: **1*2*3*4#3330001.
+
+                "
+  DEFVAL        { disable }
+  ::= { callGroup 300 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Call Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificCallTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF EpSpecificCallEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Endpoint Specific Call Configuration
+
+                A table of the telephony features configuration for the call,
+                indexed by the endpoint ID.
+                "
+  ::= { callGroup 400 }
+  epSpecificCallEntry OBJECT-TYPE
+   SYNTAX        EpSpecificCallEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Call Configuration. "
+   INDEX         {
+                   epSpecificCallEpId
+                 }
+
+   ::= { epSpecificCallTable 1 }
+
+  EpSpecificCallEntry ::= SEQUENCE
+  {
+    epSpecificCallEpId                OCTET STRING,
+    epSpecificCallEnableConfig        MxEnableState,
+    epSpecificCallHookFlashProcessing INTEGER
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificCallEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificCallEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificCallEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultCallHookFlashProcessing parameter.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificCall.HookFlashProcessing
+                     parameter.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificCallEntry 200 }
+
+  -- Columnar:Endpoint Specific Call Hook Flash Processing
+
+  epSpecificCallHookFlashProcessing OBJECT-TYPE
+   SYNTAX        INTEGER { processLocally(100) ,
+                 transmitUsingSignalingProtocol(200) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Call Hook Flash Processing
+
+                 Selects how to process hook-flash detection.
+
+                 When a call is in progress, the user can normally put the
+                 call on hold, transfer the call, or even initiate a
+                 conference call. DefaultCallHookFlashProcessing defines
+                 whether these subscriber services are handled by the unit or
+                 delegated to a remote party.
+
+                   * ProcessLocally: Hook-flash is processed locally. The
+                     actual behavior of the 'flash' button depends on which
+                     subscriber services are enabled for this endpoint.
+                   * TransmitUsingSignalingProtocol: Hook-flash is processed
+                     by a remote party. The hook-flash event is carried by a
+                     signaling protocol message. The actual behavior of the
+                     'flash' button depends on the remote party. This option
+                     also enables the unit to receive call waiting events with
+                     caller ID via the signaling protocol.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultCallHookFlashProcessing parameter if the
+                 EpSpecificCall.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { processLocally }
+   ::= { epSpecificCallEntry 400 }
+
+ -- End of table:Endpoint Specific Call Configuration
+
+ -- ***************************************************************************
+ 
+ -- Group:Call DTMF Map
+
+ -- ***************************************************************************
+ 
+ callDtmfMapGroup OBJECT IDENTIFIER
+  ::= { callGroup 500 }
+  -- ***************************************************************************
+  
+  -- Table:Call DTMF Map Allowed Configuration
+
+  -- ***************************************************************************
+  
+  callDtmfMapAllowedTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF CallDtmfMapAllowedEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " Call DTMF Map Allowed Configuration
+
+                 A table of the DTMF maps that are considered valid if dialed,
+                 indexed by the DTMF map entry number.
+                 "
+   ::= { callDtmfMapGroup 100 }
+   callDtmfMapAllowedEntry OBJECT-TYPE
+    SYNTAX        CallDtmfMapAllowedEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Call DTMF Map Allowed Configuration. "
+    INDEX         {
+                    callDtmfMapAllowedIndex
+                  }
+
+    ::= { callDtmfMapAllowedTable 1 }
+
+   CallDtmfMapAllowedEntry ::= SEQUENCE
+   {
+     callDtmfMapAllowedIndex              Unsigned32,
+     callDtmfMapAllowedEnable             MxEnableState,
+     callDtmfMapAllowedApplyTo            INTEGER,
+     callDtmfMapAllowedEpId               OCTET STRING,
+     callDtmfMapAllowedDtmfMap            MxDigitMap,
+     callDtmfMapAllowedDtmfTransformation OCTET STRING,
+     callDtmfMapAllowedTargetHost         MxIpHostNamePort,
+     callDtmfMapAllowedEmergency          MxEnableState
+   }
+
+   -- Index:Index
+
+   callDtmfMapAllowedIndex OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 1..10 )
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Index
+
+                  Accepted DTMF map index for this row.
+                  "
+    ::= { callDtmfMapAllowedEntry 100 }
+
+   -- Columnar:Enables/Disables the Row
+
+   callDtmfMapAllowedEnable OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Enables/Disables the Row
+
+                  If enabled, this DTMF map is recognised and accepted only if
+                  it is also valid.
+
+                  If disabled, this DTMF map is not recognised.
+
+                  "
+    DEFVAL        { enable }
+    ::= { callDtmfMapAllowedEntry 200 }
+
+   -- Columnar:DTMF Map Apply To
+
+   callDtmfMapAllowedApplyTo OBJECT-TYPE
+    SYNTAX        INTEGER { unit(100) , endpoint(200) }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " DTMF Map Apply To
+
+                  Sets the entity to which apply the DTMF map.
+
+                    * Unit: The DTMF map applies to all endpoints.
+                    * Endpoint: The DTMF map applies to a specific endpoint.
+                      The endpoint is specified in the EpId parameter.
+
+                  "
+    DEFVAL        { unit }
+    ::= { callDtmfMapAllowedEntry 300 }
+
+   -- Columnar:Endpoint Identifier
+
+   callDtmfMapAllowedEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+
+                  More than one endpoint can be specified. In that case, the
+                  endpoints are separated with ','.
+
+                  "
+    DEFVAL        { "" }
+    ::= { callDtmfMapAllowedEntry 400 }
+
+   -- Columnar:DTMF Map Mask
+
+   callDtmfMapAllowedDtmfMap OBJECT-TYPE
+    SYNTAX        MxDigitMap
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " DTMF Map Mask
+
+                  The DTMF map string used to validate the dialed DTMFs.
+
+                  The DTMF map syntax is taken from the MGCP specification (RFC
+                  3435 section 2.1.5). Refer to the DTMF Maps configuration in
+                  the Software Configuration Guide for examples.
+
+                  Local emulation of a service code:
+
+                  By using the special 'S' character to emulate a star code
+                  activation, the caller will hear a stutter dial tone after a
+                  service code has been dialed (e.g. *72). To use the special S
+                  character, it must be preceded by a valid DTMF map string. If
+                  characters are specified after the S, they must be a valid
+                  DTMF map string. If a DTMF transformation is associated with
+                  this DTMF map, the transformation is done on the signaled
+                  DTMF after the 'S' character. All dialed DTMFs will be
+                  present in the outgoing call, including the ones dialed
+                  before the stutter dial tone.
+
+                  "
+    DEFVAL        { "x.T" }
+    ::= { callDtmfMapAllowedEntry 500 }
+
+   -- Columnar:DTMF Transformation
+
+   callDtmfMapAllowedDtmfTransformation OBJECT-TYPE
+    SYNTAX        OCTET STRING ( SIZE(0..32) )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " DTMF Transformation
+
+                  Configures the transformation to apply to the signaled DTMF
+                  before using it as call destination.
+
+                  In the following description, 'x' represents the signaled
+                  number.
+
+                  Add before 'x' the DTMF to prefix or/and after 'x' the suffix
+                  to add. Characters '0123456789*#ABCD' are allowed.
+
+                  Use a sequence of DTMFs beween '{}' to remove a prefix/suffix
+                  to the dialed number if present. Use before 'x' to remove a
+                  prefix and after 'x' to remove a suffix. Characters
+                  '0123456789*#ABCD' are allowed.
+
+                  Use a number between '()' to remove a number of DTMFs. Use
+                  before 'x' to remove DTMFs at the beginning of the number and
+                  after 'x' to remove DTMFs at the end. Characters '0123456789'
+                  are allowed.
+
+                  The transformations are applied in order from left to right.
+
+                  Example with '18195551111#' as signaled number.
+
+                    * Add the prefix '0' to the dialed number: '0x' ==>
+                      '018195551111#'.
+                    * Remove the suffix '#' from the dialed number: 'x{#}' ==>
+                      '18195551111'.
+                    * Remove the first 4 DTMFs from the dialed number: '(4)x' =
+                      => '5551111#'
+                    * Remove the international code and termination and replace
+                      the area code by another one: '(1){819}514x{#}' ==>
+                      '5145551111'.
+                    * Replace the signaled DTMFs by '3332222' : '3332222' ==>
+                      '3332222'.
+
+                  "
+    DEFVAL        { "x" }
+    ::= { callDtmfMapAllowedEntry 600 }
+
+   -- Columnar:DTMF Map Target
+
+   callDtmfMapAllowedTargetHost OBJECT-TYPE
+    SYNTAX        MxIpHostNamePort
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " DTMF Map Target
+
+                  Target to use when the DTMF map matches. The default target
+                  is used when the value is empty.
+                  "
+    DEFVAL        { "" }
+    ::= { callDtmfMapAllowedEntry 700 }
+
+   -- Columnar:Emergency Flag
+
+   callDtmfMapAllowedEmergency OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Emergency Flag
+
+                  Enables/Disables the emergency process of the call.
+
+                    * Disable: The call is processed as normal.
+                    * Enable: The call is processed as emergency.
+
+                  "
+    DEFVAL        { disable }
+    ::= { callDtmfMapAllowedEntry 800 }
+
+  -- End of table:Call DTMF Map Allowed Configuration
+
+  -- ***************************************************************************
+  
+  -- Table:Refused Call DTMF Map
+
+  -- ***************************************************************************
+  
+  callDtmfMapRefuseTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF CallDtmfMapRefuseEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " Refused Call DTMF Map
+
+                 A table of the DTMF maps that are considered invalid if
+                 dialed, indexed by the DTMF map entry number.
+                 "
+   ::= { callDtmfMapGroup 200 }
+   callDtmfMapRefuseEntry OBJECT-TYPE
+    SYNTAX        CallDtmfMapRefuseEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Refused Call DTMF Map. "
+    INDEX         {
+                    callDtmfMapRefuseIndex
+                  }
+
+    ::= { callDtmfMapRefuseTable 1 }
+
+   CallDtmfMapRefuseEntry ::= SEQUENCE
+   {
+     callDtmfMapRefuseIndex   Unsigned32,
+     callDtmfMapRefuseEnable  MxEnableState,
+     callDtmfMapRefuseApplyTo INTEGER,
+     callDtmfMapRefuseEpId    OCTET STRING,
+     callDtmfMapRefuseDtmfMap MxDigitMap
+   }
+
+   -- Index:Index
+
+   callDtmfMapRefuseIndex OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 1..10 )
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Index
+
+                  Refused DTMF map index for this row.
+                  "
+    ::= { callDtmfMapRefuseEntry 100 }
+
+   -- Columnar:Enable DTMF Map
+
+   callDtmfMapRefuseEnable OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Enable DTMF Map
+
+                  If enabled, this DTMF map is recognised and refused only if
+                  it is also valid.
+
+                  If disabled, this DTMF map is not recognised.
+
+                  "
+    DEFVAL        { disable }
+    ::= { callDtmfMapRefuseEntry 200 }
+
+   -- Columnar:DTMF Map Apply To
+
+   callDtmfMapRefuseApplyTo OBJECT-TYPE
+    SYNTAX        INTEGER { unit(100) , endpoint(200) }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " DTMF Map Apply To
+
+                  Sets the entity to which apply the DTMF map.
+
+                    * Unit: The DTMF map applies to all endpoints.
+                    * Endpoint: The DTMF map applies to a specific endpoint.
+                      The endpoint is specified in the EpId parameter.
+
+                  "
+    DEFVAL        { unit }
+    ::= { callDtmfMapRefuseEntry 300 }
+
+   -- Columnar:Endpoint Identifier
+
+   callDtmfMapRefuseEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+
+                  More than one endpoint can be specified. In that case, the
+                  endpoints are separated with ','.
+
+                  "
+    DEFVAL        { "" }
+    ::= { callDtmfMapRefuseEntry 400 }
+
+   -- Columnar:Refused DTMF Map
+
+   callDtmfMapRefuseDtmfMap OBJECT-TYPE
+    SYNTAX        MxDigitMap
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Refused DTMF Map
+
+                  The actual DTMF map string that is considered invalid when
+                  dialed.
+
+                  The permitted DTMF map syntax is taken from the core MGCP
+                  specification, RFC 2705: ftp://ftp.isi.edu/in-notes/
+                  rfc2705.txt, section 3.4.
+
+                  "
+    DEFVAL        { "" }
+    ::= { callDtmfMapRefuseEntry 500 }
+
+  -- End of table:Refused Call DTMF Map
+
+ -- End of group:Call DTMF Map
+
+-- End of group:Call Services Group
+
+-- ****************************************************************************
+
+-- Group:Automatic Call Services Group
+
+-- ****************************************************************************
+
+autoCallGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 200 }
+ -- Scalar:Default Enable/Disable Automatic Call Service.
+
+ defaultAutoCallEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Automatic Call Service.
+
+                Enables/Disables the automatic call service. This service
+                provides a 'redphone'-like experience.
+
+                If enabled, the target address is automatically called when
+                the user picks up the phone.
+
+                When this service is enabled, the second line service is
+                disabled but the call waiting feature is still functional. The
+                user can still accept incoming calls.
+
+                If a specific configuration is set in the
+                EpSpecificAutoCall.Enable parameter and the
+                EpSpecificAutoCall.EnableConfig parameter is set to 'Enable',
+                then it overrides the current default configuration.
+
+                "
+  DEFVAL        { disable }
+  ::= { autoCallGroup 100 }
+
+ -- Scalar:Default Automatic Call Target Address
+
+ defaultAutoCallTargetAddress OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..127) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Automatic Call Target Address
+
+                Address or telephone number that the user wants to
+                automatically call.
+
+                If a specific configuration is set in the
+                EpSpecificAutoCall.TargetAddress parameter and the
+                EpSpecificAutoCall.EnableConfig parameter is set to 'Enable',
+                then it overrides the current default configuration.
+
+                "
+  DEFVAL        { "" }
+  ::= { autoCallGroup 200 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Automatic Call Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificAutoCallTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF EpSpecificAutoCallEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Endpoint Specific Automatic Call Configuration
+
+                A table of the telephony features configuration for the
+                automatic call, indexed by the endpoint ID.
+                "
+  ::= { autoCallGroup 300 }
+  epSpecificAutoCallEntry OBJECT-TYPE
+   SYNTAX        EpSpecificAutoCallEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Automatic Call Configuration
+                 . "
+   INDEX         {
+                   epSpecificAutoCallEpId
+                 }
+
+   ::= { epSpecificAutoCallTable 1 }
+
+  EpSpecificAutoCallEntry ::= SEQUENCE
+  {
+    epSpecificAutoCallEpId          OCTET STRING,
+    epSpecificAutoCallEnableConfig  MxEnableState,
+    epSpecificAutoCallEnable        MxEnableState,
+    epSpecificAutoCallTargetAddress OCTET STRING
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificAutoCallEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificAutoCallEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificAutoCallEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultAutoCallEnable and
+                     DefaultAutoCallTargetAddress parameters.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificAutoCall.Enable and
+                     EpSpecificAutoCall.TargetAddress parameters.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificAutoCallEntry 200 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Automatic Call Service
+
+  epSpecificAutoCallEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Automatic Call Service
+
+                 Enables/Disables the automatic call service. This service
+                 provides a 'redphone'-like experience.
+
+                 If enabled, the target address is automatically called when
+                 the user picks up the phone.
+
+                 When this service is enabled, the second line service is
+                 disabled but the call waiting feature is still functional.
+                 The user can still accept incoming calls.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultAutoCallEnable parameter if the
+                 EpSpecificAutoCall.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificAutoCallEntry 300 }
+
+  -- Columnar:Endpoint Specific Automatic Call Target Address
+
+  epSpecificAutoCallTargetAddress OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..127) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Automatic Call Target Address
+
+                 Address or telephone number that the user wants to
+                 automatically call.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultAutoCallTargetAddress parameter if the
+                 EpSpecificAutoCall.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { epSpecificAutoCallEntry 400 }
+
+ -- End of table:Endpoint Specific Automatic Call Configuration
+
+-- End of group:Automatic Call Services Group
+
+-- ****************************************************************************
+
+-- Group:Hold Services Group
+
+-- ****************************************************************************
+
+holdGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 300 }
+ -- Scalar:Default Enable/Disable Holding Service
+
+ defaultHoldEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Holding Service
+
+                Enables/Disables the holding service.
+
+                This service allows to temporarily put an active call on hold,
+                usually by using the 'flash' button of the telephone. The user
+                can resume the call in the same way.
+
+                This service has no dependencies on other services being
+                enabled.
+
+                If a specific configuration is set in the
+                EpSpecificHold.Enable parameter and the
+                EpSpecificHold.EnableConfig parameter is set to 'Enable', then
+                it overrides the current default configuration.
+
+                "
+  DEFVAL        { enable }
+  ::= { holdGroup 100 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificHoldTable OBJECT-TYPE
+  SYNTAX         SEQUENCE OF EpSpecificHoldEntry
+  MAX-ACCESS     not-accessible
+  STATUS         current
+  DESCRIPTION  " Endpoint Specific Subscriber Services Enabling Configuration
+
+                 "
+  ::= { holdGroup 200 }
+  epSpecificHoldEntry OBJECT-TYPE
+   SYNTAX        EpSpecificHoldEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                 Configuration. "
+   INDEX         {
+                   epSpecificHoldEpId
+                 }
+
+   ::= { epSpecificHoldTable 1 }
+
+  EpSpecificHoldEntry ::= SEQUENCE
+  {
+    epSpecificHoldEpId         OCTET STRING,
+    epSpecificHoldEnableConfig MxEnableState,
+    epSpecificHoldEnable       MxEnableState
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificHoldEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificHoldEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificHoldEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultHoldEnable parameter.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificHold.Enable parameter.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificHoldEntry 200 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Holding Service.
+
+  epSpecificHoldEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Holding Service.
+
+                 Enables/Disables the holding service.
+
+                 This service allows to temporarily put an active call on
+                 hold, usually by using the 'flash' button of the telephone.
+                 The user can resume the call in the same way.
+
+                 This service has no dependencies on other services being
+                 enabled.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultHoldEnable parameter if the
+                 EpSpecificHold.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificHoldEntry 300 }
+
+ -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ -- Table:Hold Services Status
+
+ -- ***************************************************************************
+ 
+ holdStatusTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF HoldStatusEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Hold Services Status
+
+                A table of the hold services status for the endpoint, indexed
+                by the endpoint ID.
+                "
+  ::= { holdGroup 300 }
+  holdStatusEntry OBJECT-TYPE
+   SYNTAX        HoldStatusEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Hold Services Status. "
+   INDEX         {
+                   holdStatusEpId
+                 }
+
+   ::= { holdStatusTable 1 }
+
+  HoldStatusEntry ::= SEQUENCE
+  {
+    holdStatusEpId  OCTET STRING,
+    holdStatusState MxActivationState
+  }
+
+  -- Index:Endpoint Identifier
+
+  holdStatusEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { holdStatusEntry 100 }
+
+  -- Columnar:Holding Service Status
+
+  holdStatusState OBJECT-TYPE
+   SYNTAX        MxActivationState
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Holding Service Status
+
+                 Status of the holding service.
+
+                 See the DefaultHoldEnabling parameter.
+
+                 "
+   ::= { holdStatusEntry 200 }
+
+ -- End of table:Hold Services Status
+
+-- End of group:Hold Services Group
+
+-- ****************************************************************************
+
+-- Group:Call Waiting Services
+
+-- ****************************************************************************
+
+callWaitingGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 400 }
+ -- Scalar:Default Enable/Disable Call Waiting Service
+
+ defaultCallWaitingEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Call Waiting Service
+
+                Enables/Disables the call waiting service.
+
+                With this service enabled, when an endpoint with an active
+                call receives a new call, it sends a special tone indicating
+                that a call is waiting on the second line. The user may then
+                answer that call by using the 'flash' button of the telephone.
+                The user can switch between the two active calls by using the
+                'flash' button.
+
+                To enable this service, the call hold service must be enabled
+                as well.
+
+                The user may cancel this service by dialing the DTMF sequence
+                stored in the DefaultCallWaitingCancelDtmfMap parameter.
+
+                See the DefaultHoldEnable and DefaultCallWaitingCancelDtmfMap
+                parameters.
+
+                If a specific configuration is set in the
+                EpSpecificCallWaiting.Enable parameter and the
+                EpSpecificCallWaiting.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { enable }
+  ::= { callWaitingGroup 100 }
+
+ -- Scalar:Default DTMF Map to Cancel the Call Waiting Service
+
+ defaultCallWaitingCancelDtmfMap OBJECT-TYPE
+  SYNTAX        MxDigitMap
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default DTMF Map to Cancel the Call Waiting Service
+
+                DTMF map the user can dial to disable the call waiting
+                service. This service is cancelled on a per-call basis.
+
+                This DTMF map must follow the syntax for DTMF maps as declared
+                in the DTMF maps configuration.
+
+                Note that dialing this DTMF map does not have any effect
+                unless the call waiting service's status is 'enabled'.
+
+                See the DefaultCallWaitingEnable parameter.
+
+                "
+  DEFVAL        { "" }
+  ::= { callWaitingGroup 200 }
+
+ -- Scalar:Default DTMF Map to Activate the Call Waiting Service
+
+ defaultCallWaitingActivationDtmfMap OBJECT-TYPE
+  SYNTAX        MxDigitMap
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default DTMF Map to Activate the Call Waiting Service
+
+                DTMF map the user can dial to activate the call waiting
+                service.
+
+                This DTMF map must follow the syntax for DTMF maps as declared
+                in the DTMF maps configuration.
+
+                Note that dialing this DTMF map does not have any effect
+                unless the call waiting service's status is 'enabled'.
+
+                See the DefaultCallWaitingEnable parameter.
+
+                "
+  DEFVAL        { "" }
+  ::= { callWaitingGroup 210 }
+
+ -- Scalar:Default DTMF Map to Deactivate the Call Waiting Service
+
+ defaultCallWaitingDeactivationDtmfMap OBJECT-TYPE
+  SYNTAX        MxDigitMap
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default DTMF Map to Deactivate the Call Waiting Service
+
+                DTMF map the user can dial to deactivate the call waiting
+                service.
+
+                This DTMF map must follow the syntax for DTMF maps as declared
+                in the DTMF maps configuration.
+
+                Note that dialing this DTMF map does not have any effect
+                unless the call waiting service's status is 'enabled'.
+
+                See the DefaultCallWaitingEnable parameter.
+
+                "
+  DEFVAL        { "" }
+  ::= { callWaitingGroup 220 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificCallWaitingTable OBJECT-TYPE
+  SYNTAX              SEQUENCE OF EpSpecificCallWaitingEntry
+  MAX-ACCESS          not-accessible
+  STATUS              current
+  DESCRIPTION      "  Endpoint Specific Subscriber Services Enabling
+                      Configuration
+
+                      "
+  ::= { callWaitingGroup 300 }
+  epSpecificCallWaitingEntry OBJECT-TYPE
+   SYNTAX        EpSpecificCallWaitingEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                 Configuration. "
+   INDEX         {
+                   epSpecificCallWaitingEpId
+                 }
+
+   ::= { epSpecificCallWaitingTable 1 }
+
+  EpSpecificCallWaitingEntry ::= SEQUENCE
+  {
+    epSpecificCallWaitingEpId         OCTET STRING,
+    epSpecificCallWaitingEnableConfig MxEnableState,
+    epSpecificCallWaitingEnable       MxEnableState
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificCallWaitingEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificCallWaitingEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificCallWaitingEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultCallWaitingEnable parameter.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificCallWaiting.Enable parameter.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificCallWaitingEntry 200 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Call Waiting Service
+
+  epSpecificCallWaitingEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Call Waiting Service
+
+                 Enables/Disables the call waiting service.
+
+                 With this service enabled, when an endpoint with an active
+                 call receives new calls, it sends a special tone indicating
+                 that a call is waiting on the second line. The user may then
+                 answer that call by using the 'flash' button of the
+                 telephone. The user can switch between the two active calls
+                 by using the 'flash' button.
+
+                 To enable this service, the call hold service must be enabled
+                 as well.
+
+                 The user cancels this service when dialing a DTMF sequence
+                 matching the DTMF map stored in
+                 DefaultCallWaitingCancelDtmfMap parameter.
+
+                 See the DefaultHoldEnable and DefaultCallWaitingCancelDtmfMap
+                 parameters.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultCallWaitingEnable parameter if the
+                 EpSpecificCallWaiting.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificCallWaitingEntry 300 }
+
+ -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ -- Table:Call Waiting Service Status
+
+ -- ***************************************************************************
+ 
+ callWaitingStatusTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF CallWaitingStatusEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Call Waiting Service Status
+
+                A table of the call waiting service status for the endpoint,
+                indexed by the endpoint ID.
+                "
+  ::= { callWaitingGroup 400 }
+  callWaitingStatusEntry OBJECT-TYPE
+   SYNTAX        CallWaitingStatusEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Call Waiting Service Status. "
+   INDEX         {
+                   callWaitingStatusEpId
+                 }
+
+   ::= { callWaitingStatusTable 1 }
+
+  CallWaitingStatusEntry ::= SEQUENCE
+  {
+    callWaitingStatusEpId  OCTET STRING,
+    callWaitingStatusState MxActivationState
+  }
+
+  -- Index:Endpoint Identifier
+
+  callWaitingStatusEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { callWaitingStatusEntry 100 }
+
+  -- Columnar:Call Waiting Service Status
+
+  callWaitingStatusState OBJECT-TYPE
+   SYNTAX        MxActivationState
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Call Waiting Service Status
+
+                 Status of the call waiting service.
+
+                 See the DefaultCallWaitingEnable parameter.
+
+                 "
+   ::= { callWaitingStatusEntry 200 }
+
+ -- End of table:Call Waiting Service Status
+
+ -- ***************************************************************************
+ 
+ -- Table:Call Waiting Service User Config
+
+ -- ***************************************************************************
+ 
+ callWaitingUserConfigTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF CallWaitingUserConfigEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Call Waiting Service User Config
+
+                A table of the call waiting service user config for the
+                endpoint, indexed by the endpoint ID.
+                "
+  ::= { callWaitingGroup 500 }
+  callWaitingUserConfigEntry OBJECT-TYPE
+   SYNTAX        CallWaitingUserConfigEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Call Waiting Service User Config. "
+   INDEX         {
+                   callWaitingUserConfigEpId
+                 }
+
+   ::= { callWaitingUserConfigTable 1 }
+
+  CallWaitingUserConfigEntry ::= SEQUENCE
+  {
+    callWaitingUserConfigEpId  OCTET STRING,
+    callWaitingUserConfigState MxActivationState
+  }
+
+  -- Index:Endpoint Identifier
+
+  callWaitingUserConfigEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies the endpoint.
+                 "
+   ::= { callWaitingUserConfigEntry 100 }
+
+  -- Columnar:Call Waiting Service User Config
+
+  callWaitingUserConfigState OBJECT-TYPE
+   SYNTAX        MxActivationState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Call Waiting Service User Config
+
+                 User config of the call waiting service.
+
+                   * Active: Indicates that the call waiting service is active
+                     (usable) for that line.
+                   * Inactive: Indicates that the call waiting service for
+                     that line has been deactivated by the user.
+
+                 "
+   DEFVAL        { active }
+   ::= { callWaitingUserConfigEntry 200 }
+
+ -- End of table:Call Waiting Service User Config
+
+-- End of group:Call Waiting Services
+
+-- ****************************************************************************
+
+-- Group:Second Call Services Group
+
+-- ****************************************************************************
+
+secondCallGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 500 }
+ -- Scalar:Default Enable/Disable Second Call Service
+
+ defaultSecondCallEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Second Call Service
+
+                Enables/Disables the second call service.
+
+                This service allows a user with an active call to put the call
+                on hold and initiate a new call on the second line.
+
+                This service is most useful in conjunction with the transfer
+                and conference services.
+
+                To enable this service, the call hold service must be enabled
+                as well. See the DefaultHoldEnable parameter.
+
+                If a specific configuration is set in the
+                EpSpecificSecondCall.Enable parameter and the
+                EpSpecificSecondCall.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { enable }
+  ::= { secondCallGroup 100 }
+
+ -- Scalar:Default Action on second call disconnect
+
+ defaultSecondCallDisconnectAction OBJECT-TYPE
+  SYNTAX        INTEGER { wait(100) , autoSwitch(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Action on second call disconnect
+
+                The action to execute when the second call disconnects:
+
+                  * Wait: This is the normal behavior. The end-of-call tone
+                    will be played until the user either flash hook to go back
+                    to the first call or on-hook to disconnect the first call.
+                  * AutoSwitch: This will play a specific tone then
+                    automatically switch back to the first call. Unless the
+                    user either flash hook or on-hook while the tone plays.
+                    Then those action have the same effect as when wait is
+                    choosen
+
+                If a specific configuration is set in the
+                EpSpecificSecondCall.DisconnectAction parameter and the
+                EpSpecificSecondCall.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { wait }
+  ::= { secondCallGroup 150 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificSecondCallTable OBJECT-TYPE
+  SYNTAX           SEQUENCE OF EpSpecificSecondCallEntry
+  MAX-ACCESS       not-accessible
+  STATUS           current
+  DESCRIPTION    " Endpoint Specific Subscriber Services Enabling
+                   Configuration
+
+                   "
+  ::= { secondCallGroup 200 }
+  epSpecificSecondCallEntry OBJECT-TYPE
+   SYNTAX        EpSpecificSecondCallEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                 Configuration. "
+   INDEX         {
+                   epSpecificSecondCallEpId
+                 }
+
+   ::= { epSpecificSecondCallTable 1 }
+
+  EpSpecificSecondCallEntry ::= SEQUENCE
+  {
+    epSpecificSecondCallEpId             OCTET STRING,
+    epSpecificSecondCallEnableConfig     MxEnableState,
+    epSpecificSecondCallEnable           MxEnableState,
+    epSpecificSecondCallDisconnectAction INTEGER
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificSecondCallEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificSecondCallEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificSecondCallEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultSecondCallEnable parameter.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificSecondCall.Enable parameter.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificSecondCallEntry 200 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Second Call Service
+
+  epSpecificSecondCallEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Second Call Service
+
+                 Enables/Disables the second call service.
+
+                 This service allows a user with an active call to put the
+                 call on hold and initiate a new call on the second line.
+
+                 This service is most useful in conjunction with the transfer
+                 and conference services.
+
+                 To enable this service, the call hold service must be enabled
+                 as well. See the DefaultHoldEnable parameter.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultSecondCallEnable parameter if the
+                 EpSpecificSecondCall.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificSecondCallEntry 300 }
+
+  -- Columnar:Endpoint Specific Action on second call disconnect
+
+  epSpecificSecondCallDisconnectAction OBJECT-TYPE
+   SYNTAX        INTEGER { wait(100) , autoSwitch(200) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Action on second call disconnect
+
+                 The action to execute when the second call disconnects:
+
+                   * Wait: This is the normal behavior. The end-of-call tone
+                     will be played until the user either flash hook to go
+                     back to the first call or on-hook to disconnect the first
+                     call.
+                   * AutoSwitch: This will play a specific tone then
+                     automatically switch back to the first call. Unless the
+                     user either flash hook or on-hook while the tone plays.
+                     Then those action have the same effect as when wait is
+                     choosen
+
+                 This configuration overrides the default configuration set in
+                 the DefaultSecondCallDisconnectAction parameter if the
+                 EpSpecificSecondCall.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { wait }
+   ::= { epSpecificSecondCallEntry 400 }
+
+ -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ -- Table:Second Call Services Status
+
+ -- ***************************************************************************
+ 
+ secondCallStatusTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SecondCallStatusEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Second Call Services Status
+
+                A table of the second call services status for the endpoint,
+                indexed by the endpoint ID.
+                "
+  ::= { secondCallGroup 300 }
+  secondCallStatusEntry OBJECT-TYPE
+   SYNTAX        SecondCallStatusEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Second Call Services Status. "
+   INDEX         {
+                   secondCallStatusEpId
+                 }
+
+   ::= { secondCallStatusTable 1 }
+
+  SecondCallStatusEntry ::= SEQUENCE
+  {
+    secondCallStatusEpId  OCTET STRING,
+    secondCallStatusState MxActivationState
+  }
+
+  -- Index:Endpoint Identifier
+
+  secondCallStatusEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { secondCallStatusEntry 100 }
+
+  -- Columnar:Second Call Service Status
+
+  secondCallStatusState OBJECT-TYPE
+   SYNTAX        MxActivationState
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Second Call Service Status
+
+                 Status of the second call service.
+
+                 See the DefaultSecondCallEnable parameter.
+
+                 "
+   ::= { secondCallStatusEntry 200 }
+
+ -- End of table:Second Call Services Status
+
+-- End of group:Second Call Services Group
+
+-- ****************************************************************************
+
+-- Group:Transfer Services Group
+
+-- ****************************************************************************
+
+transferGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 600 }
+ -- Scalar:Default Enable/Disable Blind Call Transfer Service.
+
+ defaultTransferBlindEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Blind Call Transfer Service.
+
+                Enables/Disables the blind call transfer service, also known
+                as Transfer without Consultation or Unattended Transfer.
+
+                This service allows a user to transfer a call on hold to a
+                still ringing (unanswered) call.
+
+                Starting with an active call, a user can put the call on hold,
+                initiate a call to a third party, then transfer the
+                participant that is currently on hold to the third party. This
+                must be done before the third party has answered. In case the
+                third party answers, the transfer becomes an Attended
+                Transfer.
+
+                The user requests the transfer by hanging up the handset.
+
+                Once the transfer is executed, the remaining calls (call on
+                hold and ringing call with third party) are then connected
+                together. The call on hold is automatically unheld and hears
+                the ringback tone provided by the third party's ringing. In
+                some configurations, the transfer execution is delayed until
+                the third party answers.
+
+                To enable this service, the call hold AND second call services
+                must be enabled as well. See the DefaultHoldEnable and
+                DefaultSecondCallEnable parameters.
+
+                Also see the DefaultTransferAttendedEnable parameter for a
+                variation of the transfer method.
+
+                If a specific configuration is set in the
+                EpSpecificTransfer.BlindEnable parameter and the
+                EpSpecificTransfer.EnableConfig parameter is set to 'Enable',
+                then it overrides the current default configuration.
+
+                See also SipEp.InteropWaitConfirmedDialogForBlindTransfer.
+
+                "
+  DEFVAL        { enable }
+  ::= { transferGroup 100 }
+
+ -- Scalar:Default Enable/Disable Attended Call Transfer Service
+
+ defaultTransferAttendedEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Attended Call Transfer Service
+
+                Enables/Disables the attended call transfer service, also
+                known as Transfer with Consultation.
+
+                This service allows a user to transfer a call on hold to an
+                active call.
+
+                Starting with an active call, a user can put the call on hold,
+                initiate a call to a third party, wait for the third party to
+                answer, then transfer the participant that is currently on
+                hold to the third party.
+
+                The transfer is triggered by the user hanging up the handset.
+                The remaining calls (call on hold and active call with third
+                party) are then connected together.
+
+                To enable this service, the call hold AND second call services
+                must be enabled as well. See the DefaultHoldEnable and
+                DefaultSecondCallEnable parameters.
+
+                If a specific configuration is set in the
+                EpSpecificTransfer.AttendedEnable parameter and the
+                EpSpecificTransfer.EnableConfig parameter is set to 'Enable',
+                then it overrides the current default configuration.
+
+                "
+  DEFVAL        { enable }
+  ::= { transferGroup 200 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificTransferTable OBJECT-TYPE
+  SYNTAX              SEQUENCE OF EpSpecificTransferEntry
+  MAX-ACCESS          not-accessible
+  STATUS              current
+  DESCRIPTION      "  Endpoint Specific Subscriber Services Enabling
+                      Configuration
+
+                      "
+  ::= { transferGroup 300 }
+  epSpecificTransferEntry OBJECT-TYPE
+   SYNTAX        EpSpecificTransferEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                 Configuration. "
+   INDEX         {
+                   epSpecificTransferEpId
+                 }
+
+   ::= { epSpecificTransferTable 1 }
+
+  EpSpecificTransferEntry ::= SEQUENCE
+  {
+    epSpecificTransferEpId           OCTET STRING,
+    epSpecificTransferEnableConfig   MxEnableState,
+    epSpecificTransferBlindEnable    MxEnableState,
+    epSpecificTransferAttendedEnable MxEnableState
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificTransferEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificTransferEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificTransferEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultTransferBlindEnable and
+                     DefaultTransferAttendedEnable parameters.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificTransfer.BlindEnable and
+                     EpSpecificTransfer.AttendedEnable parameter.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificTransferEntry 200 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Blind Call Transfer Service
+
+  epSpecificTransferBlindEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Blind Call Transfer Service
+
+                 Enables/Disables the blind call transfer service, also known
+                 as called Transfer without Consultation or Unattended
+                 Transfer.
+
+                 This service allows a user to transfer a call on hold to a
+                 still ringing (unanswered) call.
+
+                 Starting with an active call, a user can put the call on
+                 hold, initiate a call to a third party, then transfer the
+                 participant that is currently on hold to the third party.
+                 This must be done before the third party has answered. In
+                 case the third party answers, the transfer becomes an
+                 Attended Transfer.
+
+                 The user requests the transfer by hanging up the handset.
+
+                 Once the transfer is executed, the remaining calls (call on
+                 hold and ringing call with third party) are then connected
+                 together. The call on hold is automatically unheld and hears
+                 the ringback tone provided by the third party's ringing. In
+                 some configurations, the transfer execution is delayed until
+                 the third party answers.
+
+                 To enable this service, the call hold AND second call
+                 services must be enabled as well. See the DefaultHoldEnable
+                 and DefaultSecondCallEnable parameters.
+
+                 Also see the DefaultTransferAttendedEnable parameter for a
+                 variation of the transfer method.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultTransferBlindEnable parameter if the
+                 EpSpecificTransfer.EnableConfig parameter is set to 'Enable'.
+
+                 See also SipEp.InteropWaitConfirmedDialogForBlindTransfer.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificTransferEntry 500 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Attended Call Transfer Service
+
+  epSpecificTransferAttendedEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Attended Call Transfer
+                 Service
+
+                 Enables/Disables the attended call transfer service, also
+                 known as Transfer with Consultation.
+
+                 This service allows a user to transfer a call on hold to an
+                 active call.
+
+                 Starting with an active call, a user can put the call on
+                 hold, initiate a call to a third party, wait for the third
+                 party to answer, then transfer the participant that is
+                 currently on hold to the third party.
+
+                 The transfer is triggered by the user hanging up the handset.
+                 The remaining calls (call on hold and active call with third
+                 party) are then connected together.
+
+                 For this service to be enabled, the call hold AND second call
+                 services must be enabled as well. See the DefaultHoldEnable
+                 and DefaultSecondCallEnable parameters.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultTransferAttendedEnable parameter if the
+                 EpSpecificTransfer.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificTransferEntry 600 }
+
+ -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ -- Table:Transfer Services Status
+
+ -- ***************************************************************************
+ 
+ transferStatusTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF TransferStatusEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Transfer Services Status
+
+                A table of the transfer services status for the endpoint,
+                indexed by the endpoint ID.
+                "
+  ::= { transferGroup 400 }
+  transferStatusEntry OBJECT-TYPE
+   SYNTAX        TransferStatusEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Transfer Services Status. "
+   INDEX         {
+                   transferStatusEpId
+                 }
+
+   ::= { transferStatusTable 1 }
+
+  TransferStatusEntry ::= SEQUENCE
+  {
+    transferStatusEpId          OCTET STRING,
+    transferStatusBlindState    MxActivationState,
+    transferStatusAttendedState MxActivationState
+  }
+
+  -- Index:Endpoint Identifier
+
+  transferStatusEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { transferStatusEntry 100 }
+
+  -- Columnar:Blind Transfer Service Status
+
+  transferStatusBlindState OBJECT-TYPE
+   SYNTAX        MxActivationState
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Blind Transfer Service Status
+
+                 Status of the blind transfer service.
+
+                 See the DefaultTransferBlindEnable parameter.
+
+                 "
+   ::= { transferStatusEntry 200 }
+
+  -- Columnar:Attended Transfer Service Status
+
+  transferStatusAttendedState OBJECT-TYPE
+   SYNTAX        MxActivationState
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Attended Transfer Service Status
+
+                 Status of the attended transfer service.
+
+                 See the DefaultTransferAttendedEnable parameter.
+
+                 "
+   ::= { transferStatusEntry 300 }
+
+ -- End of table:Transfer Services Status
+
+-- End of group:Transfer Services Group
+
+-- ****************************************************************************
+
+-- Group:Conference Services Group
+
+-- ****************************************************************************
+
+conferenceGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 700 }
+ -- Scalar:Default Enable/Disable Call Conference Service
+
+ defaultConferenceEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Call Conference Service
+
+                Enables/Disables the call conference service.
+
+                This service allows a user to link two or more calls together
+                to form a single conversation, called a conference.
+
+                Starting with an active call, a user can put the call on hold,
+                initiate a call to a third party, wait for the third party to
+                answer, then use the 'flash' button of the telephone to start
+                the conference with the call that is already on hold.
+
+                  * Currently, only 3-way conferences are supported.
+                  * Currently, a participant of the conference can put the
+                    conference on hold and attempt other calls. This
+                    participant may then rejoin the conference at a later time
+                    by unholding it. The endpoint that has initiated the
+                    conference is NOT able to put the conference on hold.
+
+                To enable this service, the call hold AND second call services
+                must be enabled as well. See the DefaultHoldEnable parameter
+                and DefaultSecondCallEnable.
+
+                If a specific configuration is set in the
+                EpSpecificConference.Enable parameter and the
+                EpSpecificConference.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { enable }
+  ::= { conferenceGroup 100 }
+
+ -- Scalar:Default Conference Type
+
+ defaultConferenceType OBJECT-TYPE
+  SYNTAX        INTEGER { local(100) , conferenceServer(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Conference Type
+
+                Specifies how to manage the conference. This configuration
+                only applies to a conference initiated by one of the unit's
+                endpoint.
+
+                  * Local: The media of the conference is locally mixed by the
+                    unit. This conference type does not require any special
+                    support of the call peer or server. Using this type of
+                    conference can reduce the number of simultaneous calls
+                    supported.
+                  * ConferenceServer: The unit uses an external server to mix
+                    the media of the conference. This conference type requires
+                    the configuration of an external server (See the
+                    SipEp.DefaultStaticConferenceServerUri parameter). Using
+                    this type of conference does not affect the number of
+                    simultaneous calls supported.
+
+                This parameter only has an effect when the conference service
+                is enabled. See the DefaultConferenceEnable parameter.
+
+                In Local mode, the number of participants is limited to the
+                unit's model capacity. In ConferenceServer mode, the number of
+                participants is limited by the server's capacity.
+
+                If a specific configuration is set in the
+                EpSpecificConference.Enable parameter and the
+                EpSpecificConference.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { local }
+  ::= { conferenceGroup 150 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificConferenceTable OBJECT-TYPE
+  SYNTAX             SEQUENCE OF EpSpecificConferenceEntry
+  MAX-ACCESS         not-accessible
+  STATUS             current
+  DESCRIPTION      " Endpoint Specific Subscriber Services Enabling
+                     Configuration
+
+                     "
+  ::= { conferenceGroup 200 }
+  epSpecificConferenceEntry OBJECT-TYPE
+   SYNTAX        EpSpecificConferenceEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                 Configuration. "
+   INDEX         {
+                   epSpecificConferenceEpId
+                 }
+
+   ::= { epSpecificConferenceTable 1 }
+
+  EpSpecificConferenceEntry ::= SEQUENCE
+  {
+    epSpecificConferenceEpId         OCTET STRING,
+    epSpecificConferenceEnableConfig MxEnableState,
+    epSpecificConferenceEnable       MxEnableState,
+    epSpecificConferenceType         INTEGER
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificConferenceEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificConferenceEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificConferenceEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultConferenceEnable and
+                     DefaultConferenceType parameters.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificConference.Enable and
+                     EpSpecificConference.Type parameters.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificConferenceEntry 200 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Call Conference Service
+
+  epSpecificConferenceEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Call Conference Service
+
+                 Enables/Disables the call conference service.
+
+                 This service allows a user to link two or more calls together
+                 to form a single conversation, called a conference.
+
+                 Starting with an active call, a user can put the call on
+                 hold, initiate a call to a third party, wait for the third
+                 party to answer, then use the 'flash' button of the telephone
+                 to start the conference with the call that is already on
+                 hold.
+
+                   * Currently, only 3-way conferences are supported.
+                   * Currently, a participant of the conference can put the
+                     conference on hold and attempt other calls. This
+                     participant may then rejoin the conference at a later
+                     time by unholding it. The endpoint that has initiated the
+                     conference is NOT able to put the conference on hold.
+
+                 To enable this service, the call hold AND second call
+                 services must be enabled as well. See the DefaultHoldEnable
+                 parameter and DefaultSecondCallEnable.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultConferenceEnable parameter if the
+                 EpSpecificConference.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificConferenceEntry 300 }
+
+  -- Columnar:Endpoint Specific Conference Type
+
+  epSpecificConferenceType OBJECT-TYPE
+   SYNTAX        INTEGER { local(100) , conferenceServer(200) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Conference Type
+
+                 Specifies how to manage the conference. This configuration
+                 only applies to a conference initiated by one of the unit's
+                 endpoint.
+
+                   * Local: The media of the conference is locally mixed by
+                     the unit. This conference type does not require any
+                     special support of the call peer or server. Using this
+                     type of conference can reduce the number of simultaneous
+                     calls supported.
+                   * ConferenceServer: The unit use an external server to mix
+                     the media of the conference. This conference type
+                     requires the configuration of an external server (See the
+                     SipEp.DefaultStaticConferenceServerUri parameter). Using
+                     this type of conference does not affect the number of
+                     simultaneous calls supported.
+
+                 This parameter only has an effect when the conference service
+                 is enabled. See the DefaultConferenceEnable parameter.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultConferenceType parameter if the
+                 EpSpecificConference.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { local }
+   ::= { epSpecificConferenceEntry 400 }
+
+ -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ -- Table:Conference Services Status
+
+ -- ***************************************************************************
+ 
+ conferenceStatusTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF ConferenceStatusEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Conference Services Status
+
+                A table of the conference services status for the endpoint,
+                indexed by the endpoint ID.
+                "
+  ::= { conferenceGroup 300 }
+  conferenceStatusEntry OBJECT-TYPE
+   SYNTAX        ConferenceStatusEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Conference Services Status. "
+   INDEX         {
+                   conferenceStatusEpId
+                 }
+
+   ::= { conferenceStatusTable 1 }
+
+  ConferenceStatusEntry ::= SEQUENCE
+  {
+    conferenceStatusEpId  OCTET STRING,
+    conferenceStatusState MxActivationState
+  }
+
+  -- Index:Endpoint Identifier
+
+  conferenceStatusEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { conferenceStatusEntry 100 }
+
+  -- Columnar:Conference Service Status
+
+  conferenceStatusState OBJECT-TYPE
+   SYNTAX        MxActivationState
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Conference Service Status
+
+                 Status of the conference service.
+
+                 See the DefaultConferenceEnable parameter.
+
+                 "
+   ::= { conferenceStatusEntry 200 }
+
+ -- End of table:Conference Services Status
+
+-- End of group:Conference Services Group
+
+-- ****************************************************************************
+
+-- Group:Forward Group
+
+-- ****************************************************************************
+
+forwardGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 800 }
+ -- ***************************************************************************
+ 
+ -- Group:Forward Unconditional Group
+
+ -- ***************************************************************************
+ 
+ forwardUnconditionalGroup OBJECT IDENTIFIER
+  ::= { forwardGroup 100 }
+  -- Scalar:Default Enable/Disable Unconditional Call Forward Service
+
+  defaultForwardUnconditionalEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Default Enable/Disable Unconditional Call Forward Service
+
+                 Enables/Disables the unconditional call forward service.
+
+                 This service allows a user to forward ALL incoming calls to a
+                 specified target. A short ring is emitted to alert the user
+                 that the call has been forwarded, but the user cannot pick up
+                 the call from that location.
+
+                 If enabled, the user can dial the DTMF maps for enabling and
+                 disabling this service.
+
+                 See the ForwardingAddress,
+                 DefaultForwardUnconditionalDtmfMapActivation and
+                 DefaultForwardUnconditionalDtmfMapDeactivation parameters.
+
+                 If a specific configuration is set in the
+                 EpSpecificForwardUnconditional.Enable parameter and the
+                 EpSpecificForwardUnconditional.EnableConfig parameter is set
+                 to 'Enable', then it overrides the current default
+                 configuration.
+
+                 "
+   DEFVAL        { disable }
+   ::= { forwardUnconditionalGroup 100 }
+
+  -- Scalar:Unconditional Forward Activation DTMF Map
+
+  defaultForwardUnconditionalDtmfMapActivation OBJECT-TYPE
+   SYNTAX        MxDigitMap
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Unconditional Forward Activation DTMF Map
+
+                 DTMF map the user can dial to enable the application of the
+                 service.
+
+                 This DTMF map must follow the syntax for DTMF maps as declared
+                 in the DTMF maps configuration.
+
+                 Note that dialing this DTMF map does not have any effect
+                 unless the service's status is 'enabled'.
+
+                 See the DefaultForwardUnconditionalEnable parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { forwardUnconditionalGroup 200 }
+
+  -- Scalar:Unconditional Forward Deactivation DTMF Map
+
+  defaultForwardUnconditionalDtmfMapDeactivation OBJECT-TYPE
+   SYNTAX        MxDigitMap
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Unconditional Forward Deactivation DTMF Map
+
+                 DTMF map the user can dial to disable the application of the
+                 service.
+
+                 This DTMF map must follow the syntax for DTMF maps as declared
+                 in the DTMF maps configuration.
+
+                 Note that dialing this DTMF map does not have any effect
+                 unless the service's status is 'enabled'.
+
+                 See the DefaultForwardUnconditionalEnable parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { forwardUnconditionalGroup 300 }
+
+  -- ***************************************************************************
+  
+  -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+  -- ***************************************************************************
+  
+  epSpecificForwardUnconditionalTable OBJECT-TYPE
+   SYNTAX           SEQUENCE OF EpSpecificForwardUnconditionalEntry
+   MAX-ACCESS       not-accessible
+   STATUS           current
+   DESCRIPTION    " Endpoint Specific Subscriber Services Enabling
+                    Configuration
+
+                    "
+   ::= { forwardUnconditionalGroup 400 }
+   epSpecificForwardUnconditionalEntry OBJECT-TYPE
+    SYNTAX        EpSpecificForwardUnconditionalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                  Configuration. "
+    INDEX         {
+                    epSpecificForwardUnconditionalEpId
+                  }
+
+    ::= { epSpecificForwardUnconditionalTable 1 }
+
+   EpSpecificForwardUnconditionalEntry ::= SEQUENCE
+   {
+     epSpecificForwardUnconditionalEpId         OCTET STRING,
+     epSpecificForwardUnconditionalEnableConfig MxEnableState,
+     epSpecificForwardUnconditionalEnable       MxEnableState
+   }
+
+   -- Index:Endpoint Identifier
+
+   epSpecificForwardUnconditionalEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+                  "
+    ::= { epSpecificForwardUnconditionalEntry 100 }
+
+   -- Columnar:Enable Configuration
+
+   epSpecificForwardUnconditionalEnableConfig OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Enable Configuration
+
+                  Defines the configuration to use for a specific endpoint.
+
+                    * Disable: The endpoint uses the default configuration as
+                      defined in the DefaultForwardUnconditionalEnable
+                      parameter.
+                    * Enable: The endpoint uses the specific configuration as
+                      defined in the EpSpecificForwardUnconditional.Enable
+                      parameter.
+
+                  "
+    DEFVAL        { disable }
+    ::= { epSpecificForwardUnconditionalEntry 200 }
+
+   -- Columnar:Endpoit Specific Enable/Disable Unconditional Call Forward
+   -- Service
+
+   epSpecificForwardUnconditionalEnable OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Endpoit Specific Enable/Disable Unconditional Call Forward
+                  Service
+
+                  Enables/Disables the unconditional call forward service.
+
+                  This service allows a user to forward ALL incoming calls to a
+                  specified target. A short ring is emitted to alert the user
+                  that the call has been forwarded, but the user cannot pick up
+                  the call from that location.
+
+                  If enabled, the user can dial the DTMF maps for enabling and
+                  disabling this service.
+
+                  See the ForwardingAddress parameter.
+
+                  This configuration overrides the default configuration set in
+                  the DefaultForwardUnconditionalEnable parameter if the
+                  EpSpecificForwardUnconditional.EnableConfig parameter is set
+                  to 'Enable'.
+
+                  "
+    DEFVAL        { disable }
+    ::= { epSpecificForwardUnconditionalEntry 300 }
+
+  -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+  -- ***************************************************************************
+  
+  -- Table:Unconditional Call Forward Activation Configuration
+
+  -- ***************************************************************************
+  
+  forwardUnconditionalConfigTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF ForwardUnconditionalConfigEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " Unconditional Call Forward Activation Configuration
+
+                 A table of the unconditional call forward activation for the
+                 endpoint, indexed by the endpoint ID.
+                 "
+   ::= { forwardUnconditionalGroup 500 }
+   forwardUnconditionalConfigEntry OBJECT-TYPE
+    SYNTAX        ForwardUnconditionalConfigEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Unconditional Call Forward Activation
+                  Configuration . "
+    INDEX         {
+                    forwardUnconditionalConfigEpId
+                  }
+
+    ::= { forwardUnconditionalConfigTable 1 }
+
+   ForwardUnconditionalConfigEntry ::= SEQUENCE
+   {
+     forwardUnconditionalConfigEpId              OCTET STRING,
+     forwardUnconditionalConfigActivation        MxActivationState,
+     forwardUnconditionalConfigForwardingAddress OCTET STRING
+   }
+
+   -- Index:Endpoint Identifier
+
+   forwardUnconditionalConfigEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+                  "
+    ::= { forwardUnconditionalConfigEntry 100 }
+
+   -- Columnar:Unconditional Forward Activation State
+
+   forwardUnconditionalConfigActivation OBJECT-TYPE
+    SYNTAX        MxActivationState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Unconditional Forward Activation State
+
+                  Activation state of the unconditional call forward service.
+
+                  Using the DTMF maps configured for this service, the user can
+                  use his/her handset to activate or deactivate this service.
+                  In that case, the parameter is automatically updated to
+                  reflect the activation status.
+
+                  This service can also be activated or deactivated by setting
+                  the value of this parameter.
+
+                  "
+    DEFVAL        { inactive }
+    ::= { forwardUnconditionalConfigEntry 200 }
+
+   -- Columnar:Unconditional Forward Activation Forwarding Address
+
+   forwardUnconditionalConfigForwardingAddress OBJECT-TYPE
+    SYNTAX        OCTET STRING ( SIZE(0..127) )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Unconditional Forward Activation Forwarding Address
+
+                  Address or telephone number to which the user wants to
+                  forward calls.
+                  "
+    DEFVAL        { "" }
+    ::= { forwardUnconditionalConfigEntry 300 }
+
+  -- End of table:Unconditional Call Forward Activation Configuration
+
+ -- End of group:Forward Unconditional Group
+
+ -- ***************************************************************************
+ 
+ -- Group:Forward On Busy Group
+
+ -- ***************************************************************************
+ 
+ forwardOnBusyGroup OBJECT IDENTIFIER
+  ::= { forwardGroup 200 }
+  -- Scalar:Default Enable/Disable Call Forward On Busy Service
+
+  defaultForwardOnBusyEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Default Enable/Disable Call Forward On Busy Service
+
+                 Enables/Disables the call forward on busy service.
+
+                 This service allows a user to forward incoming calls to a
+                 specified target when the user is already participating in
+                 another call.
+
+                 The user does not have any feedback that a call was forwarded.
+
+                 If enabled, the user can dial the DTMF maps for enabling and
+                 disabling this service.
+
+                 See the ForwardingAddress,
+                 DefaultForwardOnBusyDtmfMapActivation, and
+                 DefaultForwardOnBusyDtmfMapDeactivation parameters.
+
+                 If a specific configuration is set in the
+                 EpSpecificForwardOnBusy.Enable parameter and the
+                 EpSpecificForwardOnBusy.EnableConfig parameter is set to
+                 'Enable', then it overrides the current default configuration.
+
+                 "
+   DEFVAL        { disable }
+   ::= { forwardOnBusyGroup 100 }
+
+  -- Scalar:Forward On Busy Activation DTMF Map
+
+  defaultForwardOnBusyDtmfMapActivation OBJECT-TYPE
+   SYNTAX        MxDigitMap
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Forward On Busy Activation DTMF Map
+
+                 DTMF map the user can dial to enable the application of the
+                 service.
+
+                 This DTMF map must follow the syntax for DTMF maps as declared
+                 in the DTMF maps configuration.
+
+                 Note that dialing this DTMF map does not have any effect
+                 unless the service's status is 'enabled'.
+
+                 See the DefaultForwardOnBusyEnable parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { forwardOnBusyGroup 300 }
+
+  -- Scalar:Default Forward On Busy DTMF Map Deactivation
+
+  defaultForwardOnBusyDtmfMapDeactivation OBJECT-TYPE
+   SYNTAX        MxDigitMap
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Default Forward On Busy DTMF Map Deactivation
+
+                 DTMF map the user can dial to disable the application of the
+                 service.
+
+                 This DTMF map must follow the syntax for DTMF maps as declared
+                 in the DTMF maps configuration.
+
+                 Note that dialing this DTMF map does not have any effect
+                 unless the service's status is 'enabled'.
+
+                 See the DefaultForwardOnBusyEnable parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { forwardOnBusyGroup 400 }
+
+  -- ***************************************************************************
+  
+  -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+  -- ***************************************************************************
+  
+  epSpecificForwardOnBusyTable OBJECT-TYPE
+   SYNTAX          SEQUENCE OF EpSpecificForwardOnBusyEntry
+   MAX-ACCESS      not-accessible
+   STATUS          current
+   DESCRIPTION   " Endpoint Specific Subscriber Services Enabling Configuration
+
+                   "
+   ::= { forwardOnBusyGroup 500 }
+   epSpecificForwardOnBusyEntry OBJECT-TYPE
+    SYNTAX        EpSpecificForwardOnBusyEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                  Configuration. "
+    INDEX         {
+                    epSpecificForwardOnBusyEpId
+                  }
+
+    ::= { epSpecificForwardOnBusyTable 1 }
+
+   EpSpecificForwardOnBusyEntry ::= SEQUENCE
+   {
+     epSpecificForwardOnBusyEpId         OCTET STRING,
+     epSpecificForwardOnBusyEnableConfig MxEnableState,
+     epSpecificForwardOnBusyEnable       MxEnableState
+   }
+
+   -- Index:Endpoint Identifier
+
+   epSpecificForwardOnBusyEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+                  "
+    ::= { epSpecificForwardOnBusyEntry 100 }
+
+   -- Columnar:Enable Configuration
+
+   epSpecificForwardOnBusyEnableConfig OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Enable Configuration
+
+                  Defines the configuration to use for a specific endpoint.
+
+                    * Disable: The endpoint uses the default configuration as
+                      defined in the DefaultForwardOnBusyEnable parameter.
+                    * Enable: The endpoint uses the specific configuration as
+                      defined in the EpSpecificForwardOnBusy.Enable parameter.
+
+                  "
+    DEFVAL        { disable }
+    ::= { epSpecificForwardOnBusyEntry 200 }
+
+   -- Columnar:Endpoint Specific Enable/Disable Call Forward On Busy Service
+
+   epSpecificForwardOnBusyEnable OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Endpoint Specific Enable/Disable Call Forward On Busy Service
+
+                  Enables/Disables the call forward on busy service.
+
+                  This service allows a user to forward incoming calls to a
+                  specified target when the user is already participating in
+                  another call.
+
+                  The user does not have any feedback that a call was
+                  forwarded.
+
+                  If enabled, the user can dial the DTMF maps for enabling and
+                  disabling this service.
+
+                  See the ForwardingAddress parameter.
+
+                  This configuration overrides the default configuration set in
+                  the DefaultForwardOnBusyEnable parameter if the
+                  EpSpecificForwardOnBusy.EnableConfig parameter is set to
+                  'Enable'.
+
+                  "
+    DEFVAL        { disable }
+    ::= { epSpecificForwardOnBusyEntry 300 }
+
+  -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+  -- ***************************************************************************
+  
+  -- Table:Call Forward On Busy Activation Configuration
+
+  -- ***************************************************************************
+  
+  forwardOnBusyConfigTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF ForwardOnBusyConfigEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " Call Forward On Busy Activation Configuration
+
+                 A table of the call forward on busy activation for the
+                 endpoint, indexed by the endpoint ID.
+                 "
+   ::= { forwardOnBusyGroup 600 }
+   forwardOnBusyConfigEntry OBJECT-TYPE
+    SYNTAX        ForwardOnBusyConfigEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Call Forward On Busy Activation Configuration
+                  . "
+    INDEX         {
+                    forwardOnBusyConfigEpId
+                  }
+
+    ::= { forwardOnBusyConfigTable 1 }
+
+   ForwardOnBusyConfigEntry ::= SEQUENCE
+   {
+     forwardOnBusyConfigEpId              OCTET STRING,
+     forwardOnBusyConfigActivation        MxActivationState,
+     forwardOnBusyConfigForwardingAddress OCTET STRING
+   }
+
+   -- Index:Endpoint Identifier
+
+   forwardOnBusyConfigEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+                  "
+    ::= { forwardOnBusyConfigEntry 100 }
+
+   -- Columnar:Forward On Busy Activation State
+
+   forwardOnBusyConfigActivation OBJECT-TYPE
+    SYNTAX        MxActivationState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Forward On Busy Activation State
+
+                  Activation status of the call forward on busy service.
+
+                  Using the DTMF maps configured for this service, the user can
+                  use his/her handset to activate or deactivate this service.
+                  In that case, the parameter is automatically updated to
+                  reflect the activation status.
+
+                  This service can also be activated or deactivated by setting
+                  the value of this parameter.
+
+                  "
+    DEFVAL        { inactive }
+    ::= { forwardOnBusyConfigEntry 200 }
+
+   -- Columnar:Forward On Busy Activation Forwarding Address
+
+   forwardOnBusyConfigForwardingAddress OBJECT-TYPE
+    SYNTAX        OCTET STRING ( SIZE(0..127) )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Forward On Busy Activation Forwarding Address
+
+                  Address or telephone number to which the user wants to
+                  forward calls.
+                  "
+    DEFVAL        { "" }
+    ::= { forwardOnBusyConfigEntry 300 }
+
+  -- End of table:Call Forward On Busy Activation Configuration
+
+ -- End of group:Forward On Busy Group
+
+ -- ***************************************************************************
+ 
+ -- Group:Forward On No Answer Group
+
+ -- ***************************************************************************
+ 
+ forwardNoAnswerGroup OBJECT IDENTIFIER
+  ::= { forwardGroup 300 }
+  -- Scalar:Default Enable/Disable Call Forward On No Answer Service
+
+  defaultForwardNoAnswerEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Default Enable/Disable Call Forward On No Answer Service
+
+                 Enables/Disables the call forward on no answer service.
+
+                 This service allows a user to forward incoming calls to a
+                 specified target when the user is unable to pick up the call
+                 before the timeout, specified by the
+                 DefaultForwardNoAnswerTimeout parameter, expires.
+
+                 The user does not have any feedback that a call was forwarded.
+
+                 If enabled, the user can dial the DTMF maps for enabling and
+                 disabling this service.
+
+                 See the ForwardingAddress, Timeout,
+                 DefaultForwardNoAnswerDtmfMapActivation and
+                 DefaultForwardNoAnswerDtmfMapDeactivation parameters.
+
+                 If a specific configuration is set in the
+                 EpSpecificForwardNoAnswer.Enable parameter and the
+                 EpSpecificForwardNoAnswer.EnableConfig parameter is set to
+                 'Enable', then it overrides the current default configuration.
+
+                 "
+   DEFVAL        { disable }
+   ::= { forwardNoAnswerGroup 100 }
+
+  -- Scalar:Default Forward No Answer Timeout
+
+  defaultForwardNoAnswerTimeout OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 200..120000 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Default Forward No Answer Timeout
+
+                 Time, in milliseconds, the telephone keeps ringing before the
+                 call forwarding activates.
+
+                 If a specific configuration is set in the
+                 EpSpecificForwardNoAnswer.Timeout parameter and the
+                 EpSpecificForwardNoAnswer.EnableConfig parameter is set to
+                 'Enable', then it overrides the current default configuration.
+
+                 "
+   DEFVAL        { 5000 }
+   ::= { forwardNoAnswerGroup 200 }
+
+  -- Scalar:Forward No Answer Activation DTMF Map
+
+  defaultForwardNoAnswerDtmfMapActivation OBJECT-TYPE
+   SYNTAX        MxDigitMap
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Forward No Answer Activation DTMF Map
+
+                 DTMF map the user can dial to enable the application of the
+                 service.
+
+                 This DTMF map must follow the syntax for DTMF maps as declared
+                 in the DTMF maps configuration.
+
+                 Note that dialing this DTMF map does not have any effect
+                 unless the service's status is 'enabled'.
+
+                 See the DefaultForwardNoAnswerEnable parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { forwardNoAnswerGroup 300 }
+
+  -- Scalar:Forward No Answer Deactivation DTMF Map
+
+  defaultForwardNoAnswerDtmfMapDeactivation OBJECT-TYPE
+   SYNTAX        MxDigitMap
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Forward No Answer Deactivation DTMF Map
+
+                 DTMF map the user can dial to disable the application of the
+                 service.
+
+                 This DTMF map must follow the syntax for DTMF maps as declared
+                 in the DTMF maps configuration.
+
+                 Note that dialing this DTMF map does not have any effect
+                 unless the service's status is 'enabled'.
+
+                 See the DefaultForwardNoAnswerEnable parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { forwardNoAnswerGroup 400 }
+
+  -- ***************************************************************************
+  
+  -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+  -- ***************************************************************************
+  
+  epSpecificForwardNoAnswerTable OBJECT-TYPE
+   SYNTAX          SEQUENCE OF EpSpecificForwardNoAnswerEntry
+   MAX-ACCESS      not-accessible
+   STATUS          current
+   DESCRIPTION   " Endpoint Specific Subscriber Services Enabling Configuration
+
+                   "
+   ::= { forwardNoAnswerGroup 500 }
+   epSpecificForwardNoAnswerEntry OBJECT-TYPE
+    SYNTAX        EpSpecificForwardNoAnswerEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                  Configuration. "
+    INDEX         {
+                    epSpecificForwardNoAnswerEpId
+                  }
+
+    ::= { epSpecificForwardNoAnswerTable 1 }
+
+   EpSpecificForwardNoAnswerEntry ::= SEQUENCE
+   {
+     epSpecificForwardNoAnswerEpId         OCTET STRING,
+     epSpecificForwardNoAnswerEnableConfig MxEnableState,
+     epSpecificForwardNoAnswerEnable       MxEnableState,
+     epSpecificForwardNoAnswerTimeout      Unsigned32
+   }
+
+   -- Index:Endpoint Identifier
+
+   epSpecificForwardNoAnswerEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+                  "
+    ::= { epSpecificForwardNoAnswerEntry 100 }
+
+   -- Columnar:Enable Configuration
+
+   epSpecificForwardNoAnswerEnableConfig OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Enable Configuration
+
+                  Defines the configuration to use for a specific endpoint.
+
+                    * Disable: The endpoint uses the default configuration as
+                      defined in the DefaultForwardNoAnswerEnable and
+                      DefaultForwardNoAnswerTimeout parameters.
+                    * Enable: The endpoint uses the specific configuration as
+                      defined in the EpSpecificForwardNoAnswer.Enable and
+                      EpSpecificForwardNoAnswer.Timeout parameters.
+
+                  "
+    DEFVAL        { disable }
+    ::= { epSpecificForwardNoAnswerEntry 200 }
+
+   -- Columnar:Endpoint Specific Enable/Disable Call Forward On No Answer
+   -- Service
+
+   epSpecificForwardNoAnswerEnable OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Endpoint Specific Enable/Disable Call Forward On No Answer
+                  Service
+
+                  Enables/Disables the call forward on no answer service.
+
+                  This service allows a user to forward incoming calls to a
+                  specified target when the user is unable to pick up the call
+                  before the timeout, specified by Timeout, expires.
+
+                  The user does not have any feedback that a call was
+                  forwarded.
+
+                  If enabled, the user can dial the DTMF maps for enabling and
+                  disabling this service.
+
+                  See the ForwardingAddress and Timeout parameters.
+
+                  This configuration overrides the default configuration set in
+                  the DefaultForwardNoAnswerEnable parameter if the
+                  EpSpecificForwardNoAnswer.EnableConfig parameter is set to
+                  'Enable'.
+
+                  "
+    DEFVAL        { disable }
+    ::= { epSpecificForwardNoAnswerEntry 300 }
+
+   -- Columnar:Endpoint Specific Forward No Answer Timeout
+
+   epSpecificForwardNoAnswerTimeout OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 200..120000 )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Endpoint Specific Forward No Answer Timeout
+
+                  Time, in milliseconds, the telephone keeps ringing before the
+                  call forwarding activates.
+
+                  This configuration overrides the default configuration set in
+                  the DefaultForwardNoAnswerTimeout parameter if the
+                  EpSpecificForwardNoAnswer.EnableConfig parameter is set to
+                  'Enable'.
+
+                  "
+    DEFVAL        { 5000 }
+    ::= { epSpecificForwardNoAnswerEntry 400 }
+
+  -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+  -- ***************************************************************************
+  
+  -- Table:Call Forward No Answer Activation Configuration
+
+  -- ***************************************************************************
+  
+  forwardNoAnswerConfigTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF ForwardNoAnswerConfigEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " Call Forward No Answer Activation Configuration
+
+                 A table of the call forward no answer activation for the
+                 endpoint, indexed by the endpoint ID.
+                 "
+   ::= { forwardNoAnswerGroup 600 }
+   forwardNoAnswerConfigEntry OBJECT-TYPE
+    SYNTAX        ForwardNoAnswerConfigEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Call Forward No Answer Activation
+                  Configuration . "
+    INDEX         {
+                    forwardNoAnswerConfigEpId
+                  }
+
+    ::= { forwardNoAnswerConfigTable 1 }
+
+   ForwardNoAnswerConfigEntry ::= SEQUENCE
+   {
+     forwardNoAnswerConfigEpId              OCTET STRING,
+     forwardNoAnswerConfigActivation        MxActivationState,
+     forwardNoAnswerConfigForwardingAddress OCTET STRING
+   }
+
+   -- Index:Endpoint Identifier
+
+   forwardNoAnswerConfigEpId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Endpoint Identifier
+
+                  String that identifies an endpoint in other tables.
+                  "
+    ::= { forwardNoAnswerConfigEntry 100 }
+
+   -- Columnar:Forward No Answer Activation State
+
+   forwardNoAnswerConfigActivation OBJECT-TYPE
+    SYNTAX        MxActivationState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Forward No Answer Activation State
+
+                  Activation status of the call forward on no answer service.
+
+                  Using the DTMF maps configured for this service, the user can
+                  use his/her handset to activate or deactivate this service.
+                  In that case, the parameter is automatically updated to
+                  reflect the activation status.
+
+                  This service can also be activated or deactivated by setting
+                  the value of this parameter.
+
+                  "
+    DEFVAL        { inactive }
+    ::= { forwardNoAnswerConfigEntry 200 }
+
+   -- Columnar:Forward No Answer Activation Forwarding Address
+
+   forwardNoAnswerConfigForwardingAddress OBJECT-TYPE
+    SYNTAX        OCTET STRING ( SIZE(0..127) )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Forward No Answer Activation Forwarding Address
+
+                  Address or telephone number to which the user wants to
+                  forward calls.
+                  "
+    DEFVAL        { "" }
+    ::= { forwardNoAnswerConfigEntry 300 }
+
+  -- End of table:Call Forward No Answer Activation Configuration
+
+ -- End of group:Forward On No Answer Group
+
+-- End of group:Forward Group
+
+-- ****************************************************************************
+
+-- Group:Call Completion Group
+
+-- ****************************************************************************
+
+callCompletionGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 900 }
+ -- Scalar:Default Enable/Disable Completion Of Calls To Busy Subscriber
+ -- (CCBS) Service
+
+ defaultCallCompletionBusySubscriberEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Completion Of Calls To Busy Subscriber
+                (CCBS) Service
+
+                Enables/Disables the completion of calls to busy subscriber
+                (CCBS) service.
+
+                This service allows a caller to establish a call with a 'busy'
+                called as soon as this called is available to take the call.
+
+                If a specific configuration is set in the
+                EpSpecificCallCompletion.BusySubscriberEnable parameter and
+                the EpSpecificCallCompletion.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { disable }
+  ::= { callCompletionGroup 100 }
+
+ -- Scalar:Completion Of Calls To Busy Subscriber (CCBS) Activation DTMF Map
+
+ defaultCallCompletionBusySubscriberDtmfMapActivation OBJECT-TYPE
+  SYNTAX        MxDigitMap
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Completion Of Calls To Busy Subscriber (CCBS) Activation DTMF
+                Map
+
+                DTMF map the user can dial to enable the application of the
+                completion of calls to busy subscriber (CCBS) service.
+
+                This DTMF map must follow the syntax for DTMF maps as declared
+                in the DTMF maps configuration.
+
+                The same code can be used in
+                DefaultCallCompletionBusySubscriberDtmfMapActivation and
+                DefaultCallCompletionNoReplyDtmfMapActivation parameters.
+
+                Note that dialing this DTMF map does not have any effect
+                unless the service's status is 'enabled'.
+
+                See the DefaultCallCompletionBusySubscriberEnable parameter.
+
+                "
+  DEFVAL        { "" }
+  ::= { callCompletionGroup 200 }
+
+ -- Scalar:Default Enable/Disable Completion Of Calls On No Reply (CCNR)
+ -- Service
+
+ defaultCallCompletionNoReplyEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Completion Of Calls On No Reply (CCNR)
+                Service
+
+                Enables/Disables the completion of calls on no reply (CCNR)
+                service.
+
+                This service allows a caller to establish a call with an
+                'idle' called right after this called uses his phone and is
+                available to take the call.
+
+                If a specific configuration is set in the
+                EpSpecificCallCompletion.NoReplyEnable parameter and the
+                EpSpecificCallCompletion.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { disable }
+  ::= { callCompletionGroup 300 }
+
+ -- Scalar:Completion Of Calls On No Reply (CCNR) Activation DTMF Map
+
+ defaultCallCompletionNoReplyDtmfMapActivation OBJECT-TYPE
+  SYNTAX        MxDigitMap
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Completion Of Calls On No Reply (CCNR) Activation DTMF Map
+
+                DTMF map the user can dial to enable the application of the
+                completion of calls on no reply (CCNR) service.
+
+                This DTMF map must follow the syntax for DTMF maps as declared
+                in the DTMF maps configuration.
+
+                The same code can be used in
+                DefaultCallCompletionBusySubscriberDtmfMapActivation and
+                DefaultCallCompletionNoReplyDtmfMapActivation parameters.
+
+                Note that dialing this DTMF map does not have any effect
+                unless the service's status is 'enabled'.
+
+                See the DefaultCallCompletionNoReplyEnable parameter.
+
+                "
+  DEFVAL        { "" }
+  ::= { callCompletionGroup 400 }
+
+ -- Scalar:Call Completion Deactivation DTMF Map
+
+ defaultCallCompletionDtmfMapDeactivation OBJECT-TYPE
+  SYNTAX        MxDigitMap
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Call Completion Deactivation DTMF Map
+
+                DTMF map the user can dial to disable the application of the
+                completion of calls to busy subscriber (CCBS) and completion
+                of calls on no reply (CCNR) services.
+
+                This DTMF map must follow the syntax for DTMF maps as declared
+                in the DTMF maps configuration.
+
+                Note that dialing this DTMF map does not have any effect
+                unless the service's status is 'enabled'.
+
+                See the DefaultCallCompletionBusySubscriberEnable parameter
+                and DefaultCallCompletionNoReplyEnable.
+
+                "
+  DEFVAL        { "" }
+  ::= { callCompletionGroup 500 }
+
+ -- Scalar:Call Completion Expiration Timeout
+
+ defaultCallCompletionExpirationTimeout OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 1..1440 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Call Completion Expiration Timeout
+
+                Defines the delay after the call completion activation to
+                automatically deactivate the call completion if the call is
+                not completed.
+
+                This value is expressed in minutes (m).
+
+                "
+  DEFVAL        { 180 }
+  ::= { callCompletionGroup 600 }
+
+ -- Scalar:Default Call Completion Method
+
+ defaultCallCompletionMethod OBJECT-TYPE
+  SYNTAX        INTEGER { monitoringOnly(100) , monitoringAndPolling(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Call Completion Method
+
+                Selects the call completion method to detect that the call
+                completion destination is ready to complete the call.
+
+                  * MonitoringOnly: The call completion only uses the
+                    monitoring method to detect that the destination is ready
+                    to complete the call.
+                  * MonitoringAndPolling: The call completion only uses the
+                    monitoring method to detect that the destination is ready
+                    to complete the call. The polling mechanism is used if the
+                    call completion destination cannot be monitored.
+
+                The monitoring method consists of using the protocol
+                signalling to detect the destination state without using the
+                call. When the destination is ready to complete the call, the
+                local user is notified that the call is ready to be completed
+                and the call to the destination is initiated when the user is
+                ready to initiate the call.
+
+                The polling method consists of using periodic calls to the
+                call completion destination until the destination responds
+                with a ringing or connect. Upon receiving these responses, the
+                local user is notified that the call is ready to be completed.
+
+                The polling mechanism can only be used for call completion to
+                busy subscriber (CCBS).
+
+                The retransmission of the polling mechanism is configurable
+                with DefaultCallCompletionPollingInterval.
+
+                "
+  DEFVAL        { monitoringOnly }
+  ::= { callCompletionGroup 650 }
+
+ -- Scalar:Default Enable/Disable Call Completion Auto Reactivation
+
+ defaultCallCompletionAutoReactivateEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Call Completion Auto Reactivation
+
+                Enables/Disables the call completion auto reactivation.
+
+                When enabled, the completion of calls to busy is automatically
+                activated if the call initiated by a completion of calls to
+                busy or a completion of calls on no reply fails because of a
+                busy destination.
+
+                "
+  DEFVAL        { disable }
+  ::= { callCompletionGroup 700 }
+
+ -- Scalar:Default Call Completion Auto Reactivation Delay
+
+ defaultCallCompletionAutoReactivateDelay OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..600 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Call Completion Auto Reactivation Delay
+
+                Defines the minimal delay to wait before executing a call
+                completion after its activation. This delay only applies to
+                call completion activated via the call completion auto
+                reactivation feature.
+
+                It is recommended to set a delay when the method to monitor
+                the target state is based on the target calls instead of its
+                ability to answer a call.
+
+                This parameter is not used if the
+                DefaultCallCompletionAutoReactivateEnable parameter is set to
+                'Disable'.
+
+                This value is expressed in seconds (s).
+
+                "
+  DEFVAL        { 30 }
+  ::= { callCompletionGroup 750 }
+
+ -- Scalar:Default Call Completion Early Media Behaviour
+
+ defaultCallCompletionEarlyMediaBehaviour OBJECT-TYPE
+  SYNTAX        INTEGER { none(100) , ccbs(200) , ccnr(300) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Call Completion Early Media Behaviour
+
+                Defines how the call completion service needs to interpret the
+                reception of a progress message with early media.
+
+                  * None: The progress message with early media is not
+                    considered as a busy or a ringing response.
+                  * Ccbs: The progress message with early media is interpreted
+                    as a busy response and the CCBS can be activated on the
+                    call.
+                  * Ccnr: The progress message with early media is interpreted
+                    as a ringing response and the CCNR can be activated on the
+                    call.
+
+                "
+  DEFVAL        { none }
+  ::= { callCompletionGroup 775 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificCallCompletionTable OBJECT-TYPE
+  SYNTAX          SEQUENCE OF EpSpecificCallCompletionEntry
+  MAX-ACCESS      not-accessible
+  STATUS          current
+  DESCRIPTION   " Endpoint Specific Subscriber Services Enabling Configuration
+
+                  "
+  ::= { callCompletionGroup 800 }
+  epSpecificCallCompletionEntry OBJECT-TYPE
+   SYNTAX        EpSpecificCallCompletionEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Subscriber Services Enabling
+                 Configuration. "
+   INDEX         {
+                   epSpecificCallCompletionEpId
+                 }
+
+   ::= { epSpecificCallCompletionTable 1 }
+
+  EpSpecificCallCompletionEntry ::= SEQUENCE
+  {
+    epSpecificCallCompletionEpId                 OCTET STRING,
+    epSpecificCallCompletionEnableConfig         MxEnableState,
+    epSpecificCallCompletionBusySubscriberEnable MxEnableState,
+    epSpecificCallCompletionNoReplyEnable        MxEnableState
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificCallCompletionEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificCallCompletionEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificCallCompletionEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultCallCompletionBusySubscriberEnable
+                     and DefaultCallCompletionNoReplyEnable parameters.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the
+                     EpSpecificCallCompletion.BusySubscriberEnable and
+                     EpSpecificCallCompletion.NoReplyEnable parameters.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificCallCompletionEntry 200 }
+
+  -- Columnar:Endpoint Specific Completion Of Calls To Busy Subscriber (CCBS)
+  -- Service
+
+  epSpecificCallCompletionBusySubscriberEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Completion Of Calls To Busy Subscriber
+                 (CCBS) Service
+
+                 Enables/Disables the completion of calls to busy subscriber
+                 (CCBS) service.
+
+                 This service allows a caller to establish a call with a
+                 'busy' called as soon as this called is available to take the
+                 call.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultCallCompletionBusySubscriberEnable parameter if
+                 the EpSpecificCallCompletion.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificCallCompletionEntry 300 }
+
+  -- Columnar:Endpoint Specific Completion Of Calls On No Reply (CCNR) Service
+
+  epSpecificCallCompletionNoReplyEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Completion Of Calls On No Reply (CCNR)
+                 Service
+
+                 Enables/Disables the completion of calls on no reply (CCNR)
+                 service.
+
+                 This service allows a caller to establish a call with an
+                 'idle' called right after this called uses his phone and is
+                 available to take the call.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultCallCompletionNoReplyEnable parameter if the
+                 EpSpecificCallCompletion.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { enable }
+   ::= { epSpecificCallCompletionEntry 400 }
+
+ -- End of table:Endpoint Specific Subscriber Services Enabling Configuration
+
+ -- ***************************************************************************
+ 
+ -- Table:Call Completion Services Config
+
+ -- ***************************************************************************
+ 
+ callCompletionConfigTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF CallCompletionConfigEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Call Completion Services Config
+
+                A table of the call completion configuration on the unit.
+                "
+  ::= { callCompletionGroup 900 }
+  callCompletionConfigEntry OBJECT-TYPE
+   SYNTAX        CallCompletionConfigEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Call Completion Services Config. "
+   INDEX         {
+                   callCompletionConfigIndex
+                 }
+
+   ::= { callCompletionConfigTable 1 }
+
+  CallCompletionConfigEntry ::= SEQUENCE
+  {
+    callCompletionConfigIndex         Unsigned32,
+    callCompletionConfigEpId          OCTET STRING,
+    callCompletionConfigType          INTEGER,
+    callCompletionConfigTargetAddress OCTET STRING,
+    callCompletionConfigTargetState   INTEGER
+  }
+
+  -- Index:Index
+
+  callCompletionConfigIndex OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Index
+
+                 Unique identifier of the row.
+                 "
+   ::= { callCompletionConfigEntry 100 }
+
+  -- Columnar:Endpoint Identifier
+
+  callCompletionConfigEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 Identification of the endpoint using this call completion
+                 service.
+                 "
+   ::= { callCompletionConfigEntry 200 }
+
+  -- Columnar:Call Completion Type
+
+  callCompletionConfigType OBJECT-TYPE
+   SYNTAX        INTEGER { ccbs(100) , ccnr(200) }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Call Completion Type
+
+                 The type of the call completion.
+
+                   * Ccbs : Completion of calls to busy subscriber.
+                   * Ccnr : Completion of calls on no reply.
+
+                 "
+   ::= { callCompletionConfigEntry 300 }
+
+  -- Columnar:Call Completion Target Address
+
+  callCompletionConfigTargetAddress OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Call Completion Target Address
+
+                 The target address of the call completion.
+
+                 This address is the final address after manipulation of the
+                 call router.
+
+                 "
+   ::= { callCompletionConfigEntry 400 }
+
+  -- Columnar:Call Completion Target State
+
+  callCompletionConfigTargetState OBJECT-TYPE
+   SYNTAX        INTEGER { unknown(100) , idle(200) , busy(300) }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Call Completion Target State
+
+                 The state of the call completion target.
+
+                   * Unknown : The destination state is unknown.
+                   * Idle : The destination is currently idle.
+                   * Busy : The destination is currently busy.
+
+                 "
+   ::= { callCompletionConfigEntry 500 }
+
+ -- End of table:Call Completion Services Config
+
+ -- ***************************************************************************
+ 
+ -- Group:Call Completion Polling Group
+
+ -- ***************************************************************************
+ 
+ callCompletionPollingGroup OBJECT IDENTIFIER
+  ::= { callCompletionGroup 10000 }
+  -- Scalar:Call Completion Polling Interval
+
+  defaultCallCompletionPollingInterval OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 5..3600 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Call Completion Polling Interval
+
+                 Defines the delay between the calls to the call completion
+                 target used for the polling mechanism.
+
+                 This parameter is used only if the DefaultCallCompletionMethod
+                 is set to 'MonitoringAndPolling'.
+
+                 This value is expressed in second (s).
+
+                 "
+   DEFVAL        { 5 }
+   ::= { callCompletionPollingGroup 780 }
+
+ -- End of group:Call Completion Polling Group
+
+-- End of group:Call Completion Group
+
+-- ****************************************************************************
+
+-- Group:Delayed Hotline Services Group
+
+-- ****************************************************************************
+
+delayedHotlineGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 1000 }
+ -- Scalar:Default Enable/Disable Delayed Hotline Service.
+
+ defaultDelayedHotlineEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Enable/Disable Delayed Hotline Service.
+
+                Enables/Disables the delayed hotline service. This service is
+                also called warm line.
+
+                The delayed hotline allows the user to call a particular
+                destination without dialling. The configured destination is
+                called by picking up the phone and waiting for a configurable
+                number of seconds without dialling.
+
+                The delayed hotline can also be configured to be initiated if
+                the user does not dial a complete sequence of digits in an
+                allowed time period.
+
+                The condition to execute the delayed hotline is configurable
+                with the DefaultDelayedHotlineCondition parameter and the
+                destination with the DefaultDelayedHotlineTargetAddress
+                parameter.
+
+                If a specific configuration is set in the
+                EpSpecificDelayedHotline.Enable parameter and the
+                EpSpecificDelayedHotline.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { disable }
+  ::= { delayedHotlineGroup 100 }
+
+ -- Scalar:Default Delayed Hotline Activation Condition
+
+ defaultDelayedHotlineCondition OBJECT-TYPE
+  SYNTAX        INTEGER { firstDtmfTimeout(100) , interDtmfOrCompletionTimeout
+                (200) , anyTimeout(300) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Delayed Hotline Activation Condition
+
+                Selects the condition(s) that activate the delayed hotline.
+
+                  * FirstDtmfTimeout: The delayed hotline is activated when
+                    the timeout configured in DtmfMapTimeoutFirstDtmf elapse.
+                  * InterDtmfOrCompletionTimeout: The delayed hotline is
+                    activated when the timeout configured in
+                    DtmfMapTimeoutCompletion elapses or the DTMFs collection
+                    fails because the DtmfMapTimeoutInterDtmf elapses.
+                  * AnyTimeout: The delayed hotline is activated for the
+                    condition of 'FirstDtmfTimeout' and
+                    'InterDtmfOrCompletionTimeout'.
+
+                If a specific configuration is set in the
+                EpSpecificDelayedHotline.Condition parameter and the
+                EpSpecificDelayedHotline.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { firstDtmfTimeout }
+  ::= { delayedHotlineGroup 200 }
+
+ -- Scalar:Default Delayed Hotline Target Address
+
+ defaultDelayedHotlineTargetAddress OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..127) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Default Delayed Hotline Target Address
+
+                Address or telephone number of the target of the delayed
+                hotline.
+
+                If a specific configuration is set in the
+                EpSpecificDelayedHotline.TargetAddress parameter and the
+                EpSpecificDelayedHotline.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { "" }
+  ::= { delayedHotlineGroup 300 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific Delayed Hotline Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificDelayedHotlineTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF EpSpecificDelayedHotlineEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Endpoint Specific Delayed Hotline Configuration
+
+                A table of the telephony features configuration for the dlayed
+                hotline, indexed by the endpoint ID.
+                "
+  ::= { delayedHotlineGroup 1000 }
+  epSpecificDelayedHotlineEntry OBJECT-TYPE
+   SYNTAX        EpSpecificDelayedHotlineEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific Delayed Hotline
+                 Configuration . "
+   INDEX         {
+                   epSpecificDelayedHotlineEpId
+                 }
+
+   ::= { epSpecificDelayedHotlineTable 1 }
+
+  EpSpecificDelayedHotlineEntry ::= SEQUENCE
+  {
+    epSpecificDelayedHotlineEpId          OCTET STRING,
+    epSpecificDelayedHotlineEnableConfig  MxEnableState,
+    epSpecificDelayedHotlineEnable        MxEnableState,
+    epSpecificDelayedHotlineCondition     INTEGER,
+    epSpecificDelayedHotlineTargetAddress OCTET STRING
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificDelayedHotlineEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificDelayedHotlineEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificDelayedHotlineEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DefaultDelayedHotlineEnable,
+                     DefaultDelayedHotlineCondition and
+                     DefaultDelayedHotlineTargetAddress parameters.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificDelayedHotline.Enable,
+                     EpSpecificDelayedHotline.Condition and
+                     EpSpecificDelayedHotline.TargetAddress parameters.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificDelayedHotlineEntry 200 }
+
+  -- Columnar:Endpoint Specific Enable/Disable Delayed Hotline Service
+
+  epSpecificDelayedHotlineEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Enable/Disable Delayed Hotline Service
+
+                 Enables/Disables the delayed hotline service. This service is
+                 also called warm line.
+
+                 The delayed hotline allows the user to call a particular
+                 destination without dialling. The configured destination is
+                 called by picking up the phone and waiting for a configurable
+                 number of seconds without dialling.
+
+                 The delayed hotline can also be configured to be initiated if
+                 the user does not dial a complete sequence of digits in an
+                 allowed time period.
+
+                 The condition to execute the delayed hotline is configurable
+                 with the parameter DefaultDelayedHotlineCondition and the
+                 destination with the parameter
+                 DefaultDelayedHotlineTargetAddress.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultDelayedHotlineEnable parameter if the
+                 EpSpecificDelayedHotline.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificDelayedHotlineEntry 300 }
+
+  -- Columnar:Endpoint Specific Delayed Hotline Activation Condition
+
+  epSpecificDelayedHotlineCondition OBJECT-TYPE
+   SYNTAX        INTEGER { firstDtmfTimeout(100) ,
+                 interDtmfOrCompletionTimeout(200) , anyTimeout(300) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Delayed Hotline Activation Condition
+
+                 Select the condition(s) that activate the delayed hotline.
+
+                   * FirstDtmfTimeout: The delayed hotline is activated when
+                     the timeout configured in DtmfMapTimeoutFirstDtmf elapse.
+                   * InterDtmfOrCompletionTimeout: The delayed hotline is
+                     activated when the timeout configured in
+                     DtmfMapTimeoutCompletion elapses or the DTMFs collection
+                     fails because the DtmfMapTimeoutInterDtmf elapses.
+                   * AnyTimeout: The delayed hotline is activated for the
+                     condition of 'FirstDtmfTimeout' and
+                     'InterDtmfOrCompletionTimeout'.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultDelayedHotlineCondition parameter if the
+                 EpSpecificDelayedHotline.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { firstDtmfTimeout }
+   ::= { epSpecificDelayedHotlineEntry 400 }
+
+  -- Columnar:Endpoint Specific Delayed Hotline Target Address
+
+  epSpecificDelayedHotlineTargetAddress OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..127) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Delayed Hotline Target Address
+
+                 Address or telephone number of the target of the delayed
+                 hotline.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultDelayedHotlineTargetAddress parameter if the
+                 EpSpecificDelayedHotline.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { epSpecificDelayedHotlineEntry 500 }
+
+ -- End of table:Endpoint Specific Delayed Hotline Configuration
+
+-- End of group:Delayed Hotline Services Group
+
+-- ****************************************************************************
+
+-- Group:Statistics Group
+
+-- ****************************************************************************
+
+statisticsGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 1200 }
+ -- ***************************************************************************
+ 
+ -- Table:Call Statistics
+
+ -- ***************************************************************************
+ 
+ callStatisticsTable OBJECT-TYPE
+  SYNTAX                  SEQUENCE OF CallStatisticsEntry
+  MAX-ACCESS              not-accessible
+  STATUS                  current
+  DESCRIPTION          "  Call Statistics
+
+                          Call statistics per endpoint.
+                          "
+  ::= { statisticsGroup 100 }
+  callStatisticsEntry OBJECT-TYPE
+   SYNTAX        CallStatisticsEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Call Statistics. "
+   INDEX         {
+                   callStatisticsEpId
+                 }
+
+   ::= { callStatisticsTable 1 }
+
+  CallStatisticsEntry ::= SEQUENCE
+  {
+    callStatisticsEpId                   OCTET STRING,
+    callStatisticsIncomingCallsReceived  Unsigned32,
+    callStatisticsIncomingCallsAnswered  Unsigned32,
+    callStatisticsIncomingCallsConnected Unsigned32,
+    callStatisticsIncomingCallsFailed    Unsigned32,
+    callStatisticsOutgoingCallsAttempted Unsigned32,
+    callStatisticsOutgoingCallsAnswered  Unsigned32,
+    callStatisticsOutgoingCallsConnected Unsigned32,
+    callStatisticsOutgoingCallsFailed    Unsigned32,
+    callStatisticsCallsDropped           Unsigned32,
+    callStatisticsTotalCallTime          Unsigned32,
+    callStatisticsReset                  INTEGER
+  }
+
+  -- Index:Endpoint Identifier
+
+  callStatisticsEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { callStatisticsEntry 100 }
+
+  -- Columnar:CallsDropped
+
+  callStatisticsCallsDropped OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " CallsDropped
+
+                 Number of IP calls, on the endpoint since service start, that
+                 were successfully connected (incoming or outgoing), but
+                 dropped unexpectedly while in progress without explicit user
+                 termination.
+                 "
+   ::= { callStatisticsEntry 1000 }
+
+  -- Columnar:TotalCallTime
+
+  callStatisticsTotalCallTime OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " TotalCallTime
+
+                 Cumulative duration of all IP calls on the endpoint since
+                 service start, in seconds. This value is updated at the end
+                 of the call.
+                 "
+   ::= { callStatisticsEntry 1100 }
+
+  -- Row command:Reset
+
+  callStatisticsReset OBJECT-TYPE
+   SYNTAX        INTEGER { noOp(0), reset(10) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Reset
+
+                 Sets all the values in the row to zero.
+                 "
+   DEFVAL        { noOp }
+   ::= { callStatisticsEntry 1200 }
+
+  -- Columnar:Incoming Calls Received
+
+  callStatisticsIncomingCallsReceived OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Incoming Calls Received
+
+                 Number of incoming IP calls received on the endpoint since
+                 service start. This value is updated at the end of the call.
+                 "
+   ::= { callStatisticsEntry 200 }
+
+  -- Columnar:IncomingCallsAnswered
+
+  callStatisticsIncomingCallsAnswered OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " IncomingCallsAnswered
+
+                 Number of incoming IP calls answered on the endpoint since
+                 service start. This value is updated at the end of the call.
+                 "
+   ::= { callStatisticsEntry 300 }
+
+  -- Columnar:Incoming Calls Connected
+
+  callStatisticsIncomingCallsConnected OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Incoming Calls Connected
+
+                 Number of incoming IP calls that successfully completed call
+                 setup signaling on the endpoint since service start. This
+                 value is updated at the end of the call.
+                 "
+   ::= { callStatisticsEntry 400 }
+
+  -- Columnar:IncomingCallsFailed
+
+  callStatisticsIncomingCallsFailed OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " IncomingCallsFailed
+
+                 Number of incoming IP calls that failed to complete call
+                 setup signaling on the endpoint since service start. This
+                 value is updated at the end of the call.
+                 "
+   ::= { callStatisticsEntry 500 }
+
+  -- Columnar:OutgoingCallsAttempted
+
+  callStatisticsOutgoingCallsAttempted OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " OutgoingCallsAttempted
+
+                 Number of outgoing IP calls attempted for the endpoint since
+                 service start. This value is updated at the end of the call.
+                 "
+   ::= { callStatisticsEntry 600 }
+
+  -- Columnar:OutgoingCallsAnswered
+
+  callStatisticsOutgoingCallsAnswered OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " OutgoingCallsAnswered
+
+                 Number of outgoing IP calls answered by the called party for
+                 the endpoint since service start. This value is updated at
+                 the end of the call.
+                 "
+   ::= { callStatisticsEntry 700 }
+
+  -- Columnar:OutgoingCallsConnected
+
+  callStatisticsOutgoingCallsConnected OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " OutgoingCallsConnected
+
+                 Number of outgoing IP calls that successfully completed call
+                 setup signaling for the endpoint since service start. This
+                 value is updated at the end of the call.
+                 "
+   ::= { callStatisticsEntry 800 }
+
+  -- Columnar:OutgoingCallsFailed
+
+  callStatisticsOutgoingCallsFailed OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " OutgoingCallsFailed
+
+                 Number of outgoing IP calls that failed to complete call
+                 setup signaling for the endpoint since service start. This
+                 value is updated at the end of the call.
+                 "
+   ::= { callStatisticsEntry 900 }
+
+ -- End of table:Call Statistics
+
+-- End of group:Statistics Group
+
+-- ****************************************************************************
+
+-- Group:DTMF Map Configuration Group
+
+-- ****************************************************************************
+
+dtmfMapGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 20000 }
+ -- Scalar:Completion Timeout
+
+ dtmfMapTimeoutCompletion OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 1000..180000 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Completion Timeout
+
+                Total time the user has to dial the DTMF sequence. The timer
+                starts when the dial tone is played. When the timer expires,
+                the receiver off-hook tone is played.
+
+                This value is expressed in milliseconds (ms).
+
+                If a specific configuration is set in the
+                EpSpecificDtmfMapTimeout.Completion parameter and the
+                EpSpecificDtmfMapTimeout.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { 60000 }
+  ::= { dtmfMapGroup 100 }
+
+ -- Scalar:First DTMF Timeout
+
+ dtmfMapTimeoutFirstDtmf OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 1000..180000 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " First DTMF Timeout
+
+                Time the user has to enter the first DTMF after the dial tone.
+                A receiver off-hook is played when the time has elapsed.
+
+                This value is expressed in milliseconds (ms).
+
+                If a specific configuration is set in the
+                EpSpecificDtmfMapTimeout.FirstDtmf parameter and the
+                EpSpecificDtmfMapTimeout.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { 20000 }
+  ::= { dtmfMapGroup 200 }
+
+ -- Scalar:Inter DTMF Timeout
+
+ dtmfMapTimeoutInterDtmf OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 500..10000 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Inter DTMF Timeout
+
+                Value of the 'T' DTMF in the DTMF map strings.
+
+                The 'T' DTMF is used to express a time lapse between the
+                detection of two DTMFs.
+
+                This value is expressed in milliseconds (ms).
+
+                If a specific configuration is set in the
+                EpSpecificDtmfMapTimeout.InterDtmf parameter and the
+                EpSpecificDtmfMapTimeout.EnableConfig parameter is set to
+                'Enable', then it overrides the current default configuration.
+
+                "
+  DEFVAL        { 3000 }
+  ::= { dtmfMapGroup 300 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Endpoint Specific DTMF Map Timeout Configuration
+
+ -- ***************************************************************************
+ 
+ epSpecificDtmfMapTimeoutTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF EpSpecificDtmfMapTimeoutEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Endpoint Specific DTMF Map Timeout Configuration
+
+                A table of the DTMF Map timeout configuration, indexed by the
+                endpoint ID.
+                "
+  ::= { dtmfMapGroup 1000 }
+  epSpecificDtmfMapTimeoutEntry OBJECT-TYPE
+   SYNTAX        EpSpecificDtmfMapTimeoutEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Endpoint Specific DTMF Map Timeout
+                 Configuration . "
+   INDEX         {
+                   epSpecificDtmfMapTimeoutEpId
+                 }
+
+   ::= { epSpecificDtmfMapTimeoutTable 1 }
+
+  EpSpecificDtmfMapTimeoutEntry ::= SEQUENCE
+  {
+    epSpecificDtmfMapTimeoutEpId         OCTET STRING,
+    epSpecificDtmfMapTimeoutEnableConfig MxEnableState,
+    epSpecificDtmfMapTimeoutCompletion   Unsigned32,
+    epSpecificDtmfMapTimeoutFirstDtmf    Unsigned32,
+    epSpecificDtmfMapTimeoutInterDtmf    Unsigned32
+  }
+
+  -- Index:Endpoint Identifier
+
+  epSpecificDtmfMapTimeoutEpId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Endpoint Identifier
+
+                 String that identifies an endpoint in other tables.
+                 "
+   ::= { epSpecificDtmfMapTimeoutEntry 100 }
+
+  -- Columnar:Enable Configuration
+
+  epSpecificDtmfMapTimeoutEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Configuration
+
+                 Defines the configuration to use for a specific endpoint.
+
+                   * Disable: The endpoint uses the default configuration as
+                     defined in the DtmfMapTimeoutCompletion,
+                     DtmfMapTimeoutFirstDtmf and DtmfMapTimeoutInterDtmf
+                     parameters.
+                   * Enable: The endpoint uses the specific configuration as
+                     defined in the EpSpecificDtmfMapTimeout.Completion,
+                     EpSpecificDtmfMapTimeout.FirstDtmf and
+                     EpSpecificDtmfMapTimeout.InterDtmf parameters.
+
+                 "
+   DEFVAL        { disable }
+   ::= { epSpecificDtmfMapTimeoutEntry 200 }
+
+  -- Columnar:Endpoint Specific Timeout Completion
+
+  epSpecificDtmfMapTimeoutCompletion OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 1000..180000 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Timeout Completion
+
+                 Total time the user has to dial the DTMF sequence. The timer
+                 starts when the dial tone is played. When the timer expires,
+                 the receiver off-hook tone is played.
+
+                 This value is expressed in milliseconds (ms).
+
+                 This configuration overrides the default configuration set in
+                 the DtmfMapTimeoutCompletion parameter if the
+                 EpSpecificDtmfMapTimeout.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { 60000 }
+   ::= { epSpecificDtmfMapTimeoutEntry 300 }
+
+  -- Columnar:Endpoint Specific First DTMF Timeout
+
+  epSpecificDtmfMapTimeoutFirstDtmf OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 1000..180000 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific First DTMF Timeout
+
+                 Time the user has to enter the first DTMF after the dial
+                 tone. A receiver off-hook is played when the time has
+                 elapsed.
+
+                 This value is expressed in milliseconds (ms).
+
+                 This configuration overrides the default configuration set in
+                 the DtmfMapTimeoutFirstDtmf parameter if the
+                 EpSpecificDtmfMapTimeout.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { 20000 }
+   ::= { epSpecificDtmfMapTimeoutEntry 400 }
+
+  -- Columnar:Endpoint Specific Inter DTMF Timeout
+
+  epSpecificDtmfMapTimeoutInterDtmf OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 500..10000 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Endpoint Specific Inter DTMF Timeout
+
+                 Value of the 'T' DTMF in the DTMF map strings.
+
+                 The 'T' DTMF is used to express a time lapse between the
+                 detection of two DTMFs.
+
+                 This value is expressed in milliseconds (ms).
+
+                 This configuration overrides the default configuration set in
+                 the DtmfMapTimeoutInterDtmf parameter if the
+                 EpSpecificDtmfMapTimeout.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { 3000 }
+   ::= { epSpecificDtmfMapTimeoutEntry 500 }
+
+ -- End of table:Endpoint Specific DTMF Map Timeout Configuration
+
+-- End of group:DTMF Map Configuration Group
+
+-- ****************************************************************************
+
+-- Group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+notificationsGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 60010 }
+ -- Scalar:Minimal Severity of Notification
+
+ minSeverity OBJECT-TYPE
+  SYNTAX        INTEGER { disable(0) , debug(100) , info(200) , warning(300) ,
+                error(400) , critical (500) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Minimal Severity of Notification
+
+                Sets the minimal severity to issue a notification message
+                incoming from this service.
+
+                  * Disable: No notification is issued.
+                  * Debug: All notification messages are issued.
+                  * Info: Notification messages with a 'Informational' and
+                    higher severity are issued.
+                  * Warning: Notification messages with a 'Warning' and higher
+                    severity are issued.
+                  * Error: Notification messages with an 'Error' and higher
+                    severity are issued.
+                  * Critical: Notification messages with a 'Critical' severity
+                    are issued.
+
+                "
+  DEFVAL        { warning }
+  ::= { notificationsGroup 100 }
+
+-- End of group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+-- Group:Configuration Settings
+
+-- ****************************************************************************
+
+configurationGroup OBJECT IDENTIFIER
+ ::= { epServMIBObjects 60020 }
+ -- Scalar:Need Restart
+
+ needRestartInfo OBJECT-TYPE
+  SYNTAX        INTEGER { no(0) , yes(100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Need Restart
+
+                Indicates if the service needs to be restarted for the
+                configuration to fully take effect.
+
+                  * Yes: Service needs to be restarted.
+                  * No: Service does not need to be restarted.
+
+                Services can be restarted by using the
+                Scm.ServiceCommands.Restart command.
+
+                "
+  ::= { configurationGroup 100 }
+
+-- End of group:Configuration Settings
+
+END

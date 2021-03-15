@@ -15,7 +15,7 @@
 // hardware platform
 if (!strlen($hardware))
 {
-  if ($poll_device['sysObjectID'] == '.1.3.6.1.4.1.1916.2.93' || str_contains($poll_device['sysDescr'], 'Stack'))
+  if ($poll_device['sysObjectID'] == '.1.3.6.1.4.1.1916.2.93' || str_exists($poll_device['sysDescr'], 'Stack'))
   {
     // Stacked devices
     //EXTREME-STACKING-MIB::extremeStackMemberType.1 = OID: EXTREME-BASE-MIB::summitX460G2-48t-10G4

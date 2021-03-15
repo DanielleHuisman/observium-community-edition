@@ -1,0 +1,418 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--
+--             Copyright(c) 2001-2004 Mediatrix Telecom, Inc.
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+--
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-IF-ADMIN-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        ifIndex
+    FROM RFC1213-MIB
+        mediatrixAdmin
+    FROM MX-SMI;
+
+ifAdminMIB MODULE-IDENTITY
+    LAST-UPDATED "200406100000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION  "This MIB defines the administrative commands and status related to a
+                  managed object. These objects are managed by the combination of three
+                  attributes that are termed OSI States attributes.
+
+                  This MIB follows ISO/IEC 10164-2 CCITT Recommendation X.731 with
+                  the following interpretations and extensions.
+
+                  The management state of a managed object represents the
+                  instantaneous condition of availability and operability of the
+                  associated resource from the management point of view.
+                  Managed objects have a variety of state attributes that express
+                  and control aspects of the operation of their associated
+                  resource that are peculiar to each. However, the management
+                  state is expected to be common to a large number of resources
+                  and for this reason is standardized; it expresses key aspects
+                  of their usability at any given time. We used three primary
+                  factors to allocate the management state of a managed object.
+                  These are:
+
+                  operability    : indicates whether the resource is
+                                   operational or not.
+
+                  usage          : indicates whether or not the resource is
+                                   actively in use at a specific instant, and if
+                                   so, whether or not it has spare capacity for
+                                   additional request at that instant.
+
+                  administration : indicates the current maintenance state.
+                                   This attribute reflects the result of an
+                                   operator-initiated maintenance request.
+
+                  The managed object status is closely related to the status of
+                  its children. These status are affected by external events such
+                  as administrative commands. The behavior of the managed object
+                  to these events is explained below.
+
+                  event : receive an administrative lock (graceful) command
+                          for an interface:
+
+                          1) The interface administrative state (groupAdminState)
+                             is changed to SHUTTING DOWN.
+                          2) All children are notified to set their usage state to
+                             IDLE UNUSABLE gracefully.
+                          3) The children change their usage state to IDLE UNUSABLE
+                             as soon as their activities end.
+                          4) When the usage state of all children has been set to
+                             IDLE UNUSABLE, the usage state of the interface
+                             (groupUsageState) is changed to IDLE UNUSABLE.
+                          5) Its administrative state (groupAdminState) is
+                             changed to LOCKED.
+
+                  event : receive an administrative lock command (non graceful)
+                          for an interface:
+
+                          1) All children are notified to immediately set their
+                             usage state to IDLE UNUSABLE.
+                          2) The children abruptly change their usage state to
+                             IDLE UNUSABLE.
+                          3) When the usage state of all children has been changed to
+                             IDLE UNUSABLE, the usage state of the interface
+                             (groupUsageState) is changed to IDLE UNUSABLE.
+                          4) Its administrative state (groupAdminState) is
+                             changed to LOCKED
+
+                  event : receive an administrative unlock command for an interface
+
+                          1) All children are notified to set their usage state to
+                             IDLE if:
+                               * the child's administrative state is UNLOCKED
+                                 AND
+                               * the administrative state of all its parents are
+                                 also UNLOCKED AND
+                               * the operational state of the child is ENABLED AND
+                               * all the operational states of all its parents are
+                                 also ENABLED.
+                          2) The usage state of the interface (groupUsageState) is set
+                             to IDLE if:
+                               * all the administrative states of all its parents are
+                                 also UNLOCKED AND
+                               * the operational state of the group is ENABLED AND
+                               * all the operational states of all its parents are
+                                 also ENABLED.
+                          3) The administrative state of the interface (groupAdminState)
+                             is changed to UNLOCKED.
+
+                  event : An operational problem is discovered with an interface
+
+                         1) All children are notified to abruptly set their usage state
+                            to IDLE UNUSABLE.
+                         2) All children abruptly change their usage state to 
+                            IDLE UNUSABLE.
+                         3) When the usage state of all children has been set to
+                            IDLE UNUSABLE, the usage state of the interface
+                            (groupUsageState) is changed to IDLE UNUSABLE.
+                         4) Its operational state (groupOpState) is changed
+                            to DISABLED.
+
+                  event : An operational problem is resolved in an interface
+
+                         1) All children are notified to set their usage state
+                           to IDLE if:
+                               * the administrative state of the child is
+                                 UNLOCKED AND
+                               * the administrative state of all its parents are
+                                 also UNLOCKED AND
+                               * the operational state of the child is ENABLED AND
+                               * all the operational states of all its parents are
+                                 also ENABLED.
+                         2) The usage state of the interface (groupUsageState) is changed
+                            to IDLE if:
+                               * the administrative state of the group is UNLOCKED AND
+                               * the administrative state of all its parents are
+                                 also UNLOCKED AND
+                               * all the operational states of all its parents are
+                                 also ENABLED.
+                         3) Its operational state (groupOpState) is changed
+                            to ENABLED.
+                  "
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "200406100000Z"
+    DESCRIPTION "Modify the list of ifAdminSetAdmin commands following addition
+                 of the new ifAdminInitialAdminState variable that will now be
+                 used to make ifAdminState permanent."
+    REVISION    "0111280000Z"
+    DESCRIPTION "November 28th, 2002
+                    Added permanentForcelock as option for ifAdminSetAdmin. Also
+                    added permanentLock as option for ifAdminAdminState.
+                 August 27, 2001
+                    Creation"
+    ::= { mediatrixAdmin 8 }
+
+ifAdminMIBObjects OBJECT IDENTIFIER ::= { ifAdminMIB 1 }
+ifAdminConformance OBJECT IDENTIFIER ::= { ifAdminMIB 2 }
+
+    -- ************************************************************************
+    -- if Admin table parameters
+    -- ************************************************************************
+    ifAdminTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF IfAdminEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of managed objects."
+        ::= { ifAdminMIBObjects 10 }
+
+        ifAdminEntry OBJECT-TYPE
+            SYNTAX      IfAdminEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the ifAdminTable used to manage each interface."
+            INDEX       {
+                            ifIndex
+                        }
+            ::= { ifAdminTable 1 }
+
+            IfAdminEntry ::= SEQUENCE
+                {
+                    ifAdminSetAdmin          INTEGER,
+                    ifAdminAdminState        INTEGER,
+                    ifAdminOpState           INTEGER,
+                    ifAdminUsageState        INTEGER, -- Fault state will be added later on
+                    ifAdminParentType        INTEGER,
+                    ifAdminParent            Integer32,
+                    ifAdminInitialAdminState INTEGER
+                }
+
+            ifAdminSetAdmin OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                 noOp(0),
+                                 permanentUnlock(1),
+                                 lock(2),
+                                 forcelock(3),
+                                 permanentForcelock(4),
+                                 unlock(5)
+                                }
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Command to set the administrative state of the current interface.
+                             Represents action on admin status. Lock indicates that component
+                             usage states of active or idle are updated with their admin state
+                             set to locked. Their usage state is updated to idle. For active calls
+                             in progress which usage state is busy, calls remain established until
+                             normal call termination. The admin state is set to shuttingdown.
+
+                             Once the call is terminated, the admin state is set to locked and usage
+                             state to idle. For forcelock, the admin state is set to locked. Their usage
+                             state is updated to idle. All active calls in progress are terminated
+                             immediately; there is no transition admin state of shuttingdown. No new
+                             calls may be initiated. For unlock, the admin state is set to unlocked.
+                             
+                             The permanentUnlock and permanentForcelock commands are deprecated.  
+                             Use the ifAdminInitialAdminState variable instead when a permanent setting 
+                             is desired.
+
+                             This variable’s semantics are different depending on protocol and/or
+                             hardware platforms.
+                             Please refer to the documentation shipped with your device for more details."
+                DEFVAL      { noOp }
+                ::= { ifAdminEntry 2 }
+
+            ifAdminAdminState OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                 unlocked(1),
+                                 shuttingDown(2),
+                                 locked(3),
+                                 permanentlock(4)
+                                }
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "The administrative state of the current interface.
+                             It indicates the current maintenance state of a gateway
+                             component. This attribute reflects the result of an
+                             operator-initiated maintenance request.
+
+                             Unlocked      : no operator-initiated maintenance request is
+                                             affecting the operation of the component.
+
+                             ShuttingDown  : the component is in a transition state between
+                                             unlocked and locked state. An active component
+                                             will only transition to a locked state once
+                                             activity, if present, has completed. No new
+                                             request will be accepted once the activity is
+                                             completed.
+
+                             Locked        : an operator-initiated request has been issued
+                                             for this component. This component and all its
+                                             children are unavailable for normal operation.
+ 
+                             The permanentLock state is deprecated.  AdminState can now be
+                             made permanent through the variable ifAdminInitialAdminState.
+
+                             This variable’s semantics are different depending on protocol and/or
+                             hardware platforms.
+                             Please refer to the documentation shipped with your device for more details."
+
+                DEFVAL      { unlocked }
+                ::= { ifAdminEntry 3 }
+
+            ifAdminOpState OBJECT-TYPE
+            SYNTAX  INTEGER {
+                             enabled(1),
+                             disabled(2)
+                            }
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "The operational state of the current interface.
+
+                             This state reflects the component's internal state.
+                             There are certain conditions that affect the internal
+                             state of a voice component.
+
+                             Enabled  : the component is operationally functional.
+
+                             Disabled : the component is operationally non-functional
+                                        due to an internal condition that would not
+                                        allow it to participate in normal VoIP call."
+                DEFVAL      { disabled }
+                ::= { ifAdminEntry 4 }
+
+            ifAdminUsageState OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                 idle(1),
+                                 active(2),
+                                 busy(3),
+                                 idle-unusable(4)
+                                }
+                MAX-ACCESS   read-only
+                STATUS       current
+                DESCRIPTION "The usage state of the current interface.
+
+                             It indicates the running state of a voice component.
+
+                             Idle          : the component is not currently
+                                             processing calls, but is available
+                                             for use.
+
+                             Active        : the component being used is usable and
+                                             available for processing and still has
+                                             additional capacity.
+
+                             Busy          : the component is usable but is not available
+                                             for any new processing requests, since all
+                                             its ressources are currently being used.
+
+                             Idle-Unusable : the component is not currently processing
+                                             calls and not available for use."
+                DEFVAL      { idle-unusable }
+                ::= { ifAdminEntry 5 }
+
+            ifAdminParentType OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                 groupAdmin(1),
+                                 ifAdmin(2)
+                                }
+                MAX-ACCESS   read-only
+                STATUS       current
+                DESCRIPTION "The parents type of this interface.
+
+                             groupAdmin : the ifAdminParent represents the index
+                                          (groupAdminIndex) of a group from the
+                                          groupAdminTable (from the module
+                                          MX-GROUPS-ADMIN-MIB).
+                             ifAdmin    : the ifAdminParent represents the index
+                                          (ifIndex) of the ifAdminTable (this table)"
+                DEFVAL      { groupAdmin }
+                ::= { ifAdminEntry 14 }
+
+            ifAdminParent OBJECT-TYPE
+                SYNTAX  Integer32
+                MAX-ACCESS   read-only
+                STATUS       current
+                DESCRIPTION "The index of the parent of this interface."
+                ::= { ifAdminEntry 15 }
+
+            ifAdminInitialAdminState OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                 unlocked(1),
+                                 locked(2)
+                                }
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Indicates the administrative state the current interface will have after 
+                             the unit restarts.  Refer to ifAdminAdminState for a description
+                             of the states.
+
+                             This variable’s semantics are different depending on protocol and/or
+                             hardware platforms.
+                             Please refer to the documentation shipped with your device for more details."
+
+                DEFVAL      { unlocked }
+                ::= { ifAdminEntry 65 }
+
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    ifAdminCompliances OBJECT IDENTIFIER ::= { ifAdminConformance 1 }
+
+    ifAdminAnalogPortComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "List of groups required to support analog ports parameters."
+        MODULE -- This Module
+            MANDATORY-GROUPS {
+                                ifAdminAnalogPortGroupVer1
+                             }
+        ::= { ifAdminCompliances 1 }
+
+    -- ************************************************************************
+    -- MIB variable grouping
+    -- ************************************************************************
+    ifAdminGroups OBJECT IDENTIFIER ::= { ifAdminConformance 2 }
+
+    ifAdminAnalogPortGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                    ifAdminSetAdmin,
+                    ifAdminAdminState,
+                    ifAdminOpState,
+                    ifAdminUsageState,
+                    ifAdminParentType,
+                    ifAdminParent,
+                    ifAdminInitialAdminState
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the caracteristics of an analog port."
+        ::= { ifAdminGroups 1 }
+END

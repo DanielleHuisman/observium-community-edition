@@ -1,3 +1,43 @@
+-- ------------------------------------------------
+-- Version Number:20040624001
+-- Desc:Problem description -- ES4624C-17-00099: private mib->aclMgt->aclpAceTable->aclpAceEnTry->aclpAceTos,aclpAcePrec,acllpAceDscp range error
+--     Root cause             
+--             ===== State: Opened by:steven_zhang at 6/15/2004 1:49:51 PM =====
+--            
+--            load:2.1.0.0
+--            diag:2.0.2.1
+--            runtime:1.0.1.14
+--            
+--            sorry, I have made a mistake, I forgot the mib value should include the value any, so the aclpAceTos,aclpAcePrec,acllpAceDscp should just as before,0-8,0-8,0-64, 8 and 64 means any.
+--            
+--            ===== State: Submitted by:steven_zhang at 4/6/2004 2:35:27 PM =====
+--            
+--            aclpAceTos,aclpAcePrec range should be 0-7
+--            acllpAceDscp range should be 0-63
+--            
+--            ===== State: Submitted by:steven_zhang at 4/5/2004 11:53:02 AM =====
+--            
+--            Create EPR From TRR (TRR-ES4624C-17-040304-01)
+--            ===== Test Problem =====
+--            aclpAceTos range is 0-8
+--            ===== Expected Result =====
+--            aclpAceTos range should be 0-16
+--            ===== Test Procedure =====
+--            view private mib->aclMgt->aclpAceTable->aclpAceEnTry->aclpAceTos range
+--            ===== Other =====
+--     Resolution -- modify mib and leaf the correct the range
+--               after double check with pttch
+--               aclIpAceTos range should be 0-16
+--               aclIpAcePrec range should be 0-8
+--               aclIpAceDscp range should be 0-64          
+--     Modify files --  Smc8612xl3.mib, Smc8612xl3Version.txt
+--                 Dcrs5512g.mib, Dcrs5512gVersion.txt,
+--                 Es4612.mib, Es4612Version.txt
+--                 Smc8624tl3.mib, Smc8624tl3Version.txt,                          
+--                 leaf_es3626a.h
+-- Profile:ES4612-CO_V2.2.3.2_profile
+-- ------------------------------------------------
+
 ES4612-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
@@ -19,6 +59,8 @@ IMPORTS
         InterfaceIndex, ifIndex, InterfaceIndexOrZero
                FROM IF-MIB;
                
+
+
 accton                                 OBJECT IDENTIFIER ::= { enterprises 259 }
 snmpMgt            					   OBJECT IDENTIFIER ::= { accton 6 }
 cheetahSwitchMgt                       OBJECT IDENTIFIER ::= { snmpMgt 10 }
@@ -765,6 +807,44 @@ portComboForcedMode  OBJECT-TYPE
                     equal to none(1), and setting this variable to none(1) is
                     not allowed."
        ::= { portEntry 12}        
+
+portVlanTrunkingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PortVlanTrunkingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Configures vlan trunking feature."
+    ::= { portMgt 7 }
+
+portVlanTrunkingEntry OBJECT-TYPE
+    SYNTAX      PortVlanTrunkingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Configures vlan trunking feature."
+    INDEX       { portVlanTrunkingIfIndex }
+    ::= { portVlanTrunkingTable 1 }
+
+PortVlanTrunkingEntry ::= SEQUENCE
+{
+    portVlanTrunkingIfIndex     Integer32,
+    portVlanTrunkingStatus      EnabledStatus
+}
+
+portVlanTrunkingIfIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The port and trunk interface of the portVlanTrunkingTable.
+                 The interface identified by a particular value of this
+                 index is the same interface identified by the same value
+                 of ifIndex in the IF-MIB."
+    ::= { portVlanTrunkingEntry 1 }
+
+portVlanTrunkingStatus OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Whether vlan trunking is enabled."
+    ::= { portVlanTrunkingEntry 2 }
 
 --
 -- trunkMgt
@@ -3691,14 +3771,16 @@ portSecMaxMacCount OBJECT-TYPE
                       the MAC has reached this value."
         ::= { portSecPortEntry 4 }        
         
+--
 -- radiusMgt 
+--
 
-radiusServerAddress OBJECT-TYPE
-        SYNTAX      IpAddress
-        MAX-ACCESS  read-write
-        STATUS      current
-        DESCRIPTION "IP address of RADIUS server."
-        ::= { radiusMgt 1 }
+-- radiusServerAddress OBJECT-TYPE
+--         SYNTAX      IpAddress
+--         MAX-ACCESS  read-write
+--         STATUS      current
+--         DESCRIPTION "IP address of RADIUS server."
+--         ::= { radiusMgt 1 }
 
 radiusServerPortNumber OBJECT-TYPE
         SYNTAX      INTEGER (1..65535)
@@ -3730,6 +3812,87 @@ radiusServerTimeout OBJECT-TYPE
         DESCRIPTION "Timeout for RADIUS."
         ::= { radiusMgt 5 }
         
+--radiusMultipleServerTable
+
+radiusMultipleServerTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF RadiusMultipleServerEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The table for multiple RADIUS server."
+        ::= { radiusMgt 7 }
+
+radiusMultipleServerEntry OBJECT-TYPE
+        SYNTAX      RadiusMultipleServerEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The conceptual row for radiusMultipleServerTable."
+        INDEX       { radiusMultipleServerIndex }
+        ::= { radiusMultipleServerTable 1 }
+
+RadiusMultipleServerEntry ::= SEQUENCE
+{
+   radiusMultipleServerIndex      Integer32,
+   radiusMultipleServerAddress    IpAddress,
+   radiusMultipleServerPortNumber Integer32,
+   radiusMultipleServerKey        DisplayString,
+   radiusMultipleServerRetransmit Integer32,
+   radiusMultipleServerTimeout    Integer32,
+   radiusMultipleServerStatus     ValidStatus
+}
+
+radiusMultipleServerIndex OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "The RADIUS multiple server index."
+        ::= { radiusMultipleServerEntry 1 }
+
+radiusMultipleServerAddress OBJECT-TYPE
+        SYNTAX      IpAddress
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "IP address of a multiple RADIUS server."
+        ::= { radiusMultipleServerEntry 2 }
+
+radiusMultipleServerPortNumber OBJECT-TYPE
+        SYNTAX      Integer32 (1..65535)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "IP port number of a multiple RADIUS server."
+        ::= { radiusMultipleServerEntry 3 }
+
+radiusMultipleServerKey OBJECT-TYPE
+        SYNTAX      DisplayString(SIZE(0..48))
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Key for RADIUS. This variable can only be set.
+                     When this variable is read, it always returns a
+                     zero-length string."
+        ::= { radiusMultipleServerEntry 4 }
+
+radiusMultipleServerRetransmit OBJECT-TYPE
+        SYNTAX      Integer32 (1..30)
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Maximum number of retransmissions for RADIUS."
+        ::= { radiusMultipleServerEntry 5 }
+
+radiusMultipleServerTimeout OBJECT-TYPE
+        SYNTAX      Integer32 (1..65535)
+        UNITS       "seconds"
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Timeout for RADIUS."
+        ::= { radiusMultipleServerEntry 6 }
+
+radiusMultipleServerStatus OBJECT-TYPE
+        SYNTAX      ValidStatus
+        MAX-ACCESS  read-create
+        STATUS      current
+        DESCRIPTION "Setting this to valid(1) creates an entry.
+                     Setting this to invalid(2) destroys an entry."
+        ::= { radiusMultipleServerEntry 8 }
+
 -- tacacsMgt
 
 -- Management for Terminal Access Controller Access Control System plus (TACACS+).

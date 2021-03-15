@@ -86,7 +86,8 @@ if ($vars['editing'])
         $update['snmp_retries'] = array('NULL');
       }
 
-      if (is_numeric($vars['snmp_maxrep']) && $vars['snmp_maxrep'] > 0 && $vars['snmp_maxrep'] <= 500)
+      // SNMPbulk max repetitions, allow 0 for disable snmpbulk(walk|get)
+      if (is_numeric($vars['snmp_maxrep']) && $vars['snmp_maxrep'] >= 0 && $vars['snmp_maxrep'] <= 500)
       {
         $update['snmp_maxrep'] = (int)$vars['snmp_maxrep'];
       } else {
@@ -206,7 +207,7 @@ $form['row'][7]['snmp_community'] = array(
                                 'width'       => '250px',
                                 'readonly'    => $readonly,
                                 'show_password' => !$readonly,
-                                'value'       => $device['snmp_community']); // FIXME. For passwords we should use filter instead escape!
+                                'value'       => $device['snmp_community']);  // FIXME. For passwords we should use filter instead escape!
 
 // Snmp v3 fieldset
 $form['row'][8]['snmp_authlevel'] = array(
@@ -226,6 +227,7 @@ $form['row'][9]['snmp_authname'] = array(
                                 'name'        => 'Auth Username',
                                 'width'       => '250px',
                                 'readonly'    => $readonly,
+                                'show_password' => !$readonly,
                                 'value'       => $device['snmp_authname']);
 
 $form['row'][10]['snmp_authpass'] = array(

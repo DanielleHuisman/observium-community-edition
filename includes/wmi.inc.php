@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage wmi
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -22,9 +20,13 @@ function wmi_query($wql, $override = NULL, $namespace = NULL)
     $namespace = $GLOBALS['config']['wmi']['namespace'];
   }
 
-  if (isset($override) && is_array(($override)))
+  if (isset($override) && is_array($override))
   {
     $hostname = $override['hostname'];
+    if (empty($hostname))
+    {
+      $hostname = $GLOBALS['device']['hostname'];
+    }
     $domain   = $override['domain'];
     $username = $override['username'];
     $password = $override['password'];
@@ -37,15 +39,44 @@ function wmi_query($wql, $override = NULL, $namespace = NULL)
     $password = $GLOBALS['config']['wmi']['pass'];
   }
 
-  $options = "--user='" . $username . "' ";
-  if (empty($password)) { $options .= "--no-pass "; } else { $options .= "--password='". $password . "' "; }
-  if (!empty($domain)) { $options .= "--workgroup='". $domain . "' "; }
-  if (empty($GLOBALS['config']['wmi']['delimiter'])) { $options .= "--delimiter=## "; } else { $options .= "--delimiter=" . $GLOBALS['config']['wmi']['delimiter'] ." "; }
-  if (empty($namespace)) { $options .= "--namespace='root\CIMV2' "; } else { $options .= "--namespace='" . $namespace ."' "; }
-  if (OBS_DEBUG) { $options .= "-d2 "; }
-  $options .= "//" . $hostname;
+  $options = " --user=" . escapeshellarg($username);
+  if (empty($password))
+  {
+    $options .= " --no-pass";
+  } else {
+    $options .= " --password=". escapeshellarg($password);
+  }
+  if (!empty($domain))
+  {
+    $options .= " --workgroup=". escapeshellarg($domain);
+  }
+  if (empty($GLOBALS['config']['wmi']['delimiter']))
+  {
+    $options .= " --delimiter=##"; // FIXME. escaping
+  } else {
+    $options .= " --delimiter=" . escapeshellarg($GLOBALS['config']['wmi']['delimiter']);
+  }
+  if (empty($namespace))
+  {
+    $options .= " --namespace='root\CIMV2'";
+  } else {
+    $options .= " --namespace=" . escapeshellarg($namespace);
+  }
+  if (OBS_DEBUG > 1) { $options .= " -d2"; }
+  $options .= " //" . escapeshellarg($hostname);
 
-  $cmd = $GLOBALS['config']['wmic'] . " " . $options . " " . "\"".$wql."\"";
+  // Override old default wmic cmd path if not found
+  if ($GLOBALS['config']['wmic'] === '/bin/wmic' && !is_file($GLOBALS['config']['wmic']))
+  {
+    $GLOBALS['config']['wmic'] = '/usr/bin/wmic';
+  }
+  if (!is_executable($GLOBALS['config']['wmic']))
+  {
+    print_error("The wmic binary was not found at the configured path (".$GLOBALS['config']['wmic'].").");
+    return FALSE;
+  }
+
+  $cmd = $GLOBALS['config']['wmic'] . " $options " . '"' . $wql . '"';
 
   return external_exec($cmd);
 }
@@ -67,13 +98,14 @@ function wmi_parse($wmi_string, $ret_single = FALSE, $ret_val = NULL)
 
   foreach ($wmi_lines as $line)
   {
-    if (preg_match('/ERROR:/', $line))
+    if (str_contains($line, 'ERROR:'))
     {
       $wmi_error = substr($line, strpos($line, 'ERROR:') + strlen("ERROR: "));
       if (OBS_DEBUG)
       {
         // If the error is something other than "Retrieve result data." please report it
-        switch($wmi_error) {
+        switch($wmi_error)
+        {
           case "Retrieve result data.":
             echo("WMI Error: Cannot connect to host or Class\n");
             break;
@@ -89,12 +121,12 @@ function wmi_parse($wmi_string, $ret_single = FALSE, $ret_val = NULL)
     }
     if (empty($wmi_class))
     {
-      if (preg_match('/^CLASS:/', $line))
+      if (str_starts($line, 'CLASS:'))
       {
         $wmi_class = substr($line, strlen("CLASS: "));
       }
     }
-    else if (empty($wmi_properties))
+    elseif (empty($wmi_properties))
     {
       $wmi_properties = explode($GLOBALS['config']['wmi']['delimiter'], $line);
     } else {
@@ -107,13 +139,16 @@ function wmi_parse($wmi_string, $ret_single = FALSE, $ret_val = NULL)
     {
       if ($ret_val)
       {
-        return $wmi_results[0][$ret_val];
+        $wmi_results = $wmi_results[0][$ret_val];
+        //return $wmi_results[0][$ret_val];
       } else {
-        return $wmi_results[0];
+        $wmi_results = $wmi_results[0];
+        //return $wmi_results[0];
       }
     }
   }
 
+  print_debug_vars($wmi_results);
   return $wmi_results;
 }
 
@@ -134,7 +169,7 @@ function wmi_dbAppInsert($device_id, $app)
 
     dbInsert(array('device_id' => $device_id, 'app_type' => $app['type'], 'app_instance' => $app['instance'], 'app_name' => $app['name']), 'applications');
   }
-  else if (empty($dbCheck['app_name']) && isset($app['name']))
+  elseif (empty($dbCheck['app_name']) && isset($app['name']))
   {
     dbUpdate(array('app_name' => $app['name']), 'applications', "`app_id` = ?", array($dbCheck['app_id']));
   }

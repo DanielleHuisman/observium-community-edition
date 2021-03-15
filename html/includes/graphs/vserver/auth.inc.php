@@ -14,7 +14,7 @@
 if (is_numeric($vars['id']))
 {
 #  $auth= TRUE;
-  $vserver = dbFetchRow("SELECT * FROM `loadbalancer_vservers` AS WHERE `classmap_id` = ?", array($vars['id']));
+  $vserver = dbFetchRow("SELECT * FROM `lb_slb_vsvrs` AS WHERE `classmap_id` = ?", array($vars['id']));
 
   if (is_numeric($vserver['device_id']) && ($auth || device_permitted($vserver['device_id'])))
   {

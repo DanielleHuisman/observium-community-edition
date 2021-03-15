@@ -1,0 +1,52 @@
+#!/bin/bash
+# vi: set sw=4 ts=4 ai:
+
+# See also
+#     https://docs.observium.org/developing/add_app/
+#     https://docs.observium.org/developing/add_graph/
+#     http://www.ajlc.waterloo.on.ca/node/6
+#
+# This script needs a config file, containing:
+#
+#    ICEURL="http://<icecast_ip>:<icecast_port>"
+#
+# e.g.
+#    ICEURL="http://127.0.0.1:8000"
+#
+
+IAM="${0##*/}"
+CRD="$( [[ "$(printf "${0}" | cut -c 1 )" = "." ]] &&
+	{       printf "${PWD}/${0}"
+	} || {
+		printf "${0}"
+	})"
+CRD="${CRD%/*}"
+CONF="${CRD}/${IAM}.conf"
+
+# Need a config
+if [[ ! -f ${CONF} ]]
+then
+	echo "No config file found for ${IAM}" >&2
+	exit 1
+fi
+
+# Read the config
+source ${CONF}
+
+L=$(wget ${ICEURL}/status.xsl -o /dev/null -O -)
+
+cur=$(echo "${L}"							| \
+	sed -n '/Current Listeners/,/<\/tr>/p'	| \
+	grep streamdata							| \
+	sed 's/[^0-9]//g')
+
+peak=$(echo "${L}"							| \
+	sed -n '/Peak Listeners/,/<\/tr>/p'		| \
+	grep streamdata							| \
+	sed 's/[^0-9]//g')
+
+echo '<<<app-icecast>>>'
+echo "current:${cur}"
+echo "max:${peak}"
+
+exit 0

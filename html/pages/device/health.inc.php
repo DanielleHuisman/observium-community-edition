@@ -88,7 +88,7 @@ elseif (isset($config['counter_types'][$vars['metric']]) || $vars['metric'] == "
 {
   include($config['html_dir']."/pages/device/health/counter.inc.php");
 }
-elseif (is_file($config['html_dir']."/pages/device/health/".$vars['metric'].".inc.php"))
+elseif (is_alpha($vars['metric']) && is_file($config['html_dir']."/pages/device/health/".$vars['metric'].".inc.php"))
 {
   include($config['html_dir']."/pages/device/health/".$vars['metric'].".inc.php");
 } else {

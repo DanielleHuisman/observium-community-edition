@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -20,7 +19,7 @@ foreach ($oids as $index => $entry)
   if (isset($entry['cpqDaCntlrBoardStatus']))
   {
     $hardware   = rewrite_cpqida_hardware($entry['cpqDaCntlrModel']);
-    $descr      = $hardware.' ('.$entry['cpqDaCntlrHwLocation'].')';
+    $descr      = $hardware . ' (' . $entry['cpqDaCntlrHwLocation'] . ')';
 
     $oid        = ".1.3.6.1.4.1.232.3.2.2.1.1.10.".$index;
     $status     = $entry['cpqDaCntlrBoardStatus'];
@@ -52,33 +51,45 @@ foreach ($oids as $index => $entry)
 {
 
   $name    = $entry['cpqDaPhyDrvLocationString'];
-  if(!empty($entry['cpqDaPhyDrvModel'])) { $name .= ' ('.$entry['cpqDaPhyDrvModel'].')'; }
-  if(!empty($entry['cpqDaPhyDrvSerialNum'])) { $name .= ' ('.$entry['cpqDaPhyDrvSerialNum'].')'; }
+  if (!empty($entry['cpqDaPhyDrvModel']))
+  {
+    $name .= ' ('.trim($entry['cpqDaPhyDrvModel']).')';
+  }
+  if (!empty($entry['cpqDaPhyDrvSerialNum']))
+  {
+    $name .= ' ('.trim($entry['cpqDaPhyDrvSerialNum']).')';
+  }
+  $name = preg_replace('/\s{2,}/', ' ', $name);
 
   if ($entry['cpqDaPhyDrvTemperatureThreshold'] > 0)
   {
-    $descr      = $name; // "HDD ".$entry['cpqDaPhyDrvBay'];
-    $oid        = ".1.3.6.1.4.1.232.3.2.5.1.1.70.".$index;
-    $value      = $entry['cpqDaPhyDrvCurrentTemperature'];
-    $options    = array('limit_high' => $entry['cpqDaPhyDrvTemperatureThreshold']);
+    $descr   = $name; // "HDD ".$entry['cpqDaPhyDrvBay'];
+    $oid     = ".1.3.6.1.4.1.232.3.2.5.1.1.70.".$index;
+    $value   = $entry['cpqDaPhyDrvCurrentTemperature'];
+    $options = array('limit_high' => $entry['cpqDaPhyDrvTemperatureThreshold']);
 
     $options['rename_rrd'] = "cpqida-cpqDaPhyDrv.%index%";
     discover_sensor_ng($device, 'temperature', $mib, 'cpqDaPhyDrvCurrentTemperature', $oid, $index, NULL, $descr, 1, $value, $options);
 
   }
 
-  $oid     = '1.3.6.1.4.1.232.3.2.5.1.1.6.' . $index;
-  $oidn    = 'cpqDaPhyDrvStatus.' . $index;
+  $oid    = '.1.3.6.1.4.1.232.3.2.5.1.1.6.' . $index;
   $state  = $entry['cpqDaPhyDrvStatus'];
 
   discover_status_ng($device, $mib, 'cpqDaPhyDrvStatus', $oid, $index, 'cpqDaPhyDrvStatus', $name . ' Status', $state, array('entPhysicalClass' => 'physicalDrive'));
 
-  $oid     = '1.3.6.1.4.1.232.3.2.5.1.1.37.' . $index;
-  $oidn    = 'cpqDaPhyDrvCondition.' . $index;
+  $oid    = '.1.3.6.1.4.1.232.3.2.5.1.1.37.' . $index;
   $state  = $entry['cpqDaPhyDrvCondition'];
 
   discover_status_ng($device, $mib, 'cpqDaPhyDrvCondition', $oid, $index, 'cpqDaPhyDrvCondition', $name . ' Condition', $state, array('entPhysicalClass' => 'physicalDrive'));
 
+  $oid    = '.1.3.6.1.4.1.232.3.2.5.1.1.57.' . $index;
+  $state  = $entry['cpqDaPhyDrvSmartStatus'];
+
+  discover_status_ng($device, $mib, 'cpqDaPhyDrvSmartStatus', $oid, $index, 'cpqDaPhyDrvSmartStatus', $name . ' S.M.A.R.T.', $state, array('entPhysicalClass' => 'physicalDrive'));
+
+  $oid    = '.1.3.6.1.4.1.232.3.2.5.1.1.9.' . $index;
+  discover_counter($device, 'lifetime', $mib, 'cpqDaPhyDrvRefHours', $oid, $index, $name . ' Hours', 3600, $entry['cpqDaPhyDrvRefHours'], array('entPhysicalClass' => 'physicalDrive'));
 }
 
 // Logical Disks
@@ -89,16 +100,17 @@ foreach ($oids as $index => $entry)
 {
 
   $name   = 'Controller '. $entry['cpqDaLogDrvCntlrIndex'] . ' Logical Drive ' . $entry['cpqDaLogDrvIndex'];
-  if(!empty($entry['cpqDaLogDrvOsName'])) { $name .= ' ('.$entry['cpqDaLogDrvOsName'].')'; }
+  if (!empty($entry['cpqDaLogDrvOsName']))
+  {
+    $name .= ' (' . $entry['cpqDaLogDrvOsName'] . ')';
+  }
 
   $oid    = '.1.3.6.1.4.1.232.3.2.3.1.1.4.' . $index;
-  $oidn    = 'cpqDaLogDrvStatus.' . $index;
   $state  = $entry['cpqDaLogDrvStatus'];
 
   discover_status_ng($device, $mib, 'cpqDaLogDrvStatus', $oid, $index, 'cpqDaLogDrvStatus', $name . ' Status', $state, array('entPhysicalClass' => 'logicalDrive'));
 
   $oid    = '.1.3.6.1.4.1.232.3.2.3.1.1.11.' . $index;
-  $oidn    = 'cpqDaLogDrvCondition.' . $index;
   $state  = $entry['cpqDaLogDrvCondition'];
 
   discover_status_ng($device, $mib, 'cpqDaLogDrvCondition', $oid, $index, 'cpqDaLogDrvCondition', $name . ' Condition', $state, array('entPhysicalClass' => 'logicalDrive'));

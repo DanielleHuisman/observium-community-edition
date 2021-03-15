@@ -16,7 +16,7 @@
 chdir(dirname($argv[0]));
 
 // Get options before definitions!
-$options = getopt("h:i:m:n:dqurMV");
+$options = getopt("h:i:m:n:U:dquaMV");
 
 include("includes/sql-config.inc.php");
 include("includes/discovery/functions.inc.php");
@@ -110,7 +110,8 @@ if (isset($options['i']) && $options['i'] && isset($options['n'])) {
   $doing = $options['n'] . '/' . $options['i'];
 }
 
-if (isset($options['u']) || ($where && in_array($options['h'], array('all', 'odd', 'even'))))
+if (isset($options['u']) || isset($options['U']) ||
+    ($where && in_array($options['h'], array('all', 'odd', 'even'))))
 {
   $options['u'] = TRUE;
 
@@ -128,7 +129,7 @@ elseif (!isset($options['q']))
   unset($db_version);
 }
 
-if (!$where && !$options['u'])
+if (!$where && !$options['u'] && !isset($options['a']))
 {
   print_message("%n
 USAGE:
@@ -149,6 +150,7 @@ OPTIONS:
  -i                                          Discovery instance.
  -n                                          Discovery number.
  -q                                          Quiet output.
+ -a                                          Force update Groups/Alerts table
  -u                                          Upgrade DB schema
  -M                                          Show globally enabled/disabled modules and exit.
  -V                                          Show version and exit.
@@ -166,7 +168,19 @@ if ($config['version_check'] && ($options['h'] != 'new' || $options['u']))
   include($config['install_dir'] . '/includes/versioncheck.inc.php');
 }
 
-if (!$where) { exit; }
+if (!$where)
+{
+  // Only update Group/Alert tables
+  if (isset($options['a']))
+  {
+    $silent = isset($options['q']);
+    // Not exist in CE
+    if (function_exists('update_group_tables')) { update_group_tables($silent); }
+    if (function_exists('update_alert_tables')) { update_alert_tables($silent); }
+  }
+
+  exit;
+}
 
 // For not new devices discovery, skip down devices
 if ($options['h'] != 'new')
@@ -189,9 +203,6 @@ foreach (dbFetchRows("SELECT * FROM `devices` WHERE `disabled` = 0 $where ORDER 
   if ($options['h'] == 'new' || isSNMPable($device))
   {
     discover_device($device, $options);
-    // Not exist in CE
-    if ((!isset($options['m']) || isset($options['r'])) && function_exists('update_group_tables')) { update_group_tables(); }
-    if ((!isset($options['m']) || isset($options['r'])) && function_exists('update_alert_tables')) { update_alert_tables(); }
   } else {
     $string = "Device '" . $device['hostname'] . "' skipped, because switched off during runtime discovery process.";
     print_debug($string);
@@ -205,8 +216,19 @@ $end = utime();
 $run = $end - $start;
 $discovery_time = substr($run, 0, 5);
 
-if ($discovered_devices) {
-  if (is_numeric($doing)) { $doing = $device['hostname']; } // Single device ID convert to hostname for log
+// Update Group/Alert tables
+if (($discovered_devices && !isset($options['m'])) || isset($options['a']))
+{
+  $silent = isset($options['q']);
+  // Not exist in CE
+  if (function_exists('update_group_tables')) { update_group_tables($silent); }
+  if (function_exists('update_alert_tables')) { update_alert_tables($silent); }
+}
+
+if ($discovered_devices)
+{
+  // Single device ID convert to hostname for log
+  if (is_numeric($doing)) { $doing = $device['hostname']; }
 }
 elseif (!isset($options['q']) && !$options['u'])
 {
@@ -221,9 +243,9 @@ logfile($string);
 foreach (dbFetchRows("SELECT * FROM `observium_processes` WHERE `process_start` < ?", array($config['time']['fourhour'])) as $process)
 {
   // We found processes in DB, check if it exist on system
-  print_debug_vars($processes);
+  print_debug_vars($process);
   $pid_info = get_pid_info($process['process_pid']);
-  if (is_array($pid_info) && strpos($pid_info['COMMAND'], $process_name) !== FALSE)
+  if (is_array($pid_info) && strpos($pid_info['COMMAND'], $process['process_name']) !== FALSE)
   {
     // Process still running
   } else {

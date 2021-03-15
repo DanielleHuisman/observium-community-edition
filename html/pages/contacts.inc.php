@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -22,53 +21,6 @@ if ($_SESSION['userlevel'] < 7)
 include($config['html_dir'].'/includes/alerting-navbar.inc.php');
 include($config['html_dir'].'/includes/contacts-navbar.inc.php');
 
-// Begin Actions
-$readonly = $_SESSION['userlevel'] < 10; // Currently edit allowed only for Admins
-
-if (!$readonly && isset($vars['action']))
-{
-  switch ($vars['action'])
-  {
-    case 'add_contact':
-      // Only proceed if the contact_method is valid in our transports array
-      if (is_array($config['transports'][$vars['contact_method']]))
-      {
-        foreach ($config['transports'][$vars['contact_method']]['parameters'] as $section => $parameters)
-        {
-          foreach ($parameters as $parameter => $description)
-          {
-            if (isset($vars['contact_' . $vars['contact_method'] . '_' . $parameter]))
-            {
-              $endpoint_data[$parameter] = $vars['contact_' . $vars['contact_method'] . '_' . $parameter];
-            }
-          }
-        }
-
-        dbInsert('alert_contacts', array('contact_descr' => $vars['contact_descr'], 'contact_endpoint' => json_encode($endpoint_data), 'contact_method' => $vars['contact_method']));
-      }
-      break;
-
-    case 'edit_contact':
-      break;
-
-    case 'delete_contact':
-      if (in_array($vars['confirm_'.$vars['contact_id']], array('1', 'on', 'yes', 'confirm')))
-      {
-        $rows_deleted  = dbDelete('alert_contacts',       '`contact_id` = ?', array($vars['contact_id']));
-        $rows_deleted += dbDelete('alert_contacts_assoc', '`contact_id` = ?', array($vars['contact_id']));
-
-        if ($rows_deleted)
-        {
-          print_success('Deleted contact and all associations ('.$vars['contact_id'].')');
-        }
-      }
-      unset($vars['contact_id']);
-      break;
-
-  }
-}
-
-// End Actions
 ?>
 
 <div class="row">
@@ -89,7 +41,7 @@ if (count($contacts))
     <tr>
     <th style="width: 1px"></th>
     <th style="width: 50px">Id</th>
-    <th style="width: 100px">Method</th>
+    <th style="width: 100px">Transport</th>
     <th style="width: 100px">Description</th>
     <th>Destination</th>
     <th style="width: 60px">Used</th>
@@ -111,7 +63,8 @@ if (count($contacts))
 
     // If we have "identifiers" set for this type of transport, use those to print a user friendly destination.
     // If we don't, just dump the JSON array as we don't have a better idea what to do right now.
-    if (isset($config['transports'][$contact['contact_method']]['identifiers']))
+    $transport = $contact['contact_method'];
+    if (isset($config['transports'][$transport]['identifiers']))
     {
       // Decode JSON for use below
       $contact['endpoint_variables'] = json_decode($contact['contact_endpoint'], TRUE);
@@ -136,14 +89,23 @@ if (count($contacts))
       $contact['endpoint_descr'] = escape_html($contact['contact_endpoint']);
     }
 
+    if (!isset($config['transports'][$transport]))
+    {
+        // Transport undefined (removed or limited to Pro)
+      $transport_name = nicecase($transport) . ' (Missing)';
+      $transport_status = '<span class="label">missing</span>';
+    } else {
+      $transport_name = $config['transports'][$transport]['name'];
+      $transport_status = $contact['contact_disabled'] ? '<span class="label label-error">disabled</span>' : '<span class="label label-success">enabled</span>';
+    }
     echo '    <tr>';
     echo '      <td></td>';
     echo '      <td>'.$contact['contact_id'].'</td>';
-    echo '      <td><span class="label">'.$config['transports'][$contact['contact_method']]['name'].'</span></td>';
+    echo '      <td><span class="label">'.$transport_name.'</span></td>';
     echo '      <td class="text-nowrap">'.escape_html($contact['contact_descr']).'</td>';
     echo '      <td><a href="' . generate_url(array('page' => 'contact', 'contact_id' => $contact['contact_id'])) . '">' . $contact['endpoint_descr'] . '</a></td>';
     echo '      <td><span class="label label-primary">'.$num_assocs.'</span></td>';
-    echo '      <td>' . ($contact['contact_disabled'] ?  '<span class="label label-error">disabled</span>' : '<span class="label label-success">enabled</span>') . '</td>';
+    echo '      <td>' . $transport_status . '</td>';
     echo '      <td style="text-align: right;">';
     if ($_SESSION['userlevel'] >= 10)
     {

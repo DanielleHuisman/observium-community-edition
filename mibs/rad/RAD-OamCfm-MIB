@@ -1,0 +1,5438 @@
+RAD-OamCfm-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       dot1agCfmMdIndex, dot1agCfmMaIndex, dot1agCfmMepIdentifier, 
+       dot1agCfmMepDbRMepIdentifier, dot1agCfmMaMepListIdentifier, Dot1agCfmCcmInterval, 
+       dot1agCfmMepDefects, dot1agCfmMepDbRMepState, dot1agCfmMepDbRdi, 
+       dot1agCfmMdName, dot1agCfmMaNetName, Dot1agCfmMepId     FROM  IEEE8021-CFM-MIB
+       InterfaceIndexOrZero     FROM  IF-MIB
+       LldpPortIdSubtype     FROM  LLDP-MIB
+       PerfCurrentCount, PerfIntervalCount, PerfTotalCount     FROM  PerfHist-TC-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       sysName     FROM  SNMPv2-MIB
+       Integer32, Counter32, Unsigned32, 
+       Counter64, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE, OBJECT-IDENTITY     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, RowStatus, DateAndTime, 
+       TruthValue, MacAddress     FROM  SNMPv2-TC
+       ethIf     FROM  RAD-EthIf-MIB
+       DayType, RadTestPbitValues     FROM  RAD-TC
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+
+    ethIfOamCfm MODULE-IDENTITY
+        LAST-UPDATED "201608041940Z"  -- August 04, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "OAM CFM MIB."
+    ::= { ethIf 3 }
+
+
+--======================================
+--  Textual Conventions
+--======================================
+
+EthOamBinCounterType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "Type of OAM BIN Measurements counter, e.g
+    Round Trip Frame Delay
+    Round Trip Frame Delay Variation
+    Forward  Frame Delay
+    Forward  Frame Delay Variation
+    Backward Frame Delay
+    Backward Frame Delay Variation"
+    SYNTAX  INTEGER {
+            rtDelay (1),
+            rtDelayVar (2),
+            fwDelay(3),
+            fwDelayVar(4),
+            bwDelay(5),
+            bwDelayVar(6)
+            }
+
+
+
+ethIfOamCfmEvents  OBJECT IDENTIFIER ::= { ethIfOamCfm 0 }
+
+ethOamCfmDefectCondition NOTIFICATION-TYPE
+	STATUS		current
+	DESCRIPTION     
+	"This trap indicates that a MEP has a persistent defect condition."
+     ::= { ethIfOamCfmEvents 1 }
+
+-- New RAD Common Traps
+
+oamCfmMepAis        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates AIS on MEP.
+    "
+     ::= { ethIfOamCfmEvents 4 }
+
+oamCfmMepLck        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates  LCK on MEP.
+    "
+     ::= { ethIfOamCfmEvents 5 }
+
+oamCfmMepMismatch       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName, 
+     dot1agXCfmMepCcStatus } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates Mismatch.
+    "
+     ::= { ethIfOamCfmEvents 6 }
+
+oamCfmRmepLoc       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates Remote MEP LOC.
+    "
+     ::= { ethIfOamCfmEvents 7 }
+
+oamCfmRmepRdi       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates Remote MEP RDI.
+    "
+     ::= { ethIfOamCfmEvents 8 }
+
+oamCfmDestNeDelayTca         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Delay threshold crossing alert.
+    "
+     ::= { ethIfOamCfmEvents 9 }
+
+oamCfmDestNeDelayTcaOff         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates that the Delay is in the permitted range.
+    "
+     ::= { ethIfOamCfmEvents 10 }
+
+
+oamCfmDestNeDelayVarTca         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Delay variance threshold crossing alert.
+    "
+     ::= { ethIfOamCfmEvents 11 }
+
+
+oamCfmDestNeDelayVarTcaOff         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates that the Delay variance is in the permitted range.
+    "
+     ::= { ethIfOamCfmEvents 12 }
+
+
+oamCfmDestNeLossRatioTca         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Loss ratio threshold crossing alert.
+    "
+     ::= { ethIfOamCfmEvents 13 }
+
+
+oamCfmDestNeLossRatioTcaOff         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates that the Loss ratio is in permitted range.
+    "
+     ::= { ethIfOamCfmEvents 14 }
+
+
+oamCfmDestNeLossRatioTcaFe         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Loss ratio is in permitted range at the far-end.
+    "
+     ::= { ethIfOamCfmEvents 15 }
+
+
+oamCfmDestNeLossRatioTcaFeOff         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Loss ratio threshold crossing alert at the far-end.
+    "
+     ::= { ethIfOamCfmEvents 16 }
+
+
+oamCfmDestNeUnavailRatioTca         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Unavailable ratio threshold crossing alert.
+    "
+     ::= { ethIfOamCfmEvents 17 }
+
+
+oamCfmDestNeUnavailRatioTcaOff         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Unavailable ratio is in the permitted range.
+    "
+     ::= { ethIfOamCfmEvents 18 }
+
+
+oamCfmDestNeUnavailRatioTcaFe         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "Unavailable ratio threshold crossing alert at the far-end.
+    "
+     ::= { ethIfOamCfmEvents 19}
+
+
+oamCfmDestNeUnavailRatioTcaFeOff         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ethOamDestNeDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates that the Unavailable ratio is in the permitted range at far-end.
+    "
+     ::= { ethIfOamCfmEvents 20}
+
+oamCfmMepDefXconCCM       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates the MEP has received at least one CCM from either
+     another MAID or lower MD level.
+    "
+     ::= { ethIfOamCfmEvents 21 }
+
+oamCfmMepDefErrorCCM       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates the MEP has received at least one invalid CCM whose CCM
+     interval has not yet timed out.
+    "
+     ::= { ethIfOamCfmEvents 22 }
+
+oamCfmRmepDefRemoteCCM       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates Loss Of Continuity (LOC) with a specific RMEP.
+    "
+     ::= { ethIfOamCfmEvents 23 }
+
+oamCfmRmepDefRDICCM       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates a specific RMEP has reported the RDI bit in its
+    last CCM.
+    "
+     ::= { ethIfOamCfmEvents 24 }
+
+oamCfmRmepDefMACstatus       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     dot1agXCfmMaMepListDescr, dot1agCfmMdName, dot1agCfmMaNetName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates a specific RMEP is either reporting its Interface
+    Status TLV as not isUp(1), or its Port Status TLV as not psUp(2).
+    "
+     ::= { ethIfOamCfmEvents 25 }
+
+systemCfmSoamRxPacketDropped       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName } 
+    STATUS      current
+    DESCRIPTION
+    "This trap indicates received CFM SOAM packets dropped during last interval.
+    "
+     ::= { ethIfOamCfmEvents 26 }
+
+-- ETH OAM CFM Definitions  (802.1ag)
+
+-- MEP Definition
+-- ******************************************************************
+-- The MEG End Point Table
+-- ******************************************************************
+radMepTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS  deprecated
+    DESCRIPTION
+    "MEG End Point (MEP) configuration table associated with
+     Maitenance Entity Group (MEG) End Point.
+     MEP is a short name for an expanded ETH flow point that includes a compound
+     ETH Segment flow termination function, which marks the end point of an ETH ME,
+     and a compound ETH Diagnostic flow function."
+    ::= { ethIfOamCfm 1 }
+    
+radMepEntry OBJECT-TYPE
+    SYNTAX  RadMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS  deprecated
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  { radOamIdx1, radOamEvcIdx, radMepIdx }
+    ::= { radMepTable 1 }
+
+RadMepEntry ::= SEQUENCE {
+    radOamIdx1                   Unsigned32,
+    radOamEvcIdx                 Unsigned32,
+    radMepIdx                    Unsigned32,
+    radMepRowStatus              RowStatus, 
+   	radMepLocalMepId			 Unsigned32,
+	radMepRemoteMepId  			 Unsigned32,
+	radMepOamMode    			 INTEGER,
+	radMepContinuityVerMode		 INTEGER,
+	radMepMeLevel				 Unsigned32,
+	radMepOamDestAddrType		 INTEGER,
+	radMepOamDestMacAddr		 MacAddress,
+	radMepDefaultPriority		 Unsigned32,
+	radMepCcStatus               INTEGER,
+	radMepOamProtocol            INTEGER,
+	radMepMdId                   Unsigned32,
+	radMepMaFormat				 INTEGER,
+	radMepMaName				 OCTET STRING,
+	radMepSpVlanId               Unsigned32,
+	radMepCcInterval             INTEGER,
+	radMepTransmitLbmDestMacAddress    MacAddress,
+	radMepTransmitLbmDestMepId		   Unsigned32,
+	radMepTransmitLbmDestIsMepId	   INTEGER,
+	radMepTransmitLbmMassages          Integer32,
+	radMepTransmitLbmVlanPriority	   Unsigned32,
+	radMepTransmitLbmVlanDropEnable	   INTEGER,
+	radMepLbrIn                        Counter32,
+	radMepLbrInOutOfOrder			   Counter32,
+	radMepLbmOut                       Counter32,
+	radMepTransmitLtmTargetMacAddress  MacAddress,
+	radMepTransmitLtmTargetMepId	   Unsigned32,
+	radMepTransmitLtmTargetIsMepId	   INTEGER,
+	radMepTransmitLtmTtl               Unsigned32,
+	radMepTransmitLtmActivationCmd     INTEGER
+ }
+    
+radOamIdx1 OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+     "This object may indicate the Bridge Index or Configuration index."
+    ::= { radMepEntry 1 }
+
+    radOamEvcIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+     "This object indicates the Index of the EVC (Ethernet Virtual Circuit)
+     that the MEP is associated to."
+    ::= { radMepEntry 2 }
+
+radMepIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+     "This object indicates the ID of the MEP being accessed."
+    ::= { radMepEntry 3 }
+
+radMepRowStatus  OBJECT-TYPE
+      SYNTAX     RowStatus
+      MAX-ACCESS read-create
+      STATUS     deprecated
+      DESCRIPTION
+      "This attribute allows to create/delete a row in this table."
+      ::= {radMepEntry 4 }
+
+radMepLocalMepId  OBJECT-TYPE
+    SYNTAX       	 Unsigned32
+    MAX-ACCESS       read-create
+    STATUS           current
+    DESCRIPTION
+     "This object indicates the local MEP ID."
+    ::= { radMepEntry 5 }
+  
+radMepRemoteMepId  OBJECT-TYPE
+    SYNTAX              Unsigned32 
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+     "This atribute is currently implemneted at radMepCcTable, that
+     supports multicast."
+    ::= { radMepEntry 6 }
+
+radMepOamMode  OBJECT-TYPE
+    SYNTAX              INTEGER
+	{
+       disabled    	 (2),
+       initiate   	 (3),
+       react	     (4) 
+    }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+     "This object determines the OAM mode of the MEP:
+     disabled - no CC is initiated nor responded
+     initiate - the device initiates and responds to CC
+     react - the device does not initiate a CC, but responds to CC."
+    ::= { radMepEntry 7 }
+  
+radMepContinuityVerMode  OBJECT-TYPE
+    SYNTAX              INTEGER
+	{
+       disabled    	 (2),
+       ccBased   	 (3),
+       lbBased	     (4) 
+    }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+     "This object determines the OAM behavior of the MEP: 
+     disabled - no CC is done
+     cc_based - CC is done based on incoming messages
+     lb_based - CC is done based on loopback messages."
+    ::= { radMepEntry 8 }
+
+radMepMeLevel OBJECT-TYPE
+     SYNTAX  Unsigned32 (0..7) 
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "At any point in a network, ME Level is used to distinguish between OAM 
+     signals belonging to different nested MEs.
+     Maintenance Entity Levels are defined as follows:
+     0,1,2 are assigned to customers
+     3,4   are assigned to providers
+     5,6,7 are assigned to operators."
+    ::= { radMepEntry 9 }
+
+radMepOamDestAddrType OBJECT-TYPE
+SYNTAX  INTEGER
+	{
+       unicast		(1),
+       multicast  	(2)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object determines if the OAM messages are sent to user defined 
+    unicast address, or to RAD proprietary multicast address."
+    ::= { radMepEntry 10 }
+
+radMepOamDestMacAddr OBJECT-TYPE
+	SYNTAX  MacAddress 
+	MAX-ACCESS  read-create
+	STATUS current
+	DESCRIPTION
+	"This object determines the MAC address that OAM packets are sent to."
+	::= { radMepEntry 11 }
+
+radMepDefaultPriority OBJECT-TYPE
+     SYNTAX  Unsigned32 (0..7) 
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This object defines the priority of the OAM messages sent when no 
+     service is defined on EVC. If a service is defined, the OAM messages
+     will get the highest service priority existing on the EVC."
+    ::= { radMepEntry 12 }
+
+
+radMepCcStatus OBJECT-TYPE
+     SYNTAX  INTEGER 
+	{
+       notApplicable     (1),
+	   fail	             (2),
+       ok  	             (3),
+	   mismerge          (4),
+	   unexpectedMep     (5),
+       unexpectedMeLevel (6)
+    }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "This object indicates the Continuity Check (CC)
+      status."
+    ::= { radMepEntry 13 }
+
+radMepOamProtocol  OBJECT-TYPE
+     SYNTAX         INTEGER
+	 {
+       proprietary     (1),
+	   standard        (2)	   
+     }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "Determines whether to use proprietary OAM mechanism, 
+     or to use the standard (IEEE 802.1ag, ITU-T Y.1731)."
+    ::= { radMepEntry 14 }
+
+
+radMepMdId   OBJECT-TYPE
+     SYNTAX       Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The index of the Maintenance Domain in the radMdTable (radMdIndex)."
+    ::= { radMepEntry 15 }
+
+radMepMaFormat	OBJECT-TYPE
+     SYNTAX  INTEGER 
+	{
+       primaryVid        (1),
+       charString        (2),
+       unsignedInt16     (3),
+       rfc2865VpnId      (4),
+	   icc               (32)  -- ITU Carrier Code
+     }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The type (and thereby format) of the Maintenance Association
+        Name."
+    ::= { radMepEntry 16 }
+
+radMepMaName  OBJECT-TYPE
+     SYNTAX   OCTET STRING (SIZE(1..45))
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The Short Maintenance Association name."
+    ::= { radMepEntry 17 }
+
+radMepSpVlanId  OBJECT-TYPE
+     SYNTAX     Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The SP (Service Provider) VLAN used when sending an OAM message."
+    ::= { radMepEntry 18 }
+    	
+radMepCcInterval  OBJECT-TYPE
+     SYNTAX       INTEGER
+	 {
+       intervalInvalid   (0),  -- No CCMs are sent (disabled)
+       interval300Hz     (1),  -- CCMs are sent every 3 1/3 milliseconds (300Hz)
+       interval10ms      (2),  -- CCMs are sent every 10 milliseconds
+       interval100ms     (3),  -- CCMs are sent every 100 milliseconds
+       interval1s        (4),  -- CCMs are sent every 1 second
+       interval10s       (5),  -- CCMs are sent every 10 seconds
+       interval1min      (6),  -- CCMs are sent every minute
+       interval10min     (7)   -- CCMs are sent every 10 minutes   
+     }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "Indicates the interval at which CCMs are sent by a MEP
+     Valid only if radMepOamMode = initiate(4)."
+    ::= { radMepEntry 19 }
+
+
+radMepTransmitLbmDestMacAddress OBJECT-TYPE
+     SYNTAX      MacAddress
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The Target MAC Address Field to be transmitted in the Loopback Message: 
+     For unicast MAC Address this is the unicast destination MAC address.
+     For multicast MAC Address, this variable is read-only.
+     This address will be used if the value of 
+     radMepTransmitLbmDestIsMepId is no (2).
+     802.1ag clause 12.14.7.3.2:b."
+    ::= { radMepEntry 20 }
+
+radMepTransmitLbmDestMepId	OBJECT-TYPE
+     SYNTAX    	   Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The MEPID of another MEP in the same MA to which the
+	  LBM is to be sent. This address will be used if the value of
+      radMepTransmitLbmDestIsMepId is yes (3).
+      802.1ag clause 12.14.7.3.2:b."
+    ::= { radMepEntry 21 }
+
+
+radMepTransmitLbmDestIsMepId	  OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	  no  (2),
+	  yes (3)
+	}
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "yes (3) indicates that MEPID of the target MEP is used for loopback transmission.
+	    no (2) indicates that unicast destination MAC address of the target MEP is used.
+        802.1ag clause 12.14.7.3.2:b."
+    ::= { radMepEntry 22 }
+
+
+radMepTransmitLbmMassages OBJECT-TYPE
+     SYNTAX      Integer32(1..1024)
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The number of Loopback messages to be transmitted."
+    ::= { radMepEntry 23 }
+
+radMepTransmitLbmVlanPriority	OBJECT-TYPE
+     SYNTAX     Unsigned32(0..7)
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The priority to be used in the VLAN tag, if present,
+      in the transmitted frame. 
+      The default value is CCM priority.
+      802.1ag clause 12.14.7.3.2:e"
+    ::= { radMepEntry 24 }
+
+radMepTransmitLbmVlanDropEnable	 OBJECT-TYPE
+     SYNTAX       INTEGER
+	 {
+	  no  (2),
+	  yes (3)
+     }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "Drop Enable bit to be used in the VLAN tag, if present,
+      in the transmitted frame. 
+      802.1ag clause 12.14.7.3.2:e"
+    ::= { radMepEntry 25 }
+
+
+radMepLbrIn OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of valid, in-order Loopback Replies received."
+    ::= { radMepEntry 26 }
+
+radMepLbrInOutOfOrder	  OBJECT-TYPE
+     SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The total number of valid, out-of-order Loopback Replies
+        received."
+    ::= { radMepEntry 27 }
+
+radMepLbmOut OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of Loopback Messages transmitted."
+    ::= { radMepEntry 28 }
+
+radMepTransmitLtmTargetMacAddress OBJECT-TYPE
+     SYNTAX      MacAddress
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The Target MAC Address Field to be transmitted in the Link Trace Message: 
+      A unicast destination MAC address.
+	  This address will be used 
+      if the value of radMepTransmitLtmTargetIsMepId is no (2).
+      802.1ag clause 12.14.7.4.2:c."
+    ::= { radMepEntry 29 }
+
+
+radMepTransmitLtmTargetMepId OBJECT-TYPE
+    SYNTAX      Unsigned32
+	MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The MEPID of another MEP in the same MA to which 
+        LTM is to be transmitted. This address will be used 
+        if the value of radMepTransmitLtmTargetIsMepId is yes (3).
+        802.1ag clause 12.14.7.4.2:c."
+    ::= { radMepEntry 30 }
+
+radMepTransmitLtmTargetIsMepId OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	  no  (2),
+	  yes (3)
+	}
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "yes (3) indicates that MEPID of the target MEP is used for Linktrace transmission.
+	    no (2) indicates that unicast destination MAC address of the target MEP is used.
+        802.1ag clause 12.14.7.4.2:c."
+    ::= { radMepEntry 31 }
+   
+radMepTransmitLtmTtl   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The LTM TTL field. Default value, if not specified, is 64.
+       The TTL field indicates the number of hops remaining to the LTM.
+       Decremented by 1 each Linktrace Responder that handles the LTM.
+       The value received in the LTM is returned in the LTR.
+       If 0 on input, the LTM is not transmitted to the next hop.
+       802.1ag clause 12.14.7.4.2:b and 21.8.4."
+    ::= { radMepEntry 32 }
+
+radMepTransmitLtmActivationCmd   OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	  off  (2),
+	  on   (3)
+	}
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Activation command for starting Loop Trace. Set will be always 
+        to 'on' value. After operation was finished, Agent will turn the value to 'off'."
+    ::= { radMepEntry 33 }
+
+
+ethOamMepStats              OBJECT IDENTIFIER ::= { ethIfOamCfm 18 } 
+
+--=====================================
+-- Local MEP Current Interval Statistics
+--=====================================
+   
+ethOamMepCurrentTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamMepCurrentEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Current interval statistics per local MEP."
+       ::= { ethOamMepStats 1}
+
+ethOamMepCurrentEntry OBJECT-TYPE
+    SYNTAX  EthOamMepCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in this table includes current interval counters of local MEP. "
+    INDEX  {dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMepIdentifier}
+    ::= { ethOamMepCurrentTable 1 }
+
+EthOamMepCurrentEntry ::= SEQUENCE {
+    ethOamMepCurrentCcmTx        Counter64 
+ }
+    
+ethOamMepCurrentCcmTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of CCM PDUs transmitted by local MEP 
+       in the current interval"
+    ::= { ethOamMepCurrentEntry 1 }   
+   
+--====================================
+-- Local MEP statistics history
+--====================================
+ethOamMepIntervalTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EthOamMepIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table provides local MEP statistics for the history intervals."
+   ::= { ethOamMepStats 2 }
+
+ethOamMepIntervalEntry OBJECT-TYPE
+    SYNTAX        EthOamMepIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+    "An entry in this table is created by the agent for every ethOamMepCurrentEntry
+     that completes its statistics interval duration.
+
+     The contents of the current entry are copied to the new entry here.
+     The current entry then resets its counts to zero for the next
+     interval."    
+     
+        INDEX  {dot1agCfmMdIndex,
+                dot1agCfmMaIndex,
+                dot1agCfmMepIdentifier,                
+                ethOamMepIntervalNumber }
+    ::= { ethOamMepIntervalTable 1 }
+
+EthOamMepIntervalEntry ::= SEQUENCE {
+    ethOamMepIntervalNumber                     Unsigned32,
+    ethOamMepIntervalValidData                  TruthValue,
+    ethOamMepIntervalDuration                   Unsigned32,
+    ethOamMepIntervalTimeStamp                  DateAndTime,
+    ethOamMepIntervalCcmTx                      Counter64 
+ }
+
+ethOamMepIntervalNumber OBJECT-TYPE
+    SYNTAX  Unsigned32 (1..96)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "A number N, between 1 and 96, which identifies the interval for which
+     the set of statistics is available.
+     The interval identified by 1 is the most recently completed 
+     interval, and the interval identified by N is the interval immediately
+     preceding the one identified by N-1."
+    ::= { ethOamMepIntervalEntry 1 }
+
+ethOamMepIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This variable indicates if the data for this interval is valid."
+    ::= { ethOamMepIntervalEntry 2 }
+
+ethOamMepIntervalDuration OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..900)
+      UNITS       "seconds"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "The duration of this interval in seconds."
+    ::= { ethOamMepIntervalEntry 3 }
+
+ethOamMepIntervalTimeStamp   OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The date and time of start of this interval.
+     Time zone octets are not used (OCTET STRING (SIZE (8))."
+    ::= { ethOamMepIntervalEntry 4 }
+    
+ethOamMepIntervalCcmTx OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "Total number of CCM PDUs transmitted by Local MEP."
+    ::= { ethOamMepIntervalEntry 5 }
+
+
+--=====================================
+-- Remote MEP Running Statistics
+--======================================
+
+ethOamRMepStatsTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamRMepStatsEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Running statistics of remote MEP."
+       ::= { ethOamMepStats 3 }
+
+ethOamRMepStatsEntry OBJECT-TYPE
+    SYNTAX  EthOamRMepStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in this table includes running counters for remote MEP. "
+    INDEX  {dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMepIdentifier, -- Local MEP
+            ethOamRMepStatsRMepId}
+    ::= { ethOamRMepStatsTable 1 }
+
+EthOamRMepStatsEntry ::= SEQUENCE {
+    ethOamRMepStatsRMepId       Dot1agCfmMepId,
+    ethOamRMepStatsCcmRx        Counter64,
+    ethOamRMepStatsClearCmd     INTEGER 
+ }
+
+ethOamRMepStatsRMepId OBJECT-TYPE
+    SYNTAX      Dot1agCfmMepId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "Remote MEP ID."
+    ::= { ethOamRMepStatsEntry 1 } 
+    
+ethOamRMepStatsCcmRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of CCM PDUs received by the MEP."
+    ::= { ethOamRMepStatsEntry 2 }
+    
+ethOamRMepStatsClearCmd  OBJECT-TYPE
+    SYNTAX      INTEGER
+     {
+     off  (2), -- read-only value
+     on   (3)  -- write-only value
+     }
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "A command that instructs the agent to clear 
+      running statistics of selected remote MEP.
+
+      Setting this object to on(3), shall clear the per MEP
+      statistics. Upon completion, the value shall automatically
+      change to off(2)."
+     DEFVAL {off}
+    ::= { ethOamRMepStatsEntry 3 }
+              
+--=====================================
+-- Remote MEP Current Interval Statistics
+--=====================================
+   
+ethOamRMepCurrentTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamRMepCurrentEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Current interval statistics of remote MEP."
+       ::= { ethOamMepStats 4 }
+
+ethOamRMepCurrentEntry OBJECT-TYPE
+    SYNTAX  EthOamRMepCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in this table includes current interval counters of remote MEP."
+    INDEX  {dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMepIdentifier,
+            ethOamRMepStatsRMepId}
+    ::= { ethOamRMepCurrentTable 1 }
+
+EthOamRMepCurrentEntry ::= SEQUENCE {
+    ethOamRMepCurrentCcmRx        Counter64 
+ }
+    
+ethOamRMepCurrentCcmRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of CCM PDUs received by remote MEP in the current interval."
+    ::= { ethOamRMepCurrentEntry 1 }     
+   
+--====================================
+-- Remote MEP statistics history
+--====================================
+ethOamRMepIntervalTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EthOamRMepIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table provides per remote MEP 
+    statistics for the history intervals."
+   ::= { ethOamMepStats 5 }
+
+ethOamRMepIntervalEntry OBJECT-TYPE
+    SYNTAX        EthOamRMepIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+    "An entry in this table is created by the agent for every ethOamRMepCurrentEntry
+     that completes its statistics interval duration.
+
+     The contents of the current entry are copied to the new entry here.
+     The current entry then resets its counts to zero for the next
+     interval."    
+     
+        INDEX  {dot1agCfmMdIndex,
+                dot1agCfmMaIndex,
+                dot1agCfmMepIdentifier,
+                ethOamRMepStatsRMepId,
+                ethOamRMepIntervalNumber }
+    ::= { ethOamRMepIntervalTable 1 }
+
+EthOamRMepIntervalEntry ::= SEQUENCE {
+    ethOamRMepIntervalNumber                     Unsigned32,
+    ethOamRMepIntervalValidData                  TruthValue,
+    ethOamRMepIntervalDuration                   Unsigned32,
+    ethOamRMepIntervalTimeStamp                  DateAndTime,
+    ethOamRMepIntervalCcmRx                      Counter64 
+ }
+
+ethOamRMepIntervalNumber OBJECT-TYPE
+    SYNTAX  Unsigned32 (1..96)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "A number N, between 1 and 96, which identifies the interval for which
+     the set of statistics is available.
+     The interval identified by 1 is the most recently completed 
+     interval, and the interval identified by N is the interval immediately
+     preceding the one identified by N-1."
+    ::= { ethOamRMepIntervalEntry 1 }
+
+ethOamRMepIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This variable indicates if the data for this interval is valid."
+    ::= { ethOamRMepIntervalEntry 2 }
+
+ethOamRMepIntervalDuration OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..900)
+      UNITS       "seconds"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "The duration of this interval in seconds."
+    ::= { ethOamRMepIntervalEntry 3 }
+
+ethOamRMepIntervalTimeStamp   OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The date and time of start of this interval. (time stamp)
+     Time zone octets are not used (OCTET STRING (SIZE (8))."
+    ::= { ethOamRMepIntervalEntry 4 }
+        
+ethOamRMepIntervalCcmRx OBJECT-TYPE
+      SYNTAX      Counter64
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "Total number of CCM PDUs received by Remote MEP."
+    ::= { ethOamRMepIntervalEntry 5 }
+        
+-- ETH OAM Service Definition
+
+
+ethOamService   OBJECT IDENTIFIER ::= { ethIfOamCfm 2 }
+
+-- ******************************************************************
+-- The ETH OAM Service Table
+-- ******************************************************************
+
+ethOamServiceTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EthOamServiceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Service configuration table associated with Services running on a MEP."
+    ::= { ethOamService 1 }
+
+ethOamServiceEntry OBJECT-TYPE
+    SYNTAX  EthOamServiceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in the table. Indices are as follows:
+         - radOamIdx1 corresponds to MD Id (IEEE8021-CFM-MIB.dot1agCfmMdIndex).
+         - radOamEvcIdx corresponds to MA Id (IEEE8021-CFM-MIB.dot1agCfmMaIndex).
+         - radMepIdx corresponds to MEP ID (IEEE8021-CFM-MIB.dot1agCfmMepIdentifier).
+         - ethOamServiceIdx is the Service number. Up to 8 services can be defined per MEP."
+     INDEX  { radOamIdx1, radOamEvcIdx, radMepIdx, ethOamServiceIdx  }
+    ::= { ethOamServiceTable 1 }
+
+EthOamServiceEntry ::= SEQUENCE {
+    ethOamServiceIdx                     Unsigned32,
+    ethOamServiceRowStatus               RowStatus,
+    ethOamServicePriority                Unsigned32,
+    ethOamServicePmEnable                INTEGER,
+	ethOamServiceFrameLossRatioThresh 	Integer32,
+    ethOamServiceDelayThresh             Integer32,
+    ethOamServiceDelayVarThresh          Integer32,
+	ethOamServiceUnavailRatioThresh    	Integer32,
+    ethOamServiceTxFrames                Counter32,
+    ethOamServiceOverflowTxFrames        Counter32,
+    ethOamServiceFarEndFrameLoss         Counter32,
+    ethOamServiceOverflowFarEndFrameLoss Counter32,
+    ethOamServiceFarEndFrameLossRatio    Unsigned32,
+    ethOamServiceElapsedTime             Counter32,
+	ethOamServiceUnavailSec				Counter32,
+	ethOamServiceUnavailRatio			Unsigned32,
+    ethOamServiceFramesAboveDelay               Counter32,
+    ethOamServiceOverflowFramesAboveDelay       Counter32,
+    ethOamServiceFramesAboveDelayVar            Counter32,
+    ethOamServiceOverflowFramesAboveDelayVar    Counter32,
+    ethOamServiceCurrentDelay                   Unsigned32,
+    ethOamServiceCurrentDelayVariation          Unsigned32,
+    ethOamServiceResetCounters                  INTEGER,
+    ethOamServiceNearEndFrameLoss               Counter32,
+    ethOamServiceOverflowNearEndFrameLoss       Counter32,
+    ethOamServiceNearEndFrameLossRatio          Unsigned32,
+    ethOamServiceDmmInterval                    Dot1agCfmCcmInterval,
+    ethOamServiceLmmInterval                    Dot1agCfmCcmInterval,
+    ethOamServiceTxLmm                          Counter32,
+    ethOamServiceOverflowTxLmm                  Counter32,
+    ethOamServiceTxDmm                          Counter32,
+    ethOamServiceOverflowTxDmm                  Counter32,
+    ethOamServiceRxLmr                          Counter32,
+    ethOamServiceOverflowRxLmr                  Counter32,
+    ethOamServiceRxDmr                          Counter32,
+    ethOamServiceOverflowRxDmr                  Counter32,
+    ethOamServiceTxForward                      Counter32,
+    ethOamServiceOverflowTxForward              Counter32,
+    ethOamServiceRxForward                      Counter32,
+    ethOamServiceOverflowRxForward              Counter32,
+    ethOamServiceTxBackward                     Counter32,
+    ethOamServiceOverflowTxBackward             Counter32,
+    ethOamServiceRxBackward                     Counter32,
+    ethOamServiceOverflowRxBackward             Counter32,
+    ethOamServiceConvertedIndex                 Unsigned32 
+ }
+
+ethOamServiceIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "This object indicates the Index of the service being accessed."
+    ::= { ethOamServiceEntry 1 }
+
+ethOamServiceRowStatus   OBJECT-TYPE
+      SYNTAX     RowStatus
+      MAX-ACCESS read-create
+      STATUS     current
+      DESCRIPTION
+      "This attribute allows to create/delete a row in this table."
+      ::= {ethOamServiceEntry 2 }
+
+ethOamServicePriority OBJECT-TYPE
+     SYNTAX  Unsigned32 (0..7)
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This object determines the priority of the service.
+     It is sent as P bits in an OAM message originated by this service."
+    ::= { ethOamServiceEntry 3 }
+
+ethOamServicePmEnable  OBJECT-TYPE
+    SYNTAX              INTEGER
+    {
+       disable       (2),
+       enable        (3)
+    }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+     "This object determines PM (Performance Monitoring)
+     shall be enabled or not for the service.
+     Setting the object to disable(2) will stop the PM activity
+     of all Destination NEs of this service."
+    ::= { ethOamServiceEntry 4 }
+
+ethOamServiceFrameLossRatioThresh OBJECT-TYPE
+    SYNTAX  Integer32  (3..10)
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object determines the Frame Loss ratio threshold in exponent
+     of 1/10. That is, a value of 4 means that the threshold is 1E-4."
+    ::= { ethOamServiceEntry 5 }
+
+ethOamServiceDelayThresh OBJECT-TYPE
+    SYNTAX  Integer32  (0..5000000)
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object determines the delay threshold defined for this service,
+    in measurement unit of 0.1 milliseconds (100 x usec)."
+    ::= { ethOamServiceEntry 6 }
+
+ethOamServiceDelayVarThresh OBJECT-TYPE
+    SYNTAX  Integer32  (0..5000000)
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object determines the delay-variation threshold defined for this service,
+    in measurement unit of 0.1 milliseconds (100 x usec)."
+    ::= { ethOamServiceEntry 7 }
+
+ethOamServiceUnavailRatioThresh OBJECT-TYPE
+    SYNTAX  Integer32  (3..10)
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object determines the Unavailability ratio threshold in exponent 
+    of 1/10. That is, a value of 4 means that the threshold is 1E-4."
+    ::= { ethOamServiceEntry 8 }
+
+ethOamServiceTxFrames  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of frames trnasmitted by since the time the service is up."
+    ::= { ethOamServiceEntry 9 }
+
+ethOamServiceOverflowTxFrames  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamServiceTxFrames counter has overflowed."
+    ::= { ethOamServiceEntry 10 }
+
+ethOamServiceFarEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of frames lost at the far end
+     since the time the service is up."
+    ::= { ethOamServiceEntry 11 }
+
+ethOamServiceOverflowFarEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamServiceFarEndFrameLoss counter has overflowed."
+    ::= { ethOamServiceEntry 12 }
+
+ethOamServiceFarEndFrameLossRatio OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the ratio of the lost frames at the far end
+    since the time the service is up.
+    The value is the ratio multiplied by 1E10.
+    0xFFFFFFFF will be returned for ratio greater than 4/10 (40%)."
+    ::= { ethOamServiceEntry 13 }
+
+ethOamServiceElapsedTime OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the time elapsed in seconds since the time the service is up."
+    ::= { ethOamServiceEntry 14 }
+
+ethOamServiceUnavailSec  OBJECT-TYPE
+    SYNTAX  Counter32  
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of unavailable seconds since
+     the time the service is up."
+    ::= { ethOamServiceEntry 15 }
+
+ethOamServiceUnavailRatio  OBJECT-TYPE
+    SYNTAX  Unsigned32  
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    " Indicates the ratio of the unavailable seconds since the 
+    time the service is up. The value is the ratio multiplied by 1E10.
+    0xFFFFFFFF will be returned for ratio greater than 4/10 (40%)."
+    ::= { ethOamServiceEntry 16 }
+
+ethOamServiceFramesAboveDelay  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of frames arrived with delay
+    greater than the delay threshold."
+    ::= { ethOamServiceEntry 17 }
+
+ethOamServiceOverflowFramesAboveDelay  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamServiceFramesAboveDelay counter has overflowed."
+    ::= { ethOamServiceEntry 18 }
+
+ethOamServiceFramesAboveDelayVar  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of frames arrived with delay variation
+    greater than the delay variation threshold."
+    ::= { ethOamServiceEntry 19 }
+
+ethOamServiceOverflowFramesAboveDelayVar  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamServiceFramesAboveDelayVar counter has overflowed."
+    ::= { ethOamServiceEntry 20 }
+
+ethOamServiceCurrentDelay    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the last measured delay sample."
+    ::= { ethOamServiceEntry 21 }
+
+
+ethOamServiceCurrentDelayVariation    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the last measured delay variation sample."
+    ::= { ethOamServiceEntry 22 }
+
+ethOamServiceResetCounters       OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+       off(2),
+       on (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "Reset all PM counters of the selected service."
+    ::= { ethOamServiceEntry 23 }
+
+ethOamServiceNearEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of frames lost at the near end
+     since the time the service is up."
+    ::= { ethOamServiceEntry 25 }
+
+ethOamServiceOverflowNearEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamServiceNearEndFrameLoss counter has overflowed."
+    ::= { ethOamServiceEntry 26 }
+
+ethOamServiceNearEndFrameLossRatio OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the ratio of the lost frames at the near end
+    since the time the service is up.
+    The value is the ratio multiplied by 1E10.
+    0xFFFFFFFF will be returned for ratio greater than 4/10 (40%)."
+    ::= { ethOamServiceEntry 27 }
+
+ethOamServiceDmmInterval         OBJECT-TYPE
+    SYNTAX      Dot1agCfmCcmInterval
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Indicates the interval between DMM transmissions.
+        This value is used by all Destination NEs defined on a Service."
+    DEFVAL { interval1s }
+    ::= { ethOamServiceEntry 28 }
+
+ethOamServiceLmmInterval         OBJECT-TYPE
+    SYNTAX      Dot1agCfmCcmInterval
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "Indicates the interval between PM transmissions:
+        DMM and LMM in Phase 2, LMM only in Phase 3.
+        This value is used by all Destination NEs defined on a Service."
+    DEFVAL { interval1s }
+    ::= { ethOamServiceEntry 29 }
+
+ethOamServiceTxLmm  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    " "
+    ::= { ethOamServiceEntry 30 }
+
+ethOamServiceOverflowTxLmm  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    " "
+    ::= { ethOamServiceEntry 31 }
+
+ethOamServiceTxDmm  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    " "
+    ::= { ethOamServiceEntry 32 }
+
+ethOamServiceOverflowTxDmm  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    " "
+    ::= { ethOamServiceEntry 33 }
+
+
+ethOamServiceRxLmr  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Counts the number of LMR frames received since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamServiceEntry 34 }
+
+ethOamServiceOverflowRxLmr  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeRxLmr counter has overflowed."
+    ::= { ethOamServiceEntry 35 }
+
+ethOamServiceRxDmr  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Counts the number of DMR frames received since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamServiceEntry 36 }
+
+ethOamServiceOverflowRxDmr  OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeRxDmr counter has overflowed."
+    ::= { ethOamServiceEntry 37 }
+
+
+ethOamServiceTxForward             OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Counts the number of transmitted frames in the forward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamServiceEntry 38}
+
+ethOamServiceOverflowTxForward    OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeTxForward counter has overflowed."
+    ::= { ethOamServiceEntry 39}
+
+ethOamServiceRxForward                                         OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Counts the number of received frames in the forward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamServiceEntry 40}
+
+ethOamServiceOverflowRxForward   OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeRxForward counter has overflowed."
+    ::= { ethOamServiceEntry 41}
+
+
+ethOamServiceTxBackward                                       OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Counts the number of transmitted frames in the backward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamServiceEntry 42}
+
+ethOamServiceOverflowTxBackward         OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeTxBackward counter has overflowed."
+    ::= { ethOamServiceEntry 43}
+
+ethOamServiceRxBackward               OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Counts the number received frames in the backward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamServiceEntry 44}
+
+ethOamServiceOverflowRxBackward     OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeTxBackward counter has overflowed."
+    ::= { ethOamServiceEntry 45}
+
+ethOamServiceConvertedIndex     OBJECT-TYPE
+    SYNTAX                      Unsigned32
+    MAX-ACCESS                  read-only
+    STATUS                      current
+    DESCRIPTION
+    "This attribute defines the converted index (according to entityConvertIndexTable )
+     assigned to this Service."
+    ::= { ethOamServiceEntry 46}
+
+
+-- ******************************************************************
+-- The ETH OAM Service Current PM Table
+-- ******************************************************************
+
+ethOamSvcCurrentStatTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamSvcCurrentStatEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "ETH OAM Service/Destination NE Current PM counters Table."
+       ::= { ethOamService 2 }
+
+ethOamSvcCurrentStatEntry OBJECT-TYPE
+       SYNTAX EthOamSvcCurrentStatEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+       "Each entry in this table contains the ETH OAM PM counters for the current interval.
+       The counters are per Service, and/or per Destination NE.
+       The value of the 4th index - ethOamServiceIdx - is either the Service ID, or,
+       the Destination NE ID as follows:
+       Values 1 - 1000000 represent Service ID.
+       The index for Destination NE ID is composed from Service ID x 1000000 + Destination NE ID.
+       For example: the index for Destination NE 7 of Service 4 is 4000007."
+       INDEX   { radOamIdx1, radOamEvcIdx,
+                 radMepIdx, ethOamServiceIdx }
+       ::= { ethOamSvcCurrentStatTable 1 }
+
+EthOamSvcCurrentStatEntry ::= SEQUENCE {
+    ethOamSvcCurrFramesAboveDelayThresh   PerfCurrentCount,
+    ethOamSvcCurrFramesBelowDelayThresh   PerfCurrentCount,
+    ethOamSvcCurrFramesAboveDVarThresh    PerfCurrentCount,
+    ethOamSvcCurrFramesBelowDVarThresh    PerfCurrentCount,
+    ethOamSvcCurrFramesTxCounter          PerfCurrentCount,
+    ethOamSvcCurrFarEndFramesLossCounter  PerfCurrentCount,
+    ethOamSvcCurrMinRoundTripDelay        Unsigned32,
+    ethOamSvcCurrMaxRoundTripDelay        Unsigned32,
+    ethOamSvcCurrAvgRoundTripDelay        Unsigned32,
+    ethOamSvcCurrMaxRoundTripDVar         Unsigned32,
+    ethOamSvcCurrAvgRoundTripDVar         Unsigned32,
+    ethOamSvcCurrElapsedTime              Integer32,
+    ethOamSvcCurrUnavailSec	          PerfCurrentCount,
+    ethOamSvcCurrLmmTxFrames              PerfCurrentCount,
+    ethOamSvcCurrDmmTxFrames              PerfCurrentCount,
+    ethOamSvcCurrLmrRxFrames              PerfCurrentCount,
+    ethOamSvcCurrDmrRxFrames              PerfCurrentCount,
+    ethOamSvcCurrNearEndFramesLossCounter PerfCurrentCount,
+    ethOamSvcCurrTxFramesForward          PerfCurrentCount,
+    ethOamSvcCurrRxFramesForward          PerfCurrentCount,
+    ethOamSvcCurrTxFramesBackward         PerfCurrentCount,
+    ethOamSvcCurrRxFramesBackward         PerfCurrentCount,
+    ethOamSvcCurrUnavailableIndForward    PerfCurrentCount,
+    ethOamSvcCurrUnavailableIndBackward   PerfCurrentCount,
+    ethOamSvcCurrNearEndFrameLossRatio    PerfCurrentCount,
+    ethOamSvcCurrFarEndFrameLossRatio     PerfCurrentCount,
+    ethOamSvcCurrMinRoundTripDVar         Unsigned32,
+    ethOamSvcCurrMinForwardDelay          Unsigned32,
+    ethOamSvcCurrMaxForwardDelay          Unsigned32,
+    ethOamSvcCurrAvgForwardDelay          Unsigned32,
+    ethOamSvcCurrMinForwardDVar           Unsigned32,
+    ethOamSvcCurrMaxForwardDVar           Unsigned32,
+    ethOamSvcCurrAvgForwardDVar           Unsigned32,
+    ethOamSvcCurrMinBackwardDVar          Unsigned32,
+    ethOamSvcCurrMaxBackwardDVar          Unsigned32,
+    ethOamSvcCurrAvgBackwardDVar          Unsigned32,
+    ethOamSvcCurrAvailableIndForward      PerfCurrentCount,
+    ethOamSvcCurrAvailableIndBackward     PerfCurrentCount 
+ }
+
+ethOamSvcCurrFramesAboveDelayThresh     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in the current interval
+     at a delay greater than the threshold value defined for the service."
+     ::= { ethOamSvcCurrentStatEntry 1 }
+
+ethOamSvcCurrFramesBelowDelayThresh     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in the current interval at a delay
+     lower than or equal to the threshold value defined for the service."
+     ::= { ethOamSvcCurrentStatEntry 2 }
+
+ethOamSvcCurrFramesAboveDVarThresh     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in the current interval at a delay
+    variation greater than the threshold value defined for the service."
+     ::= { ethOamSvcCurrentStatEntry 3 }
+
+ethOamSvcCurrFramesBelowDVarThresh     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in the current interval
+    at a delay variation lower than or equal to the
+    threshold value defined for the service."
+     ::= { ethOamSvcCurrentStatEntry 4 }
+
+ethOamSvcCurrFramesTxCounter     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of trnasmitted frames in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 5 }
+
+ethOamSvcCurrFarEndFramesLossCounter     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of lost frames at the far end
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 6 }
+
+ethOamSvcCurrMinRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The mininal value of round trip delay in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 7 }
+
+ethOamSvcCurrMaxRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of round trip delay in the current interval. "
+     ::= { ethOamSvcCurrentStatEntry 8 }
+
+ethOamSvcCurrAvgRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average round trip delay in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 9 }
+
+ethOamSvcCurrMaxRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of round trip delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 10 }
+
+ethOamSvcCurrAvgRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average round trip delay variation in the current interval. "
+     ::= { ethOamSvcCurrentStatEntry 11 }
+
+ethOamSvcCurrElapsedTime          OBJECT-TYPE
+    SYNTAX       Integer32 (0..899)
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of seconds that have elapsed since
+     the beginning of the  current interval."
+     ::= { ethOamSvcCurrentStatEntry 12 }
+
+ethOamSvcCurrUnavailSec OBJECT-TYPE
+     SYNTAX      PerfCurrentCount
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "The number of seconds that the service was unavailable in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 13 }
+
+ethOamSvcCurrLmmTxFrames     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted LMM frames in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 14 }
+
+ethOamSvcCurrDmmTxFrames     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted DMM frames in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 16 }
+
+ethOamSvcCurrLmrRxFrames     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of received LMR frames in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 19 }
+
+ethOamSvcCurrDmrRxFrames     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of received DMR frames in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 21 }
+
+ethOamSvcCurrNearEndFramesLossCounter     OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of lost frames at the near end
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 22 }
+
+ethOamSvcCurrTxFramesForward               OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The total number of frames transmited in the forward direction
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 23 }
+
+ethOamSvcCurrRxFramesForward                OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The total number of of frames received in the forward direction
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 24 }
+
+ethOamSvcCurrTxFramesBackward              OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The total number of of frames transmited in the backward direction
+     (as reported by far-end) in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 25 }
+
+ethOamSvcCurrRxFramesBackward              OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The total number of frames received in the backward direction
+     (as reported by far-end) in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 26 }
+
+ethOamSvcCurrUnavailableIndForward                OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of unavailability
+     indicators evaluated as unavailable in the forward direction
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 27 }
+
+ethOamSvcCurrUnavailableIndBackward               OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of unavailability
+     indicators evaluated as unavailable in the backward direction
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 28 }
+
+ethOamSvcCurrNearEndFrameLossRatio               OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Object reflecting the percentage lost frames at the near end direction.
+     Equals to (near End frame loss / Tx frame count in the forward direction)
+    in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 29 }
+
+ethOamSvcCurrFarEndFrameLossRatio              OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Object reflecting the percentage lost frames at the far end direction.
+     Equals to (Far End frame loss / Tx frame count in the forward direction)
+    in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 30 }
+
+ethOamSvcCurrMinRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of round trip delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 31 }
+
+ethOamSvcCurrMinForwardDelay        OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of one way (forward 1DM) delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 32 }
+
+ethOamSvcCurrMaxForwardDelay        OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of one way (forward 1DM) delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 33 }
+
+ethOamSvcCurrAvgForwardDelay        OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of one way (forward 1DM) delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 34 }
+
+ethOamSvcCurrMinForwardDVar         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of one way forward delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 35 }
+
+ethOamSvcCurrMaxForwardDVar         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of one way forward delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 36 }
+
+ethOamSvcCurrAvgForwardDVar         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of one way forward delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 37 }
+
+ethOamSvcCurrMinBackwardDVar         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of one way backward delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 38 }
+
+ethOamSvcCurrMaxBackwardDVar         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of one way backward delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 39 }
+
+ethOamSvcCurrAvgBackwardDVar         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of one way backward delay variation in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 40 }
+
+ethOamSvcCurrAvailableIndForward                OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of availability
+     indicators evaluated as available in the forward direction
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 41 }
+
+ethOamSvcCurrAvailableIndBackward               OBJECT-TYPE
+    SYNTAX        PerfCurrentCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of availability
+     indicators evaluated as available in the backward direction
+     in the current interval."
+     ::= { ethOamSvcCurrentStatEntry 42 }
+
+
+-- ******************************************************************
+-- The ETH OAM Service Interval PM Table
+-- ******************************************************************
+
+ethOamSvcIntervalTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamSvcIntervalEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+        "Each entry in this table contains the ETH OAM PM counters
+         collected over the previous 24 hours of operation.
+         The past 24 hours are broken into 96 completed 15 minute intervals.
+         The counters are per Service, and/or per Destination NE.
+         Please refer to for ethOamSvcCurrentStatEntry for index resolution.
+        "
+       ::= { ethOamService 3 }
+
+ethOamSvcIntervalEntry OBJECT-TYPE
+       SYNTAX EthOamSvcIntervalEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+       "Interval Statistics per service"
+       INDEX   { radOamIdx1, radOamEvcIdx,
+                 radMepIdx, ethOamServiceIdx, ethOamSvcIntervalNum }
+       ::= { ethOamSvcIntervalTable 1 }
+
+EthOamSvcIntervalEntry ::= SEQUENCE {
+    ethOamSvcIntervalNum                      Integer32,
+         ethOamSvcIntervalFramesAboveDelayThresh  PerfIntervalCount,
+         ethOamSvcIntervalFramesBelowDelayThresh  PerfIntervalCount,
+         ethOamSvcIntervalFramesAboveDVarThresh   PerfIntervalCount,
+		 ethOamSvcIntervalFramesBelowDVarThresh   PerfIntervalCount,
+    ethOamSvcIntervalFramesTxCounter          PerfIntervalCount,
+    ethOamSvcIntervalFarEndFramesLossCounter  PerfIntervalCount,
+    ethOamSvcIntervalMinRoundTripDelay        Unsigned32,
+    ethOamSvcIntervalMaxRoundTripDelay        Unsigned32,
+    ethOamSvcIntervalAvgRoundTripDelay        Unsigned32,
+    ethOamSvcIntervalMaxRoundTripDVar         Unsigned32,
+    ethOamSvcIntervalAvgRoundTripDVar         Unsigned32,
+    ethOamSvcIntervalUnavailSec	   		  PerfIntervalCount,
+    ethOamSvcIntervalLmmTxFrames              PerfIntervalCount,
+    ethOamSvcIntervalDmmTxFrames              PerfIntervalCount,
+    ethOamSvcIntervalLmrRxFrames              PerfIntervalCount,
+    ethOamSvcIntervalDmrRxFrames              PerfIntervalCount,
+    ethOamSvcIntervalNearEndFramesLossCounter PerfIntervalCount,
+    ethOamSvcIntervalTxFramesForward          PerfIntervalCount,
+    ethOamSvcIntervalRxFramesForward          PerfIntervalCount,
+    ethOamSvcIntervalTxFramesBackward         PerfIntervalCount,
+    ethOamSvcIntervalRxFramesBackward         PerfIntervalCount,
+    ethOamSvcIntervalUnavailableIndForward    PerfIntervalCount,
+    ethOamSvcIntervalUnavailableIndBackward   PerfIntervalCount,
+    ethOamSvcIntervalNearEndFrameLossRatio    PerfIntervalCount,
+    ethOamSvcIntervalFarEndFrameLossRatio     PerfIntervalCount,
+    ethOamSvcIntervalValidData                TruthValue,
+    ethOamSvcIntervalDuration                 Integer32,
+    ethOamSvcIntervalTimeStamp                DateAndTime,
+    ethOamSvcIntervalMinRoundTripDVar         Unsigned32,
+    ethOamSvcIntervalMinForwardDelay          Unsigned32,
+    ethOamSvcIntervalMaxForwardDelay          Unsigned32,
+    ethOamSvcIntervalAvgForwardDelay          Unsigned32,
+    ethOamSvcIntervalMinForwardDVar           Unsigned32,
+    ethOamSvcIntervalMaxForwardDVar           Unsigned32,
+    ethOamSvcIntervalAvgForwardDVar           Unsigned32,
+    ethOamSvcIntervalMinBackwardDVar          Unsigned32,
+    ethOamSvcIntervalMaxBackwardDVar          Unsigned32,
+    ethOamSvcIntervalAvgBackwardDVar          Unsigned32,
+    ethOamSvcIntervalAvailableIndForward      PerfIntervalCount,
+    ethOamSvcIntervalAvailableIndBackward     PerfIntervalCount 
+ }
+
+ethOamSvcIntervalNum  OBJECT-TYPE
+    SYNTAX        Integer32 (1..96)
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+    "The Interval index, which is actualy the Interval number,
+    where 1 is the most recently completed 15 minute interval,
+     and 96 is the least recently completed 15 minutes interval
+     (assuming that all 96 intervals exist)."
+    ::= { ethOamSvcIntervalEntry 1 }
+
+ethOamSvcIntervalFramesAboveDelayThresh     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay greater than the 
+    threshold value defined for the service in the selected interval."
+     ::= { ethOamSvcIntervalEntry 2 }
+
+ethOamSvcIntervalFramesBelowDelayThresh     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay lower than the 
+    threshold value defined for the service in the selected interval."
+     ::= { ethOamSvcIntervalEntry 3 }
+
+ethOamSvcIntervalFramesAboveDVarThresh     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay variation greater than the 
+    threshold value defined for the service in the selected interval."
+     ::= { ethOamSvcIntervalEntry 4 }
+
+ethOamSvcIntervalFramesBelowDVarThresh     OBJECT-TYPE
+    SYNTAX       PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay variation lower than the 
+    threshold value defined for the service in the selected interval."
+     ::= { ethOamSvcIntervalEntry 5 }
+
+ethOamSvcIntervalFramesTxCounter     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of trnasmitted frames in the selected interval."
+     ::= { ethOamSvcIntervalEntry 6 }
+
+ethOamSvcIntervalFarEndFramesLossCounter     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of lost frames at the far end
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 7 }
+
+ethOamSvcIntervalMinRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The mininal value of round trip delay in the selected interval. "
+     ::= { ethOamSvcIntervalEntry 8 }
+
+ethOamSvcIntervalMaxRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of round trip delay in the selected interval. "
+     ::= { ethOamSvcIntervalEntry 9 }
+
+ethOamSvcIntervalAvgRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average round trip delay in the selected interval."
+     ::= { ethOamSvcIntervalEntry 10 }
+
+ethOamSvcIntervalMaxRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of round trip delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 11 }
+
+ethOamSvcIntervalAvgRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average round trip delay variation in the selected interval. "
+     ::= { ethOamSvcIntervalEntry 12 }
+
+ethOamSvcIntervalUnavailSec OBJECT-TYPE
+     SYNTAX  	 PerfIntervalCount
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "The number of seconds that the service was unavailable 
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 13 }
+
+ethOamSvcIntervalLmmTxFrames     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted LMM frames in the selected interval."
+     ::= { ethOamSvcIntervalEntry 14 }
+
+ethOamSvcIntervalDmmTxFrames     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted DMM frames in the selected interval."
+     ::= { ethOamSvcIntervalEntry 16 }
+
+ethOamSvcIntervalLmrRxFrames     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of received LMR frames in the selected interval."
+     ::= { ethOamSvcIntervalEntry 19 }
+
+ethOamSvcIntervalDmrRxFrames     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of received DMR frames in the selected interval."
+     ::= { ethOamSvcIntervalEntry 21 }
+
+ethOamSvcIntervalNearEndFramesLossCounter     OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of lost frames at the near end
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 22 }
+
+ethOamSvcIntervalTxFramesForward         OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of transmitted frames in the forward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 23 }
+
+ethOamSvcIntervalRxFramesForward    OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of  received frames in the forward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 24 }
+
+ethOamSvcIntervalTxFramesBackward  OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of transmitted frames in the  backward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 25 }
+
+ethOamSvcIntervalRxFramesBackward  OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of received frames in the backward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 26 }
+
+ethOamSvcIntervalUnavailableIndForward            OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of unavailability
+     indicators evaluated as unavailable in the forward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 27 }
+
+ethOamSvcIntervalUnavailableIndBackward              OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of unavailability
+     indicators evaluated as unavailable in the backward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 28 }
+
+ethOamSvcIntervalNearEndFrameLossRatio               OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Object reflecting the percentage lost frames at the near end direction.
+     Equals to (near End frame loss / Tx frame count in the forward direction)
+    in the current interval."
+     ::= { ethOamSvcIntervalEntry 29 }
+
+ethOamSvcIntervalFarEndFrameLossRatio              OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Object reflecting the percentage lost frames at the far end direction.
+     Equals to (Far End frame loss / Tx frame count in the forward direction)
+    in the current interval."
+     ::= { ethOamSvcIntervalEntry 30 }
+
+ethOamSvcIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "This object indicates if the data for this interval is
+            valid."
+    ::= { ethOamSvcIntervalEntry 31 }
+
+ethOamSvcIntervalDuration OBJECT-TYPE
+    SYNTAX        Integer32 (1..900)
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The Object presents duration of a particular interval
+            in seconds. The partial second is counted."
+    ::= { ethOamSvcIntervalEntry 32 }
+
+ethOamSvcIntervalTimeStamp   OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The Object presents date and time of start of Interval.
+            Time zone octets are not used (OCTET STRING (SIZE (8))."
+    ::= { ethOamSvcIntervalEntry 33 }
+
+ethOamSvcIntervalMinRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of round trip delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 34 }
+
+ethOamSvcIntervalMinForwardDelay         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of one way (forward 1DM) delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 35 }
+
+ethOamSvcIntervalMaxForwardDelay         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of one way (forward 1DM) delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 36 }
+
+ethOamSvcIntervalAvgForwardDelay         OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of one way (forward 1DM) delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 37 }
+
+ethOamSvcIntervalMinForwardDVar          OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of one way forward delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 38 }
+
+ethOamSvcIntervalMaxForwardDVar          OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of one way forward delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 39 }
+
+ethOamSvcIntervalAvgForwardDVar          OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of one way forward delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 40 }
+
+ethOamSvcIntervalMinBackwardDVar             OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of one way backward delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 41 }
+
+ethOamSvcIntervalMaxBackwardDVar             OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of one way backward delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 42 }
+
+ethOamSvcIntervalAvgBackwardDVar             OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of one way backward delay variation in the selected interval."
+     ::= { ethOamSvcIntervalEntry 43 }
+
+ethOamSvcIntervalAvailableIndForward            OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of availability
+     indicators evaluated as available in the forward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 44 }
+
+ethOamSvcIntervalAvailableIndBackward              OBJECT-TYPE
+    SYNTAX        PerfIntervalCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of availability
+     indicators evaluated as available in the backward direction
+     in the selected interval."
+     ::= { ethOamSvcIntervalEntry 45 }
+
+
+-- ******************************************************************
+-- The ETH OAM Service Total PM Table
+-- ******************************************************************
+
+ethOamSvcTotalTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamSvcTotalEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "ETH OAM Service Total (24H) Statistics Table."
+       ::= { ethOamService 4 }
+
+ethOamSvcTotalEntry OBJECT-TYPE
+       SYNTAX EthOamSvcTotalEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+       "Each entry in this table contains the ETH OAM PM counters
+        collected over the previous 24 hours of operation.
+        The counters are per Service, and/or per Destination NE.
+        Please refer to for ethOamSvcCurrentStatEntry for index resolution."
+       INDEX   { radOamIdx1, radOamEvcIdx,
+                 radMepIdx, ethOamServiceIdx }
+       ::= { ethOamSvcTotalTable 1 }
+
+EthOamSvcTotalEntry ::= SEQUENCE {
+         ethOamSvcTotalFramesAboveDelayThresh  PerfTotalCount,
+         ethOamSvcTotalFramesBelowDelayThresh  PerfTotalCount,
+         ethOamSvcTotalFramesAboveDVarThresh   PerfTotalCount,
+		 ethOamSvcTotalFramesBelowDVarThresh   PerfTotalCount,
+    ethOamSvcTotalFramesTxCounter          PerfTotalCount,
+    ethOamSvcTotalFarEndFramesLossCounter  PerfTotalCount,
+    ethOamSvcTotalMinRoundTripDelay        Unsigned32,
+    ethOamSvcTotalMaxRoundTripDelay        Unsigned32,
+    ethOamSvcTotalAvgRoundTripDelay        Unsigned32,
+    ethOamSvcTotalMaxRoundTripDVar         Unsigned32,
+    ethOamSvcTotalAvgRoundTripDVar         Unsigned32,
+    ethOamSvcTotalUnavailSec	   		   PerfTotalCount,
+    ethOamSvcTotalLmmTxFrames              PerfTotalCount,
+    ethOamSvcTotalDmmTxFrames              PerfTotalCount,
+    ethOamSvcTotalLmrRxFrames              PerfTotalCount,
+    ethOamSvcTotalDmrRxFrames              PerfTotalCount,
+    ethOamSvcTotalNearEndFramesLossCounter PerfTotalCount,
+    ethOamSvcTotalTxFramesForward          PerfTotalCount,
+    ethOamSvcTotalRxFramesForward          PerfTotalCount,
+    ethOamSvcTotalTxFramesBackward         PerfTotalCount,
+    ethOamSvcTotalRxFramesBackward         PerfTotalCount,
+    ethOamSvcTotalUnavailableIndForward    PerfTotalCount,
+    ethOamSvcTotalUnavailableIndBackward   PerfTotalCount,
+    ethOamSvcTotalMinRoundTripDVar         Unsigned32,
+    ethOamSvcTotalMinForwardDelay          Unsigned32,
+    ethOamSvcTotalMaxForwardDelay          Unsigned32,
+    ethOamSvcTotalAvgForwardDelay          Unsigned32,
+    ethOamSvcTotalMinForwardDVar           Unsigned32,
+    ethOamSvcTotalMaxForwardDVar           Unsigned32,
+    ethOamSvcTotalAvgForwardDVar           Unsigned32,
+    ethOamSvcTotalMinBackwardDVar          Unsigned32,
+    ethOamSvcTotalMaxBackwardDVar          Unsigned32,
+    ethOamSvcTotalAvgBackwardDVar          Unsigned32,
+    ethOamSvcTotalForwardFrameLossRatio    PerfTotalCount,
+    ethOamSvcTotalBackwardFrameLossRatio   PerfTotalCount,
+    ethOamSvcTotalAvailableIndForward      Counter32,
+    ethOamSvcTotalAvailableIndBackward     Counter32 
+ }
+
+ethOamSvcTotalFramesAboveDelayThresh     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay greater than the 
+    threshold value defined for the service in the last 24H."
+     ::= { ethOamSvcTotalEntry 1 }
+
+ethOamSvcTotalFramesBelowDelayThresh     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay lower than the 
+    threshold value defined for the service in the last 24H."
+     ::= { ethOamSvcTotalEntry 2 }
+
+ethOamSvcTotalFramesAboveDVarThresh     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay variation greater than the 
+    threshold value defined for the service in the last 24H."
+     ::= { ethOamSvcTotalEntry 3 }
+
+ethOamSvcTotalFramesBelowDVarThresh     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of frames that arrived in a delay variation lower than the 
+    threshold value defined for the service in the last 24H."
+     ::= { ethOamSvcTotalEntry 4 }
+
+ethOamSvcTotalFramesTxCounter     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of trnasmitted frames in the last 24H."
+     ::= { ethOamSvcTotalEntry 5 }
+
+ethOamSvcTotalFarEndFramesLossCounter     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The nuumber of lost frames at the far end
+     in the last 24H."
+     ::= { ethOamSvcTotalEntry 6 }
+
+ethOamSvcTotalMinRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The mininal value of round trip delay in the last 24H. "
+     ::= { ethOamSvcTotalEntry 7 }
+
+ethOamSvcTotalMaxRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of round trip delay in the last 24H. "
+     ::= { ethOamSvcTotalEntry 8 }
+
+ethOamSvcTotalAvgRoundTripDelay     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average round trip delay in the last 24H. "
+     ::= { ethOamSvcTotalEntry 9 }
+
+ethOamSvcTotalMaxRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of round trip delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 10 }
+
+ethOamSvcTotalAvgRoundTripDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average round trip delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 11 }
+
+ethOamSvcTotalUnavailSec OBJECT-TYPE
+     SYNTAX  	 PerfTotalCount 
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "The number of seconds that the service was unavailable 
+     in the last 24H."
+     ::= { ethOamSvcTotalEntry 12 }
+
+ethOamSvcTotalLmmTxFrames     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted LMM frames in the last 24H."
+     ::= { ethOamSvcTotalEntry 13 }
+
+ethOamSvcTotalDmmTxFrames     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted DMM frames in the last 24H."
+     ::= { ethOamSvcTotalEntry 15 }
+
+ethOamSvcTotalLmrRxFrames     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of received LMR frames in the last 24H."
+     ::= { ethOamSvcTotalEntry 18 }
+
+ethOamSvcTotalDmrRxFrames     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of received DMR frames in the last 24H."
+     ::= { ethOamSvcTotalEntry 20 }
+
+ethOamSvcTotalNearEndFramesLossCounter     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The number of lost frames at the near end
+     in the last 24H."
+     ::= { ethOamSvcTotalEntry 21 }
+
+ethOamSvcTotalTxFramesForward     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted frames in the forward direction
+     in the last 24H."
+     ::= { ethOamSvcTotalEntry 22 }
+
+ethOamSvcTotalRxFramesForward     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of received frames in the forward direction
+    in the last 24H."
+     ::= { ethOamSvcTotalEntry 23 }
+
+ethOamSvcTotalTxFramesBackward     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of transmitted frames in the backward direction
+    in the last 24H."
+     ::= { ethOamSvcTotalEntry 24 }
+
+ethOamSvcTotalRxFramesBackward     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Number of  received frames in the backward direction
+    in the last 24H."
+     ::= { ethOamSvcTotalEntry 25 }
+
+ethOamSvcTotalUnavailableIndForward      OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of unavailability
+     indicators evaluated as unavailable in the forward direction
+     in the last 24H."
+     ::= { ethOamSvcTotalEntry 26 }
+
+ethOamSvcTotalUnavailableIndBackward     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter reflecting the number of unavailability
+     indicators evaluated as unavailable in the backward direction
+     in the last 24H"
+     ::= { ethOamSvcTotalEntry 27 }
+
+ethOamSvcTotalMinRoundTripDVar      OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of round trip delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 29 }
+
+ethOamSvcTotalMinForwardDelay      OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of  one way (forward 1DM) delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 30 }
+
+ethOamSvcTotalMaxForwardDelay      OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of  one way (forward 1DM) delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 31 }
+
+ethOamSvcTotalAvgForwardDelay      OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of  one way (forward 1DM) delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 32 }
+
+ethOamSvcTotalMinForwardDVar      OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The minimal value of  one way (forward 1DM) delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 33}
+
+ethOamSvcTotalMaxForwardDVar      OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The maximum value of  one way (forward 1DM) delay variation in the last 24H. "
+     ::= { ethOamSvcTotalEntry 34 }
+
+ethOamSvcTotalAvgForwardDVar       OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The average value of  one way (forward 1DM) delay variation in the last 24H."
+     ::= { ethOamSvcTotalEntry 35 }
+
+ethOamSvcTotalMinBackwardDVar     OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The minimal value of one way backward delay variation in the last 24H. "
+    ::= { ethOamSvcTotalEntry 36 }
+
+ethOamSvcTotalMaxBackwardDVar    OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The maximum value of one way backward delay variation in the last 24H."
+    ::= { ethOamSvcTotalEntry 37 }
+
+ethOamSvcTotalAvgBackwardDVar    OBJECT-TYPE
+    SYNTAX        Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The average value of one way backward delay variation in the last 24H. "
+    ::= { ethOamSvcTotalEntry 38 }
+
+ethOamSvcTotalForwardFrameLossRatio      OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Object reflecting the percentage lost frames at the forward direction.
+     Equals to (near End frame loss / Tx frame count in the backward direction)
+    in the last 24H."
+     ::= { ethOamSvcTotalEntry 39 }
+
+ethOamSvcTotalBackwardFrameLossRatio     OBJECT-TYPE
+    SYNTAX        PerfTotalCount
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Object reflecting the percentage lost frames at the backward direction.
+     Equals to (Far End frame loss / Tx frame count in the forward direction)
+    in the last 24H."
+     ::= { ethOamSvcTotalEntry 40 }
+
+ethOamSvcTotalAvailableIndForward OBJECT-TYPE
+    SYNTAX        Counter32
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter presenting the number of availability indicators
+     evaluated as available in the forward direction in the last 24H."
+    ::= { ethOamSvcTotalEntry 41 }
+
+ethOamSvcTotalAvailableIndBackward OBJECT-TYPE
+    SYNTAX        Counter32
+    UNITS         "seconds"
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "Counter presenting the number of availability indicators
+     evaluated as available in the backward direction in the last 24H."
+    ::= { ethOamSvcTotalEntry 42 }
+
+
+-- ******************************************************************
+-- The ETH OAM Service Destination NE Table
+-- ******************************************************************
+-- OAM functions for performance monitoring allow measurement of
+-- different performance parameters.
+-- The performance parameters implemented are according to
+-- ITU-T Y.1731 Recommendation parameters, which are based on MEF 10:
+--    Frame Loss
+--    Frame Delay
+--    Frame Delay Variation
+--    Availability
+-- Frame Loss measurement (ETH-LM) can be performed in two ways:
+--    Single-ended ETH-LM
+--    Dual-ended ETH-LM
+-- Frame Delay Measurement (ETH-DM) can be performed in two ways:
+--    One-way ETH-DM
+--    Two-way ETH-DM
+
+ethOamDestNeTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamDestNeEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "One of the targets in ETH OAM is to support point-to-point
+        as well as point-to-multipoint PM.
+        For point-to-multipoint support it is needed to identify each of
+        the remote NEs to which PM frames are sent,
+        and from which PM frames are received.
+        PM activity for each such remote NE (Destination NE)
+        is managed separately,
+        maintaining its own set of parameters and PM counters.
+
+        Note:
+        In point-to-multipoint PM mode, only the first
+        defined Destination NE (per Service)
+        will count the transmitted (DMM, LMM) multicast frames."
+       ::= { ethOamService 5 }
+
+ethOamDestNeEntry OBJECT-TYPE
+       SYNTAX EthOamDestNeEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+       "Each entry in the table holds the parameters of a Destination NE."
+       INDEX   { radOamIdx1, radOamEvcIdx,
+                 radMepIdx, ethOamServiceIdx, ethOamDestNeIdx }
+       ::= { ethOamDestNeTable 1 }
+
+EthOamDestNeEntry ::= SEQUENCE {
+    ethOamDestNeIdx               Unsigned32,
+    ethOamDestNeRowStatus         RowStatus,
+    ethOamDestNePmDestAddr        MacAddress,
+    ethOamDestNePmRemoteMepId     Unsigned32,
+    ethOamDestNePmActivity        BITS,
+    ethOamDestNeTxFrames          Counter32,
+    ethOamDestNeOverflowTxFrames  Counter32,
+    ethOamDestNeTxLmm             Counter32,
+    ethOamDestNeOverflowTxLmm     Counter32,
+    ethOamDestNeTxDmm             Counter32,
+    ethOamDestNeOverflowTxDmm     Counter32,
+    ethOamDestNeRxLmr             Counter32,
+    ethOamDestNeOverflowRxLmr     Counter32,
+    ethOamDestNeRxDmr             Counter32,
+    ethOamDestNeOverflowRxDmr     Counter32,
+    ethOamDestNeFarEndFrameLoss                Counter32,
+    ethOamDestNeOverflowFarEndFrameLoss        Counter32,
+    ethOamDestNeFarEndFrameLossRatio           Unsigned32,
+    ethOamDestNeTimeElapsed                    Unsigned32,
+    ethOamDestNeFramesAboveDelay               Counter32,
+    ethOamDestNeOverflowFramesAboveDelay       Counter32,
+    ethOamDestNeFramesAboveDelayVar            Counter32,
+    ethOamDestNeOverflowFramesAboveDelayVar    Counter32,
+    ethOamDestNeCurrentDelay                   Unsigned32,
+    ethOamDestNeCurrentDelayVariation          Unsigned32,
+    ethOamDestNeResetCounters                  INTEGER,
+    ethOamDestNeNearEndFrameLoss               Counter32,
+    ethOamDestNeOverflowNearEndFrameLoss       Counter32,
+    ethOamDestNeNearEndFrameLossRatio          Unsigned32,
+    ethOamDestNeLmmTraffic                     INTEGER,
+    ethOamDestNeFramesAboveDelayBinProfile     Unsigned32,
+    ethOamDestNeFramesAboveDelayVarBinProfile  Unsigned32,
+    ethOamDestNeDmmDataTlvLength                Unsigned32,
+    ethOamDestNeLossActivity                    INTEGER,
+    ethOamDestNeDelayActivity                   INTEGER,
+    ethOamDestNeTxForward                       Counter32,
+    ethOamDestNeOverflowTxForward               Counter32,
+    ethOamDestNeRxForward                       Counter32,
+    ethOamDestNeOverflowRxForward               Counter32,
+    ethOamDestNeTxBackward                      Counter32,
+    ethOamDestNeOverflowTxBackward              Counter32,
+    ethOamDestNeRxBackward                      Counter32,
+    ethOamDestNeOverflowRxBackward              Counter32,
+    ethOamDestNeUnavailableIndForward           Counter32,
+    ethOamDestNeOverflowUnavailableIndForward   Counter32,
+    ethOamDestNeUnavailableIndBackward          Counter32,
+    ethOamDestNeOverflowUnavailableIndBackward  Counter32,
+    ethOamDestNeUnavailRatioForward             Unsigned32,
+    ethOamDestNeUnavailRatioBackward            Unsigned32,
+    ethOamDestNeDescr                           SnmpAdminString,
+    ethOamDestNeConvertedIndex                  Unsigned32,
+    ethOamDestNeSlmDataTlvLength                Unsigned32,
+    ethOamDestNeLmMode                          INTEGER,
+    ethOamDestNeSlmTestId                       Unsigned32,
+    ethOamDestNeForwardDelayVarBinProfile       Unsigned32,
+    ethOamDestNeBackwardDelayVarBinProfile      Unsigned32,
+    ethOamDestNeAvailableIndForward             Counter32,
+    ethOamDestNeAvailableIndBackward            Counter32,
+    ethOamDestNeDelayVariationForward           Unsigned32,
+    ethOamDestNeDelayVariationBackward          Unsigned32 
+ }
+
+ethOamDestNeIdx OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "This object indicates the Index of the Destination NE being accessed."
+    ::= { ethOamDestNeEntry 1 }
+
+ethOamDestNeRowStatus    OBJECT-TYPE
+      SYNTAX     RowStatus
+      MAX-ACCESS read-create
+      STATUS     current
+      DESCRIPTION
+      "This attribute allows to create/delete a row in this table."
+      ::= { ethOamDestNeEntry 2 }
+
+ethOamDestNePmDestAddr   OBJECT-TYPE
+    SYNTAX  MacAddress
+    MAX-ACCESS  read-create
+    STATUS current
+    DESCRIPTION
+    "This object indicates the destination NE (remote) MAC Address
+    that PM frames (LMMs, DMMs, LMRs and DMRs) are sent to.
+    If its value is 0, then the ethOamDestNePmRemoteMepId will be used.
+    Setting this object to a value different from 0,
+    will set ethOamDestNePmRemoteMepId to 0."
+    ::= { ethOamDestNeEntry 3 }
+
+ethOamDestNePmRemoteMepId    OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-create
+    STATUS current
+    DESCRIPTION
+    "This object indicates the Remote MEP ID that PM frames are sent to.
+     This parameter refers to dot1agCfmMaMepListIdentifier of the MEP.
+     If no remote MEP has been learned yet, the value will be 0,
+     until a remote MEP is learned.
+     If its value is 0, then ethOamDestNePmDestAddr will be used.
+     Setting this object to a value different than 0,
+     will set ethOamDestNePmDestAddr to 0.
+
+     This object is applicable only when dot1agCfmMaNetCcmInterval
+     of the corresponding MEP is different than 0."
+    ::= { ethOamDestNeEntry 4 }
+
+ethOamDestNePmActivity OBJECT-TYPE
+    SYNTAX  BITS {
+       singleEndedLoss       (0),
+       dualEndedLoss         (1),
+       oneWayDelay           (2),
+       twoWayDelay           (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS  deprecated
+-- This Object is replaced by two objects:
+-- ethOamDestNeLossActivity and ethOamDestNeDelayActivity
+
+    DESCRIPTION
+    "This object defines the PM activity of the specific Destination NE.
+     Setting this object to 0 (all zeros) will stop all PM activity
+     for the Destination NE.
+     singleEndedLoss(0) and dualEndedLoss(1) cannot be set simultaneously.
+     oneWayDelay(2) and twoWayDelay(3) cannot be set simultaneously."
+    ::= { ethOamDestNeEntry 5 }
+
+ethOamDestNeTxFrames  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the total number of frames transmitted since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 6 }
+
+ethOamDestNeOverflowTxFrames  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeTxFrames counter has overflowed."
+    ::= { ethOamDestNeEntry 7 }
+
+ethOamDestNeTxLmm  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of LMM frames transmitted since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 8 }
+
+ethOamDestNeOverflowTxLmm  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeTxLmm counter has overflowed."
+    ::= { ethOamDestNeEntry 9 }
+
+ethOamDestNeTxDmm  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of DMM frames transmitted since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 12 }
+
+ethOamDestNeOverflowTxDmm  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeTxDmm counter has overflowed."
+    ::= { ethOamDestNeEntry 13 }
+
+ethOamDestNeRxLmr  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of LMR frames received since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 18 }
+
+ethOamDestNeOverflowRxLmr  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeRxLmr counter has overflowed."
+    ::= { ethOamDestNeEntry 19 }
+
+ethOamDestNeRxDmr  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of DMR frames received since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 22 }
+
+ethOamDestNeOverflowRxDmr  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeRxDmr counter has overflowed."
+    ::= { ethOamDestNeEntry 23 }
+
+ethOamDestNeFarEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of frames lost at the far end
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 24 }
+
+ethOamDestNeOverflowFarEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeFarEndFrameLoss counter has overflowed."
+    ::= { ethOamDestNeEntry 25 }
+
+ethOamDestNeFarEndFrameLossRatio OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the ratio of the lost frames at the far end
+    since the time the service is up.
+    The value is the ratio multiplied by 1E10.
+    0xFFFFFFFF will be returned for ratio greater than 4/10 (40%)."
+    ::= { ethOamDestNeEntry 26 }
+
+ethOamDestNeTimeElapsed OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the time elapsed in seconds since the time
+    the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 27 }
+
+ethOamDestNeFramesAboveDelay  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of frames arrived with delay
+    greater than the delay threshold, since the time
+    the service is up, or since last counters reset.
+    Delay threshold is defined in RMON-MIB in alarmTable (alarmRisingThreshold)."
+    ::= { ethOamDestNeEntry 30 }
+
+ethOamDestNeOverflowFramesAboveDelay  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeFramesAboveDelay counter has overflowed."
+    ::= { ethOamDestNeEntry 31 }
+
+ethOamDestNeFramesAboveDelayVar  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of frames arrived with delay variation
+    greater than the delay variation threshold, since the time
+    the service is up, or since last counters reset.
+    Delay variation threshold is defined in RMON-MIB in alarmTable (alarmRisingThreshold)."
+    ::= { ethOamDestNeEntry 32 }
+
+ethOamDestNeOverflowFramesAboveDelayVar  OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeFramesAboveDelayVar counter has overflowed."
+    ::= { ethOamDestNeEntry 33 }
+
+ethOamDestNeCurrentDelay     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the last measured delay sample."
+    ::= { ethOamDestNeEntry 34 }
+
+ethOamDestNeCurrentDelayVariation     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS         "microseconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the last measured delay variation sample."
+    ::= { ethOamDestNeEntry 35 }
+
+ethOamDestNeResetCounters        OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+       off(2),
+       on (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "Reset all PM counters related to the Destination NE."
+    ::= { ethOamDestNeEntry 36 }
+
+ethOamDestNeNearEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of frames lost at the near end
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 37 }
+
+ethOamDestNeOverflowNearEndFrameLoss   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of times the associated
+     ethOamDestNeNearEndFrameLoss counter has overflowed."
+    ::= { ethOamDestNeEntry 38 }
+
+ethOamDestNeNearEndFrameLossRatio OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the ratio of the lost frames at the near end
+    since the time the service is up.
+    The value is the ratio multiplied by 1E10.
+    0xFFFFFFFF will be returned for ratio greater than 4/10 (40%)."
+    ::= { ethOamDestNeEntry 39 }
+
+ethOamDestNeLmmTraffic      OBJECT-TYPE
+    SYNTAX        INTEGER
+    {
+        syntheticTraffic       (1),
+        realTraffic            (2), --LMM
+        lmmSynthetic           (3),
+        slm                    (4),
+        realTrafficGreen       (5),
+        realTrafficYellow      (6),
+        realTrafficNoCcm       (7),
+        realTrafficGreenNoCcm  (8),
+        notApplicable          (255)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "Determine if Frame Loss measurements will be applied on
+        synthetic traffic or on real traffic (all, Green only or
+        Yellow only, with or without CCM).
+        Note that if the MEP is configured in E-LAN forwarding mode,
+        only synthetic traffic is supported."
+    DEFVAL { realTraffic }
+    ::= { ethOamDestNeEntry 40 }
+
+ethOamDestNeFramesAboveDelayBinProfile   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable defines the delay measurement bin profile assigned
+        to this Dest NE. If set to '0', no  profile is assigned to this Dest NE."
+    ::= { ethOamDestNeEntry 41 }
+
+ethOamDestNeFramesAboveDelayVarBinProfile OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable defines the dalay variation measurement bin profile assigned
+        to this Dest NE. If set to '0', no  profile is assigned to this Dest NE."
+    ::= { ethOamDestNeEntry 42 }
+
+ethOamDestNeDmmDataTlvLength    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable denotes the length of the data TLV sent in DMM frames."
+    DEFVAL {0}
+    ::= { ethOamDestNeEntry 43 }
+
+ethOamDestNeLossActivity      OBJECT-TYPE
+    SYNTAX        INTEGER
+        {
+        none (1),
+        singleEnded (2),
+        dualEnded (3)
+        }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "Determine the type of activity for Tx LMM."
+    DEFVAL { none }
+    ::= { ethOamDestNeEntry 44 }
+
+ethOamDestNeDelayActivity      OBJECT-TYPE
+    SYNTAX        INTEGER
+        {
+        none (1),
+        oneWay (2),
+        twoWay (3)
+        }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "Determine the type of activity for Tx DMM."
+    DEFVAL { none }
+    ::= { ethOamDestNeEntry 45 }
+
+ethOamDestNeTxForward             OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of transmitted frames in the forward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 46}
+
+ethOamDestNeOverflowTxForward    OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeTxForward counter has overflowed."
+    ::= { ethOamDestNeEntry 47}
+
+ethOamDestNeRxForward                     OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of received frames in the forward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 48}
+
+ethOamDestNeOverflowRxForward   OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeRxForward counter has overflowed."
+    ::= { ethOamDestNeEntry 49}
+
+ethOamDestNeTxBackward                     OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of transmitted frames in the backward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 50}
+
+ethOamDestNeOverflowTxBackward         OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeTxBackward counter has overflowed."
+    ::= { ethOamDestNeEntry 51}
+
+ethOamDestNeRxBackward                     OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number received frames in the backward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 52}
+
+ethOamDestNeOverflowRxBackward     OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeTxBackward counter has overflowed."
+    ::= { ethOamDestNeEntry 53}
+
+ethOamDestNeUnavailableIndForward        OBJECT-TYPE
+    SYNTAX  Counter32
+    UNITS   "seconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts the number of unavailability indicators evaluated
+     as unavailable in the forward direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 54}
+
+ethOamDestNeOverflowUnavailableIndForward  OBJECT-TYPE
+    SYNTAX  Counter32
+    UNITS   "seconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeUnavailableIndForward counter has overflowed."
+    ::= { ethOamDestNeEntry 55}
+
+ethOamDestNeUnavailableIndBackward       OBJECT-TYPE
+    SYNTAX  Counter32
+    UNITS   "seconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Counts Counts the number of unavailability indicators evaluated
+     as unavailable in the backward  direction
+     since the time the service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 56}
+
+ethOamDestNeOverflowUnavailableIndBackward OBJECT-TYPE
+    SYNTAX  Counter32
+    UNITS   "seconds"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the number of times the associated
+     ethOamDestNeUnavailableIndBackward counter has overflowed."
+    ::= { ethOamDestNeEntry 57}
+
+ethOamDestNeUnavailRatioForward  OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Indicates the ratio of the unavailable seconds, in the forward
+    direction, in the last 48 intervals. (12 hours window).
+    The mib value is the ratio multiplied by 1000.
+    0xFFFFFFFF will be returned for ratio greater than 4/10 (40%)."
+    ::= { ethOamDestNeEntry 58 }
+
+ethOamDestNeUnavailRatioBackward  OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    " Indicates the ratio of the unavailable seconds, in the backward
+    direction, in the last 48 intervals period (12 hours window).
+    The mib value is the ratio multiplied by 1000.
+    0xFFFFFFFF will be returned for ratio greater than 4/10 (40%)."
+    ::= { ethOamDestNeEntry 59 }
+
+ethOamDestNeDescr   OBJECT-TYPE
+    SYNTAX              SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "A textual string containing information about the Remote MEP."
+    DEFVAL { "" }
+    ::= { ethOamDestNeEntry 61}
+
+ethOamDestNeConvertedIndex       OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "This attribute defines the converted index (according to entityConvertIndexTable )
+     assigned to this Dest NE."
+    ::= { ethOamDestNeEntry 62}
+
+ethOamDestNeSlmDataTlvLength     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "This object indicates the SLM Data TLV length.
+     It is taken into consideration only if ethOamDestNeLmmTraffic
+     is set to 'slm'(4)."
+     DEFVAL { 0 }
+    ::= { ethOamDestNeEntry 63}
+
+ethOamDestNeLmMode     OBJECT-TYPE
+    SYNTAX      INTEGER
+               {
+                 rx      (1),
+                 txAndRx (2)
+               }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "Determines Loss Measurement work mode:
+     rx(1): Rx only.
+     txAndRx(2): Tx and Rx."
+     DEFVAL { txAndRx }
+    ::= { ethOamDestNeEntry 64}
+
+ethOamDestNeSlmTestId     OBJECT-TYPE
+    SYNTAX      Unsigned32(1..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "This object indicates the unique indication per EVC.COS
+     and MEP/RMEP of SLM Test ID.
+     Range of values is 1..255."
+     DEFVAL { 1 }
+    ::= { ethOamDestNeEntry 65}
+
+ethOamDestNeForwardDelayVarBinProfile     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "This variable defines the 1-Way delay measurement bin
+     profile assigned to this Dest NE forward direction. if set
+     to '0', no profile is assigned to this Dest NE."
+     DEFVAL { 0 }
+    ::= { ethOamDestNeEntry 66}
+
+ethOamDestNeBackwardDelayVarBinProfile     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "This variable defines the 1-Way delay measurement bin
+     profile assigned to this Dest NE backward direction. if set
+     to '0', no profile is assigned to this Dest NE."
+     DEFVAL { 0 }
+    ::= { ethOamDestNeEntry 67}
+
+ethOamDestNeAvailableIndForward     OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+     "Counts the number of availability indicators evaluated
+     as available in the forward direction since the time the
+     service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 68}
+
+ethOamDestNeAvailableIndBackward     OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+     "Counts the number of availability indicators evaluated
+     as available in the backward direction since the time the
+     service is up, or since last counters reset."
+    ::= { ethOamDestNeEntry 69}
+
+ethOamDestNeDelayVariationForward    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+     "Indicates the last calculated one way forward delay variation
+     value."
+    ::= { ethOamDestNeEntry 70}
+
+ethOamDestNeDelayVariationBackward    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+     "Indicates the last calculated one way forward delay variation
+     value."
+    ::= { ethOamDestNeEntry 71}
+
+-- ******************************************************************
+-- The RMON Configuration Table
+-- ******************************************************************
+ethOamSvcRmonConfigTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamSvcRmonConfigEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "The purpose of this table is to enable RMON parameters configuration
+            for all Destination NEs that exists for a certain service."
+       ::= { ethOamService 6 }
+
+ethOamSvcRmonConfigEntry OBJECT-TYPE
+    SYNTAX  EthOamSvcRmonConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in this table includes parameters to be configured in
+         alarmTable and eventTable of RMON-MIB.
+         When the manager creates an entry in this table, the agent
+         automatically creates corresponding entries in
+         RMON-MIB.alarmTable and eventTable.
+         An entry is created for each Dest NE that exists for the selected
+         service and the selected counter type that is denoted by
+         ethOamSvcRmonConfigCounterType. The values set for each Dest NE are identical
+         to the values set in this table."
+    INDEX  { radOamIdx1, radOamEvcIdx,
+             radMepIdx, ethOamServiceIdx, ethOamSvcRmonConfigPerfAttrib }
+    ::= { ethOamSvcRmonConfigTable 1 }
+
+EthOamSvcRmonConfigEntry ::= SEQUENCE {
+    ethOamSvcRmonConfigPerfAttrib         INTEGER,
+    ethOamSvcRmonConfigRowStatus          RowStatus,
+    ethOamSvcRmonConfigAlarmInterval      Integer32,
+    ethOamSvcRmonConfigAlarmRisingThresh  Integer32,
+    ethOamSvcRmonConfigAlarmFallingThresh Integer32,
+    ethOamSvcRmonConfigEventType          INTEGER 
+ }
+
+
+ethOamSvcRmonConfigPerfAttrib OBJECT-TYPE
+    SYNTAX  INTEGER
+    {
+        framesAboveDelay      (1),
+        framesAboveDelayVar   (2),
+        farEndFrameLossRatio  (3),
+        nearEndFrameLossRatio (4),
+        unavailabilityRatio   (5),
+        farEndUnavailabilityRatio (6),
+        nearEndUnavailabilityRatio (7)
+        }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each value corresponds to a service performance attribute
+         (as defined in MEF 10.1), that can be monitored.
+         The value set to this variable is used to resolve which counter's
+         OID will be set to alarmTable.alarmVariable of RMON-MIB."
+    ::= { ethOamSvcRmonConfigEntry 1 }
+
+
+ethOamSvcRmonConfigRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This variable enables table row creation and deletion."
+    ::= { ethOamSvcRmonConfigEntry 2 }
+
+ethOamSvcRmonConfigAlarmInterval   OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value set to this variable will be set (by the agent) to
+         alarmTable.alarmInterval in RMON-MIB for each Dest NE.
+         The measurement unit is seconds.
+         For further information refer to RFC-2819."
+    ::= { ethOamSvcRmonConfigEntry 3 }
+
+
+ethOamSvcRmonConfigAlarmRisingThresh OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value set to this variable will be set (by the agent) to
+         alarmTable.alarmRisingThreshold in RMON-MIB for each Dest NE.
+         For further information refer to RFC-2819."
+    ::= { ethOamSvcRmonConfigEntry 4 }
+
+ethOamSvcRmonConfigAlarmFallingThresh OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value set to this variable will be set (by the agent) to
+         alarmTable.alarmFallingThreshold in RMON-MIB for each Dest NE.
+         For further information refer to RFC-2819."
+    ::= {  ethOamSvcRmonConfigEntry 5 }
+
+ethOamSvcRmonConfigEventType    OBJECT-TYPE
+    SYNTAX       INTEGER
+    {
+         none      (1),
+         log       (2),
+         snmptrap  (3),    -- send an SNMP trap
+         logandtrap(4)
+    }
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The value set to this variable will be set (by the agent) to
+         eventTable.eventType in RMON-MIB for each Dest NE.
+         For further information refer to RFC-2819."
+    ::= { ethOamSvcRmonConfigEntry 6 }
+
+
+-- ******************************************************************
+-- The Measurement Bins Profile Table
+-- ******************************************************************
+ethOamMeasureBinProfileTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamMeasureBinProfileEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "This table defines measurement bin profiles, to be used for
+           threshold setting of FD (Frame Delay) and FDV (Frame Delay Variation) measurements."
+       ::= { ethOamService 7 }
+
+ethOamMeasureBinProfileEntry OBJECT-TYPE
+    SYNTAX  EthOamMeasureBinProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "Each entry in this table represents a profile that can be
+        bind to a Dest NE."
+    INDEX  { ethOamMeasureBinProfileIndex }
+    ::= { ethOamMeasureBinProfileTable 1 }
+
+EthOamMeasureBinProfileEntry ::= SEQUENCE {
+    ethOamMeasureBinProfileIndex       Unsigned32,
+    ethOamMeasureBinProfileRowStatus   RowStatus,
+    ethOamMeasureBinProfileName        SnmpAdminString,
+    ethOamMeasureBinThresh             OCTET STRING 
+ }
+
+ethOamMeasureBinProfileIndex OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This attribute defines the Measurement Bin profile index."
+    ::= { ethOamMeasureBinProfileEntry 1 }
+
+ethOamMeasureBinProfileRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This attribute is used to create a new row or to delete an existing row
+         in the table."
+    ::= {  ethOamMeasureBinProfileEntry 2 }
+
+ethOamMeasureBinProfileName   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A string to denote the profile's name."
+    ::= {  ethOamMeasureBinProfileEntry 3 }
+
+ethOamMeasureBinThresh   OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(36))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The structure of this variable is as follows:
+         Each consecutive 4 bytes represent a threshold value.
+         There are up to 10 possible bins per measurement type (FD, FDV).
+         The first 4 bytes represent the upper threshold of Bin #1.
+         The next 4 bytes represent the upper threshold of Bin #2, etc.
+         Threshold measurement unit is microseconds."
+    ::= {  ethOamMeasureBinProfileEntry 4 }
+
+
+-- ******************************************************************
+-- The Current Delay (Frame Delay and Frame Delay Variation),
+-- Measurement Bins Table
+-- ******************************************************************
+ethOamDelayCurrentBinsTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamDelayCurrentBinsEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "This table holds a set of Frame Delay bin or Frame Delay Variation
+            counters in the current interval.
+            The number of bins is determined according to the Bin Profile selected
+            per Dest NE.
+            For Dest NE resolution (ethOamServiceIdx) refer to ethOamSvcCurrentStatTable."
+       ::= { ethOamService 8 }
+
+ethOamDelayCurrentBinsEntry OBJECT-TYPE
+       SYNTAX EthOamDelayCurrentBinsEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "Each entry in the table holds a Frame Delay or Frame Delay Variation
+           bin counter of a Destination NE in the current interval."
+       INDEX   { radOamIdx1, radOamEvcIdx, radMepIdx,
+                 ethOamServiceIdx,ethOamDelayCurrentBinCounterType,
+                 ethOamDelayCurrentBinNumber }
+       ::= { ethOamDelayCurrentBinsTable 1 }
+
+EthOamDelayCurrentBinsEntry ::= SEQUENCE {
+    ethOamDelayCurrentBinCounterType     EthOamBinCounterType,
+    ethOamDelayCurrentBinNumber          Unsigned32,
+    ethOamDelayCurrentBinValue            PerfCurrentCount 
+ }
+
+
+    ethOamDelayCurrentBinCounterType   OBJECT-TYPE
+    SYNTAX      EthOamBinCounterType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Define counter type for current bin measurements
+        (See Textual Convention for detailed defintion.) "
+    ::= { ethOamDelayCurrentBinsEntry 1 }
+
+
+    ethOamDelayCurrentBinNumber   OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..10)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This variable denotes the Frame Delay or Frame Delay Variation Bin number
+         in the current interval.
+         The bin upper threshold is derived from the corresponding bytes of
+         ethOamMeasureBinThresh of the Bin Profile selected per Dest NE."
+    ::= { ethOamDelayCurrentBinsEntry 2 }
+
+ethOamDelayCurrentBinValue   OBJECT-TYPE
+    SYNTAX      PerfCurrentCount
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This variable counts the number of frames that arrived in the current interval
+         with delay or or Delay Variation falling within the bin range."
+    ::= { ethOamDelayCurrentBinsEntry 3 }
+
+
+-- ******************************************************************
+-- The Delay  (Frame Delay and Frame Delay Variation)
+-- Interval Measurement Bins Table
+-- ******************************************************************
+ethOamDelayIntervalBinsTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamDelayIntervalBinsEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "This table holds a set of Frame Delay or Frame Delay Variation
+            bin counters in the last 24H period.
+            The number of bins is determined according to the Bin Profile selected
+            per Dest NE."
+       ::= { ethOamService 10 }
+
+ethOamDelayIntervalBinsEntry OBJECT-TYPE
+       SYNTAX EthOamDelayIntervalBinsEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "Each entry in the table holds a Frame Delay or Frame Delay Variation
+           bin counter of a Destination NE in the selected interval.
+           For Dest NE resolution (ethOamServiceIdx) refer to ethOamSvcIntervalStatTable."
+       INDEX   { radOamIdx1, radOamEvcIdx, radMepIdx,
+                 ethOamServiceIdx, ethOamSvcIntervalNum,
+                 ethOamDelayIntervalBinCounterType,
+                 ethOamDelayIntervalBinNumber }
+       ::= { ethOamDelayIntervalBinsTable 1 }
+
+EthOamDelayIntervalBinsEntry ::= SEQUENCE {
+    ethOamDelayIntervalBinCounterType     EthOamBinCounterType,
+    ethOamDelayIntervalBinNumber          Unsigned32,
+    ethOamDelayIntervalBinValue           PerfIntervalCount 
+ }
+
+
+    ethOamDelayIntervalBinCounterType   OBJECT-TYPE
+    SYNTAX      EthOamBinCounterType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Define counter type for current bin measurements
+        (See Textual Convention for detailed defintion.)"
+    ::= { ethOamDelayIntervalBinsEntry 1 }
+
+ethOamDelayIntervalBinNumber   OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..10)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This variable denotes the Frame Delay or Frame Delay Variation
+         bin number in the selected interval.
+         The bin upper threshold is derived from the corresponding bytes of
+         ethOamMeasureBinThresh of the Bin Profile selected per Dest NE."
+    ::= { ethOamDelayIntervalBinsEntry 2 }
+
+
+ethOamDelayIntervalBinValue  OBJECT-TYPE
+    SYNTAX      PerfIntervalCount
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This variable counts the number of frames in the selected interval
+         that arrived with delay or Delay Variation falling within the bin range."
+    ::= { ethOamDelayIntervalBinsEntry 3 }
+
+-- MD (Maintenance Domain) Definition
+-- ******************************************************************
+-- The Maintenance Domain Table
+-- ******************************************************************
+radMdTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The MaintenanceDomain table. Each row in the table represents
+        a different maintenance domain.
+
+        A Maintenance domain is described in 802.1ag (3.22) as the
+        network or the part of the network for which faults in
+        connectivity are to be managed. The boundary of a Maintenance
+        Domain is defined by a set of DSAPs, each of which can become
+        a point of connectivity to a service instance."
+    ::= { ethIfOamCfm 3 }
+
+radMdEntry OBJECT-TYPE
+    SYNTAX  RadMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The Maintenance Domain table entry. This entry is not lost
+        upon reboot. It is backed up by stable storage"
+     INDEX  { radMdIndex }
+    ::= { radMdTable 1 }
+
+RadMdEntry ::= SEQUENCE {
+      radMdIndex                Unsigned32,
+      radMdFormat               INTEGER,
+      radMdName                 OCTET STRING,
+      radMdRowStatus            RowStatus
+    }
+
+radMdIndex OBJECT-TYPE
+    SYNTAX      Unsigned32	  
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "The index to the maintenance domain table."
+    ::= { radMdEntry 1 }
+
+radMdFormat OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+      none              (1),
+      dnsLikeName       (2),
+      macAddressAndUint (3),
+      charString        (4)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The type (and thereby format) of the Maintenance Domain Name."
+    ::= { radMdEntry 2 }
+
+radMdName OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..43))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Domain name. The type/format of this object
+        is determined by the value of the radMdNameType object.
+          
+        Each Maintenance Domain has unique name amongst all those
+        used or available to a service provider or operator.  It
+        facilitates easy identification of administrative
+        responsibility for each Maintenance Domain."
+    ::= { radMdEntry 3 }
+
+
+radMdRowStatus	 OBJECT-TYPE
+      SYNTAX     RowStatus 
+      MAX-ACCESS read-create
+      STATUS     current
+      DESCRIPTION
+         "This attribute allows to create/delete a row in this table.
+         
+         The writable columns in a row can not be changed if the row
+         is active. All columns must have a valid value before a row
+         can be activated."
+      ::= { radMdEntry 4 }
+
+
+-- ******************************************************************
+-- The Linktrace Reply Table
+-- ******************************************************************
+
+radMepLtrTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadMepLtrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains a list of Linktrace replies 
+       received by a specific MEP in response to
+       a linktrace message.
+       "
+    ::= { ethIfOamCfm 4 }
+
+radMepLtrEntry OBJECT-TYPE
+    SYNTAX      RadMepLtrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The LinktraceReply table entry."
+    INDEX { radOamIdx1, radMepIdx, radMepLtrReceiveOrder }
+    ::= { radMepLtrTable 1 }
+
+
+RadMepLtrEntry ::= SEQUENCE {
+      radMepLtrReceiveOrder         Unsigned32,
+      radMepLtrTtl                  Unsigned32,
+      radMepLtrMacAddr              MacAddress,
+	  radMepLtrRelay                INTEGER,
+	  radMepLtrIngress				INTEGER,
+	  radMepLtrIngressPortIdSubtype	LldpPortIdSubtype,
+	  radMepLtrIngressPortId        OCTET STRING,
+   	  radMepLtrEgress				INTEGER,
+	  radMepLtrEgressPortIdSubtype	LldpPortIdSubtype,
+	  radMepLtrEgressPortId         OCTET STRING
+}
+
+radMepLtrReceiveOrder  OBJECT-TYPE
+    SYNTAX      Unsigned32	  
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "An index to distinguish among multiple LTRs with the same LTR
+        Transaction Identifier field value.  radMepLtrReceiveOrder
+        are assigned sequentially from 1, in the order that the
+        Linktrace Initiator received the LTRs."
+    ::= { radMepLtrEntry 1 }
+
+
+radMepLtrTtl   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "TTL field value for a returned LTR."
+    ::= { radMepLtrEntry 2 }
+
+radMepLtrMacAddr  OBJECT-TYPE
+    SYNTAX        MacAddress
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The MAC address in the header of the returned LTR."
+    ::= { radMepLtrEntry 3 }
+
+radMepLtrRelay    OBJECT-TYPE
+    SYNTAX        INTEGER
+	{
+         rlyHit     (1),
+         rlyFdb     (2),
+         rlyMpdb    (3)
+  	}
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The value returned in the Relay Action field:
+        rlyHit - the LTM reached an MP whose MAC address matches the target MAC address.
+        rlyFdb - the Egress Port was determined by consulting the Filtering Database.
+        rlyMpdb - the Egress Port was determined by consulting the MIP CCM Database.
+        802.1ag clauses 12.14.7.5.3:g and 20.36.2.5"
+    ::= { radMepLtrEntry 4 }
+
+radMepLtrIngress    OBJECT-TYPE
+    SYNTAX        	INTEGER
+	{
+          ingNoTlv    (1),
+          ingOk       (2),
+          ingDown     (3),
+          ingBlocked  (4),
+          ingVid      (5)
+	}
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The value returned in the Ingress Action Field of the LTM.
+        ingNoTlv - no Reply Ingress TLV was returned in the LTM.
+        ingOK - the target data frame would be passed through to the MAC Relay Entity.
+        ingDown - the Bridge Port's MAC_Operational parameter is false.
+        ingBlocked - the target data frame would not be forwarded if received on this port.
+        ingVid - the ingress port is not in the members of the LTM's VID,
+        and ingress filtering is enabled, so the target data frame would be 
+        filtered by the ingress filtering.
+        802.1ag clauses 12.14.7.5.3:k and 20.36.2.6"
+    ::= { radMepLtrEntry 5 }
+
+radMepLtrIngressPortIdSubtype	OBJECT-TYPE
+    SYNTAX        LldpPortIdSubtype
+	MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The format of the Ingress Port ID.
+	   If the radMepLtrIngress object contains the value
+       egrNoTlv(1), then the contents of this object are meaningless.
+       802.1ag clauses 12.14.7.5.3:m and 20.36.2.8"
+    ::= { radMepLtrEntry 6 }
+
+radMepLtrIngressPortId	OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (1..255))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Ingress Port ID. This is an alpha-numeric string that contains a
+       specific identifier for the port.
+       The format of this object is determined by
+        the value of the radMepLtrIngressPortIdSubtype object.
+        If the radMepLtrIngress object contains the value
+        ingNoTlv(1), then the contents of this object are meaningless.
+        802.1ag clauses 12.14.7.5.3:n and 20.36.2.9"
+    ::= { radMepLtrEntry 7 }
+
+radMepLtrEgress	OBJECT-TYPE
+    SYNTAX     		INTEGER
+    {
+        egrNoTlv    (1),
+        egrOK       (2),
+        egrDown     (3),
+        egrBlocked  (4),
+        egrVid      (5)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The value returned in the Egress Action Field of the LTM.
+        The value egrNoTlv(1) indicates that no Reply Egress TLV was
+        returned in the LTM.
+        802.1ag clauses 12.14.7.5.3:o and 20.36.2.10"
+    ::= { radMepLtrEntry 8 }
+
+
+radMepLtrEgressPortIdSubtype  OBJECT-TYPE
+    SYNTAX     	  LldpPortIdSubtype
+	MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "The format of the egress Port ID.
+        If the radMepLtrEgress object contains the value
+        egrNoTlv(1), then the contents of this object are meaningless.
+        802.1ag clauses 12.14.7.5.3:q and 20.36.2.12"
+    ::= { radMepLtrEntry 9 }
+
+radMepLtrEgressPortId      OBJECT-TYPE
+    SYNTAX     	  OCTET STRING (SIZE (1..255))
+	MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+       "Egress Port ID. The format of this object is determined by
+        the value of the radMepLtrEgressPortIdSubtype object.
+        If the radMepLtrEgress object contains the value
+        egrNoTlv(1), then the contents of this object are meaningless.
+        802.1ag clauses 12.14.7.5.3:r and 20.36.2.13"
+    ::= { radMepLtrEntry 10 }
+
+
+-- ******************************************************************
+-- The MEP CC Status Table
+-- ******************************************************************
+
+radMepCcStatusTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadMepCcStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains a list of CC Status  
+       received by a specific MEP from different Remote MEPs. 
+       "
+    ::= { ethIfOamCfm 5 }
+
+radMepCcStatusEntry OBJECT-TYPE
+    SYNTAX      RadMepCcStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "An entry in the CC Status Table."
+    INDEX { radOamIdx1, radMepIdx, radMepRemoteMepIdx }
+    ::= { radMepCcStatusTable 1 }
+
+RadMepCcStatusEntry ::= SEQUENCE {
+      radMepRemoteMepIdx        Unsigned32,
+	  radMepCcStatusRemMepId	Unsigned32,
+      radMepCcStat              INTEGER,
+      radMepCcStatusMacAddr     MacAddress
+      }
+
+radMepRemoteMepIdx  OBJECT-TYPE
+    SYNTAX      Unsigned32	  
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "This is a running index for arriving CC messages (from different Remote MEPs)
+      for a specific MEP ID."
+    ::= { radMepCcStatusEntry 1 }
+
+radMepCcStatusRemMepId		OBJECT-TYPE
+     SYNTAX   Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This attribute indicates the Remote MEP ID from which the CC 
+      messages has arrived."
+    ::= { radMepCcStatusEntry 2 }
+
+radMepCcStat OBJECT-TYPE
+     SYNTAX  INTEGER 
+	{
+       notApplicable     (1),
+	   fail	             (2),
+       ok  	             (3),
+	   mismerge          (4),
+	   unexpectedMep     (5),
+       unexpectedMeLevel (6),
+	   unexpectedPeriod  (7),
+	   rdi               (8)
+    }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "This object indicates the Continuity Check (CC) status (ITU-T Y.1731, Appendix I):
+     mismerge - A MEP detects a Mismerge condition when a CCM frame arrives with the 
+       correct MEG level, but incorrect MEG ID.
+	 unexpectedMep -A MEP detects an Unexpected MEP condition when a CCM frame arrives with the 
+       correct MEG level, the correct MEG ID, but an unexpected MEP ID,
+       which includes the MEP's own MEP ID.
+     unexpectedMeLevel - A MEP detects an Unexpected MEG Level condition when a CCM frame
+       arrives with incorrect MEG Level. Incorrect MEG Level is less than the MEP's 
+       own MEG level.
+     unexpectedPeriod - A MEP detects an Unexpected Period condition when a CCM frame
+       arrives with a correct MEG level. a correct MEG ID, a correct MEP ID, 
+       but with the Period field value different from the MEP's own CCM
+       transmission period.
+     rdi - A MEP detects RDI when it receives a CCM frame with the RDI field set."
+    ::= { radMepCcStatusEntry 3 }
+
+radMepCcStatusMacAddr   OBJECT-TYPE
+     SYNTAX   MacAddress
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "This object indicates the MAC Address in the 
+     CC Status message received."
+    ::= { radMepCcStatusEntry 4 }
+
+
+--Ethernet Type at system level
+ethOamStdEtherType  OBJECT-TYPE
+     SYNTAX      Unsigned32
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+     "The Standard Ether Type in an OAM message.
+      This object will be RW until a formal value will be issued for standard Ethernet Type.
+      When such Standard will exist, this object will be supported RO to reflect
+      the Standard value."
+    ::= { ethIfOamCfm 6 }
+
+
+--MAC Address at system level
+ethOamStdMacAddress  OBJECT-TYPE
+     SYNTAX      MacAddress
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+     "The Standard MAC Address in an OAM message.
+      This object will be RW until a formal value will be issued for standard MAC Address.
+      When such Standard will exist, this object will be supported RO to reflect
+      the Standard value."
+    ::= { ethIfOamCfm 7 }
+
+-- ******************************************************************
+-- The Extension for the Maintenance Domain Table
+-- ******************************************************************
+
+dot1agXCfmMdTable
+OBJECT-TYPE
+    SYNTAX  SEQUENCE OF Dot1agXCfmMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "The Maintenance Domain table. Each row in the table represents
+        a different maintenance association."
+    ::= { ethIfOamCfm 8 }
+
+dot1agXCfmMdEntry OBJECT-TYPE
+    SYNTAX  Dot1agXCfmMdEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The Maintenance Domain table entry."
+--   AUGMENTS  { dot1agCfmMdEntry }
+     INDEX  { dot1agCfmMdIndex }
+    ::= { dot1agXCfmMdTable 1 }
+
+Dot1agXCfmMdEntry ::= SEQUENCE {
+    dot1agXCfmMdProtocol   INTEGER 
+ }
+
+dot1agXCfmMdProtocol  OBJECT-TYPE
+     SYNTAX         INTEGER
+     {
+       preStandard     (1),
+       standard        (2)
+     }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "
+     ."
+::= { dot1agXCfmMdEntry 1 }
+
+
+
+
+
+
+-- ********************************************************************
+-- The Extension for the MA  Table
+-- ********************************************************************
+
+dot1agXCfmMaNetTable        OBJECT-TYPE
+    SYNTAX  SEQUENCE OF Dot1agXCfmMaNetEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An extension to the standard Maintenance Association
+        table, dot1agCfmMaNetTable"
+    ::= { ethIfOamCfm 15 }
+
+dot1agXCfmMaNetEntry OBJECT-TYPE
+    SYNTAX  Dot1agXCfmMaNetEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The Maintenance Association table entry."
+--   AUGMENTS  { dot1agCfmMaNetTable }
+     INDEX  { dot1agCfmMdIndex, dot1agCfmMaIndex }
+    ::= { dot1agXCfmMaNetTable 1 }
+
+Dot1agXCfmMaNetEntry ::= SEQUENCE {
+    dot1agXCfmMaNetServiceIdName   SnmpAdminString,
+    dot1agXCfmMaNetIfStatusTlv     INTEGER 
+ }
+
+dot1agXCfmMaNetServiceIdName  OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This attribute specify the Service ID name of this MA."
+::= { dot1agXCfmMaNetEntry 1 }
+
+dot1agXCfmMaNetIfStatusTlv  OBJECT-TYPE
+    SYNTAX      INTEGER
+          {
+            enable  (1),
+            disable (2)
+          }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object determines if Interface Status TLV is added in
+    CCM message."
+    DEFVAL { enable }
+::= { dot1agXCfmMaNetEntry 2 }
+
+-- ******************************************************************
+-- The Extension for the MEP Table
+-- ******************************************************************
+
+dot1agXCfmMepTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1agXCfmMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The Maintenance Association End Point (MEP) table."
+    ::= { ethIfOamCfm 9 }
+
+dot1agXCfmMepEntry OBJECT-TYPE
+    SYNTAX      Dot1agXCfmMepEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MEP table entry."
+ -- AUGMENTS    { dot1agCfmMepEntry }
+    INDEX { dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMepIdentifier
+          }
+    ::= { dot1agXCfmMepTable 1 }
+
+Dot1agXCfmMepEntry ::= SEQUENCE {
+    dot1agXCfmMepContinuityVerMode      INTEGER,
+    dot1agXCfmMepDestAddrType           INTEGER,
+    dot1agXCfmMepDestMacAddr            MacAddress,
+    dot1agXCfmMepMappingProfile         Unsigned32,
+    dot1agXCfmMepQBlock                 OBJECT IDENTIFIER,
+    dot1agXCfmMepFixedQueueMapping      Unsigned32,
+    dot1agXCfmMepQueueMappingProfile    Unsigned32,
+    dot1agXCfmMepConvertedIndex         Unsigned32,
+    dot1agXCfmMepPmDestAddrType         INTEGER,
+    dot1agXCfmMepForwardingMode         INTEGER,
+    dot1agXCfmMepLbmDataTlvLength       Unsigned32,
+    dot1agXCfmMepClientMdLevel          Unsigned32,
+    dot1agXCfmMepAisTransmit            INTEGER,
+    dot1agXCfmMepAisInterval            Dot1agCfmCcmInterval,
+    dot1agXCfmMepAisPriority            Unsigned32,
+    dot1agXCfmMepDefects                BITS,
+    dot1agXCfmMepLastAlarmDefect        INTEGER,
+    dot1agXCfmMepCosMapping             Unsigned32,
+    dot1agXCfmMepCosMappingProfile      Unsigned32,
+    dot1agXCfmMepCcStatus               BITS,
+    dot1agXCfmMepStatus                 INTEGER,
+    dot1agXCfmMepExcludeCustomerTags    TruthValue,
+    dot1agXCfmMepClearStatsCmd          INTEGER,
+    dot1agXCfmMepTimeElapsed            Unsigned32,
+    dot1agXCfmMepCcmTx                  Counter64 
+ }
+
+
+dot1agXCfmMepContinuityVerMode  OBJECT-TYPE
+    SYNTAX              INTEGER
+    {
+       disabled      (2),
+       ccBased       (3),
+       lbBased       (4)
+    }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+     "This object determines the OAM behavior of the MEP:
+     disabled - no Continuity Verification is done
+     cc_based - Continuity Verification is done based on incoming CC messages
+     lb_based - Continuity Verification is done based on loopback messages."
+    ::= { dot1agXCfmMepEntry 1 }
+
+dot1agXCfmMepDestAddrType OBJECT-TYPE
+SYNTAX  INTEGER
+    {
+       unicast      (1),
+       multicast    (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object determines if the OAM messages are sent to user defined
+    unicast address, or to RAD proprietary multicast address."
+    ::= { dot1agXCfmMepEntry 2 }
+
+dot1agXCfmMepDestMacAddr OBJECT-TYPE
+    SYNTAX  MacAddress
+    MAX-ACCESS  read-create
+    STATUS current
+    DESCRIPTION
+    "This object determines the MAC address that OAM packets are sent to."
+    ::= { dot1agXCfmMepEntry 3 }
+
+dot1agXCfmMepMappingProfile   OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the Mapping/classification profile (flowMappingProfileTable )
+     assigned to this MEP."
+     ::= { dot1agXCfmMepEntry 4}
+
+dot1agXCfmMepQBlock   OBJECT-TYPE
+    SYNTAX       OBJECT IDENTIFIER
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the QBlock assigned to this MEP."
+     ::= { dot1agXCfmMepEntry 5 }
+
+dot1agXCfmMepFixedQueueMapping      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the queue (cosProfileTable) that will be assigned to the MEP.
+    A value of 255 means that the Mep will use the profile according
+    to dot1agXCfmMepQueueMappingProfile."
+     ::= { dot1agXCfmMepEntry 6 }
+
+dot1agXCfmMepQueueMappingProfile     OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the queueMapping Profile (CosProfileTable) assigned to this MEP."
+     ::= { dot1agXCfmMepEntry 7 }
+
+dot1agXCfmMepConvertedIndex  OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "This attribute defines the converted index (according to entityConvertIndexTable )
+     assigned to this MEP."
+     ::= { dot1agXCfmMepEntry 8 }
+
+dot1agXCfmMepPmDestAddrType OBJECT-TYPE
+    SYNTAX  INTEGER
+    {
+       unicast      (1),
+       multicast    (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object defines the type of MAC Address being used by the PM frames
+    (Delay Measurement frames and Loss Measurement frames)."
+    ::= { dot1agXCfmMepEntry 9 }
+
+dot1agXCfmMepForwardingMode   OBJECT-TYPE
+    SYNTAX   INTEGER
+    {
+       eline  (1),
+       elan   (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "This variable denotes the mode MEP forwarding mode.
+        If set to elan(2) mode, dot1agXCfmMepPmDestAddrType must be unicast(1). "
+    DEFVAL { eline }
+    ::= { dot1agXCfmMepEntry 10 }
+
+
+dot1agXCfmMepLbmDataTlvLength   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable denotes the length of the data TLV sent in LBM."
+    DEFVAL {0}
+    ::= { dot1agXCfmMepEntry 11 }
+
+dot1agXCfmMepClientMdLevel    OBJECT-TYPE
+    SYNTAX      Unsigned32(0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable denotes the client MD level to transmit ETH-AIS and LCK frames.
+       It is irrelevant if the corresponding dot1agCfmMdMdLevel equals to 7.
+       Otherwise, it value must be greater than the corresponding value of dot1agCfmMdMdLevel "
+    ::= { dot1agXCfmMepEntry 12 }
+
+dot1agXCfmMepAisTransmit      OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+      disable (2),
+      enable  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable denotes if ETH-AIS frame transmission is enabled or not.
+        It can  be enabled only if the value of the corresponding
+        dot1agCfmMdMdLevel is less than 7
+       "
+    DEFVAL { disable }
+    ::= { dot1agXCfmMepEntry 13 }
+
+dot1agXCfmMepAisInterval    OBJECT-TYPE
+    SYNTAX      Dot1agCfmCcmInterval
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable denotes the interval of ETH-AIS frame transmission."
+    DEFVAL { interval1s }
+    ::= { dot1agXCfmMepEntry 14 }
+
+dot1agXCfmMepAisPriority     OBJECT-TYPE
+    SYNTAX      Unsigned32(0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "This variable denotes the priority of ETH-AIS frames."
+    DEFVAL {0}
+    ::= { dot1agXCfmMepEntry 15 }
+
+dot1agXCfmMepDefects     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+        bDefAIS (0),
+        bDefLCK (1)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "
+       An extnetion to dot1agCfmMepDefects which is A vector of
+       Boolean error conditions, any of which may be true.
+       A MEP can detect and report a number of defects,
+       and multiple defects can be present at the same time.
+        The following defects are indicated by this object.
+       Defect are ordered according to their severity.
+
+       bDefAIS - an AIS was received by this MEP in the last
+       3.5*AIS-interval, meaning some server MEP is reporting an AIS.
+
+       bDefLCK - An LCK was received by this MEP in the last
+       3.5*AIS-interval, meaning some server MEP is performing a test.
+       "
+    ::= { dot1agXCfmMepEntry 16 }
+
+dot1agXCfmMepLastAlarmDefect   OBJECT-TYPE
+    SYNTAX              INTEGER
+    {
+    none(1),          -- no defects since FNG_RESET
+    defRDICCM(2),      -- RDI CCM
+    defMACstatus(3),   -- MAC status
+    defRemoteCCM(4),   -- Remote CCM
+    defErrorCCM(5),    -- ErrorCCM
+    defXconCCM(6),     -- Xcon CCM
+    defAIS(7),         -- AIS
+    defLCK(8)          -- LCK
+    }
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION
+    "This object indicates the last defect that generated an alarm at the MEP:
+    none           no defects since FNG_RESET
+    defRDICCM       RDI CCM
+    defMACstatus    MAC status
+    defRemoteCCM    Remote CCM
+    defErrorCCM     Error CCM
+    defXconCCM      Xcon CCM
+    defAIS
+    defLCK."
+    ::= { dot1agXCfmMepEntry 17 }
+
+dot1agXCfmMepCosMapping OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines MEP CoS mapping.
+            The value 0..7 indicates fixed CoS selection.
+            The value 255 defines using of dot1agXCfmMepCosMappingProfile
+            OBJECT belonging to this table (see below)."
+    ::= { dot1agXCfmMepEntry 19 }
+
+dot1agXCfmMepCosMappingProfile  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute contains cosInternalProfileIndex that defines CoS
+            mapping profile assigned to this MEP, see cosInternalProfileTable."
+    ::= { dot1agXCfmMepEntry 20 }
+
+dot1agXCfmMepCcStatus   OBJECT-TYPE
+    SYNTAX              BITS
+    {
+        notApplicable      (0),
+        otherFail          (1),
+        mismerge           (2),
+        unexpectedMep      (3),
+        unexpectedMepLevel (4),
+        unexpectedPeriod   (5)
+    }
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION
+    "This obejct indicates the Continuity Check status.
+     If no bit is set then it means that the ststus is ok.
+     If notApplicable (0) is set then the other bits should not be set.
+     If otherFail (1) is set then the other bits should not be set."
+    ::= { dot1agXCfmMepEntry 24 }
+
+dot1agXCfmMepStatus      OBJECT-TYPE
+    SYNTAX              INTEGER
+    {
+    none        (1),
+    y1564       (2),
+    rfc2544     (3),
+    mef46Loop   (4)
+    }
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION
+    "This objects indicates the test status of the MEP."
+    ::= { dot1agXCfmMepEntry  28}
+
+dot1agXCfmMepExcludeCustomerTags      OBJECT-TYPE
+    SYNTAX              TruthValue
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+    "This objects denotes whether the tag structure of transmitted OAM
+    frames includes or excludes the customer tags (C-tags).
+
+    A value of true(1) forbids C-tags on OAM frames.
+    A value of false(2) allows C-tags on OAM frames.
+
+    This object is relevant only when dot1agCfmMepDirection is up(2).
+
+    The default value is implementation specific."
+    ::= { dot1agXCfmMepEntry  29}
+    
+dot1agXCfmMepClearStatsCmd     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     off  (2), -- read-only value
+     on   (3)  -- write-only value
+     }
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+     "A command that instructs the agent to clear 
+      running statistics of selected MEP.
+      Setting this object to on(3), shall clear the  MEP
+      statistics. Upon completion, the value shall automatically
+      change to off(2)."
+     DEFVAL {off}
+    ::= { dot1agXCfmMepEntry 30 }
+
+dot1agXCfmMepTimeElapsed      OBJECT-TYPE
+    SYNTAX      Unsigned32  (0..899)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The number of seconds that have elapsed since the beginning of the
+       current statistics interval of the MEPs (local and remote).
+        (Time elapsed is common to MEP current interval statistics tables:
+         ethOamMepCurrentTable and ethOamRMepCurrentTable)"
+    ::= { dot1agXCfmMepEntry 31 }
+    
+dot1agXCfmMepCcmTx        OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Total number of CCM PDUs transmitted by the MEP"
+    ::= { dot1agXCfmMepEntry 32 }    
+    
+
+-- ******************************************************************
+-- The Extension for the MEP Database Table - deprecated - for Remote MEP
+-- ******************************************************************
+
+dot1agXCfmMepDbTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1agXCfmMepDbEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+       "The MEP DB table, now used for Remote MEP.
+       Table was deprectated and replaced by the following objects:
+       dot1agCfmMepDefects,  and dot1agCfmMepDbRMepState (standard MIB)
+       and dot1agXCfmMepDefects
+       "
+    ::= { ethIfOamCfm 10 }
+
+dot1agXCfmMepDbEntry OBJECT-TYPE
+    SYNTAX      Dot1agXCfmMepDbEntry
+    MAX-ACCESS  not-accessible
+    STATUS      deprecated
+    DESCRIPTION
+    "The MEP Database table entry.
+    "
+-- AUGMENTS    dot1agCfmMepDbEntry
+    INDEX { dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMepIdentifier,
+            dot1agCfmMepDbRMepIdentifier
+          }
+    ::= { dot1agXCfmMepDbTable 1 }
+
+Dot1agXCfmMepDbEntry ::= SEQUENCE {
+    dot1agXCfmMepCcStat            INTEGER,
+    dot1agXCfmMepDbConvertedIndex  Unsigned32 
+ }
+
+dot1agXCfmMepCcStat OBJECT-TYPE
+    SYNTAX  INTEGER
+    {
+       notApplicable     (1),
+       fail              (2),
+       ok                (3),
+       mismerge          (4),
+       unexpectedMep     (5),
+       unexpectedMeLevel (6),
+       unexpectedPeriod  (7),
+       rdi               (8)
+    }
+     MAX-ACCESS  read-only
+     STATUS  deprecated
+     DESCRIPTION
+     "This object indicates the Continuity Check (CC) status (ITU-T Y.1731, Appendix I):
+     mismerge - A MEP detects a Mismerge condition when a CCM frame arrives with the
+       correct MEG level, but incorrect MEG ID.
+     unexpectedMep -A MEP detects an Unexpected MEP condition when a CCM frame arrives with the
+       correct MEG level, the correct MEG ID, but an unexpected MEP ID,
+       which includes the MEP's own MEP ID.
+     unexpectedMeLevel - A MEP detects an Unexpected MEG Level condition when a CCM frame
+       arrives with incorrect MEG Level. Incorrect MEG Level is less than the MEP's
+       own MEG level.
+     unexpectedPeriod - A MEP detects an Unexpected Period condition when a CCM frame
+       arrives with a correct MEG level. a correct MEG ID, a correct MEP ID,
+       but with the Period field value different from the MEP's own CCM
+       transmission period.
+     rdi - A MEP detects RDI when it receives a CCM frame with the RDI field set."
+    ::= { dot1agXCfmMepDbEntry 1 }
+
+dot1agXCfmMepDbConvertedIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+     "This attribute defines the converted index (according to entityConvertIndexTable )
+     assigned to this remote MEP."
+    ::= { dot1agXCfmMepDbEntry 2}
+    
+    
+-- ***************************************************************************
+-- The Extension for the MA List Table: The list of known MEPs for a given MA
+-- ***************************************************************************
+dot1agXCfmMaMepListTable
+OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Dot1agXCfmMaMepListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The MA List table"
+    ::= { ethIfOamCfm 11 }
+
+
+dot1agXCfmMaMepListEntry OBJECT-TYPE
+    SYNTAX      Dot1agXCfmMaMepListEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The known MEPS table entry.
+       "
+-- AUGMENTS   dot1agCfmMaMepListEntry
+    INDEX { dot1agCfmMdIndex,
+            dot1agCfmMaIndex,
+            dot1agCfmMaMepListIdentifier
+          }
+    ::= { dot1agXCfmMaMepListTable 1 }
+
+Dot1agXCfmMaMepListEntry ::= SEQUENCE {
+    dot1agXCfmMaMepListLocalMep    Unsigned32,
+    dot1agXCfmMaMepListDescr        SnmpAdminString 
+ }
+
+dot1agXCfmMaMepListLocalMep    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "If the entry is of a Remote MEP then
+       this variable denotes the Local MEPID that the Remote MEPID applies to.
+       If the entry is of a Local MEP, then this variable will be set to 0xFFFF.
+       It intends to support the case of multiple Local MEPs on the same MD/MA,
+       with different p-bit."
+::= { dot1agXCfmMaMepListEntry 1 }
+
+dot1agXCfmMaMepListDescr         OBJECT-TYPE
+    SYNTAX                  SnmpAdminString
+    MAX-ACCESS      read-create
+    STATUS                  current
+    DESCRIPTION
+    "This object defines the description of MEP entity.
+    By default the device sets this object value in the following format:
+    1.        If md name is not empty:
+                md: 'IEEE8021-CFM-MIB.dot1agCfmMdName'
+                ma: 'IEEE8021-CFM-MIB.dot1agCfmMaNetName'
+    2.        If md name is empty:
+                ma: 'IEEE8021-CFM-MIB.dot1agCfmMaNetName' "
+       ::= { dot1agXCfmMaMepListEntry 2 }
+
+
+--********************************
+-- MIP per MD Configuration Table
+--********************************
+
+ethIfOamCfmMip  OBJECT IDENTIFIER ::= { ethIfOamCfm 12 }
+
+ethIfOamCfmMipTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EthIfOamCfmMipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The Maintenance Entity Group Intermediate Point (MIP) table.
+            MIP entities are defined under MD (Maintenance Domain Level)."
+    ::= { ethIfOamCfmMip 1 }
+
+ethIfOamCfmMipEntry OBJECT-TYPE
+    SYNTAX      EthIfOamCfmMipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The MIP (per MD) table entry."
+    INDEX   { ethIfOamCfmMipMdIdx, ethIfOamCfmMipIdx}
+    ::= { ethIfOamCfmMipTable 1 }
+
+EthIfOamCfmMipEntry ::= SEQUENCE {
+    ethIfOamCfmMipMdIdx                 Unsigned32,
+    ethIfOamCfmMipIdx                   Unsigned32,
+    ethIfOamCfmMipRowStatus             RowStatus,
+    ethIfOamCfmMipBoundedPortIfIndex    InterfaceIndexOrZero,
+    ethIfOamCfmMipFlowType           INTEGER,
+    ethIfOamCfmMipFlowRxIndex    Unsigned32,
+    ethIfOamCfmMipFlowTxIndex     Unsigned32 
+ }
+
+ethIfOamCfmMipMdIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The index to the Maintenance Domain (MD).
+            See dot1agCfmMdIndex description in the IEEE8021-CFM-MIB."
+    ::= { ethIfOamCfmMipEntry 1 }
+
+ethIfOamCfmMipIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The index to the Maintenance Entity Group Intermediate
+            Point (MIP)"
+    ::= { ethIfOamCfmMipEntry 2 }
+
+ethIfOamCfmMipRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "The status of the row.
+            The writable columns in a row can not be changed if the row
+            is active. All columns MUST have a valid value before a row
+            can be activated."
+   ::= { ethIfOamCfmMipEntry 3 }
+
+ethIfOamCfmMipBoundedPortIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object is the interface index of the interface to
+            which the MIP is attached. If no such interface exists, then
+            the variable is set to 0."
+    ::= { ethIfOamCfmMipEntry 4 }
+
+ethIfOamCfmMipFlowType             OBJECT-TYPE
+    SYNTAX              INTEGER
+    {
+    uniDirectional (1),
+    biDirectional   (2)
+    }
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+    "uni-directional indicates that the flow
+      is defined from ingress port to egress,
+      bi-directional indicates both flow parameters
+      for ingress to egress and opposite."
+    ::= { ethIfOamCfmMipEntry  5}
+
+ethIfOamCfmMipFlowRxIndex           OBJECT-TYPE
+    SYNTAX                     Unsigned32
+    MAX-ACCESS           read-create
+    STATUS                     current
+    DESCRIPTION
+    "The received flow for the MIP that holds the MIP 1 classification "
+    ::= { ethIfOamCfmMipEntry  6}
+
+ethIfOamCfmMipFlowTxIndex       OBJECT-TYPE
+    SYNTAX                    Unsigned32
+    MAX-ACCESS          read-create
+    STATUS                    current
+    DESCRIPTION
+    "The received flow for the MIP that holds the MIP 2 classification "
+    ::= { ethIfOamCfmMipEntry  7}
+
+--**************************
+-- MHF Configuration Table
+--**************************
+
+ethIfOamCfmMhfTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EthIfOamCfmMhfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The MIP Half Function (MHF) table.
+            The table defines MHF configuration, two MHF entities per
+            MIP."
+    ::= { ethIfOamCfmMip 2 }
+
+ethIfOamCfmMhfEntry OBJECT-TYPE
+    SYNTAX      EthIfOamCfmMhfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The MHF table entry"
+    INDEX   { ethIfOamCfmMhfMdIdx, ethIfOamCfmMhfMipIdx,
+            ethIfOamCfmMhfIdx }
+    ::= { ethIfOamCfmMhfTable 1 }
+
+EthIfOamCfmMhfEntry ::= SEQUENCE {
+    ethIfOamCfmMhfMdIdx                 Unsigned32,
+    ethIfOamCfmMhfMipIdx                Unsigned32,
+    ethIfOamCfmMhfIdx                   Unsigned32,
+    ethIfOamCfmMhfActive                TruthValue,
+    ethIfOamCfmMhfOutputPortIfIndex     InterfaceIndexOrZero,
+    ethIfOamCfmMhfPrimaryVid            Unsigned32,
+    ethIfOamCfmMhfMappingProfile        Unsigned32,
+    ethIfOamCfmMhfCosMapping            Unsigned32,
+    ethIfOamCfmMhfCosMappingProfile     Unsigned32,
+    ethIfOamCfmMhfQBlock                OBJECT IDENTIFIER,
+    ethIfOamCfmMhfFixedQueueMapping     Unsigned32,
+    ethIfOamCfmMhfQueueMappingProfile   Unsigned32 
+ }
+
+ethIfOamCfmMhfMdIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The index to the Maintenance Domain (MD).
+            See description of the dot1agCfmMdIndex in the
+            IEEE8021-CFM-MIB."
+    ::= { ethIfOamCfmMhfEntry 1 }
+
+ethIfOamCfmMhfMipIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The index to the Maintenance Entity Group Intermediate
+            Point (MIP)"
+    ::= { ethIfOamCfmMhfEntry 2 }
+
+ethIfOamCfmMhfIdx OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The index to the MIP Half Function (MHF)."
+    ::= { ethIfOamCfmMhfEntry 3 }
+
+ethIfOamCfmMhfActive OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "A Boolean indicating the administrative state of the MHF.
+                True indicates that the MHF is to function normally, and
+                false that it is to cease functioning."
+    ::= { ethIfOamCfmMhfEntry 4 }
+
+ethIfOamCfmMhfOutputPortIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This object is the interface index of the output interface
+            of the MHF. If no such interface exists, then the variable
+            is set to 0."
+    ::= { ethIfOamCfmMhfEntry 5 }
+
+ethIfOamCfmMhfPrimaryVid OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This object indicates the Primary VID of the MHF.
+            The value 0 defines using of ethIfOamCfmMhfMappingProfile
+            OBJECT belonging to this table (see below)."
+    ::= { ethIfOamCfmMhfEntry 6 }
+
+ethIfOamCfmMhfMappingProfile OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines the Mapping (Classification) profile
+            (flowMappingProfileTable) assigned to this MHF."
+    ::= { ethIfOamCfmMhfEntry 7 }
+
+ethIfOamCfmMhfCosMapping OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines MHF CoS mapping.
+            The value 0..7 indicates fixed CoS selection.
+            The value 255 defines use of ethIfOamCfmMhfCosMappingProfile
+            OBJECT belonging to this table (see below)."
+    ::= { ethIfOamCfmMhfEntry 8 }
+
+ethIfOamCfmMhfCosMappingProfile  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "The attribute contains cosInternalProfileIndex that defines
+            CoS mapping profile assigned to this MHF, see
+            cosInternalProfileTable."
+    ::= { ethIfOamCfmMhfEntry 9 }
+
+ethIfOamCfmMhfQBlock   OBJECT-TYPE
+    SYNTAX       OBJECT IDENTIFIER
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+            "This attribute defines the QBlock assigned to this MHF."
+    ::= { ethIfOamCfmMhfEntry 10 }
+
+ethIfOamCfmMhfFixedQueueMapping OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines the queue (cosProfileTable) that is
+            assigned to the MHF.
+            The value 255 defines using of
+            ethIfOamCfmMhfQueueMappingProfile OBJECT belonging to this
+            table (see below)."
+    ::= { ethIfOamCfmMhfEntry 11 }
+
+ethIfOamCfmMhfQueueMappingProfile OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+            "This attribute defines the queueMapping Profile
+            (CosProfileTable) assigned to this MHF."
+    ::= { ethIfOamCfmMhfEntry 12 }
+
+
+--*******************************************
+-- MIP per port and VLAN Configuration Table
+--*******************************************
+
+ethOamMip    OBJECT IDENTIFIER ::= { ethIfOamCfm 13 }
+
+ethOamMipTable OBJECT-TYPE
+   SYNTAX     SEQUENCE OF  EthOamMipEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+            "The Maintenance Entity Group Intermediate Point (MIP) table.
+            MIP entities are defined per port and VLAN.
+            This table holds all the MIPs that were created."
+  ::= { ethOamMip 1 }
+
+ethOamMipEntry OBJECT-TYPE
+   SYNTAX      EthOamMipEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+            "The MIP (per port and VLAN) table entry."
+   INDEX        { ethOamMipIfIndex, ethOamMipVlanId }
+   ::= { ethOamMipTable 1 }
+
+EthOamMipEntry ::= SEQUENCE {
+    ethOamMipIfIndex Unsigned32,
+    ethOamMipVlanId  Unsigned32,
+    ethOamMipMdLevel Unsigned32 
+ }
+
+ethOamMipIfIndex  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The port index associated with this MIP port."
+    ::= { ethOamMipEntry 1 }
+
+ethOamMipVlanId  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The VLAN-ID with which the MIP is associated on the
+            interface."
+    ::= { ethOamMipEntry 2 }
+
+ethOamMipMdLevel  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "The MD level of the MIP."
+    ::= { ethOamMipEntry 3 }
+
+
+agnAutoMipAssign OBJECT-TYPE
+    SYNTAX INTEGER {
+        auto (1),
+        manual (2)
+        }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "Specifies the mode of creation of OAM MIP entity:
+        auto(1) -   If the MIP Policy (dot1agCfmMdMhfCreation) has a value
+                    that is different than None and if the conditions
+                    enable creating the MIP according to 802.1ag definitions,
+                    the MIP will be created automatically without human intervention.
+                    In this case the value of agnFunctionAttributes Bit 32 will be set to 0.
+        manual(2)-  the MIP will be created manually by user
+                    configuration. This is the default value and
+                    the value of agnFunctionAttributes Bit 32
+                    (MIP and MHF manual configuration)
+                    will be set to 1.
+    "
+    DEFVAL { manual }
+    ::= { ethOamMip 2 }
+
+ethIfOamCfmSumMipMep OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+            "This object is used as an index in rowInfoTable to calculate the number
+             of MEP and MIP entities.
+             This OID object is referenced in rowInfoTableId."
+    ::= { ethIfOamCfm 14 }
+
+
+ethOamMepFlowsTable OBJECT-TYPE
+   SYNTAX     SEQUENCE OF  EthOamMepFlowsEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+            "Multiple flows association to MEP."
+  ::= { ethIfOamCfm 16 }
+
+ethOamMepFlowsEntry OBJECT-TYPE
+   SYNTAX      EthOamMepFlowsEntry
+   MAX-ACCESS not-accessible
+   STATUS     current
+   DESCRIPTION
+            "Entry in this table represents flow association to MEP."
+       INDEX    {dot1agCfmMdIndex,
+                dot1agCfmMaIndex,
+                dot1agCfmMepIdentifier,
+                ethOamMepFlowType,
+                ethOamMepFlowIndex1,
+                ethOamMepFlowIndex2
+                }
+    ::= { ethOamMepFlowsTable 1 }
+
+EthOamMepFlowsEntry ::= SEQUENCE {
+    ethOamMepFlowType          INTEGER,
+    ethOamMepFlowIndex1        Unsigned32,
+    ethOamMepFlowIndex2        Unsigned32,
+    ethOamMepFlowsRowStatus    RowStatus 
+ }
+
+ethOamMepFlowType      OBJECT-TYPE
+    SYNTAX              INTEGER
+    {
+    uniDirectionalRx (1),
+    uniDirectionalTx (2),
+    biDirectional    (3)
+    }
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+    "Flow direction:
+    uniDirectionalRx - flow toward the UNI (LAN)),
+    uniDirectionalTx - flow toward the NNI (WAN)),
+    bidirectional - two flows with same index,
+                    having same properties,  in opposite  directions."
+    ::= { ethOamMepFlowsEntry  1 }
+
+ethOamMepFlowIndex1      OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+    "Flow 1st index,  equals to MEF-R flowTable flowIdx1"
+    ::= { ethOamMepFlowsEntry  2 }
+
+ethOamMepFlowIndex2      OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+    "Flow 2nd index, equals to MEF-R flowTable flowIdx2"
+    ::= { ethOamMepFlowsEntry  3 }
+
+ethOamMepFlowsRowStatus  OBJECT-TYPE
+      SYNTAX            RowStatus
+      MAX-ACCESS        read-create
+      STATUS            current
+      DESCRIPTION
+      "This attribute allows to create/delete a row in this table."
+      ::= {ethOamMepFlowsEntry 4 }
+
+-- ******************************************************************
+-- The OAM Per Device Table
+-- ******************************************************************
+ethOamConfigTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF EthOamConfigEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "The purpose of this table is to enable the configuration
+            of all per-Device OAM parameters. A single row is automatically
+            created, and cannot be deleted."
+       ::= { ethIfOamCfm 17 }
+
+ethOamConfigEntry OBJECT-TYPE
+    SYNTAX  EthOamConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in this table includes parameters to be configured
+         Per Device."
+    INDEX  { ethOamConfigIdx }
+    ::= { ethOamConfigTable 1 }
+
+EthOamConfigEntry ::= SEQUENCE {
+    ethOamConfigIdx                               Unsigned32,
+    ethOamConfigAlarmType                         INTEGER,
+    ethOamConfigAvailabilityDeltaT                Unsigned32,
+    ethOamConfigAvailabilityNumDeltaTs            Unsigned32,
+    ethOamConfigAvailabilityFwdFlrThreshold       Unsigned32,
+    ethOamConfigAvailabilityBckFlrThreshold       Unsigned32,
+    ethOamConfigMdLevelMips                       BITS 
+ }
+
+ethOamConfigIdx OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This index is equal to 1."
+    ::= { ethOamConfigEntry 1 }
+
+ethOamConfigAlarmType OBJECT-TYPE
+    SYNTAX  INTEGER
+    {
+        legacy (1),
+        soam   (2)
+        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates alarm legacy report configuration.
+        Legacy (1): Alarm name as defined in RAD OamCfm-MIB.
+        SOAM (2): Alarm name as defined in IEEE 802.1ag table 20-1."
+        DEFVAL { legacy }
+    ::= { ethOamConfigEntry 2 }
+
+
+ethOamConfigAvailabilityDeltaT   OBJECT-TYPE
+    SYNTAX      Unsigned32 ( 1 | 2 | 3 | 4 | 5 | 6 | 10 | 12 | 15 | 20 )
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the length of the small time interval for
+        frame loss ratio calculation."
+        DEFVAL { 1 }
+    ::= { ethOamConfigEntry 3 }
+
+ethOamConfigAvailabilityNumDeltaTs   OBJECT-TYPE
+    SYNTAX      Unsigned32(1..100)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the number of consecutive small
+        time intervals used to determine a change in the availability
+        status as indicated by MEF 10.2.1. This parameter is equivalent
+        to the Availability parameter of 'n' as specified by MEF 10.2.1."
+        DEFVAL { 10 }
+    ::= { ethOamConfigEntry 4 }
+
+ethOamConfigAvailabilityFwdFlrThreshold   OBJECT-TYPE
+    SYNTAX      Unsigned32(0..100)
+    UNITS       "percents"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Forward FLR threshold, in percentage,
+        to be used in evaluating the availability/unavailability status
+        of an availability indicator per MEF 10.2.1. This parameter is
+        equivalent to the Availability parameter of 'C' as specified in
+        MEF 10.2.1."
+        DEFVAL { 50 }
+    ::= { ethOamConfigEntry 5 }
+
+ethOamConfigAvailabilityBckFlrThreshold   OBJECT-TYPE
+    SYNTAX      Unsigned32(0..100)
+    UNITS       "percents"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Backward FLR threshold, in percentage,
+        to be used in evaluating the availability/unavailability status
+        of an availability indicator per MEF 10.2.1. This parameter is
+        equivalent to the Availability parameter of 'C' as specified in
+        MEF 10.2.1."
+        DEFVAL { 50 }
+    ::= { ethOamConfigEntry 6 }
+
+ ethOamConfigMdLevelMips   OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    mdlLevel0          (0),
+    mdlLevel1          (1),
+    mdlLevel2          (2),
+    mdlLevel3          (3),
+    mdlLevel4          (4),
+    mdlLevel5          (5),
+    mdlLevel6          (6),
+    mdlLevel7          (7)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The global MIP/s that are configured for device services.
+    When configured, a MIP shall be automatically defined at the
+    specified MD level/s for all the services (EVCs) in the device."
+    DEFVAL { {} }  -- Default: No bit is selected
+    ::= { ethOamConfigEntry 7 }
+    
+    
+END
+

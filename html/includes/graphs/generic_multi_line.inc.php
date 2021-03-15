@@ -78,7 +78,7 @@ if ($legend != 'no')
 $colour_iter = 0;
 $i = 0;
 
-foreach ($rrd_list AS $rrd)
+foreach ($rrd_list as $rrd)
 {
 
   $i++;
@@ -93,7 +93,7 @@ foreach ($rrd_list AS $rrd)
   }
 
   $ds = $rrd['ds'];
-  $filename = $rrd['filename'];
+  $filename = rrdtool_escape($rrd['filename']);
 
   $descr = rrdtool_escape($rrd['descr'], $descr_len);
 

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -71,8 +70,6 @@ if (count($cache_discovery['netapp-mib']))
     {
       // Add server info on cluster devices
       $descr .= ' - ' . $storage['dfVserver'];
-      // CLEANME, remove in r7500, but not before CE 0.16.1
-      rename_rrd($device, 'storage-netapp-mib-' . $storage['dfFileSys'] . '.rrd', 'storage-netapp-mib-' . $descr . '.rrd');
     }
     $deny   = FALSE;
 

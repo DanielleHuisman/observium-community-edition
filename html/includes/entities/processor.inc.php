@@ -6,14 +6,13 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 function generate_processor_query($vars)
 {
   $sql  = "SELECT * FROM `processors`";
-  //$sql .= " LEFT JOIN `processors-state` USING(`processor_id`)";
   if(!isset($vars['sort']) || $vars['sort'] == 'hostname' || $vars['sort'] == 'device' || $vars['sort'] == 'device_id')
   {
     $sql .= ' LEFT JOIN `devices` USING(`device_id`)';
@@ -160,7 +159,7 @@ function generate_processor_row($processor, $vars)
 
   // FIXME should that really be done here? :-)
   // FIXME - not it shouldn't. we need some per-os rewriting on discovery-time.
-  $text_descr = rewrite_entity_name($proc['processor_descr']);
+  $text_descr = rewrite_entity_name($processor['processor_descr'], 'processor');
   //$text_descr = $processor['processor_descr'];
   //$text_descr = str_replace("Routing Processor", "RP", $text_descr);
   //$text_descr = str_replace("Switching Processor", "SP", $text_descr);
@@ -193,7 +192,7 @@ function generate_processor_row($processor, $vars)
 
   $processor['html_row_class'] = $background['class'];
 
-  $row .= '<tr class="' . $processor['html_row_class'] . '">
+  $row = '<tr class="' . $processor['html_row_class'] . '">
           <td class="state-marker"></td>';
 
   if ($vars['page'] != "device" && $vars['popup'] != TRUE) { $row .= '<td class="entity">' . generate_device_link($processor) . '</td>'; }

@@ -13,16 +13,16 @@
 
 $scale_min = "0";
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "cras_sessions.rrd");
 
-$rrd_options .= " DEF:email=$rrd_filename:email:AVERAGE";
-$rrd_options .= " DEF:ipsec=$rrd_filename:ipsec:AVERAGE";
-$rrd_options .= " DEF:l2l=$rrd_filename:l2l:AVERAGE";
-$rrd_options .= " DEF:lb=$rrd_filename:lb:AVERAGE";
-$rrd_options .= " DEF:svc=$rrd_filename:svc:AVERAGE";
-$rrd_options .= " DEF:webvpn=$rrd_filename:webvpn:AVERAGE";
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
+
+$rrd_options .= " DEF:email=$rrd_filename_escape:email:AVERAGE";
+$rrd_options .= " DEF:ipsec=$rrd_filename_escape:ipsec:AVERAGE";
+$rrd_options .= " DEF:l2l=$rrd_filename_escape:l2l:AVERAGE";
+$rrd_options .= " DEF:lb=$rrd_filename_escape:lb:AVERAGE";
+$rrd_options .= " DEF:svc=$rrd_filename_escape:svc:AVERAGE";
+$rrd_options .= " DEF:webvpn=$rrd_filename_escape:webvpn:AVERAGE";
 //$rrd_options .= " CDEF:webvpn_only=webvpn,svc,-";
 
 $rrd_options .= " COMMENT:'Sessions         Current    Average   Maximum\\n'";

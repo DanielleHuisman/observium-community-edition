@@ -846,7 +846,7 @@ class Net_IPv6
                 return array("", $ip);
             }
 
-            $ip{$pos} = '_';
+            $ip[$pos] = '_';
             $ipPart   = explode('_', $ip);
 
             return $ipPart;

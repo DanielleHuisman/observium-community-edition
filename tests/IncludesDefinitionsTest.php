@@ -37,13 +37,13 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
     global $config;
 
     $array = [];
-    foreach (['os_group', 'os'] as $type)
+    foreach ([ 'os_group', 'os', 'mibs'] as $type)
     {
       foreach ($config[$type] as $name => $entry)
       {
         foreach ($entry as $param => $def)
         {
-          if (in_array($param, ['sysDescr', 'sysDescr_regex', 'port_label', 'syslog_msg', 'syslog_program', 'comments']))
+          if (in_array($param, [ 'sysDescr', 'sysDescr_regex', 'port_label', 'syslog_msg', 'syslog_program', 'comments' ]))
           {
             // simple definitions with regex patterns
             foreach ($def as $pattern)
@@ -51,14 +51,14 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
               $array[] = [$type, $name, $param, $pattern];
             }
           }
-          elseif ($param == 'discovery')
+          elseif ($param === 'discovery')
           {
             // discovery definition, additional array level
             foreach ($def as $disovery)
             {
               foreach ($disovery as $discovery_param => $pattern)
               {
-                if ($discovery_param == 'sysObjectID') { continue; } // All except sysObjectID is regexp
+                if (in_array($discovery_param, [ 'sysObjectID', 'os', 'os_group', 'type', 'vendor' ])) { continue; } // All except sysObjectID is regexp
                 $array[] = [$type, $name, $param.'->'.$discovery_param, $pattern];
               }
             }
@@ -110,6 +110,7 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
     $array[] = array($pattern, '64 bytes from 192.168.10.110: icmp_seq=0 ttl=122 time=10.643 ms', TRUE, '192.168.10.110');
     $array[] = array($pattern, 'Invalid user test from 213.149.105.28',     TRUE, '213.149.105.28');
     $array[] = array($pattern, 'Invalid user test from 213.149.105.28 hs',  TRUE, '213.149.105.28');
+    $array[] = array($pattern, 'Invalid user test from 213.149.105.28. Next.', TRUE, '213.149.105.28');
     $array[] = array($pattern, 'Invalid user test from 213.149.105.28sss',  FALSE);
 
     $pattern = OBS_PATTERN_IPV4_NET_FULL;
@@ -232,6 +233,7 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
     $array[] = array($pattern, '(0026.22eb.3bef, qu-qu)',  TRUE, '0026.22eb.3bef');
     $array[] = array($pattern, 'wevent.ubnt_custom_event(): EVENT_STA_IP ath3: 9c:4f:da:73:5c:cc / 10.10.35.16',     TRUE, '9c:4f:da:73:5c:cc');
     $array[] = array($pattern, 'ath0: STA 44:d9:e7:f7:18:f2 DRIVER: Sead AUTH addr=9c:4f:da:73:5c:cc status_code=0', TRUE, '44:d9:e7:f7:18:f2');
+    $array[] = array($pattern, 'ath0: STA 44:d9:e7:f7:18:f2. DRIVER: Sead AUTH addr=9c:4f:da:73:5c:cc status_code=0', TRUE, '44:d9:e7:f7:18:f2');
     $array[] = array($pattern, 'wevent.ubnt_custom_event(): EVENT_STA_IP ath3: 9c:4f:da:73:5c:cccc',  FALSE);
     $array[] = array($pattern, 'Host 0016.3e2e.2b98 in vlan 400 is flapping between port Gi1/0/25 and port Te1/0/1', TRUE, '0016.3e2e.2b98');
 
@@ -271,7 +273,7 @@ class IncludesDefinitionsTest extends \PHPUnit\Framework\TestCase
     $array[] = array($pattern, '(my.host-name.test, help)',   TRUE, 'my.host-name.test');
     $array[] = array($pattern, 'Invalid user test from my.host-name.test',     TRUE, 'my.host-name.test');
     $array[] = array($pattern, 'Invalid user test from my.host-name.test hs',  TRUE, 'my.host-name.test');
-    $array[] = array($pattern, 'Invalid user test from my.host-name.test.',    FALSE);
+    $array[] = array($pattern, 'Invalid user test from my.host-name.test.',    TRUE, 'my.host-name.test');
 
     $pattern = OBS_PATTERN_EMAIL_FULL;
     // Email valid

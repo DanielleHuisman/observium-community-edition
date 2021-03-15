@@ -1,17 +1,16 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-if (is_integer($i/2)) { $bg_colour = $list_colour_a; } else { $bg_colour = $list_colour_b; }
+if (is_integer($i/2)) { $bg_colour = OBS_COLOUR_LIST_A; } else { $bg_colour = OBS_COLOUR_LIST_B; }
 
 echo("<tr bgcolor='$bg_colour'>");
 
@@ -37,7 +36,7 @@ foreach (dbFetchRows("SELECT * FROM ports WHERE `device_id` = ? AND `ifVrf` = ?"
     <div style='font-size: 9px;'>".short_port_descr($port['ifAlias'])."</div>
    </div>");
   } else {
-    echo($vrf['port_sep'] . generate_port_link($port, short_ifname($port['ifDescr'])));
+    echo($vrf['port_sep'] . generate_port_link_short($port));
     $vrf['port_sep'] = ", ";
   }
 }

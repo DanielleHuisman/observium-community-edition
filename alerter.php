@@ -1,6 +1,5 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
@@ -9,7 +8,7 @@
  * @package    observium
  * @subpackage poller
  * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -43,7 +42,11 @@ if (!isset($options['q']))
   print_cli_banner();
 }
 
-if ($options['h'] == "all")  { $where = " "; $doing = "all"; }
+if ($options['h'] === "all")
+{
+  $where = " ";
+  $doing = "all";
+}
 elseif ($options['h'])
 {
   $params = array();

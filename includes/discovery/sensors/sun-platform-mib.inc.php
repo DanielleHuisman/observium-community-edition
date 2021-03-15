@@ -162,7 +162,7 @@ foreach ($oids as $index => $entry)
   //    upperThresholdFatal(5)
   // }
   $options      = array();
-  $limits_flags = base_convert($entry['sunPlatNumericSensorEnabledThresholds'], 16, 10);
+  $limits_flags = base_convert(str_replace(' ', '', $entry['sunPlatNumericSensorEnabledThresholds']), 16, 10);
   if (is_flag_set(bindec(10), $limits_flags))
   {
     $options['limit_low_warn']  = $entry['sunPlatNumericSensorLowerThresholdCritical'];

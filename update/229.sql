@@ -1,4 +1,4 @@
---IGNORE_ERROR
+-- IGNORE_ERROR
 ALTER TABLE  `alert_table-state` ENGINE = INNODB;
 -- ignore error with duplicate table 'last_ok'
 ALTER TABLE  `alert_table-state` ADD  `last_ok` INT NULL AFTER  `last_recovered` ;

@@ -18,14 +18,8 @@ $where .= generate_query_values($neighbours_ports, 'port_id');
 //r($where);
 
 $form_items = array();
-foreach (dbFetchColumn('SELECT DISTINCT `device_id` FROM `ports`' . $where) as $device_id)
-{
-  if ($cache['devices']['id'][$device_id]['hostname'])
-  {
-    $form_items['devices'][$device_id] = $cache['devices']['id'][$device_id]['hostname'];
-  }
-}
-natcasesort($form_items['devices']);
+
+$form_items['devices'] = generate_form_values('device', dbFetchColumn('SELECT DISTINCT `device_id` FROM `neighbours`'));
 
 // If device IDs passed, limit ports to specified devices
 if ($vars['device'])
@@ -60,6 +54,7 @@ $form['row'][0]['device']   = array(
                                 'name'        => 'Device',
                                 'width'       => '100%',
                                 'value'       => $vars['device'],
+                                'groups'      => array('', 'UP', 'DOWN', 'DISABLED'), // This is optgroup order for values (if required)
                                 'values'      => $form_items['devices']);
 $form['row'][0]['protocol']  = array(
                                 'type'        => 'multiselect',

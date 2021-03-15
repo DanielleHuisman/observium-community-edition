@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -60,9 +59,12 @@
  *                    'hr'   => FALSE);                   // (optional) show or not horizontal line
  *  print_search($search, 'Title here', 'search', url);
  *
- * @param array $data, string $title
- * @return none
+ * @param array       $data
+ * @param string|null $title
+ * @param string      $button
+ * @param string|null $url
  *
+ * @return void
  */
 function print_search($data, $title = NULL, $button = 'search', $url = NULL)
 {
@@ -211,6 +213,13 @@ function print_form($data, $return = FALSE)
 {
   // Just return if safety requirements are not fulfilled
   if (isset($data['userlevel']) && $data['userlevel'] > $_SESSION['userlevel']) { return; }
+
+  // Return if the user doesn't have write permissions to the relevant entity
+  if (isset($data['entity_write_permit']) &&
+      !is_entity_write_permitted($data['entity_write_permit']['entity_id'], $data['entity_write_permit']['entity_type']))
+  {
+    return;
+  }
 
   /*
   // Use modal with form
@@ -370,7 +379,7 @@ function print_form($data, $return = FALSE)
   } // end rows type
   else if ($data['type'] == 'horizontal')
   {
-    // Horizontal form, see example in html/pages/edituser.inc.php
+    // Horizontal form, see example in html/pages/user_edit.inc.php
     if (strpos($base_class, 'widget') !== FALSE || strpos($base_class, 'box') !== FALSE)
     {
       $base_space = ($data['space'] ? $data['space'] : '10px');
@@ -458,14 +467,22 @@ function print_form($data, $return = FALSE)
             }
             if ($i < 1)
             {
-              // Add laber for first element in row
+              // Add label for first element in row
               if ($element['name'])
               {
                 $row_label = '    <label';
-                if ($element['offset'])
+
+                $class_label = $element['offset'] ? 'control-label' : '';
+                if (str_contains($element['class'], 'text-nowrap'))
                 {
-                  $row_label .= ' class="control-label"';
+                  // Append nowrap to label element if requested
+                  $class_label .= ' text-nowrap';
                 }
+                if ($class_label)
+                {
+                  $row_label .= ' class="'.$class_label.'"';
+                }
+
                 $row_label .= ' for="'.$element['id'].'">'.$element['name'].'</label>' . PHP_EOL;
               }
               $row_control_id = $element['id'] . '_div';
@@ -569,7 +586,7 @@ function print_form($data, $return = FALSE)
     // Final combining elements
     $string_elements = implode('', $fieldset);
   } else {
-    // Simple form, without any divs, see example in html/pages/edituser.inc.php
+    // Simple form, without any divs, see example in html/pages/user_edit.inc.php
     $div_begin  = '';
     $div_end    = '';
     $string_elements = '';
@@ -1031,13 +1048,8 @@ function generate_form_element($item, $type = '')
   if (isset($item['attribs']) && is_array($item['attribs']))
   {
     // Custom html attributes
-    foreach ($item['attribs'] as $attr => $value)
-    {
-      if (preg_match('/^(data\-.+|aria\-.+|role)$/', $attr)) // Filter attributes (data-*, aria-*, role)
-      {
-        $element_data .= ' ' . escape_html($attr) . '="' . escape_html($value) . '"';
-      }
-    }
+    $element_data .= ' ' . generate_html_attribs($item['attribs']);
+
     if (isset($item['attribs']['data-toggle']))
     {
       // Enable item specific JS/CSS/Script
@@ -1056,7 +1068,7 @@ function generate_form_element($item, $type = '')
         //  register_html_resource('script', '$("[data-toggle=\'' . $item['attribs']['data-toggle'] . '\']").bootstrapSwitch();');
         //  break;
         case 'toggle':
-          if (str_contains($item['class'], 'tiny-toggle'))
+          if (str_exists($item['class'], 'tiny-toggle'))
           {
             // TinyToggle
             $script = '';
@@ -1138,14 +1150,21 @@ function generate_form_element($item, $type = '')
           // Autofill off is not simple!
           //https://developer.mozilla.org/en-US/docs/Web/Security/Securing_your_site/Turning_off_form_autocompletion#The_autocomplete_attribute_and_login_fields
           //https://www.chromium.org/developers/design-documents/form-styles-that-chromium-understands
-          if ($item['type'] == 'password') {
+          //https://stackoverflow.com/questions/41945535/html-disable-password-manager
+          if ($item['type'] === 'password')
+          {
             $autocomplete_value = 'new-password';
+            $item_begin = '<input type="password" id="disable-pwd-mgr-1" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-1" />' .
+                          '<input type="password" id="disable-pwd-mgr-2" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-2" />' .
+                          '<input type="password" id="disable-pwd-mgr-3" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-3" />' .
+                          $item_begin;
           } else {
             $autocomplete_value = 'off';
           }
           $item_begin .= ' autocomplete="'.$autocomplete_value.'" ';
 
-          if ($browser['browser'] == 'Safari') {
+          if ($browser['browser'] === 'Safari')
+          {
             // Safari issue: https://stackoverflow.com/questions/22661977/disabling-safari-autofill-on-usernames-and-passwords
             //$item_begin .= ' autocomplete="off" readonly onfocus="if (this.hasAttribute(\'readonly\')) {this.removeAttribute(\'readonly\'); this.blur(); this.focus();}" ';
             //$item_begin .= ' autocomplete="false" ';
@@ -1162,7 +1181,7 @@ STYLE
             );
           }
           /*
-          else if ($browser['browser'] == 'Chrome') {
+          elseif ($browser['browser'] == 'Chrome') {
             // Chrome issue: http://stackoverflow.com/questions/15738259/disabling-chrome-autofill
             //$item_begin .= ' autocomplete="new-password" ';
             $item_begin .= ' autocomplete="off" ';
@@ -1313,11 +1332,12 @@ SCRIPT;
 
     case 'switch-ng':
     case 'switch-new':
+      //r($item);
       // toggle specific options
       // Convert to data attribs and recursive call to checkbox
       $item['attribs']['data-toggle'] = 'toggle';
       // Convert to data attribs and recursive call to checkbox
-      $item_attribs = ['size', 'width', 'height'];
+      $item_attribs = [ 'size', 'width', 'height' ];
       foreach($item_attribs as $attr)
       {
         if (isset($item[$attr])) { $item['attribs']['data-'.$attr] = $item[$attr]; }
@@ -1347,7 +1367,7 @@ SCRIPT;
         }
       }
       // This is compat with old 'switch' item attribs
-      $item_attribs = ['on-color' => 'onstyle', 'on-text' => 'on', 'off-color' => 'offstyle', 'off-text' => 'off', 'class' => 'style'];
+      $item_attribs = [ 'on-color' => 'onstyle', 'on-text' => 'on', 'off-color' => 'offstyle', 'off-text' => 'off', 'class' => 'style' ];
       foreach($item_attribs as $attr => $data_attr)
       {
         if (isset($item[$attr])) { $item['attribs']['data-'.$data_attr] = $item[$attr]; }
@@ -1361,6 +1381,7 @@ SCRIPT;
 
       //$item['class'] .= ' tiny-toggle'; // additional class for toggle
       $item['type'] = 'checkbox';       // replace item type
+      //r(generate_form_element($item));
       return generate_form_element($item);
     // end toggle
 
@@ -1424,11 +1445,11 @@ SCRIPT;
       {
         $string .= ' disabled="1"';
       }
-      else if ($item['readonly'])
+      elseif ($item['readonly'])
       {
         $string .= ' readonly="1" onclick="return false"';
       }
-      else if ($item['onchange'])
+      elseif ($item['onchange'])
       {
         $string .= ' onchange="'.$item['onchange'].'"';
       }
@@ -1497,7 +1518,7 @@ SCRIPT;
       // Date/Time input fields
       if ($item['from'] !== FALSE)
       {
-        $string .= '  <div id="'.$id_from.'_div" class="input-prepend" style="margin-bottom: 0;">' . PHP_EOL;
+        $string .= '  <div id="'.$id_from.'_div" class="input-prepend" style="margin-bottom: 5px;">' . PHP_EOL;
         $string .= '    <span class="add-on btn"><i data-time-icon="icon-time" data-date-icon="icon-calendar"></i> '.$name_from.'</span>' . PHP_EOL;
         //$string .= '    <input type="text" class="input-medium" data-format="yyyy-MM-dd hh:mm:ss" ';
         $string .= '    <input type="text" data-format="yyyy-MM-dd hh:mm:ss" ';
@@ -1506,7 +1527,7 @@ SCRIPT;
         {
           $string .= 'disabled="1" ';
         }
-        else if ($item['readonly'])
+        elseif ($item['readonly'])
         {
           $item['disabled'] = TRUE; // for js
           $string .= 'readonly="1" ';
@@ -1516,7 +1537,7 @@ SCRIPT;
       }
       if ($item['to'] !== FALSE)
       {
-        $string .= '  <div id="'.$id_to.'_div" class="input-prepend" style="margin-bottom: 0;">' . PHP_EOL;
+        $string .= '  <div id="'.$id_to.'_div" class="input-prepend" style="margin-bottom: 5px;">' . PHP_EOL;
         $string .= '    <span class="add-on btn"><i data-time-icon="icon-time" data-date-icon="icon-calendar"></i> To</span>' . PHP_EOL;
         //$string .= '    <input type="text" class="input-medium" data-format="yyyy-MM-dd hh:mm:ss" ';
         $string .= '    <input type="text" data-format="yyyy-MM-dd hh:mm:ss"';
@@ -1735,7 +1756,7 @@ SCRIPT;
         $item['values'] = array(0 => '[there is no data]');
         $item['subtext'] = FALSE;
       }
-      if ($item['type'] == 'multiselect')
+      if ($item['type'] === 'multiselect')
       {
         $string .= '    <select multiple name="'.$item['id'].'[]" ';
         // Enable Select/Deselect all (if select values count more than 4)
@@ -1763,7 +1784,7 @@ SCRIPT;
       {
         $string .= ' disabled="1"';
       }
-      else if ($item['readonly'])
+      elseif ($item['readonly'])
       {
         $string .= ' disabled="1" readonly="1"'; // Bootstrap select not support readonly attribute, currently use disable
       }
@@ -1817,7 +1838,7 @@ SCRIPT;
             $entry['selected'] = TRUE;
           }
         }
-        else if ($entry['name'] == '[there is no data]')
+        elseif ($entry['name'] == '[there is no data]')
         {
           $entry['disabled'] = TRUE;
         }
@@ -1846,11 +1867,11 @@ SCRIPT;
           {
             $optgroup[$group] .= ' class="' . escape_html($entry['class']) . '"';
           }
-          else if (isset($entry['style']) && $entry['style'])
+          elseif (isset($entry['style']) && $entry['style'])
           {
             $optgroup[$group] .= ' style="' . $entry['style'] . '"';
           }
-          else if (isset($entry['color']) && $entry['color'])
+          elseif (isset($entry['color']) && $entry['color'])
           {
             $optgroup[$group] .= ' style="color:' . $entry['color'] . ' !important;"';
             //$optgroup[$group] .= ' data-content="<span style=\'color: ' . $entry['color'] . '\'>' . $entry['name'] . '</span>"';
@@ -2193,6 +2214,13 @@ function generate_form_modal($form)
 {
   // Just return if safety requirements are not fulfilled
   if (isset($form['userlevel']) && $form['userlevel'] > $_SESSION['userlevel']) { return; }
+
+  // Return if the user doesn't have write permissions to the relevant entity
+  if (isset($form['entity_write_permit']) &&
+      !is_entity_write_permitted($form['entity_write_permit']['entity_id'], $form['entity_write_permit']['entity_type']))
+  {
+    return;
+  }
 
   // Time our form filling.
   $form_start = microtime(TRUE);

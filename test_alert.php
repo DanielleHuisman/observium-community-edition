@@ -60,7 +60,7 @@ if ($options['a'] || $options['c'])
     // Generate alerts and insert them into the queue
     $ids = alert_notifier($entry);
   }
-  else if ($options['c'])
+  elseif ($options['c'])
   {
     // Test by contact id
     $ids   = array();
@@ -96,15 +96,6 @@ if ($options['a'] || $options['c'])
 
   // Sent alert notifications which were just inserted into the queue
   process_notifications(array('notification_id' => $ids));
-
-}
-else if ($options['c'])
-{
-  if ($config['alerts']['disable']['all'])
-  {
-    print_warning("All alert notifications disabled in config \$config['alerts']['disable']['all'], ignore it for testing!");
-    $config['alerts']['disable']['all'] = FALSE;
-  }
 
 } else {
 

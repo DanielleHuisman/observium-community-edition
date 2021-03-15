@@ -14,7 +14,7 @@
 register_html_resource('css', 'simplemde.min.css');
 register_html_resource('js', 'simplemde.min.js');
 
-if($_SESSION['userlevel'] >= 7 && isset($vars['notes_text']))
+if(($_SESSION['userlevel'] >= 7 || is_entity_write_permitted($device['device_id'], 'device')) && isset($vars['notes_text']))
 {
   set_entity_attrib('device', $device['device_id'], 'notes', $vars['notes_text'], $device['device_id']);
   unset($vars['notes_text']);
@@ -46,7 +46,7 @@ var simplemde = new SimpleMDE();
   echo $Parsedown->text($notes);
   echo generate_box_close();
 
-  if ($_SESSION['userlevel'] >= 7)
+  if (($_SESSION['userlevel'] >= 7 || is_entity_write_permitted($device['device_id'], 'device')) )
   {
     echo '<a href="'.generate_url($vars, array('edit' => TRUE)).'" id="edit" name="edit" type="submit" class="btn btn-primary text-nowrap pull-right" value="edit"><i class="icon-ok icon-white" style="margin-right: 0px;"></i>&nbsp;&nbsp;Edit Notes</a>';
   }

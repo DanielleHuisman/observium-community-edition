@@ -1,18 +1,22 @@
 ELTEX-MES-BRIDGE-EXT-MIB DEFINITIONS ::= BEGIN
 
 -- Title:      ELTEX MES Bridge Extension Private
--- Version:    1.0
--- Date:       17 Oct 2012
+-- Version:    1.1
+-- Date:       01 Feb 2016
 -- 21-Sep-2012 - Added eltBridgeExtMacLearningVlanTable
 -- 01-Feb-2016 - Added eltBridgeStpConfigPortTable
+-- 18-Apr-2018 - Added eltBridgeStpConfigPortTable
+-- 26-Oct-2018 - Added eltBridgePvstAuxAdminStatus into eltBridgePvstAuxStatusTable
 
 IMPORTS
     eltMesBridgeExtMIB                                      FROM ELTEX-MES-MNG-MIB
-    VlanIndex                                               FROM Q-BRIDGE-MIB
-    dot1dBasePort                                           FROM BRIDGE-MIB
-    MODULE-IDENTITY, OBJECT-TYPE                            FROM SNMPv2-SMI
+    VlanIndex, VlanId                                       FROM Q-BRIDGE-MIB
+    dot1dBasePort, BridgeId, Timeout                        FROM BRIDGE-MIB
+    MacAddress                                              FROM BRIDGE-MIB-A
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, Unsigned32     FROM SNMPv2-SMI
     TruthValue                                              FROM SNMPv2-TC
-    rldot1sMstpInstanceEntry                                FROM RADLAN-BRIDGEMIBOBJECTS-MIB;
+    rldot1sMstpInstanceEntry                                FROM RADLAN-BRIDGEMIBOBJECTS-MIB
+    Counter                                                 FROM RFC1155-SMI;
 
 
 eltMesBridgeExtMIBObjects  OBJECT IDENTIFIER
@@ -21,16 +25,19 @@ eltMesBridgeExtMIBObjects  OBJECT IDENTIFIER
 
 eltMesBridgeExtMacLearning  OBJECT IDENTIFIER
     ::= { eltMesBridgeExtMIBObjects 0 }
-
+    
 eltMesBridgeMstp  OBJECT IDENTIFIER
     ::= { eltMesBridgeExtMIBObjects 3 }
-
-eltMesdot1dTp  OBJECT IDENTIFIER
-    ::= { eltMesBridgeExtMIBObjects 4 }
-
+    
 eltMesBridgeStp OBJECT IDENTIFIER
     ::= { eltMesBridgeExtMIBObjects 5 }
-    
+
+eltMesBridgePvst OBJECT IDENTIFIER
+    ::= { eltMesBridgeExtMIBObjects 6 }
+
+eltMesdot1qTp  OBJECT IDENTIFIER
+    ::= { eltMesBridgeExtMIBObjects 7 }
+
 EltBridgeStpGroupMacAddressType ::= TEXTUAL-CONVENTION
     STATUS          current
     DESCRIPTION         "Type of STP BPDU destination MAC address"
@@ -39,7 +46,65 @@ EltBridgeStpGroupMacAddressType ::= TEXTUAL-CONVENTION
                                 dot1ad  (2)   -- Provider Bridge Group Address (01-80-C2-00-00-08)
                              } 
 
+EltBridgeStpLoopGuardConfigMode ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "STP loop guard mode."
+    SYNTAX          INTEGER  {
+                                enable  (1),  -- enable loop guard
+                                disable (2),  -- disable loop guard
+                                default (3)   -- use default setings for loop guard in device
+                             } 
 
+EltBridgeStpInconsistencyStateType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "STP inconsistency state type."
+    SYNTAX          INTEGER  {
+                                none (1),  -- no inconsistency
+                                loop (2),  -- loop inconsistency
+                                root (3)   -- root inconsistency
+                             }
+
+EltBridgePvstEnableType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "The status of PVST instance."
+    SYNTAX          INTEGER  {
+                                enabled(1),       -- PVST instance is enabled
+                                disabled(2),      -- PVST instance is disabled
+                                notApplicable(3)  -- PVST instance can't be enabled
+                             }
+
+EltBridgeStpPortStateType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "The status of port in the spanning-tree."
+    SYNTAX          INTEGER  {
+                                disabled(1),    -- port is in disabled state
+                                blocking(2),    -- port is in blocking state
+                                listening(3),   -- port is in listening state
+                                learning(4),    -- port is in learning state
+                                forwarding(5),  -- port is in forwarding state
+                                broken(6)       -- port is broken
+                             }
+
+EltBridgeStpPortRoleType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "The status of port in the spanning-tree."
+    SYNTAX          INTEGER  {
+                                unknown(1),     -- port role is unknown
+                                disabled(2),    -- port role is disabled
+                                alternate(3),   -- port role is alternate
+                                backup(4),      -- port role is backup
+                                root(5),        -- port role is root
+                                designated(6),  -- port role is designated
+                                master(7)       -- port role is master
+                             }
+
+EltBridgeStpPortConnectionType ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "The connection type of port."
+    SYNTAX          INTEGER  {
+                                p2p(1),    -- point-to-point connection type
+                                shared(2)  -- shared connection type
+                             }
 --
 -- eltBridgeExtMacLearningVlanTable
 --
@@ -81,165 +146,6 @@ eltBridgeExtMacLearningVlanEnabled OBJECT-TYPE
     ::= { eltBridgeExtMacLearningVlanEntry 2 }
 
 --
--- eltdot1sMstpPendingGroupTable
---
-
-eltdot1sMstpPendingGroupTable OBJECT-TYPE
-    SYNTAX  SEQUENCE OF Eltdot1sMstpPendingGroupEntry
-    MAX-ACCESS  not-accessible
-    STATUS  current
-    DESCRIPTION
-        "A table that contains information about the alocation of vlans to groups."
-    ::= { eltMesBridgeMstp 3 }
-
-eltdot1sMstpPendingGroupEntry OBJECT-TYPE
-    SYNTAX  Eltdot1sMstpPendingGroupEntry
-    MAX-ACCESS  not-accessible
-    STATUS  current
-    DESCRIPTION
-        "Entry of eltdot1sMstpPendingGroupTable"
-    INDEX   { eltdot1sMstpPendingGroup }
-    ::= { eltdot1sMstpPendingGroupTable 1 }
-
-Eltdot1sMstpPendingGroupEntry ::= SEQUENCE {
-      eltdot1sMstpPendingGroup       INTEGER,
-      eltdot1sMstpVlanId1To1024      OCTET STRING,
-      eltdot1sMstpVlanId1025To2048   OCTET STRING,
-      eltdot1sMstpVlanId2049To3072   OCTET STRING,
-      eltdot1sMstpVlanId3073To4094   OCTET STRING
-}
-
-eltdot1sMstpPendingGroup OBJECT-TYPE
-    SYNTAX  INTEGER
-    MAX-ACCESS  read-only
-    STATUS  current
-    DESCRIPTION
-        "The pending group number."
-    ::= { eltdot1sMstpPendingGroupEntry 1 }
-
-eltdot1sMstpVlanId1To1024 OBJECT-TYPE
-    SYNTAX  OCTET STRING (SIZE(0..128))
-    MAX-ACCESS  read-write
-    STATUS  current
-    DESCRIPTION
-        "first VlanId List of specific group number."
-    ::= { eltdot1sMstpPendingGroupEntry 2 }
-
-eltdot1sMstpVlanId1025To2048 OBJECT-TYPE
-    SYNTAX  OCTET STRING (SIZE(0..128))
-    MAX-ACCESS  read-write
-    STATUS  current
-    DESCRIPTION
-        "second VlanId List of specific group number."
-    ::= { eltdot1sMstpPendingGroupEntry 3 }
-
-eltdot1sMstpVlanId2049To3072 OBJECT-TYPE
-    SYNTAX  OCTET STRING (SIZE(0..128))
-    MAX-ACCESS  read-write
-    STATUS  current
-    DESCRIPTION
-        "third VlanId List of specific group number."
-    ::= { eltdot1sMstpPendingGroupEntry 4 }
-
-eltdot1sMstpVlanId3073To4094 OBJECT-TYPE
-    SYNTAX  OCTET STRING (SIZE(0..128))
-    MAX-ACCESS  read-write
-    STATUS  current
-    DESCRIPTION
-        "fourth VlanId List of specific group number."
-    ::= { eltdot1sMstpPendingGroupEntry 5 }
-
---
--- eltdot1dTpAgingTimeVlanTable
---
-
-eltdot1dTpVlanTable OBJECT-TYPE
-    SYNTAX          SEQUENCE OF Eltdot1dTpVlanEntry
-    MAX-ACCESS      not-accessible
-    STATUS          current
-    DESCRIPTION        "Table that contains configuration of mac aging time for each VLAN."
-    ::= { eltMesdot1dTp 1 }
-
-eltdot1dTpVlanEntry OBJECT-TYPE
-    SYNTAX          Eltdot1dTpVlanEntry
-    MAX-ACCESS      not-accessible
-    STATUS          current
-    DESCRIPTION        "Each entry contains the aging out configuration
-	                    and the configuration source of the aging out value
-                        applied for each VLAN."
-    INDEX           { eltdot1dTpVlanIndex }
-    ::= { eltdot1dTpVlanTable 1 }
-
-Eltdot1dTpVlanEntry ::= SEQUENCE {
-        eltdot1dTpVlanIndex            VlanIndex,
-        eltdot1dTpVlanAgingTime        INTEGER,
-		eltdot1dTpVlanAgingFromGlobal  TruthValue
-}
-
-eltdot1dTpVlanIndex OBJECT-TYPE
-	SYNTAX          VlanIndex
-	MAX-ACCESS      not-accessible
-	STATUS          current
-	DESCRIPTION        "VLAN number."
-    ::= { eltdot1dTpVlanEntry 1 }
-
-eltdot1dTpVlanAgingTime OBJECT-TYPE
-    SYNTAX          INTEGER
-    MAX-ACCESS      read-write
-    STATUS          current
-    DESCRIPTION        "The timeout period in seconds for aging out
-	                    dynamically learned mac address at this VLAN."
-	DEFVAL          { 300 }
-    ::= { eltdot1dTpVlanEntry 2 }
-
-eltdot1dTpVlanAgingFromGlobal OBJECT-TYPE
-	SYNTAX          TruthValue
-	MAX-ACCESS      read-write
-	STATUS          current
-	DESCRIPTION        "Indicates whether the aging time applied at
-                        this VLAN is from dot1dTpAgingTime object or not."
-    DEFVAL          { true }
-    ::= { eltdot1dTpVlanEntry 3 }
-
---
---   The Multiple Spanning Tree Instance Table
---
-
-eltdot1sMstpInstanceTable OBJECT-TYPE
-    SYNTAX  SEQUENCE OF Eltdot1sMstpInstanceEntry
-    MAX-ACCESS  not-accessible
-    STATUS  current
-    DESCRIPTION
-            "A table that contains Mstp instance specific information
-            for the Multiple Spanning Tree Protocol."
-    ::= { eltMesBridgeMstp 4 }
-
-eltdot1sMstpInstanceEntry OBJECT-TYPE
-    SYNTAX  Eltdot1sMstpInstanceEntry
-    MAX-ACCESS  not-accessible
-    STATUS  current
-    DESCRIPTION
-        "A list of information maintained by every instance
-         about the multiple Spanning Tree Protocol state for
-         that instance."
-    AUGMENTS { rldot1sMstpInstanceEntry }
-    ::= { eltdot1sMstpInstanceTable 1 }
-
-Eltdot1sMstpInstanceEntry ::= SEQUENCE {
-	eltdot1sMstpInstanceLastTopologyChangePort   INTEGER
-}
-
-eltdot1sMstpInstanceLastTopologyChangePort OBJECT-TYPE
-	SYNTAX  INTEGER
-    MAX-ACCESS  read-only
-	STATUS  current
-	DESCRIPTION
-    		"This value contain port ifIndex from
-            which the request about the last change of topology came.
-            If value is 0 - topology wasn't changed yet."
-    ::= { eltdot1sMstpInstanceEntry 1}
-
---
 -- eltBridgeStpConfigPortTable
 --
 
@@ -278,7 +184,7 @@ eltBridgeStpConfigPortRestrictedTcn OBJECT-TYPE
     STATUS          current
     DESCRIPTION         "Configure filtering of Spanning Tree BPDUs with TC flag set."
     DEFVAL          { false }
-    ::= { eltBridgeStpConfigPortEntry 2 }  
+    ::= { eltBridgeStpConfigPortEntry 2 } 
 
 eltdot1dStpLastTopologyChangePort OBJECT-TYPE
     SYNTAX  INTEGER
@@ -289,5 +195,852 @@ eltdot1dStpLastTopologyChangePort OBJECT-TYPE
             which the request about the last change of topology came.
             If value is 0 - topology wasn't changed yet."
     ::= { eltMesBridgeStp 2 }
+
+--
+-- eltBridgeStpInconsistencyObjects
+--
+
+eltBridgeStpInconsistencyObjects OBJECT IDENTIFIER 
+    ::= { eltMesBridgeStp 3 }
+
+--
+-- LoopGuardGlobalDefaultMode
+--
+
+eltBridgeStpLoopGuardGlobalDefaultMode OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION         "Indicates the global default config mode of
+    					LoopGuard feature on the device."
+    DEFVAL          { false }
+    ::= { eltBridgeStpInconsistencyObjects 1 } 
+
+--
+-- eltBridgeStpLoopGuardConfigTable
+--
+
+eltBridgeStpLoopGuardConfigTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltBridgeStpLoopGuardConfigEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION        "A table containing a list of the bridge ports 
+    					for which Spanning Tree LoopGuard capability
+    					can be configured."
+    ::= { eltBridgeStpInconsistencyObjects 2 }
+    
+eltBridgeStpLoopGuardConfigEntry OBJECT-TYPE
+    SYNTAX          EltBridgeStpLoopGuardConfigEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION        "A entry of table with a list of bridge ports
+    					for which Spanning Tree LoopGuard capability 
+    					can be configured."
+    INDEX           { eltBridgeStpLoopGuardConfigPortIndex }
+    ::= { eltBridgeStpLoopGuardConfigTable 1 }
+    
+EltBridgeStpLoopGuardConfigEntry ::= SEQUENCE {
+		eltBridgeStpLoopGuardConfigPortIndex INTEGER,
+        eltBridgeStpLoopGuardConfigMode      EltBridgeStpLoopGuardConfigMode
+}
+
+eltBridgeStpLoopGuardConfigPortIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION         "The value of dot1dBasePort for bridge port."
+    ::= { eltBridgeStpLoopGuardConfigEntry 1 } 
+
+eltBridgeStpLoopGuardConfigMode OBJECT-TYPE
+    SYNTAX          EltBridgeStpLoopGuardConfigMode
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION         "Indicates the mode of LoopGuard feature on this port.
+    					This configuration will be applied to all the spanning tree 
+    					instances in which this port exists."
+    DEFVAL          { default }
+    ::= { eltBridgeStpLoopGuardConfigEntry 2 }
+    
+--
+-- eltBridgeStpInconsistencyTable
+--
+
+eltBridgeStpInconsistencyTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltBridgeStpInconsistencyEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION        "A table containing a list of the bridge ports for which 
+    					a particular Spanning Tree instance has been found to 
+    					have some inconsistent state. The agent creates a new entry 
+    					in this table whenever it detects a new inconsistency, 
+    					and deletes entries when/soon after the inconsistency 
+    					is no longer present."
+    ::= { eltBridgeStpInconsistencyObjects 3 }
+    
+eltBridgeStpInconsistencyEntry OBJECT-TYPE
+    SYNTAX          EltBridgeStpInconsistencyEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION        "A Spanning Tree instance on a particular port for which 
+    					a Spanning Tree inconsistent state is currently in effect."
+    INDEX           { eltBridgeStpInconsistencyIndex,
+    				  eltBridgeStpInconsistencyPortIndex}
+    ::= { eltBridgeStpInconsistencyTable 1 }
+    
+EltBridgeStpInconsistencyEntry ::= SEQUENCE {
+		eltBridgeStpInconsistencyIndex     INTEGER,
+		eltBridgeStpInconsistencyPortIndex INTEGER,
+        eltBridgeStpInconsistencyState     EltBridgeStpInconsistencyStateType
+}
+
+eltBridgeStpInconsistencyIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION         "The spanning tree instance id."
+    ::= { eltBridgeStpInconsistencyEntry 1 } 
+
+eltBridgeStpInconsistencyPortIndex OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION         "The value of dot1dBasePort for bridge port."
+    ::= { eltBridgeStpInconsistencyEntry 2 }
+
+eltBridgeStpInconsistencyState OBJECT-TYPE
+    SYNTAX          EltBridgeStpInconsistencyStateType
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION         "Indicates whether the port in a particular Spanning Tree 
+    					instance is currently in inconsistent state or not."
+    DEFVAL          { none }
+    ::= { eltBridgeStpInconsistencyEntry 3 }
+
+eltBridgeStpTcProtectionObjects OBJECT IDENTIFIER
+    ::= { eltMesBridgeStp 4 }
+
+eltBridgeStpTcProtectionEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Indicates the status of TC Protection feature."
+    DEFVAL          { false }
+    ::= { eltBridgeStpTcProtectionObjects 1 }
+
+eltBridgeStpTcProtectionInterval OBJECT-TYPE
+    SYNTAX          INTEGER (1..10)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The time taken by the switch to process the maximum of TC BPDUs."
+    DEFVAL          { 2 }
+    ::= { eltBridgeStpTcProtectionObjects 2 }
+
+eltBridgeStpTcProtectionThresholdValue OBJECT-TYPE
+    SYNTAX          INTEGER (1..255)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The maximum number of MAC table flushes that the device can perform within set interval."
+    DEFVAL          { 1 }
+    ::= { eltBridgeStpTcProtectionObjects 3 }
+
+eltBridgeStpBridgeCounters OBJECT IDENTIFIER
+    ::= { eltMesBridgeStp 5 }
+
+eltBridgeStpNumOfTcBpduHandled OBJECT-TYPE
+    SYNTAX          Counter
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The number of topology change BPDU handled by the current bridge."
+    ::= { eltBridgeStpBridgeCounters 1 }
+
+--
+--   The Multiple Spanning Tree Instance Table
+--
+
+eltdot1sMstpInstanceTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF Eltdot1sMstpInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+            "A table that contains STP/RSTP/MSTP. Configurations for STP
+                and RSTP are stored in the zero instance. "
+    ::= { eltMesBridgeMstp 4 }
+
+eltdot1sMstpInstanceEntry OBJECT-TYPE
+    SYNTAX  Eltdot1sMstpInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "A list of information maintained by every instance
+         about the multiple Spanning Tree Protocol state for
+         that instance."
+    AUGMENTS { rldot1sMstpInstanceEntry }
+    ::= { eltdot1sMstpInstanceTable 1 }
+
+Eltdot1sMstpInstanceEntry ::= SEQUENCE {
+    eltdot1sMstpInstanceLastTopologyChangePort
+        INTEGER,
+    eltdot1sMstpInstanceTcProtectionEnable
+        TruthValue,
+    eltdot1sMstpInstanceTcProtectionInterval
+        INTEGER,
+    eltdot1sMstpInstanceTcProtectionThresholdValue
+        INTEGER,
+    eltdot1sMstpInstanceNumOfTcBpduHandled
+        Counter
+}
+
+eltdot1sMstpInstanceLastTopologyChangePort OBJECT-TYPE
+	SYNTAX  INTEGER
+    MAX-ACCESS  read-only
+	STATUS  current
+	DESCRIPTION
+    		"This value contain port ifIndex from
+            which the request about the last change of topology came.
+            If value is 0 - topology wasn't changed yet."
+    ::= { eltdot1sMstpInstanceEntry 1}
+
+eltdot1sMstpInstanceTcProtectionEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Indicates the status of TC Protection feature."
+    DEFVAL          { false }
+    ::= { eltdot1sMstpInstanceEntry 2 }
+
+eltdot1sMstpInstanceTcProtectionInterval OBJECT-TYPE
+    SYNTAX          INTEGER (1..10)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The time taken by the switch to process the maximum of TC BPDUs."
+    DEFVAL          { 2 }
+    ::= { eltdot1sMstpInstanceEntry 3 }
+
+eltdot1sMstpInstanceTcProtectionThresholdValue OBJECT-TYPE
+    SYNTAX          INTEGER (1..255)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The maximum number of MAC entry flushes that the device can perform within set interval."
+    DEFVAL          { 1 }
+    ::= { eltdot1sMstpInstanceEntry 4 }
+
+eltdot1sMstpInstanceNumOfTcBpduHandled OBJECT-TYPE
+    SYNTAX          Counter
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The number of topology change BPDU handled by the current instance."
+    ::= { eltdot1sMstpInstanceEntry 5 }
+
+--
+--   The Per-VLAN Spanning Tree Configuration Table
+--
+
+eltBridgePvstConfigTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltBridgePvstConfigEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "A table that contains configuration
+            for each PVST instance."
+    ::= { eltMesBridgePvst 1 }
+
+eltBridgePvstConfigEntry OBJECT-TYPE
+    SYNTAX          EltBridgePvstConfigEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "An entry that contains configuration
+            of the certain PVST instance."
+    INDEX           { eltBridgePvstVlanIndex }
+    ::= { eltBridgePvstConfigTable 1 }
+
+EltBridgePvstConfigEntry ::= SEQUENCE {
+    eltBridgePvstVlanIndex
+        VlanIndex,
+    eltBridgePvstConfigEnable
+        EltBridgePvstEnableType,
+    eltBridgePvstConfigFwdDelay
+        Timeout,
+    eltBridgePvstConfigHelloTime
+        Timeout,
+    eltBridgePvstConfigMaxAge
+        Timeout,
+    eltBridgePvstConfigPriority
+        INTEGER,
+    eltBridgePvstConfigFilterBpdu
+        TruthValue,
+    eltBridgePvstConfigTcProtectionEnable
+        TruthValue,
+    eltBridgePvstConfigTcProtectionInterval
+        INTEGER,
+    eltBridgePvstConfigTcProtectionThresholdValue
+        INTEGER
+}
+
+eltBridgePvstVlanIndex OBJECT-TYPE
+    SYNTAX          VlanIndex
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "VLAN tag that identifies PVST instance."
+    ::= { eltBridgePvstConfigEntry 1 }
+
+eltBridgePvstConfigEnable OBJECT-TYPE
+    SYNTAX          EltBridgePvstEnableType
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Indicates the status of PVST instance"
+    DEFVAL          { enabled }
+    ::= { eltBridgePvstConfigEntry 2 }
+
+eltBridgePvstConfigFwdDelay OBJECT-TYPE
+    SYNTAX          Timeout
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "This time value, measured in units of hundredths
+            of a second, controls how fast a port changes its
+            spanning state when moving towards the Forwarding
+            state.  The value determines how long the VLAN
+            stays in each of the Listening and Learning
+            states, which precede the Forwarding state.  This
+            value is also used, when a topology change has
+            been detected and is underway, to age all dynamic
+            entries in the Forwarding Database."
+    DEFVAL          { 1500 }
+    ::= { eltBridgePvstConfigEntry 3 }
+
+eltBridgePvstConfigHelloTime OBJECT-TYPE
+    SYNTAX          Timeout
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The amount of time between the transmission of
+            Configuration PDUs by this node on VLAN's ports
+            when it is the root of the spanning tree or trying
+            to become so, in units of hundredths of a second.
+            This is the actual value that this VLAN is
+            currently using."
+    DEFVAL          { 200 }
+    ::= { eltBridgePvstConfigEntry 4 }
+
+eltBridgePvstConfigMaxAge OBJECT-TYPE
+    SYNTAX          Timeout
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The maximum age of PVST information learned from
+            the network on any VLAN's port before it is discarded,
+            in units of hundredths of a second. This is the actual
+            value that this VLAN is currently using."
+    DEFVAL          { 2000 }
+    ::= { eltBridgePvstConfigEntry 5 }
+
+eltBridgePvstConfigPriority OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The value of the writable portion of the Bridge
+            ID, i.e., the first two octets of the (8 octet long)
+            Bridge ID ORed (logical addition) with current VLAN ID.
+            The other (last) 6 octets of the Bridge ID are given by
+            the value of dot1dBaseBridgeAddress."
+    DEFVAL          { 32768 }
+    ::= { eltBridgePvstConfigEntry 6 }
+
+eltBridgePvstConfigFilterBpdu OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Specified if PVST-instance should filter BPDUs when STP is disabled."
+    DEFVAL          { false }
+    ::= { eltBridgePvstConfigEntry 7 }
+
+eltBridgePvstConfigTcProtectionEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Indicates the status of TC Protection feature."
+    DEFVAL          { false }
+    ::= { eltBridgePvstConfigEntry 8 }
+
+eltBridgePvstConfigTcProtectionInterval OBJECT-TYPE
+    SYNTAX          INTEGER (1..10)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The time taken by the switch to process the maximum of TC BPDUs."
+    DEFVAL          { 2 }
+    ::= { eltBridgePvstConfigEntry 9 }
+
+eltBridgePvstConfigTcProtectionThresholdValue OBJECT-TYPE
+    SYNTAX          INTEGER (1..255)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The maximum number of MAC entry flushes that the device can perform within set interval."
+    DEFVAL          { 1 }
+    ::= { eltBridgePvstConfigEntry 10 }
+
+--
+--   The Per-VLAN Spanning Tree Port Configuration Table
+--
+
+eltBridgePvstPortConfigTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltBridgePvstPortConfigEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "A table that contains port specific
+            configuration for each PVST instance."
+    ::= { eltMesBridgePvst 2 }
+
+eltBridgePvstPortConfigEntry OBJECT-TYPE
+    SYNTAX          EltBridgePvstPortConfigEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "An entry that contains port specific
+            configuration of the certain PVST instance."
+    INDEX           { eltBridgePvstVlanIndex, eltBridgePvstPortIndex }
+    ::= { eltBridgePvstPortConfigTable 1 }
+
+EltBridgePvstPortConfigEntry ::= SEQUENCE {
+    eltBridgePvstPortIndex
+        INTEGER,
+    eltBridgePvstPortConfigEnable
+        EltBridgePvstEnableType,
+    eltBridgePvstPortConfigPathCost
+        INTEGER,
+    eltBridgePvstPortConfigAdminPathCost
+        INTEGER,
+    eltBridgePvstPortConfigPriority
+        INTEGER
+}
+
+eltBridgePvstPortIndex OBJECT-TYPE
+    SYNTAX          INTEGER (1..65535)
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "The index of port that belogns to specific VLAN."
+    ::= { eltBridgePvstPortConfigEntry 1 }
+
+eltBridgePvstPortConfigEnable OBJECT-TYPE
+    SYNTAX          EltBridgePvstEnableType
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Indicates the status of PVST instance
+            on the specific port."
+    DEFVAL          { enabled }
+    ::= { eltBridgePvstPortConfigEntry 2 }
+
+eltBridgePvstPortConfigPathCost OBJECT-TYPE
+    SYNTAX          INTEGER (1..200000000)
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The contribution of this port in the configured
+            VLAN to the path cost of paths towards the PVST
+            root which include this port."
+    DEFVAL          { 2000000 }
+    ::= { eltBridgePvstPortConfigEntry 3 }
+
+eltBridgePvstPortConfigAdminPathCost OBJECT-TYPE
+    SYNTAX          INTEGER (0..200000000)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "Field for manual port cost configuration."
+    DEFVAL          { 0 }
+    ::= { eltBridgePvstPortConfigEntry 4 }
+
+eltBridgePvstPortConfigPriority OBJECT-TYPE
+    SYNTAX          INTEGER (0..255)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+            "The value of the priority field which is
+            contained in the first (in network byte order)
+            octet of the (2 octet long) Port ID. The other
+            octet of the Port ID is given by the value of
+            dot1dStpPort."
+    DEFVAL          { 128 }
+    ::= { eltBridgePvstPortConfigEntry 5 }
+
+--
+--   The Per-VLAN Spanning Tree Status Table
+--
+
+eltBridgePvstStatusTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltBridgePvstStatusEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "A table that contains status
+            for each PVST instance."
+    ::= { eltMesBridgePvst 3 }
+
+eltBridgePvstStatusEntry OBJECT-TYPE
+    SYNTAX          EltBridgePvstStatusEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "An entry that contains status
+            of the certain PVST instance."
+    INDEX           { eltBridgePvstVlanIndex }
+    ::= { eltBridgePvstStatusTable 1 }
+
+EltBridgePvstStatusEntry ::= SEQUENCE {
+    eltBridgePvstStatusDesignatedRoot
+        BridgeId,
+    eltBridgePvstStatusRootFwdDelay
+        Timeout,
+    eltBridgePvstStatusRootHelloTime
+        Timeout,
+    eltBridgePvstStatusRootMaxAge
+        Timeout,
+    eltBridgePvstStatusRootPriority
+        INTEGER,
+    eltBridgePvstStatusRootPort
+        INTEGER,
+    eltBridgePvstStatusRootCost
+        INTEGER,
+    eltBridgePvstStatusNumOfTcBpduHandled
+        Counter
+}
+
+eltBridgePvstStatusDesignatedRoot OBJECT-TYPE
+    SYNTAX          BridgeId
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The unique Bridge Identifier of the Root Bridge
+            recorded as the Root in the Configuration BPDUs
+            transmitted by the Designated Bridge for the
+            segment to which the port is attached."
+    ::= { eltBridgePvstStatusEntry 1 }
+
+eltBridgePvstStatusRootFwdDelay OBJECT-TYPE
+    SYNTAX          Timeout
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "This time value, measured in units of hundredths
+            of a second, controls how fast a port changes its
+            spanning state when moving towards the Forwarding
+            state.  The value determines how long the Root Bridge
+            VLAN stays in each of the Listening and Learning
+            states, which precede the Forwarding state.  This
+            value is also used, when a topology change has
+            been detected and is underway, to age all dynamic
+            entries in the Forwarding Database."
+    ::= { eltBridgePvstStatusEntry 2 }
+
+eltBridgePvstStatusRootHelloTime OBJECT-TYPE
+    SYNTAX          Timeout
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The amount of time between the transmission of
+            Configuration PDUs by this node on VLAN's ports
+            when it is the root of the spanning tree or trying
+            to become so, in units of hundredths of a second.
+            This is the actual value that Root Bridge VLAN is
+            currently using."
+    ::= { eltBridgePvstStatusEntry 3 }
+
+eltBridgePvstStatusRootMaxAge OBJECT-TYPE
+    SYNTAX          Timeout
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The maximum age of PVST information learned from
+            the network on any VLAN's port before it is discarded,
+            in units of hundredths of a second. This is the actual
+            value that Root Bridge VLAN is currently using."
+    ::= { eltBridgePvstStatusEntry 4 }
+
+eltBridgePvstStatusRootPriority OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The value of the writable portion of the Root Bridge
+            ID, i.e., the first two octets of the (8 octet long)
+            Root Bridge ID ORed (logical addition) with Root VLAN ID.
+            The other (last) 6 octets of the Root Bridge ID are given by
+            the value of dot1dBaseBridgeAddress."
+    ::= { eltBridgePvstStatusEntry 5 }
+
+eltBridgePvstStatusRootPort OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The port number of the port which offers the
+            lowest cost path from this VLAN-instance to the
+            root VLAN instance."
+    ::= { eltBridgePvstStatusEntry 6 }
+
+eltBridgePvstStatusRootCost OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The cost of the path to the root as seen from
+            this bridge."
+    ::= { eltBridgePvstStatusEntry 7 }
+
+eltBridgePvstStatusNumOfTcBpduHandled OBJECT-TYPE
+    SYNTAX          Counter
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The number of topology change BPDU handled by the current instance."
+    ::= { eltBridgePvstStatusEntry 8 }
+
+--
+--   The Per-VLAN Spanning Tree Port Status Table
+--
+
+eltBridgePvstPortStatusTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltBridgePvstPortStatusEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "A table that contains port specific
+            status for each PVST instance."
+    ::= { eltMesBridgePvst 4 }
+
+eltBridgePvstPortStatusEntry OBJECT-TYPE
+    SYNTAX          EltBridgePvstPortStatusEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "An entry that contains port specific
+            status of the certain PVST instance."
+    INDEX           { eltBridgePvstVlanIndex, eltBridgePvstPortIndex }
+    ::= { eltBridgePvstPortStatusTable 1 }
+
+EltBridgePvstPortStatusEntry ::= SEQUENCE {
+    eltBridgePvstPortStatusPortState
+        EltBridgeStpPortStateType,
+    eltBridgePvstPortStatusPortRole
+        EltBridgeStpPortRoleType,
+    eltBridgePvstPortStatusDesigRoot
+        BridgeId,
+    eltBridgePvstPortStatusDesigCost
+        INTEGER,
+    eltBridgePvstPortStatusDesigBridge
+        BridgeId,
+    eltBridgePvstPortStatusDesigPort
+        OCTET STRING
+}
+
+eltBridgePvstPortStatusPortState OBJECT-TYPE
+    SYNTAX          EltBridgeStpPortStateType
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The port's current state as defined by
+            application of the Spanning Tree Protocol.  This
+            state controls what action a port takes on
+            reception of a frame.  If the bridge has detected
+            a port that is malfunctioning it will place that
+            port into the broken(6) state.  For ports which
+            are disabled (see eltBridgePvstPortConfigEnable),
+            this object will have a value of disabled(1)."
+    ::= { eltBridgePvstPortStatusEntry 1 }
+
+eltBridgePvstPortStatusPortRole OBJECT-TYPE
+    SYNTAX          EltBridgeStpPortRoleType
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The port's current state as defined by
+            application of the Spanning Tree Protocol. This
+            state controls what action a port takes on
+            reception of a frame.  If the bridge has detected
+            a port that is malfunctioning it will place that
+            port into the broken(6) state.  For ports which
+            are disabled (see eltBridgePvstPortConfigEnable),
+            this object will have a value of disabled(1)."
+    ::= { eltBridgePvstPortStatusEntry 2 }
+
+eltBridgePvstPortStatusDesigRoot OBJECT-TYPE
+    SYNTAX          BridgeId
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The unique Bridge Identifier of the Bridge
+            recorded as the Root in the Configuration BPDUs
+            transmitted by the Designated Bridge for the
+            segment to which the port is attached."
+    ::= { eltBridgePvstPortStatusEntry 3 }
+
+eltBridgePvstPortStatusDesigCost OBJECT-TYPE
+    SYNTAX          INTEGER
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The path cost of the Designated Port of the
+            segment connected to this port.  This value is
+            compared to the Root Path Cost field in received
+            bridge PDUs."
+    ::= { eltBridgePvstPortStatusEntry 4 }
+
+eltBridgePvstPortStatusDesigBridge OBJECT-TYPE
+    SYNTAX          BridgeId
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The Bridge Identifier of the bridge which this
+            port considers to be the Designated Bridge for
+            this port's segment."
+    ::= { eltBridgePvstPortStatusEntry 5 }
+
+eltBridgePvstPortStatusDesigPort OBJECT-TYPE
+    SYNTAX          OCTET STRING (SIZE (2))
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "The Port Identifier of the port on the Designated
+            Bridge for this port's segment."
+    ::= { eltBridgePvstPortStatusEntry 6 }
+
+--
+--   The Per-VLAN Spanning Tree Auxilary Table
+--
+
+eltBridgePvstAuxStatusTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltBridgePvstAuxStatusEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "A table that contains real operational and administrative
+            statuses for each PVST instance that was
+            created in the system."
+    ::= { eltMesBridgePvst 5 }
+
+eltBridgePvstAuxStatusEntry OBJECT-TYPE
+    SYNTAX          EltBridgePvstAuxStatusEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+            "An entry that contains real operational and administrative
+            statuses for each PVST instance that was
+            created in the system."
+    INDEX           { eltBridgePvstVlanIndex, eltBridgePvstPortIndex }
+    ::= { eltBridgePvstAuxStatusTable 1 }
+
+EltBridgePvstAuxStatusEntry ::= SEQUENCE {
+    eltBridgePvstAuxOperStatus
+        TruthValue,
+    eltBridgePvstAuxAdminStatus
+        TruthValue
+}
+
+eltBridgePvstAuxOperStatus OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "Indicates the status of PVST instance
+            on the specific port."
+    ::= { eltBridgePvstAuxStatusEntry 1 }
+
+eltBridgePvstAuxAdminStatus OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+            "Indicates the administrative status of PVST instance
+            on the specific port."
+    ::= { eltBridgePvstAuxStatusEntry 2 }
+
+--
+--  eltdot1qTpFdbPortTable
+--
+
+eltdot1qTpFdbPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Eltdot1qTpFdbPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "This table contains port index, vlan
+                 number, Mac address related to this port
+                 and status of this Mac address."
+    ::= { eltMesdot1qTp 1 }
+
+eltdot1qTpFdbPortEntry OBJECT-TYPE
+    SYNTAX      Eltdot1qTpFdbPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "An entry contains port index, vlan
+                 number, Mac address related to this port
+                 and status of this Mac address."
+    INDEX   { eltdot1qTpFdbPort,
+              eltdot1qTpFdbPortFdbId,
+              eltdot1qTpFdbPortAddress }
+    ::= { eltdot1qTpFdbPortTable 1 }
+
+Eltdot1qTpFdbPortEntry ::=
+    SEQUENCE {
+        eltdot1qTpFdbPort
+            Integer32,
+        eltdot1qTpFdbPortFdbId
+            VlanId,
+        eltdot1qTpFdbPortAddress
+            MacAddress,
+        eltdot1qTpFdbPortStatus
+            INTEGER
+    }
+
+eltdot1qTpFdbPort OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Port index"
+    ::= { eltdot1qTpFdbPortEntry 1 }
+
+eltdot1qTpFdbPortFdbId OBJECT-TYPE
+    SYNTAX      VlanId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The identity of Filtering Database."
+    ::= { eltdot1qTpFdbPortEntry 2 }
+
+eltdot1qTpFdbPortAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Mac address related to this port"
+    ::= { eltdot1qTpFdbPortEntry 3 }
+
+eltdot1qTpFdbPortStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    other(1),
+                    invalid(2),
+                    learned(3),
+                    self(4),
+                    mgmt(5)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The status of this Mac address."
+    ::= { eltdot1qTpFdbPortEntry 4 }
 
 END

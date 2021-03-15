@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -88,7 +87,7 @@ if (!ishit_cache_item($cache_item))
       humanize_device($device);
 
       // Assign device graphs from array created above
-      $device['graphs'] = $device_graphs[$device['device_id']];
+      $device['graphs'] = (array)$device_graphs[$device['device_id']];
       $cache['graphs']  = array_unique(array_merge($cache['graphs'], array_keys($device['graphs']))); // Add to global array cache
 
       $cache['devices']['permitted'][] = (int)$device['device_id']; // Collect IDs for permitted

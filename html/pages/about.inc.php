@@ -19,16 +19,37 @@
 
 print_versions();
 
+$ua = detect_browser();
+//r($ua);
+register_html_resource('js', 'moment.min.js');
+$tz = get_timezone();
+//r($tz);
 ?>
+  <div class="box box-solid">
+      <div class="box-header">
+          <h3 class="box-title">Browser & Timezone Information</h3>
+      </div>
+      <div class="box-body no-padding">
+          <table class="table table-striped table-condensed-more">
+              <tbody>
+              <tr><td><b>User-Agent</b></td><td><?php echo $ua['user_agent']; ?></td></tr>
+              <tr><td><b>Browser</b></td><td><?php echo $ua['browser_full'] . ' (' . $ua['platform'] . ')'; ?></td></tr>
+              <tr><td><b>Screen Resolution</b></td><td><?php echo $ua['screen_resolution']; ?></td></tr>
+              <tr><td><b>Timezone</b></td><td><?php echo $tz['system'] . ' (System), ' . $tz['php'] . ' (PHP), ' . $tz['mysql'] . ' (DB), '; ?><script>document.write(moment().format('Z') + ' (User)');</script></td></tr>
+              </tbody>
+          </table>
+      </div>
+  </div>
+
   <div style="margin-bottom: 10px; margin-top: 10px;">
   <table style="width: 100%; background: transparent;">
     <tr>
       <td style="width: 12%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_URL; ?>"><i style="font-size: small;" class="icon-globe"></i>&nbsp; Web</a></td>
-      <td style="width: 12%; text-align: center;"><a class="btn btn" target="_blank" href="http://docs.observium.org/"><i style="font-size: small;" class="icon-info"></i>&nbsp; Docs</a></td>
-      <td style="width: 18%; text-align: center;"><a class="btn btn" target="_blank" href="http://jira.observium.org/"><i style="font-size: small;" class="icon-bug"></i>&nbsp; Bugtracker</a></td>
-      <td style="width: 19%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_URL; ?>/docs/mailinglists"><i class="icon-envelope"></i>&nbsp; Mailing&nbsp;List</a></td>
-      <td style="width: 17%; text-align: center;"><a class="btn btn" target="_blank" href="http://twitter.com/observium"><i style="font-size: small;" class="icon-twitter-sign"></i>&nbsp; Twitter</a></td>
-      <td style="width: 16%; text-align: center;"><a class="btn btn" target="_blank" href="http://www.facebook.com/pages/Observium/128354461353"><i style="font-size: small;" class="icon-facebook-sign"></i>&nbsp; Facebook</a></td>
+      <td style="width: 12%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_DOCS_URL; ?>"><i style="font-size: small;" class="icon-info"></i>&nbsp; Docs</a></td>
+      <td style="width: 18%; text-align: center;"><a class="btn btn" target="_blank" href="https://jira.observium.org/"><i style="font-size: small;" class="icon-bug"></i>&nbsp; Bugtracker</a></td>
+      <!-- <td style="width: 19%; text-align: center;"><a class="btn btn" target="_blank" href="<?php echo OBSERVIUM_URL; ?>/docs/mailinglists"><i class="icon-envelope"></i>&nbsp; Mailing&nbsp;List</a></td> -->
+      <td style="width: 17%; text-align: center;"><a class="btn btn" target="_blank" href="https://twitter.com/observium"><i style="font-size: small;" class="icon-twitter-sign"></i>&nbsp; Twitter</a></td>
+      <td style="width: 16%; text-align: center;"><a class="btn btn" target="_blank" href="https://www.facebook.com/pages/Observium/128354461353"><i style="font-size: small;" class="icon-facebook-sign"></i>&nbsp; Facebook</a></td>
     </tr>
   </table>
   </div>
@@ -52,7 +73,7 @@ print_versions();
           <dt style="text-align: left;"><i class="icon-user"></i> Xiaochi Jin</dt><dd>Logo design</dd>
           <dt style="text-align: left;"><i class="icon-user"></i> Akichi Ren</dt><dd>Post-steampunk observational hamster</dd>
           <dt style="text-align: left;"><i class="icon-user"></i> Bruno Pramont</dt><dd>Collectd code</dd>
-          <dt style="text-align: left;"><i class="icon-user"></i> <a href="mailto:DavidPFarrell@gmail.com" data-alt="DavidPFarrell@gmail.com">David Farrell</a></dt><dd>Help with parsing net-SNMP output in PHP</dd>
+          <dt style="text-align: left;"><i class="icon-user"></i> David Farrell</dt><dd>Help with parsing net-SNMP output in PHP</dd>
           <dt style="text-align: left;"><i class="icon-user"></i> Dennis de Houx</dt><dd>Code contributions</dd>
           <dt style="text-align: left;"><i class="icon-user"></i> Geert Hauwaerts</dt><dd>Code contributions</dd>
         </dl>
@@ -103,7 +124,7 @@ if (!$_SESSION['user_limited'])
     $stats['db']                 = get_db_size();
     $stats['rrd']                = get_dir_size($config['rrd_dir']);
 
-    set_cache_item($cache_item, $stats, array('ttl' => 300));
+    set_cache_item($cache_item, $stats, array('ttl' => 900)); // 15 min
   } else {
     $stats = get_cache_data($cache_item);
   }

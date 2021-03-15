@@ -11,8 +11,10 @@
  *
  */
 
-$defs  = ' DEF:in_octets='.$rrd_filename.':INOCTETS:AVERAGE';
-$defs .= ' DEF:out_octets='.$rrd_filename.':OUTOCTETS:AVERAGE';
+$rrd_filename_escape = rrdtool_escape($rrd_filename);
+
+$defs  = ' DEF:in_octets='.$rrd_filename_escape.':INOCTETS:AVERAGE';
+$defs .= ' DEF:out_octets='.$rrd_filename_escape.':OUTOCTETS:AVERAGE';
 $defs .= ' CDEF:in_bits=in_octets,8,*';
 $defs .= ' CDEF:out_bits=out_octets,8,*';
 

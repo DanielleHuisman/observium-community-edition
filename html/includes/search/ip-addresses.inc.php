@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage search
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -57,21 +56,21 @@ if (count($results))
     $port = get_port_by_id_cache($result['port_id']);
     $device = device_by_id_cache($port['device_id']);
 
-    $descr = $device['hostname'].' | '.escape_html($port['port_label']);
+    $descr = strlen($device['location']) ? $device['location'] . ' | ' : '';
+    $descr .= $port['port_label'];
 
     $name = $result['ip_address'].'/'.$result['ip_prefixlen'];
     if (strlen($name) > 35) { $name = substr($name, 0, 35) . "..."; }
 
-    /// FIXME: once we have alerting, colour this to the sensor's status
     $tab_colour = '#194B7F'; // FIXME: This colour pulled from functions.inc.php humanize_device, maybe set it centrally in definitions?
 
     $ip_search_results[] = array(
       'url'    => generate_port_url($port),
       'name'   => $name,
       'colour' => $tab_colour,
-      'icon'   => '<i class="'.$config['icon']['ipv4'].'"></i>',
+      'icon'   => strpos($result['ip_address'], '.') ? $config['icon']['ipv4'] : $config['icon']['ipv6'],
       'data'   => array(
-        '',
+        '| ' . escape_html($device['hostname']),
         escape_html($descr)),
     );
 

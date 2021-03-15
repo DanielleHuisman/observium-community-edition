@@ -1,0 +1,396 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-EMS-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxActivationState,
+        MxIpHostName,
+        MxIpAddress,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpSubnetMask,
+        MxDigitMap
+    FROM MX-TC
+        MxUInt64,
+        MxFloat32,
+        MxIpHostNamePort,
+        MxIpAddr,
+        MxIpAddrPort,
+        MxIpAddrMask,
+        MxUri,
+        MxUrl
+    FROM MX-TC2
+        mediatrixServices
+    FROM MX-SMI2;
+
+emsMIB MODULE-IDENTITY
+ LAST-UPDATED   "1910210000Z"
+ ORGANIZATION " Mediatrix Telecom, Inc. "
+ CONTACT-INFO " Mediatrix Telecom, Inc.
+                4229, Garlock Street
+                Sherbrooke (Quebec)
+                Canada
+                Phone: (819) 829-8749
+                "
+ DESCRIPTION  " Element Management System
+
+                The Element Management System (Ems) service makes the unit
+                compatible with the Virtuo EMS infrastructure.
+                "
+ ::= { mediatrixServices 4700 }
+
+emsMIBObjects OBJECT IDENTIFIER ::= { emsMIB 1 }
+
+-- ****************************************************************************
+
+-- Group:Provisioning
+
+-- ****************************************************************************
+
+provisioningGroup OBJECT IDENTIFIER
+ ::= { emsMIBObjects 100 }
+ -- Scalar:EMS Provisioning Enable
+
+ emsProvisioningEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " EMS Provisioning Enable
+
+                Specifies if the Ems service allows the unit to be provisioned
+                and managed by the Virtuo EMS infrastructure.
+
+                  * Disable: Unit can not be provisioned by the Virtuo EMS
+                    infrastructure.
+                  * Enable: Unit can be provisioned by the Virtuo EMS
+                    infrastructure.
+
+                "
+  DEFVAL        { disable }
+  ::= { provisioningGroup 100 }
+
+ -- Scalar:Periodic Provisioning Timer
+
+ periodicProvisioningTimer OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..250) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Periodic Provisioning Timer
+
+                Defines the periodic interval for the provisioning.
+
+                  * hourly: provision every hour, at the time defined in the
+                    HourlyTimeRange parameter.
+                  * daily: provision once a day, at the time defined in the
+                    DailyTimeRange parameter.
+                  * weekly: provision once a week, at the date and time
+                    defined in the WeeklyTimeRange parameter.
+
+                In the scenario where the provisioning failed with a
+                'ConnectionFailure' (see the LastProvisioningResult
+                parameter), the unit will frequently retry until the
+                connection is successful. The frequency of the retry attempts
+                will decrease over time, down to once a week if the connection
+                still cannot be established.
+
+                Has no effect if the EmsProvisioningEnable parameter is
+                disabled.
+
+                Note: Unless a specific time is defined in the hourly/daily/
+                weekly parameters, the random value within a time range is
+                determined at service start-up. As long as the service is not
+                restarted, the same value will be used. For instance, if a
+                daily timer has a range between 10:00 and 10:30 with a
+                randomised value of 10:19, then the timer will trigger at
+                10:19 every day as long as the Ems service or the unit is not
+                restarted.
+
+                "
+  DEFVAL        { "daily" }
+  ::= { provisioningGroup 200 }
+
+-- End of group:Provisioning
+
+-- ****************************************************************************
+
+-- Group:Timers
+
+-- ****************************************************************************
+
+timersGroup OBJECT IDENTIFIER
+ ::= { emsMIBObjects 150 }
+ -- Scalar:Hourly Time Range
+
+ hourlyTimeRange OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..30) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Hourly Time Range
+
+                Expression defining the specific time or a time range into
+                which an hourly timer will be triggered. If a range is
+                specified, the timer will trigger randomly within that range.
+
+                The syntax is: mm[:ss][ - mm[:ss]]
+
+                  * mm specifies the minute within the hour. Possible values
+                    are 0 to 59.
+                  * ss specifies the second within the minute. Possible values
+                    are 0 to 59.
+                  * The square braces indicate the optional parts of the
+                    expression.
+                  * The spaces around the hyphen are optional.
+                  * The second part, i.e. [ - mm[:ss]] is optional. If omited,
+                    the expression specifies a specific time instead of a
+                    range.
+
+                Examples:
+
+                  * 10 - 15: The timer will trigger at a random time between
+                    the 10th and the 15th minute at each hour, e.g. between
+                    12:10 and 12:15.
+                  * 55 - 05: The timer will trigger at a random time between
+                    the 55th and the 5th minute at each hour, e.g. between
+                    3:55 and 4:05.
+                  * 12: The timer will trigger at the 12th minute every hour
+                    (i.e. at 2:12, 3:12, 4:12, ...).
+
+                "
+  DEFVAL        { "55 - 05" }
+  ::= { timersGroup 100 }
+
+ -- Scalar:Daily Time Range
+
+ dailyTimeRange OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..30) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Daily Time Range
+
+                Expression defining the specific time or a time range into
+                which a daily timer will be triggered. If a range is
+                specified, the timer will trigger randomly within that range.
+
+                The syntax is: hh[:mm[:ss]][ - hh[:mm[:ss]]]
+
+                  * hh specifies the hour within the day in local time.
+                    Possible values are 0 to 23.
+                  * mm specifies the minute within the hour. Possible values
+                    are 0 to 59.
+                  * ss specifies the second within the minute. Possible values
+                    are 0 to 59.
+                  * The square braces indicate the optional parts of the
+                    expression.
+                  * The spaces around the hyphen are optional.
+                  * The second part, i.e. [ - hh[:mm[:ss]]] is optional. If
+                    omited, the expression specifies a specific time instead
+                    of a range.
+
+                Examples:
+
+                  * 10 - 15: The timer will trigger at a random time between
+                    10:00 and 15:00 every day.
+                  * 11:10 - 11:15: The timer will trigger at a random time
+                    between 11:10 and 11:15 every day.
+                  * 23:30 - 00:30: The timer will trigger at a random time
+                    between 23:30 and 00:30 every day.
+                  * 14:10: The timer will trigger at 14:10 every day.
+
+                "
+  DEFVAL        { "01:00 - 03:00" }
+  ::= { timersGroup 200 }
+
+ -- Scalar:Weekly Time Range
+
+ weeklyTimeRange OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..50) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Weekly Time Range
+
+                Expression defining the specific time or a time range into
+                which a weekly timer will be triggered. If a range is
+                specified, the timer will trigger randomly within that range.
+
+                The syntax is: dd hh[:mm[:ss]][ - dd hh[:mm[:ss]]]
+
+                  * dd specifies the day. Possible values are the full names
+                    in English: Sunday, Monday, Tuesday, Wednesday, Thursday,
+                    Friday, Saturday.
+                  * hh specifies the hour within the day in local time.
+                    Possible values are 0 to 23.
+                  * mm specifies the minute within the hour. Possible values
+                    are 0 to 59.
+                  * ss specifies the second within the minute. Possible values
+                    are 0 to 59.
+                  * The square braces indicate the optional parts of the
+                    expression.
+                  * The spaces around the hyphen are optional.
+                  * The second part, i.e. [ - hh[:mm[:ss]]] is optional. If
+                    omited, the expression specifies a specific time instead
+                    of a range.
+
+                Examples:
+
+                  * Sunday 10:00 - Sunday 11:00: The timer will trigger at a
+                    random time between Sunday 10:00 and Sunday 11:00.
+                  * Monday 9 - Friday 17: The timer will trigger at a random
+                    time between Monday 9:00 and Friday 17:00.
+                  * Friday 17 - Monday 9: The timer will trigger at a random
+                    time between Friday 17:00 and Monday 9:00.
+                  * Wednesday 4: The timer will trigger at 4:00 every
+                    Wednesday.
+
+                "
+  DEFVAL        { "Monday 01:00 - Monday 03:00" }
+  ::= { timersGroup 300 }
+
+-- End of group:Timers
+
+-- ****************************************************************************
+
+-- Group:Status
+
+-- ****************************************************************************
+
+statusGroup OBJECT IDENTIFIER
+ ::= { emsMIBObjects 200 }
+ -- Scalar:Last Successful Connection Date and Time
+
+ lastConnectionDateTime OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..255) )
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Last Successful Connection Date and Time
+
+                The date and time of the last successful connection to the
+                provisioning service.
+                "
+  ::= { statusGroup 100 }
+
+ -- Scalar:Last Provisioning result
+
+ lastProvisioningResult OBJECT-TYPE
+  SYNTAX        INTEGER { none(100) , success(200) , partiallyProvisioned(300)
+                , connectionFailed(400) , provisioningError(500) ,
+                unmanagedUnit(600) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Last Provisioning result
+
+                The result of the lastest provisioning against the Virtuo EMS
+                infrastructure.
+
+                  * None: No provisioning has been requested or provisioning
+                    is not yet completed.
+                  * Success: Unit has been provisioned successfully.
+                  * PartiallyProvisioned: Unit has been partially provisioned.
+                    See logs for details.
+                  * ConnectionFailed: Unit could not successfully connect to
+                    Virtuo. See logs for details.
+                  * ProvisioningError: The connection to Virtuo was
+                    successful, but unit could not be provisioned. See logs
+                    for details.
+                  * UnmanagedUnit: The connection to Virtuo was successful,
+                    but Virtuo is not configured to manage this unit.
+
+                "
+  DEFVAL        { none }
+  ::= { statusGroup 200 }
+
+-- End of group:Status
+
+-- ****************************************************************************
+
+-- Group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+notificationsGroup OBJECT IDENTIFIER
+ ::= { emsMIBObjects 60010 }
+ -- Scalar:Minimal Severity of Notification
+
+ minSeverity OBJECT-TYPE
+  SYNTAX        INTEGER { disable(0) , debug(100) , info(200) , warning(300) ,
+                error(400) , critical (500) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Minimal Severity of Notification
+
+                Sets the minimal severity to issue a notification message
+                incoming from this service.
+
+                  * Disable: No notification is issued.
+                  * Debug: All notification messages are issued.
+                  * Info: Notification messages with a 'Informational' and
+                    higher severity are issued.
+                  * Warning: Notification messages with a 'Warning' and higher
+                    severity are issued.
+                  * Error: Notification messages with an 'Error' and higher
+                    severity are issued.
+                  * Critical: Notification messages with a 'Critical' severity
+                    are issued.
+
+                "
+  DEFVAL        { warning }
+  ::= { notificationsGroup 100 }
+
+-- End of group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+-- Group:Configuration Settings
+
+-- ****************************************************************************
+
+configurationGroup OBJECT IDENTIFIER
+ ::= { emsMIBObjects 60020 }
+ -- Scalar:Need Restart
+
+ needRestartInfo OBJECT-TYPE
+  SYNTAX        INTEGER { no(0) , yes(100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Need Restart
+
+                Indicates if the service needs to be restarted for the
+                configuration to fully take effect.
+
+                  * Yes: Service needs to be restarted.
+                  * No: Service does not need to be restarted.
+
+                Services can be restarted by using the
+                Scm.ServiceCommands.Restart command.
+
+                "
+  ::= { configurationGroup 100 }
+
+-- End of group:Configuration Settings
+
+END

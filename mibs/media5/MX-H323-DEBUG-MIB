@@ -1,0 +1,1091 @@
+-- **SDOC***********************************************************************
+-- *****************************************************************************
+--
+--             Copyright(c) 2001-2004 Mediatrix Telecom, Inc.
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc..
+--
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+--
+-- *****************************************************************************
+-- *****************************************************************************
+--
+-- This MIB contains configuration objects for H.323 endpoints. In particular,
+-- this MIB is used to enable/disable various types of traces. These traces are
+-- used to debug, monitor and track Mediatrix H.323 endpoints
+--
+-- *****************************************************************************
+-- **EDOC***********************************************************************
+
+
+MX-H323-DEBUG-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE
+    FROM SNMPv2-CONF
+        mediatrixExperimental
+    FROM MX-SMI
+        MxEnableState
+    FROM MX-TC;
+
+
+h323DebugMIB MODULE-IDENTITY
+    LAST-UPDATED "200410140000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749"
+    DESCRIPTION  "This MIB contains configuration objects for H.323 endpoints.
+                  In particular, this MIB is used to enable/disable various
+                  types of traces. These traces are used to debug, monitor and
+                  track Mediatrix H.323 endpoints."
+
+
+    -- *************************************************************************
+    -- Revision history
+    -- *************************************************************************
+    REVISION    "200410140000Z"
+    DESCRIPTION "Addition of:
+
+                    - h323DebugH323StackTrace2
+                    - h323DebugH323StackTrace2Enable
+                    - h323DebugH323StackTrace2ContentEnable
+                    - h323DebugH323StackTrace2GeneralLevel
+                    - h323DebugH323StackTrace2ModuleTable
+                    - h323DebugH323StackTrace2GroupVer1
+
+                 h323DebugH323StackTraceGroupVer1
+                 and h323DebugH323StackTraceModulesGroupVer1 were merged
+                 together (as h323DebugH323StackTraceGroupVer1)."
+
+    REVISION    "200304090000Z"
+    DESCRIPTION "h323DebugSuppTraceTerminalProvision was renamed to
+                 h323DebugSuppTraceEngineProvision.
+
+                 Corrections to the description of
+                 h323DebugSuppTraceEngineProvision.
+
+                 h323DebugSuppTraceGatewayProvision was deleted."
+
+    REVISION    "200301070000Z"
+    DESCRIPTION "Implement the use of MxEnableState."
+
+    REVISION    "200212190000Z"
+    DESCRIPTION "Addition of h323DebugSuppTraceTerminalProvision,
+                 h323DebugSuppTraceGatewayProvision,
+                 h323DebugSuppTraceMediaProvision,
+                 h323DebugSuppTraceDebugProvision and h323DebugSuppTraceGkReg."
+
+    REVISION    "200211130000Z"
+    DESCRIPTION "Renamed the trace modules with lower case letters."
+
+    REVISION    "200210020000Z"
+    DESCRIPTION "Creation"
+    ::= { mediatrixExperimental 35 }
+
+
+
+
+h323DebugMIBObjects  OBJECT IDENTIFIER ::= { h323DebugMIB 1 }
+h323DebugConformance OBJECT IDENTIFIER ::= { h323DebugMIB 2 }
+
+
+
+
+    -- *************************************************************************
+    -- H.323 stack trace
+    -- *************************************************************************
+    h323DebugH323StackTrace OBJECT IDENTIFIER ::= { h323DebugMIBObjects 5 }
+        -- *********************************************************************
+        h323DebugH323StackTraceLevel OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  level-0(0),
+                                  level-1(1),
+                                  level-2(2),
+                                  level-3(3)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates the level of the traces sent by the
+                         H.323 stack.
+
+                         level-0 : the H.323 stack does not send traces.
+
+                         level-1 : the H.323 stack sends traces. The content of
+                                   the ASN.1 structures is not traced.
+                                   Inconsistencies found in the ASN.1 structures
+                                   are not traced.
+
+                         level-2 : the H.323 stack sends traces. The content of
+                                   the ASN.1 structures is traced.
+                                   Inconsistencies found in the ASN.1 structures
+                                   are not traced. This level is verbose.
+
+                         level-3 : the H.323 stack sends traces. The content of
+                                   the ASN.1 structures is traced.
+                                   Inconsistencies found in the ASN.1 structures
+                                   are traced. This level is very verbose.
+
+                         The H.323 stack tracing functionality produces an
+                         output for debugging, monitoring and tracking a
+                         Mediatrix H.323 endpoint. This functionality provides:
+
+                           - A full picture of all H.323 events on the
+                             network, from the perspective of the endpoint that
+                             is generating the log.
+
+                           - Details about the fields of the H.225/H.245
+                             messages.
+
+                           - A decoded view of each H.225/H.245 message,
+                             including the message fields and the value of each
+                             field.
+
+                           - A chronological record of call events to track
+                             exactly where and when a problem occurred.
+
+                           - An important vehicle for tracking interoperability.
+                             You can see if the events on the remote side are
+                             interoperable with the events on the local side.
+
+                         The traces are sent as Syslog messages you can see with
+                         a Syslog daemon. The Syslog functionality of the
+                         endpoint has to be configured with the debug level
+                         (syslogMsgMaxSeverity of MX-SYSLOG-MIB) set to 'debug'.
+
+                         There are various trace modules. Each module can be
+                         enabled/disabled individually.
+
+                         WARNING: Only a few modules should be enabled at the
+                                  same time. Enabling several modules may
+                                  generate a huge amount of traces. This may
+                                  introduce significant delays and/or system
+                                  timeouts. This may render the endpoint
+                                  unusable."
+            DEFVAL { level-0 }
+            ::=  {  h323DebugH323StackTrace 5 }
+
+        h323DebugH323StackTraceModules OBJECT IDENTIFIER ::= { h323DebugH323StackTrace 10 }
+
+            h323DebugH323StackTraceModulesAnnexE OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the AnnexE module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 5 }
+
+            h323DebugH323StackTraceModulesCa OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the CA module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 10 }
+
+            h323DebugH323StackTraceModulesCaerr OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the CAERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 15 }
+
+            h323DebugH323StackTraceModulesChannels OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the CHANNELS module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 20 }
+
+            h323DebugH323StackTraceModulesCm OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the CM module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 25 }
+
+            h323DebugH323StackTraceModulesCmapi OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the CMAPI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 30 }
+
+            h323DebugH323StackTraceModulesCmapicb OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the CMAPICB module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 35 }
+
+            h323DebugH323StackTraceModulesCmerr OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the CMERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 40 }
+
+            h323DebugH323StackTraceModulesDebug OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the DEBUG module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 45 }
+
+            h323DebugH323StackTraceModulesEfrm OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the EFRM module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 50 }
+
+            h323DebugH323StackTraceModulesEtimer OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the ETIMER module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 55 }
+
+            h323DebugH323StackTraceModulesEtimerheap OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the ETIMERHEAP module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 60 }
+
+            h323DebugH323StackTraceModulesH450apdu OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the H450APDU module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 65 }
+
+            h323DebugH323StackTraceModulesLi OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the LI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 70 }
+
+            h323DebugH323StackTraceModulesLiinfo OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the LIINFO module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 75 }
+
+            h323DebugH323StackTraceModulesMei OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the MEI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 80 }
+
+            h323DebugH323StackTraceModulesNamechan OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the NAMECHAN module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 85 }
+
+            h323DebugH323StackTraceModulesPer OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PER module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 90 }
+
+            h323DebugH323StackTraceModulesPererr OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PERERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 95 }
+
+            h323DebugH323StackTraceModulesPdlapi OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLAPI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 100 }
+
+            h323DebugH323StackTraceModulesPdlchan OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLCHAN module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 105 }
+
+            h323DebugH323StackTraceModulesPdlcomm OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLCOMM module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 110 }
+
+            h323DebugH323StackTraceModulesPdlconf OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLCONF module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 115 }
+
+            h323DebugH323StackTraceModulesPdlencode OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLENCODE module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 120 }
+
+            h323DebugH323StackTraceModulesPdlerror OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLERROR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 125 }
+
+            h323DebugH323StackTraceModulesPdlfnerr OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLFNERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 130 }
+
+            h323DebugH323StackTraceModulesPdllist OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLLIST module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 135 }
+
+            h323DebugH323StackTraceModulesPdlmisc OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLMISC module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 140 }
+
+            h323DebugH323StackTraceModulesPdlmtask OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLMTASK module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 145 }
+
+            h323DebugH323StackTraceModulesPdlprint OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLPRINT module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 150 }
+
+            h323DebugH323StackTraceModulesPdlprnerr OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLPRNERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 155 }
+
+            h323DebugH323StackTraceModulesPdlprnwrn OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLPRNWRN module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 160 }
+
+            h323DebugH323StackTraceModulesPdlsm OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLSM module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 165 }
+
+            h323DebugH323StackTraceModulesPdlsrc OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLSRC module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 170 }
+
+            h323DebugH323StackTraceModulesPdltimer OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PDLTIMER module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 175 }
+
+            h323DebugH323StackTraceModulesPi OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the PI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 180 }
+
+            h323DebugH323StackTraceModulesQ931 OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the Q931 module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 185 }
+
+            h323DebugH323StackTraceModulesQ931err OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the Q931ERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 190 }
+
+            h323DebugH323StackTraceModulesRa OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the RA module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 195 }
+
+            h323DebugH323StackTraceModulesRasctrl OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the RASCTRL module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 200 }
+
+            h323DebugH323StackTraceModulesRasindb OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the RASINDB module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 205 }
+
+            h323DebugH323StackTraceModulesSeli OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SELI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 210 }
+
+            h323DebugH323StackTraceModulesSsapi OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSAPI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 215 }
+
+            h323DebugH323StackTraceModulesSsapicb OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSAPICB module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 220 }
+
+            h323DebugH323StackTraceModulesSschan OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSCHAN module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 225 }
+
+            h323DebugH323StackTraceModulesSseapi OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSEAPI module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 230 }
+
+            h323DebugH323StackTraceModulesSseapicb OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSEAPICB module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 235 }
+
+            h323DebugH323StackTraceModulesSsechan OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSECHAN module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 240 }
+
+            h323DebugH323StackTraceModulesSseerr OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSEERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 245 }
+
+            h323DebugH323StackTraceModulesSserr OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the SSERR module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 250 }
+
+            h323DebugH323StackTraceModulesTimer OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the TIMER module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 255 }
+
+            h323DebugH323StackTraceModulesTpktchan OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the TPKTCHAN module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 260 }
+
+            h323DebugH323StackTraceModulesTransport OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the TRANSPORT module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 265 }
+
+            h323DebugH323StackTraceModulesTunnctrl OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the TUNNCTRL module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 270 }
+
+            h323DebugH323StackTraceModulesUdpchan OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the UDPCHAN module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 275 }
+
+            h323DebugH323StackTraceModulesUnreg OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the UNREG module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 280 }
+
+            h323DebugH323StackTraceModulesVt OBJECT-TYPE
+                SYNTAX      MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables/disables the VT module."
+                DEFVAL { disable }
+                ::=  {  h323DebugH323StackTraceModules 285 }
+
+
+
+
+    -- *************************************************************************
+    -- H.323 debug supplementary trace
+    -- *************************************************************************
+    h323DebugSupplementaryTrace OBJECT IDENTIFIER ::= { h323DebugMIBObjects 10 }
+        -- *********************************************************************
+        h323DebugSuppTraceEngineProvision OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Enables/disables traces related to interaction between
+                         the H.323 classes, MX-H323-REGISTRATION-MIB,
+                         MX-H323-ATTRIBUTES-MIB and MX-H323-ALIASES-MIB. These
+                         traces are used to track exactly where and when a
+                         problem occurred.
+
+                         The traces are sent as Syslog messages you can see with
+                         a Syslog daemon. The Syslog functionality of the
+                         endpoint has to be configured with the debug level
+                         (syslogMsgMaxSeverity of MX-SYSLOG-MIB) set to 'debug'."
+            DEFVAL { disable }
+            ::=  {  h323DebugSupplementaryTrace 5 }
+
+        h323DebugSuppTraceMediaProvision OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Enables/disables traces related to interaction between
+                         the H.323 classes, MX-VOICEIF-MIB and MX-DATAIF-MIB.
+                         These traces can help in tracking exactly where and
+                         when a problem occurred.
+
+                         The traces are sent as Syslog messages you can see with
+                         a Syslog daemon. The Syslog functionality of the
+                         endpoint has to be configured with the debug level
+                         (syslogMsgMaxSeverity of MX-SYSLOG-MIB) set to 'debug'."
+            DEFVAL { disable }
+            ::=  {  h323DebugSupplementaryTrace 15 }
+
+        h323DebugSuppTraceDebugProvision OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Enables/disables traces related to interaction between
+                         the H.323 classes and MX-H323-DEBUG-MIB. These traces
+                         can help in tracking exactly where and when a problem
+                         occurred.
+
+                         The traces are sent as Syslog messages you can see with
+                         a Syslog daemon. The Syslog functionality of the
+                         endpoint has to be configured with the debug level
+                         (syslogMsgMaxSeverity of MX-SYSLOG-MIB) set to 'debug'."
+            DEFVAL { disable }
+            ::=  {  h323DebugSupplementaryTrace 20 }
+
+        h323DebugSuppTraceGkReg OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Enables/disables supplementary traces related to the
+                         gatekeeper registration. These traces can help in
+                         tracking exactly where and when a problem occurred.
+
+                         The traces are sent as Syslog messages you can see with
+                         a Syslog daemon. The Syslog functionality of the
+                         endpoint has to be configured with the debug level
+                         (syslogMsgMaxSeverity of MX-SYSLOG-MIB) set to 'debug'."
+            DEFVAL { disable }
+            ::=  {  h323DebugSupplementaryTrace 25 }
+
+
+
+
+    -- *************************************************************************
+    -- H.323 debug stack trace 2
+    -- *************************************************************************
+    h323DebugH323StackTrace2 OBJECT IDENTIFIER ::= { h323DebugMIBObjects 15 }
+        -- *********************************************************************
+        h323DebugH323StackTrace2Enable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The H.323 stack tracing functionality produces an output for debugging,
+                         monitoring and tracking a H.323 endpoint. This functionality provides:
+
+                           - A full picture of all H.323 events on the network, from the perspective of
+                             the endpoint that is generating the log.
+
+                           - Details about the fields of the H.323 messages.
+
+                           - A decoded view of each H.323 message, including the message fields and the
+                             value of each field.
+
+                           - A chronological record of call events to track exactly where and when a
+                             problem occurred.
+
+                           - An important vehicle for tracking interoperability. You can see if the events
+                             on the remote side are interoperable with the events on the local side.
+
+                         The traces are sent as Syslog messages you can see with a Syslog daemon.
+
+                         enable  :  the H.323 stack sends traces.
+
+                         disable :  the H.323 stack doesn't send traces.
+
+                         WARNING: Only a few modules should be enabled at the same time. Enabling several
+                                  trace modules may generate a huge amount of traces. This may introduce
+                                  significant delays and/or system timeouts. This may render the endpoint
+                                  unusable."
+            DEFVAL { disable }
+            ::=  {  h323DebugH323StackTrace2 5 }
+
+        h323DebugH323StackTrace2ContentEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The H.323 stack can display the content of the H.323 messages the endpoint
+                         sends/receives.
+
+                         enable  :  the H.323 stack displays the content of the H.323 messages the
+                                    endpoint sends/receives.
+
+                         disable :  the H.323 stack doesn't display the content of the H.323 messages the
+                                    endpoint sends/receives."
+            DEFVAL { disable }
+            ::=  {  h323DebugH323StackTrace2 10 }
+
+        h323DebugH323StackTrace2GeneralLevel OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  disable(0),
+                                  exception(1),
+                                  error(2),
+                                  warning(3)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The exception, error and warning traces can be enabled for all the trace modules
+                         of the H.323 stack. Enabling a trace level also enables the previous trace
+                         levels.
+
+                         The configuration of the h323DebugH323StackTrace2ModuleTable overwrites the
+                         configuration of this variable. For example, let's consider the following
+                         configuration:
+
+                             - In h323DebugH323StackTrace2ModuleTable, the TPKTCHAN trace module is enabled
+                               with the exception trace level. According to this configuration, only the
+                               exception traces are sent for the TPKTCHAN trace module.
+
+                             - The h323DebugH323StackTrace2GeneralLevel variable is set to the warning
+                               trace level. According to this configuration, the exception, error and
+                               warning traces are sent for all the trace modules (including the TPKTCHAN
+                               trace module).
+
+                         Since the configuration of h323DebugH323StackTrace2ModuleTable overwrites the
+                         configuration of h323DebugH323StackTrace2GeneralLevel, only the exception traces
+                         will be sent for the TPKTCHAN trace module.
+
+                         disable   : there is no general configuration for all the trace modules of the
+                                     H.323 stack.
+
+                         exception : enables the exception traces for all the trace modules of the H.323
+                                     stack.
+
+                         error     : enables the exception and error traces for all the trace modules of
+                                     the H.323 stack.
+
+                         warning   : enables the exception, error and warning traces for all the trace
+                                     modules of the H.323 stack."
+            DEFVAL { disable }
+            ::=  {  h323DebugH323StackTrace2 15 }
+
+        h323DebugH323StackTrace2ModuleTable OBJECT-TYPE
+            SYNTAX      SEQUENCE OF H323DebugH323StackTrace2ModuleEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "This table holds the trace configuration for the H.323 stack."
+            ::= { h323DebugH323StackTrace2 20 }
+
+            h323DebugH323StackTrace2ModuleEntry OBJECT-TYPE
+                SYNTAX      H323DebugH323StackTrace2ModuleEntry
+                MAX-ACCESS  not-accessible
+                STATUS      current
+                DESCRIPTION "This row holds the trace configuration for a single trace module of the
+                             H.323 stack."
+                INDEX       { h323DebugH323StackTrace2ModuleIndex }
+
+                ::= { h323DebugH323StackTrace2ModuleTable 1 }
+
+                H323DebugH323StackTrace2ModuleEntry ::= SEQUENCE
+                    {
+                        h323DebugH323StackTrace2ModuleIndex Unsigned32,
+                        h323DebugH323StackTrace2Module      INTEGER,
+                        h323DebugH323StackTrace2Level       INTEGER
+                    }
+
+                h323DebugH323StackTrace2ModuleIndex OBJECT-TYPE
+                    SYNTAX      Unsigned32
+                    MAX-ACCESS  read-only
+                    STATUS      current
+                    DESCRIPTION "Row index."
+                    ::= { h323DebugH323StackTrace2ModuleEntry 5 }
+
+                h323DebugH323StackTrace2Module OBJECT-TYPE
+                    SYNTAX      INTEGER {
+                                          annexe(0),
+                                          appl(1),
+                                          ares(2),
+                                          cat(3),
+                                          ci(4),
+                                          cm(5),
+                                          cmapi(6),
+                                          cmapicb(7),
+                                          cmerr(8),
+                                          config(9),
+                                          ema(10),
+                                          faststart(11),
+                                          h245(12),
+                                          host(13),
+                                          lock(14),
+                                          memory(15),
+                                          mti(16),
+                                          mutex(17),
+                                          per(18),
+                                          pererr(19),
+                                          port(20),
+                                          q931(21),
+                                          q931err(22),
+                                          queue(23),
+                                          ra(24),
+                                          ras(25),
+                                          sec(26),
+                                          select(27),
+                                          sema4(28),
+                                          socket(29),
+                                          ssapi(30),
+                                          ssapicb(31),
+                                          sschan(32),
+                                          sseapi(33),
+                                          sseapicb(34),
+                                          sseerr(35),
+                                          sserr(36),
+                                          sups(37),
+                                          tcp(38),
+                                          thread(39),
+                                          timepool(40),
+                                          timestamp(41),
+                                          tls(42),
+                                          tm(43),
+                                          tpktchan(44),
+                                          tpktwire(45),
+                                          transport(46),
+                                          udpchan(47),
+                                          udpwire(48),
+                                          unreg(49),
+                                          vt(50),
+                                          watchdog(51),
+                                          moduleDisabled(99)
+                                        }
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "Selects and enables a single trace module of the H.323 stack.
+
+                                 moduleDisabled     : no trace module is enabled.
+
+                                 not moduleDisabled : the selected trace module is enabled."
+                    DEFVAL { moduleDisabled }
+                    ::=  {  h323DebugH323StackTrace2ModuleEntry 10 }
+
+                h323DebugH323StackTrace2Level OBJECT-TYPE
+                    SYNTAX      INTEGER {
+                                          disable(0),
+                                          exception(1),
+                                          error(2),
+                                          warning(3),
+                                          informational(4),
+                                          debug(5),
+                                          function(6)
+                                        }
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "Trace level for the selected trace module. Enabling a trace level also enables
+                                 the previous trace levels.
+
+                                 The configuration of the h323DebugH323StackTrace2ModuleTable overwrites the
+                                 configuration of h323DebugH323StackTrace2GeneralLevel. For example, let's
+                                 consider the following configuration:
+
+                                     - In h323DebugH323StackTrace2ModuleTable, the TPKTCHAN trace module is enabled
+                                       with the exception trace level. According to this configuration, only the
+                                       exception traces are sent for the TPKTCHAN trace module.
+
+                                     - The h323DebugH323StackTrace2GeneralLevel variable is set to the warning
+                                       trace level. According to this configuration, the exception, error and
+                                       warning traces are sent for all the trace modules (including the TPKTCHAN
+                                       trace module).
+
+                                 Since the configuration of h323DebugH323StackTrace2ModuleTable overwrites the
+                                 configuration of h323DebugH323StackTrace2GeneralLevel, only the exception traces
+                                 will be sent for the TPKTCHAN trace module.
+
+                                 exception     : sends the exception traces for the selected trace module.
+
+                                 error         : sends the exception and error traces for the selected trace
+                                                 module.
+
+                                 warning       : sends the traces, from level exception to level warning, for the
+                                                 selected trace module.
+
+                                 informational : sends the traces, from level exception to level informational,
+                                                 for the selected trace module.
+
+                                 debug         : sends the traces, from level exception to level debug, for the
+                                                 selected trace module.
+
+                                 function      : sends the traces, from level exception to level function, for
+                                                 the selected trace module. The function traces are used to
+                                                 follow the chain of function calls in the H.323 stack. A trace
+                                                 is sent when entering a function and another trace is sent when
+                                                 leaving the function. This level is very verbose and should be
+                                                 used carefully."
+                    DEFVAL { disable }
+                    ::=  {  h323DebugH323StackTrace2ModuleEntry 15 }
+
+
+
+
+    -- *************************************************************************
+    -- Conformance information
+    -- *************************************************************************
+    h323DebugCompliances OBJECT IDENTIFIER ::= { h323DebugConformance 1 }
+        -- *********************************************************************
+        h323DebugBasicComplVer1 MODULE-COMPLIANCE
+            STATUS      current
+            DESCRIPTION "This is a list of conformance groups. These conformance
+                         groups contain the name of objects used to debug,
+                         monitor and track Mediatrix H.323 endpoints."
+            MODULE      -- MX-H323-DEBUG-MIB
+            MANDATORY-GROUPS {
+                               h323DebugH323StackTraceGroupVer1,
+                               h323DebugH323StackTrace2GroupVer1,
+                               h323DebugH323SupplementaryTraceGroupVer1
+                             }
+            ::= { h323DebugCompliances 5 }
+
+
+
+
+    -- *************************************************************************
+    -- MIB variable grouping
+    -- *************************************************************************
+    h323DebugGroups OBJECT IDENTIFIER ::= { h323DebugConformance 2 }
+        -- *********************************************************************
+        h323DebugH323StackTraceGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                      h323DebugH323StackTraceLevel,
+                      h323DebugH323StackTraceModulesAnnexE,
+                      h323DebugH323StackTraceModulesCa,
+                      h323DebugH323StackTraceModulesCaerr,
+                      h323DebugH323StackTraceModulesChannels,
+                      h323DebugH323StackTraceModulesCm,
+                      h323DebugH323StackTraceModulesCmapi,
+                      h323DebugH323StackTraceModulesCmapicb,
+                      h323DebugH323StackTraceModulesCmerr,
+                      h323DebugH323StackTraceModulesDebug,
+                      h323DebugH323StackTraceModulesEfrm,
+                      h323DebugH323StackTraceModulesEtimer,
+                      h323DebugH323StackTraceModulesEtimerheap,
+                      h323DebugH323StackTraceModulesH450apdu,
+                      h323DebugH323StackTraceModulesLi,
+                      h323DebugH323StackTraceModulesLiinfo,
+                      h323DebugH323StackTraceModulesMei,
+                      h323DebugH323StackTraceModulesNamechan,
+                      h323DebugH323StackTraceModulesPer,
+                      h323DebugH323StackTraceModulesPererr,
+                      h323DebugH323StackTraceModulesPdlapi,
+                      h323DebugH323StackTraceModulesPdlchan,
+                      h323DebugH323StackTraceModulesPdlcomm,
+                      h323DebugH323StackTraceModulesPdlconf,
+                      h323DebugH323StackTraceModulesPdlencode,
+                      h323DebugH323StackTraceModulesPdlerror,
+                      h323DebugH323StackTraceModulesPdlfnerr,
+                      h323DebugH323StackTraceModulesPdllist,
+                      h323DebugH323StackTraceModulesPdlmisc,
+                      h323DebugH323StackTraceModulesPdlmtask,
+                      h323DebugH323StackTraceModulesPdlprint,
+                      h323DebugH323StackTraceModulesPdlprnerr,
+                      h323DebugH323StackTraceModulesPdlprnwrn,
+                      h323DebugH323StackTraceModulesPdlsm,
+                      h323DebugH323StackTraceModulesPdlsrc,
+                      h323DebugH323StackTraceModulesPdltimer,
+                      h323DebugH323StackTraceModulesPi,
+                      h323DebugH323StackTraceModulesQ931,
+                      h323DebugH323StackTraceModulesQ931err,
+                      h323DebugH323StackTraceModulesRa,
+                      h323DebugH323StackTraceModulesRasctrl,
+                      h323DebugH323StackTraceModulesRasindb,
+                      h323DebugH323StackTraceModulesSeli,
+                      h323DebugH323StackTraceModulesSsapi,
+                      h323DebugH323StackTraceModulesSsapicb,
+                      h323DebugH323StackTraceModulesSschan,
+                      h323DebugH323StackTraceModulesSseapi,
+                      h323DebugH323StackTraceModulesSseapicb,
+                      h323DebugH323StackTraceModulesSsechan,
+                      h323DebugH323StackTraceModulesSseerr,
+                      h323DebugH323StackTraceModulesSserr,
+                      h323DebugH323StackTraceModulesTimer,
+                      h323DebugH323StackTraceModulesTpktchan,
+                      h323DebugH323StackTraceModulesTransport,
+                      h323DebugH323StackTraceModulesTunnctrl,
+                      h323DebugH323StackTraceModulesUdpchan,
+                      h323DebugH323StackTraceModulesUnreg,
+                      h323DebugH323StackTraceModulesVt
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to enable/disable the various
+                         trace modules of the H.323 stack."
+            ::= { h323DebugGroups 5 }
+        -- *********************************************************************
+        h323DebugH323StackTrace2GroupVer1 OBJECT-GROUP
+            OBJECTS {
+                      h323DebugH323StackTrace2Enable,
+                      h323DebugH323StackTrace2ContentEnable,
+                      h323DebugH323StackTrace2GeneralLevel,
+                      h323DebugH323StackTrace2Module,
+                      h323DebugH323StackTrace2Level
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to enable/disable the various
+                         trace modules of the H.323 stack."
+            ::= { h323DebugGroups 10 }
+        -- *********************************************************************
+        h323DebugH323SupplementaryTraceGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                      h323DebugSuppTraceEngineProvision,
+                      h323DebugSuppTraceMediaProvision,
+                      h323DebugSuppTraceDebugProvision,
+                      h323DebugSuppTraceGkReg
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to enable/disable supplementary
+                         traces."
+            ::= { h323DebugGroups 15 }
+END

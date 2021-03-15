@@ -1,0 +1,1820 @@
+RAD-Pw-MIB DEFINITIONS ::= BEGIN
+
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       InterfaceIndexOrZero     FROM  IF-MIB
+       PerfCurrentCount, PerfIntervalCount     FROM  PerfHist-TC-MIB
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       IpAddress, Integer32, Gauge32, 
+       NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       InetAddressType, InetAddress     FROM  INET-ADDRESS-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       IndexIntegerNextFree     FROM  DIFFSERV-MIB
+       pwDescr     FROM  PW-STD-MIB
+       MacAddress, RowStatus, DateAndTime, 
+       TruthValue     FROM  SNMPv2-TC
+       rad     FROM  RAD-SMI-MIB
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB
+       protectGroupLastSwitchReason     FROM  RAD-Protection-MIB; 
+
+    radPw MODULE-IDENTITY
+        LAST-UPDATED "201507161121Z"  -- July 16, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+        DESCRIPTION
+            "PW MIB."
+    ::= { rad 14 }
+
+radPwNotifications      OBJECT IDENTIFIER ::= { radPw 0 }
+radPwCfgObjects         OBJECT IDENTIFIER ::= { radPw 1 }
+radPwPerfMonitoring     OBJECT IDENTIFIER ::= { radPw 2 }
+
+radPwGenCfgObjects      OBJECT IDENTIFIER ::= { radPwCfgObjects 1 }
+radPwPsnCfgObjects		OBJECT IDENTIFIER ::= { radPwCfgObjects 2 }
+radPwServiceCfgObjects	OBJECT IDENTIFIER ::= { radPwCfgObjects 3 }
+
+-- *** PW General Parameters ***
+
+pwGenTable  OBJECT-TYPE
+     SYNTAX        SEQUENCE OF PwGenEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+     "This table contains general configuration for PW connection."
+     ::= { radPwGenCfgObjects 1 }
+
+pwGenEntry OBJECT-TYPE
+     SYNTAX        PwGenEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table is indexed by pwIdx, the value of which is equal
+          to the same index that was created for the associated entry
+          in the PW Table (in the PW-STD-MIB)- the pwIndex.
+          An entry is created in this table by the agent for every
+          entry in the pwTable."
+     INDEX  { pwIdx }
+        ::= { pwGenTable 1 }
+
+PwGenEntry ::= SEQUENCE {
+    pwIdx                       Unsigned32,
+    pwGenPeerIdx                Unsigned32,
+        pwGenAttachmentCircuit		InterfaceIndexOrZero,
+    pwGenOutgoingInterface      InterfaceIndexOrZero,
+    pwGenOamMode                INTEGER,
+		pwGenOamType				INTEGER,
+    pwGenSequenceNumberField    INTEGER,
+		pwGenNextHopType			INTEGER,
+		pwGenNextHop				Unsigned32,
+  		pwGenIpNextHop				IpAddress,
+  		pwGenMacNextHop				MacAddress,
+    pwGenEnableVlanTag          INTEGER,
+    pwGenVlanId                 Unsigned32,
+    pwGenVlanPriority           Unsigned32,
+    pwGenIpTos                  Unsigned32,
+		pwGenSourceUdpPort			Unsigned32,
+    pwGenSubType                INTEGER,
+		pwGenSourceIpAddress        IpAddress,
+		pwGenSourceIpMask 			IpAddress,
+    pwGenUdpMuxMethod           INTEGER,
+    pwGenOamStatus              INTEGER,
+    pwGenMismatchReason         INTEGER,
+    pwGenOamDelayThreshold      Unsigned32,
+    pwGencasFramesPerPacket     Unsigned32,
+    pwGenOamDelayThresholdFalling  Unsigned32 
+ }
+
+pwIdx  OBJECT-TYPE
+     SYNTAX        Unsigned32
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+     "Index of this table.
+      The value for this object is equal to the value
+      of pwIndex from the pwTable of PW-STD-MIB"
+    ::= { pwGenEntry 1}
+
+pwGenPeerIdx OBJECT-TYPE
+     SYNTAX       Unsigned32
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+     "This object indicates the Index of the Peer
+      (as it is defined in the Peer Table), which terminated this PW."
+    ::= { pwGenEntry 2 }
+
+pwGenAttachmentCircuit OBJECT-TYPE
+     SYNTAX        InterfaceIndexOrZero
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+         "This is a unique index within the ifTable. It represents
+          the attached circuit interface (e.g ATM VC, HDLC) attached to 
+          this PW connection (from  service initiator side).
+
+          A value of zero indicates an interface index that has yet
+          to be determined.
+          Once set, if the attached circuit  is (for some reason) later
+          removed, the agent should DELETE the associated PW rows.
+          If the agent does not delete the rows,
+          the agent MUST set this object to zero.
+          
+          This object is applicable only for device which
+          translates  Attachment Circuit to other logical interface. "
+    ::= { pwGenEntry 3 } 
+
+pwGenOutgoingInterface OBJECT-TYPE
+     SYNTAX        InterfaceIndexOrZero
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "This is a unique index within the ifTable. It represents
+      the outgoing interface (towards the PSN ) attached to
+      this PW connection.
+
+      This object is applicable only when the forwarding is done at
+      layer 2 i.e. without routing. Applicable PSN types are MPLS and
+      Ethernet (MEF8).
+
+      A value of zero indicates an interface index that has yet
+      to be determined, or it is not applicable.
+
+      Once set, if the outgoing interface is (for some reason) later
+      removed, the agent may DELETE the associated PW rows.
+      If the agent does not delete the rows, the agent MUST set this
+      object to zero.
+
+      This object is applicable only for devices that allow
+      manual configuration of outgoing interface."
+    ::= { pwGenEntry 4 }
+
+pwGenOamMode  OBJECT-TYPE
+      SYNTAX        INTEGER
+      {
+      notApplicable (1),
+      disabled      (2),
+      enabled       (3)
+      }
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+      "This objects defines whether OAM will be enabled on this PW.
+       notApplicable(1) value will be used when
+       PW type does not support OAM."
+     ::= { pwGenEntry 5 }
+
+ pwGenOamType    OBJECT-TYPE
+      SYNTAX        INTEGER
+ 	                {
+ 	                 notApplicable (1), 
+ 	                 propietary    (2),
+ 	                 bfd           (3)
+ 	                }
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+ 	 "This objects defines the failure detection mechanism used 
+ 	  on this PW.
+ 	  BFD - Bidirectional Forwarding Detection
+   	  notApplicable(1) value will be used when
+ 	  pwGenOamMode is notApplicable."
+     ::= { pwGenEntry 6 }
+ 
+pwGenSequenceNumberField    OBJECT-TYPE
+      SYNTAX        INTEGER
+      {
+      notApplicable (1),
+      disabled      (2),
+      enabled       (3)
+      }
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+      "This object defines whether processing of Sequence Number field
+       (ATM cell encapsulation) will be done by device, on this PW."
+     ::= { pwGenEntry 7 }
+
+pwGenNextHopType OBJECT-TYPE
+      SYNTAX        INTEGER
+	  {
+	  notApplicable  (1),
+	  atmVc          (2),
+	  bridgePort     (3),
+	  ipV4           (4)	  
+	  }
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+      "Indicates address type of the Next Hop.
+	  Not applicable for device with router."
+      ::= { pwGenEntry 8 }
+ 
+pwGenNextHop  OBJECT-TYPE
+     SYNTAX        Unsigned32 
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "Not applicable (=0) when pwMplsEgressTunnelNextHopType=notApplicable.
+      When applicable, represents ATM VC, Bridge Port, 
+      according to pwMplsEgressTunnelNextHopType."
+    ::= { pwGenEntry 9}
+
+pwGenIpNextHop OBJECT-TYPE
+      SYNTAX        IpAddress
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+ 	  "This object defines local Next Hop IP Address for this PW.
+ 	  0.0.0.0  - means  - not applicable. 
+ 	  This object is applicable only when pwGenNextHopType=ipV4"
+     ::= { pwGenEntry 10 }
+
+pwGenMacNextHop OBJECT-TYPE
+      SYNTAX        MacAddress
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+ 	  "This object defines local Next Hop MAC Address for this PW.
+ 	  0:0:0:0:0:0  - means  - not applicable.
+ 	  This object is applicable only when pwGenNextHopType=bridgePort"
+     ::= { pwGenEntry 11 } 
+     
+pwGenEnableVlanTag OBJECT-TYPE
+     SYNTAX        INTEGER
+     {
+     notApplicable (1),
+     disabled      (2),
+     enabled       (3)
+     }
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "This object enables or disables a VLAN tag on
+      every transmitted packet via this PW connection"
+    ::= { pwGenEntry 12 }
+
+pwGenVlanId      OBJECT-TYPE
+     SYNTAX      Unsigned32  (1..4095)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+     "This object indicates the VLAN ID tag attached
+      to every transmitted packet via this PW connection.
+      This entry is applicable only if pwGenEnableVlanTag=enabled(3)."
+    ::= { pwGenEntry 13 }
+
+pwGenVlanPriority OBJECT-TYPE
+     SYNTAX       Unsigned32 (0..7)
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+     "This object indicates the VLAN priority assigned
+      to every transmitted packet via this PW connection.
+      This entry is applicable only if pwGenEnableVlanTag=enabled(3)"
+    ::= { pwGenEntry 14 }
+
+pwGenIpTos OBJECT-TYPE
+     SYNTAX       Unsigned32
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+     "This object indicates TOS field value
+      for PW having pwPsnType= ip(3)"
+    ::= { pwGenEntry 15 }
+
+pwGenSourceUdpPort OBJECT-TYPE
+     SYNTAX       Unsigned32  
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+	 "This object indicates source UDP port (1...65535) value
+	  for pw having pwPsnType= ip (3)"
+    ::= { pwGenEntry 16 }
+
+pwGenSubType  OBJECT-TYPE
+     SYNTAX        INTEGER
+     {
+     notApplicable       (1),
+     clockRecovery       (2),
+     clockDistribution   (3),
+     data                (4)
+     }
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "This object indicates the PW Sub Type
+      (i.e. Sub Type of 'pwType' from 'pwTable').
+
+      For ACE-3000 devices:
+      It is applicable only when pwType = basicCesPsn(21)."
+    ::= { pwGenEntry 17 }
+
+pwGenSourceIpAddress  OBJECT-TYPE
+     SYNTAX       IpAddress  
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+	 "Source IP Address per PW"
+    ::= { pwGenEntry 18 }
+
+pwGenSourceIpMask  OBJECT-TYPE
+     SYNTAX       IpAddress  
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+	 "Source IP Mask per PW"
+    ::= { pwGenEntry 19 }
+
+pwGenUdpMuxMethod  OBJECT-TYPE
+     SYNTAX        INTEGER
+     {
+     notApplicable   (1),
+     sourcePort      (2),
+     destinationPort (3)
+     }
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "This objects defines the method in which the UDP header is used
+      to multiplex between different PWs, as follows:
+
+      sourcePort - validate the destination port value
+      and perform internal routing according to the source port
+      (RAD's old implementation).
+
+      destinationPort - the configured destination port,
+      together with both the source and destination IP addresses,
+      uniquely identifies the PW for the receiver (standard method).
+
+      It is applicable only when pwPsnType= ip(3)."
+    ::= { pwGenEntry 21 }
+
+pwGenOamStatus  OBJECT-TYPE
+     SYNTAX        INTEGER
+     {
+     notApplicable   (1),
+     disabled        (2),
+     connected       (3),
+     failure         (4),
+     validationFail  (5)
+     }
+     MAX-ACCESS    read-only
+     STATUS        current
+     DESCRIPTION
+     "This objects indicates the status of the PW OAM:
+      disabled - the PW is shutdown and/or OAM is disabled for the PW.
+      connected - OAM is enabled and is synchronized with the peer
+                  device.
+      failure - OAM not synchronized with the peer and/or data failure.
+      validationFail - configuration mismatch between local and remote
+                       devices."
+    ::= { pwGenEntry 23 }
+
+pwGenMismatchReason       OBJECT-TYPE
+     SYNTAX        INTEGER
+     {
+    tdmoipFrameFormat             (1),
+    tdmoipVersion                 (2),
+    receivedEthernetFrame         (3),
+    receivedFrameLength           (4),
+    other (2147483647)
+     }
+     MAX-ACCESS    read-only
+     STATUS        current
+     DESCRIPTION
+     "  This object details the PW configuration mismatch."
+    ::= { pwGenEntry 24 }
+
+pwGenOamDelayThreshold     OBJECT-TYPE
+     SYNTAX        Unsigned32
+     UNITS         "microseconds"
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "This objects defines a Delay Threshold in microseconds
+     when this value is exceeded an event is sent. (used as rising threshold)
+     Rising threshold range of values is between 1-180 msec,
+     default value is 180msec."
+    ::= { pwGenEntry 27 }
+
+pwGencasFramesPerPacket     OBJECT-TYPE
+     SYNTAX        Unsigned32 ( 1|2|3|4|5|6|7|8|12|16|24|32|40|48|56|64)
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "This objects defines the Frames Per Packet:
+     4 -  E1/T1 frames per packet, packetization delay of 0.5 m.s.
+     8 -  E1/T1 frames per packet, packetization delay of 1 m.s.
+     12 - T1 frames per packet,    packetization delay of 1.5 m.s
+                                (for SF this means no fragmentation)
+     16 - E1 frames per packet (no fragmentation), packetization delay of 2 m.s.
+     24 - T1 frames per packet (no fragmentation), packetization delay of 3 m.s."
+    ::= { pwGenEntry 28 }
+
+pwGenOamDelayThresholdFalling     OBJECT-TYPE
+     SYNTAX        Unsigned32
+     UNITS         "microseconds"
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "This objects defines a PW OAM Delay falling Threshold
+      in microseconds units. When delay reach below this value, event is cleared.
+      Falling threshold range of values is between 1-180 msec,
+      default value is 180msec.
+      Falling threshold must be equal or smaller then rising threshold"
+    ::= { pwGenEntry 29 }
+
+     
+pwGenTimeout     OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION
+       "This object defines the Timeout period, measured in usec.
+        This object is relevant only for ATM service."
+   ::= { radPwGenCfgObjects 2 }
+
+pwGenMisorderWindowSize  OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION
+       "This object defines the Window Size (in packets),
+		in which the device will attempt to reorder packets.
+
+		Packets having sequence number with gap greater than the Window Size -
+		will not take part in the process.	 
+        
+        This object is relevant only for ATM service."
+   ::= { radPwGenCfgObjects 3 }
+
+pwGenFixMisorderSupport  OBJECT-TYPE
+   SYNTAX        INTEGER
+   {
+   notApplicable (1), 
+   disabled      (2),
+   enabled       (3)
+   }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION
+       "This object defines whether the process of reorder,
+        within the Window Size (pwGenMisorderWindowSize), should be activated or not.
+
+        This object is relevant only for ATM service."
+   ::= { radPwGenCfgObjects 4 }
+
+ pwGenLabelTable  OBJECT-TYPE
+    SYNTAX        SEQUENCE OF PwGenLabelEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This table defines supported range of PW labels."
+    ::= { radPwGenCfgObjects 5 }
+ 
+ pwGenLabelEntry OBJECT-TYPE
+      SYNTAX        PwGenLabelEntry
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+          "Entry in this table defines range of PW labels in the direction and type 
+           indicated by pwGenLabelType and pwGenLabelDirection."
+      INDEX  { pwGenLabelType,
+               pwGenLabelDirection}
+         ::= { pwGenLabelTable 1 }
+ 
+ PwGenLabelEntry ::= SEQUENCE {
+ 		pwGenLabelType        INTEGER,
+ 		pwGenLabelDirection   INTEGER,
+ 		pwGenLabelMinValue    Unsigned32,
+ 		pwGenLabelMaxValue	  Unsigned32
+ 		         }
+ 	
+ pwGenLabelType  OBJECT-TYPE
+      SYNTAX        INTEGER
+      {
+ 	  static (2),
+ 	  dynamic(3)
+      } 
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+ 	     "This object defines type of label."
+     ::= { pwGenLabelEntry 1 } 
+ 
+ pwGenLabelDirection  OBJECT-TYPE
+      SYNTAX        INTEGER
+      {
+ 	  ingress (2),
+ 	  egress  (3)
+      } 
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+ 	   "This object defines PW direction."
+     ::= { pwGenLabelEntry 2 }
+ 
+ pwGenLabelMinValue OBJECT-TYPE
+      SYNTAX        Unsigned32 
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+    	"This object defines minimum value of PW labels, 
+    	  in the direction and type indicated by 
+    	  pwGenLabelType and pwGenLabelDirection."
+     ::= { pwGenLabelEntry 3 } 
+  
+ pwGenLabelMaxValue  OBJECT-TYPE
+      SYNTAX        Unsigned32 
+      MAX-ACCESS    read-write
+      STATUS        current
+      DESCRIPTION
+ 	  "This object define maximum value of PW labels,
+ 	   in the direction and type indicated by 
+ 	   pwGenLabelType and pwGenLabelDirection."
+     ::= { pwGenLabelEntry 4 } 
+
+
+-- Peer Table
+
+peerTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Peer Table"
+    ::= { radPwGenCfgObjects 6 }
+
+peerEntry OBJECT-TYPE
+    SYNTAX      PeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in this table."
+    INDEX { peerIndex }
+    ::= { peerTable 1 }
+
+PeerEntry ::= SEQUENCE {
+    peerIndex               Unsigned32,
+    peerRowStatus           RowStatus,
+    peerAddressType         InetAddressType,
+    peerAddress             InetAddress,
+    peerName                SnmpAdminString,
+    peerNoOfUsages          Unsigned32,
+    peerTargeted            INTEGER,
+    peerNextHopAddressType  InetAddressType,
+    peerNextHopAddress      InetAddress,
+    peerAddressClass        INTEGER,
+    peerMacAddress          MacAddress,
+    peerRouterInstance      Unsigned32 
+ }
+
+peerIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Peer Index."
+    ::= { peerEntry 1 }
+
+peerRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object is used for creating, modifying and deleting
+     a row of this table."
+    ::= { peerEntry 2 }
+
+peerAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Address Type of the Peer node.
+     It should be set to 'unknown' if PE/PW maintenance protocol
+     is not used and the address is unknown.
+
+     The peer address can be an IP address or a MAC address. Since the
+     standard TC (InetAddressType) supports only IP address types an
+     additional object, peerAddressClass, is defined.
+     The value of peerAddressClass indicates whether the relevant
+     objects are peerAddressType+peerAddress or peerMacAddress."
+    ::= { peerEntry 3 }
+
+peerAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Peer node Address.
+     of the PW/PE maintenance protocol entity.
+     This object SHOULD contain a value of all zeroes if not applicable
+     (peerAddrType is 'unknown')."
+    ::= { peerEntry 4 }
+
+peerName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Peer Name."
+    ::= { peerEntry 5 }
+
+peerNoOfUsages OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the number of times this Peer is used
+     (by PWs, Egress LSP Tunnels etc)."
+    ::= { peerEntry 6 }
+
+peerTargeted OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable   (1),
+    no              (2),
+    yes             (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object indicates whether the Peer is configured
+     as a Targeted Peer or not."
+    ::= { peerEntry 7 }
+
+peerNextHopAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Address Type of the Peer Next Hop node.
+     It should be set to 'unknown' if the address is unknown."
+    ::= { peerEntry 8 }
+
+peerNextHopAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the Peer Next Hop node Address.
+     This object SHOULD contain a value of all zeroes if not applicable
+     (peerAddrType is 'unknown')."
+    ::= { peerEntry 9 }
+
+peerAddressClass OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    ip             (2),
+    mac            (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object defines if the Peer address is given as an IP address
+     or a MAC address.
+     The value of peerAddressClass indicates whether the relevant
+     objects are peerAddressType+peerAddress or peerMacAddress."
+    DEFVAL {ip}
+    ::= { peerEntry 10 }
+
+peerMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object defines the address of the peer node when layer 2
+     forwarding is used (MEF8)"
+    ::= { peerEntry 11 }
+
+peerRouterInstance OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object defines the instance of the routing domain that this peer belongs to."
+    DEFVAL {1}
+    ::= { peerEntry 12 }
+
+
+
+-- *** PW PSN Parameters
+
+-- *** MPLS PSN type parameters ***
+
+radPwPsnCfgMpls   OBJECT IDENTIFIER ::= { radPwPsnCfgObjects 1}
+
+-- MPLS Type PSN Configuration Table
+
+pwMplsCfgTable  OBJECT-TYPE
+     SYNTAX        SEQUENCE OF PwMplsCfgEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table contains MPLS PSN related configuration for 
+          PW connection."
+     ::= { radPwPsnCfgMpls 1 }
+
+pwMplsCfgEntry OBJECT-TYPE
+     SYNTAX        PwMplsCfgEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table is indexed by pwIdx, the value of which is equal
+          to the same index that was created for the associated entry 
+          in the PW Table (in the PW-STD-MIB)- the pwIndex.
+          An entry is created in this table by the agent for every
+          entry in the pwGenTable with a pwGenPsnType=MPLS."
+     INDEX  { pwIdx }
+        ::= { pwMplsCfgTable 1 }
+
+PwMplsCfgEntry ::= SEQUENCE {
+		pwMplsCfgIngressTunnel Unsigned32,
+		pwMplsCfgEgressTunnel  Unsigned32
+        }
+	
+pwMplsCfgIngressTunnel  OBJECT-TYPE
+     SYNTAX        Unsigned32 
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+	 "This object points to an entry of pwMplsIngressTunnelTable.
+	 Its value is equal to pwMplsIngressTunnelIndex"
+    ::= { pwMplsCfgEntry  1} 
+
+pwMplsCfgEgressTunnel    OBJECT-TYPE
+     SYNTAX        Unsigned32 
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+	 "This object points to an entry of pwMplsEgressTunnelTable.
+	  Its value is equal to pwMplsEgressTunnelIndex."
+    ::= { pwMplsCfgEntry 2 } 
+
+-- *** ETH PSN Type tables were removed
+-- since there's no ETH PSN.
+-- VLAN parameters were replaced by
+-- pwGenEnableVlanTag, pwGenVlanId,pwGenVlanPriority 
+
+-- *** IP PSN Type tables were removed.
+
+
+-- *** Service Parameters ***
+
+-- *** TDM over IP / CESoPSN Service
+radPwServiceCfgTDMoIp   OBJECT IDENTIFIER ::= { radPwServiceCfgObjects 1}
+
+pwTDMoIpTable  OBJECT-TYPE
+     SYNTAX        SEQUENCE OF PwTDMoIpEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table contains TDMoIP Service  related configuration for 
+          PW connection."
+     ::= { radPwServiceCfgTDMoIp 1 }
+
+pwTDMoIpEntry OBJECT-TYPE
+     SYNTAX        PwTDMoIpEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table is indexed by pwIdx, the value of which is equal
+          to the same index that was created for the associated entry 
+          in the PW Table (in the PW-STD-MIB)- the pwIndex.
+
+          An entry is created in this table by the agent for every
+          entry in the pwTable with a pwType equal to one of the
+          following:          
+          e1Satop(17), t1Satop(18), e3Satop(19), t3Satop(20),
+          basicCesPsn(21), basicTdmIp(22),  tdmCasCesPsn(23),
+          tdmCasTdmIp(24)."
+     INDEX  { pwIdx }
+        ::= { pwTDMoIpTable 1 }
+
+PwTDMoIpEntry ::= SEQUENCE {
+        pwTDMoIpCfgIndex    	  Unsigned32
+        }
+
+pwTDMoIpCfgIndex     OBJECT-TYPE
+     SYNTAX        Unsigned32 
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+	 "Index to TDMoIP table below. Multiple TDMoIP PWs  
+      MAY share a single pwTDMoIpCfgEntry"
+    ::= { pwTDMoIpEntry 1}
+
+-- *** TDM over IP / CESoPSN Service configuration table
+
+
+pwTDMoIpIndexNext  OBJECT-TYPE
+      SYNTAX        IndexIntegerNextFree 
+      MAX-ACCESS    read-only
+      STATUS        current
+      DESCRIPTION
+          "This object contains an unused value for
+           pwTDMoIpCfgTableIndex, or a zero to indicate
+           that none exist. Negative values are not allowed,
+           as they do not correspond to valid values of
+           pwTDMoIpCfgTableIndex."
+      ::= { radPwServiceCfgTDMoIp 2 }
+
+pwTDMoIpCfgTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF PwTDMoIpCfgEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table contains TDM over IP service configuration 
+         for PW connection."
+     ::= { radPwServiceCfgTDMoIp 3 }
+
+pwTDMoIpCfgEntry OBJECT-TYPE
+     SYNTAX        PwTDMoIpCfgEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table is indexed by pwIdx, the value of which is equal
+          to the same index that was created for the associated entry 
+          in the PW Table (in the PW-STD-MIB)- the pwIndex.
+          
+          An entry is created in this table by the agent for every
+          entry in the pwTable with a pwType equal to one of the
+          following:   
+          e1Satop(17), t1Satop(18), e3Satop(19), t3Satop(20),
+          basicCesPsn(21), basicTdmIp(22),  tdmCasCesPsn(23),
+          tdmCasTdmIp(24)."
+     INDEX  { pwTDMoIpCfgTableIndex }
+        ::= { pwTDMoIpCfgTable 1 }
+
+PwTDMoIpCfgEntry ::= SEQUENCE {
+        pwTDMoIpCfgTableIndex   	  Unsigned32,
+        pwTDMoIpCfgRowStatus          RowStatus,
+        pwTDMoIpCfgPayloadFormat      INTEGER,
+		pwTDMoIpCfgFarEndType		  INTEGER,
+		pwTDMoIpCfgDelaySensitivity   INTEGER,
+    	pwTDMoIpCfgFramesInPacket     Unsigned32
+        }
+
+pwTDMoIpCfgTableIndex  OBJECT-TYPE
+     SYNTAX        Unsigned32 
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+	 "Index to an entry in this table"
+    ::= { pwTDMoIpCfgEntry 1}
+
+pwTDMoIpCfgRowStatus    OBJECT-TYPE
+     SYNTAX               RowStatus
+     MAX-ACCESS           read-create
+     STATUS               current
+     DESCRIPTION
+         "Object used for creating, modifying, and deleting
+          a row of this table."
+     ::= { pwTDMoIpCfgEntry 2 }
+
+pwTDMoIpCfgPayloadFormat OBJECT-TYPE
+     SYNTAX        INTEGER
+	               {
+	                notApplicable (1),
+	                v1  (2),
+	                v2	(3)
+	               }
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+     "determine TDM over IP proprietary 
+      payload format."
+    ::= { pwTDMoIpCfgEntry 3 } 
+
+pwTDMoIpCfgFarEndType OBJECT-TYPE
+     SYNTAX        INTEGER
+	                {
+	                 notApplicable (1), 
+	                 dsx1E1        (2),	--E1
+	                 dsx1ESF       (3), --T1 (ESF)
+					 dsx1SF        (4),	--T1 (SF)
+					 unframed      (5) -- Serial
+	                }
+
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+     "Determines TDM over IP Far End type."
+    ::= { pwTDMoIpCfgEntry 4 }
+
+pwTDMoIpCfgDelaySensitivity OBJECT-TYPE
+     SYNTAX        INTEGER
+	                {
+	                 notApplicable (1), 
+	                 disable       (2),--Accurate Clock
+	                 enable        (3) --Constant Delay
+	                }
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+     "Determines whether to optimize the clock 
+      for accurateness or for constant delay:
+         o Disable (Accurate clock is more important than constant delay)
+         o Enable (Constant delay is more important than accurate clock).
+         This parameter is applicable only if PSN Type
+         is TDMoIP , CESoIP, SATOP "
+    ::= { pwTDMoIpCfgEntry 5 } 
+
+pwTDMoIpCfgFramesInPacket OBJECT-TYPE   
+     SYNTAX        Unsigned32 
+     MAX-ACCESS    read-create
+     STATUS        current
+     DESCRIPTION
+     "UDP payload length - determines the ethernet packet size "
+    ::= { pwTDMoIpCfgEntry 6 }
+
+
+-- *** ATM Service
+radPwServiceCfgAtm   OBJECT IDENTIFIER ::= { radPwServiceCfgObjects 2}
+
+pwAtmCfgXTable OBJECT-TYPE				 
+     SYNTAX        SEQUENCE OF PwAtmCfgXEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table is an extension of pwAtmCfgTable
+          of PW-ATM-R-MIB. Each row that is added/removed there
+          will be added/removed in this table."
+     ::= { radPwServiceCfgAtm 1 }
+
+pwAtmCfgXEntry OBJECT-TYPE
+     SYNTAX        PwAtmCfgXEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table is indexed by pwIdx, the value of which is equal
+          to the same index that was created for the associated entry 
+          in the PW Table (in the PW-STD-MIB)- the pwIndex. 
+          An entry may be  created by Agent in this table for 
+          pseudo wires having ATM pwType"
+     INDEX  { pwIdx }	   
+        ::= { pwAtmCfgXTable 1 }
+
+PwAtmCfgXEntry ::= SEQUENCE {
+	pwAtmCfgAal5Mode			INTEGER,
+	pwAtmCfgAal5SduTermType		INTEGER,
+	pwAtmCfgTimeout				Unsigned32
+	}
+
+pwAtmCfgAal5Mode OBJECT-TYPE
+	SYNTAX        INTEGER
+	{
+		notApplicable (1), 
+		disabled      (2),
+		enabled       (3)
+	}
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+	"This objects defines whether AAL5 Mode is enabled for this PW."
+	::= { pwAtmCfgXEntry 1 } 
+
+pwAtmCfgAal5SduTermType OBJECT-TYPE
+	SYNTAX        INTEGER
+	{
+		notApplicable	(1), 
+		atm				(2),
+		router			(3)
+	}
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+	"This objects defines the AAL5-SDU Termination Type.
+	 It means - where should the AAL5-SDU PW frame, received from PSN, be forwarded:  
+	 
+	 atm(2)		- forwarded into ATM VCC.
+	 router(3)	- forwarded into router. 
+	 ."
+	::= { pwAtmCfgXEntry 2 } 
+
+pwAtmCfgTimeout OBJECT-TYPE
+	SYNTAX        Unsigned32
+	MAX-ACCESS    read-write
+	STATUS        current
+	DESCRIPTION
+       "This object defines the Timeout period, measured in usec.
+	    Timeout mechanism is used in order to send out a packet
+	    before the maximum concatenated cells limit has been reached."
+	::= { pwAtmCfgXEntry 3 } 
+
+
+-- ***Frame Relay Service PW Table
+
+radPwServiceCfgFr   OBJECT IDENTIFIER ::= { radPwServiceCfgObjects 3}
+
+
+pwFrCfgTable OBJECT-TYPE
+     SYNTAX        SEQUENCE OF PwFrCfgEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "This table contains a set of parameters for
+          Frame Relay PW in the pwFrTable."
+     ::= { radPwServiceCfgFr 1 }
+
+pwFrCfgEntry OBJECT-TYPE
+     SYNTAX        PwFrCfgEntry
+     MAX-ACCESS    not-accessible
+     STATUS        current
+     DESCRIPTION
+         "These parameters define the characteristics of a
+          Frame Relay PW.
+          This table is indexed by pwIdx, the value of which is equal
+          to the same index that was created for the associated entry 
+          in the PW Table (in the PW-STD-MIB)- the pwIndex. 
+          An entry may be created by Agent in this table for 
+          pseudo wires having Frame Relay pwType"
+          INDEX  { pwIdx }
+        ::= { pwFrCfgTable 1 }
+
+PwFrCfgEntry ::= SEQUENCE {
+        pwFrCfgDlciFieldLength Unsigned32,
+		pwFrCfgBitMarking      BITS,
+		pwFrCfgDlci 		   Unsigned32
+        }
+
+pwFrCfgDlciFieldLength	OBJECT-TYPE
+     SYNTAX        Unsigned32 (10|17|24)
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+	 "DLCI Field length in bytes. Possible values ae
+	 10, 17 or 24"
+    ::= { pwFrCfgEntry 1 }
+
+pwFrCfgBitMarking OBJECT-TYPE
+     SYNTAX        BITS
+	  {
+       pwFrDeIncomingMarking    (0),
+       pwFrFecnIncomingMarking  (1),
+       pwFrBecnIncomingMarking	(2),
+       pwFrDeOutgoingMarking  	(3),
+       pwFrFecnOutgoingMarking	(4),
+       pwFrBecnOutgoingMarking	(5)
+	 }
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+	 "This object defines which Frame Relay bits are copied
+	 into the outgoing interface or from the incoming interface.
+	 When labeled bit is 1, FR bit is copied.
+     For incoming FR bits - DE, FECN and BECN:
+        DE   - pwFrDeIncomingMarking  
+        FECN - pwFrFecnIncomingMarking
+	    BECN - pwFrBecnIncomingMarking
+	For outgoing FR bits - DE, FECN and BECN:
+	    DE   - pwFrDeOutgoingMarking  
+	    FECN - pwFrFecnOutgoingMarking
+	    BECN - pwFrBecnOutgoingMarking "
+    ::= { pwFrCfgEntry 2 }
+
+pwFrCfgDlci        OBJECT-TYPE
+     SYNTAX        Unsigned32 
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+	 "DLCI value of Frame Relay VC associated with this PW."
+    ::= { pwFrCfgEntry 3 }
+
+
+-- PW Performance 
+
+pwPerfCurrentXTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PwPerfCurrentXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table is an extension of pwPerfCurrentTable (PW-STD-R-MIB)."
+   ::= { radPwPerfMonitoring 1 }
+
+pwPerfCurrentXEntry OBJECT-TYPE
+    SYNTAX        PwPerfCurrentXEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+            "An entry in a table."
+    INDEX  { pwIdx }
+    ::= { pwPerfCurrentXTable 1 }
+
+PwPerfCurrentXEntry ::= SEQUENCE {
+    pwPerfCurrentInCongestDropPackets			PerfCurrentCount,
+    pwPerfCurrentOutCongestDropPackets			PerfCurrentCount,
+    pwPerfCurrentInLostPackets          PerfCurrentCount 
+ }
+
+pwPerfCurrentInCongestDropPackets OBJECT-TYPE 
+	SYNTAX		PerfCurrentCount  
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The counter for number of received packets that are dropped
+		 due to congestion by the PW (from the PSN)
+		 in the current 15-minute interval." 
+	::= { pwPerfCurrentXEntry 1 } 
+
+pwPerfCurrentOutCongestDropPackets OBJECT-TYPE 
+	SYNTAX		PerfCurrentCount  
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The counter for number of transmitted packets that are dropped
+		 due to congestion by the PW (to the PSN)
+		 in the current 15-minute interval." 
+	::= { pwPerfCurrentXEntry 2 } 
+
+pwPerfCurrentInLostPackets OBJECT-TYPE
+    SYNTAX      PerfCurrentCount
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The counter for number of incoming lost packets that are
+            lost due to any reason in the current 15-minute interval.
+            The counter takes into account both missing packets as
+            defined by pwTDMPerfCurrentMissingPkts and packets detected
+            out of order that could not be re-ordered or could not fit
+            in the jitter buffer as defined by
+            pwTDMPerfCurrentMisOrderDropped. See RFC5604.
+            The object may be used by devices that not support standard
+            counters mentioned above."
+    ::= { pwPerfCurrentXEntry 3 }
+
+pwPerfIntervalXTable  OBJECT-TYPE
+   SYNTAX       SEQUENCE OF PwPerfIntervalXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table is an extension of pwPerfIntervalTable (PW-STD-R-MIB)."
+    ::= { radPwPerfMonitoring 2 }
+
+pwPerfIntervalXEntry OBJECT-TYPE
+    SYNTAX      PwPerfIntervalXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in a table."
+    INDEX  { pwIdx, pwPerfIntervalXNumber }
+    ::= { pwPerfIntervalXTable 1 }
+
+PwPerfIntervalXEntry ::= SEQUENCE {
+    pwPerfIntervalXNumber               Integer32,
+    pwPerfIntervalInCongestDropPackets		PerfIntervalCount, 
+    pwPerfIntervalOutCongestDropPackets		PerfIntervalCount,
+    pwPerfIntervalInLostPackets         PerfIntervalCount 
+ }
+
+pwPerfIntervalXNumber OBJECT-TYPE
+    SYNTAX      Integer32 (1..96)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A number N, between 1 and 96, which identifies the
+     interval for which the set of statistics is available.
+     The interval identified by 1 is the most recently
+     completed 15 minute interval, and the interval identified
+     by N is the interval immediately preceding the one
+     identified by N-1.
+     The minimum range of N is 1 through 4. The default range
+     is 1 to 32. The maximum range of N is 1 through 96."
+   ::= { pwPerfIntervalXEntry 1 }
+
+pwPerfIntervalInCongestDropPackets OBJECT-TYPE 
+	SYNTAX		PerfIntervalCount 
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The counter for number of received packets that are dropped
+		 due to congestion by the PW (to the PSN) during the interval." 
+	::= { pwPerfIntervalXEntry 2 } 
+
+pwPerfIntervalOutCongestDropPackets OBJECT-TYPE 
+	SYNTAX		PerfIntervalCount 
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The counter for number of transmitted packets that are dropped
+		 due to congestion by the PW (to the PSN) during the interval." 
+	::= { pwPerfIntervalXEntry 3 } 
+
+pwPerfIntervalInLostPackets OBJECT-TYPE
+    SYNTAX      PerfIntervalCount
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The counter for number of incoming lost packets that are
+            lost due to any reason in the 15-minute interval.
+            The counter takes into account both missing packets as
+            defined by pwTDMPerfIntervalMissingPkts and packets detected
+            out of order that could not be re-ordered or could not fit
+            in the jitter buffer as defined by
+            pwTDMPerfIntervalMisOrderDropped. See RFC5604.
+            The object may be used by devices that not support standard
+            counters mentioned above."
+    ::= { pwPerfIntervalXEntry 4 }
+
+-- ATM PW Performance 
+
+pwAtmPerfCurrentXTable  OBJECT-TYPE 
+	SYNTAX		SEQUENCE OF PwAtmPerfCurrentXEntry 
+	MAX-ACCESS	not-accessible 
+	STATUS		current 
+	DESCRIPTION 
+         "This table is an extension of pwArmPerfCurrentTable (PW-ATM-R-MIB)."
+   ::= { radPwPerfMonitoring 3 } 
+
+pwAtmPerfCurrentXEntry OBJECT-TYPE 
+	SYNTAX        PwAtmPerfCurrentXEntry 
+	MAX-ACCESS    not-accessible 
+	STATUS        current 
+	DESCRIPTION 
+		"An entry in a table." 
+	INDEX  { pwIdx } 
+	::= { pwAtmPerfCurrentXTable 1 } 
+
+PwAtmPerfCurrentXEntry ::= SEQUENCE
+	{ 
+		pwAtmPerfCurrentInDiscardTotalCells			PerfCurrentCount,
+		pwAtmPerfCurrentInDiscardClp0Cells			PerfCurrentCount,
+		pwAtmPerfCurrentTaggedCells					PerfCurrentCount
+	} 
+
+pwAtmPerfCurrentInDiscardTotalCells OBJECT-TYPE 
+	SYNTAX		PerfCurrentCount  
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The number of total received cells (CLP0 and CLP1)
+		 that were discarded by the traffic policer,
+		 in the current 15-minute interval." 
+	::= { pwAtmPerfCurrentXEntry 1 } 
+
+pwAtmPerfCurrentInDiscardClp0Cells OBJECT-TYPE 
+	SYNTAX		PerfCurrentCount  
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The number of received CLP0 cells
+		 that were discarded by the traffic policer,
+		 in the current 15-minute interval." 
+	::= { pwAtmPerfCurrentXEntry 2 } 
+
+pwAtmPerfCurrentTaggedCells OBJECT-TYPE 
+	SYNTAX		PerfCurrentCount  
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The number of cells that were tagged
+		 by the traffic policer from CLP=0 to CLP=1,
+		 in the current 15-minute interval." 
+	::= { pwAtmPerfCurrentXEntry 3 } 
+
+
+pwAtmPerfIntervalXTable  OBJECT-TYPE 
+   SYNTAX		SEQUENCE OF PwAtmPerfIntervalXEntry 
+	MAX-ACCESS	not-accessible 
+	STATUS		current 
+	DESCRIPTION 
+         "This table is an extension of pwAtmPerfIntervalTable (PW-ATM-R-MIB)."
+	::= { radPwPerfMonitoring 4 } 
+
+pwAtmPerfIntervalXEntry OBJECT-TYPE 
+	SYNTAX		PwAtmPerfIntervalXEntry 
+	MAX-ACCESS	not-accessible 
+	STATUS		current 
+	DESCRIPTION 
+		"An entry in a table." 
+	INDEX  { pwIdx, pwAtmPerfIntervalXNumber } 
+	::= { pwAtmPerfIntervalXTable 1 } 
+
+PwAtmPerfIntervalXEntry ::= SEQUENCE
+	{ 
+		pwAtmPerfIntervalXNumber					Integer32, 
+		pwAtmPerfIntervalInDiscardTotalCells		PerfIntervalCount,
+		pwAtmPerfIntervalInDiscardClp0Cells			PerfIntervalCount,
+		pwAtmPerfIntervalTaggedCells				PerfIntervalCount
+	} 
+
+pwAtmPerfIntervalXNumber OBJECT-TYPE 
+	SYNTAX		Integer32 (1..96) 
+	MAX-ACCESS	not-accessible 
+	STATUS		current 
+	DESCRIPTION 
+		"A number N, between 1 and 96, which identifies the 
+		 interval for which the set of statistics is available. 
+		 The interval identified by 1 is the most recently 
+		 completed 15 minute interval, and the interval identified 
+		 by N is the interval immediately preceding the one 
+		 identified by N-1. 
+		 The minimum range of N is 1 through 4. The default range 
+		 is 1 to 32. The maximum range of N is 1 through 96." 
+   ::= { pwAtmPerfIntervalXEntry 1 } 
+
+pwAtmPerfIntervalInDiscardTotalCells OBJECT-TYPE 
+	SYNTAX		PerfIntervalCount 
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The number of total received cells (CLP0 and CLP1)
+		 that were discarded by the traffic policer,
+		 during the interval."
+	::= { pwAtmPerfIntervalXEntry 2 }
+
+pwAtmPerfIntervalInDiscardClp0Cells OBJECT-TYPE 
+	SYNTAX		PerfIntervalCount  
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The number of received CLP0 cells
+		 that were discarded by the traffic policer,
+		 during the interval." 
+	::= { pwAtmPerfIntervalXEntry 3 } 
+
+pwAtmPerfIntervalTaggedCells OBJECT-TYPE 
+	SYNTAX		PerfIntervalCount  
+	MAX-ACCESS	read-only 
+	STATUS		current 
+	DESCRIPTION 
+		"The number of cells that were tagged
+		 by the traffic policer from CLP=0 to CLP=1,
+		 during the interval." 
+	::= { pwAtmPerfIntervalXEntry 4 } 
+
+-- PW connectivity running statistics
+
+pwPerfConnTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PwPerfConnEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table provides connectivity statistics for PW troubleshooting."
+   ::= { radPwPerfMonitoring 5 }
+
+pwPerfConnEntry OBJECT-TYPE
+    SYNTAX        PwPerfConnEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+    "An entry in a table."
+    INDEX  { pwIdx }
+    ::= { pwPerfConnTable 1 }
+
+PwPerfConnEntry ::= SEQUENCE {
+    pwPerfConnJitterBufferLevel           Gauge32,
+    pwPerfConnMinJitterBufferLevel        Gauge32,
+    pwPerfConnMaxJitterBufferLevel        Gauge32,
+    pwPerfConnRoundTripDelay              Gauge32,
+    pwPerfConnMinRoundTripDelay           Gauge32,
+    pwPerfConnMaxRoundTripDelay           Gauge32,
+    pwPerfConnClearStats                  INTEGER 
+ }
+
+pwPerfConnJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the current level (depth), in microseconds,
+     of the jitter buffer."
+    ::= { pwPerfConnEntry 1 }
+
+pwPerfConnMinJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the minimum level (depth), in microseconds,
+     of the jitter buffer since the last statistics reset."
+    ::= { pwPerfConnEntry 2 }
+
+pwPerfConnMaxJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the maximum level (depth), in microseconds,
+     of the jitter buffer since the last statistics reset."
+    ::= { pwPerfConnEntry 3 }
+
+pwPerfConnRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the current round trip delay (RTD), in
+     microseconds."
+    ::= { pwPerfConnEntry 4 }
+
+pwPerfConnMinRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the minimum round trip delay (RTD), in
+     microseconds, since the last statistics reset."
+    ::= { pwPerfConnEntry 5 }
+
+pwPerfConnMaxRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the maximum round trip delay (RTD), in
+     microseconds, since the last statistics reset."
+    ::= { pwPerfConnEntry 6 }
+
+pwPerfConnClearStats OBJECT-TYPE
+     SYNTAX        INTEGER
+     {
+     off  (2), -- read-only value
+     on   (3)  -- write-only value
+     }
+     MAX-ACCESS    read-write
+     STATUS        current
+     DESCRIPTION
+     "A command that instructs the agent to clear the connectivity
+      statistics i.e. to reset the values of the minimum and maximum
+      jitter buffer levels and RTDs.
+
+      Setting this object to on(3), shall clear the connectivity
+      statistics. Upon completion, the value shall automatically
+      change to off(2)."
+     DEFVAL {off}
+    ::= { pwPerfConnEntry 7 }
+
+
+-- PW connectivity current statistics
+
+pwPerfConnCurrentTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PwPerfConnCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table provides per-PW connectivity statistics for the current
+     15-minute interval."
+   ::= { radPwPerfMonitoring 6 }
+
+pwPerfConnCurrentEntry OBJECT-TYPE
+    SYNTAX        PwPerfConnCurrentEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+    "An entry in this table is created by the agent for every PW.
+
+     After 15 minutes, the contents of this table entry are copied to a
+     new entry in the pwPerfConnIntervalTable, and the counts in this
+     entry are reset to zero."
+    INDEX  { pwIdx }
+    ::= { pwPerfConnCurrentTable 1 }
+
+PwPerfConnCurrentEntry ::= SEQUENCE {
+    pwPerfConnCurrentMinJitterBufferLevel        Gauge32,
+    pwPerfConnCurrentAvgJitterBufferLevel        Gauge32,
+    pwPerfConnCurrentMaxJitterBufferLevel        Gauge32,
+    pwPerfConnCurrentMinRoundTripDelay           Gauge32,
+    pwPerfConnCurrentAvgRoundTripDelay           Gauge32,
+    pwPerfConnCurrentMaxRoundTripDelay           Gauge32 
+ }
+
+pwPerfConnCurrentMinJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the minimum level (depth), in microseconds,
+     of the jitter buffer in the current 15-minute interval."
+    ::= { pwPerfConnCurrentEntry 1 }
+
+pwPerfConnCurrentAvgJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the average level (depth), in microseconds,
+     of the jitter buffer in the current 15-minute interval."
+    ::= { pwPerfConnCurrentEntry 2 }
+
+pwPerfConnCurrentMaxJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the maximum level (depth), in microseconds,
+     of the jitter buffer in the current 15-minute interval."
+    ::= { pwPerfConnCurrentEntry 3 }
+
+pwPerfConnCurrentMinRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the minimum round trip delay (RTD), in
+     microseconds, in the current 15-minute interval."
+    ::= { pwPerfConnCurrentEntry 4 }
+
+pwPerfConnCurrentAvgRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the average round trip delay (RTD), in
+     microseconds, in the current 15-minute interval."
+    ::= { pwPerfConnCurrentEntry 5 }
+
+pwPerfConnCurrentMaxRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the maximum round trip delay (RTD), in
+     microseconds, in the current 15-minute interval."
+    ::= { pwPerfConnCurrentEntry 6 }
+
+
+-- PW connectivity interval statistics
+
+pwPerfConnIntervalTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PwPerfConnIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table provides per-PW connectivity statistics for the history
+     15-minute intervals."
+   ::= { radPwPerfMonitoring 7 }
+
+pwPerfConnIntervalEntry OBJECT-TYPE
+    SYNTAX        PwPerfConnIntervalEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+    "An entry in this table is created by the agent for every
+     pwPerfConnCurrentEntry that is 15 minutes old.
+
+     The contents of the current entry are copied to the new entry here.
+     The current entry then resets its counts to zero for the next
+     15-minute interval."
+    INDEX  { pwIdx,
+             pwPerfConnIntervalNumber }
+    ::= { pwPerfConnIntervalTable 1 }
+
+PwPerfConnIntervalEntry ::= SEQUENCE {
+    pwPerfConnIntervalNumber                      Unsigned32,
+    pwPerfConnIntervalValidData                   TruthValue,
+    pwPerfConnIntervalTimeElapsed                 Unsigned32,
+    pwPerfConnIntervalStartTime                   DateAndTime,
+    pwPerfConnIntervalMinJitterBufferLevel        Gauge32,
+    pwPerfConnIntervalAvgJitterBufferLevel        Gauge32,
+    pwPerfConnIntervalMaxJitterBufferLevel        Gauge32,
+    pwPerfConnIntervalMinRoundTripDelay           Gauge32,
+    pwPerfConnIntervalAvgRoundTripDelay           Gauge32,
+    pwPerfConnIntervalMaxRoundTripDelay           Gauge32 
+ }
+
+pwPerfConnIntervalNumber OBJECT-TYPE
+    SYNTAX  Unsigned32 (1..96)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "A number N, between 1 and 96, which identifies the interval for which
+     the set of statistics is available.
+     The interval identified by 1 is the most recently completed 15-minute
+     interval, and the interval identified by N is the interval immediately
+     preceding the one identified by N-1."
+    ::= { pwPerfConnIntervalEntry 1 }
+
+pwPerfConnIntervalValidData OBJECT-TYPE
+    SYNTAX        TruthValue
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "This variable indicates if the data for this interval is valid."
+    ::= { pwPerfConnIntervalEntry 2 }
+
+pwPerfConnIntervalTimeElapsed OBJECT-TYPE
+      SYNTAX      Unsigned32
+      UNITS       "seconds"
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "The duration of this interval in seconds.
+
+       Adjustments in the system's time-of-day clock may cause the interval
+       to be greater or less than the normal value. Therefore, this actual
+       interval value is provided."
+    ::= { pwPerfConnIntervalEntry 3 }
+
+pwPerfConnIntervalStartTime   OBJECT-TYPE
+    SYNTAX        DateAndTime
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The date and time of start of this interval.
+
+     Time zone octets are not used (OCTET STRING (SIZE (8))."
+    ::= { pwPerfConnIntervalEntry 4 }
+
+pwPerfConnIntervalMinJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the minimum level (depth), in microseconds,
+     of the jitter buffer during the history 15-minute interval."
+    ::= { pwPerfConnIntervalEntry 5 }
+
+pwPerfConnIntervalAvgJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the average level (depth), in microseconds,
+     of the jitter buffer during the history 15-minute interval."
+    ::= { pwPerfConnIntervalEntry 6 }
+
+pwPerfConnIntervalMaxJitterBufferLevel OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the maximum level (depth), in microseconds,
+     of the jitter buffer during the history 15-minute interval."
+    ::= { pwPerfConnIntervalEntry 7 }
+
+pwPerfConnIntervalMinRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the minimum round trip delay (RTD), in
+     microseconds, during the history 15-minute interval."
+    ::= { pwPerfConnIntervalEntry 8 }
+
+pwPerfConnIntervalAvgRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the average round trip delay (RTD), in
+     microseconds, during the history 15-minute interval."
+    ::= { pwPerfConnIntervalEntry 9 }
+
+pwPerfConnIntervalMaxRoundTripDelay OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "microseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The gauge that shows the maximum round trip delay (RTD), in
+     microseconds, during the history 15-minute interval."
+    ::= { pwPerfConnIntervalEntry 10 }
+
+
+
+----------------------------------------------------------
+-- Pseudo Wire (PW) Common Trap Definitions
+----------------------------------------------------------
+
+-- CONFIGURATION MISMATCH
+pwConfigMismatch  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr, pwGenMismatchReason } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that a configuration mismatch was detected on the PW.
+       Mismatches can be detected for example in: TDMoIP frame format, received frame length ,
+       TDMoIP version or when an Ethernet Frame is received instead of TDMoIP frame.
+      "
+      ::= { radPwNotifications 1 }
+
+
+-- OAM FAILURE
+pwOamFailure  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that the OAM PW is disconnected.
+      "
+      ::= { radPwNotifications 2 }
+
+
+-- REMOTE DEFECT INDICATION (RDI)
+pwRdi  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that a Remote Defect indication at the far end device was
+       detected on the PW.
+      "
+      ::= { radPwNotifications 3 }
+
+
+-- RECEIVE FAILURE
+pwRxFailure  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that Ethernet frames were not received on the PW.
+      "
+      ::= { radPwNotifications 4 }
+
+-- PW JITTER BUFFER OVERFLOW
+
+pwJitterBufferOverflow    NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that PW Jitter Buffer Overflow .
+      "
+::= { radPwNotifications 9 }
+
+-- PW JITTER BUFFER UNDERFLOW
+
+pwJitterBufferUnderflow         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that PW Jitter Buffer Underflow .
+      "
+::= { radPwNotifications 10 }
+
+
+pwOamDelayTca                   NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr, pwPerfConnRoundTripDelay, pwGenOamDelayThreshold } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that OAM PW Delay threshold crossing alert.
+      "
+::= { radPwNotifications 11 }
+
+
+pwOamDelayTcaOff                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     pwDescr, pwPerfConnRoundTripDelay, pwGenOamDelayThresholdFalling } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that OAM PW Delay is in the permitted range.
+      "
+::= { radPwNotifications 12 }
+
+
+END
+

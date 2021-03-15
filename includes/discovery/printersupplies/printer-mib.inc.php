@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,12 +6,12 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-$prt_supplies = snmpwalk_cache_oid($device, 'prtMarkerSuppliesTable', array(), 'Printer-MIB', NULL, OBS_SNMP_ALL_ASCII);
-$prt_colorant = snmpwalk_cache_twopart_oid($device, 'prtMarkerColorantTable', array(), 'Printer-MIB', NULL, OBS_SNMP_ALL_ASCII);
+$prt_supplies = snmpwalk_cache_oid($device, 'prtMarkerSuppliesTable', array(), 'Printer-MIB', NULL, OBS_SNMP_ALL_UTF8);
+$prt_colorant = snmpwalk_cache_twopart_oid($device, 'prtMarkerColorantTable', array(), 'Printer-MIB', NULL, OBS_SNMP_ALL_UTF8);
 //print_vars($prt_supplies);
 //print_vars($prt_colorant);
 
@@ -64,7 +63,7 @@ foreach ($prt_supplies as $index => $entry)
   // prtMarkerColorantTonality.1.1 = 256
 
   //$descr        = snmp_hexstring($entry['prtMarkerSuppliesDescription']); // Some HPs return a Hex-string.
-  $descr        = $entry['prtMarkerSuppliesDescription']; // Forced ASCII
+  $descr        = rewrite_entity_name($entry['prtMarkerSuppliesDescription']); // Forced ASCII
   $oid          = ".1.3.6.1.2.1.43.11.1.1.9.$index";
   $capacity_oid = ".1.3.6.1.2.1.43.11.1.1.8.$index";
 
@@ -96,7 +95,7 @@ foreach ($prt_supplies as $index => $entry)
 
   if ($capacity > 0 && $level >= 0)
   {
-    $level = round($level / $capacity * 100);
+    $level = percent($level, $capacity, FALSE);
   }
 
   switch ($entry['prtMarkerSuppliesSupplyUnit'])

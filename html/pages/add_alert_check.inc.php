@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -23,14 +22,14 @@ register_html_resource('js', 'jQuery.extendext.min.js');
 register_html_resource('js', 'doT.min.js');
 register_html_resource('js', 'query-builder.js');
 register_html_resource('js', 'bootbox.min.js');
-register_html_resource('js', 'bootstrap-select.min.js');
+//register_html_resource('js', 'bootstrap-select.min.js');
 register_html_resource('js', 'interact.min.js');
 
 include($config['html_dir']."/includes/alerting-navbar.inc.php");
 
   // print_vars($vars);
 
-  if (isset($vars['submit']) && $vars['submit'] == "add_alert_check")
+  if (isset($vars['submit']) && $vars['submit'] === "add_alert_check")
   {
     $message = '<h4>Adding alert checker</h4> ';
 
@@ -250,10 +249,11 @@ if(!isset($vars['entity_type'])) {
                         <div class="controls">
                            <?php
                            $item = array('id'        => 'alert_send_recovery',
-                                         'size'      => 'small',
-                                         'off-color' => 'danger',
+                                         'size'      => 'big',
+                                         'view'      => 'toggle',
+                                         'palette'   => 'blue',
                                          'value'     => (isset($vars['alert_send_recovery']) ? $vars['alert_send_recovery'] : 1)); // Set to on by default
-                           echo(generate_form_element($item, 'switch'));
+                           echo(generate_form_element($item, 'toggle'));
                            ?>
                         </div>
                     </div>
@@ -266,13 +266,7 @@ if(!isset($vars['entity_type'])) {
                                          'live-search' => FALSE,
                                          'width'       => '220px',
                                          'value'       => $vars['alert_severity'],
-                                         'values'      => array('crit' => array('name' => 'Critical',
-                                                                                'icon' => $config['icon']['exclamation']),
-                                                                //'warn' => array('name' => 'Warning',
-                                                                //                'icon' => 'oicon-warning'),
-                                                                //'info' => array('name' => 'Informational',
-                                                                //                'icon' => 'oicon-information'),
-                                         )
+                                         'values'      => $config['alert']['severity'],
                            );
                            echo(generate_form_element($item, 'select'));
                            ?>
@@ -323,14 +317,28 @@ if(!isset($vars['entity_type'])) {
 
                    echo(PHP_EOL . '          </div>' . PHP_EOL);
 
+                   $metrics_list = [];
+                   foreach ($config['entities'][$vars['entity_type']]['metrics'] as $metric => $entry)
+                   {
+                     $metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;('.$entry['label'].')';
+                   }
+
                    $item = array('id'          => 'alert_conditions',
                                  'name'        => 'Metric Conditions',
                                  'placeholder' => TRUE,
                                  //'width'       => '220px',
-                                 'class'       => 'col-md-12',
-                                 'rows'        => 3,
+                                 'class'       => 'col-md-7',
+                                 'style'       => 'margin-right: 10px',
+                                 'rows'        => count($metrics_list) > 3 ? count($metrics_list) : 3,
                                  'value'       => $vars['alert_conditions']);
                    echo generate_form_element($item, 'textarea');
+
+                   $metrics_list = [];
+                   foreach ($config['entities'][$vars['entity_type']]['metrics'] as $metric => $entry)
+                   {
+                     $metrics_list[] = '<span class="label">'.$metric.'</span>&nbsp;-&nbsp;'.$entry['label'];
+                   }
+                   echo('<div class="col-md-5"><b>List of known metrics:</b><br />' . implode(',<br/>', $metrics_list) . '</div>');
 
                    echo generate_box_close();
 

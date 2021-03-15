@@ -1,7 +1,6 @@
 <?php
 
 $scale_min = 0;
-include($config['html_dir']."/includes/graphs/common.inc.php");
 
 $colour_area     = "EEEEEE";
 $colour_line     = "36393D";
@@ -11,9 +10,11 @@ $unit_text       = "Seconds";
 
 $rrd_filename = get_rrd_path($device, "app-lighttpd-".$app['app_id']);
 
+include($config['html_dir']."/includes/graphs/common.inc.php");
+
 $ds = "uptime";
 
-$rrd_options   .= " DEF:uptime=".$rrd_filename.":uptime:AVERAGE";
+$rrd_options   .= " DEF:uptime=".$rrd_filename_escape.":uptime:AVERAGE";
 $rrd_options   .= " CDEF:cuptime=uptime,86400,/";
 
 if ($width<224)

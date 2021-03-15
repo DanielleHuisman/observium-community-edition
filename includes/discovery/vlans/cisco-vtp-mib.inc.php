@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -43,6 +42,9 @@ switch ($vtpversion)
       }
       foreach ($vtpvlans[$vtp_domain_index] as $vlan_id => $vlan)
       {
+        // Skip extra entries with unknown state
+        if (!isset($vlan['vtpVlanState'], $vlan['vtpVlanType'])) { continue; }
+
         $vlan_array = array('ifIndex'     => $vlan['vtpVlanIfIndex'],
                             'vlan_domain' => $vtp_domain_index,
                             'vlan_vlan'   => $vlan_id,
@@ -72,7 +74,7 @@ if (in_array($device['os'], array('ios', 'iosxe')) && is_device_mib($device, 'Q-
     // Already configured snmp context
     print_warning("WARNING: Device already configured with SNMP context, polling ports vlans not possible.");
   }
-  else if ($device['snmp_version'] == 'v3' && $device['os'] == "ios" && ($ios_version * 10) <= 121)
+  elseif ($device['snmp_version'] === 'v3' && $device['os'] === "ios" && ($ios_version * 10) <= 121)
   {
     // vlan context not worked on Cisco IOS <= 12.1 (SNMPv3)
     print_error("ERROR: For VLAN context to work on this device please use SNMP v2/v1 for this device (or upgrade IOS).");
@@ -105,7 +107,7 @@ if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking all
 
       $device_context = $device;
       // Add vlan context for snmp auth
-      if ($device['snmp_version'] == 'v3')
+      if ($device['snmp_version'] === 'v3')
       {
         $device_context['snmp_context'] = 'vlan-' . $vlan_id;
       } else {
@@ -118,7 +120,7 @@ if ($check_ports_vlans && count($discovery_vlans)) // Per port vlans walking all
       if ($GLOBALS['exec_status']['exitcode'] != 0)
       {
         unset($device_context);
-        if ($device['snmp_version'] == 'v3')
+        if ($device['snmp_version'] === 'v3')
         {
           print_error("ERROR: For VLAN context to work on Cisco devices with SNMPv3, it is necessary to add 'match prefix' in snmp-server config.");
         } else {

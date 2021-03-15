@@ -4,9 +4,9 @@
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -183,7 +183,7 @@ function generate_mempool_row($mempool, $vars)
 
   $link = generate_url(array("page" => "device", "device" => $mempool['device_id'], "tab" => "health", "metric" => 'mempool'));
 
-  $overlib_content = generate_overlib_content($graph_array, $mempool['hostname'] . " - " . $mempool['mempool_descr']);
+  $overlib_content = generate_overlib_content($graph_array, $mempool['hostname'] . " - " . rewrite_entity_name($mempool['mempool_descr'], 'mempool'));
 
   $graph_array['width'] = 80;
   $graph_array['height'] = 20;

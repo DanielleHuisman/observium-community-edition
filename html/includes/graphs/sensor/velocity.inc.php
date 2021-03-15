@@ -26,8 +26,8 @@ $print_min = 1;
 
 include($config['html_dir']."/includes/graphs/generic_simplex.inc.php");
 
-if (is_numeric($sensor['sensor_limit']))     { $rrd_options .= " HRULE:".$sensor['sensor_limit']."#999999::dashes"; }
-if (is_numeric($sensor['sensor_limit_low'])) { $rrd_options .= " HRULE:".$sensor['sensor_limit_low']."#999999::dashes"; }
+if (is_numeric($sensor['sensor_limit']))     { $rrd_options .= " HRULE:".$sensor['sensor_limit']."#99999960::dashes"; }
+if (is_numeric($sensor['sensor_limit_low'])) { $rrd_options .= " HRULE:".$sensor['sensor_limit_low']."#99999960::dashes"; }
 
 $graph_return['descr'] = 'Velocity sensor measured in m/s.';
 

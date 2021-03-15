@@ -5,7 +5,7 @@
  *
  * @package    observium
  * @subpackage templates
- * @copyright  (C) 2006-2015 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 /**
@@ -108,7 +108,7 @@
     <tr><td colspan=2><strong>Metrics</strong></td><td>{{{METRICS}}}</td></tr>
     <tr><td colspan=2><strong>Duration</strong></td><td>{{DURATION}}</td></tr>
     <tr><td colspan=3>Device</td></tr>
-    <tr><td colspan=2><strong>Device</strong></td><td><strong>{{{DEVICE_LINK}}}</strong></td></tr>
+    <tr><td colspan=2><strong>Device</strong></td><td><strong>{{{DEVICE_LINK}}}</strong>{{#DEVICE_DESCRIPTION}} ({{DEVICE_DESCRIPTION}}){{/DEVICE_DESCRIPTION}}</td></tr>
     <tr><td colspan=2><strong>Hardware</strong></td><td>{{DEVICE_HARDWARE}}</td></tr>
     <tr><td colspan=2><strong>Operating System</strong></td><td>{{DEVICE_OS}}</td></tr>
     <tr><td colspan=2><strong>Location</strong></td><td>{{DEVICE_LOCATION}}</td></tr>

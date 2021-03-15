@@ -81,10 +81,19 @@
           $prefix += strlen($bin);
         }
       }
+      /*
       $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
                                                             'ip'      => $ip_address,
                                                             'mask'    => $ip_mask,
                                                             'prefix'  => $prefix);
+      */
+      $data = [
+        'ifIndex' => $ifIndex,
+        'ip'      => $ip_address,
+        'mask'    => $ip_mask,
+        'prefix'  => $prefix
+      ];
+      discover_add_ip_address($device, $mib, $data);
     }
     unset($ifName, $ifIndex, $ip_version, $ip_address, $ip_mask, $prefix);
   }

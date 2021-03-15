@@ -18,7 +18,7 @@ $rrd_filename = get_rrd_path($device, "netstats-tcp.rrd");
 $ds = "tcpCurrEstab";
 
 $colour_area = "ef3b2c";
-$colour_line = "67000d";
+$colour_line = "80000d";
 
 $colour_area_max = "dddddd";
 

@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -20,7 +19,7 @@ $type_text['ipsec_tunnels'] = "IPSEC Tunnels";
 
 // Cisco ACE
 $type_text['loadbalancer_rservers'] = "Rservers";
-$type_text['loadbalancer_vservers'] = "Serverfarms";
+$type_text['lb_slb_vsvrs'] = "Serverfarms";
 
 register_html_title("Routing");
 
@@ -48,7 +47,7 @@ if (isset($device_routing_count[$vars['proto']]) && $device_routing_count[$vars[
   return;
 }
 
-if (is_file($config['html_dir']."/pages/device/routing/".$vars['proto'].".inc.php"))
+if (is_alpha($vars['proto']) && is_file($config['html_dir']."/pages/device/routing/".$vars['proto'].".inc.php"))
 {
   include($config['html_dir']."/pages/device/routing/".$vars['proto'].".inc.php");
 } else {
@@ -59,7 +58,7 @@ if (is_file($config['html_dir']."/pages/device/routing/".$vars['proto'].".inc.ph
       if (is_file($config['html_dir']."/pages/device/routing/overview/".$type.".inc.php"))
       {
         $g_i++;
-        if (!is_integer($g_i/2)) { $row_colour = $list_colour_a; } else { $row_colour = $list_colour_b; }
+        if (!is_integer($g_i/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
 
         echo('<div style="background-color: '.$row_colour.';">');
         echo('<div style="padding:4px 0px 0px 8px;"><span class=graphhead>'.$type_text[$type].'</span>');

@@ -11,12 +11,12 @@
  *
  */
 
-// We should walk, so we can discover here too.
+/* FIXME. At some day I should rewrite this to definitions, but some checks is so hard, need more time for convert */
 
 $table_rows = array();
 $c_table_rows = array();
 
-// 'BGP4-MIB', 'CISCO-BGP4-MIB', 'BGP4-V2-MIB-JUNIPER', 'FORCE10-BGP4-V2-MIB', 'ARISTA-BGP4V2-MIB', 'FOUNDRY-BGP4V2-MIB'
+// 'BGP4-MIB', 'CISCO-BGP4-MIB', 'BGP4-V2-MIB-JUNIPER', 'FORCE10-BGP4-V2-MIB', 'ARISTA-BGP4V2-MIB', 'FOUNDRY-BGP4V2-MIB', 'HUAWEI-BGP-VPN-MIB'
 if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-MIB is main MIB, without it, the rest will not be checked
 {
   $p_list          = array(); // Init founded peers list
@@ -130,6 +130,34 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
                                    'vendor_PrefixCountersSafi'      => 'bgp4V2PrefixInPrefixes'),
                                    # PrefixCountersSafi is not-accessible in draft-13, but we
                                    # only use the INDEX from it, so use bgp4V2PrefixInPrefixes.
+
+    // Huawei BGP
+    'HUAWEI-BGP-VPN-MIB'  => array('vendor_use_index'         => array('hwBgpPeerRemoteAddr'      => 1,
+                                                                       'hwBgpPeerRemoteAddrType'  => 1,
+                                                                       'hwBgpPeerRemoteIdentifier' => 1,
+                                                                       'hwBgpPeerAdminStatus' => 1,
+                                                                       'afi'  => 'hwBgpPeerAddrFamilyAfi',
+                                                                       'safi' => 'hwBgpPeerAddrFamilySafi'),
+                                   'vendor_PeerTable'               => 'hwBgpPeerTable',
+                                   'vendor_PeerState'               => 'hwBgpPeerState',
+                                   'vendor_PeerAdminStatus'         => 'hwBgpPeerAdminStatus', // really not exist, always set to start if entry exist
+                                   'vendor_PeerInUpdates'           => 'hwBgpPeerInUpdateMsgCounter',
+                                   'vendor_PeerOutUpdates'          => 'hwBgpPeerOutUpdateMsgCounter',
+                                   'vendor_PeerInTotalMessages'     => 'hwBgpPeerInTotalMsgCounter',
+                                   'vendor_PeerOutTotalMessages'    => 'hwBgpPeerOutTotalMsgCounter',
+                                   'vendor_PeerFsmEstablishedTime'  => 'hwBgpPeerFsmEstablishedTime',
+                                   'vendor_PeerInUpdateElapsedTime' => '', // not exist
+                                   'vendor_PeerLocalAs'             => '', // not exist
+                                   'vendor_PeerLocalAddr'           => '',
+                                   'vendor_PeerIdentifier'          => 'hwBgpPeerRemoteIdentifier', // really not exist
+                                   'vendor_PeerRemoteAs'            => 'hwBgpPeerRemoteAs',
+                                   'vendor_PeerRemoteAddr'          => 'hwBgpPeerRemoteAddr',
+                                   'vendor_PeerRemoteAddrType'      => 'hwBgpPeerRemoteAddrType', // not exist
+                                   'vendor_PeerIndex'               => '',
+                                   'vendor_PeerAcceptedPrefixes'    => 'hwBgpPeerPrefixRcvCounter',
+                                   'vendor_PeerDeniedPrefixes'      => '',
+                                   'vendor_PeerAdvertisedPrefixes'  => 'hwBgpPeerPrefixAdvCounter',
+                                   'vendor_PrefixCountersSafi'      => 'hwBgpPeerPrefixActiveCounter'), # we only use the INDEX from it
   );
 
   $vendor_mib = FALSE;
@@ -285,7 +313,7 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
           $oid = 'vendor_'.$oid;
           $vendor_oid = $$oid;
           //print_vars($oid);
-          if ($vendor_oid)
+          if (strlen($vendor_oid) && !isset($vendor_use_index[$vendor_oid]))
           {
             //print_vars($vendor_oid);
             $vendor_bgp = snmpwalk_cache_oid($device, $vendor_oid, $vendor_bgp, $vendor_mib, NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
@@ -408,7 +436,7 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
         $$bgp_oid = $bgp_peers[$peer_ip][$bgp_oid];
       }
     }
-    else if ($cisco_version === 2)
+    elseif ($cisco_version === 2)
     {
       // Cisco BGP4 V2 MIB
       $c_index = (strstr($peer_ip, ':')) ? 'ipv6.' . ip2hex($peer_ip, ':') : 'ipv4.' . $peer_ip;
@@ -430,12 +458,15 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
         $$bgp_oid = $cisco_peers[$c_index][$c_oid];
       }
     }
-    else if ($vendor_mib)
+    elseif ($vendor_mib)
     {
       foreach ($bgp_oids as $bgp_oid)
       {
         $vendor_oid = $vendor_oids[$vendor_mib][str_replace('bgp', 'vendor_', $bgp_oid)];
-        $$bgp_oid   = $vendor_peers[$peer_ip][$peer_as][$vendor_oid];
+        if (strlen($vendor_peers[$peer_ip][$peer_as][$vendor_oid]))
+        {
+          $$bgp_oid = $vendor_peers[$peer_ip][$peer_as][$vendor_oid];
+        }
       }
     }
     print_debug(PHP_EOL."Peer: $peer_ip (State = $bgpPeerState, AdminStatus = $bgpPeerAdminStatus)");
@@ -568,31 +599,29 @@ if ($config['enable_bgp'] && is_device_mib($device, 'BGP4-MIB')) // Note, BGP4-M
           // Missing: cbgpPeerAdminLimit cbgpPeerPrefixThreshold cbgpPeerPrefixClearThreshold cbgpPeerSuppressedPrefixes cbgpPeerWithdrawnPrefixes
 
           // See posible AFI/SAFI here: https://www.juniper.net/techpubs/en_US/junos12.3/topics/topic-map/bgp-multiprotocol.html
-          $afis['1'] = 'ipv4';
-          $afis['2'] = 'ipv6';
-          $afis['ipv4'] = '1';
-          $afis['ipv6'] = '2';
-          $safis = array('unicast'    => 1,
-                         'multicast'  => 2,
-                         'mpls'       => 4,
-                         'mdt'        => 66,
-                         'vpn'        => 128,
-                         'vpn multicast' => 129);
+          $afi_num  = is_numeric($afi)  ? $afi  : $config['routing_afis_name'][$afi];
+          $safi_num = is_numeric($safi) ? $safi : $config['routing_safis_name'][$safi];
 
           //$peer_index = $vendor_peers[$peer_ip][$peer_as][$vendor_PeerIndex];
           $peer_index = $peer_afi['bgpPeerIndex'];
-          if (isset($vendor_counters[$peer_index.'.'.$afi.'.'.$safis[$safi]]))
+          if (isset($vendor_counters[$peer_index])) // Huawei MIB
           {
-            $index = $peer_index . '.' . $afi        . '.' . $safis[$safi];
+            $index = $peer_index;
+          }
+          elseif (isset($vendor_counters[$peer_index.'.'.$afi_num.'.'.$safi_num]))
+          {
+            $index = $peer_index.'.'.$afi_num.'.'.$safi_num;
           } else {
-            $index = $peer_index . '.' . $afis[$afi] . '.' . $safis[$safi];
+            // unknown index
+            print_debug("Unknown AFI/SAFI index");
+            //$index = $peer_index . '.' . $afis[$afi] . '.' . $safis[$safi];
           }
 
           $cbgpPeerAcceptedPrefixes   = $vendor_counters[$index][$vendor_PeerAcceptedPrefixes];
           $cbgpPeerDeniedPrefixes     = $vendor_counters[$index][$vendor_PeerDeniedPrefixes];
           $cbgpPeerAdvertisedPrefixes = $vendor_counters[$index][$vendor_PeerAdvertisedPrefixes];
-          $cbgpPeerSuppressedPrefixes = "U";
-          $cbgpPeerWithdrawnPrefixes  = "U";
+          $cbgpPeerSuppressedPrefixes = "";
+          $cbgpPeerWithdrawnPrefixes  = "";
         }
 
         // Update cbgp states

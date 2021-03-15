@@ -1,0 +1,332 @@
+-- *****************************************************************
+-- MY-TIME-MIB.mib:  My Time MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+DES7200-TIME-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        DateAndTime
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        myMgmt
+                FROM DES7200-SMI;
+
+myTimeMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "This module defines my time mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 15}
+
+myTimeMIBObjects OBJECT IDENTIFIER ::= { myTimeMIB 1 }
+
+myClockDateAndTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The current local date and time for the system.
+
+        Setting this object is equivalent to setting an automated
+        clock and calendar.  The value of the object will track the
+        date and time from the value set.  Note that due to hardware
+        limitations some systems may not be able to preserve such
+        meaning across reboots of the system, as indicated by
+        csyClockLostOnReboot.
+
+        A constant value of all zeros and length 8 indicates the
+        system is not aware of the present date and time."
+    ::= { myTimeMIBObjects 1 }
+
+myClockWeek OBJECT-TYPE
+    SYNTAX      INTEGER(1..7)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This value indicate that which day currunt time of system indicate. e.g. 
+         1 indicate Monday，7 indicate Sunday"
+    ::= { myTimeMIBObjects 2 }    
+    
+
+myTimeRangeMIBObjects OBJECT IDENTIFIER ::= { myTimeMIB 2}
+
+--
+-- Time/scheduling range filter table
+--
+
+myTimeRangeTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyTimeRangeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Defines a table of filters which can be used to effectively
+         enable or disable policies based on a valid time range."
+    ::= { myTimeRangeMIBObjects 1}
+
+myTimeRangeEntry OBJECT-TYPE
+    SYNTAX      MyTimeRangeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A row describing a given time range for which a policy may be
+         filtered on to place the rule active or inactive."
+    INDEX   { myTimeRangeName }
+    ::= { myTimeRangeTable 1 }
+
+MyTimeRangeEntry ::= SEQUENCE {
+    myTimeRangeName                 DisplayString,
+    myTimeRangePeriodMy          DateAndTime,
+    myTimeRangePeriodEnd            DateAndTime,
+    myTimeRangeRowStatus            RowStatus
+}
+
+myTimeRangeName OBJECT-TYPE
+    SYNTAX      DisplayString(SIZE (1..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An administratively assigned name for this time range.
+         This value is unique for every entry
+         When this string be used as an index,Value of a sub-identifier equal 
+         ASCII value of corresponding character(first sub-identifier corresponds
+         first character of string). The number of sub-identifiers of this string
+         must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+         will be filled in tail."
+    ::= { myTimeRangeEntry 1 }
+
+
+myTimeRangePeriodMy OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The mying time period for this filter.  In addition to a
+         normal DateAndTime string, this object may be set to the
+         OCTET STRING value THISANDPRIOR which indicates that the
+         filter is valid from any time before now up until (at least)
+         now."
+    DEFVAL { '0000010100000000'H }
+    ::= { myTimeRangeEntry 2 }
+
+myTimeRangePeriodEnd OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The ending time period for this filter.  In addition to a
+         normal DateAndTime string, this object may be set to the
+         OCTET STRING value THISANDFUTURE which indicates that the
+         filter is valid without an ending date and/or time."
+    DEFVAL { '9999123123595909'H }
+    ::= { myTimeRangeEntry 3 }
+
+myTimeRangeRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the conceptual status of this row."
+    ::= { myTimeRangeEntry 4 }
+
+
+--
+-- Time range periodic filter table
+--
+
+myTimeRangePeriodicTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyTimeRangePeriodicEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Defines a table of periodic time filters in the time-range."
+    ::= { myTimeRangeMIBObjects 2 }
+
+myTimeRangePeriodicEntry OBJECT-TYPE
+    SYNTAX      MyTimeRangePeriodicEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A row describing a given periodic time limit for the time-range."
+    INDEX   { myTimeRangePeriodicTRName }
+    ::= { myTimeRangePeriodicTable 1 }
+
+MyTimeRangePeriodicEntry ::= SEQUENCE {
+    myTimeRangePeriodicTRName               DisplayString,
+    myTimeRangePeriodicIndex                Integer32,
+    myTimeRangePeriodicType                 INTEGER, 
+    myTimeRangePeriodicMyWeekDay         BITS,
+    myTimeRangePeriodicEndWeekDay           INTEGER,
+    myTimeRangePeriodicTimeOfDayMy       DateAndTime,
+    myTimeRangePeriodicTimeOfDayEnd         DateAndTime,
+    myTimeRangePeriodicRowStatus            RowStatus
+}
+
+myTimeRangePeriodicTRName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(1..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Time-range name which this periodic time filter belong to.
+         This value is unique for every entry
+         When this string be used as an index,Value of a sub-identifier equal 
+         ASCII value of corresponding character(first sub-identifier corresponds
+         first character of string). The number of sub-identifiers of this string
+         must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+         will be filled in tail."
+    ::= { myTimeRangePeriodicEntry 1 }
+
+myTimeRangePeriodicIndex OBJECT-TYPE
+        SYNTAX Integer32(1..65535)
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+               "Object which specifies a unique entry in the myTimeRangePeriodicTable. 
+                A management station wishing to initiate a entry operation should use a
+                pseudo-random value for this object when creating
+                or modifying an instance of a entry.
+                
+                The RowStatus semantics of the entry object will prevent access conflicts."
+        ::= { myTimeRangePeriodicEntry 2 }
+        
+myTimeRangePeriodicType OBJECT-TYPE
+        SYNTAX INTEGER{
+              fixed-segment(1),   -- 固定时间段，表项定义的时间区间是在一天或若干天内的一
+                                  -- 个固定时间段 
+              unfixed-segment(2)  -- 非固定时间段，表项定义的时间区间是一个星期内的某一段时间，
+                                  -- 可能跨越一天或几天
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+               "表项中时间段定义的类型"
+        ::= { myTimeRangePeriodicEntry 3 }        
+
+myTimeRangePeriodicMyWeekDay OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "这个字段表示时间段在星期内的起始日，这个字节中的每一位
+         表示星期中的某一天。最低位(最右边的一位)代表monday，向
+         左依次为Tuesday, wednesday,thursday, friday,saturday,
+         sunday，最高位(最左边的一位)始终为0。每位为1表示包括其
+         代表的这一天"	   
+    DEFVAL {'fe'H}
+    ::= { myTimeRangePeriodicEntry 4 }
+
+myTimeRangePeriodicEndWeekDay OBJECT-TYPE
+    SYNTAX      INTEGER{
+                       monday(1), tuesday(2), wednesday(3),
+                       thursday(4), friday(5), saturday(6),
+                       sunday(7)                            
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "时间段在星期内的结束日,当myTimeRangePeriodicType
+         的类型为'fixed-segment'时，这个字段没有意义"
+    ::= { myTimeRangePeriodicEntry 5 }
+    
+myTimeRangePeriodicTimeOfDayMy OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "时间段的开始时间(time)，这里利用了'DateAndTime'这种
+         数据类型，实际中数据类型中中只有时间(time)部分有意义，
+         日期(date)部分忽略."
+    ::= { myTimeRangePeriodicEntry 6 }
+
+myTimeRangePeriodicTimeOfDayEnd OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "时间段的结束时间(time)，这里利用了'DateAndTime'
+        这种数据类型，实际中数据类型中中只有时间(time)
+        部分有意义，日期(date)部分忽略."
+     ::= { myTimeRangePeriodicEntry 7 }
+
+myTimeRangePeriodicRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the conceptual status of this row"
+    ::= { myTimeRangePeriodicEntry 8 }
+
+myTimeMIBConformance OBJECT IDENTIFIER ::= { myTimeMIB 3 }
+myTimeMIBCompliances OBJECT IDENTIFIER ::= { myTimeMIBConformance 1 }
+myTimeMIBGroups      OBJECT IDENTIFIER ::= { myTimeMIBConformance 2 }
+
+
+-- compliance statements
+
+myTimeMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My Time MIB"
+        MODULE  -- this module
+                GROUP myTimeMIBGroup
+                DESCRIPTION
+                  "This group is mandatory for device which support RTC."                  
+                GROUP myTimeRangeMIBGroup
+                DESCRIPTION
+                  "This group is mandatory for device which support RTC or NTP/SNTP."                
+                
+        ::= { myTimeMIBCompliances 1 }
+                
+-- units of conformance
+
+myTimeMIBGroup OBJECT-GROUP
+        OBJECTS {
+               myClockDateAndTime, 
+               myClockWeek
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing time information."
+        ::= { myTimeMIBGroups 1 } 
+        
+myTimeRangeMIBGroup OBJECT-GROUP
+        OBJECTS {
+          myTimeRangePeriodicTRName         ,
+          myTimeRangePeriodicIndex          ,
+          myTimeRangePeriodicType           ,
+          myTimeRangePeriodicMyWeekDay   ,
+          myTimeRangePeriodicEndWeekDay     ,
+          myTimeRangePeriodicTimeOfDayMy ,
+          myTimeRangePeriodicTimeOfDayEnd   ,
+          myTimeRangePeriodicRowStatus       
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing time-range function."
+        ::= { myTimeMIBGroups 2 }        
+  
+END

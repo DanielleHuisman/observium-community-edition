@@ -19,6 +19,10 @@
 
 $form_devices = dbFetchColumn('SELECT DISTINCT `device_id` FROM `ipv6_addresses`;');
 $form_items['devices'] = generate_form_values('device', $form_devices);
+foreach (dbFetchColumn('SELECT DISTINCT `ipv6_type` FROM `ipv6_addresses`;') as $type)
+{
+  $form_items['types'][$type] = [ 'name' => $config['ip_types'][$type]['name'], 'subtext' => $config['ip_types'][$type]['subtext'] ];
+}
 
 $form = array('type'  => 'rows',
               'space' => '5px',
@@ -37,6 +41,12 @@ $form['row'][0]['interface']  = array(
                                 'width'       => '100%',
                                 'value'       => $vars['interface'],
                                 'values'      => array('' => 'All Interfaces', 'Lo' => 'Loopbacks', 'Vlan' => 'Vlans'));
+$form['row'][0]['type']  = array(
+                                'type'        => 'multiselect',
+                                'name'        => 'IP Type',
+                                'width'       => '100%',
+                                'value'       => $vars['type'],
+                                'values'      => $form_items['types']);
 $form['row'][0]['network'] = array(
                                 'type'        => 'text',
                                 'name'        => 'IP Network',
@@ -56,7 +66,7 @@ $form['row'][0]['address']  = array(
 // search button
 $form['row'][0]['search']   = array(
                                 'type'        => 'submit',
-                                'grid'        => 3,
+                                'grid'        => 1,
                                 //'div_class'   => 'col-lg-3 col-md-3 col-sm-3',
                                 //'name'        => 'Search',
                                 //'icon'        => 'icon-search',

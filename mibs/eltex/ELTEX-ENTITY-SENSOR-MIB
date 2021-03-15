@@ -1,0 +1,312 @@
+ELTEX-ENTITY-SENSOR-MIB DEFINITIONS ::= BEGIN
+
+-- Title:   ELTEX ENTITY SENSOR MIB
+-- Version: 1.0
+-- Date:    2 May 2017
+
+IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Unsigned32
+        FROM SNMPv2-SMI
+
+    TruthValue,
+    RowStatus
+        FROM SNMPv2-TC
+
+    EltexThresholdRelation
+        FROM ELTEX-TC
+
+    EntitySensorValue, entPhySensorValue
+        FROM ENTITY-SENSOR-MIB
+
+    entPhysicalIndex
+        FROM ENTITY-MIB
+
+    eltexLtd
+        FROM ELTEX-SMI-ACTUAL
+
+    SyslogSeverity
+        FROM SYSLOG-TC-MIB;
+
+eltexEntitySensorMIB MODULE-IDENTITY
+    LAST-UPDATED    "201705020000Z"
+    ORGANIZATION    "Eltex Enterprise, Ltd."
+    CONTACT-INFO
+        "www.eltex.nsk.ru"
+    DESCRIPTION
+        "The ELTEX-ENTITY-SENSOR-MIB is used as extension of
+        ENTITY-SENSOR-MIB (RFC 3433)."
+    REVISION        "201705020000Z"
+    DESCRIPTION "Initial revision of ELTEX-ENTITY-SENSOR-MIB."
+    ::= { eltexLtd 40 }
+
+---------------------------------------------------------------------------------------
+eltexEntitySensorMIBObjects OBJECT IDENTIFIER ::= { eltexEntitySensorMIB 1 }
+
+eltexEntitySensorCommon  OBJECT IDENTIFIER ::= { eltexEntitySensorMIBObjects 1 }
+---------------------------------------------------------------------------------------
+
+eltexEntitySensorTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexEntitySensorEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table contains one row per physical sensor represented by an associated
+        row in the entPhysicalTable and extends entPhySensorTable."
+    ::= { eltexEntitySensorCommon 2 }
+
+eltexEntitySensorEntry OBJECT-TYPE
+    SYNTAX          EltexEntitySensorEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "An entry describes a physical sensor and contains summary
+        information of all thresholds configured for this sensor."
+    INDEX           { entPhysicalIndex }
+    ::= { eltexEntitySensorTable 1 }
+
+EltexEntitySensorEntry ::= SEQUENCE {
+    eltexEntitySensorThresholdFreeIndex  Unsigned32
+}
+
+eltexEntitySensorThresholdFreeIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the minimal value of eltexEntitySensorThresholdIndex
+        that isn't in use by any threshold configured in eltexEntitySensorThresholdTable
+        and which can be used as index to create a new eltexEntitySensorThresholdEntry instance."
+    ::= { eltexEntitySensorEntry 1 }
+
+---------------------------------------------------------------------------------------
+eltexEntitySensorThresholds  OBJECT IDENTIFIER ::= { eltexEntitySensorMIBObjects 2 }
+---------------------------------------------------------------------------------------
+
+eltexEntitySensorThresholdNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This field enables the generation of
+        eltexEntitySensorThresholdNotification globally
+        on the device.
+
+        If this object value is 'false', then
+        no eltexEntitySensorThresholdNotification will
+        be generated on this device. If this object value is 'true',
+        then notification will be generated."
+    DEFVAL          { false }
+    ::= { eltexEntitySensorThresholds 1 }
+
+eltexEntitySensorThresholdRecoveryNotificationGlobalEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION
+        "This field enables the generation of
+        eltexEntitySensorThresholdRecoveryNotification globally
+        on the device.
+
+        If this object value is 'false', then
+        no eltexEntitySensorThresholdRecoveryNotification will
+        be generated on this device. If this object value is 'true',
+        then notification will be generated."
+    DEFVAL          { false }
+    ::= { eltexEntitySensorThresholds 2 }
+---------------------------------------------------------------------------------------
+
+eltexEntitySensorThresholdTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF EltexEntitySensorThresholdEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This table lists the thresholds severity, relation, and comparison
+        value, for a sensor listed in the ENTITY-SENSOR-MIB.
+
+        List of notification sending conditions:
+
+        Val - entPhySensorValue
+        Thr - eltexEntitySensorThresholdValue
+        Int - eltexEntitySensorThresholdFlappingInterval
+        abs - absolute value
+
+        +----------------+------------------------+------------------------+
+        | Relation       | Notification Condition |   Recovery Condition   |
+        +----------------+------------------------+------------------------+
+        | greaterThan    |       Val >  Thr       |   Val <  (Thr - Int)   |
+        | greaterOrEqual |       Val >= Thr       |   Val <= (Thr - Int)   |
+        | lessThan       |       Val <  Thr       |   Val >  (Thr + Int)   |
+        | lessOrEqual    |       Val <= Thr       |   Val >= (Thr + Int)   |
+        | equalTo        |       Val == Thr       |  abs(Val - Thr) > Int  |
+        | notEqualTo     |  abs(Val - Thr) > Int  |       Val == Thr       |
+        +----------------+------------------------+------------------------+
+        "
+    ::= { eltexEntitySensorThresholds 3 }
+
+eltexEntitySensorThresholdEntry OBJECT-TYPE
+    SYNTAX          EltexEntitySensorThresholdEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "An entry describes the threshold for a sensor:
+        the threshold severity, the threshold value,
+        the relation, and the evaluation of the threshold."
+    INDEX           {
+                        entPhysicalIndex,
+                        eltexEntitySensorThresholdIndex
+                    }
+    ::= { eltexEntitySensorThresholdTable 1 }
+
+EltexEntitySensorThresholdEntry ::= SEQUENCE {
+    eltexEntitySensorThresholdIndex                         Unsigned32,
+    eltexEntitySensorThresholdRowStatus                     RowStatus,
+    eltexEntitySensorThresholdValue                         EntitySensorValue,
+    eltexEntitySensorThresholdFlappingInterval              EntitySensorValue,
+    eltexEntitySensorThresholdSeverity                      SyslogSeverity,
+    eltexEntitySensorThresholdRelation                      EltexThresholdRelation,
+    eltexEntitySensorThresholdNotificationEnable            TruthValue,
+    eltexEntitySensorThresholdRecoveryNotificationEnable    TruthValue,
+    eltexEntitySensorThresholdEvaluation                    TruthValue
+}
+
+eltexEntitySensorThresholdIndex OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "An index unique within a sensor entity.
+
+        The first free index can be obtained from the field
+        eltexEntitySensorThresholdFreeIndex in the
+        eltexEntitySensorTable."
+    ::= { eltexEntitySensorThresholdEntry 1 }
+
+eltexEntitySensorThresholdRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the RowStatus of this entry."
+    ::= { eltexEntitySensorThresholdEntry 2 }
+
+eltexEntitySensorThresholdValue OBJECT-TYPE
+    SYNTAX          EntitySensorValue
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the value of the threshold."
+    ::= { eltexEntitySensorThresholdEntry 3 }
+
+eltexEntitySensorThresholdFlappingInterval OBJECT-TYPE
+    SYNTAX          EntitySensorValue
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the value of flapping interval. This field is
+        necessary for determining the moment of sending notifications."
+    DEFVAL          { 0 }
+    ::= { eltexEntitySensorThresholdEntry 4 }
+
+eltexEntitySensorThresholdSeverity OBJECT-TYPE
+    SYNTAX          SyslogSeverity
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the severity of this threshold."
+    DEFVAL          { alert }
+    ::= { eltexEntitySensorThresholdEntry 5 }
+
+eltexEntitySensorThresholdRelation OBJECT-TYPE
+    SYNTAX          EltexThresholdRelation
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the relation between sensor value
+        (entPhySensorValue) and threshold value (eltexEntitySensorThresholdValue),
+        required to trigger the alarm."
+    ::= { eltexEntitySensorThresholdEntry 6 }
+
+eltexEntitySensorThresholdNotificationEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This field controls generation of eltexEntitySensorThresholdNotification
+        for this threshold.
+
+        When This field is 'true', generation of
+        eltexEntitySensorThresholdNotification is enabled for this
+        threshold. When This field is 'false', generation of
+        eltexEntitySensorThresholdNotification is disabled for this threshold."
+    DEFVAL          { true }
+    ::= { eltexEntitySensorThresholdEntry 7 }
+
+eltexEntitySensorThresholdRecoveryNotificationEnable OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This field controls generation of eltexEntitySensorThresholdRecoveryNotification
+        for this threshold.
+
+        When This field is 'true', generation of
+        eltexEntitySensorThresholdRecoveryNotification is enabled for this
+        threshold. When This field is 'false', generation of
+        eltexEntitySensorThresholdRecoveryNotification is disabled for this threshold."
+    DEFVAL          { true }
+    ::= { eltexEntitySensorThresholdEntry 8 }
+
+eltexEntitySensorThresholdEvaluation OBJECT-TYPE
+    SYNTAX          TruthValue
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This field indicates the result of the most recent evaluation of
+        the threshold."
+    ::= { eltexEntitySensorThresholdEntry 9 }
+
+------------------------------------------------------------------------------------------------------
+-- Notifications
+------------------------------------------------------------------------------------------------------
+eltexEntitySensorMIBNotifications  OBJECT IDENTIFIER ::= { eltexEntitySensorMIB 2 }
+
+eltexEntitySensorMIBNotificationsPrefix  OBJECT IDENTIFIER ::= { eltexEntitySensorMIBNotifications 0 }
+------------------------------------------------------------------------------------------------------
+
+eltexEntitySensorThresholdNotification NOTIFICATION-TYPE
+    OBJECTS         {
+                        eltexEntitySensorThresholdSeverity,
+                        eltexEntitySensorThresholdRelation,
+                        eltexEntitySensorThresholdValue,
+                        entPhySensorValue
+                    }
+    STATUS          current
+    DESCRIPTION
+        "The notification is generated when the value of
+        eltexEntitySensorThresholdEvaluation changes from false to true.
+
+        Notifications can be disabled for a threshold by
+        eltexEntitySensorThresholdNotificationEnable field or globally by
+        eltexEntitySensorThresholdNotificationGlobalEnable."
+   ::= { eltexEntitySensorMIBNotificationsPrefix 1 }
+
+eltexEntitySensorThresholdRecoveryNotification NOTIFICATION-TYPE
+    OBJECTS         {
+                        eltexEntitySensorThresholdSeverity,
+                        eltexEntitySensorThresholdRelation,
+                        eltexEntitySensorThresholdValue,
+                        entPhySensorValue
+                    }
+    STATUS          current
+    DESCRIPTION
+        "The notification is generated when the value of
+        eltexEntitySensorThresholdEvaluation changes from true to false.
+        Notifications can be disabled for a threshold by
+        eltexEntitySensorThresholdRecoveryNotificationEnable field or globally by
+        eltexEntitySensorThresholdRecoveryNotificationGlobalEnable."
+   ::= { eltexEntitySensorMIBNotificationsPrefix 2 }
+
+END

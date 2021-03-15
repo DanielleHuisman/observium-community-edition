@@ -6,8 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
- *
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -86,12 +85,34 @@ function get_port_id_by_ip_cache($device, $ip)
 
 }
 
+// DOCME needs phpdoc block
+// TESTME needs unit testing
+function get_port_id_by_mac($device, $mac)
+{
+  if (is_array($device) && isset($device['device_id']))
+  {
+    $device_id = $device['device_id'];
+  }
+  elseif (is_numeric($device))
+  {
+    $device_id = $device;
+  }
+
+  $remote_mac = mac_zeropad($mac);
+  if ($remote_mac && $remote_mac != '000000000000')
+  {
+    return dbFetchCell("SELECT `port_id` FROM `ports` WHERE `deleted` = '0' AND `ifPhysAddress` = ? AND `device_id` = ? LIMIT 1", [ $remote_mac, $device_id ]);
+  }
+
+  return FALSE;
+}
+
 function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
 {
   $mib = 'ENTITY-MIB';
   if (!is_numeric($entPhysicalIndex) ||
-    !is_numeric($device['device_id']) ||
-    !is_device_mib($device, $mib))
+      !is_numeric($device['device_id']) ||
+      !is_device_mib($device, $mib))
   {
     return FALSE;
   }
@@ -144,7 +165,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
       $sensor_port = $entity_array[$sensor_index];
     } else {
       // DB (web)
-      $sensor_port = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalIndex` = ?', array($device['device_id'], $sensor_index));
+      $sensor_port = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalIndex` = ? AND `deleted` IS NULL', array($device['device_id'], $sensor_index));
     }
     print_debug_vars($sensor_index, 1);
     print_debug_vars($sensor_port, 1);
@@ -167,7 +188,7 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
           break;
         }
       }
-      if (isset($entAliasMappingIdentifier) && str_contains($entAliasMappingIdentifier, 'fIndex'))
+      if (isset($entAliasMappingIdentifier) && str_exists($entAliasMappingIdentifier, 'fIndex'))
       {
         list(, $ifIndex) = explode('.', $entAliasMappingIdentifier);
 
@@ -175,9 +196,6 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
         if (is_array($port))
         {
           // Hola, port really found
-          //$options['entPhysicalIndex_measured'] = $ifIndex;
-          //$options['measured_class']  = 'port';
-          //$options['measured_entity'] = $port['port_id'];
           print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port['port_id']);
           return $port;
         }
@@ -201,32 +219,114 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
         // Hola, port really found
         $port    = get_port_by_id($port_id);
         $ifIndex = $port['ifIndex'];
-        //$options['entPhysicalIndex_measured'] = $ifIndex;
-        //$options['measured_class']  = 'port';
-        //$options['measured_entity'] = $port_id;
         print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
-        return $port;
-        //break; // Exit do-while
+        return $port; // Exit do-while
       }
       $sensor_index = $sensor_port['entPhysicalContainedIn']; // Next ifIndex
     }
     elseif ($sensor_index == $sensor_port['entPhysicalContainedIn'])
     {
       break; // Break if current index same as next to avoid loop
+    }
+    elseif ($sensor_port['entPhysicalClass'] == 'module' &&
+            (isset($sensor_port[0]['entAliasMappingIdentifier']) || isset($sensor_port[1]['entAliasMappingIdentifier']) || isset($sensor_port[2]['entAliasMappingIdentifier'])))
+    {
+      // Cisco IOSXR 6.5.x ASR 9900 platform && NCS 5500
+      $sensor_index = $sensor_port['entPhysicalContainedIn']; // Next ifIndex
+
+      // By first try if entAliasMappingIdentifier correct
+      unset($entAliasMappingIdentifier);
+      foreach (array(0, 1, 2) as $i)
+      {
+        if (isset($sensor_port[$i]['entAliasMappingIdentifier']))
+        {
+          $entAliasMappingIdentifier = $sensor_port[$i]['entAliasMappingIdentifier'];
+          break;
+        }
+      }
+      if (isset($entAliasMappingIdentifier) && str_exists($entAliasMappingIdentifier, 'fIndex'))
+      {
+        list(, $ifIndex) = explode('.', $entAliasMappingIdentifier);
+
+        $port = get_port_by_index_cache($device['device_id'], $ifIndex);
+        if (is_array($port))
+        {
+          // Hola, port really found
+          print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port['port_id']);
+          return $port;
+        }
+      }
+
+      // This case for Cisco IOSXR ASR 9900 platform, when have incorrect entAliasMappingIdentifier association,
+      // https://jira.observium.org/browse/OBS-3147
+      $port_id = FALSE;
+      if (str_exists($sensor_port['entPhysicalName'], '-PORT-'))
+      {
+        // Second, try detect port by entPhysicalDescr/entPhysicalName
+        if (str_starts($sensor_port['entPhysicalDescr'], [ '10GBASE', '10GE' ]) ||
+            str_iexists($sensor_port['entPhysicalDescr'], [ ' 10GBASE', ' 10GE', ' 10G ' ]))
+        {
+          $ifDescr_base = 'TenGigE';
+        }
+        elseif (str_starts($sensor_port['entPhysicalDescr'], [ '25GBASE', '25GE' ]) ||
+                str_iexists($sensor_port['entPhysicalDescr'], [ ' 25GBASE', ' 25GE', ' 25G ' ]))
+        {
+          $ifDescr_base = 'TwentyFiveGigE';
+        }
+        elseif (str_starts($sensor_port['entPhysicalDescr'], [ '40GBASE', '40GE' ]) ||
+                str_iexists($sensor_port['entPhysicalDescr'], [ ' 40GBASE', ' 40GE', ' 40G ' ]))
+        {
+          $ifDescr_base = 'FortyGigE';
+        }
+        elseif (str_starts($sensor_port['entPhysicalDescr'], [ '100GBASE', '100GE' ]) ||
+                str_iexists($sensor_port['entPhysicalDescr'], [ ' 100GBASE', ' 100GE', ' 100G ' ]))
+        {
+          // Ie:
+          // Cisco CPAK 100GBase-SR4, 100m, MMF
+          // 100GBASE-ER4 CFP2 Module for SMF (<40 km)
+          // Non-Cisco QSFP28 100G ER4 Pluggable Optics Module
+          $ifDescr_base = 'HundredGigE';
+        }
+        $ifDescr_num = str_replace('-PORT-', '/', $sensor_port['entPhysicalName']);
+        $port_id = get_port_id_by_ifDescr($device['device_id'], $ifDescr_base . $ifDescr_num);
+        if (!is_numeric($port_id))
+        {
+          // FIXME, I think first node number '0/' should be detected by some how
+          $port_id = get_port_id_by_ifDescr($device['device_id'], $ifDescr_base . '0/' . $ifDescr_num);
+        }
+      }
+      elseif (str_exists($sensor_port['entPhysicalName'], [ 'TenGigE', 'TwentyFiveGigE', 'FortyGigE', 'HundredGigE' ]))
+      {
+        // Same as previous, but on NCS platform and entPhysicalName contain correct ifDescr, ie:
+        // FortyGigE0/0/0/20
+        $ifDescr = $sensor_port['entPhysicalName'];
+        $port_id = get_port_id_by_ifDescr($device['device_id'], $ifDescr);
+      }
+
+      if (is_numeric($port_id))
+      {
+        // Hola, port really found
+        $port = get_port_by_id($port_id);
+        $ifIndex = $port['ifIndex'];
+        print_debug("Port is found: ifIndex = $ifIndex, port_id = " . $port_id);
+
+        return $port;
+      }
+
     } else {
       $sensor_index = $sensor_port['entPhysicalContainedIn']; // Next ifIndex
 
       // See: http://jira.observium.org/browse/OBS-2295
       // IOS-XE and IOS-XR can store in module index both: sensors and port
       $sensor_transceiver = $sensor_port['entPhysicalClass'] == 'sensor' &&
-        str_icontains($sensor_port['entPhysicalName'] . $sensor_port['entPhysicalDescr'] . $sensor_port['entPhysicalVendorType'], array('transceiver', '-PORT-'));
+                            str_iexists($sensor_port['entPhysicalName'] . $sensor_port['entPhysicalDescr'] . $sensor_port['entPhysicalVendorType'], array( 'transceiver', '-PORT-'));
       // This is multi-lane optical transceiver, ie 100G, 40G, multiple sensors for each port
       $sensor_multilane   = $sensor_port['entPhysicalClass'] == 'container' &&
-        (in_array($sensor_port['entPhysicalVendorType'], ['cevContainer40GigBasePort', 'cevContainerCXP', 'cevContainerCPAK', ]) || // Known Cisco specific containers
-          str_contains($sensor_port['entPhysicalName'] . $sensor_port['entPhysicalDescr'], array('Optical')));
+                            (in_array($sensor_port['entPhysicalVendorType'], [ 'cevContainer40GigBasePort', 'cevContainerCXP', 'cevContainerCPAK' ]) || // Known Cisco specific containers
+                             str_exists($sensor_port['entPhysicalName'] . $sensor_port['entPhysicalDescr'], array( 'Optical')));                       // Pluggable Optical Module Container
       if ($sensor_transceiver)
       {
-        $tmp_index = dbFetchCell('SELECT `entPhysicalIndex` FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalClass` = ?', array($device['device_id'], $sensor_index, 'port'));
+        $tmp_index = dbFetchCell('SELECT `entPhysicalIndex` FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalClass` = ? AND `deleted` IS NULL', array($device['device_id'], $sensor_index, 'port'));
         if (is_numeric($tmp_index) && $tmp_index > 0)
         {
           // If port index found, try this entPhysicalIndex in next round
@@ -235,9 +335,11 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
       }
       elseif ($sensor_multilane)
       {
-        $entries = dbFetchRow('SELECT `entPhysicalIndex`, `entPhysicalName` FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalClass` = ?', array($device['device_id'], $sensor_index, 'port'));
+        $entries = dbFetchRows('SELECT `entPhysicalIndex`, `entPhysicalName` FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalClass` = ? AND `deleted` IS NULL', array($device['device_id'], $sensor_index, 'port'));
+        print_debug("Multi-Lane entries:");
+        print_debug_vars($entries, 1);
         if (count($entries) > 1 &&
-          preg_match('/(?<start>\D{2})(?<num>\d+(?:\/\d+)+).*Lane\s*(?<lane>\d+)/', $sensor_name, $matches)) // detect port numeric part and lane
+            preg_match('/(?<start>\D{2})(?<num>\d+(?:\/\d+)+).*Lane\s*(?<lane>\d+)/', $sensor_name, $matches)) // detect port numeric part and lane
         {
           // There is each Line associated with breakout port, mostly is QSFP+ 40G
           // FortyGigE0/0/0/0-Tx Lane 1 Power -> 0/RP0-TenGigE0/0/0/0/1
@@ -263,6 +365,36 @@ function get_port_by_ent_index($device, $entPhysicalIndex, $allow_snmp = FALSE)
     // NOTE for self: entPhysicalParentRelPos >= 0 because on iosxr trouble
   } while ($sensor_port['entPhysicalClass'] !== 'port' && $sensor_port['entPhysicalContainedIn'] > 0 && ($sensor_port['entPhysicalParentRelPos'] >= 0 || $device['os'] == 'arista_eos'));
 
+}
+
+// Get port array by ID (using cache)
+// DOCME needs phpdoc block
+// TESTME needs unit testing
+function get_port_by_id_cache($port_id)
+{
+  return get_entity_by_id_cache('port', $port_id);
+}
+
+// Get port array by ID (with port state)
+// NOTE get_port_by_id(ID) != get_port_by_id_cache(ID)
+// DOCME needs phpdoc block
+// TESTME needs unit testing
+function get_port_by_id($port_id)
+{
+  if (is_numeric($port_id))
+  {
+    //$port = dbFetchRow("SELECT * FROM `ports` LEFT JOIN `ports-state` ON `ports`.`port_id` = `ports-state`.`port_id`  WHERE `ports`.`port_id` = ?", array($port_id));
+    $port = dbFetchRow("SELECT * FROM `ports`  WHERE `ports`.`port_id` = ?", array($port_id));
+  }
+
+  if (is_array($port))
+  {
+    //$port['port_id'] = $port_id; // It corrects the situation, when `ports-state` is empty
+    humanize_port($port);
+    return $port;
+  }
+
+  return FALSE;
 }
 
 // Get port array by ifIndex (using cache)
@@ -410,6 +542,138 @@ function get_port_id_by_customer($customer)
   return FALSE;
 }
 
+// DOCME needs phpdoc block
+// TESTME needs unit testing
+function is_port_valid($port, $device)
+{
+  global $config;
+
+  // Ignore non standard ifOperStatus
+  // See http://tools.cisco.com/Support/SNMP/do/BrowseOID.do?objectInput=ifOperStatus
+  $valid_ifOperStatus = [ 'testing', 'dormant', 'down', 'lowerLayerDown', 'unknown', 'up', 'monitoring' ];
+  if (isset($port['ifOperStatus']) && strlen($port['ifOperStatus']) &&
+      !in_array($port['ifOperStatus'], $valid_ifOperStatus))
+  {
+    print_debug("ignored (by ifOperStatus = notPresent or invalid value).");
+    return FALSE;
+  }
+
+  // Ignore ports with empty ifType
+  $ports_allow_empty = isset($config['os'][$device['os']]['ports_ignore']['allow_empty']) &&
+                       $config['os'][$device['os']]['ports_ignore']['allow_empty'];
+  if (!isset($port['ifType']) && !$ports_allow_empty)
+  {
+    /* Some devices (ie D-Link) report ports without any useful info, example:
+    [74] => Array
+        (
+            [ifName] => po22
+            [ifInMulticastPkts] => 0
+            [ifInBroadcastPkts] => 0
+            [ifOutMulticastPkts] => 0
+            [ifOutBroadcastPkts] => 0
+            [ifLinkUpDownTrapEnable] => enabled
+            [ifHighSpeed] => 0
+            [ifPromiscuousMode] => false
+            [ifConnectorPresent] => false
+            [ifAlias] => po22
+            [ifCounterDiscontinuityTime] => 0:0:00:00.00
+        )
+    */
+    print_debug("ignored (by empty ifType).");
+    return FALSE;
+  }
+
+  // This happen on some liebert UPS devices or when device have memory leak (ie Eaton Powerware)
+  if (isset($config['os'][$device['os']]['ifType_ifDescr']) && $config['os'][$device['os']]['ifType_ifDescr'] && $port['ifIndex'])
+  {
+    $len = strlen($port['ifDescr']);
+    $type = rewrite_iftype($port['ifType']);
+    if ($type && ($len === 0 || $len > 255 ||
+                  isHexString($port['ifDescr']) ||
+                  preg_match('/(.)\1{4,}/', $port['ifDescr'])))
+    {
+      $port['ifDescr'] = $type . ' ' . $port['ifIndex'];
+    }
+  }
+
+  //$if = ($config['os'][$device['os']]['ifname'] ? $port['ifName'] : $port['ifDescr']);
+  $valid_ifDescr = strlen($port['ifDescr']);
+  $valid_ifName  = strlen($port['ifName']);
+
+  // Ignore ports with empty ifName and ifDescr (while not possible store in db)
+  if (!$valid_ifDescr && !$valid_ifName)
+  {
+    print_debug("ignored (by empty ifDescr and ifName).");
+    return FALSE;
+  }
+
+  // FIXME. Prefer regexp
+  foreach ((array)$config['bad_if'] as $bi)
+  {
+    if (stripos($port['ifDescr'], $bi) !== FALSE)
+    {
+      print_debug("ignored (by ifDescr): ".$port['ifDescr']." [ $bi ]");
+      return FALSE;
+    }
+    elseif ($valid_ifName && stripos($port['ifName'], $bi) !== FALSE)
+    {
+      print_debug("ignored (by ifName): ".$port['ifName']." [ $bi ]");
+      return FALSE;
+    }
+  }
+
+  $ports_ignore_alias = isset($config['os'][$device['os']]['ports_ignore']['alias_regex']) ? (array)$config['os'][$device['os']]['ports_ignore']['alias_regex'] : [];
+  if (isset($config['bad_ifalias_regexp']))
+  {
+    $ports_ignore_alias = array_merge($ports_ignore_alias, (array)$config['bad_ifalias_regexp']);
+  }
+  foreach ($ports_ignore_alias as $bi)
+  {
+    if (preg_match($bi, $port['ifAlias']))
+    {
+      print_debug("ignored (by ifAlias): ".$port['ifAlias']." [ $bi ]");
+      return FALSE;
+    }
+  }
+
+  // Ignore ports by ifName/ifDescr (do not forced as case insensitive)
+  $ports_ignore_label = isset($config['os'][$device['os']]['ports_ignore']['label_regex']) ? (array)$config['os'][$device['os']]['ports_ignore']['label_regex'] : [];
+  if (isset($config['bad_if_regexp']))
+  {
+    $ports_ignore_label = array_merge($ports_ignore_label, (array)$config['bad_if_regexp']);
+  }
+  foreach ($ports_ignore_label as $bi)
+  {
+    if (preg_match($bi, $port['ifDescr']))
+    {
+      print_debug("ignored (by ifDescr regexp): ".$port['ifDescr']." [ $bi ]");
+      return FALSE;
+    }
+    elseif ($valid_ifName && preg_match($bi, $port['ifName']))
+    {
+      print_debug("ignored (by ifName regexp): ".$port['ifName']." [ $bi ]");
+      return FALSE;
+    }
+  }
+
+  // Ignore ports by ifType
+  $ports_ignore_type = isset($config['os'][$device['os']]['ports_ignore']['type']) ? (array)$config['os'][$device['os']]['ports_ignore']['type'] : [];
+  if (isset($config['bad_iftype']))
+  {
+    $ports_ignore_type = array_merge($ports_ignore_type, (array)$config['bad_iftype']);
+  }
+  foreach ($ports_ignore_type as $bi)
+  {
+    if (strpos($port['ifType'], $bi) !== FALSE)
+    {
+      print_debug("ignored (by ifType): ".$port['ifType']." [ $bi ]");
+      return FALSE;
+    }
+  }
+
+  return TRUE;
+}
+
 // Delete port from database and associated rrd files
 // DOCME needs phpdoc block
 // TESTME needs unit testing
@@ -479,13 +743,46 @@ function delete_port($int_id, $delete_rrd = TRUE)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
+function port_html_class($ifOperStatus, $ifAdminStatus, $encrypted = FALSE)
+{
+  $ifclass = "interface-upup";
+  if      ($ifAdminStatus == "down")           { $ifclass = "gray"; }
+  elseif  ($ifAdminStatus == "up")
+  {
+    if     ($ifOperStatus == "down")           { $ifclass = "red"; }
+    elseif ($ifOperStatus == "lowerLayerDown") { $ifclass = "orange"; }
+    elseif ($ifOperStatus == "monitoring")     { $ifclass = "green"; }
+    //elseif ($encrypted === '1')                { $ifclass = "olive"; }
+    elseif ($encrypted)                        { $ifclass = "olive"; }
+    elseif ($ifOperStatus == "up")             { $ifclass = ""; }
+    else                                       { $ifclass = "purple"; }
+  }
+
+  return $ifclass;
+}
+
+// DOCME needs phpdoc block
+// TESTME needs unit testing
 function get_port_rrdindex($port)
 {
   global $config;
 
-  $device = device_by_id_cache($port['device_id']);
+  if (isset($port['device_id']))
+  {
+    $device_id = $port['device_id'];
+  } else {
+    // In poller, device_id not always passed
+    $port_tmp = get_port_by_id_cache($port['port_id']);
+    $device_id = $port_tmp['device_id'];
+  }
+  $device = device_by_id_cache($device_id);
 
-  $device_identifier = strtolower($config['os'][$device['os']]['port_rrd_identifier']);
+  if (isset($config['os'][$device['os']]['port_rrd_identifier']))
+  {
+    $device_identifier = strtolower($config['os'][$device['os']]['port_rrd_identifier']);
+  } else {
+    $device_identifier = 'ifindex';
+  }
 
   // default to ifIndex
   $this_port_identifier = $port['ifIndex'];
@@ -512,7 +809,15 @@ function get_port_rrdfilename($port, $suffix = NULL, $fullpath = FALSE)
 
   if ($fullpath)
   {
-    $device   = device_by_id_cache($port['device_id']);
+    if (isset($port['device_id']))
+    {
+      $device_id = $port['device_id'];
+    } else {
+      // In poller, device_id not always passed
+      $port_tmp = get_port_by_id_cache($port['port_id']);
+      $device_id = $port_tmp['device_id'];
+    }
+    $device   = device_by_id_cache($device_id);
     $filename = get_rrd_path($device, $filename);
   }
 

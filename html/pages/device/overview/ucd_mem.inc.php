@@ -19,7 +19,13 @@ $box_args = array('title' => 'Memory',
 echo generate_box_open($box_args);
 
 $mem_used_total = $device_state['ucd_mem']['mem_total'] - $device_state['ucd_mem']['mem_avail'];
-$mem_used       = $mem_used_total - ($device_state['ucd_mem']['mem_cached'] + $device_state['ucd_mem']['mem_buffer']);
+if (isset($device_state['ucd_mem']['mem_used']))
+{
+  //r($device_state['ucd_mem']);
+  $mem_used = $device_state['ucd_mem']['mem_used'];
+} else {
+  $mem_used = $mem_used_total - ($device_state['ucd_mem']['mem_cached'] + $device_state['ucd_mem']['mem_buffer']);
+}
 
 $used_perc = round(($mem_used / $device_state['ucd_mem']['mem_total']) * 100);
 $used_perc_total = round(($mem_used_total / $device_state['ucd_mem']['mem_total']) * 100);

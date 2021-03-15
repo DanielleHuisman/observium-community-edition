@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -25,7 +24,7 @@ if (is_numeric($vars['id']))
       $rrd_filename = get_rrd_path($device, "mempool-".strtolower($mempool['mempool_mib'])."-".$mempool['mempool_index'].".rrd");
     }
     $title  = generate_device_link($device);
-    $title .= " :: Memory Pool :: " . escape_html($mempool['mempool_descr']);
+    $title .= " :: Memory Pool :: " . rewrite_entity_name($mempool['mempool_descr'], 'mempool');
     $auth = TRUE;
   }
 }

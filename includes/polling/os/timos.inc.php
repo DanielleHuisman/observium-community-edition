@@ -16,7 +16,7 @@
 //TIMETRA-SYSTEM-MIB::sgiSwVersionModifier.0 = STRING: "R6"
 //TIMETRA-CHASSIS-MIB::tmnxChassisTypeName.20 = STRING: "7210 SAS-M 24F 2XFP-1"
 
-// FIXME. Use snmp here, but in most cases same detected by sysDescr_regexp (see os definition)
+// FIXME. Use snmp here, but in most cases same detected by sysDescr_regex (see os definition)
 
 //TIMETRA-CHASSIS-MIB::tmnxHwSerialNumber.1.50331649 = STRING: XX1416X2339
 //TIMETRA-CHASSIS-MIB::tmnxHwSerialNumber.1.83886081 = STRING:

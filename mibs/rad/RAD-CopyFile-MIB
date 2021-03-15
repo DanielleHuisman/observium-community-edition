@@ -1,0 +1,413 @@
+RAD-CopyFile-MIB DEFINITIONS ::= BEGIN
+
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       InetAddressType, InetAddress, InetPortNumber     FROM  INET-ADDRESS-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       sysName     FROM  SNMPv2-MIB
+       Integer32, Unsigned32, OBJECT-TYPE, 
+       MODULE-IDENTITY, NOTIFICATION-TYPE, OBJECT-IDENTITY     FROM  SNMPv2-SMI
+       RowStatus, DateAndTime     FROM  SNMPv2-TC
+       fileTransfer     FROM  RAD-SMI-MIB
+       FileType     FROM  RAD-TC
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+	copyFileGroup MODULE-IDENTITY
+		LAST-UPDATED "201502191800Z"  -- February 19, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Copy File MIB."
+	::= { fileTransfer 18 }
+
+
+-- RAD General File Copy Mechanism
+
+copyFileTable  OBJECT-TYPE
+      SYNTAX		SEQUENCE OF	CopyFileEntry
+      MAX-ACCESS 	not-accessible
+      STATUS  current
+      DESCRIPTION
+      "This object defines Copy File table."
+      ::= { copyFileGroup 1 }
+
+copyFileEntry OBJECT-TYPE
+      SYNTAX CopyFileEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+	  "An entry in the Copy File table."
+      INDEX { copyFileIdx }
+      ::= { copyFileTable 1 }
+
+CopyFileEntry ::= SEQUENCE {
+    copyFileIdx     Integer32,
+    copyFileRowStatus   RowStatus,
+    copyFileProtocol    INTEGER,
+    copyFileAddressType   InetAddressType,
+    copyFileAddress    InetAddress,
+    copyFilePort      InetPortNumber,
+    copyFileUserName     SnmpAdminString,
+    copyFilePassword   SnmpAdminString,
+    copyFileSrcType    FileType,
+    copyFileSrcFilePath   SnmpAdminString,
+    copyFileSrcFileName   SnmpAdminString,
+    copyFileDstType    FileType,
+    copyFileDstFilePath   SnmpAdminString,
+    copyFileDstFileName   SnmpAdminString,
+    copyFileStatus    INTEGER,
+    copyFileError     INTEGER,
+    copyFileStartTime   DateAndTime,
+    copyFileEndTime    DateAndTime,
+    copyFileProgressBytes  Unsigned32,
+    copyFileDirection    INTEGER 
+ }
+
+copyFileIdx OBJECT-TYPE
+	SYNTAX 		Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Index of the Copy File Table.
+            Initiator of the Copy File operation gets rowInfoIndexNext
+            in order to obtain copyFileIdx value of the next free entry.
+            Agent is responsible to update rowInfoTable upon this get
+            action.
+            If neither entry is available, an entry shall be destroyed,
+            preferably the one with the lowest index, i.e. the oldest
+            entry. The Get operation of rowInfoIndexNext shall be
+            repeated.
+            Creation of the entry requires setting copyFileRowStatus of
+            the entry with obtained copyFileIdx to createAndGo.
+            The index (received in previous stage) and all the other
+            variables relevant for the copy, must be sent in one PDU."
+    ::= { copyFileEntry 1 }
+
+copyFileRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "The object enables handling of copyFileTable entries.
+            Agent MUST update copyFileRowStatus table and associated
+            entry of rowInfoTable accordingly.
+            A Manager may only create an entry i.e. set createAndGo(4).
+            The Agent is responsible to delete the oldest entry when the
+            table is full and provide Managers with at least one free
+            entry at any time."
+    ::= { copyFileEntry 2 }
+
+copyFileProtocol 	OBJECT-TYPE
+	SYNTAX	INTEGER	{
+	  undefined (1),
+	  tftp (2),
+	  sftp (3),
+	  xmodem (4),
+	  localFile (5)
+	  }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "The object defines the copy file operation protocol.
+	 The default value is 'localFile (5)'."
+    ::= { copyFileEntry 3 }
+
+copyFileAddressType		OBJECT-TYPE
+	SYNTAX	InetAddressType
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Server Address Type. Default Value is ipv4(1)."
+    ::= { copyFileEntry 4 }
+
+copyFileAddress		OBJECT-TYPE
+	SYNTAX	InetAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "File Transfer Server Address, according to type defined by the
+	 copyFileAddressType.
+	 The default value is 0.0.0.0."
+    ::= { copyFileEntry 5 }
+
+copyFilePort OBJECT-TYPE
+	SYNTAX	InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "File Transfer Server Port. The default value is 0 WHICH means
+	 use of the default protocol port number."
+    ::= { copyFileEntry 6 }
+
+copyFileUserName OBJECT-TYPE
+	SYNTAX	    SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "User Name. It is relevant for copy operations requiring
+            user name. The default value is the empty string ''."
+    ::= { copyFileEntry 7 }
+
+copyFilePassword OBJECT-TYPE
+	SYNTAX	    SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "User Password. It is relevant for copy operations requiring
+            password. The object should be readable: any read operation
+            accessing it should obtain constant value '****'.
+            The default value is the empty string ''."
+    ::= { copyFileEntry 8 }
+
+copyFileSrcType OBJECT-TYPE
+	SYNTAX	    FileType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object represents the copy file source type.
+            The default value is 'otherType' (2).
+            Copy file operation should use proper type value, i.e. one
+            of the defined by the FileType enumeration.
+            Using of the 'otherType' (2) is not allowed when the type
+            can be specified by another value from the list."
+    ::= { copyFileEntry 9 }
+
+copyFileSrcFilePath	OBJECT-TYPE
+	SYNTAX	    SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the path to the location of the source file.
+    The length of the path is limited to 64 octets."
+    ::= { copyFileEntry 10 }
+
+copyFileSrcFileName	OBJECT-TYPE
+	SYNTAX	    SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object represents the name of the source file.
+        The length of the name is limited to 32 octets."
+    ::= { copyFileEntry 11 }
+
+copyFileDstType	OBJECT-TYPE
+	SYNTAX	    FileType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object represents the copy file destination type.
+            The default value is 'otherType' (2).
+            Copy file operation should use proper type value, i.e. one
+            of the defined by the FileType enumeration.
+            Using of the 'otherType' (2) is not allowed when the type
+            can be specified by another value from the list."
+    ::= { copyFileEntry 12 }
+
+copyFileDstFilePath	OBJECT-TYPE
+	SYNTAX	    SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the path to the location of the destination file.
+    The length of the path is limited to 64 octets."
+    ::= { copyFileEntry 13 }
+
+copyFileDstFileName	OBJECT-TYPE
+	SYNTAX	    SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object represents the name of the destination file.
+    The length of the name is limited to 32 octets."
+    ::= { copyFileEntry 14 }
+
+copyFileStatus OBJECT-TYPE
+	SYNTAX	    INTEGER	{
+        noOp				(2),
+        authenticating		(3),
+        connecting			(4),
+        transferringData	(5),
+        endedOk				(6),
+        error				(7),
+        errorOveridden      (8)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Status of Copy File session.
+            The copyFileStatus should be equal to noOp(2) when an entry
+            was created by createAndWait and is not activated yet. When
+            session ended with success, the Status should be endedOk(6).
+            The copyFileStatus is equal to error(7) in case of failure.
+            NMS can obtain error reason from the copyFileError OBJECT.
+            The default value is the 'noOp(2)'.
+            The copyFileStatus is equal to errorOveridden (8) in case of
+            invalid or incorrect file. This status indicates to the
+            agent to remove the file."
+    ::= { copyFileEntry 15 }
+
+
+copyFileError OBJECT-TYPE
+    SYNTAX      INTEGER	{
+        noError                 (1),
+		serverNotResponding     (2),
+        fileNotFound            (3),
+        accessViolationDst      (4),
+        invalidSrcFile          (5),
+        invalidRollbackSrc      (6),
+
+        connectionFail          (8),
+        lackOfSpace             (9),
+        lackOfInternalResources (10),
+        endedTimeout            (11),
+
+        accessViolationSrc      (14),
+		transferToStandbyFailed (15),
+        otherError              (255)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The object represents the available error codes.
+            noError (1): the operation completed successfully,
+            serverNotResponding (2): server providing the copying is not
+                responding
+            fileNotFound (3): the required source file is not found
+            accessViolationDst (4): Destination file cannot be written
+                or created due to access violation, e.g. authentication
+                failure, destination file is RO or in-use
+            invalidSrcFile (5): invalid Source file CRC, signature or
+                header
+            invalidRollbackSrc (6): invalid source for configuration
+                rollback operation
+
+            connectionFail (8): the copy file session can't start due to
+                failure of TCP/IP or SSH connection
+            lackOfSpace (9): the copy destination doesn't have enough
+                space for the file
+            lackOfInternalResources (10): the device doesn't have enough
+                internal resources (e.g. free RAM) to carry out the copy
+                operation
+            endedTimeout (11): operation timeout occurred
+
+            accessViolationSrc (14): Source file cannot be read due to
+                access violation, e.g. authentication failure, source
+                file is RO or in use
+			transferToStandbyFailed (15): Transfer of the copied file
+			    from Active card to Standby card failed.
+
+            otherError (255)
+
+            The (7) and (8) errors can occur during configuration
+            rollback processing. Agent reports the (7) error when it
+            tries to perform configuration rollback (e.g. due to failure
+            of a new configuration activation), but it can't find valid
+            rollback configuration.
+            Agent reports the (8) error if it can't save running
+            configuration when it activates a new configuration set. As
+            a result the next time configuration rollback will fail."
+    ::= { copyFileEntry 16 }
+
+copyFileStartTime	OBJECT-TYPE
+	SYNTAX 		DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Represents Start Date and Time of the copy file process. This parameter
+	 holds the UTC date and time value.
+     Agent sets the Object Value upon Copy File start. The default value is
+	 '2000.01.01. 00:00:00. +0.0'
+	"
+    ::= { copyFileEntry 17}
+
+copyFileEndTime		OBJECT-TYPE
+	SYNTAX 		DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Represents End Date and Time of the copy file process. This parameter
+	 holds the UTC date and time value.
+     Agent sets the Object Value upon Copy File end. The default value is
+	 '2000.01.01. 00:00:00. +0.0'
+	"
+	 ::= { copyFileEntry 18}
+
+copyFileProgressBytes	OBJECT-TYPE
+	SYNTAX 		Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Represents the Copy File Progress in Bytes.
+     The Object value is zeroed by Agent when it releases the table row."
+    ::= {copyFileEntry 19}
+
+copyFileDirection 	OBJECT-TYPE
+	SYNTAX	INTEGER	{
+        networkToDevice (1),
+        deviceToNetwork (2),
+        deviceLocally (3)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "The object defines the copy file direction.
+            networkToDevice (1) - copy from device to network
+            deviceToNetwork (2) - copy from network to device
+            deviceLocally   (3) - copy locally within device
+            The default value is 'deviceLocally (3)'."
+    ::= { copyFileEntry 20 }
+
+
+-- Copyfile Traps/Notifications
+
+copyFileNotifications OBJECT-IDENTITY
+     STATUS  current
+     DESCRIPTION
+     "The copy file events."
+     ::= { copyFileGroup 0 }
+
+systemDownloadEnd NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, copyFileSrcType, copyFileSrcFilePath, 
+     copyFileSrcFileName, copyFileDstType, copyFileDstFilePath, 
+     copyFileDstFileName, copyFileAddress, copyFilePort, 
+     copyFileError } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that file download has ended, successfully or not.
+	   The status of the download exists in: copyFileError.
+      "
+      ::= { copyFileNotifications 2 }
+
+
+
+
+
+END
+

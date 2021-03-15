@@ -1,17 +1,16 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-if ($vars['view'] == 'graphs' || $vars['view'] == 'minigraphs')
+if ($vars['view'] === 'graphs' || $vars['view'] === 'minigraphs')
 {
   if (isset($vars['graph'])) { $graph_type = "port_" . $vars['graph']; } else { $graph_type = "port_bits"; }
 }
@@ -113,7 +112,7 @@ function is_filtered()
          ($filters_array['deleted']  && $port['deleted']);
 }
 
-if (isset($vars['view']) && ($vars['view'] == 'basic' || $vars['view'] == 'details' || $vars['view'] == 'graphs' || $vars['view'] == 'minigraphs'))
+if (isset($vars['view']) && in_array($vars['view'], [ 'basic', 'details', 'graphs', 'minigraphs' ]))
 {
   // List filters
   $filter_options = array('up'       => 'Hide UP',
@@ -140,13 +139,13 @@ if (isset($vars['view']) && ($vars['view'] == 'basic' || $vars['view'] == 'detai
     {
       $navbar['options_right']['filters']['class'] .= ' active';
       $navbar['options_right']['filters']['suboptions'][$option]['class'] = 'active';
-      if ($option == 'all')
+      if ($option === 'all')
       {
         $option_array = array('disabled' => FALSE);
       } else {
         $option_array[$option] = FALSE;
       }
-    } elseif ($option == 'all') {
+    } elseif ($option === 'all') {
       $option_array = $option_all;
     }
     $navbar['options_right']['filters']['suboptions'][$option]['url'] = generate_url($vars, array('filters' => $option_array));
@@ -156,7 +155,7 @@ if (isset($vars['view']) && ($vars['view'] == 'basic' || $vars['view'] == 'detai
 print_navbar($navbar);
 unset($navbar);
 
-if ($vars['view'] == 'minigraphs')
+if ($vars['view'] === 'minigraphs')
 {
   $timeperiods = array('-1day','-1week','-1month','-1year');
   $from = '-1day';
@@ -181,13 +180,16 @@ if ($vars['view'] == 'minigraphs')
   }
   echo("</div>");
 }
-else if (is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php'))
+elseif (is_alpha($vars['view']) && is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php'))
 {
   include($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . '.inc.php');
 } else {
-  if ($vars['view'] == "details") { $port_details = 1; }
+  if ($vars['view'] === "details")
+  {
+    $port_details = 1;
+  }
 
-  if ($vars['view'] == "graphs") { $table_class = OBS_CLASS_TABLE_STRIPED_TWO; } else { $table_class = OBS_CLASS_TABLE_STRIPED; }
+  $table_class = $vars['view'] === "graphs" ? OBS_CLASS_TABLE_STRIPED_TWO : OBS_CLASS_TABLE_STRIPED;
 
   $i = "1";
 
@@ -196,7 +198,6 @@ else if (is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . 
 
   $sql  = "SELECT *, `ports`.`port_id` as `port_id`";
   $sql .= " FROM  `ports`";
-  //$sql .= " LEFT JOIN `ports-state` USING (`port_id`)";
   $sql .= " WHERE `device_id` = ? ORDER BY `ifIndex` ASC";
   $ports = dbFetchRows($sql, array($device['device_id']));
 
@@ -223,11 +224,18 @@ else if (is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . 
   }
 
   //$where = ' IN ('.implode(',', array_keys($port_cache)).')';
-  $where = generate_query_values(array_keys($port_cache), 'port_id');
+  //$where = generate_query_values(array_keys($port_cache), 'port_id');
+  $where = generate_query_permitted(array('ports', 'devices'));
   foreach ($ext_tables as $table)
   {
     // Here stored port_id!
-    $cache['ports_option'][$table] = dbFetchColumn("SELECT DISTINCT `port_id` FROM `$table` WHERE 1 " . generate_query_permitted(array('ports', 'devices'))); //. $where);
+    $sql = "SELECT DISTINCT `port_id` FROM `$table` WHERE 1 ";
+    if ($table === 'neighbours')
+    {
+      // Show only active neighbours
+      $sql .= 'AND `active` = 1 ';
+    }
+    $cache['ports_option'][$table] = dbFetchColumn($sql . $where);
 
     //r("SELECT DISTINCT `port_id` FROM `$table` WHERE 1 " . generate_query_permitted(array('ports', 'devices')));
 
@@ -243,16 +251,32 @@ else if (is_file($config['html_dir'] . '/pages/device/ports/' . $vars['view'] . 
   echo generate_box_open();
   echo '<table class="' . $table_class . ' table-hover">' . PHP_EOL;
 
-  $cols = array(
-                   array(NULL, 'class="state-marker"'),
-                   array(NULL),
-    'port'      => array('Port'),
-                   array(NULL),
-    'traffic'   => array('Traffic'),
-    'speed'     => array('Speed'),
-    'mac'       => array('MAC Address'),
-                   array(NULL),
-  );
+  if ($vars['view'] === 'basic')
+  {
+    $cols = [
+                   [ NULL, 'class="state-marker"' ],
+                   [ NULL ],
+      'port'    => [ 'Port' ],
+                   //[ NULL ],
+      'traffic' => [ 'Traffic' ],
+                   [ NULL ],
+                   [ NULL ],
+      'speed'   => [ 'Speed' ],
+      'mac'     => [ 'MAC Address' ],
+                   //[ NULL ],
+    ];
+  } else {
+    $cols = [
+                   [ NULL, 'class="state-marker"' ],
+                   [ NULL ],
+      'port'    => [ 'Port' ],
+                   [ NULL ],
+      'traffic' => [ 'Traffic' ],
+      'speed'   => [ 'Speed' ],
+      'mac'     => [ 'MAC Address' ],
+                   [ NULL ],
+    ];
+  }
 
   echo get_table_header($cols, $vars);
   echo '<tbody>' . PHP_EOL;

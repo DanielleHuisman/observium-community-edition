@@ -67,7 +67,7 @@ foreach ($oids as $sla_index => $entry)
   );
 
   // Use jitter or simple echo graph for SLA
-  if (str_icontains($data['rtt_type'], 'jitter'))
+  if (str_iexists($data['rtt_type'], 'jitter'))
   {
     $data['sla_graph'] = 'jitter';
   } else {

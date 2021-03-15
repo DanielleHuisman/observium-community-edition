@@ -19,7 +19,7 @@
 
 //$index        = $sla['sla_index'];
 // Index gets from auth.inc.php
-$rrd_filename = get_rrd_path($device, 'sla_jitter-'.$index.'.rrd');
+$rrd_filename_escape = get_rrd_path($device, 'sla_jitter-'.$index.'.rrd');
 
 //$unit_text    = 'SLA '.$index;
 //if ($sla['sla_tag'])
@@ -34,20 +34,20 @@ $rrd_filename = get_rrd_path($device, 'sla_jitter-'.$index.'.rrd');
 //$scale_min = -0.5;
 $scale_rigid = FALSE;
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
+include($config['html_dir']."/includes/graphs/common.inc.php");
 
-$rrd_options .= " DEF:rtt=".$rrd_filename.":rtt:AVERAGE ";
-$rrd_options .= " DEF:rtt_success=".$rrd_filename.":rtt_success:AVERAGE ";
-$rrd_options .= " DEF:rtt_loss=".$rrd_filename.":rtt_loss:AVERAGE ";
+$rrd_options .= " DEF:rtt=".$rrd_filename_escape.":rtt:AVERAGE ";
+$rrd_options .= " DEF:rtt_success=".$rrd_filename_escape.":rtt_success:AVERAGE ";
+$rrd_options .= " DEF:rtt_loss=".$rrd_filename_escape.":rtt_loss:AVERAGE ";
 $rrd_options .= " CDEF:rtt_count=rtt_success,rtt_loss,+ ";
-//$rrd_options .= " DEF:req_count=".$rrd_filename.":req_count:AVERAGE ";
+//$rrd_options .= " DEF:req_count=".$rrd_filename_escape.":req_count:AVERAGE ";
 $rrd_options .= " CDEF:ploss=rtt_loss,UNKN,EQ,1,rtt_loss,IF,rtt_count,/,100,*,CEIL ";
 
-$rrd_options .= " DEF:rtt_minimum=".$rrd_filename.":rtt_minimum:AVERAGE ";
+$rrd_options .= " DEF:rtt_minimum=".$rrd_filename_escape.":rtt_minimum:AVERAGE ";
 $rrd_options .= " CDEF:smoke_minimal=rtt_minimum,rtt,- ";
 $rrd_options .= " LINE2:rtt#FFFFFF00:'' AREA:smoke_minimal#00000045:'':STACK ";
 
-$rrd_options .= " DEF:rtt_maximum=".$rrd_filename.":rtt_maximum:AVERAGE ";
+$rrd_options .= " DEF:rtt_maximum=".$rrd_filename_escape.":rtt_maximum:AVERAGE ";
 $rrd_options .= " CDEF:smoke_maximal=rtt_maximum,rtt,- ";
 $rrd_options .= " LINE2:rtt#FFFFFF00:'' AREA:smoke_maximal#00000045:'':STACK ";
 

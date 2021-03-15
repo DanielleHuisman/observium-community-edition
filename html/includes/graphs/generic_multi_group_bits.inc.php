@@ -23,7 +23,7 @@ if ($vars['perc'] || $vars['perc_agg']) { $scale_min = 0; }
 include_once($config['html_dir'] . '/includes/graphs/common.inc.php');
 include_once($config['html_dir'] . '/includes/graphs/legend.inc.php');
 
-foreach ($data AS $id => $group)
+foreach ($data as $id => $group)
 {
 
    if (!$config['graph_colours'][$colours_in][$iter] || !$config['graph_colours'][$colours_out][$iter]) { $iter = 0; }
@@ -43,12 +43,14 @@ foreach ($data AS $id => $group)
       $ds_out  = $rrd['ds_out'] . "_" . $i;
       $ods_out = $ds_out;
 
-      $rrd_options .= " DEF:" . $ds_in . "=" . $rrd['file'] . ":" . $rrd['ds_in'] . ":AVERAGE ";         // Load data
-      $rrd_options .= " DEF:" . $ds_out . "=" . $rrd['file'] . ":" . $rrd['ds_out'] . ":AVERAGE ";       // Load data
+      $rrd_filename_escape = rrdtool_escape($rrd['file']);
+
+      $rrd_options .= " DEF:" . $ds_in  . "=" . $rrd_filename_escape . ":" . $rrd['ds_in']  . ":AVERAGE ";       // Load data
+      $rrd_options .= " DEF:" . $ds_out . "=" . $rrd_filename_escape . ":" . $rrd['ds_out'] . ":AVERAGE ";       // Load data
 
       $ds_io = "io_" . $i;
 
-     $rrd_options .= " CDEF:" . $ds_io . "=" . $ds_in . "," . $ds_out . ",ADDNAN";
+      $rrd_options .= " CDEF:" . $ds_io . "=" . $ds_in . "," . $ds_out . ",ADDNAN";
 
       // if we've been passed a multiplier we must make a CDEF based on it!
       if (is_numeric($multiplier) || is_numeric($divider) || is_numeric($divisor))
@@ -107,7 +109,7 @@ foreach ($data AS $id => $group)
    $rrd_options_b .= " CDEF:" . $group_ds . "_perc_io=" . $group_ds . "_io,agg_io,/,100,*";
 
 
-   // Create Aggreage
+   // Create Aggregate
    $group_ds_in[]  = $group_ds . "_in";
    $group_ds_out[] = $group_ds . "_out";
    $group_ds_io[]  = $group_ds . "_io";

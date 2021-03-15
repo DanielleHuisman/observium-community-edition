@@ -11,6 +11,8 @@
  *
  */
 
+$rrd_filename = get_rrd_path($device, "wmi-app-mssql_".$app['app_instance']."-memory.rrd");
+
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $colour="CC0000";
@@ -21,13 +23,11 @@ $app_state = dbFetchRow($sql, array($app['app_id']));
 $app_data = unserialize($app_state['app_state']);
 $descr = rrdtool_escape($app['app_instance'], $descr_len);
 
-$rrd_filename = get_rrd_path($device, "wmi-app-mssql_".$app['app_instance']."-memory.rrd");
-
 $rrd_options .= " -b 1024 -l 0 ";
 $rrd_options .= " COMMENT:'            Current      Average      Maximum\l'";
-$rrd_options .= " DEF:used=".$rrd_filename.":totalmemory:AVERAGE ";
-$rrd_options .= " DEF:total=".$rrd_filename.":targetmemory:AVERAGE ";
-$rrd_options .= " DEF:cache=".$rrd_filename.":cachememory:AVERAGE ";
+$rrd_options .= " DEF:used=".$rrd_filename_escape.":totalmemory:AVERAGE ";
+$rrd_options .= " DEF:total=".$rrd_filename_escape.":targetmemory:AVERAGE ";
+$rrd_options .= " DEF:cache=".$rrd_filename_escape.":cachememory:AVERAGE ";
 $rrd_options .= " CDEF:free=total,used,-";
 $rrd_options .= " CDEF:usedperc=used,total,/,100,* ";
 $rrd_options .= " CDEF:cacheperc=cache,total,/,100,* ";

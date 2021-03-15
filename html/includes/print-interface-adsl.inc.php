@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -27,7 +26,7 @@ if ($port['ifInErrors_delta'] > 0 || $port['ifOutErrors_delta'] > 0)
   $error_img = "";
 }
 
-echo("<tr valign=top onmouseover=\"this.style.backgroundColor='$list_highlight';\" onmouseout=\"this.style.backgroundColor='$row_colour';\"
+echo("<tr valign=top onmouseover=\"this.style.backgroundColor='".OBS_COLOUR_LIST_HIGHLIGHT."';\" onmouseout=\"this.style.backgroundColor='$row_colour';\"
 onclick=\"openLink('device/".$device['device_id']."/port/".$port['port_id']."/')\" style='cursor: pointer;'>
  <td valign=top width=350>");
 echo("        <span class=entity-title>

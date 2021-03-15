@@ -13,15 +13,14 @@
 
 $scale_min = "0";
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $device = device_by_id_cache($id);
-
 $rrd_filename = get_rrd_path($device, "/altiga-ssl.rrd.rrd");
 
-$rrd_options .= " DEF:TotalSessions=$rrd_filename:TotalSessions:AVERAGE";
-$rrd_options .= " DEF:ActiveSessions=$rrd_filename:ActiveSessions:AVERAGE";
-$rrd_options .= " DEF:MaxSessions=$rrd_filename:MaxSessions:AVERAGE";
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
+
+$rrd_options .= " DEF:TotalSessions=$rrd_filename_escape:TotalSessions:AVERAGE";
+$rrd_options .= " DEF:ActiveSessions=$rrd_filename_escape:ActiveSessions:AVERAGE";
+$rrd_options .= " DEF:MaxSessions=$rrd_filename_escape:MaxSessions:AVERAGE";
 $rrd_options .= " CDEF:a=1min,100,/";
 $rrd_options .= " CDEF:b=5min,100,/";
 $rrd_options .= " CDEF:c=15min,100,/";

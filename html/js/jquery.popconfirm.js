@@ -23,28 +23,28 @@
   $.fn.extend({
     popConfirm: function (options) {
       var defaults = {
-          title: 'Confirmation',
-          content: 'Are you really sure ?',
-          placement: 'right',
-          container: 'body',
-          yesBtn: 'Yes',
-          noBtn: 'No'
-        },
-        last = null;
+            title: 'Confirmation',
+            content: 'Are you really sure ?',
+            placement: 'right',
+            container: 'body',
+            yesBtn: 'Yes',
+            noBtn: 'No'
+          },
+          last = null;
       options = $.extend(defaults, options);
       return this.each(function () {
         var self = $(this),
-          arrayActions = [],
-          arrayDelegatedActions = [],
-          eventToConfirm,
-          optName,
-          optValue,
-          i,
-          elmType,
-          code,
-          form;
+            arrayActions = [],
+            arrayDelegatedActions = [],
+            eventToConfirm,
+            optName,
+            optValue,
+            i,
+            elmType,
+            code,
+            form;
 
-        // Load data-* attriutes
+        // Load data-* attributes
         for (optName in options) {
           if (options.hasOwnProperty(optName)) {
             optValue = $(this).attr('data-confirm-' + optName);
@@ -98,7 +98,7 @@
 
         // If the button is a submit one
         if (self.attr('type') && self.attr('type') === 'submit') {
-          // Get the form related to this button then store submiting in closure
+          // Get the form related to this button then store submitting in closure
           form = $(this).parents('form:first');
           arrayActions.push(function () {
             // Add the button name / value if specified
@@ -133,15 +133,17 @@
         self.bind('click', function (e) {
           eventToConfirm = e;
 
-          e.preventDefault();
-          e.stopPropagation();
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
 
           $('.popconfirm-active').not(self).popover('hide').removeClass('popconfirm-active');
           self.popover('show').addClass('popconfirm-active');
 
           $(document).find('.popover .confirm-dialog-btn-confirm').one('click', function (e) {
             for (i = 0; i < arrayActions.length; i = i + 1) {
-              arrayActions[i].apply(self);
+              arrayActions[i].apply(self, [eventToConfirm]);
             }
 
             for (i = 0; i < arrayDelegatedActions.length; i = i + 1) {

@@ -11,23 +11,23 @@
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "netstats-ip.rrd");
 
-$rrd_options .= " DEF:ipInDelivers=$rrd_filename:ipInDelivers:AVERAGE";
-$rrd_options .= " DEF:ipReasmReqds=$rrd_filename:ipReasmReqds:AVERAGE";
-$rrd_options .= " DEF:ipReasmOKs=$rrd_filename:ipReasmOKs:AVERAGE";
-$rrd_options .= " DEF:ipReasmFails=$rrd_filename:ipReasmFails:AVERAGE";
-$rrd_options .= " DEF:ipFragOKs=$rrd_filename:ipFragOKs:AVERAGE";
-$rrd_options .= " DEF:ipFragFails=$rrd_filename:ipFragFails:AVERAGE";
-$rrd_options .= " DEF:ipFragCreates=$rrd_filename:ipFragCreates:AVERAGE";
-$rrd_options .= " DEF:MipReasmReqds=$rrd_filename:ipReasmReqds:MAX";
-$rrd_options .= " DEF:MipReasmOKs=$rrd_filename:ipReasmOKs:MAX";
-$rrd_options .= " DEF:MipReasmFails=$rrd_filename:ipReasmFails:MAX";
-$rrd_options .= " DEF:MipFragOKs=$rrd_filename:ipFragOKs:MAX";
-$rrd_options .= " DEF:MipFragFails=$rrd_filename:ipFragFails:MAX";
-$rrd_options .= " DEF:MipFragCreates=$rrd_filename:ipFragCreates:MAX";
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
+
+$rrd_options .= " DEF:ipInDelivers=$rrd_filename_escape:ipInDelivers:AVERAGE";
+$rrd_options .= " DEF:ipReasmReqds=$rrd_filename_escape:ipReasmReqds:AVERAGE";
+$rrd_options .= " DEF:ipReasmOKs=$rrd_filename_escape:ipReasmOKs:AVERAGE";
+$rrd_options .= " DEF:ipReasmFails=$rrd_filename_escape:ipReasmFails:AVERAGE";
+$rrd_options .= " DEF:ipFragOKs=$rrd_filename_escape:ipFragOKs:AVERAGE";
+$rrd_options .= " DEF:ipFragFails=$rrd_filename_escape:ipFragFails:AVERAGE";
+$rrd_options .= " DEF:ipFragCreates=$rrd_filename_escape:ipFragCreates:AVERAGE";
+$rrd_options .= " DEF:MipReasmReqds=$rrd_filename_escape:ipReasmReqds:MAX";
+$rrd_options .= " DEF:MipReasmOKs=$rrd_filename_escape:ipReasmOKs:MAX";
+$rrd_options .= " DEF:MipReasmFails=$rrd_filename_escape:ipReasmFails:MAX";
+$rrd_options .= " DEF:MipFragOKs=$rrd_filename_escape:ipFragOKs:MAX";
+$rrd_options .= " DEF:MipFragFails=$rrd_filename_escape:ipFragFails:MAX";
+$rrd_options .= " DEF:MipFragCreates=$rrd_filename_escape:ipFragCreates:MAX";
 $rrd_options .= " CDEF:ReasmReqds=ipReasmReqds,ipInDelivers,/,100,*";
 $rrd_options .= " CDEF:ReasmOKs=ipReasmOKs,ipInDelivers,/,100,*";
 $rrd_options .= " CDEF:ReasmFails=ipReasmFails,ipInDelivers,/,100,*";

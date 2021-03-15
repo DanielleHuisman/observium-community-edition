@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,65 +6,21 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-$isdp_array = snmpwalk_cache_twopart_oid($device, "agentIsdpCache", array(), "DNOS-ISDP-MIB");
+// DNOS-ISDP-MIB::agentIsdpCacheAddress.50.1 = STRING: "0.0.0.0"
+// DNOS-ISDP-MIB::agentIsdpCacheLocalIntf.50.1 = STRING: "Fo1/0/2"
+// DNOS-ISDP-MIB::agentIsdpCacheVersion.50.1 = STRING: "6.3.3.10"
+// DNOS-ISDP-MIB::agentIsdpCacheDeviceId.50.1 = STRING: "dc-cores-n4032f"
+// DNOS-ISDP-MIB::agentIsdpCacheDevicePort.50.1 = STRING: "Fo2/1/2"
+// DNOS-ISDP-MIB::agentIsdpCachePlatform.50.1 = STRING: "N4032F"
+// DNOS-ISDP-MIB::agentIsdpCacheCapabilities.50.1 = STRING: "Router "
+// DNOS-ISDP-MIB::agentIsdpCacheLastChange.50.1 = Timeticks: (924574000) 107 days, 0:15:40.00
+// DNOS-ISDP-MIB::agentIsdpCacheProtocolVersion.50.1 = STRING: "2"
+// DNOS-ISDP-MIB::agentIsdpCacheHoldtime.50.1 = INTEGER: -83 seconds
 
-// FIXME, make this code generic for all *-ISDP-MIB
-if ($isdp_array)
-{
-  foreach ($isdp_array as $ifIndex => $port_neighbours)
-  {
-    $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?", array($device['device_id'], $ifIndex));
-
-    foreach ($port_neighbours as $entry_id => $isdp_entry)
-    {
-      list($isdp_entry['agentIsdpCacheDeviceId']) = explode('(', $isdp_entry['agentIsdpCacheDeviceId']); // Fix for Nexus ISDP neighbors: <hostname>(serial number)
-
-      $remote_device_id = FALSE;
-      if (is_valid_hostname($isdp_entry['agentIsdpCacheDeviceId']))
-      {
-        if (isset($GLOBALS['cache']['discovery-protocols'][$isdp_entry['agentIsdpCacheDeviceId']]))
-        {
-          // This hostname already checked, skip discover
-          $remote_device_id = $GLOBALS['cache']['discovery-protocols'][$isdp_entry['agentIsdpCacheDeviceId']];
-        } else {
-          $remote_device_id = dbFetchCell("SELECT `device_id` FROM `devices` WHERE `sysName` = ? OR `hostname` = ?", array($isdp_entry['agentIsdpCacheDeviceId'], $isdp_entry['agentIsdpCacheDeviceId']));
-
-          // FIXME do LLDP-code-style hostname overwrite here as well? (see below)
-          if (!$remote_device_id && is_valid_hostname($isdp_entry['agentIsdpCacheDeviceId']) && !is_bad_xdp($isdp_entry['agentIsdpCacheDeviceId'], $isdp_entry['agentIsdpCachePlatform']))
-          {
-            // For now it's a Cisco so CDP discovery is ok
-            $remote_device_id = discover_new_device($isdp_entry['agentIsdpCacheDeviceId'], 'xdp', 'ISDP', $device, $port);
-          }
-
-          // Cache remote device ID for other protocols
-          $GLOBALS['cache']['discovery-protocols'][$isdp_entry['agentIsdpCacheDeviceId']] = $remote_device_id;
-        }
-
-        if ($remote_device_id)
-        {
-          $if = $isdp_entry['agentIsdpCacheDevicePort'];
-          $remote_port_id = dbFetchCell("SELECT `port_id` FROM `ports` WHERE (`ifDescr` = ? OR `ifName` = ?) AND `device_id` = ?", array($if, $if, $remote_device_id));
-        } else {
-          $remote_port_id = NULL;
-        }
-
-        if (!is_bad_xdp($isdp_entry['agentIsdpCacheDeviceId']) && $port['port_id'] && $isdp_entry['agentIsdpCacheDeviceId'] && $isdp_entry['agentIsdpCacheDevicePort'])
-        {
-          $remote_address = $isdp_entry['agentIsdpCacheAddress'];
-          if (!get_ip_version($remote_address)) { $remote_address = NULL; }
-
-          discover_link($port, 'isdp', $remote_port_id, $isdp_entry['agentIsdpCacheDeviceId'], $isdp_entry['agentIsdpCacheDevicePort'], $isdp_entry['agentIsdpCachePlatform'], $isdp_entry['agentIsdpCacheVersion'], $remote_address);
-        }
-      } else {
-        echo("X");
-      }
-    }
-  }
-}
+include("isdp-mib.inc.php");
 
 // EOF

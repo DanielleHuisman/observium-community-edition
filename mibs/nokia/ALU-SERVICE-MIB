@@ -1,0 +1,2355 @@
+ALU-SERVICE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, 
+        Counter32, Counter64,
+        NOTIFICATION-TYPE, Unsigned32, Integer32      FROM SNMPv2-SMI
+
+        RowStatus, TimeStamp, TruthValue, MacAddress,
+        TEXTUAL-CONVENTION, DisplayString             FROM SNMPv2-TC
+
+        InetAddress, InetAddressType                  FROM INET-ADDRESS-MIB
+        
+        MODULE-COMPLIANCE, OBJECT-GROUP, 
+        NOTIFICATION-GROUP                            FROM SNMPv2-CONF
+
+        aluSARMIBModules, aluSARObjs,
+        aluSARNotifyPrefix, aluSARConfs               FROM ALU-SAR-GLOBAL-MIB
+                
+        sapEthernetInfoEntry, sapEthLoopbackEntry,
+        sapEthCfmEntry,
+        sapIpipeInfoEntry, sapTlsInfoEntry,
+        sapAtmInfoEntry, sapPortId, sapEncapValue, 
+        sapCemStatsEntry,
+        sapBaseInfoEntry, sapCemInfoEntry             FROM TIMETRA-SAP-MIB
+        
+        svcTlsInfoEntry, svcId,
+        TSapIngQueueId, TSapEgrQueueId,
+        ServObjDesc, svcEpipeEntry                    FROM TIMETRA-SERV-MIB
+
+        sdpBindBaseStatsEntry, sdpBindCpipeEntry      FROM TIMETRA-SDP-MIB
+
+        TNamedItemOrEmpty,
+        TmnxCustId, TNamedItem, TmnxEnabledDisabled,
+        TSapIngressPolicyID, TSapEgressPolicyID,
+        TBWRateType, TmnxActionType                   FROM TIMETRA-TC-MIB
+        
+        AluSapSchedulerCir                            FROM ALU-QOS-MIB
+        AtmVpIdentifier, AtmVcIdentifier              FROM ATM-TC-MIB
+        ;               
+        
+aluServiceMIBModule MODULE-IDENTITY
+        LAST-UPDATED    "0801180000Z"
+        ORGANIZATION    "Nokia"
+        CONTACT-INFO    
+            "Nokia 7x50 Support
+             Web: http://www.nokia.com/comps/pages/carrier_support.jhtml"
+        DESCRIPTION
+        "This document is the SNMP MIB module to manage and provision extended
+        ATM functionality for the Nokia 7705 SAR series devices.
+
+        Copyright 2003-2015 Nokia. All rights reserved.
+        Reproduction of this document is authorized on the condition that
+        the foregoing copyright notice is included.
+
+        This SNMP MIB module (Specification) embodies Nokia's
+        proprietary intellectual property.  Nokia retains
+        all title and ownership in the Specification, including any
+        revisions.
+
+        Nokia grants all interested parties a non-exclusive
+        license to use and distribute an unmodified copy of this
+        Specification in connection with management of Nokia
+        products, and without fee, provided this copyright notice and
+        license appear on all copies.
+
+        This Specification is supplied 'as is', and Nokia
+        makes no warranty, either express or implied, as to the use,
+        operation, condition, or performance of the Specification."
+--
+--  Revision History
+--
+        REVISION        "0801180000Z"
+        DESCRIPTION     "Rev 1.0                07 Oct 2008 00:00
+                         Initial version of the ALU-SERVICE-MIB."
+
+        REVISION        "1001180000Z"
+        DESCRIPTION     "Rev 2.0                26 May 2010 00:00
+                         Version 2.0 of the ALU-SERVICE-MIB."
+                         
+        ::= { aluSARMIBModules 5 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--  Nokia 7705 SAR series Service extensions
+--
+
+aluServiceObjs             OBJECT IDENTIFIER ::= { aluSARObjs 6 }
+aluServiceMIBConformance   OBJECT IDENTIFIER ::= { aluSARConfs 6 }
+
+
+
+-- --------------------------------------------------------------------
+--
+--      ALU-ATM-MIB Textual Conventions
+--
+
+--
+-- Nokia 7705 SAR series Extended IPIPE SAP Table
+--
+
+aeSapIpipeInfoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AeSapIpipeInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains IPIPE specific SAP 
+                     information for 7705 series routers."
+    ::= { aluServiceObjs 1 }
+
+aeSapIpipeInfoEntry OBJECT-TYPE
+    SYNTAX          AeSapIpipeInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "IPIPE specific information about a SAP."
+    AUGMENTS        { sapIpipeInfoEntry }
+    ::= { aeSapIpipeInfoTable 1 }
+
+AeSapIpipeInfoEntry ::=
+    SEQUENCE {
+        aeSapIpipeIpcpAssignCeAddress       TruthValue,
+        aeSapIpipeIpcpPriDnsAddrType        InetAddressType,
+        aeSapIpipeIpcpPriDnsAddr            InetAddress,
+        aeSapIpipeIpcpSecDnsAddrType        InetAddressType,
+        aeSapIpipeIpcpSecDnsAddr            InetAddress
+    }
+
+aeSapIpipeIpcpAssignCeAddress   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapIpipeIpcpAssignCeAddress specifies whether or not
+         the configured CE IP address for this IPIPE will be exchanged by IPCP, 
+         if applicable on a given interface, to configure the remote peer's IP 
+         address.
+         
+         This value may only be set when the sap encapsulation is 
+         ipcpEncap(6)."
+    DEFVAL { false } 
+    ::= { aeSapIpipeInfoEntry 1 }
+
+aeSapIpipeIpcpPriDnsAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapIpipeIpcpPriDnsAddrType specifies the type of
+         aeSapIpipeIpcpPriDnsAddr, the IP address of the primary DNS to be used 
+         by the remote peer.         
+         
+         This object can be set to non-default only when the sap encapsulation 
+         is ipcpEncap(6)."
+    DEFVAL { unknown }
+    ::= { aeSapIpipeInfoEntry 2 }
+
+aeSapIpipeIpcpPriDnsAddr  OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE(0|4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapIpipeIpcpPriDnsAddr specifies the IP address that will
+         be exchanged by IPCP, if applicable on a given interface, to configure
+         the primary DNS's IP address on the remote peer. The type of this 
+         address is specified by the value of aeSapIpipeIpcpPriDnsAddrType.
+         
+         This object can be set to non-default only when the sap encapsulation 
+         is ipcpEncap(6)."
+    DEFVAL { ''H } 
+    ::= { aeSapIpipeInfoEntry 3 }
+
+aeSapIpipeIpcpSecDnsAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapIpipeIpcpSecDnsAddrType specifies the type of
+         aeSapIpipeIpcpSecDnsAddr, the IP address of the secondary DNS to be
+         used by the remote peer.         
+         
+         This object can be set to non-default only when the sap encapsulation 
+         is ipcpEncap(6)."
+    DEFVAL { unknown }
+    ::= { aeSapIpipeInfoEntry 4 }
+
+aeSapIpipeIpcpSecDnsAddr        OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE(0|4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapIpipeIpcpSecDnsAddr specifies the IP address that will
+         be exchanged by IPCP, if applicable on a given interface, to configure
+         the secondary DNS's IP address on the remote peer. The type of this 
+         address is specified by the value of aeSapIpipeIpcpSecDnsAddrType.
+         
+         This object can be set to non-default only when the sap encapsulation 
+         is ipcpEncap(6)."
+    DEFVAL { ''H } 
+    ::= { aeSapIpipeInfoEntry 5 }
+
+--
+-- Nokia 7705 SAR series Extended TLS SAP Table
+--
+
+aeSapTlsInfoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AeSapTlsInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains TLS specific SAP 
+                     information for 7705 series routers."
+    ::= { aluServiceObjs 2 }
+
+aeSapTlsInfoEntry OBJECT-TYPE
+    SYNTAX          AeSapTlsInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "TLS specific information about a SAP."
+    AUGMENTS        { sapTlsInfoEntry }
+    ::= { aeSapTlsInfoTable 1 }
+
+AeSapTlsInfoEntry ::=
+    SEQUENCE {
+        aeSapTlsPPPoEIncludeCircuitId       TruthValue,
+        aeSapTlsPPPoECircuitId              DisplayString,
+        aeSapTlsForceCVlanForwarding        TruthValue
+    }
+
+aeSapTlsPPPoEIncludeCircuitId   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapTlsPPPoEIncludeCircuitId specifies whether or not
+         the agent-circuit-id as per RFC 4679 will be inserted into PPPoE PADI
+         and PADR messages.
+         
+         This value may only be set when the sap encapsulation is 
+         'atmEncap'. The default of 'atmEncap' SAPs will be derived from 
+         'aeSvcTlsPPPoEIncludeCircuitId'."
+    DEFVAL { false } 
+    ::= { aeSapTlsInfoEntry 1 }
+
+aeSapTlsPPPoECircuitId   OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (1..65))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapTlsPPPoECircuitId indicates the the agent-circuit-id 
+        as per RFC 4679 to be inserted into PPPoE PADI and PADR messages.
+         
+        This value is only valid when aeSapTlsPPPoEIncludeCircuitId is 'true'."
+    DEFVAL { ''H }
+    ::= { aeSapTlsInfoEntry 2 }
+
+aeSapTlsForceCVlanForwarding   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSapTlsForceCVlanForwarding specifies whether or not
+         the c-tag will be perserve when forwarding to uplink dot1q sap or vlan 
+         spoke sdp.
+         
+         This value may only be set when the sap encapsulation is 
+         'dot1q' or 'qinq'."
+    DEFVAL { false } 
+    ::= { aeSapTlsInfoEntry 3 }
+
+
+--
+-- Nokia 7705 SAR series Extended VPLS ATM SAP Table
+--
+aeSapTlsAtmInfoTable OBJECT-TYPE
+   SYNTAX          SEQUENCE OF AeSapTlsAtmInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains TLS specific SAP 
+                     information for 7705 series routers."
+    ::= { aluServiceObjs 3 }
+
+aeSapTlsAtmInfoEntry OBJECT-TYPE
+    SYNTAX          AeSapTlsAtmInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "TLS specific information about a SAP."
+    AUGMENTS        { sapAtmInfoEntry }
+    ::= { aeSapTlsAtmInfoTable 1 }
+
+AeSapTlsAtmInfoEntry ::=
+    SEQUENCE {
+        aeSapTlsAtmSubscriberVlanTag    Unsigned32    
+    }
+
+aeSapTlsAtmSubscriberVlanTag OBJECT-TYPE
+    SYNTAX          Unsigned32 ('0000'H..'0fff'H)
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION     "This object specifies the subscriber vlan tag value on a ATM sap 
+                     for this TLS service. The default value (0xfff) means invalid vlan
+                     tag."
+    DEFVAL          { '0fff'H }                 
+    ::= { aeSapTlsAtmInfoEntry 1 }    
+
+--
+-- Nokia 7705 SAR series Extended TLS Info Table
+--
+
+aeSvcTlsInfoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AeSvcTlsInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains TLS specific SVC 
+                     information for 7705 series routers."
+    ::= { aluServiceObjs 4 }
+
+aeSvcTlsInfoEntry OBJECT-TYPE
+    SYNTAX          AeSvcTlsInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "TLS specific information about a Service."
+    AUGMENTS        { svcTlsInfoEntry }
+    ::= { aeSvcTlsInfoTable 1 }
+
+AeSvcTlsInfoEntry ::=
+    SEQUENCE {
+        aeSvcTlsPPPoEIncludeCircuitId         TruthValue,
+        aeSvcTlsL4Hashing                     TmnxEnabledDisabled
+    }
+
+aeSvcTlsPPPoEIncludeCircuitId   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSvcTlsPPPoEIncludeCircuitId specifies whether or not
+         the agent-circuit-id as per RFC 4679 will be inserted by default
+         into PPPoE PADI and PADR messages of SAPs with an encapsulation of 
+         'atmEncap'."
+         
+    DEFVAL { false } 
+    ::= { aeSvcTlsInfoEntry 1 }
+
+aeSvcTlsL4Hashing               OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled 
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aeSvcTlsL4Hashing specifies whether or not
+         L4 hashing for TLS Ethernet services"
+    DEFVAL { disabled }
+    ::= { aeSvcTlsInfoEntry 2 }
+
+-- 
+-- Nokia 7705 SAR series Extended SAP ATM Table 
+-- 
+  
+aeSapApipeAtmInfoTable OBJECT-TYPE 
+    SYNTAX          SEQUENCE OF AeSapApipeAtmInfoEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "An extension table that contains Apipe Atm specific SAP  
+                     information for 7705 series routers." 
+    ::= { aluServiceObjs 6 } 
+     
+aeSapApipeAtmInfoEntry OBJECT-TYPE 
+    SYNTAX          AeSapApipeAtmInfoEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "Atm specific information about a SAP." 
+    AUGMENTS        { sapAtmInfoEntry } 
+    ::= { aeSapApipeAtmInfoTable 1 } 
+      
+AeSapApipeAtmInfoEntry ::= 
+    SEQUENCE { 
+        aeSapApipeAtmVcidTranslatedVpi         AtmVpIdentifier, 
+        aeSapApipeAtmVcidTranslatedVci         AtmVcIdentifier 
+    } 
+     
+aeSapApipeAtmVcidTranslatedVpi OBJECT-TYPE 
+     SYNTAX          AtmVpIdentifier 
+     MAX-ACCESS      read-create 
+     STATUS          current 
+     DESCRIPTION     "Unique translated Vpi value in NGT1 PW service" 
+     DEFVAL          { 0 } 
+     ::= { aeSapApipeAtmInfoEntry 1 } 
+       
+aeSapApipeAtmVcidTranslatedVci OBJECT-TYPE 
+     SYNTAX          AtmVcIdentifier 
+     MAX-ACCESS      read-create 
+     STATUS          current 
+     DESCRIPTION     "Unique translated Vci value in NGT1 PW service" 
+     DEFVAL          { 0 } 
+     ::= { aeSapApipeAtmInfoEntry 2 } 
+          
+   
+-------------------------------------- 
+-- SAP Aggregation Group Table 
+-------------------------------------- 
+aeSvcSapAGInfoTable OBJECT-TYPE 
+    SYNTAX          SEQUENCE OF SvcSapAGInfoEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "A table that contains SAP aggregation group 
+                     information. Only one group can be created per service. 
+                     This group is used to associate all N>1's SAP's group." 
+    ::= { aluServiceObjs 7 }  
+
+aeSvcSapAGInfoEntry OBJECT-TYPE 
+    SYNTAX          SvcSapAGInfoEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "SAP aggregation group information about a N>1 service." 
+    INDEX           { svcId, aeSvcSapAGName } 
+    ::= { aeSvcSapAGInfoTable 1 }
+    
+SvcSapAGInfoEntry ::= 
+    SEQUENCE { 
+      aeSvcSapAGName                   TNamedItem, 
+      aeSvcSapAGRowStatus              RowStatus, 
+      aeSvcSapAGDescription            ServObjDesc, 
+      aeSvcSapAGIngressQosPolicyId     TSapIngressPolicyID, 
+      aeSvcSapAGEgressQosPolicyId      TSapEgressPolicyID, 
+      aeSvcSapAGCollectAcctStats       TruthValue, 
+      aeSvcSapAGAccountingPolicyId     Unsigned32 
+    } 
+
+aeSvcSapAGName OBJECT-TYPE 
+     SYNTAX          TNamedItem 
+     MAX-ACCESS      not-accessible 
+     STATUS          current 
+     DESCRIPTION     "The value of the object aeSvcSapAGName specifies the name of 
+                      the SAP aggregation group. The name must be unique within 
+                      a Apipe service, however the same name can appear in different 
+                      Apipe services, in which case they denote different SAP 
+                      aggregation groups." 
+    ::= { aeSvcSapAGInfoEntry 1 } 
+     
+aeSvcSapAGRowStatus OBJECT-TYPE 
+    SYNTAX          RowStatus 
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     "The value of the object  aeSvcSapAGRowStatus specifies the 
+                     status of this row. 
+                     The only values supported during a set operation are 
+                     'createAndGo' and 'destroy'. To delete an entry 
+                     from this table, there should be no N>1 SAP's." 
+    ::= { aeSvcSapAGInfoEntry 2 } 
+       
+aeSvcSapAGDescription OBJECT-TYPE 
+    SYNTAX          ServObjDesc 
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     "Generic information about this SAP aggregation group." 
+    DEFVAL          { "" } 
+    ::= { aeSvcSapAGInfoEntry 3 } 
+       
+aeSvcSapAGIngressQosPolicyId OBJECT-TYPE 
+    SYNTAX          TSapIngressPolicyID 
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     "The value of the object aeSvcSapAGIngressQosPolicyId specifies 
+                     the row index in the aeSvcSapAGInfoTable corresponding to this 
+                     ingress QoS policy, or one if no policy is specified. 
+                     The value 0 is needed for mirror SAPs that 
+                     cannot have a qos policy assigned." 
+    DEFVAL          { 1 } 
+    ::= { aeSvcSapAGInfoEntry 4 } 
+   
+aeSvcSapAGEgressQosPolicyId OBJECT-TYPE 
+    SYNTAX          TSapEgressPolicyID 
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     "The value of the object aeSvcSapAGEgressQosPolicyId specifies 
+                     the row index in the aeSvcSapAGInfoTable corresponding to this 
+                     ingress QoS policy, or one if no policy is specified." 
+    DEFVAL          { 1 } 
+    ::= { aeSvcSapAGInfoEntry 5 } 
+
+aeSvcSapAGCollectAcctStats OBJECT-TYPE 
+    SYNTAX          TruthValue 
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     "When the value of this object is 'true' the agent 
+                     collects accounting statistics on this N>1 SAP." 
+    DEFVAL          { false } 
+    ::= { aeSvcSapAGInfoEntry 6 } 
+       
+aeSvcSapAGAccountingPolicyId OBJECT-TYPE 
+    SYNTAX          Unsigned32 
+    MAX-ACCESS      read-create 
+    STATUS          current 
+    DESCRIPTION     "This object specifies the policy to use to collect 
+                     accounting statistics on this N>1 SAP. The value zero 
+                     indicates that the agent should use the default 
+                     accounting policy, if one exists." 
+    DEFVAL          { 0 } 
+    ::= { aeSvcSapAGInfoEntry 7 } 
+
+-- 
+-- Base SAP Aggregation Group Statistics Table 
+-- 
+   
+aluSapAGBaseStatsTable OBJECT-TYPE 
+    SYNTAX          SEQUENCE OF AluSapAGBaseStatsEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "A table that contains basic statistics 
+                     of a SAP Aggregation Group." 
+    ::= { aluServiceObjs 8 } 
+    
+aluSapAGBaseStatsEntry OBJECT-TYPE 
+    SYNTAX          AluSapAGBaseStatsEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "Basic statistics about a specific  
+                     SAP Aggregation Group." 
+    INDEX           { svcId, aeSvcSapAGName } 
+    ::= { aluSapAGBaseStatsTable 1 } 
+   
+AluSapAGBaseStatsEntry ::= 
+    SEQUENCE { 
+      aluSapAGBaseStatsIngressDroppedPackets          Counter64, 
+      aluSapAGBaseStatsIngressDroppedOctets           Counter64,
+      aluSapAGBaseStatsIngressOfferedHiPrioPackets    Counter64, 
+      aluSapAGBaseStatsIngressOfferedHiPrioOctets     Counter64,
+      aluSapAGBaseStatsIngressOfferedLoPrioPackets    Counter64, 
+      aluSapAGBaseStatsIngressOfferedLoPrioOctets     Counter64,
+      aluSapAGBaseStatsIngressDroppedHiPrioPackets    Counter64, 
+      aluSapAGBaseStatsIngressDroppedHiPrioOctets     Counter64,
+      aluSapAGBaseStatsIngressDroppedLoPrioPackets    Counter64, 
+      aluSapAGBaseStatsIngressDroppedLoPrioOctets     Counter64,
+      aluSapAGBaseStatsIngressForwardedInProfPackets  Counter64, 
+      aluSapAGBaseStatsIngressForwardedInProfOctets   Counter64, 
+      aluSapAGBaseStatsIngressForwardedOutProfPackets Counter64, 
+      aluSapAGBaseStatsIngressForwardedOutProfOctets  Counter64, 
+      aluSapAGBaseStatsEgressDroppedInProfPackets     Counter64, 
+      aluSapAGBaseStatsEgressDroppedInProfOctets      Counter64,
+      aluSapAGBaseStatsEgressDroppedOutProfPackets    Counter64, 
+      aluSapAGBaseStatsEgressDroppedOutProfOctets     Counter64,
+      aluSapAGBaseStatsEgressForwardedInProfPackets   Counter64, 
+      aluSapAGBaseStatsEgressForwardedInProfOctets    Counter64, 
+      aluSapAGBaseStatsEgressForwardedOutProfPackets  Counter64, 
+      aluSapAGBaseStatsEgressForwardedOutProfOctets   Counter64,
+      aluSapAGBaseStatsUnknownVpiVciCellsDropped      Counter64, 
+      aluSapAGBaseStatsCustId                         TmnxCustId, 
+      aluSapAGBaseStatsIngressOfferedUncoloredPackets Counter64,
+      aluSapAGBaseStatsIngressOfferedUncoloredOctets  Counter64,
+      aluSapAGBaseStatsAuthenticationPktsDiscarded    Counter32,
+      aluSapAGBaseStatsAuthenticationPktsSuccess      Counter32,
+      aluSapAGBaseStatsLastClearedTime                TimeStamp 
+    } 
+
+aluSapAGBaseStatsIngressDroppedPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of packets dropped in ingress due to:
+                     SAP state, bad checksum, etc." 
+    ::= { aluSapAGBaseStatsEntry 1 } 
+
+aluSapAGBaseStatsIngressDroppedOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of octets dropped in ingress due to:
+                     SAP state, bad checksum, etc." 
+    ::= { aluSapAGBaseStatsEntry 2 } 
+       
+aluSapAGBaseStatsIngressOfferedHiPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of high priority packets 
+                     offered, as determined by the SAP  
+                     Aggregation Group's ingress QoS policy." 
+    ::= { aluSapAGBaseStatsEntry 3 } 
+   
+aluSapAGBaseStatsIngressOfferedHiPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of high priority octets 
+                     offered, as determined by the SAP  
+                     Aggregation Group's ingress QoS policy." 
+    ::= { aluSapAGBaseStatsEntry 4 }   
+
+aluSapAGBaseStatsIngressOfferedLoPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority packets 
+                     offered, as determined by the SAP  
+                     Aggregation Group's ingress QoS policy." 
+    ::= { aluSapAGBaseStatsEntry 5 } 
+   
+aluSapAGBaseStatsIngressOfferedLoPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority octets 
+                     offered, as determined by the SAP  
+                     Aggregation Group's ingress QoS policy." 
+    ::= { aluSapAGBaseStatsEntry 6 } 
+
+    
+aluSapAGBaseStatsIngressDroppedHiPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of high priority packets, 
+                     as determined by the SAP Aggregation  
+                     Group's ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGBaseStatsEntry 7 } 
+
+aluSapAGBaseStatsIngressDroppedHiPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of high priority octets, 
+                     as determined by the SAP Aggregation  
+                     Group's ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGBaseStatsEntry 8 } 
+       
+aluSapAGBaseStatsIngressDroppedLoPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority packets, 
+                     as determined by the SAP Aggregation  
+                     Group's ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGBaseStatsEntry 9 } 
+
+aluSapAGBaseStatsIngressDroppedLoPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority octets, 
+                     as determined by the SAP Aggregation  
+                     Group's ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGBaseStatsEntry 10 }        
+       
+aluSapAGBaseStatsIngressForwardedInProfPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile packets 
+                     (rate below CIR) forwarded." 
+    ::= { aluSapAGBaseStatsEntry 11 } 
+   
+aluSapAGBaseStatsIngressForwardedInProfOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile octets 
+                     (rate below CIR) forwarded." 
+    ::= { aluSapAGBaseStatsEntry 12 } 
+   
+aluSapAGBaseStatsIngressForwardedOutProfPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of out-of-profile packets 
+                    (rate above CIR) forwarded." 
+    ::= { aluSapAGBaseStatsEntry 13 } 
+    
+aluSapAGBaseStatsIngressForwardedOutProfOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of out-of-profile octets 
+                     (rate above CIR) forwarded." 
+    ::= { aluSapAGBaseStatsEntry 14 } 
+   
+aluSapAGBaseStatsEgressDroppedInProfPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile packets 
+                     discarded due to: MBS exceeded,  
+                     buffer pool limit exceeded, etc." 
+    ::= { aluSapAGBaseStatsEntry 15 } 
+
+aluSapAGBaseStatsEgressDroppedInProfOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile octets 
+                     discarded due to: MBS exceeded,  
+                     buffer pool limit exceeded, etc." 
+    ::= { aluSapAGBaseStatsEntry 16 } 
+
+aluSapAGBaseStatsEgressDroppedOutProfPackets OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of out-of-profile packets
+                     discarded due to: MBS exceeded, 
+                     buffer pool limit exceeded, etc."
+    ::= { aluSapAGBaseStatsEntry 17 }
+
+aluSapAGBaseStatsEgressDroppedOutProfOctets OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of out-of-profile octets
+                     discarded due to: MBS exceeded, 
+                     buffer pool limit exceeded, etc."
+    ::= { aluSapAGBaseStatsEntry 18 }
+
+aluSapAGBaseStatsEgressForwardedInProfPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile packets 
+                     (rate below CIR) forwarded." 
+    ::= { aluSapAGBaseStatsEntry 19 } 
+   
+aluSapAGBaseStatsEgressForwardedInProfOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile octets 
+                     (rate below CIR) forwarded." 
+    ::= { aluSapAGBaseStatsEntry 20 } 
+
+aluSapAGBaseStatsEgressForwardedOutProfPackets OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of out-of-profile packets
+                     (rate above CIR) forwarded."
+    ::= { aluSapAGBaseStatsEntry 21 }
+
+aluSapAGBaseStatsEgressForwardedOutProfOctets OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of out-of-profile octets
+                     (rate above CIR) forwarded."
+    ::= { aluSapAGBaseStatsEntry 22 }                 
+   
+aluSapAGBaseStatsUnknownVpiVciCellsDropped OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of cells received with vpi/vci 
+                     that is not defined under vcid-translation. 
+                     The cells with unknown vpi/vci are dropped." 
+    ::= { aluSapAGBaseStatsEntry 23 } 
+
+aluSapAGBaseStatsCustId OBJECT-TYPE 
+    SYNTAX          TmnxCustId 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The Customer ID for the associated service." 
+    ::= { aluSapAGBaseStatsEntry 24 } 
+
+aluSapAGBaseStatsIngressOfferedUncoloredPackets OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of uncolored packets offered,
+                     as determined by the SAP ingress QoS
+                     policy."
+    ::= { aluSapAGBaseStatsEntry 25 }
+
+aluSapAGBaseStatsIngressOfferedUncoloredOctets OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of uncolored octets offered,
+                     as determined by the SAP ingress QoS
+                     policy."
+    ::= { aluSapAGBaseStatsEntry 26 }
+
+aluSapAGBaseStatsAuthenticationPktsDiscarded OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of DHCP packets discarded
+                     as result of authentication."
+    ::= { aluSapAGBaseStatsEntry 27 }
+
+aluSapAGBaseStatsAuthenticationPktsSuccess OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of DHCP packets successfully authenticated."
+    ::= { aluSapAGBaseStatsEntry 28 }
+
+aluSapAGBaseStatsLastClearedTime OBJECT-TYPE 
+    SYNTAX          TimeStamp 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The value of aluSapAGBaseStatsLastClearedTime  
+                     Indicates the sysUpTime when the counters in this 
+                     table were last cleared." 
+    ::= { aluSapAGBaseStatsEntry 29} 
+
+----------------------------------------------------------- 
+-- Ingress QoS Queue SAP Aggregation Group Statistics Table 
+------------------------------------------------------------ 
+aluSapAGIngQosQStatsTable OBJECT-TYPE 
+    SYNTAX          SEQUENCE OF AluSapAGIngQosQStatsEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "A table that contains ingress QoS queue SAP 
+                    Aggregation Group statistics." 
+    ::= { aluServiceObjs 9 } 
+   
+aluSapAGIngQosQStatsEntry OBJECT-TYPE 
+    SYNTAX          AluSapAGIngQosQStatsEntry 
+    MAX-ACCESS      not-accessible 
+    STATUS          current 
+    DESCRIPTION     "Ingress statistics about a specific SAP 
+                     Aggregation Group?s QoS queue." 
+    INDEX           { svcId, aeSvcSapAGName, aluSapAGIngQosQueueId } 
+    ::= { aluSapAGIngQosQStatsTable 1 } 
+   
+AluSapAGIngQosQStatsEntry ::= 
+    SEQUENCE { 
+      aluSapAGIngQosQueueId                           TSapIngQueueId, 
+      aluSapAGIngQosQStatsOfferedHiPrioPackets        Counter64, 
+      aluSapAGIngQosQStatsDroppedHiPrioPackets        Counter64, 
+      aluSapAGIngQosQStatsOfferedLoPrioPackets        Counter64, 
+      aluSapAGIngQosQStatsDroppedLoPrioPackets        Counter64,
+      aluSapAGIngQosQStatsOfferedHiPrioOctets         Counter64, 
+      aluSapAGIngQosQStatsDroppedHiPrioOctets         Counter64, 
+      aluSapAGIngQosQStatsOfferedLoPrioOctets         Counter64, 
+      aluSapAGIngQosQStatsDroppedLoPrioOctets         Counter64,
+      aluSapAGIngQosQStatsForwardedInProfPackets      Counter64, 
+      aluSapAGIngQosQStatsForwardedOutProfPackets     Counter64,
+      aluSapAGIngQosQStatsForwardedInProfOctets       Counter64, 
+      aluSapAGIngQosQStatsForwardedOutProfOctets      Counter64, 
+      aluSapAGIngQosCustId                            TmnxCustId,
+      aluSapAGIngQosQStatsUncoloredPacketsOffered     Counter64,
+      aluSapAGIngQosQStatsUncoloredOctetsOffered      Counter64
+    } 
+       
+aluSapAGIngQosQueueId OBJECT-TYPE 
+    SYNTAX          TSapIngQueueId 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The index of the ingress QoS queue of 
+                     this SAP Aggregation Group." 
+    ::= { aluSapAGIngQosQStatsEntry 1 } 
+       
+aluSapAGIngQosQStatsOfferedHiPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of high priority packets, 
+                     offered as determined by the SAP  
+                     Aggregation Group ingress QoS policy." 
+    ::= { aluSapAGIngQosQStatsEntry 2 } 
+   
+aluSapAGIngQosQStatsDroppedHiPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of high priority packets, 
+                     as determined by the SAP Aggregation Group 
+                     ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGIngQosQStatsEntry 3 } 
+    
+aluSapAGIngQosQStatsOfferedLoPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority packets, 
+                     offered as determined by the SAP  
+                     Aggregation Group ingress QoS policy." 
+    ::= { aluSapAGIngQosQStatsEntry 4 } 
+   
+aluSapAGIngQosQStatsDroppedLoPrioPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority packets, 
+                     as determined by the SAP Aggregation Group 
+                     ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGIngQosQStatsEntry 5 }
+
+aluSapAGIngQosQStatsOfferedHiPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of high priority octets, 
+                     offered as determined by the SAP  
+                     Aggregation Group ingress QoS policy." 
+    ::= { aluSapAGIngQosQStatsEntry 6 } 
+   
+aluSapAGIngQosQStatsDroppedHiPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority octets, 
+                     as determined by the SAP Aggregation Group 
+                     ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGIngQosQStatsEntry 7 } 
+    
+aluSapAGIngQosQStatsOfferedLoPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority octets, 
+                     offered as determined by the SAP  
+                     Aggregation Group ingress QoS policy." 
+    ::= { aluSapAGIngQosQStatsEntry 8 } 
+   
+aluSapAGIngQosQStatsDroppedLoPrioOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of low priority octets, 
+                     as determined by the SAP Aggregation Group 
+                     ingress QoS policy, dropped due to: 
+                     MBS exceeded, buffer pool limit 
+                     exceeded, etc." 
+    ::= { aluSapAGIngQosQStatsEntry 9 }
+
+aluSapAGIngQosQStatsForwardedInProfPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile packets 
+                    (rate below CIR) forwarded." 
+    ::= { aluSapAGIngQosQStatsEntry 10} 
+    
+aluSapAGIngQosQStatsForwardedOutProfPackets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of out-of-profile packets 
+                    (rate above CIR) forwarded." 
+    ::= { aluSapAGIngQosQStatsEntry 11 } 
+   
+aluSapAGIngQosQStatsForwardedInProfOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of in-profile octets 
+                     (rate below CIR) forwarded." 
+    ::= { aluSapAGIngQosQStatsEntry 12 } 
+
+aluSapAGIngQosQStatsForwardedOutProfOctets OBJECT-TYPE 
+    SYNTAX          Counter64 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The number of out-of-profile octets 
+                     (rate above CIR) forwarded." 
+    ::= { aluSapAGIngQosQStatsEntry 13 } 
+    
+aluSapAGIngQosCustId OBJECT-TYPE 
+    SYNTAX          TmnxCustId 
+    MAX-ACCESS      read-only 
+    STATUS          current 
+    DESCRIPTION     "The Customer ID for the associated service." 
+    ::= { aluSapAGIngQosQStatsEntry 14 }
+    
+aluSapAGIngQosQStatsUncoloredPacketsOffered OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of uncolored packets offered to the ingress."
+    ::= { aluSapAGIngQosQStatsEntry 15 }
+
+aluSapAGIngQosQStatsUncoloredOctetsOffered OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The number of uncolored octets offered to
+                     the ingress."
+    ::= { aluSapAGIngQosQStatsEntry 16 }     
+   
+---------------------------------------------------------- 
+-- Egress QoS Queue SAP Aggregation Group Statistics Table 
+---------------------------------------------------------- 
+aluSapAGEgrQosQStatsTable OBJECT-TYPE 
+   SYNTAX          SEQUENCE OF AluSapAGEgrQosQStatsEntry 
+   MAX-ACCESS      not-accessible 
+   STATUS          current 
+   DESCRIPTION     "A table that contains egress QoS queue SAP 
+                    Aggregation Group statistics." 
+   ::= { aluServiceObjs 10  } 
+   
+aluSapAGEgrQosQStatsEntry OBJECT-TYPE 
+   SYNTAX          AluSapAGEgrQosQStatsEntry 
+   MAX-ACCESS      not-accessible 
+   STATUS          current 
+   DESCRIPTION     "Egress statistics about a specific SAP 
+                    Aggregation Group's QoS queue." 
+   INDEX           { svcId, aeSvcSapAGName, aluSapAGEgrQosQueueId } 
+   ::= { aluSapAGEgrQosQStatsTable 1 } 
+    
+AluSapAGEgrQosQStatsEntry ::= 
+   SEQUENCE { 
+     aluSapAGEgrQosQueueId                       TSapEgrQueueId, 
+     aluSapAGEgrQosQStatsForwardedInProfPackets  Counter64, 
+     aluSapAGEgrQosQStatsDroppedInProfPackets    Counter64,
+     aluSapAGEgrQosQStatsForwardedOutProfPackets Counter64, 
+     aluSapAGEgrQosQStatsDroppedOutProfPackets   Counter64, 
+     aluSapAGEgrQosQStatsForwardedInProfOctets   Counter64,
+     aluSapAGEgrQosQStatsDroppedInProfOctets     Counter64,
+     aluSapAGEgrQosQStatsForwardedOutProfOctets  Counter64, 
+     aluSapAGEgrQosQStatsDroppedOutProfOctets    Counter64, 
+     aluSapAGEgrQosCustId                        TmnxCustId 
+   } 
+   
+aluSapAGEgrQosQueueId OBJECT-TYPE 
+   SYNTAX          TSapEgrQueueId 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The index of the egress QoS queue of 
+                    this SAP Aggregation Group." 
+   ::= { aluSapAGEgrQosQStatsEntry 1 } 
+      
+aluSapAGEgrQosQStatsForwardedInProfPackets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of in-profile packets 
+                    (rate below CIR) forwarded." 
+   ::= { aluSapAGEgrQosQStatsEntry 2 } 
+   
+aluSapAGEgrQosQStatsDroppedInProfPackets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of in-profile packets 
+                    discarded due to: MBS exceeded,  
+                    buffer pool limit exceeded, etc." 
+   ::= { aluSapAGEgrQosQStatsEntry 3 } 
+
+aluSapAGEgrQosQStatsForwardedOutProfPackets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of in-profile packets 
+                    (rate below CIR) forwarded." 
+   ::= { aluSapAGEgrQosQStatsEntry 4 } 
+   
+aluSapAGEgrQosQStatsDroppedOutProfPackets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of in-profile packets 
+                    discarded due to: MBS exceeded,  
+                    buffer pool limit exceeded, etc." 
+   ::= { aluSapAGEgrQosQStatsEntry 5 } 
+      
+aluSapAGEgrQosQStatsForwardedInProfOctets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of in-profile octets 
+                    (rate below CIR) forwarded." 
+   ::= { aluSapAGEgrQosQStatsEntry 6 } 
+
+aluSapAGEgrQosQStatsDroppedInProfOctets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of in-profile octets 
+                    discarded due to: MBS exceeded,  
+                    buffer pool limit exceeded, etc." 
+   ::= { aluSapAGEgrQosQStatsEntry 7 } 
+
+
+aluSapAGEgrQosQStatsForwardedOutProfOctets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of out-of-profile octets 
+                    (rate below CIR) forwarded." 
+   ::= { aluSapAGEgrQosQStatsEntry 8 } 
+
+aluSapAGEgrQosQStatsDroppedOutProfOctets OBJECT-TYPE 
+   SYNTAX          Counter64 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The number of out-of-profile octets 
+                    discarded due to: MBS exceeded,  
+                    buffer pool limit exceeded, etc." 
+   ::= { aluSapAGEgrQosQStatsEntry 9 } 
+      
+aluSapAGEgrQosCustId OBJECT-TYPE 
+   SYNTAX          TmnxCustId 
+   MAX-ACCESS      read-only 
+   STATUS          current 
+   DESCRIPTION     "The Customer ID for the associated service." 
+   ::= { aluSapAGEgrQosQStatsEntry 10 } 
+  
+---------------------------------------------------------- 
+--  Base SAP ETH-CFM Table
+---------------------------------------------------------- 
+aluSapEthCfmTable OBJECT-TYPE 
+   SYNTAX          SEQUENCE OF AluSapEthCfmEntry 
+   MAX-ACCESS      not-accessible 
+   STATUS          current
+   DESCRIPTION     "A table that contains SAP Ethernet CFM Group."
+   ::= { aluServiceObjs 11  } 
+
+aluSapEthCfmEntry OBJECT-TYPE 
+   SYNTAX          AluSapEthCfmEntry 
+   MAX-ACCESS      not-accessible 
+   STATUS          current
+   DESCRIPTION     "Ethernet DFM Information specific to a SSAP" 
+   AUGMENTS        { sapEthernetInfoEntry }
+   ::= { aluSapEthCfmTable 1 } 
+    
+AluSapEthCfmEntry ::= 
+   SEQUENCE { 
+       aluSapEthCfmHoldMepUp       TruthValue
+   } 
+
+aluSapEthCfmHoldMepUp OBJECT-TYPE 
+   SYNTAX          TruthValue 
+   MAX-ACCESS      read-write 
+   STATUS          current
+   DESCRIPTION     "Enable/Disable MEPs on this SAP on failure of port link.
+                    aluSapEthCfmHoldMepUp can only be enabled on one SAP per EPIPE service." 
+   DEFVAL { false } 
+   ::= { aluSapEthCfmEntry 1 } 
+
+--
+-- Nokia 7705 SAR series Extended EPIPE SAP Table
+--
+
+aluSapEpipeInfoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluSapEpipeInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains EPIPE specific SAP 
+                     information for 7705 series routers."
+    ::= { aluServiceObjs 12 }
+
+aluSapEpipeInfoEntry OBJECT-TYPE
+    SYNTAX          AluSapEpipeInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "EPIPE specific information about a SAP."
+    INDEX           { svcId, sapPortId, sapEncapValue }
+    ::= { aluSapEpipeInfoTable 1 }
+
+AluSapEpipeInfoEntry ::=
+    SEQUENCE {
+        aluSapEpipeMwCompression             TruthValue,
+        aluSapEpipeMwDestMacAddress          MacAddress,
+        aluSapEpipeMwSrcMacAddress           MacAddress,
+        aluSapEpipeMwCompressRTP             TruthValue
+    }
+
+aluSapEpipeMwCompression   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSapEpipeMwCompression specifies whether or not
+         a SAP on a Microwave Link has radio compression enabled."
+    DEFVAL { false } 
+    ::= { aluSapEpipeInfoEntry 1 }
+
+aluSapEpipeMwDestMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSapEpipeMwDestMacAddress specifies the destination
+         MAC address to be used during compression on a microwave link.
+         
+         This object can only be set when compression is enabled."
+    DEFVAL { '000000000000'h }
+    ::= { aluSapEpipeInfoEntry 2 }
+
+aluSapEpipeMwSrcMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSapEpipeMwSrcMacAddress specifies the source
+         MAC address to be used during compression on a microwave link.
+         
+         This object can only be set when compression is enabled."
+    DEFVAL { '000000000000'h }
+    ::= { aluSapEpipeInfoEntry 3 }
+
+aluSapEpipeMwCompressRTP   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSapEpipeMwCompression specifies whether or not
+         RTP is enabled on a Microwave Link SAP when radio compression 
+         is enabled enabled."
+    DEFVAL { false } 
+    ::= { aluSapEpipeInfoEntry 4 }
+
+--
+-- Nokia 7705 SAR series Extended sapBaseInfoTable
+--
+
+AluSapSchedulerMode ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Scheduler Mode to use for a SAP.
+        
+        four-priority    - Expedited/Best-Effort plus in/out scheduling.
+        sixteen-priority - Straight Priority CIR/EIR scheduling."
+        
+    SYNTAX      INTEGER {
+                    four-priority  (1),
+                    sixteen-priority (2)
+                }
+
+aluSapBaseInfoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluSapBaseInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains SAP Base Information for 7705 series routers."
+    ::= { aluServiceObjs 13 }
+
+aluSapBaseInfoEntry OBJECT-TYPE
+    SYNTAX          AluSapBaseInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Information about a SAP."
+    AUGMENTS        { sapBaseInfoEntry }
+    ::= { aluSapBaseInfoTable 1 }
+
+AluSapBaseInfoEntry ::=
+    SEQUENCE {
+        aluSapIngressSchedulerMode           AluSapSchedulerMode,
+        aluSapEgressSchedulerMode            AluSapSchedulerMode,
+        aluSapIngressAggCir                  AluSapSchedulerCir,
+        aluSapEgressAggCir                   AluSapSchedulerCir,
+        aluSapIngressAggRateLimit            Integer32,
+        aluSapEgressAggRateLimit             Integer32,
+        aluSapIngressShaperGroup             TNamedItemOrEmpty,
+        aluSapEgressShaperGroup              TNamedItemOrEmpty,
+        aluSapIngressAggCirPercent           Unsigned32 ,
+        aluSapEgressAggCirPercent            Unsigned32 ,
+        aluSapIngressAggRatePercent          Unsigned32,
+        aluSapEgressAggRatePercent           Unsigned32,
+        aluSapIngressAggRateType             TBWRateType,
+        aluSapEgressAggRateType              TBWRateType
+    }
+
+aluSapIngressSchedulerMode   OBJECT-TYPE
+    SYNTAX      AluSapSchedulerMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "The value of aluSapIngressSchedulerMode indicates the mode that the
+         ingress scheduler is provisioned for this SAP to operate in.
+         
+         All MDAs are initialized with a valid aluSapIngressSchedulerMode, however it
+         can be modified on SAPs on some MDA types, but not on all MDA types.
+         
+         aluSapIngressSchedulerMode intitialized with 'four-priority-hqos' cannot be modified.
+         
+         When set aluSapIngressSchedulerMode to four-priority, 
+         aluSapEgressAggCir and sapIngressAggRateLimit of the same SAP are reverted 
+         to their default values."
+
+    DEFVAL {  four-priority } 
+    ::= { aluSapBaseInfoEntry 1 }
+
+aluSapEgressSchedulerMode OBJECT-TYPE
+    SYNTAX      AluSapSchedulerMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSapEgressSchedulerMode indicates the mode that the
+         egress scheduler is provisioned for this SAP to operate in. 
+         
+         All MDAs are initialized with a valid aluSapEgressSchedulerMode, however it
+         can be modified on SAPs on some MDA types, but not on all MDA types.
+         
+         aluSapEgressSchedulerMode intitialized with 'four-priority-hqos' cannot be modified.
+         
+         When set aluSapEgressSchedulerMode to four-priority, 
+         aluSapEgressAggCir and sapEgressAggRateLimit of the same SAP are reverted 
+         to their default values."
+
+    DEFVAL { four-priority }
+    ::= { aluSapBaseInfoEntry 2 }
+
+aluSapIngressAggCir OBJECT-TYPE
+    SYNTAX       AluSapSchedulerCir 
+    UNITS        "kbps"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+         "The value of the object aluSapIngressAggCir specifies the CIR of all
+         ingress queues for this SAP.
+         
+         aluSapIngressAggCir cannot be modified from its default value on a SAP with 
+         aluSapIngressSchedulerMode being four-priority or four-priority-hqos."
+    DEFVAL { 0 }
+    ::= { aluSapBaseInfoEntry 3 }
+
+aluSapEgressAggCir   OBJECT-TYPE
+    SYNTAX       AluSapSchedulerCir
+    UNITS        "kbps"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The value of the object aluSapEgressAggCir specifies the CIR of all 
+        egress queues for this SAP.  
+        
+        aluSapEgressAggCir cannot be modified from its default value on a SAP with 
+        aluSapEgressSchedulerMode being four-priority or four-priority-hqos."
+    DEFVAL { 0 }
+    ::= { aluSapBaseInfoEntry 4 }
+    
+aluSapIngressAggRateLimit  OBJECT-TYPE
+    SYNTAX       Integer32 (-1 | 1..10000000)
+    UNITS        "kbps"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The value of the object aluSapIngressAggRateLimit
+         specifies the maximum total rate of all ingress queues for
+         this SAP. The value '-1' means that there is no limit.
+
+         aluSapIngressAggRateLimit cannot be modified from its default value on a SAP with 
+         aluSapIngressSchedulerMode being four-priority."
+    DEFVAL { -1 }
+    ::= { aluSapBaseInfoEntry 5 }
+    
+aluSapEgressAggRateLimit      OBJECT-TYPE
+    SYNTAX       Integer32 (-1 | 1..10000000)
+    UNITS        "kbps"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The value of the object aluSapEgressAggRateLimit
+         specifies the maximum total rate of all egress queues for
+         this SAP. The value '-1' means that there
+         is no limit.
+                 
+        aluSapEgressAggRateLimit cannot be modified from its default value on a SAP with 
+        aluSapEgressSchedulerMode being four-priority."
+    DEFVAL { -1 }
+    ::= { aluSapBaseInfoEntry 6 }
+
+aluSapIngressShaperGroup      OBJECT-TYPE
+    SYNTAX       TNamedItemOrEmpty
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "aluSapIngressShaperGroup is one of the shaper groups defined within the
+        shaper policy associated with the access ingress MDA object
+        aluExtTmnxMDAAccessIngShaperPolicy.
+
+        If aluExtTmnxMDAAccessIngShaperPolicy of the MDA is a an empty string
+        or aluSapIngressSchedulerMode of the SAP is four-priority, a
+        luSapIngressShaperGroup is set to empty string and it cannot be
+        modified."
+
+    DEFVAL    { ''H }   -- the empty string
+    ::= { aluSapBaseInfoEntry 7 }
+
+aluSapEgressShaperGroup      OBJECT-TYPE
+    SYNTAX       TNamedItemOrEmpty
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "aluSapEgressShaperGroup is one of the shaper groups defined within the
+        shaper policy associated with the access egress port object
+        aluExtPortEtherAccEgrShaper.
+         
+        If aluExtPortEtherAccEgrShaper is a an empty string or aluSapEgressSchedulerMode of
+        the SAP is four-priority, aluSapEgressShaperGroup is set to empty string and it cannot be
+        modified."
+    DEFVAL    { ''H }   -- the empty string
+    ::= { aluSapBaseInfoEntry 8 }
+
+aluSapIngressAggCirPercent   OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..10000)
+    UNITS        "hundredths of a percent"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The CIR percentage, in hundredths of a percent.
+         An 'inconsistentValue' error is returned if aluSapIngressAggCirPercent is set
+         to non-default value when the object aluSapIngressAggRateType is set to 'kbps'."
+    DEFVAL { 0 }
+    ::= { aluSapBaseInfoEntry 9 }
+
+aluSapEgressAggCirPercent    OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..10000)
+    UNITS        "hundredths of a percent"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The CIR percentage, in hundredths of a percent.
+         An 'inconsistentValue' error is returned if aluSapEgressAggCirPercent is set
+         to non-default value when the object aluSapEgressAggRateType is set to 'kbps'."
+    DEFVAL { 0 }
+    ::= { aluSapBaseInfoEntry 10 }
+
+aluSapIngressAggRatePercent  OBJECT-TYPE
+    SYNTAX       Unsigned32 (1..10000)
+    UNITS        "hundredths of a percent"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The PIR percentage, in hundredths of a percent.
+         An 'inconsistentValue' error is returned if aluSapIngressAggRatePercent is set
+         to non-default value when the object aluSapIngressAggRateType is set to 'kbps'."
+    DEFVAL { 10000 }
+    ::= { aluSapBaseInfoEntry 11 }
+
+aluSapEgressAggRatePercent   OBJECT-TYPE
+    SYNTAX       Unsigned32 (1..10000)
+    UNITS        "hundredths of a percent"
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The PIR percentage, in hundredths of a percent.
+         An 'inconsistentValue' error is returned if aluSapEgressAggRatePercent is set
+         to non-default value when the object aluSapEgressAggRateType is set to 'kbps'."
+    DEFVAL { 10000 }
+    ::= { aluSapBaseInfoEntry 12 }
+
+aluSapIngressAggRateType     OBJECT-TYPE
+    SYNTAX       TBWRateType
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The value of aluSapIngressAggRateType specifies the type of sap ingress 
+         aggregate-rate.
+
+         When the value of aluSapIngressAggRateType is set to 'kbps', the ingress aggregate rates
+         are specified in kbps using values of aluSapIngressAggRateLimit and aluSapIngressAggCir,
+         while ojects  aluSapIngressAggCirPercent and aluSapIngressAggRatePercent
+         will be set to their default values.
+
+         When the value of aluSapIngressAggRateType is set to either 'percentPortLimit' or
+         'percentLocalLimit', the ingress aggregate rates are specified in
+         percentage using values of aluSapIngressAggRatePercent and aluSapIngressAggCirPercent,
+         while objects aluSapIngressAggCir and aluSapIngressAggRate will be set to their default values."
+    DEFVAL { kbps }
+    ::= { aluSapBaseInfoEntry 13 }
+
+aluSapEgressAggRateType      OBJECT-TYPE
+    SYNTAX       TBWRateType
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "The value of aluSapEgressAggRateType specifies the type of sap egress 
+         aggregate-rate.
+
+         When the value of aluSapEgressAggRateType is set to 'kbps', the egress aggregate rates
+         are specified in kbps, using values of aluSapEgressAggRateLimit and aluSapEgressAggCir,
+         while objects  aluSapEgressAggCirPercent and aluSapEgressAggRatePercent will be
+         set to their default values.
+
+         When the value of aluSapEgressAggRateType is set to either 'percentPortLimit' or
+         'percentLocalLimit', the egress aggregate rates are specified in
+         percentage using values of aluSapEgressAggRatePercent and aluSapEgressAggCirPercent,
+         while objects aluSapEgressAggCir and aluSapEgressAggRate will be set to their default values."
+    DEFVAL { kbps }
+    ::= { aluSapBaseInfoEntry 14 }
+
+--
+-- Nokia 7705 SAR series Extended sapEthLoopbackTable 
+--
+
+aluSapEthLoopbackTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluSapEthLoopbackEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains testhead SAP Loopback Information for 7705 series routers."
+    ::= { aluServiceObjs 14 }
+
+aluSapEthLoopbackEntry OBJECT-TYPE
+    SYNTAX          AluSapEthLoopbackEntry 
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Information about a testhead Loopback SAP."
+    AUGMENTS        { sapEthLoopbackEntry }
+    ::= { aluSapEthLoopbackTable 1 }
+
+AluSapEthLoopbackEntry ::=
+    SEQUENCE {
+        aluSapEthLoopback               INTEGER,
+        aluSapEthLoopbackDuration               Unsigned32,
+        aluSapEthLoopbackPersistent             INTEGER,
+        aluSapEthLoopbackTimeLeft               Unsigned32,
+        aluSapEthLoopbackMode                   INTEGER,
+        aluSapEthLoopbackMacSwap                TmnxEnabledDisabled
+    }
+
+aluSapEthLoopback OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   false (0),
+                   true  (1)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "aluSapEthLoopback is used to specify if the sap is set into a loopback mode for testhead
+        purpose. if true, either aluSapEthLoopbackDuration or aluSapEthLoopbackPersistent has to be set at the same time." 
+
+    DEFVAL  { false }
+    ::= { aluSapEthLoopbackEntry 1 }
+
+aluSapEthLoopbackDuration OBJECT-TYPE
+    SYNTAX      Unsigned32 (0|30..86400)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "aluSapEthLoopbackDuration is used to specify the time duration, in seconds, to set the sap
+        into a testhead loopback mode.  Setting aluSapEthLoopbackDuration to a non-zero value must be accompanied by 
+        setting aluSapEthLoopback to 'true' for the same sap.  When this timer expires,
+        it will be reset to the default value 0 by the system.
+
+        Set aluSapEthLoopbackDuration to 0 to keep the loopback mode until modified by the operator."
+
+    DEFVAL  { 0 }
+    ::= { aluSapEthLoopbackEntry 2 }
+
+aluSapEthLoopbackPersistent OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   false (0),
+                   true  (1)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "aluSapEthLoopbackPersistent is used to specify if the sap loopback configuration should be saved.
+        if true, save the config.
+        When aluSapEthLoopbackPersistent is set to 'true', aluSapEthLoopbackDuration CAN NOT be set to a non-zero value."
+
+    DEFVAL  { false }
+    ::= { aluSapEthLoopbackEntry 3 }
+
+aluSapEthLoopbackTimeLeft   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..86400)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "aluSapEthLoopbackTimeLeft is used to specify the number of seconds left since the loopback has started.
+        0 if aluSapEthLoopbackTimeLeft as assigned 0, or when aluSapEthLoopback is 'false'."
+    ::= { aluSapEthLoopbackEntry 4 }
+
+aluSapEthLoopbackMode   OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    line     (1),
+                    internal (2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value of the object aluSapEthLoopbackMode specifies how
+                 traffic will be reflected.
+
+                 If the value is set to 'line(1)', traffic arriving at the
+                 SAP ingress will be reflected back out the same SAP. If the
+                 value is set to 'internal(2)', traffic arriving at the SAP
+                 egress will be reflected back into the service in the
+                 direction of the original source."
+    ::= { aluSapEthLoopbackEntry 5 }
+
+aluSapEthLoopbackMacSwap    OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value of the object aluSapEthLoopbackMacSwap specifies the
+                 enabling or disabling of source address and destination
+                 address swapping for the reflected packets when the arriving
+                 packet is unicast. With aluSapEthLoopbackMacSwap enabled, any
+                 broadcast or multicast packets arriving on a looped point will
+                 be dropped."
+    DEFVAL { disabled }
+    ::= { aluSapEthLoopbackEntry 6 }
+
+
+aluSapCemInfoTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluSapCemInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extend table that contains sar7705 specific CEM SAP information."
+    ::= { aluServiceObjs 15 }
+
+aluSapCemInfoEntry OBJECT-TYPE
+    SYNTAX          AluSapCemInfoEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Additional SAR Information about a specific CEM SAP."
+    AUGMENTS        { sapCemInfoEntry }
+    ::= { aluSapCemInfoTable 1 }
+
+AluSapCemInfoEntry ::=
+    SEQUENCE {
+        aluSapCemAsymDelayEnable          TmnxEnabledDisabled,
+        aluSapCemAsymDelaySamples         INTEGER,
+        aluSapCemAsymDelayRepeatPeriod    INTEGER,
+        aluSapCemSerialRate               Unsigned32,
+        aluSapCemOnDemandADC              TmnxActionType
+    }
+
+aluSapCemAsymDelayEnable  OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value of the object aluSapCemAsymDelayEnable specifies the
+                 enabling or disabling of the asymetric delay control. "  
+    DEFVAL { disabled }
+    ::= { aluSapCemInfoEntry 1 }
+
+aluSapCemAsymDelaySamples OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   one                     (1),
+                   two                     (2),
+                   four                    (4),
+                   eight                   (8),
+                   sixteen                 (16),
+                   thirtytwo               (32)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value of the object aluSapCemAsymDelaySamples specifies the
+                 number of packets being sampled during the sampling period when asymetric delay 
+                 control is enabled. one, two, four or eight 
+                 corresponds to 1024, 2048, 2096 or 8192 samples "  
+    DEFVAL { sixteen }
+    ::= { aluSapCemInfoEntry 2 }
+
+aluSapCemAsymDelayRepeatPeriod OBJECT-TYPE
+    SYNTAX      INTEGER (0 | 1..1440)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value of the object aluSapCemAsymDelayRepeatPeriod specifies the
+                 sampling/adjusting period in minutes when the asymetric delay control is enabled.
+                 value zero disables the periodic sampling"
+    DEFVAL { 60 }
+    ::= { aluSapCemInfoEntry 3 }
+
+aluSapCemSerialRate              OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "bits/s"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The value of the object aluSapCemSerialRate indicates the
+                 bit-rate of the 'unstructuredSerial' CEM SAP." 
+    ::= { aluSapCemInfoEntry 4 }
+
+aluSapCemOnDemandADC             OBJECT-TYPE
+    SYNTAX      TmnxActionType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The value of aluSapCemOnDemandADC, when set to 'doAction(1)', triggers
+                 on demand ADC."
+    DEFVAL  { notApplicable }
+    ::= { aluSapCemInfoEntry 5 }
+
+aluSapCemStatsTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluSapCemStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extend table that contains sar7705 specific CEM SAP stats."
+    ::= { aluServiceObjs 16 }
+
+aluSapCemStatsEntry OBJECT-TYPE
+    SYNTAX          AluSapCemStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Additional SAR Stats for a specific CEM SAP."
+    AUGMENTS        { sapCemStatsEntry }
+    ::= { aluSapCemStatsTable 1 }
+
+AluSapCemStatsEntry ::=
+    SEQUENCE {
+        aluSapCemStatsEgressSamplingDoneCnt Counter32,             
+        aluSapCemStatsEgressAdjustDoneCnt        Counter32
+    }
+
+aluSapCemStatsEgressSamplingDoneCnt OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The value of aluSapCemStatsEgressSamplingDoneCnt indicates
+                     the number of times sampling is done for asym delay control."
+    ::= { aluSapCemStatsEntry 1 }
+
+
+aluSapCemStatsEgressAdjustDoneCnt OBJECT-TYPE
+    SYNTAX          Counter32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The value of aluSapCemStatsEgressAdjustDoneCnt indicates
+                     the number of times adjustment is done for asym delay control."
+    ::= { aluSapCemStatsEntry 2 }
+
+--
+-- Nokia 7705 SAR series Extended Base SDP Binding Statistics Table
+--
+aluSdpBindStatsTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluSdpBindStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extended table that contains 7705 SAR specific SDP Binding stats."
+    ::= { aluServiceObjs 17 }
+
+aluSdpBindStatsEntry OBJECT-TYPE
+    SYNTAX          AluSdpBindStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Additional 7705 SAR stats for a specific SDP Binding."
+    AUGMENTS        { sdpBindBaseStatsEntry }
+    ::= { aluSdpBindStatsTable 1 }
+
+AluSdpBindStatsEntry ::=
+    SEQUENCE {
+        aluSdpBindBaseStatsEgressDroppedPackets    Counter64
+    }
+
+aluSdpBindBaseStatsEgressDroppedPackets OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The value of aluSdpBindBaseStatsEgressDroppedPackets indicates
+                     the number of packets dropped egressing the sdp binding."
+    ::= { aluSdpBindStatsEntry 1 }
+
+--
+-- Nokia 7705 SAR serises Extended Base Epipe svc Table
+--
+aluSvcEpipeTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AluSvcEpipeEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "The extended svcEpipeTable contains objects related to 'epipe'
+                     services.
+
+                     Entries are created and destroyed when 'epipe' services
+                     are created and destroyed by the system."
+    ::= {  aluServiceObjs 18}
+
+aluSvcEpipeEntry   OBJECT-TYPE
+    SYNTAX          AluSvcEpipeEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Extension of svcEpipeEntry, each row entry contains objects that 
+                     allows the modification of the 'epipe' specific objects."
+    AUGMENTS        { svcEpipeEntry }
+    ::= { aluSvcEpipeTable 1 }
+
+AluSvcEpipeEntry ::=
+    SEQUENCE {
+        aluSvcEpipeTeidHashing               TmnxEnabledDisabled,
+        aluSvcEpipeL4Hashing                 TmnxEnabledDisabled
+    }
+    
+aluSvcEpipeTeidHashing  OBJECT-TYPE
+    SYNTAX          TmnxEnabledDisabled
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of aluSvcEpipeTeidHashing specifies service-level teid
+                     hashing for Ethernet services."
+    DEFVAL { disabled }
+    ::= { aluSvcEpipeEntry 1 }
+
+aluSvcEpipeL4Hashing  OBJECT-TYPE
+    SYNTAX          TmnxEnabledDisabled
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of aluSvcEpipeL4Hashing specifies service-level L4
+                     hashing for Ethernet services."
+    DEFVAL { disabled }
+    ::= { aluSvcEpipeEntry 2 }
+
+--
+-- Nokia 7705 SAR series Extended CPIPE SDP Bind Table
+--
+aeSdpBindCpipeTable              OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AeSdpBindCpipeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The extended table sdpBindCpipeTable contains 7705 SAR
+         specific objects related to a cpipe SDP Bind.
+
+         A row will exist in this table for each cpipe sdpBind
+         configured on this system. Rows are created and deleted
+         automatically by the system."
+    ::= { aluServiceObjs 19 }
+
+aeSdpBindCpipeEntry              OBJECT-TYPE
+    SYNTAX      AeSdpBindCpipeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Additional 7705 SAR objects related to a cpipe SDP Bind."
+    AUGMENTS    { sdpBindCpipeEntry }
+    ::= { aeSdpBindCpipeTable 1 }
+
+AeSdpBindCpipeEntry              ::= SEQUENCE {
+        aeSdpBindCpipeLocalAsymDelay     TmnxEnabledDisabled,
+        aeSdpBindCpipePeerAsymDelay      TmnxEnabledDisabled,
+        aeSdpBindCpipeLocalJitterBuffer  Unsigned32,
+        aeSdpBindCpipePeerJitterBuffer   Unsigned32,
+        aeSdpBindCpipeLocalSerialRate    Unsigned32,
+        aeSdpBindCpipePeerSerialRate     Unsigned32
+    }
+
+aeSdpBindCpipeLocalAsymDelay     OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aeSdpBindCpipeLocalAsymDelay indicates
+         whether Asymmetic Delay Control (ADC) is enabled locally. This value
+         is transmitted to the remote peer."
+    ::= { aeSdpBindCpipeEntry 1 }
+
+aeSdpBindCpipePeerAsymDelay      OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aeSdpBindCpipePeerAsymDelay indicates
+         whether Asymmetic Delay Control (ADC) is enabled remotely. This value
+         is received from the remote peer.
+
+         If there is no remote peer, or if the label mapping has not been
+         received, or if this value has not been received from the remote peer
+         then this object will be 'disabled'."
+    ::= { aeSdpBindCpipeEntry 2 }
+    
+aeSdpBindCpipeLocalJitterBuffer  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aeSdpBindCpipeLocalJitterBuffer indicates the
+         local jitter buffer size in milliseconds (ms)."
+    ::= { aeSdpBindCpipeEntry 3 }
+
+aeSdpBindCpipePeerJitterBuffer   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "milliseconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aeSdpBindCpipeLocalJitterBuffer indicates the
+         remote jitter buffer size in milliseconds (ms).
+
+         If there is no remote peer, or if the label mapping has not been
+         received, or if this value has not been received from the remote peer
+         then this object will be zero (0)."
+    ::= { aeSdpBindCpipeEntry 4 }
+
+aeSdpBindCpipeLocalSerialRate    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "bits/s"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aeSdpBindCpipeLocalSerialRate indicates the
+         local Serial bit-rate of the 'satopSerial' cpipe SDP Bind in bits/s."
+    ::= { aeSdpBindCpipeEntry 5 }
+
+aeSdpBindCpipePeerSerialRate     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "bits/s"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aeSdpBindCpipePeerSerialRate indicates the
+         remote Serial bit-rate of the 'satopSerial' cpipe SDP Bind in bits/s.
+
+         If there is no remote peer, or if the label mapping has not been
+         received, or if this value has not been received from the remote peer
+         then this object will be zero (0)."
+    ::= { aeSdpBindCpipeEntry 6 }
+
+--
+-- Nokia 7705 SAR series Extended Base SAP Statistics Table
+--
+aluExtSapBaseStatsTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluExtSapBaseStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "An extension table that contains 7705 SAR specific SAP stats."
+    ::= { aluServiceObjs 20 }
+
+aluExtSapBaseStatsEntry OBJECT-TYPE
+    SYNTAX          AluExtSapBaseStatsEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Additinal 7705 SAR stats for a specific SAP."
+    AUGMENTS        { sapBaseInfoEntry }
+    ::= { aluExtSapBaseStatsTable 1 }
+
+AluExtSapBaseStatsEntry ::=
+    SEQUENCE {
+        aluExtSapBaseStatsEgressDroppedPackets    Counter64
+    }
+
+aluExtSapBaseStatsEgressDroppedPackets   OBJECT-TYPE
+    SYNTAX          Counter64
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The value of aluExtSapBaseStatsEgressDroppedPackets indicates
+                     the number of packets dropped egressing the SAP.
+                     When sapType is ies or vprn, aluExtSapBaseStatsEgressDroppedPackets
+                     is always 0 as this stat count is not avaible on these services."
+  ::= { aluExtSapBaseStatsEntry 1 }
+
+----------------------------------------------------------
+--  ALU Extension of SAP ETH-CFM Table
+----------------------------------------------------------
+
+aluExtSapEthCfmTable OBJECT-TYPE
+   SYNTAX          SEQUENCE OF AluExtSapEthCfmEntry
+   MAX-ACCESS      not-accessible
+   STATUS          current
+   DESCRIPTION     "An extension table that contains 7705 SAR informationn
+                    pertaining to Ethernet Connectivity Fault Management (CFM)
+                    for Service Access Points (SAPs)."
+   ::= { aluServiceObjs 21  }
+
+aluExtSapEthCfmEntry OBJECT-TYPE
+   SYNTAX          AluExtSapEthCfmEntry
+   MAX-ACCESS      not-accessible
+   STATUS          current
+   DESCRIPTION     "Additional 7705 SAR objects related to the Ethernet CFM information
+                    for a given Ethernet encapsulated SAP."
+   AUGMENTS        { sapEthCfmEntry }
+   ::= { aluExtSapEthCfmTable 1 }
+
+AluExtSapEthCfmEntry ::=
+   SEQUENCE {
+       aluExtSapEthCfmHoldMepUp       TruthValue
+   }
+
+aluExtSapEthCfmHoldMepUp OBJECT-TYPE
+   SYNTAX          TruthValue
+   MAX-ACCESS      read-write
+   STATUS          current
+   DESCRIPTION     "Enable/Disable MEPs on this SAP on failure of port link.
+                    aluExtSapEthCfmHoldMepUp can only be enabled on one SAP per service." 
+   DEFVAL { false }
+   ::= { aluExtSapEthCfmEntry 1 }
+
+--
+-- Conformance Information
+--
+aluServiceMIBCompliances  OBJECT IDENTIFIER ::= { aluServiceMIBConformance 1 }
+aluServiceMIBGroups      OBJECT IDENTIFIER ::= { aluServiceMIBConformance 2 }
+
+-- compliance statements
+
+aluServiceMIBCompliance  MODULE-COMPLIANCE
+    STATUS  obsolete
+    DESCRIPTION
+            "The compliance statement for revision 1.0 of ALU-SERVICE-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluExtSapIpipeIpcpGroup
+        }
+    ::= { aluServiceMIBCompliances 1 }
+
+aluServiceV3v0MIBCompliance  MODULE-COMPLIANCE
+    STATUS  obsolete
+    DESCRIPTION
+            "The compliance statement for revision 3.0 of ALU-SERVICE-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluExtSapIpipeIpcpGroup,
+            aluExtSapTlsPPPoEVsaGroup,
+            aluExtSapTlsVlanManipulationGroup
+        }
+    ::= { aluServiceMIBCompliances 2 }
+
+-- aluServiceV4v0MIBCompliance  MODULE-COMPLIANCE
+--    ::= { aluServiceMIBCompliances 3 }
+
+-- aluServiceV5v0MIBCompliance  MODULE-COMPLIANCE
+--    ::= { aluServiceMIBCompliances 4 }
+
+-- aluServiceV6v0MIBCompliance  MODULE-COMPLIANCE
+--    ::= { aluServiceMIBCompliances 5 }
+
+-- aluServiceV7v0MIBCompliance  MODULE-COMPLIANCE
+--    ::= { aluServiceMIBCompliances 6 }
+
+-- aluServiceV8v0MIBCompliance  MODULE-COMPLIANCE
+--    ::= { aluServiceMIBCompliances 7 }
+
+aluServiceV9v0MIBCompliance  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for revision 9.0 of ALU-SERVICE-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluExtSapIpipeIpcpGroup,
+            aluExtSapTlsPPPoEVsaGroup,
+            aluExtSapTlsVlanManipulationGroup,
+            aluExtSapAtmTranslatedVcIdGroup,
+            aluExtSapAGBaseInfoGroup,
+            aluSapAGBaseStatsGroup,
+            aluSapAGIngQosQStatsGroup,
+            aluSapAGEgrQosQStatsGroup,
+            aluSapEthCfmGroup,
+            aluSapEpipeMwGroup,
+            aluSapQosGroup,
+            aluSapEthLoopbackGroup,
+            aluSapCemGroup,
+            aluSdpBindingGroup,
+            aluSapQosGroupV7v0,
+            aluSvcEpipeGroup,
+            aluSapQosGroupV9v0,
+            aluExtSdpBindCpipeGroup,
+            aluExtSdpBindCpipeSerialGroup,
+            aluSapCemSerialGroup,
+            aluExtSapBaseStatsGroup
+        }
+    ::= { aluServiceMIBCompliances 8 }
+
+-- units of conformance
+
+aluExtSapIpipeIpcpGroup     OBJECT-GROUP
+    OBJECTS   {
+        aeSapIpipeIpcpAssignCeAddress,
+        aeSapIpipeIpcpPriDnsAddrType,
+        aeSapIpipeIpcpPriDnsAddr,
+        aeSapIpipeIpcpSecDnsAddrType,
+        aeSapIpipeIpcpSecDnsAddr
+    }
+    STATUS    current
+    DESCRIPTION
+        "The group of objects to manage the IPCP capabilities of 
+         IPIPE sap on Nokia 7705 SAR series systems."
+    ::= { aluServiceMIBGroups 1 }
+    
+aluExtSapTlsPPPoEVsaGroup     OBJECT-GROUP
+    OBJECTS   {
+        aeSapTlsPPPoEIncludeCircuitId,
+        aeSapTlsPPPoECircuitId,
+        aeSvcTlsPPPoEIncludeCircuitId
+    }
+    STATUS    current
+    DESCRIPTION
+        "The group of objects to manage the PPP VSE capabilities of 
+         TLS sap on Nokia 7705 SAR series systems."
+    ::= { aluServiceMIBGroups 2 }
+
+aluExtSapTlsVlanManipulationGroup        OBJECT-GROUP
+    OBJECTS   {
+        aeSapTlsAtmSubscriberVlanTag,
+        aeSapTlsForceCVlanForwarding  
+    }
+    STATUS    current
+    DESCRIPTION
+        "The group of objects to manage the vlan tag manipulation behavior 
+         of TLS saps on Nokia 7705 SAR series systems."
+    ::= { aluServiceMIBGroups 3 }
+    
+aluExtSapAtmTranslatedVcIdGroup  OBJECT-GROUP
+    OBJECTS  {
+        aeSapApipeAtmVcidTranslatedVpi, 
+        aeSapApipeAtmVcidTranslatedVci
+    }
+    STATUS current
+    DESCRIPTION
+        "The group of objects includes tranlated vcid for Apipe saps 
+        in aggregation group on Nokia 7705 SAR series systems."
+    ::= { aluServiceMIBGroups 4 }    
+  
+aluExtSapAGBaseInfoGroup         OBJECT-GROUP 
+   OBJECTS   { 
+        aeSvcSapAGRowStatus, 
+        aeSvcSapAGDescription, 
+        aeSvcSapAGIngressQosPolicyId, 
+        aeSvcSapAGEgressQosPolicyId, 
+        aeSvcSapAGCollectAcctStats, 
+        aeSvcSapAGAccountingPolicyId      
+   } 
+   STATUS    current 
+   DESCRIPTION 
+     "The group of objects to manage the SAP Aggregation Group  
+      Nokia 7705 SAR series systems." 
+   ::= { aluServiceMIBGroups 5 } 
+      
+aluSapAGBaseStatsGroup           OBJECT-GROUP 
+   OBJECTS   { 
+        aluSapAGBaseStatsIngressDroppedPackets, 
+        aluSapAGBaseStatsIngressDroppedOctets,
+        aluSapAGBaseStatsIngressOfferedHiPrioPackets, 
+        aluSapAGBaseStatsIngressOfferedHiPrioOctets,
+        aluSapAGBaseStatsIngressOfferedLoPrioPackets, 
+        aluSapAGBaseStatsIngressOfferedLoPrioOctets,
+        aluSapAGBaseStatsIngressDroppedHiPrioPackets, 
+        aluSapAGBaseStatsIngressDroppedHiPrioOctets,
+        aluSapAGBaseStatsIngressDroppedLoPrioPackets, 
+        aluSapAGBaseStatsIngressDroppedLoPrioOctets,
+        aluSapAGBaseStatsIngressForwardedInProfPackets, 
+        aluSapAGBaseStatsIngressForwardedInProfOctets, 
+        aluSapAGBaseStatsIngressForwardedOutProfPackets, 
+        aluSapAGBaseStatsIngressForwardedOutProfOctets, 
+        aluSapAGBaseStatsEgressDroppedInProfPackets, 
+        aluSapAGBaseStatsEgressDroppedInProfOctets,
+        aluSapAGBaseStatsEgressDroppedOutProfPackets, 
+        aluSapAGBaseStatsEgressDroppedOutProfOctets,
+        aluSapAGBaseStatsEgressForwardedInProfPackets, 
+        aluSapAGBaseStatsEgressForwardedInProfOctets, 
+        aluSapAGBaseStatsEgressForwardedOutProfPackets, 
+        aluSapAGBaseStatsEgressForwardedOutProfOctets,
+        aluSapAGBaseStatsUnknownVpiVciCellsDropped, 
+        aluSapAGBaseStatsCustId, 
+        aluSapAGBaseStatsIngressOfferedUncoloredPackets,
+        aluSapAGBaseStatsIngressOfferedUncoloredOctets,
+        aluSapAGBaseStatsAuthenticationPktsDiscarded,
+        aluSapAGBaseStatsAuthenticationPktsSuccess,
+        aluSapAGBaseStatsLastClearedTime    
+   } 
+   STATUS    current 
+   DESCRIPTION 
+     "The group of objects for statistics of SAP Aggregation 
+      Group on Nokia 7705 SAR series systems." 
+   ::= { aluServiceMIBGroups 6 } 
+     
+aluSapAGIngQosQStatsGroup        OBJECT-GROUP 
+   OBJECTS   { 
+        aluSapAGIngQosQueueId, 
+        aluSapAGIngQosQStatsOfferedHiPrioPackets, 
+        aluSapAGIngQosQStatsDroppedHiPrioPackets, 
+        aluSapAGIngQosQStatsOfferedLoPrioPackets, 
+        aluSapAGIngQosQStatsDroppedLoPrioPackets,
+        aluSapAGIngQosQStatsOfferedHiPrioOctets, 
+        aluSapAGIngQosQStatsDroppedHiPrioOctets, 
+        aluSapAGIngQosQStatsOfferedLoPrioOctets, 
+        aluSapAGIngQosQStatsDroppedLoPrioOctets,
+        aluSapAGIngQosQStatsForwardedInProfPackets, 
+        aluSapAGIngQosQStatsForwardedOutProfPackets,
+        aluSapAGIngQosQStatsForwardedInProfOctets, 
+        aluSapAGIngQosQStatsForwardedOutProfOctets, 
+        aluSapAGIngQosCustId,
+        aluSapAGIngQosQStatsUncoloredPacketsOffered,
+        aluSapAGIngQosQStatsUncoloredOctetsOffered
+   } 
+   STATUS    current 
+   DESCRIPTION 
+     "The group of objects for statistics of ingress QoS 
+      Queue of Nokia 7705 SAR series systems." 
+   ::= { aluServiceMIBGroups 7 } 
+      
+aluSapAGEgrQosQStatsGroup        OBJECT-GROUP 
+   OBJECTS   { 
+        aluSapAGEgrQosQueueId, 
+        aluSapAGEgrQosQStatsForwardedInProfPackets, 
+        aluSapAGEgrQosQStatsDroppedInProfPackets,
+        aluSapAGEgrQosQStatsForwardedOutProfPackets, 
+        aluSapAGEgrQosQStatsDroppedOutProfPackets, 
+        aluSapAGEgrQosQStatsForwardedInProfOctets,
+        aluSapAGEgrQosQStatsDroppedInProfOctets,
+        aluSapAGEgrQosQStatsForwardedOutProfOctets, 
+        aluSapAGEgrQosQStatsDroppedOutProfOctets, 
+        aluSapAGEgrQosCustId                  
+   }  
+   STATUS    current 
+   DESCRIPTION 
+     "The group of objects for statistics of egress QoS 
+      Queue of Nokia 7705 SAR series systems." 
+   ::= { aluServiceMIBGroups 8 } 
+
+aluSapEthCfmGroup                OBJECT-GROUP 
+   OBJECTS   { 
+        aluSapEthCfmHoldMepUp                 
+   }  
+   STATUS    current
+   DESCRIPTION 
+       "The group of objects supporting Ethernet Connectivity Fault Management
+       (CFM) for the SAP feature on Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 9 } 
+    
+aluSapEpipeMwGroup               OBJECT-GROUP 
+   OBJECTS   { 
+        aluSapEpipeMwCompression,
+        aluSapEpipeMwDestMacAddress,
+        aluSapEpipeMwSrcMacAddress,
+        aluSapEpipeMwCompressRTP
+    }
+   STATUS    current 
+   DESCRIPTION 
+       "The group of objects supporting EPIPE Microwave compression
+       on Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 10 } 
+
+aluSapQosGroup                   OBJECT-GROUP 
+   OBJECTS   { 
+        aluSapIngressSchedulerMode,
+        aluSapIngressAggCir,
+        aluSapEgressSchedulerMode,
+        aluSapEgressAggCir,
+        aluSapIngressAggRateLimit,
+        aluSapEgressAggRateLimit
+                 
+   }  
+   STATUS    current 
+   DESCRIPTION 
+       "The group of objects supporting qos ingress/egress for SAPs on the
+       Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 11 } 
+
+aluSapEthLoopbackGroup           OBJECT-GROUP
+  OBJECTS {
+        aluSapEthLoopback,
+        aluSapEthLoopbackDuration,
+        aluSapEthLoopbackPersistent,
+        aluSapEthLoopbackTimeLeft,
+        aluSapEthLoopbackMode,
+        aluSapEthLoopbackMacSwap
+  }
+  STATUS    current
+  DESCRIPTION
+      "The group of objects supporting testhead sap loopback for SAPs on the
+       Nokia 7705 SAR series systems."
+  ::= { aluServiceMIBGroups 12 }
+
+aluSapCemGroup                   OBJECT-GROUP
+  OBJECTS {
+        aluSapCemAsymDelayEnable,
+        aluSapCemAsymDelaySamples,
+        aluSapCemAsymDelayRepeatPeriod,
+        aluSapCemStatsEgressSamplingDoneCnt,
+        aluSapCemStatsEgressAdjustDoneCnt
+  }
+  STATUS    current
+  DESCRIPTION
+      "The group of objects supporting asymetric delay for CEM SAPs on the
+       Nokia 7705 SAR series systems."
+  ::= { aluServiceMIBGroups 13 }
+
+aluSdpBindingGroup               OBJECT-GROUP 
+   OBJECTS   { 
+        aluSdpBindBaseStatsEgressDroppedPackets                 
+   }  
+   STATUS    current 
+   DESCRIPTION 
+       "The group of objects supporting SDP Binding on
+        Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 14 } 
+
+aluSapQosGroupV7v0               OBJECT-GROUP 
+   OBJECTS   { 
+        aluSapIngressShaperGroup,
+        aluSapEgressShaperGroup            
+   }  
+   STATUS    current 
+   DESCRIPTION 
+       "The group of objects supporting qos ingress/egress for SAPs on the
+       Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 15 } 
+
+aluSvcEpipeGroup                 OBJECT-GROUP
+   OBJECTS   {
+        aluSvcEpipeTeidHashing,
+        aluSvcEpipeL4Hashing,
+        aeSvcTlsL4Hashing
+   }
+   STATUS    current
+   DESCRIPTION
+       "The group of objects supporting Svc Epipe on
+        Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 16 }
+
+aluSapQosGroupV9v0               OBJECT-GROUP
+  OBJECTS   {
+        aluSapIngressAggCirPercent,
+        aluSapEgressAggCirPercent,
+        aluSapIngressAggRatePercent,
+        aluSapEgressAggRatePercent,
+        aluSapIngressAggRateType,
+        aluSapEgressAggRateType
+  }
+  STATUS    current
+  DESCRIPTION
+      "The group of objects supporting qos ingress/egress for SAPs in release 9.0 on
+      Nokia 7705 SAR series systems."
+    ::= { aluServiceMIBGroups 17 }
+
+aluExtSdpBindCpipeGroup          OBJECT-GROUP 
+   OBJECTS   { 
+        aeSdpBindCpipeLocalAsymDelay,
+        aeSdpBindCpipePeerAsymDelay,
+        aeSdpBindCpipeLocalJitterBuffer,
+        aeSdpBindCpipePeerJitterBuffer
+   }  
+   STATUS    current 
+   DESCRIPTION 
+        "The group of objects supporting cpipe SDP Bindings on
+         Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 18 } 
+
+aluExtSdpBindCpipeSerialGroup    OBJECT-GROUP
+   OBJECTS   { 
+        aeSdpBindCpipeLocalSerialRate,
+        aeSdpBindCpipePeerSerialRate
+   }  
+   STATUS    current 
+   DESCRIPTION 
+        "The group of objects supporting 'satopSerial' cpipe SDP Bindings on
+         Nokia 7705 SAR series systems."
+   ::= { aluServiceMIBGroups 19 } 
+
+aluSapCemSerialGroup             OBJECT-GROUP
+    OBJECTS {
+        aluSapCemSerialRate
+    }
+    STATUS    current
+    DESCRIPTION
+        "The group of objects supporting 'unstructuredSerial' CEM SAPs on the
+         Nokia 7705 SAR series systems."
+  ::= { aluServiceMIBGroups 20 }
+
+aluExtSapBaseStatsGroup          OBJECT-GROUP
+       OBJECTS   {
+            aluExtSapBaseStatsEgressDroppedPackets
+       }
+       STATUS    current
+       DESCRIPTION
+           "The group of objects supporting SDP Binding on
+            Nokia 7705 SAR series systems."
+       ::= { aluServiceMIBGroups 21 }
+
+aluExtSapEthCfmGroup      OBJECT-GROUP
+  OBJECTS   {
+       aluExtSapEthCfmHoldMepUp
+  }
+  STATUS    current
+  DESCRIPTION
+      "The group of objects supporting Ethernet Connectivity Fault Management
+      (CFM) features for SAPs on Nokia 7705 SAR series systems."
+  ::= { aluServiceMIBGroups 22 }
+
+END

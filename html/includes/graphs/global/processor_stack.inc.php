@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -19,7 +18,7 @@ foreach (dbFetchRows("SELECT * FROM `processors` AS P, devices AS D WHERE D.devi
 
   if (is_file($rrd_filename))
   {
-    $descr = rewrite_hrDevice($proc['processor_descr']);
+    $descr = rewrite_entity_name($proc['processor_descr'], 'processor');
 
     $rrd_list[$i]['filename'] = $rrd_filename;
     $rrd_list[$i]['descr'] = $descr;

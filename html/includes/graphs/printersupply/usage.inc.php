@@ -31,7 +31,7 @@ $descr = rrdtool_escape($supply['supply_descr'],26);
 
 $background = get_percentage_colours(100-$supply['supply_value']);
 
-$rrd_options .= " DEF:level" . $supply['supply_id'] . "=".$rrd_filename.":level:AVERAGE ";
+$rrd_options .= " DEF:level" . $supply['supply_id'] . "=".$rrd_filename_escape.":level:AVERAGE ";
 
 $rrd_options .= " LINE1:level" . $supply['supply_id'] . "#" . $colour['left'] . ":'" . $descr . "' ";
 

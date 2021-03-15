@@ -95,7 +95,7 @@ if(isset($colours_in))
   $colours_in = 'in';
 }
 
-if(isset($colours_out))
+if (isset($colours_out))
 {
   $config['graph_colours']['out'] = generate_colour_gradient(reset($config['graph_colours'][$colours_out]), end($config['graph_colours'][$colours_out]), $count);
   $colours_out = 'out';
@@ -111,8 +111,10 @@ foreach ($rrd_list as $rrd)
   if ($rrd['colour_area_in'])  { $colour_in  = $rrd['colour_area_in']; }
   if ($rrd['colour_area_out']) { $colour_out = $rrd['colour_area_out']; }
 
-  $rrd_options .= " DEF:inB".$i."=".$rrd['filename'].":".$rrd['ds_in'].":AVERAGE ";
-  $rrd_options .= " DEF:outB".$i."=".$rrd['filename'].":".$rrd['ds_out'].":AVERAGE ";
+  $rrd_filename_escape = rrdtool_escape($rrd['filename']);
+
+  $rrd_options .= " DEF:inB".$i."=".$rrd_filename_escape.":".$rrd['ds_in'].":AVERAGE ";
+  $rrd_options .= " DEF:outB".$i."=".$rrd_filename_escape.":".$rrd['ds_out'].":AVERAGE ";
   $rrd_options .= " CDEF:octets".$i."=inB".$i.",outB".$i.",+";
   $rrd_options .= " CDEF:inbits".$i."=inB".$i.",$multiplier,* ";
   $rrd_options .= " CDEF:outbits".$i."=outB".$i.",$multiplier,*";
@@ -121,8 +123,8 @@ foreach ($rrd_list as $rrd)
 
   if ($vars['previous'])
   {
-    $rrd_options .= " DEF:inB" . $i . "X=".$rrd['filename'].":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
-    $rrd_options .= " DEF:outB" . $i . "X=".$rrd['filename'].":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:inB" . $i . "X=".$rrd_filename_escape.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:outB" . $i . "X=".$rrd_filename_escape.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
     $rrd_options .= " SHIFT:inB" . $i . "X:$period";
     $rrd_options .= " SHIFT:outB" . $i . "X:$period";
 

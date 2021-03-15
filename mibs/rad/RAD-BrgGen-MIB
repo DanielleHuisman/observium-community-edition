@@ -1,0 +1,4096 @@
+RAD-BrgGen-MIB DEFINITIONS ::= BEGIN
+
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       InterfaceIndex     FROM  IF-MIB
+       Timeout, BridgeId, dot1dBasePortEntry     FROM  BRIDGE-MIB
+       ieee8021BridgeBaseComponentId, ieee8021BridgeBaseEntry, ieee8021BridgeBasePortEntry     FROM  IEEE8021-BRIDGE-MIB
+       ieee8021QBridgeVlanStaticEntry     FROM  IEEE8021-Q-BRIDGE-MIB
+       VlanId, PortList, dot1qVlanStaticEntry     FROM  Q-BRIDGE-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Integer32, Counter32, TimeTicks, 
+       IpAddress, Gauge32, Unsigned32, 
+       OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, DisplayString, RowStatus, 
+       MacAddress, RowPointer     FROM  SNMPv2-TC
+       radBridges     FROM  RAD-SMI-MIB
+       IEEE8021VlanIndex, IEEE8021PbbComponentIdentifier, IEEE8021BridgePortNumber     FROM  IEEE8021-TC-MIB
+       TimeFilter     FROM  RMON2-MIB
+       ieee8021MstpEntry, ieee8021MstpDesignatedRoot, ieee8021MstpTopologyChanges     FROM  IEEE8021-MSTP-MIB
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+
+    genBridge MODULE-IDENTITY
+        LAST-UPDATED "201508201800Z"  -- August 20, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "General Bridge MIB."
+    ::= { radBridges 1 }
+
+
+genBridgeEvents  OBJECT IDENTIFIER ::= {radBridges 0 }
+
+
+-- Spanning Tree Root Selection
+bridgeSpanningTreeNewRoot  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ieee8021BridgeBaseXName } 
+      STATUS  current
+      DESCRIPTION
+      "This Trap indicates Bridge was elected as spanning tree root.
+      "
+      ::= { genBridgeEvents  1 }
+
+-- Spanning Tree Topology Change
+bridgeSpanningTreeTopologyChange  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ieee8021BridgeBaseXName } 
+      STATUS  current
+      DESCRIPTION
+      "This Trap indicates a Spanning Tree Topology change.
+      "
+      ::= { genBridgeEvents  2 }
+
+-- At the end of the MIB there is a definition of all RAD general traps for bridges.
+
+-- Textual conventions
+
+
+TagHandlingType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+            "This TEXTUAL CONVENTION defines VLAN Tag process type.
+            It is mainly for use with Double Tagging."
+    SYNTAX  INTEGER
+    {
+        none        (2),
+        stacking    (3),
+        stripping   (4)
+    }
+
+BridgeTopology      ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+            "This TEXTUAL CONVENTION defines the topology of the bridge."
+    SYNTAX  INTEGER
+    {
+        notApplicable   (1),
+        eLAN            (3),
+        eTree           (4)
+    }
+
+radBridgeAction OBJECT-TYPE
+    SYNTAX  INTEGER {
+       reset(1),
+       sendNetworkTab(2),
+       deleteNetworkTab(3),
+       sendRoutingTab(4),    -- Level II
+       deleteRoutinTab(5),
+       sendLanTab(6),
+       deleteLanTab(7),
+       deleteArpTab(8),
+       sendArpTab(9),
+       deleteRouteTab(10),   -- Level III
+       sendRouteTab(11),
+       deactivateAllMasks(12),
+       saveAllActiveMasks(13),
+       loadAndActivateAllMasksFromNVRAM(14),
+       clearAllMasksFromNVRAM(15),
+       defaultConfig(16),
+       resetNVRAM(17),
+       clearIPNVRAM(18),
+    noOp(255)
+     }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This variable enables the operator to perform one of the
+    specified actions on the tables maintained by the network device.
+    Send actions are not currently implemented.  Not all actions can
+    be performed on all bridges."
+   ::= { genBridge 1  }
+
+radBridgeInactiveArpTimeOut OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This variable defines the maximum time period that can pass
+    between ARP requests concerning an entry in the ARP table.
+    After this time period, the entry is deleted from the table."
+    ::= { genBridge 2  }
+
+
+-- radBridgeMaskTab defines the format of  RAD Bridge OLD masking tables
+
+radBridgeMaskTable    OBJECT-TYPE
+    SYNTAX  SEQUENCE  OF RadBridgeMaskEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+	"Mask tables enable definition of forwarding restrictions and 
+	control of message flow in the internetwork. Each entry
+	in this table defines a mask statement consisting of up to 
+	three mask definitions and an action defined by 
+	radBridgeMaskOper. Different types of mask entries are supported, 
+	as defined by radBridgeMaskType."
+    ::=  { genBridge 3 }
+
+radBridgeMaskEntry OBJECT-TYPE
+    SYNTAX  RadBridgeMaskEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in table radBridgeMaskTable."
+    INDEX   { radBridgeMaskType, radBridgeMaskIfIndex, radBridgeMaskNum  }
+    ::=  { radBridgeMaskTable 1  }
+
+RadBridgeMaskEntry ::= SEQUENCE {
+    radBridgeMaskType
+     INTEGER,
+    radBridgeMaskIfIndex
+     Integer32,   
+    radBridgeMaskNum
+     Integer32,
+    radBridgeMaskDest
+     INTEGER,
+    radBridgeMaskPat1
+     OCTET STRING,
+    radBridgeMaskActiveBit1
+     OCTET STRING,
+    radBridgeMaskFrom1
+     INTEGER,
+    radBridgeMaskOffset1
+     Integer32,
+    radBridgeMaskCond1
+     INTEGER,
+    radBridgeMaskPat2
+     OCTET STRING,
+    radBridgeMaskActiveBit2
+     OCTET STRING,
+    radBridgeMaskFrom2
+     INTEGER,
+    radBridgeMaskOffset2
+     Integer32,
+    radBridgeMaskCond2
+     INTEGER,
+    radBridgeMaskPat3
+     OCTET STRING,
+    radBridgeMaskActiveBit3
+     OCTET STRING,
+    radBridgeMaskFrom3
+     INTEGER,
+    radBridgeMaskOffset3
+     Integer32,
+    radBridgeMaskCond3
+     INTEGER,
+    radBridgeMaskOper
+     INTEGER
+    }
+
+radBridgeMaskType  OBJECT-TYPE
+    SYNTAX INTEGER {
+       tx(1),
+       rx(2),
+       compress(3),
+       priority(4),
+       loadSharing(5),
+       facs(6),
+       codConnect(7),
+	   codDisconnect(8)
+      }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	"Defines the type of mask entry."
+    ::= { radBridgeMaskEntry 1  }
+
+radBridgeMaskIfIndex  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION 
+	"Specifies the if Index of the interface to which the mask is applied."
+   ::= { radBridgeMaskEntry 2  }
+
+radBridgeMaskNum  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	"The Mask entry number, defined by its line number in the mask
+	table."
+   ::= {  radBridgeMaskEntry 3  }
+
+radBridgeMaskDest  OBJECT-TYPE
+    SYNTAX INTEGER {
+       unassigned-cond (1),
+       broadcast-msge (2),
+       multicast-msge (3),
+       all-msge(4),
+   none(5)
+    }
+
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION 
+	"Specifies the type of destination address carried by the frame
+	to which the mask will be applied. Unassigned-condition 
+	deactivates the mask entry."
+    ::= {  radBridgeMaskEntry 4   }
+
+
+radBridgeMaskPat1 OBJECT-TYPE
+    SYNTAX OCTET STRING  -- (SIZE (2))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Describes the mask field which is either a 16 bit binary pattern,
+	or four digit hexadecimal pattern."
+    ::= { radBridgeMaskEntry 5  }
+
+radBridgeMaskActiveBit1  OBJECT-TYPE
+    SYNTAX OCTET STRING  -- (SIZE (2))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the positions of the wild card characters (*) 
+	in the radBridgeMaskPat1 field."
+    ::= { radBridgeMaskEntry 6  }
+
+radBridgeMaskFrom1  OBJECT-TYPE
+    SYNTAX INTEGER {
+       mac(1),
+       llc(2),
+	   net(3)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Offset base of radBridgeMaskPat1 within the frame.
+	 Net can be in some cases the data start point."
+    ::= { radBridgeMaskEntry 7  }
+
+radBridgeMaskOffset1  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the radBridgeMaskPat1 offset within the frame (in bytes) from 
+	the base defined in by radBridgeMaskForm1.The mask offset is an even
+	decimal number in the range of 0 to 1518." 
+    ::= { radBridgeMaskEntry 8  }
+
+radBridgeMaskCond1 OBJECT-TYPE
+    SYNTAX INTEGER {
+       false (1),
+       true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+		radBridgeMaskOffset1 the packet contains data that matches
+		the content of radBridgeMaskPat1.
+
+	false - Condition is valid if at the position specified by 
+		radBridgeMaskOffset1 the packet contains data that does not
+		match the content of radBridgeMaskPat1."
+    ::= {  radBridgeMaskEntry 9  }
+
+radBridgeMaskPat2  OBJECT-TYPE
+    SYNTAX OCTET STRING  --   (SIZE (2))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Describes the mask field which is either a 16 bit binary pattern,
+	 or four digit hexadecimal pattern."
+    ::= {  radBridgeMaskEntry 10  }
+
+radBridgeMaskActiveBit2  OBJECT-TYPE
+    SYNTAX OCTET STRING  --   (SIZE (2))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the positions of the wild card characters (*) 
+	in the radBridgeMaskPat2 field."
+    ::= {  radBridgeMaskEntry 11  }
+
+radBridgeMaskFrom2  OBJECT-TYPE
+    SYNTAX INTEGER { 
+       mac (1),
+       llc (2),
+	   net(3)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Offset base of radBridgeMaskPat2 within the frame.
+	 Net can be in some cases the data start point."
+    ::= {  radBridgeMaskEntry 12  }
+
+radBridgeMaskOffset2  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the radBridgeMaskPat2 offset within the frame (in bytes) from 
+	the base defined in by radBridgeMaskForm2.The mask offset is an even
+	decimal number in the range of 0 to 1518." 
+    ::= {  radBridgeMaskEntry 13  }
+
+radBridgeMaskCond2 OBJECT-TYPE
+    SYNTAX INTEGER { 
+       false (1),
+       true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+		radBridgeMaskOffset2 the packet contains data that matches
+		the content of radBridgeMaskPat2.
+
+	false - Condition is valid if at the position specified by 
+		radBridgeMaskOffset2 the packet contains data that does not
+		match the content of radBridgeMaskPat2."
+    ::= {  radBridgeMaskEntry 14  }
+
+radBridgeMaskPat3 OBJECT-TYPE
+    SYNTAX OCTET STRING  --   (SIZE (2))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Describes the mask field which is either a 16 bit binary pattern,
+	or four digit hexadecimal pattern."
+    ::= {  radBridgeMaskEntry 15  }
+
+radBridgeMaskActiveBit3 OBJECT-TYPE
+    SYNTAX OCTET STRING  --   (SIZE (2))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the positions of the wild card characters (*) 
+	in the radBridgeMaskPat3 field."
+    ::= {  radBridgeMaskEntry 16  }
+
+radBridgeMaskFrom3 OBJECT-TYPE
+    SYNTAX INTEGER { 
+       mac (1),
+       llc (2),
+	   net (3)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Offset base of radBridgeMaskPat3 within the frame.
+	 Net can be in some cases the data start point."
+    ::= {  radBridgeMaskEntry 17  }
+
+radBridgeMaskOffset3 OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the radBridgeMaskPat3 offset within the frame (in bytes) from 
+	the base defined in by radBridgeMaskForm3. The mask offset is an even
+	decimal number in the range of 0 to 1518." 
+    ::= {  radBridgeMaskEntry 18  }
+
+radBridgeMaskCond3 OBJECT-TYPE
+   SYNTAX INTEGER { 
+       false (1),
+       true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+		radBridgeMaskOffset3 the packet contains data that matches
+		the content of radBridgeMaskPat3
+
+	false - Condition is valid if at the position specified by 
+		radBridgeMaskOffset3 the packet contains data that does not
+		match the content of radBridgeMaskPat3."
+    ::= {  radBridgeMaskEntry 19  }
+
+radBridgeMaskOper OBJECT-TYPE
+    SYNTAX INTEGER { 
+       block (1),
+       forward (2),
+       route (3),
+       forward-route (4),
+       high-priority (5),
+       noOp(6),
+       delete(7)
+     }
+   
+   
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+	"The type of action to be taken if the frame meets the 
+     conditions of the mask.
+     noOp = disabled (mask remains on list, but is not active) 
+	 delete = mask is removed from the list. "
+    ::= {  radBridgeMaskEntry 20 }
+
+radBridgeCOD      OBJECT IDENTIFIER ::= {genBridge 4 }
+
+radBridgeCODParamTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF RadBridgeCODEntry
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+	       "The table of COD parameters "
+	::= { radBridgeCOD 1}
+
+
+radBridgeCODEntry OBJECT-TYPE
+	SYNTAX RadBridgeCODEntry
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+	       "Each radBridgeCODEntry consists of the following parameters"
+	INDEX   {radBridgeCODIfIndex}
+	::= { radBridgeCODParamTable 1 }
+
+
+RadBridgeCODEntry ::= SEQUENCE {
+	  radBridgeCODIfIndex
+		Integer32,
+	  radBridgeCODManualConnect
+		INTEGER,
+	  radBridgeCODMode
+		INTEGER,
+	  radBridgeCODConnectDelay
+		Integer32,
+	  radBridgeCODisConnectDelay
+		Integer32,
+	  radBridgeCODImplicitSwitch
+		INTEGER,
+	  radBridgeCODNumAccess
+		Counter32,
+	  radBridgeCODTotalConnecTime
+		Integer32
+ }
+
+radBridgeCODIfIndex OBJECT-TYPE
+	SYNTAX  Integer32 
+	MAX-ACCESS  read-only
+	STATUS  current
+	DESCRIPTION
+	       "The interface to which this COD entry is applicable."
+	::= { radBridgeCODEntry 1 }
+
+radBridgeCODManualConnect OBJECT-TYPE
+	SYNTAX  INTEGER {
+		connect(1),
+		disconnect(2)
+	     }
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+	       "The management station can start connection manually
+		by setting this parameter"
+	::= { radBridgeCODEntry 2 }
+
+
+radBridgeCODMode OBJECT-TYPE
+	SYNTAX  INTEGER {
+		answer(1),
+		originate(2),
+		disable(3),
+	    answerAndOriginate(4)
+	     }
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+	     "In answer mode only one incoming call may be accepted at a time. Other nodes
+	      attempting to access the local modem will receive a busy signal until the
+	      connection is terminated. (Answer mode has no difficulty supporting multiple
+	      remote connections to one local port, as blocking multiple incoming calls is
+	      just a modem function. Originate mode, on the other
+	      hand will only support a single local port to remote port connection).
+	      The disable parameter disables the COD utility for this interface. 
+	      Choosing any other mode will enable the COD utility."
+	::= { radBridgeCODEntry 3 }
+
+radBridgeCODConnectDelay OBJECT-TYPE
+	SYNTAX  Integer32
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+     "The connect delay defines the minimum time period that 
+      the link must stay disconnected, between 2 succesive 
+      connections (in seconds)."
+	::= { radBridgeCODEntry 4 }
+
+radBridgeCODisConnectDelay OBJECT-TYPE
+	SYNTAX  Integer32
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+		"The disconnect delay defines the minimum time period
+		 the link must stay connected, between 2 succesive
+		 disconnections (in seconds)."
+	::= { radBridgeCODEntry 5 }
+
+
+radBridgeCODImplicitSwitch  OBJECT-TYPE
+	SYNTAX  INTEGER  {
+	      enable(1),
+	      disable(2)
+	}
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+	     "The inplicit switch allows the user to ignore implicit triggers  provided 
+	      by the COD software."
+--      DEFVAL  { 1 }
+	::= { radBridgeCODEntry 6 }
+
+
+radBridgeCODNumAccess  OBJECT-TYPE
+	SYNTAX Counter32
+	MAX-ACCESS read-only
+	STATUS  current
+	DESCRIPTION
+	     "The number of successful connections that have been established since 
+	      the COD has been reset."
+	::= { radBridgeCODEntry 7}
+
+radBridgeCODTotalConnecTime  OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-only
+	STATUS  current
+	DESCRIPTION
+	     "The sum of all the connect time intervals since the COD was reset."
+	::= { radBridgeCODEntry 8}
+
+
+
+
+ 
+radBridgeCODTimeTriggerTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF RadBridgeCODTimeTriggerEntry
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+		     "The table of COD parameters "
+	::= { radBridgeCOD 2 }
+
+radBridgeCODTimeTriggerEntry  OBJECT-TYPE
+	SYNTAX RadBridgeCODTimeTriggerEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+	      "Each radBridgeCODTimeTriggerEntry consists of the following parameters"
+	INDEX   { radBridgeCODTimeIfIndex, radBridgeCODDay, radBridgeCODTimeTriggerNum }
+	::= { radBridgeCODTimeTriggerTable 1 }
+
+RadBridgeCODTimeTriggerEntry ::= SEQUENCE {
+	radBridgeCODTimeIfIndex
+	      Integer32,
+	radBridgeCODDay
+	      INTEGER,
+	radBridgeCODTimeTriggerNum
+	      Integer32,
+	radBridgeCODTimeTriggerFrom
+	      DisplayString,
+	radBridgeCODTimeTriggerTo
+	      DisplayString,
+	radBridgeCODTimeTriggerStatus
+	      INTEGER
+	}
+
+radBridgeCODTimeIfIndex OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+	       "The interface to which this COD  Time Trigger  entry is applicable."
+	    ::= { radBridgeCODTimeTriggerEntry 1}
+
+radBridgeCODDay  OBJECT-TYPE
+    SYNTAX  INTEGER {
+	  mon(1),
+	  tue(2),
+	  wed(3),
+	  thu(4),
+	  fri(5),
+	  sat(6),
+	  sun(7)
+	 }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+       " The  day of the week in which  the dial up connection operates."
+    ::= { radBridgeCODTimeTriggerEntry 2 }
+
+radBridgeCODTimeTriggerNum  OBJECT-TYPE
+    SYNTAX  Integer32  (1..3)
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+       " Every day of the week the user can configure 3 dial up connections."
+   ::= { radBridgeCODTimeTriggerEntry 3 }
+
+radBridgeCODTimeTriggerFrom  OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+       "Time to start Dial Up connection, in format hh:mm."
+    ::= {radBridgeCODTimeTriggerEntry 4 }
+
+radBridgeCODTimeTriggerTo  OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+       "Time to terminate Dial Up connection, in format HH:MM."
+ ::= {radBridgeCODTimeTriggerEntry 5 }
+
+radBridgeCODTimeTriggerStatus OBJECT-TYPE
+	     SYNTAX  INTEGER {
+		  valid(1),
+		  invalid(2)           
+	    }
+	     MAX-ACCESS  read-write
+	     STATUS  current
+	     DESCRIPTION
+	       "The status of a table entry."
+   ::= { radBridgeCODTimeTriggerEntry  6 }
+
+radBridgeCODTraffic  OBJECT IDENTIFIER ::= { radBridgeCOD 3}
+
+radBridgeCODTrafficTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF RadBridgeCODTrafficEntry
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+	       "The table of COD Traffic trigger "
+	::= { radBridgeCODTraffic 1 }
+
+radBridgeCODTrafficEntry OBJECT-TYPE
+	SYNTAX RadBridgeCODTrafficEntry
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+	       "Each radBridgeCODTrafficEntry consists of the following parameters."
+	INDEX {radBridgeCODProtocolType}
+	::= { radBridgeCODTrafficTable 1}
+
+
+RadBridgeCODTrafficEntry ::= SEQUENCE {
+	  radBridgeCODProtocolType
+		INTEGER,
+	  radBridgeCODTrafficTriggerStatus
+		INTEGER }
+
+
+radBridgeCODProtocolType OBJECT-TYPE
+	SYNTAX INTEGER {
+		ip(1),
+		ipx(2),
+		other(3)
+}                                   
+ 
+	MAX-ACCESS  read-only
+	STATUS  current
+	DESCRIPTION
+		"The Protocol Type of the Traffic Table"
+	::= { radBridgeCODTrafficEntry 1 }
+
+
+radBridgeCODTrafficTriggerStatus OBJECT-TYPE
+	SYNTAX INTEGER {
+		enable(1),
+		disable(2) 
+}
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+		"Command of Status of the Protocol Traffic Trigger"
+	::= { radBridgeCODTrafficEntry 2 }
+
+
+radBridgeCODRemoteIPAddr  OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+		" This is the Remote IP Address"
+	::= { radBridgeCODTraffic 2 }
+
+
+radBridgeCODIPMask  OBJECT-TYPE
+	SYNTAX IpAddress
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+		" This is the Mask of the Remote IP Address"
+	::= { radBridgeCODTraffic 3 }
+
+radBridgeCODTrafficTriggerProtType OBJECT-TYPE
+	SYNTAX  OCTET STRING
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+		"Protocol Type for the User Defined Protocol Traffic Trigger (3)."
+	::= { radBridgeCODTraffic 4 }
+
+
+--COD Condition table
+
+radBridgeCODCondTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF RadBridgeCODCondEntry
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+	       "The table of COD Condition parameters "
+	::= { radBridgeCOD 4}
+
+
+radBridgeCODCondEntry OBJECT-TYPE
+	SYNTAX RadBridgeCODCondEntry
+	MAX-ACCESS  not-accessible
+	STATUS  current
+	DESCRIPTION
+	       "Each radBridgeCODCondEntry consists of the following parameters"
+	INDEX   {radBridgeCODCondIfIndex}
+	::= { radBridgeCODCondTable 1 }
+
+
+RadBridgeCODCondEntry ::= SEQUENCE {
+	  radBridgeCODCondIfIndex 
+	  	Integer32, 
+	  radBridgeCODOriginateConnectCondition 
+	  	INTEGER, 
+	  radBridgeCODOriginateDisConnectCondition
+	  	INTEGER,
+	  radBridgeCODOriginateDisConnectDelay
+	  	Integer32, 
+	  radBridgeCODAnswerConnectCondition
+	  	INTEGER, 
+      radBridgeCODSpecificOnTrafficOIDCondition
+        OBJECT IDENTIFIER, 
+      radBridgeCODDisConnectMinimunFramesNumber
+        Integer32 
+
+
+
+  }
+
+
+radBridgeCODCondIfIndex OBJECT-TYPE
+	SYNTAX  Integer32 
+	MAX-ACCESS  read-only
+	STATUS  current
+	DESCRIPTION
+	"The interface, this COD entry is applicable to."
+	::= { radBridgeCODCondEntry 1 }
+   
+radBridgeCODOriginateConnectCondition OBJECT-TYPE
+	SYNTAX  INTEGER {
+               onPowerOn           (1),
+               whenAnyStationOnLan (2),
+               onTraffic           (3),
+               onManualConnect     (4)
+               }
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+	     " This condition, allows the user to specify the 
+	       condition under which the link is connected.
+           The options are
+                  onPowerOn           - On power on.
+                  whenAnyStationOnLan - When any station on lan.
+                  onTraffic           - On traffic. The user can specify the 
+                                        condition/s for connection.
+                                        The connection will be defined in
+                                        CODSpecificOnTrafficConditionOID .
+                  onManualConnect     - depends on radBridgeCODManualConnect 
+                                        OBJECT-TYPE (=connect).
+                  "
+	::= { radBridgeCODCondEntry 2 }
+   
+radBridgeCODOriginateDisConnectCondition OBJECT-TYPE
+	SYNTAX  INTEGER {
+               noStationOnLan                 (1),
+               onTraffic                      (2),
+               onDelayFromConnectionOnRequest (3),
+               onManualDisConnect             (4)
+               }
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+	     "This condition allows the user to specify the 
+	      condition under which the link is disconnected.
+          The options are: 
+                  noStationOnLan - When there is no station on lan.
+                                   Counts 15 minutes from the point the last 
+                                   frame from lan has been received. If no 
+                                   frame have been transmitted on lan by the 
+                                   end of this period, disconnect the connection.
+                  onTraffic      - On traffic. The user can specify the 
+                                   condition/s for disconnection.
+                                   The disconnection will be defined in
+                                   CODSpecificOnTrafficConditionOID .
+                  onDelayFromConnectionOnRequest - 
+                                   On Delay From Connection On Request .
+                                   The delay time period will be defined in
+                                   CODOriginateDisConnectDelay . 
+                  onManualDisConnect - depends on radBridgeCODManualConnect 
+                                    OBJECT-TYPE (=disconnect).
+                  "
+	::= { radBridgeCODCondEntry 3 }
+
+radBridgeCODOriginateDisConnectDelay OBJECT-TYPE
+	SYNTAX  Integer32 
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+             "Delay time in seconds. "
+	::= { radBridgeCODCondEntry 4 }
+
+radBridgeCODAnswerConnectCondition OBJECT-TYPE
+	SYNTAX  INTEGER {
+               onPowerOn           (1),
+               whenAnyStationOnLan (2),
+               onTraffic           (3),
+               onManualConnect     (4)
+               }
+	MAX-ACCESS  read-write
+	STATUS  current
+	DESCRIPTION
+	     "CODCondAnswerConnect allows the user to specify 
+	      the condition under which the link is connected.
+          The options are: 
+                  onPowerOn           - On power on.
+                  whenAnyStationOnLan - When any station on lan.
+                  onTraffic           - On traffic. The user can specify the 
+                                        condition/s for connection.
+                                        The connection will be defined in
+                                        CODSpecificOnTrafficConditionOID .
+                  onManualConnect     - depends on radBridgeCODManualConnect 
+                                        OBJECT-TYPE .
+             "     
+	::= { radBridgeCODCondEntry 5 }
+
+
+radBridgeCODSpecificOnTrafficOIDCondition OBJECT-TYPE
+        SYNTAX  OBJECT IDENTIFIER
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+             "A reference to a specific entry in the
+			  radBridgeMaskTable, which describes the 
+              particular COD condition .
+              If Connect or Disconnect Conditions are not 
+              onTraffic, its value should be set to the 
+              OBJECT IDENTIFIER { 0 0 }. "
+	::= { radBridgeCODCondEntry 6 }
+
+
+radBridgeCODDisConnectMinimunFramesNumber OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+             "Frames rate."
+	::= { radBridgeCODCondEntry 7 }
+
+--The IPX following objects define the Spoofing 
+
+radBridgeIPX      OBJECT IDENTIFIER ::= {genBridge 5 }
+
+
+radBridgeIPXdriver      OBJECT IDENTIFIER ::=  {radBridgeIPX 1 }
+radBridgeIPXRip          OBJECT IDENTIFIER ::=  {radBridgeIPX 2 }
+radBridgeIPXSap         OBJECT IDENTIFIER ::=  {radBridgeIPX 3 }
+
+radBridgeIPXForwarding OBJECT-TYPE
+    SYNTAX  INTEGER {
+	forwarding(1),
+       not-forwarding(2)
+       }
+    MAX-ACCESS  read-write      
+    STATUS  current
+    DESCRIPTION
+       "The indication of whether this entity is acting as an IPX
+       gateway in respect to the forwarding of datagrams received by,
+       but not addressed to, this entity.  IPX gateways forward
+       datagrams.  IPX hosts do not.  Note that changing this parameter 
+       requiers RESET of the router."
+--      DEFVAL  { 1 }
+    ::= { radBridgeIPXdriver 1 }
+
+radBridgeIPXRipOutPackets OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "The total number of packets transmitted by RIP."
+    ::= { radBridgeIPXRip 1 }
+    
+radBridgeIPXRipInPackets OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "The total number of packets received by RIP.  This will include
+       any packets that are subsequently discarded."
+    ::= { radBridgeIPXRip 2 }
+    
+radBridgeIPXRipInDiscards OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "The number of received packets discarded by RIP."
+    ::= { radBridgeIPXRip 3 }
+    
+radBridgeIPXRipTblNoOfEntries OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "The max number of entries that exist in the RIP routing table."
+    ::= { radBridgeIPXRip 4 }
+    
+radBridgeIPXRipTblBcastTrigUpdateInterval OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The default time interval (in seconds)between triggered RIP updates on 
+       a broadcast type interface.  A triggered update occurs when a change is 
+       detected in the routing database.  This time interval delays the 
+       broadcasting of these updates so that changes on the network will 
+       not result in a lot of triggered updates."
+    ::= { radBridgeIPXRip 5 }
+  
+
+ 
+radBridgeIPXRipTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgeIPXRipTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+       "The routing table used by RIP to calculate routes to remote
+       desination networks."
+    ::= { radBridgeIPXRip 6 }
+    
+radBridgeIPXRipTableEntry OBJECT-TYPE
+    SYNTAX  RadBridgeIPXRipTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+       "The routing information for one of this entity's destination networks."
+    INDEX   { radBridgeIPXRipDestNetwork, 
+	      radBridgeIPXRipPolicy }
+    ::= { radBridgeIPXRipTable 1 }
+    
+RadBridgeIPXRipTableEntry ::= SEQUENCE {
+radBridgeIPXRipDestNetwork
+     OCTET STRING,
+radBridgeIPXRipPolicy
+     INTEGER,
+radBridgeIPXRipForwardingRouter
+     OCTET STRING,
+radBridgeIPXRipNIC
+     Integer32,
+radBridgeIPXRipTickMetric
+     Integer32,
+radBridgeIPXRipHopMetric
+     Integer32,
+radBridgeIPXRipAgingTime
+     TimeTicks,
+radBridgeIPXRipValueStatus
+     INTEGER,
+radBridgeIPXRipForwardType
+     INTEGER
+}
+
+radBridgeIPXRipDestNetwork OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(4))
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	 "The destination network address to which this entry's
+	  routing information pertains."
+    ::= {radBridgeIPXRipTableEntry 1 }
+    
+radBridgeIPXRipPolicy OBJECT-TYPE
+    SYNTAX  INTEGER  {
+	main(1),
+	alternate(2)
+    }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "A value specifying the precidence of the route.  A value of
+       zero means that the route is the best route, a value of one
+       means that the route is the second best route and so on."
+    ::= { radBridgeIPXRipTableEntry 2 }
+    
+radBridgeIPXRipForwardingRouter OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(6))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The IPX node address of the next hop (router) for the
+       entry's associated destination network."
+    ::= { radBridgeIPXRipTableEntry 3 }
+    
+radBridgeIPXRipNIC OBJECT-TYPE
+    SYNTAX  Integer32 
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "An interface identifier specifying what IPX interface the
+       next hop can be found on."
+    ::= { radBridgeIPXRipTableEntry 4 }
+    
+radBridgeIPXRipTickMetric OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The metric, in terms of transit time, associated with the route
+       given by the entry.  This time is in terms of 1/18ths of a
+       second."
+    ::= { radBridgeIPXRipTableEntry 5 }
+    
+radBridgeIPXRipHopMetric OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The metric, in terms of distance , associated with the route
+	given by the entry."
+    ::= { radBridgeIPXRipTableEntry 6 }
+    
+    
+radBridgeIPXRipAgingTime OBJECT-TYPE
+    SYNTAX  TimeTicks
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+      "The last time that the entry was updated.  The time will be
+       provided in terms of the MIB-I object sysUpTime."
+    ::= {radBridgeIPXRipTableEntry 7 }
+    
+radBridgeIPXRipValueStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+	static(1),
+	dynamic(2),
+	invalid(3),
+	semiDynamic(4)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The entry status value; whether the entry is permanent (added
+	statically), reachable or unreachable.  In the latter two cases
+       it would be added by RIP. A semiDynamic entry is an entry
+       enterd manualy by the user and can be updated by the router."
+    ::= { radBridgeIPXRipTableEntry 8 }
+    
+radBridgeIPXRipForwardType  OBJECT-TYPE
+    SYNTAX  INTEGER {
+	 other    (1), -- not specified by this MIB
+	 local    (2), -- local interface
+	 remote   (3)  -- remote destination
+     }
+     MAX-ACCESS   read-write
+     STATUS   current
+     DESCRIPTION
+	"The type of route. Note that local(2) refers to a route for which the 
+	 next hop is the final destination; remote(3) refers to  a  route  
+	 for which  the next  hop is not the final destination."
+    ::= {radBridgeIPXRipTableEntry 9 }
+    
+	  
+    
+radBridgeIPXRipInfTable OBJECT-TYPE
+     SYNTAX  SEQUENCE OF RadBridgeIPXRipInfEntry
+     MAX-ACCESS  not-accessible
+     STATUS  current
+     DESCRIPTION
+     "The RIP interface table."
+     ::= { radBridgeIPXRip 7 }
+    
+radBridgeIPXRipInfEntry OBJECT-TYPE
+     SYNTAX  RadBridgeIPXRipInfEntry
+     MAX-ACCESS  not-accessible
+     STATUS  current
+     DESCRIPTION
+	  "Each entry corresponds to one ifindex."
+     INDEX   { radBridgeIPXRipInfIfIndex}
+     ::= { radBridgeIPXRipInfTable 1 }
+    
+RadBridgeIPXRipInfEntry ::= SEQUENCE {
+     radBridgeIPXRipInfIfIndex
+     Integer32,
+     radBridgeIPXRipInfBcastUpdate
+     Integer32,
+     radBridgeIPXRipInfAgeMultiplier
+     Integer32
+     }
+    
+radBridgeIPXRipInfIfIndex OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+	  "This value of Ifindex is same as radBridgeIPXIfIndex in the
+	   IPX Interface Table."
+     ::= { radBridgeIPXRipInfEntry 1 }
+    
+radBridgeIPXRipInfBcastUpdate OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+	    "The RIP periodic update interval, in seconds. Zero value
+	     corresponds to infinite interval."
+--     DEFVAL {60}
+     ::= { radBridgeIPXRipInfEntry 2 }
+    
+radBridgeIPXRipInfAgeMultiplier OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+       "The holding multiplier for information received in RIP
+       periodic updates. Zero value corresponds to infinite aging time."
+--     DEFVAL {3}
+     ::= { radBridgeIPXRipInfEntry 3 }
+
+radBridgeIPXSapOutPackets OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	   "The total number of packets transmitted by SAP."
+    ::= { radBridgeIPXSap 1 }
+    
+radBridgeIPXSapInPackets OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+      "The total number of packets received by SAP.  This will include
+       any packets that are subsequently discarded."
+    ::= { radBridgeIPXSap 2 }
+    
+radBridgeIPXSapInDiscards OBJECT-TYPE
+    SYNTAX  Counter32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	   "The number of received packets discarded by SAP."
+    ::= { radBridgeIPXSap 3 }
+    
+    
+radBridgeIPXSapTblNoOfEntries OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	   "The max number of entries that exist in the SAP Server
+    Information table."
+    ::= { radBridgeIPXSap 4 }
+    
+radBridgeIPXSapTblBcastTrigUpdateInterval OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The default time interval (in seconds) between triggered SAP updates on a
+	broadcast style interface.  A triggered update occurs when a
+	change is detected in the service database.  This time interval
+	delays the transmission of these updates so that changes on the
+	network will not result in a lot of triggered updates."
+    ::= { radBridgeIPXSap 5 }
+        
+    
+   
+radBridgeIPXSapTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgeIPXSapTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+	   "The Server Information table is used by SAP to store information
+	   of services which are available on the internetwork."
+    ::= { radBridgeIPXSap 6 }
+    
+radBridgeIPXSapTableEntry OBJECT-TYPE
+    SYNTAX  RadBridgeIPXSapTableEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+       "The server information for one of this entity's server entries."
+    INDEX   { radBridgeIPXSapServerType,
+	  radBridgeIPXSapName }
+    ::= { radBridgeIPXSapTable 1 }
+
+RadBridgeIPXSapTableEntry ::= SEQUENCE {
+    radBridgeIPXSapServerType
+	Integer32,
+    radBridgeIPXSapName
+	DisplayString,
+    radBridgeIPXSapNetwork
+	OCTET STRING,
+    radBridgeIPXSapNode
+	OCTET STRING,
+    radBridgeIPXSapSocket
+	Integer32,
+    radBridgeIPXSapHopsToServer
+	Integer32,
+    radBridgeIPXSapNIC
+	Integer32,
+    radBridgeIPXSapAgingTime
+	TimeTicks,
+   radBridgeIPXSapStatus
+	INTEGER 
+    }
+    
+radBridgeIPXSapServerType OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	   "The type of the server for which this entry pertains."
+    ::= { radBridgeIPXSapTableEntry 1 }
+    
+radBridgeIPXSapName OBJECT-TYPE
+    SYNTAX  DisplayString (SIZE(48))
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	   "The name of the server for which this entry pertains."
+    ::= { radBridgeIPXSapTableEntry 2 }
+    
+radBridgeIPXSapNetwork OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(4))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	   "The IPX network address of the host on which this server exists."
+    ::= { radBridgeIPXSapTableEntry 3 }
+    
+radBridgeIPXSapNode OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(6))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	   "The IPX node address of the host on which this server exists."
+    ::= { radBridgeIPXSapTableEntry 4 }
+    
+radBridgeIPXSapSocket OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	   "The IPX socket number that is being used by the server to
+	   which this entry pertains."
+    ::= { radBridgeIPXSapTableEntry 5 }
+    
+radBridgeIPXSapHopsToServer OBJECT-TYPE
+    SYNTAX  Integer32 (1..16)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The number of hops to the entity on which this server exists."
+    ::= { radBridgeIPXSapTableEntry 6 }
+    
+radBridgeIPXSapNIC OBJECT-TYPE
+    SYNTAX  Integer32 
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "An Network Interface Card identifier specifying what IPX 
+	interface the next hop can be found on."
+    ::= { radBridgeIPXSapTableEntry 7 }
+    
+radBridgeIPXSapAgingTime OBJECT-TYPE
+    SYNTAX  TimeTicks
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "The last time that the entry was updated.  The time will be
+	provided in terms of the MIB-I object sysUpTime."
+    ::= { radBridgeIPXSapTableEntry 8 }
+    
+radBridgeIPXSapStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+    permanent(1),
+    dynamic(2),
+    invalid(3),
+    semiDynamic(4)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The status of the entry."
+    ::= { radBridgeIPXSapTableEntry 9 }
+   
+  
+
+radBridgeIPXSapInfTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgeIPXSapInfEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The Sap interface table."
+    ::= { radBridgeIPXSap 7 }
+    
+radBridgeIPXSapInfEntry OBJECT-TYPE
+    SYNTAX  RadBridgeIPXSapInfEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+	 "Each entry corresponds to one ifindex."
+    INDEX   {radBridgeIPXSapInfIfIndex}
+    ::= { radBridgeIPXSapInfTable 1 }
+    
+RadBridgeIPXSapInfEntry ::= SEQUENCE {
+    radBridgeIPXSapInfIfIndex
+    Integer32,
+    radBridgeIPXSapInfBcastUpdate
+    Integer32,
+    radBridgeIPXSapInfAgeMultiplier
+    Integer32
+    }
+    
+radBridgeIPXSapInfIfIndex OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+	 "This value of Ifindex is same as radBridgeIPXIfIndex in the
+	  IPX Interface Table."
+    ::= { radBridgeIPXSapInfEntry 1 }
+    
+radBridgeIPXSapInfBcastUpdate OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The SAP periodic update interval, in seconds. Zero value
+       corresponds to infinite interval."
+--    DEFVAL {60}
+    ::= { radBridgeIPXSapInfEntry 2 }
+    
+radBridgeIPXSapInfAgeMultiplier OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The holding multiplier for information received in SAP
+       periodic updates. Zero value corresponds to infinite aging time."
+--    DEFVAL {3}
+    ::= { radBridgeIPXSapInfEntry 3 }
+
+
+-- radMaskingTab defines the new format of RAD Bridge masking tables
+
+
+GenAddress ::= OCTET STRING (SIZE(12))
+
+newMasking     OBJECT IDENTIFIER ::= {genBridge 6 }
+
+maskingMaxEntries OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The maximum number of entries in the masking table."
+    ::=  { newMasking 1 }
+
+
+maskingCurrentEntries OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The number of entries in the mask table."
+    ::=  { newMasking 2 }
+
+maskingTable    OBJECT-TYPE
+    SYNTAX  SEQUENCE  OF MaskingEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+	    "This is the new masking scheme. 
+	    Mask tables enable definition of forwarding restrictions and 
+	    control of message flow in the internetwork. Each entry
+	    in this table defines a mask statement and an action defined by 
+	    maskingOperation."
+    ::=  { newMasking 3 }
+    
+maskingEntry OBJECT-TYPE
+    SYNTAX  MaskingEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+	    "Defines the contents of each line in the mask table."
+    INDEX  { maskingType, maskingIfIndex, maskingIndex }
+    ::=  { maskingTable 1 }
+
+MaskingEntry ::= SEQUENCE {
+                     maskingType
+					  INTEGER,
+                     maskingIfIndex
+                      Integer32,
+                     maskingIndex
+                      Integer32,
+                     maskingProtocolType
+                      INTEGER,
+					 maskingSmartMaskOID
+					  OBJECT IDENTIFIER,
+                     maskingFrameType
+                      INTEGER,
+                     maskingFrameTypeCondition
+                      INTEGER,
+                     maskingSourceAddress
+                      GenAddress,
+                     maskingSourceActiveBits
+                      GenAddress,
+                     maskingSourceMacOrNet
+                        INTEGER,
+                     maskingSourceCondition
+                      INTEGER,
+                     maskingDestAddress
+                      GenAddress,
+                     maskingDestActiveBits
+                      GenAddress,
+                     maskingDestMacOrNet
+                        INTEGER,
+                     maskingDestCondition
+                      INTEGER,
+                     maskingLowLevelProt
+                      INTEGER,
+                     maskingLowLevelProtCondition
+                      INTEGER,
+                     maskingHighLevelProt
+                      Integer32,
+                     maskingHighLevelProtCondition
+                      INTEGER,
+                     maskingPortNum
+                      Integer32,
+                     maskingPortNumCondition
+                      INTEGER,
+                     maskingOperation
+                      INTEGER,
+                     maskingSrcPortNum 
+                      Integer32,
+                     maskingSrcPortNumCondition 
+                      INTEGER
+                       }
+
+   maskingType OBJECT-TYPE
+    SYNTAX  INTEGER {
+	  tx            (1),
+	  rx            (2),
+      compress(3),
+      priority(4),
+      loadSharing(5),
+      facs(6),
+      codConnect(7),
+      codDisconnect(8)
+     }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "Defines the type of mask entry. "
+    ::= {    maskingEntry 1  }
+
+
+   maskingIfIndex  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION 
+	"Specifies the ifIndex of the interface to which the mask is applied."
+	::= {    maskingEntry 2  }
+   
+
+                  
+   maskingIndex OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "An index to the masking table. This number should not be greater than maskingMaxEntries"
+    ::= {    maskingEntry 3  }
+                  
+            
+                
+        
+   maskingProtocolType OBJECT-TYPE
+    SYNTAX  INTEGER {
+    unknown     (1),
+    ip          (2),
+	ipx         (3),
+	sna         (4),
+	netbios     (5),
+              apple      (6),
+              dec         (7),
+    all         (255)
+    }			
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+         "The base protocol for masking. IPX, IP, others."
+    ::= {    maskingEntry 4  }
+
+
+    maskingSmartMaskOID OBJECT-TYPE
+	 SYNTAX  OBJECT IDENTIFIER
+	 MAX-ACCESS  read-only
+	 STATUS  current
+	 DESCRIPTION
+	      "A reference to a specific Smart mask table (old radBridgeMaskTable)
+	       which enables a more specific mask type.
+		   If this information is not available, its value 
+		   should be set to the OBJECT IDENTIFIER { 0 0 }. "
+     ::= {  maskingEntry 5  }		    
+
+         
+    maskingFrameType OBJECT-TYPE
+    SYNTAX  INTEGER {
+    unknown     (1),
+    all         (2),
+    broadcast   (3),
+    multicast   (4)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "Enables the user to decide about frame type 
+          * all frame 
+          * just broadcast 
+          * just multicast."
+    ::= {    maskingEntry 6  }
+
+   maskingFrameTypeCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+    false      (1),
+    true       (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+   		   maskingFrameType the packet contains data that matches
+  	the content of maskingFrameType.
+
+	fa    lse - Condition is valid if at the position specified by 
+		   maskingFrameType the packet contains data that does not
+    		match the content of maskingFrameType."
+    ::= {    maskingEntry 7  }
+
+   maskingSourceAddress OBJECT-TYPE
+    SYNTAX  GenAddress
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "The source address is according to the maskingMacOrNet and 
+        maskingProtocolType variables. 
+        In case of 'MAC' enter 6 bytes (48 bit) of source address.
+        In case of 'NET' 
+            if the    maskingProtocolType is IP, this is the IP address
+            if the    maskingProtocolType is IPX, this is the IPX address 
+                 (nnnnmmmmmmss)
+                                nnnn   - IPX net address
+                                mmmmmm - Node address (Mac)
+                                ss     - IPX socket
+        In case of 'Apple' 
+                                nn - net address (4 nibbles) 
+                                ss - socket (4 nibbles)."   
+    ::= {    maskingEntry 8  }
+
+   maskingSourceActiveBits OBJECT-TYPE
+    SYNTAX  GenAddress
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	   "Specifies the positions of the wild card characters (*) 
+	    in the    maskingSourceAddress field. Only the 1's bit will be taken in 
+        considerations."
+    ::= {    maskingEntry 9  }
+
+   maskingSourceMacOrNet OBJECT-TYPE
+    SYNTAX  INTEGER {
+    macAddress  (1),
+    netAddress  (2),
+    ipRange     (3),
+    appleAddress(4)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"The variable maskingSourceAddress and maskingSourceActiveBits 
+	 will be treated as MAC, or NET address.
+	 -  If maskingProtocolType = 'all', 'sna', 'netbios', dec or 
+		'unknown', the maskingSourceMacOrNet can be macAddress only!
+	 -  If maskingProtocolType = 'ip' the 
+		maskingSourceMacOrNet can be  macAddress or netAddress or 
+		appleAddress. 
+	 -  If maskingProtocolType = 'ipx', the 
+		maskingSourceMacOrNet can be either macAddress or netAddress. 
+	 -  If maskingProtocolType = 'apple', the 
+		maskingSourceMacOrNet can be either macAddress or appleAddress." 
+    ::= {    maskingEntry 10  }
+    
+   maskingSourceCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+    false (1),
+    true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+	           maskingSourceAddress (in conjunction with maskingSourceActiveBits) 
+	        the packet contains data that matches the content of maskingSourceAddress.
+
+	false - Condition is valid if at the position specified by 
+		   maskingSourceAddress (in conjunction with maskingSourceActiveBits) 
+	    	the packet contains data that does not match the content of
+	        maskingSourceAddress."
+    ::= {    maskingEntry 11 }
+    
+   maskingDestAddress OBJECT-TYPE
+    SYNTAX  GenAddress
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "If maskingFrameType = broadcast or multicast, this object
+	    is NOT APPLICABLE.
+	    If maskingFrameType = all or unknown, this object is 
+	    applicable.
+        The destination address is according to the maskingMacOrNet and maskingProtocolType variables. 
+        In case of 'MAC' enter 6 bytes (48 bit) of source address.
+        In case of 'NET' 
+            if the    maskingProtocolType is IP, this is the IP address
+            if the    maskingProtocolType is IPX, this is the IPX address 
+                 (nnnnmmmmmmss)
+                                nnnn   - IPX net address
+                                mmmmmm - Node address (Mac)
+                                ss     - IPX socket.
+        In case of 'Apple' 
+                                nn - net address (4 nibbles) 
+                                ss - socket (4 nibbles).
+        The IPX socket entered here has priority over the value of
+        maskingLowLevelProt, when it is ipxRip, ipxSap or ipxSpx, 
+        unless the entered IPX socket is don't care. "   
+    ::= {    maskingEntry 12  }
+
+   maskingDestActiveBits OBJECT-TYPE
+    SYNTAX  GenAddress
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	   "If maskingFrameType = broadcast or multicast, this object
+	    is NOT APPLICABLE.
+	    If maskingFrameType = all or unknown, this object is 
+	    applicable.
+	    Specifies the positions of the wild card characters (*) 
+	    in the    maskingDestAddress field. Only the 1's bit will be taken in 
+        considerations."
+    ::= {    maskingEntry 13   }
+
+   maskingDestMacOrNet OBJECT-TYPE
+    SYNTAX  INTEGER {
+    macAddress  (1),
+    netAddress  (2),
+    ipRange     (3),
+    appleAddress(4)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"If maskingFrameType = broadcast or multicast, this object
+	 is NOT APPLICABLE.
+	 If maskingFrameType = all or unknown, this object is 
+	 applicable.
+	 -  If maskingProtocolType = 'all', 'sna', 'netbios', dec or 
+		'unknown', the maskingDestMacOrNet can be macAddress only!
+	 -  If maskingProtocolType = 'ip' the 
+		maskingDestMacOrNet can be  macAddress or netAddress or 
+		appleAddress. 
+	 -  If maskingProtocolType = 'ipx', the 
+		maskingDestMacOrNet can be either macAddress or netAddress. 
+	 -  If maskingProtocolType = 'apple', the 
+		maskingDestMacOrNet can be either macAddress or appleAddress. 
+     The variable maskingDestAddress and maskingDestActiveBits will 
+	 be treated as MAC, or NET address.	"
+    ::= {    maskingEntry 14  }
+
+   maskingDestCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+    false (1),
+    true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"If maskingFrameType = broadcast or multicast, this object
+	 is NOT APPLICABLE.
+	 If maskingFrameType = all or unknown, this object is 
+	 applicable.
+	Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+	           maskingDestAddress (in conjunction with maskingDestActiveBits) 
+	        the packet contains data that matches the content of maskingDestAddress.
+
+	false - Condition is valid if at the position specified by 
+		   maskingDestAddress (in conjunction with maskingDestActiveBits) 
+		the packet contains data that does not match the content of maskingDestAddress."
+    ::= {    maskingEntry 15  }
+
+   maskingLowLevelProt OBJECT-TYPE
+    SYNTAX  INTEGER {
+      unknown (1), -- don't care
+      ipxRip  (2), -- 0x51
+      ipxSap  (3), -- 0x52
+      ipxSpx  (4), -- 0x53
+      ipUdp   (5), -- 0x54
+      ipTcp   (6), -- 0x55
+      ipIcmp  (7), -- 0x56
+	ipxNcp  (8), -- 0x57
+	ipxWan  (9), -- 0x58
+	ipxEco (10), -- 0x59
+	ipxErr (11), -- 0x5a
+	ipxPep (12)  -- 0x5b 
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+         "This field is set in conjunction with the maskingProtocolType variable.
+          This variable specifies the low level protocol.
+          The IPX socket entered in maskingDestAddress has priority 
+          over the value of maskingLowLevelProt, when it is ipxRip, 
+          ipxSap or ipxSpx, unless the entered IPX socket is don't 
+          care."
+    ::= {    maskingEntry 16  }
+
+   maskingLowLevelProtCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+    false  (1),
+    true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+    	   maskingLowLevelProt the packet contains data that matches
+		the content of maskingLowLevelProt.
+
+	false - Condition is valid if at the position specified by 
+		   maskingLowLevelProt the packet contains data that does not
+		match the content of maskingLowLevelProt."
+    ::= {    maskingEntry 17  }
+
+   maskingHighLevelProt OBJECT-TYPE
+    SYNTAX  Integer32 
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+         "This field is set in connection to the maskingProtocolType variable.
+          This variable specifies the high level protocols (application).
+          As for today it supports just IP protocol stack.
+          The object's value is a sum of the following instances values 
+          (selected by user):  
+                     none     (0), -- don't care
+    			   ftp      (1), 
+    			   ftpC     (2), 
+    			   telnet   (4), 
+    			   smtp     (8),
+    			   tftp     (16),
+    			   snmp     (32),
+    			   snmpTrap (64),
+			       ipRip    (128),
+			       www      (256),
+			       email    (512),
+			       dns      (1024),
+                     
+                     For Apple Protocol only:
+                     rtmp     (2048), 
+                     nbp      (4096), 
+                     atp      (8192), 
+                     aep      (16384), 
+                     zip      (32768), 
+                     adsp     (65536),
+					 pap      (131072),
+					 asp      (262144)
+ 
+          Example: if ftp(1), snmp(32) and snmpTrap(64) instances 
+                   were selected, the value should be 97 (=1+32+64)."
+    ::= {    maskingEntry 18  }
+
+   maskingHighLevelProtCondition OBJECT-TYPE
+    SYNTAX  INTEGER {
+    false  (1),
+    true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+		   maskingHighLevelProt the packet contains data that matches
+		the content of    maskingHighLevelProt.
+
+	false - Condition is valid if at the position specified by 
+		   maskingHighLevelProt the packet contains data that does not
+		match the content of    maskingHighLevelProt."
+    ::= {    maskingEntry 19  }
+
+   maskingPortNum OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The port number is the same as in high level protocol. It 
+         specifies the dest. port in IP case or the dest. socket 
+         in case of IPX & apple protocols.
+		 IP  -  This object is applicable only if none (0) value was selected in
+		        maskingHighLevelProt.
+         IPX -  This object is applicable only if the socket 
+                entered in maskingDestAddress is 'don't care'(00) AND
+			    maskingLowLevelProt is NOT ipxRip or ipxSap.
+	     Apple - This option is applicable only if the socket 
+                entered in maskingDestAddress is 'don't care'(00)."
+    ::= {    maskingEntry 20  }
+
+   maskingPortNumCondition OBJECT-TYPE
+    SYNTAX  INTEGER  {
+    false  (1),
+    true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"Specifies the logical condition of the mask pattern:
+
+	true  - Condition is valid if at the position specified by 
+		   maskingPortNum the packet contains data that matches
+		the content of    maskingPortNum.
+
+	false - Condition is valid if at the position specified by 
+		   maskingPortNum the packet contains data that does not
+		match the content of    maskingPortNum.
+	 This object is applicable only when maskingPortNum is applicable."
+    ::= {    maskingEntry 21  }
+
+ 
+maskingOperation OBJECT-TYPE
+    SYNTAX INTEGER { 
+       block         (1),
+       forward       (2),
+       route         (3),
+       forward-route (4),
+       high-priority (5),
+       noOp          (6),
+       delete        (7),
+       smartMask     (8)
+}
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+	"The type of action to be taken if the frame meets the 
+     conditions of the mask.
+       noOp = disabled (mask remains on list, but is not active) 
+	 delete = mask is removed from the list.
+	 smartMask = the operation and destination of the mask will
+	             be determined by the objects of the Smart Table 
+	             (old masking table: radBridgeMaskTable). 
+     If maskingType is codConnect, the 'block' value is NOT 
+     allowed. 
+     If maskingType is codDisconnect, the 'forward' value is NOT 
+     allowed."     
+     ::= {  maskingEntry 22 }    
+
+maskingSrcPortNum OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+        "The source port number.
+         For IP:   No Condition.
+         For IPX:  This object is applicable only if the socket entered in
+                   maskingSourceAddress is don't care (00) and maskingLowLevelProt
+                   is NOT ipxRip or ipxSap.
+         For Apple:This object is applicable only if the socket entered in
+                   maskingSourceAddress is don't care (00). "
+    ::= {    maskingEntry 23  }
+
+maskingSrcPortNumCondition OBJECT-TYPE
+    SYNTAX  INTEGER  {
+    false  (1),
+    true (2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"The same as 'maskingPortNumCondition'.
+       Relates to source port."
+    ::= {  maskingEntry 24  }
+ 
+
+radBridgePerformance      OBJECT IDENTIFIER ::= {genBridge 7 }
+
+ -- The RAD Bridge current table contains statistics being
+ -- collected for the current 15 minute interval.
+
+ radBridgeCurrentTable OBJECT-TYPE
+     SYNTAX  SEQUENCE OF RadBridgeCurrentEntry
+     MAX-ACCESS  not-accessible
+     STATUS  current
+     DESCRIPTION
+             "The RAD Bridge Current table."
+     ::= { radBridgePerformance 1 }
+
+ radBridgeCurrentEntry OBJECT-TYPE
+     SYNTAX  RadBridgeCurrentEntry
+     MAX-ACCESS  not-accessible
+     STATUS  current
+     DESCRIPTION
+             "An entry in the RAD Bridge Current table."
+     INDEX   { radBridgeCurrentIndex }
+     ::= { radBridgeCurrentTable 1 }
+
+RadBridgeCurrentEntry ::= SEQUENCE {
+    radBridgeCurrentIndex                               Integer32,
+    radBridgeCurrentIngressFilteringDiscardedFrames     Gauge32,
+    radBridgeCurrentFrameTypeDiscardedFrames            Gauge32,
+    radBridgeCurrentRxCorrectFrames                     Gauge32,
+    radBridgeCurrentRxCorrectBytes                      Gauge32,
+    radBridgeCurrentRxCorrectBytesHCOverflow            Gauge32,
+    radBridgeCurrentRxBcastFrames                       Gauge32,
+    radBridgeCurrentRxMcastFrames                       Gauge32,
+    radBridgeCurrentTxCorrectFrames                     Gauge32,
+    radBridgeCurrentTxCorrectBytes                      Gauge32,
+    radBridgeCurrentTxCorrectBytesHCOverflow            Gauge32,
+    radBridgeCurrentTxBcastFrames                       Gauge32,
+    radBridgeCurrentTxMcastFrames                       Gauge32,
+    radBridgeCurrentTxDropFrames                        Gauge32 
+ }
+
+radBridgeCurrentIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The index of the Bridge interface or Bridge Port.
+        It may be ifIndex."
+    ::= { radBridgeCurrentEntry 1 }
+
+radBridgeCurrentIngressFilteringDiscardedFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Discarded
+        Frames upon Ingress Filtering, encountered by a Bridge
+        interface in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 2 }
+
+radBridgeCurrentFrameTypeDiscardedFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Discarded
+        Frames upon Frame Type and Tagging Mismatch, encountered
+        by a Bridge interface in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 3 }
+
+radBridgeCurrentRxCorrectFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Correct Frames,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 4 }
+
+radBridgeCurrentRxCorrectBytes OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Correct Bytes,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 5 }
+
+radBridgeCurrentRxCorrectBytesHCOverflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times the associated
+         radBridgeCurrentRxCorrectBytes counter has overflowed."
+    ::= { radBridgeCurrentEntry 6 }
+
+radBridgeCurrentRxBcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Broadcast Frames,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 7 }
+
+radBridgeCurrentRxMcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Multicast Frames,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 8 }
+
+radBridgeCurrentTxCorrectFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Correct Frames,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 9 }
+
+radBridgeCurrentTxCorrectBytes OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Correct Bytes,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 10 }
+
+radBridgeCurrentTxCorrectBytesHCOverflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times the associated
+         radBridgeCurrentTxCorrectBytes counter has overflowed."
+    ::= { radBridgeCurrentEntry 11 }
+
+radBridgeCurrentTxBcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Broadcast Frames,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 12 }
+
+radBridgeCurrentTxMcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Multicast Frames,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 13 }
+
+radBridgeCurrentTxDropFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Dropped Frames,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { radBridgeCurrentEntry 14 }
+
+
+--Interval Table
+
+-- The RAD Bridge Interval table contains statistics being
+-- collected by each Interface over the previous 24
+-- hours of operation.  The past 24 hours are broken into 96
+-- completed 15 minute intervals.
+
+radBridgeIntervalTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgeIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+            "The RAD Bridge Interval table."
+    ::= { radBridgePerformance 2 }
+
+radBridgeIntervalEntry OBJECT-TYPE
+    SYNTAX  RadBridgeIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+            "An entry in the RAD Bridge Interval table."
+    INDEX   { radBridgeIntervalIndex, radBridgeIntervalNumber }
+    ::= { radBridgeIntervalTable 1 }
+
+RadBridgeIntervalEntry ::= SEQUENCE {
+    radBridgeIntervalIndex                              Integer32,
+    radBridgeIntervalNumber                             Integer32,
+    radBridgeIntervalIngressFilteringDiscardedFrames    Gauge32,
+    radBridgeIntervalFrameTypeDiscardedFrames           Gauge32,
+    radBridgeIntervalRxCorrectFrames                    Gauge32,
+    radBridgeIntervalRxCorrectBytes                     Gauge32,
+    radBridgeIntervalRxCorrectBytesHCOverflow           Gauge32,
+    radBridgeIntervalRxBcastFrames                      Gauge32,
+    radBridgeIntervalRxMcastFrames                      Gauge32,
+    radBridgeIntervalTxCorrectFrames                    Gauge32,
+    radBridgeIntervalTxCorrectBytes                     Gauge32,
+    radBridgeIntervalTxCorrectBytesHCOverflow           Gauge32,
+    radBridgeIntervalTxBcastFrames                      Gauge32,
+    radBridgeIntervalTxMcastFrames                      Gauge32,
+    radBridgeIntervalTxDropFrames                       Gauge32 
+ }
+
+radBridgeIntervalIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The index of the bridge interface or Bridge Port.
+    It may be ifIndex."
+    ::= { radBridgeIntervalEntry 1 }
+
+radBridgeIntervalNumber OBJECT-TYPE
+    SYNTAX  Integer32 (1..96)
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "A number between 1 and 96, where 1 is the most
+     recently completed 15 minute interval and 96 is
+     the least recently completed 15 minutes interval
+     (assuming that all 96 intervals exist)."
+    ::= { radBridgeIntervalEntry 2 }
+
+radBridgeIntervalIngressFilteringDiscardedFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The counter associated with the number of Discarded
+    Frames upon Ingress Filtering, encountered by a
+    Bridge interface in one of the previous 96, individual
+    15 minute, intervals."
+    ::= { radBridgeIntervalEntry 3 }
+
+radBridgeIntervalFrameTypeDiscardedFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The counter associated with the number of Discarded
+    Frames upon Frame Type and Tagging Mismatch, encountered
+    by a Bridge interface in one of the previous 96, individual
+    15 minute, intervals."
+    ::= { radBridgeIntervalEntry 4 }
+
+radBridgeIntervalRxCorrectFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Correct Frames,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 5 }
+
+radBridgeIntervalRxCorrectBytes OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Correct Bytes,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 6 }
+
+radBridgeIntervalRxCorrectBytesHCOverflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times the associated
+         radBridgeIntervalRxCorrectBytes counter has overflowed."
+    ::= { radBridgeIntervalEntry 7 }
+
+radBridgeIntervalRxBcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Broadcast Frames,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 8 }
+
+radBridgeIntervalRxMcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Multicast Frames,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 9 }
+
+radBridgeIntervalTxCorrectFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Correct Frames,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 10 }
+
+radBridgeIntervalTxCorrectBytes OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Correct Bytes,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 11 }
+
+radBridgeIntervalTxCorrectBytesHCOverflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times the associated
+         radBridgeIntervalTxCorrectBytes counter has overflowed."
+    ::= { radBridgeIntervalEntry 12 }
+
+radBridgeIntervalTxBcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Broadcast Frames,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 13 }
+
+radBridgeIntervalTxMcastFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Multicast Frames,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 14 }
+
+radBridgeIntervalTxDropFrames OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Dropped Frames,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { radBridgeIntervalEntry 15 }
+
+
+radBridgePortBaseVlan      OBJECT IDENTIFIER ::= {genBridge 8 }
+
+radBridgePortBaseVlanTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadBridgePortBaseVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table containing static configuration information for
+     each VLAN configured into the device by  management.
+     All entries are permanent and will
+     be restored after the device is reset."
+    ::= { radBridgePortBaseVlan 1 }
+
+radBridgePortBaseVlanEntry  OBJECT-TYPE
+    SYNTAX      RadBridgePortBaseVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Static information for a VLAN configured into the
+    device by (local or network) management."
+    INDEX   { radBridgePortBaseVlanCnfgIdx,radBridgePortBaseVlanIdx }
+    ::= { radBridgePortBaseVlanTable 1 }
+
+RadBridgePortBaseVlanEntry ::=
+    SEQUENCE {
+        radBridgePortBaseVlanCnfgIdx       Integer32,
+        radBridgePortBaseVlanIdx           Integer32,
+        radBridgePortBaseVlanName          SnmpAdminString,
+        radBridgePortBaseVlanEgressPorts   PortList,
+        radBridgePortBaseVlanVirtualGroups PortList,
+        radBridgePortBaseVlanRowStatus     RowStatus,
+		radBridgePortBaseVlanMng		   INTEGER
+    }
+
+radBridgePortBaseVlanCnfgIdx OBJECT-TYPE
+    SYNTAX  Integer32 (1..255)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Idx of the Agent Cnfg the following 
+     objects refer.
+     255=Temporary Cnfg (when relevant, 
+     Set is done only to this configuration).
+     For Agents that support only one configuration, 
+     this object will be  constant=1. "
+    ::= { radBridgePortBaseVlanEntry 1 }
+
+radBridgePortBaseVlanIdx OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Index of the port based VLAN."
+    ::= { radBridgePortBaseVlanEntry 2 }
+
+radBridgePortBaseVlanName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "An administratively assigned string, which may be used
+     to identify the the port based VLAN."
+    ::= { radBridgePortBaseVlanEntry 3 }
+
+radBridgePortBaseVlanEgressPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The set of ports which are permanently assigned to the
+    egress list for this port based VLAN by management.  
+    The default value of this object is a string of zeros."
+    ::= { radBridgePortBaseVlanEntry 4 }
+
+
+radBridgePortBaseVlanVirtualGroups OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The set of Virtual Groups which are permanently assigned to
+     this port based VLAN by management. 
+     (read Virtual Group instead of port in PortList Textual Convention)
+     The default value of this object is a string of zeros."
+    ::= { radBridgePortBaseVlanEntry 5 }
+
+
+radBridgePortBaseVlanRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enable user to 
+     create/delete entries in this table."
+    ::= { radBridgePortBaseVlanEntry 6 }
+ 
+radBridgePortBaseVlanMng  OBJECT-TYPE		   
+   SYNTAX         INTEGER
+      {
+      notApplicable  (1),
+	  disable		 (2),
+	  enable		 (3)
+   	  }
+    MAX-ACCESS     read-create
+    STATUS         current
+    DESCRIPTION
+    "This object allows user to enable/disable 
+    management traffic on this VLAN.
+    disable - only non-management data is allowed.
+    enable  - mixture of management traffic 0with other 
+              types of data is allowed."
+    ::= { radBridgePortBaseVlanEntry 7 }
+
+
+-- The Bridge's Ports-VLANs Memebership Table
+
+radBridgePortVlanMemberTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF RadBridgePortVlanMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+	"The Bridge Ports-VLAN Membership table.
+	 This table enables the user to assign:
+	 - Several VLANs to a Port.
+	 - Several Ports to a VLAN."
+    ::= { radBridgePortBaseVlan 2 }
+
+radBridgePortVlanMemberEntry OBJECT-TYPE
+    SYNTAX  RadBridgePortVlanMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the Bridge Ports-VLANs Memebership table."
+    INDEX   { radBridgePortVlanMemberBridgeIdx, 
+    		  radBridgePortVlanMemberPortIdx, 
+    		  radBridgePortVlanMemberVlanId }
+    ::= { radBridgePortVlanMemberTable 1 }
+
+RadBridgePortVlanMemberEntry ::=
+    SEQUENCE {
+		radBridgePortVlanMemberBridgeIdx	Integer32,
+		radBridgePortVlanMemberPortIdx		Integer32,
+		radBridgePortVlanMemberVlanId		Integer32,
+		radBridgePortVlanMemberRowStatus	RowStatus
+    }
+
+radBridgePortVlanMemberBridgeIdx OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Bridge Index."
+    ::= { radBridgePortVlanMemberEntry 1 }
+
+radBridgePortVlanMemberPortIdx OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Bridge's Port Index.
+     For some cases, it can be used as the Port ofIndex."
+    ::= { radBridgePortVlanMemberEntry 2 }
+
+radBridgePortVlanMemberVlanId OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the VLAN ID."
+    ::= { radBridgePortVlanMemberEntry 3 }
+	
+radBridgePortVlanMemberRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables the user to 
+     create/delete entries in this table."
+    ::= { radBridgePortVlanMemberEntry 4 }
+
+radBridgeGenCnfg      OBJECT IDENTIFIER ::= {genBridge 9 }
+
+
+radBridgeGenFlowTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadBridgeGenFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table containing static configuration information for
+    Bridge configured into the device by (local or
+    network) management.  All entries are permanent and will
+    be restored after the device is reset."
+    ::= {  radBridgeGenCnfg 1 }
+
+radBridgeGenFlowEntry  OBJECT-TYPE
+    SYNTAX      RadBridgeGenFlowEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Static information for a Bridge configured into the
+    device by  management."
+    INDEX   { radBridgeGenFlowCnfgIdx,radBridgeGenFlowIdx }
+    ::= { radBridgeGenFlowTable 1 }
+
+RadBridgeGenFlowEntry ::= SEQUENCE {
+    radBridgeGenFlowCnfgIdx                    Integer32,
+    radBridgeGenFlowIdx                        Integer32,
+    radBridgeGenFlowRowStatus                  RowStatus,
+    radBridgeGenFlowFloodOrBcastMaxRate        Integer32,
+    radBridgeGenFlowQosMode                    INTEGER,
+    radBridgeGenFlowSchedulingMode             INTEGER,
+    radBridgeGenFlowBasicClassification        INTEGER,
+    radBridgeGenFlowMulticastTrafficClass      Integer32,
+    radBridgeGenFlowBroadcastTrafficClass      Integer32,
+    radBridgeGenFlowUnkownUnicastTrafficClass  Integer32 
+ }
+
+radBridgeGenFlowCnfgIdx OBJECT-TYPE
+    SYNTAX  Integer32 (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Idx of the
+     Agent Cnfg the following objects refer.
+     255=Temporary Cnfg (when relevant Set is done
+     only to this configuration).
+     For Agents that support only one configuration,
+     this object will be  constant=1.
+     This object can be used to carry additional indexing
+     (e.g port index) when needed."
+    ::= { radBridgeGenFlowEntry 1 }
+
+radBridgeGenFlowIdx OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "For Agent having more than one bridge,
+     this index may be used as bridge index "
+    ::= { radBridgeGenFlowEntry 2 }
+
+radBridgeGenFlowRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enable user to
+     create/delete entries in this table."
+    ::= { radBridgeGenFlowEntry 3 }
+
+
+radBridgeGenFlowFloodOrBcastMaxRate OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object controls maximum Flooding or Broadcast Rate:
+     Max number of multicast along with unknown
+     or flooded unicast frames allowed to enter
+     any port.
+     The number can be presented either as percentage of bandwidth, or bandwidth in Kbps.
+     Once the limit is exceeded, any multicast or flooded
+     frame entering from the port is discarded
+     For RIC-155, and FCD-155 valid values are 3% , 6%, 12%
+     and 100% = No Limit"
+    ::= { radBridgeGenFlowEntry 4 }
+
+
+radBridgeGenFlowQosMode OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     notApplicable   (1),
+     vlanTag         (2), -- 802.1p
+     dscp            (3),
+     dscpAndVlanTag  (4),
+     vlanTagAndDscp  (5),
+     none            (6),
+     tos             (7),
+     perPort         (8),
+     ipPrecedence    (9),
+     dsField        (10),
+     vlanTagAndTos  (11),
+     tosAndVlanTag  (12),
+     vlanTagAndIpPrecedence(13),
+     ipPrecedenceAndVlanTag(14),
+     vlanTagAndDsField     (15),
+     dsFieldAndVlanTag     (16),
+     vlanId                (17) --VLAN ID
+          }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object controls Quality of Service mode.
+    User may select which field(s)
+    (in case of fields -  which one has precedence)
+    will affect prioritization of data between egress queues."
+    ::= { radBridgeGenFlowEntry 5 }
+
+radBridgeGenFlowSchedulingMode  OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     notApplicable (1),
+     wfq           (2), -- Weighted Fair Queuing
+     sp            (3), -- Strict Priority
+     atmCos        (4), -- ATM Class of Service
+     wrr           (5), -- Weighted Round Robin
+     hqpAndWrr     (6), -- Highest Queue Preempt + Weighted Round Robin
+     spAndWrr      (7)  -- Strict Priority + Weighted Round Robin
+     }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object controls which scheduling mode is used.
+     hqpAndWrr(6) - The highest queue will be emptied first, then the
+                    other queues, according to WRR (Weighted Round Robin)."
+    DEFVAL  { sp }
+    ::= { radBridgeGenFlowEntry 6 }
+
+radBridgeGenFlowBasicClassification  OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     none (2),
+     port (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object defines whether Classification based on Port should be
+     taken into account (either as default, or in addition to other
+     classifications)."
+    ::= { radBridgeGenFlowEntry 7 }
+
+radBridgeGenFlowMulticastTrafficClass OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The Traffic Class the received Multicast frame is mapped to."
+    ::= { radBridgeGenFlowEntry 8 }
+
+radBridgeGenFlowBroadcastTrafficClass OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The Traffic Class the received Broadcast frame is mapped to."
+    ::= { radBridgeGenFlowEntry 9 }
+
+radBridgeGenFlowUnkownUnicastTrafficClass OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The Traffic Class the received
+     Unkonwn Unicast frame is mapped to."
+    ::= { radBridgeGenFlowEntry 10 }
+
+
+radBridgeDot1qVlanStaticTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadBridgeDot1qVlanStaticEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table containing static configuration information for
+        each VLAN configured into the device by (local or
+        network) management.  All entries are permanent and will
+        be restored after the device is reset."
+    ::= { radBridgeGenCnfg 2 }
+
+radBridgeDot1qVlanStaticEntry OBJECT-TYPE
+    SYNTAX      RadBridgeDot1qVlanStaticEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Static information for a VLAN configured into the
+        device by (local or network) management."
+    AUGMENTS   { dot1qVlanStaticEntry }
+    ::= { radBridgeDot1qVlanStaticTable 1 }
+
+RadBridgeDot1qVlanStaticEntry ::= SEQUENCE {
+    radBridgeDot1qVlanTaggedPorts           PortList,
+    radBridgeDot1qVlanUnmodifiedPorts       PortList,
+    radBridgeDot1qVlanSplitHorizon          INTEGER,
+    radBridgeDot1qVlanRingMembers           BITS 
+ }
+
+radBridgeDot1qVlanTaggedPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "The set of ports which should transmit egress packets
+         for this VLAN as tagged."
+    ::= { radBridgeDot1qVlanStaticEntry 1 }
+
+radBridgeDot1qVlanUnmodifiedPorts OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The set of ports which should transmit egress packets
+         for this VLAN as unmodified."
+    ::= { radBridgeDot1qVlanStaticEntry 2 }
+
+radBridgeDot1qVlanSplitHorizon OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable (1),
+    disable       (2),
+    enable        (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "When 'enable (3)', packets having this VLAN will
+         not be switched back to other bridge ports which are
+         members of this VLAN."
+    ::= { radBridgeDot1qVlanStaticEntry 3 }
+
+radBridgeDot1qVlanRingMembers OBJECT-TYPE
+    SYNTAX  BITS {
+       notApplicable (0),
+       ring1         (1),
+       ring2         (2),
+       ring3         (3),
+       ring4         (4),
+       ring5         (5)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object indicates which Ring (ERP=Ethernet Ring Protection)
+     are members of this VLAN. For each BIT, the value means:
+     '1' = Ring is member of this VLAN.
+     '0' = Ring is NOT member of this VLAN."
+    ::= { radBridgeDot1qVlanStaticEntry 4 }
+
+
+ieee8021QBridgeVlanStaticXTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Ieee8021QBridgeVlanStaticXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A table containing static configuration information for
+            each VLAN configured into the device by (local or network)
+            management.
+            All entries are permanent and are restored after the device
+            reset.
+            The table is similar to radBridgeDot1qVlanStaticTable, but
+            supports multiple bridges."
+    ::= { radBridgeGenCnfg 7 }
+
+ieee8021QBridgeVlanStaticXEntry OBJECT-TYPE
+    SYNTAX      Ieee8021QBridgeVlanStaticXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Static information for a VLAN configured into the
+            device by (local or network) management."
+    AUGMENTS    { ieee8021QBridgeVlanStaticEntry }
+    ::= { ieee8021QBridgeVlanStaticXTable 1 }
+
+Ieee8021QBridgeVlanStaticXEntry ::= SEQUENCE {
+    ieee8021QBridgeVlanStaticXSplitHorizon          INTEGER,
+    ieee8021QBridgeVlanStaticXRingMembers           OCTET STRING,
+    ieee8021QBridgeVlanStaticXMaxMacAddr            Unsigned32,
+    ieee8021QBridgeVlanStaticXTopology              BridgeTopology 
+ }
+
+ieee8021QBridgeVlanStaticXSplitHorizon OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable (1),
+    disable       (2),
+    enable        (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "When 'enable (3)', packets having this VLAN will
+         not be switched back to other bridge ports which are
+         members of this VLAN."
+    ::= { ieee8021QBridgeVlanStaticXEntry 3 }
+
+ieee8021QBridgeVlanStaticXRingMembers OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "A sixteen-octet(128 bit) pattern: This object indicates which Ring (ERP=Ethernet Ring Protection)
+     are members of this VLAN. For each BIT, the value means:
+                              '1' = Ring is member of this VLAN.
+                              '0' = Ring is NOT member of this VLAN.
+    Each bit rank is related to the erpIdx value. For example the second bit rank (bit-1)
+    represents the erpIdx=1.
+    if the first bit rank (bit-0) is set to '1', it means that there is no ERP that is a
+    member in this VLAN-ID (not applicable).
+    From teh second bit rank (bit-1) to the 128 rank (bit-127) each bit set to '1' means that the
+    erpIdx= bit-rank is a member of this VLAN-ID."
+    ::= { ieee8021QBridgeVlanStaticXEntry 4 }
+
+ieee8021QBridgeVlanStaticXMaxMacAddr OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object indicates the maximum number of MAC addresses
+            supported by this VLAN."
+    ::= { ieee8021QBridgeVlanStaticXEntry 8 }
+
+ieee8021QBridgeVlanStaticXTopology      OBJECT-TYPE
+    SYNTAX      BridgeTopology
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object indicates the bridge topology per VLAN.
+             The default is E-LAN (2)"
+    ::= { ieee8021QBridgeVlanStaticXEntry 9 }
+
+radBridgeStatus      OBJECT IDENTIFIER ::= {genBridge 10 }
+
+radBridgeInvBasePortTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgeInvBasePortEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An inversed table to dot1dBasePortTable 
+     from RFC1493 with reduced information.
+     This table index is known to the NMS and 
+     this way the needed information can be received
+     by just one Get command, instead of searching 
+     the entire dot1dBasePortTable (where it is an 
+     attribute). "
+    ::= { radBridgeStatus 1 }
+
+radBridgeInvBasePortEntry OBJECT-TYPE
+    SYNTAX  RadBridgeInvBasePortEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The bridge port number for each bridge port 
+     interface index."
+     INDEX  { radBridgeInvBasePortIfIndex }
+    ::= { radBridgeInvBasePortTable 1 }
+
+RadBridgeInvBasePortEntry ::=
+    SEQUENCE {
+    radBridgeInvBasePortIfIndex	Integer32,
+    radBridgeInvBasePort		Integer32
+              }
+
+radBridgeInvBasePortIfIndex OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The value of the instance of the ifIndex object,
+     defined in MIB-II, for the interface corresponding
+     to this Bridge port."
+    ::= { radBridgeInvBasePortEntry 1 }
+
+radBridgeInvBasePort OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The Bridge port number."
+    ::= { radBridgeInvBasePortEntry 2 }
+
+--Spanning Tree Protocol (STP)
+
+radBridgeStp OBJECT IDENTIFIER ::= {genBridge 11 }
+
+--Configuration Table
+
+radBridgeStpCnfgTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgeStpCnfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "STP Configuration table. STP=Spanning Tree Protocol.  
+     It includes STP configurable parameters that in BRIDGE-MIB 
+     are scalars, while we need them per card/bridge/interface
+	 and per different configurations."
+    ::= { radBridgeStp 1 }
+
+radBridgeStpCnfgEntry OBJECT-TYPE
+    SYNTAX  RadBridgeStpCnfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the radBridgeStpCnfgTable."
+     INDEX  {radBridgeStpCnfgIdx1, radBridgeStpCnfgIdx2}
+    ::= { radBridgeStpCnfgTable 1 }
+
+RadBridgeStpCnfgEntry ::=
+    SEQUENCE {
+    radBridgeStpCnfgIdx1         Integer32,
+    radBridgeStpCnfgIdx2         Integer32,
+	radBridgeStpCnfgForwardDelay Timeout,
+	radBridgeStpCnfgMaxAge       Timeout,
+	radBridgeStpCnfgHelloTime	 Timeout,
+	radBridgeStpCnfgPriority	 Integer32,
+	radBridgeStpCnfgStpVersion   INTEGER
+    }
+
+radBridgeStpCnfgIdx1 OBJECT-TYPE
+    SYNTAX  Integer32 (1..255)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Index of the Agent Configuration 
+     the following objects refer to.
+     For Agents that support more than one configuration:
+         255=Temporary Cnfg ; Set can be done only to this configuration.
+     For Agents that support only one configuration, this object will be  
+     constant=1."
+    ::= { radBridgeStpCnfgEntry 1 }
+
+radBridgeStpCnfgIdx2 OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "For Agents having the table objects per Card/Bridge/Interface
+     this will be the index of the Card/Bridge/Interface used."
+    ::= { radBridgeStpCnfgEntry 2 }
+
+radBridgeStpCnfgForwardDelay OBJECT-TYPE
+    SYNTAX  Timeout (400..3000)
+    MAX-ACCESS  read-write 
+    STATUS  current
+    DESCRIPTION
+    "The value that the bridge of radBridgeStpCnfgIdx2 uses for 
+     Forward Delay when this bridge is acting as the root.  Note that
+     the range for this parameter is related to the value of
+     radBridgeStpCnfgMaxAge (according to 802.1D-1990 for the similar
+     scalars of BRIDGE-MIB).  The granularity of this timer is specified 
+     by 802.1D-1990 to be 1 second.
+     An agent may return a badValue error if a set is attempted to a value 
+     which is not a whole number of seconds."
+    ::= { radBridgeStpCnfgEntry 3 }
+
+radBridgeStpCnfgMaxAge OBJECT-TYPE
+    SYNTAX  Timeout (600..4000)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "The value that the bridge of radBridgeStpCnfgIdx2 uses for 
+     MaxAge when this bridge is acting as the root.  Note that
+     the range for this	parameter is related to the value of
+     radBridgeStpCnfgHelloTime (according to 802.1D-1990 for the similar
+     scalars of BRIDGE-MIB). The granularity of this timer is specified 
+     by 802.1D-1990 to be 1 second.
+     An agent may return a badValue error if a set is attempted to a value 
+     which is not a whole number of seconds."
+    ::= { radBridgeStpCnfgEntry 4 }
+
+radBridgeStpCnfgHelloTime OBJECT-TYPE
+    SYNTAX  Timeout (100..1000)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "The value that the bridge of radBridgeStpCnfgIdx2 uses for 
+     Hello Time when this bridge is acting as the root. The	granularity 
+     of this timer is specified by 802.1D-1990 to be 1 second.  An agent 
+     may return a badValue error if a set is attempted to a value
+     which is not a whole number of seconds."
+    ::= { radBridgeStpCnfgEntry 5 }
+
+radBridgeStpCnfgPriority OBJECT-TYPE
+    SYNTAX  Integer32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "The value of the write-able portion of the Bridge ID, i.e., the first 
+     two octets of the (8 octet	long) Bridge ID, per radBridgeStpCnfgIdx2
+     instance."
+    ::= { radBridgeStpCnfgEntry 6 }
+
+radBridgeStpCnfgStpVersion OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     notApplicable (1),
+     stp           (2), 
+     rstp          (3)  
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object determines the STP version used:
+     stp  - usual Spanning Tree Protocol.
+     rstp - Rapid Spanning Tree Protocol."
+    ::= { radBridgeStpCnfgEntry 7 }
+
+--Status Table
+
+radBridgeStpStatTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgeStpStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "STP Status table. STP=Spanning Tree Protocol.
+     It includes STP status parameters that in BRIDGE-MIB 
+     are scalars, while we need them per card/bridge/interface.
+     For devices that have several configurations, this table is for Status
+     of the Active configuration."
+    ::= { radBridgeStp 2 }
+
+radBridgeStpStatEntry OBJECT-TYPE
+    SYNTAX  RadBridgeStpStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the radBridgeStpStatTable."
+     INDEX  {radBridgeStpStatIdx}
+    ::= { radBridgeStpStatTable 1 }
+
+RadBridgeStpStatEntry ::=
+    SEQUENCE {
+    radBridgeStpStatIdx            Integer32,
+	radBridgeStpStatForwardDelay   Timeout,
+	radBridgeStpStatMaxAge         Timeout,
+	radBridgeStpStatHelloTime	   Timeout,
+	radBridgeStpStatDesignatedRoot BridgeId,
+	radBridgeStpStatRootCost       Integer32
+    }
+
+radBridgeStpStatIdx OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "For Agents having the table objects per Card/Bridge/Interface
+     this will be the index of the Card/Bridge/Interface used."
+    ::= { radBridgeStpStatEntry 1 }
+
+radBridgeStpStatForwardDelay OBJECT-TYPE
+    SYNTAX  Timeout
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+    "This time value, measured in units of hundredths of a second, 
+     controls how fast a port changes its spanning state when moving 
+     towards the Forwarding	state.  The value determines how long the port
+     stays in each of the Listening and Learning states, which precede 
+     the Forwarding state.  This value is also used, when a topology 
+     change has	been detected and is underway, to age all dynamic
+     entries in the Forwarding Database.  [Note that this value is 
+     the one that this bridge is currently using, in contrast to
+     radBridgeStpCnfgForwardDelay which is the value that this bridge 
+     would start using if/when this bridge were to become the root.]"
+    ::= { radBridgeStpStatEntry 2 }
+
+radBridgeStpStatMaxAge OBJECT-TYPE
+    SYNTAX  Timeout
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The maximum age of Spanning Tree Protocol information learned 
+     from the network on any port before it is discarded, in units 
+     of hundredths of a second.  This is the actual value that this
+     bridge is currently using."
+    ::= { radBridgeStpStatEntry 3 }
+
+radBridgeStpStatHelloTime OBJECT-TYPE
+    SYNTAX  Timeout
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The amount of time between the transmission of	Configuration 
+     bridge PDUs by this node on any port when it is the root of 
+     the spanning tree or trying to become so, in units of hundredths 
+     of a second. This is the actual value that this bridge is
+     currently using."
+    ::= { radBridgeStpStatEntry 4 }
+
+radBridgeStpStatDesignatedRoot OBJECT-TYPE
+    SYNTAX  BridgeId
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The bridge identifier of the root of the spanning tree as determined 
+     by the Spanning Tree Protocol as executed by this node.  This value 
+     is used as	the Root Identifier parameter in all Configuration
+     Bridge PDUs originated by this node."
+    ::= { radBridgeStpStatEntry 5 }
+
+radBridgeStpStatRootCost OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The cost of the path to the root as seen from this bridge."
+    ::= { radBridgeStpStatEntry 6 }
+
+ieee8021MstpXTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF Ieee8021MstpXEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "ieee8021MstpXTable augments ieee8021MstpTable.
+     It is used for mapping VLANs to MST instances.."
+    ::= { radBridgeStp 3 }
+
+ieee8021MstpXEntry OBJECT-TYPE
+    SYNTAX  Ieee8021MstpXEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the ieee8021MstpXTable."
+    AUGMENTS   { ieee8021MstpEntry }
+    ::= { ieee8021MstpXTable 1 }
+
+Ieee8021MstpXEntry ::= SEQUENCE {
+    ieee8021MstpXVids0          OCTET STRING,
+    ieee8021MstpXVids1          OCTET STRING,
+    ieee8021MstpXVids2          OCTET STRING,
+    ieee8021MstpXVids3          OCTET STRING 
+ }
+
+ieee8021MstpXVids0 OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(128))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object contains the first 1024 bits of the 4096 bit vector
+         indicating which VIDs are assigned to this MSTID.  This is a read-writable
+         object corresponding to ieee8021MstpVids0."
+    ::= { ieee8021MstpXEntry 1 }
+
+ieee8021MstpXVids1 OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(128))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object contains the first 1024 bits of the 4096 bit vector
+         indicating which VIDs are assigned to this MSTID.  This is a read-writable
+         object corresponding to ieee8021MstpVids0."
+    ::= { ieee8021MstpXEntry 2 }
+
+ieee8021MstpXVids2 OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(128))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object contains the third 1024 bits of the 4096 bit vector
+         indicating which VIDs are assigned to this MSTID.  This is a read-writable
+         object corresponding to ieee8021MstpVids2"
+    ::= { ieee8021MstpXEntry 3 }
+
+ieee8021MstpXVids3 OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(128))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object contains the fourth 1024 bits of the 4096 bit vector
+         indicating which VIDs are assigned to this MSTID.  This is a read-writable
+         object corresponding to ieee8021MstpVids3"
+    ::= { ieee8021MstpXEntry 4 }
+
+
+radBridgeForwardingMode OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     notApplicable (1),
+     transparent   (2),
+     filter        (3),
+     filterTagged  (4),
+     transparentTagged  (5)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object determines the Bridge Forwarding Mode:
+     transparent  - Forward all frames received (not dependent on VLAN).
+     filter - Filter frames received according to MAC Address.
+     filterTagged = Filter frames received according to VLAN.
+     transparentTagged = VLAN aware + Transparent."
+    ::= { genBridge 12 }
+
+
+radBridgePort      OBJECT IDENTIFIER ::= { genBridge 13 }
+
+
+ieee8021BridgeBaseXTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Ieee8021BridgeBaseXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "A RAD-defined list of objects containing information for
+            each bridge. This table augments ieee8021BridgeBaseTable."
+    ::= { genBridge 14 }
+
+ieee8021BridgeBaseXEntry OBJECT-TYPE
+    SYNTAX      Ieee8021BridgeBaseXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This is indexed by ieee8021BridgeBaseComponentId."
+    AUGMENTS    { ieee8021BridgeBaseEntry }
+    ::= { ieee8021BridgeBaseXTable 1 }
+
+Ieee8021BridgeBaseXEntry ::= SEQUENCE {
+    ieee8021BridgeBaseXForwardingMode    INTEGER,
+    ieee8021BridgeBaseXName  SnmpAdminString 
+ }
+
+ieee8021BridgeBaseXForwardingMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable       (1),
+        transparent         (2),
+        filter              (3),
+        filterTagged        (4),
+        transparentTagged   (5)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object is similar with radBridgeForwardingMode.
+            It determines the Bridge Forwarding Mode:
+            transparent  - Forward all frames received (not dependent on VLAN).
+            filter - Filter frames received according to MAC Address.
+            filterTagged - Filter frames received according to VLAN.
+            transparentTagged - VLAN aware + Transparent."
+    ::= { ieee8021BridgeBaseXEntry 1 }
+
+    ieee8021BridgeBaseXName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE(1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object indicates the Bridge's Name."
+    ::= { ieee8021BridgeBaseXEntry 2 }
+
+
+invieee8021QBridgeVlanCurrentTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF Invieee8021QBridgeVlanCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A Reverese table of ieee8021QBridgeVlanCurrentTable."
+    ::= { genBridge 15 }
+
+invieee8021QBridgeVlanCurrentEntry OBJECT-TYPE
+    SYNTAX      Invieee8021QBridgeVlanCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Information for an FDB ID configured into the device."
+    INDEX   { invieee8021QBridgeVlanCurrentComponentId,
+              invieee8021QBridgeVlanFdbId,
+              invieee8021QBridgeVlanTimeMark}
+    ::= { invieee8021QBridgeVlanCurrentTable 1 }
+
+Invieee8021QBridgeVlanCurrentEntry ::= SEQUENCE {
+    invieee8021QBridgeVlanCurrentComponentId             IEEE8021PbbComponentIdentifier,
+    invieee8021QBridgeVlanFdbId             Unsigned32,
+    invieee8021QBridgeVlanTimeMark             TimeFilter,
+    invieee8021QBridgeVlanIndex             IEEE8021VlanIndex 
+ }
+invieee8021QBridgeVlanCurrentComponentId OBJECT-TYPE
+    SYNTAX      IEEE8021PbbComponentIdentifier
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The component identifier is used to distinguish between the
+        multiple virtual bridge instances within a PBB.  In simple
+        situations where there is only a single component the default
+        value is 1."
+    ::= { invieee8021QBridgeVlanCurrentEntry 1 }
+
+invieee8021QBridgeVlanFdbId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Filtering Database used by this VLAN.  This is one
+        of the ieee8021QBridgeFdbId values in the ieee8021QBridgeFdbTable.
+        This value is allocated automatically by the device whenever
+        the VLAN is created: either dynamically by MVRP, or by
+        management, in ieee8021QBridgeVlanStaticTable.  Allocation of this
+        value follows the learning constraints defined for this
+        VLAN in ieee8021QBridgeLearningConstraintsTable."
+    ::= { invieee8021QBridgeVlanCurrentEntry 2 }
+
+invieee8021QBridgeVlanTimeMark OBJECT-TYPE
+    SYNTAX      TimeFilter
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A TimeFilter for this entry.  See the TimeFilter
+        textual convention to see how this works."
+    ::= { invieee8021QBridgeVlanCurrentEntry 3 }
+
+
+invieee8021QBridgeVlanIndex OBJECT-TYPE
+    SYNTAX      IEEE8021VlanIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The VLAN-ID or other identifier referring to this VLAN."
+    ::= { invieee8021QBridgeVlanCurrentEntry 4 }
+
+
+
+radBridgePortCnfgTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF RadBridgePortCnfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The Bridge Port Configuration Table."
+    ::= { radBridgePort 1 }
+
+radBridgePortCnfgEntry OBJECT-TYPE
+    SYNTAX  RadBridgePortCnfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  { radBridgePortCnfgIdx, radBridgePortCnfgPrtIdx }
+    ::= { radBridgePortCnfgTable 1 }
+
+RadBridgePortCnfgEntry ::= SEQUENCE {
+    radBridgePortCnfgIdx                Integer32,
+    radBridgePortCnfgPrtIdx             Integer32,
+	radBridgePortCnfgMaxMacAddr			Integer32,
+	radBridgePortCnfgMngFlow			INTEGER,
+	radBridgePortCnfgMcastMode			INTEGER,
+	radBridgePortCnfgDefaultVpi			Integer32,
+	radBridgePortCnfgDefaultVci		   	Integer32,
+    radBridgePortCnfgStatVlanId         Integer32,
+	radBridgePortCnfgIngressMtu  		Integer32,
+    radBridgePortCnfgEgressMtu          Integer32,
+	radBridgePortCnfgDot1x    		    INTEGER,	    -- Not in use. Moved to ethIftable
+	radBridgePortCnfgMappingProfile		Integer32
+ }
+
+radBridgePortCnfgIdx OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The first index of the table.
+     It can serve for Configuration index, Bridge index or other."
+    ::= { radBridgePortCnfgEntry 1 }
+
+radBridgePortCnfgPrtIdx OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the Bridge Port index."
+    ::= { radBridgePortCnfgEntry 2 }
+
+radBridgePortCnfgMaxMacAddr OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the maximum number of total MAC Addresses
+	 (static and learned) supported by this Bridge Port."
+    ::= { radBridgePortCnfgEntry 3 }
+
+radBridgePortCnfgMngFlow OBJECT-TYPE    
+    SYNTAX  INTEGER {
+		disable  (2),
+		enable   (3) 
+            }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object indicates whether this Bridge Port
+     is dedicated for management flow."
+    ::= { radBridgePortCnfgEntry 4 }
+
+radBridgePortCnfgMcastMode OBJECT-TYPE    
+    SYNTAX  INTEGER {
+		flooding	(1),
+		forwarding	(2) 
+            }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object indicates this Bridge Port's Multicast Mode:
+     flooding	(1) - flood multicast MAC addresses
+	 forwarding	(2) - forward multicast MAC addresses to the subnet indicated."
+    ::= { radBridgePortCnfgEntry 5 }
+
+radBridgePortCnfgDefaultVpi OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the VPI of this Bridge Port's Default VCL.
+     An incoming frame with priority that is not assigned to any VCL
+     will be transferred to the Default VCL."
+    ::= { radBridgePortCnfgEntry 6 }
+
+radBridgePortCnfgDefaultVci OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the VCI of this Bridge Port's Default VCL.
+     An incoming frame with priority that is not assigned to any VCL
+     will be transferred to the Default VCL."
+    ::= { radBridgePortCnfgEntry 7 }
+
+radBridgePortCnfgStatVlanId OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the selected VlanId of the bridge port
+    on which statistics are being collected.
+    0=no Statistics collected for VLAN on this bridge port."
+    ::= { radBridgePortCnfgEntry 8 }
+
+radBridgePortCnfgIngressMtu  OBJECT-TYPE
+    SYNTAX     	Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The size of the largest packet which can be received
+     on the interface, specified in octets."
+    ::= { radBridgePortCnfgEntry 9 }
+
+
+radBridgePortCnfgEgressMtu   OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The size of the largest packet which can be sent
+     on the interface, specified in octets."
+    ::= { radBridgePortCnfgEntry 10 }
+
+
+radBridgePortCnfgDot1x       OBJECT-TYPE
+    SYNTAX      INTEGER
+	{
+	  disabled (2),
+	  enabled  (3)
+	}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This feature is currently supported via the variable ethIfTable.ethDot1xEnable.
+    Determnines if the Port-Based Network Access Protocol
+    (IEEE-802.1x)is enabled for the bridge Port."
+    ::= { radBridgePortCnfgEntry 11 }
+
+radBridgePortCnfgMappingProfile   OBJECT-TYPE
+    SYNTAX       Integer32
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+	"This attribute defines the Queue Mapping Profile ID(cosProfileTable) assigned 
+	 to this Bridge Port."
+     ::= { radBridgePortCnfgEntry 12 }
+
+
+radDot1qPortVlanTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadDot1qPortVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table containing control and status
+     information for VLAN configuration per port."
+    ::= { radBridgeGenCnfg 3 }
+
+radDot1qPortVlanEntry OBJECT-TYPE
+    SYNTAX      RadDot1qPortVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Information controlling VLAN configuration for a port.  
+    This is indexed by dot1dBasePort."
+    AUGMENTS { dot1dBasePortEntry }
+    ::= { radDot1qPortVlanTable 1 }
+
+RadDot1qPortVlanEntry ::=
+    SEQUENCE {
+        radDot1qPortStacking
+            INTEGER,
+        radDot1qPortCopyOriginVlanPriority
+            INTEGER,
+		radDot1qPortDefaultVlanPriority
+            Integer32,
+		radDot1qPortTagStripping
+            INTEGER,
+		radDot1qPortEgressTagHandling
+		    INTEGER,
+		radDot1qPortIngressTagHandling
+		    INTEGER,
+		radDot1qPortReplaceVlanPriority
+		    INTEGER,
+		radDot1qPortVlanEthType
+		    Unsigned32,
+		radDot1qPortVlanCnodeLevel1Agent
+			INTEGER
+    }
+
+radDot1qPortStacking OBJECT-TYPE
+SYNTAX  INTEGER
+	{
+       notApplicable (1),
+       unmodify  	 (2),
+       tag        	 (3),
+	   stack		 (4)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the port stacking operation:
+    unmodify  	 (2) = Do not add Tag.
+    tag        	 (3) = Add Tag to Untagged Frames.
+    stack		 (4) = Add Tag to all Frames."
+    ::= { radDot1qPortVlanEntry 1 }
+
+radDot1qPortCopyOriginVlanPriority OBJECT-TYPE
+SYNTAX  INTEGER
+	{
+       notApplicable (1),
+       no       	 (2),
+       yes        	 (3) 
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates whether use the original VLAN Priority of the frame, 
+    as the priority of the VLAN added by this port."
+    ::= { radDot1qPortVlanEntry 2 }
+
+radDot1qPortDefaultVlanPriority OBJECT-TYPE
+     SYNTAX  Integer32 
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+     "Default VLAN Frame priority of the VLAN added by this port."
+    ::= { radDot1qPortVlanEntry 3 }
+
+radDot1qPortTagStripping OBJECT-TYPE
+SYNTAX  INTEGER
+	{
+       notApplicable (1),
+       no       	 (2),
+       yes        	 (3) 
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates whether remove a tag from the frame on this port,
+     frame with double tag will remain with one tag and frame with 
+     one tag will remain untagged."
+    ::= { radDot1qPortVlanEntry 4 }
+
+radDot1qPortEgressTagHandling OBJECT-TYPE
+SYNTAX  INTEGER
+	{
+       none       	 (2),
+       stacking   	 (3),
+       stripping     (4) 
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates how is the Egress VLAN Tag processed.
+     It is mainly for use with Double Tagging."
+    ::= { radDot1qPortVlanEntry 5 }
+
+radDot1qPortIngressTagHandling OBJECT-TYPE
+SYNTAX  INTEGER
+	{
+       none       	 (2),
+       stacking   	 (3),
+       stripping     (4) 
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates how is the Ingress VLAN Tag processed.
+     It is mainly for use with Double Tagging."
+    ::= { radDot1qPortVlanEntry 6 }
+
+radDot1qPortReplaceVlanPriority OBJECT-TYPE
+	SYNTAX  INTEGER
+	{
+       notApplicable (1),
+       no       	 (2),
+       yes        	 (3) 
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates whether for each received tagged frame on this Bridge Port -
+     VLAN Priority will be replaced by another Priority.
+	 no(2)  = no repacement
+	 yes(3) = VLAN Priority will be replaced
+
+     For Egate-100:
+     When value is 'yes', the original Priority is replaced by the Default Priority."
+    ::= { radDot1qPortVlanEntry 7 }
+
+radDot1qPortVlanEthType OBJECT-TYPE
+	SYNTAX  Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Ethernet Type. 
+	 For some devices, it is applicable only when radDot1qPortStacking = stack."
+    ::= { radDot1qPortVlanEntry 8 }
+
+radDot1qPortVlanCnodeLevel1Agent	 OBJECT-TYPE
+ 	SYNTAX	INTEGER
+ 	{
+ 	   disable (2),
+ 	   enable  (3)
+ 	}
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+     "Specify if a Level 1 cNode agent is enabled or not for the bridge port."
+     ::= { radDot1qPortVlanEntry 9 }
+
+
+radBridgeGenCfgTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadBridgeGenCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table containing Bridge configuration parameters."
+    ::= {  radBridgeGenCnfg 4 }
+
+radBridgeGenCfgEntry  OBJECT-TYPE
+    SYNTAX      RadBridgeGenCfgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Describes an entry in the radBridgeGenCfgTable."
+    INDEX   { radBridgeGenCfgIdx, radBridgeGenCfgIdx2 }
+    ::= { radBridgeGenCfgTable 1 }
+
+RadBridgeGenCfgEntry ::= SEQUENCE {
+    radBridgeGenCfgIdx                      Integer32,
+    radBridgeGenCfgIdx2                     Integer32,
+    radBridgeGenCfgBridgeAction             INTEGER,
+    radBridgeAgingTimeSec                   INTEGER,
+    radBridgeMngVlanId                      Unsigned32,
+    radBridgeLoopDetectVlanId               Unsigned32,
+    radBridgeSplitHorizon                   INTEGER,
+    radBridgeEthType                        Unsigned32,
+    radBridgeTopology                       BridgeTopology 
+ }
+
+radBridgeGenCfgIdx OBJECT-TYPE
+    SYNTAX  Integer32 (1..255)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Idx of the
+     Agent Cnfg the following objects refer.
+     255=Temporary Cnfg.
+     For Agents that support only one Configuration,
+     this object will be  constant=1. "
+    ::= { radBridgeGenCfgEntry 1 }
+
+radBridgeGenCfgIdx2 OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "For Agents having more than one bridge,
+     this index may be used as bridge index "
+    ::= { radBridgeGenCfgEntry 2 }
+
+radBridgeGenCfgBridgeAction OBJECT-TYPE
+    SYNTAX  INTEGER {
+       deleteLanTab(7),
+       noOp(255)
+     }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This variable enables the operator to perform one of the
+    specified actions on the tables maintained by the Bridge.
+    After performing the action, Agent will automatically
+    Set the value of this variable to noOp(255)."
+    ::= { radBridgeGenCfgEntry 3 }
+
+radBridgeAgingTimeSec OBJECT-TYPE
+     SYNTAX   INTEGER (10..1000000)
+     MAX-ACCESS   read-write
+     STATUS   current
+     DESCRIPTION
+     "This variable duplicates scalar object
+     dot1dTpAgingTimeThe of BRIDGE-MIB with configuration index
+     and Bridge index.
+
+     It defines the timeout period in seconds for aging out
+     dynamically learned forwarding information.
+     802.1D-1990 recommends a default of 300 seconds."
+     REFERENCE
+     "IEEE 802.1D-1990: Section 6.7.1.1.3"
+   ::= { radBridgeGenCfgEntry 4 }
+
+radBridgeMngVlanId OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+     "This variable indicates the VLAN ID
+      used for remote management traffic.
+      0 = Not Applicable."
+   ::= { radBridgeGenCfgEntry 5 }
+
+radBridgeLoopDetectVlanId OBJECT-TYPE
+     SYNTAX         Unsigned32
+     MAX-ACCESS     read-write
+     STATUS         current
+     DESCRIPTION
+     "This variable indicates the VLAN ID used for Loop Detection packets.
+      Valid values:
+      1 - 4095: VLAN ID
+      0 - Means that the Loop Detection is Disabled."
+   ::= { radBridgeGenCfgEntry 6 }
+
+radBridgeSplitHorizon OBJECT-TYPE
+    SYNTAX  INTEGER {
+       notApplicable (1),
+       disable       (2),
+       enabled       (3),
+       vlanBased     (4)
+            }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object configure 'split horizon' switching between bridge Ports.
+      - disable - normal (VLAN aware) bridge behavior.
+      - enable - all packets, regardless their VLAN, coming from user side
+        are blocked from being switched back to other user side bridge ports.
+      - vlanBased  - split horizon behavior is applicable only for specific VLANs,
+        according to radBridgeDot1qVlanSplitHorizon."
+   ::= { radBridgeGenCfgEntry 7 }
+
+radBridgeEthType     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "Value of Ethertype field in Ethernet frame.
+     This field indicates which protocol is being transported
+     in an ethernet frame."
+   ::= { radBridgeGenCfgEntry 8 }
+
+radBridgeTopology OBJECT-TYPE
+    SYNTAX  BridgeTopology
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the topology type of the Bridge.
+    The default is E-LAN (2)"
+    ::= { radBridgeGenCfgEntry 9 }
+
+radBridgeAgingTime OBJECT-TYPE
+    SYNTAX  INTEGER {
+       notApplicable (1),
+       infinite(2),
+       finite  (3)
+            }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"This variable defines whether the Aging Time will be finite or infinite.
+	 When selecting the finite (3) value, the exact time will be determined 
+	 by another variable of the standard MIB (ex. 1493.dot1dTpAgingTime).
+	 or by radBridgeAgingTime below."
+   ::= { radBridgeGenCnfg 5 }
+
+
+radBridgeMngFlow OBJECT-TYPE
+    SYNTAX  INTEGER {
+		disable  (2),
+		enable   (3) 
+            }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+	"This variable defines whether the Management Flow is passed
+	 through the bridge (enable) or not (disable)."
+   ::= { radBridgeGenCnfg 6 }
+
+
+-- radBridgePortVlanTable
+
+radBridgePortVlanTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RadBridgePortVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A table containing Bridge configuration parameters
+     of the management traffic."
+    ::= {  radBridgeGenCnfg 9 }
+
+radBridgePortVlanEntry  OBJECT-TYPE
+    SYNTAX      RadBridgePortVlanEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Describes an entry in the radBridgePortVlanTable."
+    INDEX   { radBridgePortVlanBridgeIdx , radBridgePortVlanIdx, radBridgePortVlanPrtIdx }
+    ::= { radBridgePortVlanTable 1 }
+
+RadBridgePortVlanEntry ::= SEQUENCE {
+    radBridgePortVlanBridgeIdx          IEEE8021PbbComponentIdentifier,
+    radBridgePortVlanIdx                IEEE8021VlanIndex,
+    radBridgePortVlanPrtIdx             IEEE8021BridgePortNumber,
+    radBridgePortVlanRowStatus          RowStatus,
+    radBridgePortVlanIsRoot             INTEGER 
+ }
+
+radBridgePortVlanBridgeIdx   OBJECT-TYPE
+    SYNTAX      IEEE8021PbbComponentIdentifier
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the Idx of the bridge."
+    ::= { radBridgePortVlanEntry 1 }
+
+radBridgePortVlanIdx     OBJECT-TYPE
+    SYNTAX      IEEE8021VlanIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "- For VLAN Aware :
+     This object indicates the VLAN ID number.
+     - For VLAN Unaware:
+     This object is not applicable and the value shall be 0xFFFFFFFF = Not Applicable."
+    ::= { radBridgePortVlanEntry 2 }
+
+radBridgePortVlanPrtIdx   OBJECT-TYPE
+    SYNTAX      IEEE8021BridgePortNumber
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the bridge port Idx."
+    ::= { radBridgePortVlanEntry 3 }
+
+radBridgePortVlanRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of entries
+     in the radBridgePortVlanTable.
+     Leaf nodes of E-TREE topology will not be registered
+     in this table (see object radBridgePortVlanIsRoot)."
+    ::= { radBridgePortVlanEntry 4 }
+
+radBridgePortVlanIsRoot   OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+       yes       (2),
+       no        (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object indicates if the node is Root port
+     or Leaf port.
+     By default:
+      - for E-LAN topology all nodes are root.
+      - for E-TREE topology all nodes that are leaves will
+        not be registered.
+     "
+    ::= { radBridgePortVlanEntry 5 }
+
+bridgeMacSearchTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF BridgeMacSearchEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Table that allow to find specific MAC address in a bridge
+     its allow to search:
+     - specific Mac address in a bridge
+     - Mac addresses on a VLAN
+     - Mac addresses on a port."
+    ::= { radBridgeStatus 2 }
+
+bridgeMacSearchEntry OBJECT-TYPE
+    SYNTAX  BridgeMacSearchEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Entries define list of MAC and VLAN per bridge."
+     INDEX  { bridgeMacSearchIdx }
+    ::= { bridgeMacSearchTable 1 }
+
+BridgeMacSearchEntry ::= SEQUENCE {
+    bridgeMacSearchIdx               Unsigned32,
+    bridgeMacSearchBridgeComponentId   Unsigned32,
+    bridgeMacSearchAddress             MacAddress,
+    bridgeMacSearchVlan                Unsigned32,
+    bridgeMacSearchPort                Unsigned32,
+    bridgeMacSearchCmdStatus           INTEGER 
+ }
+
+bridgeMacSearchIdx       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Value is always equal to 1."
+    ::= { bridgeMacSearchEntry 1 }
+
+bridgeMacSearchBridgeComponentId       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The Mac address to search in a specific bridge."
+    ::= { bridgeMacSearchEntry 2 }
+
+bridgeMacSearchAddress       OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The Mac address to search in a specific bridge."
+    ::= { bridgeMacSearchEntry 3 }
+
+bridgeMacSearchVlan       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The object is used to search all the MAC addresses in a specific VLAN."
+    ::= { bridgeMacSearchEntry 4 }
+
+bridgeMacSearchPort       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The object is used to search all the MAC addresses in a specific port."
+    ::= { bridgeMacSearchEntry 5 }
+
+bridgeMacSearchCmdStatus        OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+       notApplicable     (1),
+       startSearch       (2),
+       macSearching      (3),
+       macFound          (4),
+       macNoFound        (5),
+       failed            (6)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The status of the search process:
+    notApplicable - used as default value
+    startSearch   - initiate search process
+    macSearching  - search is in process
+    macFound      - the search was end with a result
+    macNoFound    - the search was end without a result
+    failed        - there was a failed in the process ."
+    ::= { bridgeMacSearchEntry 6 }
+
+
+bridgeMacResultTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF BridgeMacResultEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "The table holds the result of the searching MAC addresses
+     initiated in table bridgeMacTable."
+    ::= { radBridgeStatus 3 }
+
+bridgeMacResultEntry OBJECT-TYPE
+    SYNTAX  BridgeMacResultEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Describes an entry in the bridgeMacResultTable."
+     INDEX  { bridgeMacResultBridgeIdx, bridgeMacResultVlan , bridgeMacResultMacAddress }
+    ::= { bridgeMacResultTable 1 }
+
+BridgeMacResultEntry ::= SEQUENCE {
+    bridgeMacResultBridgeIdx    Unsigned32,
+    bridgeMacResultVlan         Unsigned32,
+    bridgeMacResultMacAddress   MacAddress,
+    bridgeMacResultPort         Unsigned32,
+    bridgeMacResultCmdStatus    INTEGER 
+ }
+
+bridgeMacResultBridgeIdx       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The bridge index."
+    ::= { bridgeMacResultEntry 1 }
+
+bridgeMacResultVlan       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Mac address on a VLAN that was searched."
+    ::= { bridgeMacResultEntry 2 }
+
+bridgeMacResultMacAddress       OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Mac address that was searched."
+    ::= { bridgeMacResultEntry 3 }
+
+
+bridgeMacResultPort       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Mac address on a port that was searched."
+    ::= { bridgeMacResultEntry 4 }
+
+bridgeMacResultCmdStatus        OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    other(1),
+                    invalid(2),
+                    learned(3),
+                    self(4),
+                    mgmt(5)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The type of the Mac address, see ieee8021QBridgeTpFdbStatus for details."
+    ::= { bridgeMacResultEntry 5 }
+
+
+    END

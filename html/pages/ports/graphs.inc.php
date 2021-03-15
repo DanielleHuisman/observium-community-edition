@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -15,7 +14,7 @@
 
 foreach ($ports as $port)
 {
-#  if (is_integer($row/2)) { $row_colour = $list_colour_a; } else { $row_colour = $list_colour_b; }
+#  if (is_integer($row/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
 
   $speed = humanspeed($port['ifSpeed']);
   $type  = rewrite_iftype($port['ifType']);

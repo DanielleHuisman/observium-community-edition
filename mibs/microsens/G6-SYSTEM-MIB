@@ -9,7 +9,7 @@ IMPORTS
 	;
 
 device MODULE-IDENTITY --Category
-	LAST-UPDATED "201505221059Z"
+	LAST-UPDATED "201802121619Z"
 	ORGANIZATION "MICROSENS GmbH & Co. KG"
 	CONTACT-INFO
 		"Kueferstrasse 16
@@ -20,7 +20,7 @@ device MODULE-IDENTITY --Category
 	DESCRIPTION
 		"Microsens private MIB for Generation 6 Ethernet Switches"
 
-	REVISION "201505221059Z"
+	REVISION "201802121619Z"
 	DESCRIPTION
 		"File creation"
 	::= { g6 1 }
@@ -100,7 +100,7 @@ systemAlternativeMacAddress OBJECT-TYPE   -- alternative_mac_address
 	MAX-ACCESS read-write
 	STATUS current
 	DESCRIPTION
-	"This field is usually empty. This field may be used to override the MAC address fixed in the factory setting. NOTE: This value is read only after a reset!"
+	"This field is usually empty. This field may be used to override the MAC address fixed in the factory setting. NOTE: This value is only activated after a reset!"
 	::= { system 8 }
 
 
@@ -124,7 +124,7 @@ systemInventory OBJECT-TYPE   -- inventory
 	MAX-ACCESS read-write
 	STATUS current
 	DESCRIPTION
-	"Inventory string free for customer use. Up to 512 character are accepted. Note this config is linked to the SD card and may change when config or SD card is exchanged. For an inventory that is fixed to the hardware use device.system.set_factory_inventory command."
+	"Inventory string free for customer use. Up to 512 character are accepted. Note this config is linked to the SD card and may change when config or SD card is exchanged. For an inventory information that is fixed to the hardware use Device.Factory.custom_info command."
 	::= { system 10 }
 
 
@@ -137,12 +137,19 @@ systemAutorunCliScript OBJECT-TYPE   -- autorun_cli_script
 	::= { system 11 }
 
 
-systemLocalConsole OBJECT-TYPE   -- local_console
-	SYNTAX INTEGER {  disabled(0), enabled(1) }
+systemSerialPort OBJECT-TYPE   -- serial_port
+	SYNTAX INTEGER 
+		{
+		disabled (0),
+		console (1),
+		appControlled (2),
+		terminalServer (3),
+		smartSensor (4)
+		}
 	MAX-ACCESS read-write
 	STATUS current
 	DESCRIPTION
-	"When set to disabled the local serial console port is disabled. Local access via serial cable is blocked. While this enhances local protection it also closes the emergency access should the device become inaccessible over the network due to misconfiguration. The port is also set to disabled, when serial port extension hardware is installed."
+	"When set to DISABLED the local serial console port is disabled. Local access via serial cable is blocked. While this enhances local protection it also closes the emergency access should the device become inaccessible over the network due to misconfiguration. Other setting permit use of the serial port as TERMINAL_SERVER to attach a foreign device for management or to SMART_SENSOR to attach a local hardware extension for use with smart office solutions. "
 	::= { system 12 }
 
 
@@ -151,7 +158,7 @@ systemPermitDebugAccess OBJECT-TYPE   -- permit_debug_access
 	MAX-ACCESS read-write
 	STATUS current
 	DESCRIPTION
-	"When enabled it is possible to log into the system for debug purposes. This includes telnet/ssh, as well as web and file transfer protocols. To protect the system from unauthorized access it is strongly advised to disable this feature unless instructed by authorized service personnel. NOTE: To ensure that any possibly pending debug access is terminated reboot the device after setting this parameter to disabled."
+	"When enabled it is possible to log into the system for debug purposes. This includes telnet/ssh, as well as web and file transfer protocols. To protect the system from unauthorized access it is advised to disable this feature unless instructed by authorized service personnel. NOTE: To ensure that any possibly pending debug access is terminated reboot the device after setting this parameter to disabled."
 	::= { system 13 }
 
 
@@ -164,6 +171,32 @@ systemPermitIncomingAlerts OBJECT-TYPE   -- permit_incoming_alerts
 	::= { system 14 }
 
 
+systemCharacterSet OBJECT-TYPE   -- character_set
+	SYNTAX INTEGER 
+		{
+		iso88591 (1),
+		iso88595 (5)
+		}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+	"This parameter can be set to support languages with characters not found the normal Western European character set. Be sure to set your CLI terminal to the matching setting."
+	::= { system 15 }
+
+
+systemConfigurationSaveMode OBJECT-TYPE   -- configuration_save_mode
+	SYNTAX INTEGER 
+		{
+		permanently (0),
+		temporarily (1)
+		}
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+	"In most cases the configuration of the device should be permanently saved and automatically be applied after a power up. In some cases, however, where public acces to the device is granted it can be desireable to only save changes temporarily. In this mode all configuration changes that occured after setting this mode will be saved in RAM only and will be forgotten on the next system reboot. Important: When this parameter changed to PERMANENTLY all outstanding changes are commited to SD card immediately. When this parameter is changed to temporarily, this already is not saved permanently. Use Management.Files.configuration.commit_config to save this setting before proceeding."
+	::= { system 16 }
+
+
 -- ******************* Begin of scriptScheduleTable *************************
 
 scriptScheduleTable	OBJECT-TYPE
@@ -172,7 +205,7 @@ scriptScheduleTable	OBJECT-TYPE
 	STATUS current
 	DESCRIPTION
 		"This dynamic table permits the setup of automated script execution based on precise time scheduling definition. Any number of scripts may be executed at any desired interval or at selected dates. Please ensure the time and date are properly set (via NTP) when using this feature."
-	::= { system 15 }
+	::= { system 17 }
 
 scriptScheduleEntry	OBJECT-TYPE
 	SYNTAX ScriptScheduleEntry
@@ -431,6 +464,7 @@ saveInfoEntry	OBJECT-TYPE
 	SaveInfoEntry ::= SEQUENCE {
 	saveInfoIndex INTEGER,
 	saveInfoLastSavedParameter DisplayString,
+	saveInfoSaveMode INTEGER ,
 	saveInfoWriteStatus INTEGER ,
 	saveInfoTimeStamp Counter32
 	}
@@ -451,6 +485,18 @@ saveInfoLastSavedParameter OBJECT-TYPE   -- last_saved_parameter
 	"Records the last written parameter."
 	::= { saveInfoEntry 2 }
 
+saveInfoSaveMode OBJECT-TYPE   -- save_mode
+	SYNTAX INTEGER 
+		{
+		permanently (0),
+		temporarily (1)
+		}
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+	"Reflects Device.system.configuration_save_mode setting."
+	::= { saveInfoEntry 3 }
+
 saveInfoWriteStatus OBJECT-TYPE   -- write_status
 	SYNTAX INTEGER 
 		{
@@ -462,8 +508,8 @@ saveInfoWriteStatus OBJECT-TYPE   -- write_status
 	MAX-ACCESS read-only
 	STATUS current
 	DESCRIPTION
-	"Indicates if writing was succcessful."
-	::= { saveInfoEntry 3 }
+	"Indicates if last parameter was written to SD card or temporary RAM."
+	::= { saveInfoEntry 4 }
 
 saveInfoTimeStamp OBJECT-TYPE   -- time_stamp
 	SYNTAX Counter32
@@ -471,7 +517,7 @@ saveInfoTimeStamp OBJECT-TYPE   -- time_stamp
 	STATUS current
 	DESCRIPTION
 	"Records the time the write status was last changed."
-	::= { saveInfoEntry 4 }
+	::= { saveInfoEntry 5 }
 
 
 -- ********************* End of saveInfoTable ***********************

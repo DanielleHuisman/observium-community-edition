@@ -1,0 +1,585 @@
+-- *****************************************************************
+-- MY-SMP-MIB.mib:  My SMP MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+MY-SMP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        IpAddress
+                FROM SNMPv2-SMI
+        RowStatus,
+        DisplayString,
+        MacAddress,
+        TruthValue
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        IfIndex,
+        ConfigStatus
+                FROM MY-TC
+        ifIndex        
+                FROM IF-MIB
+        myMgmt
+                FROM MY-SMI
+        Community
+        				FROM MY-SNMP-AGENT-MIB
+        VlanId
+                FROM Q-BRIDGE-MIB;        				
+
+mySMPMIB MODULE-IDENTITY
+        LAST-UPDATED "200409090000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "本模块定义了安全方案所需的MIB,目前该MIB只能被指定
+                的SMP Server访问"
+        REVISION      "200409090000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 39}
+
+mySMPMIBObjects OBJECT IDENTIFIER ::= { mySMPMIB 1 }
+
+--
+--  user management
+--
+
+mySMPServer OBJECT-TYPE
+		SYNTAX IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "SMP服务器的IP地址信息"
+    ::= { mySMPMIBObjects 1 }
+    
+mySMPServerKey OBJECT-TYPE
+		SYNTAX Community
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "为SMP服务器配置的密码信息"
+    ::= { mySMPMIBObjects 2 }    
+    
+mySMPEventSendSlice OBJECT-TYPE
+		SYNTAX Unsigned32 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "允许接收SU安全事件的最小时间间隔,该变量值必须小于
+            mySMPHICheckInterval定义的时间间隔"
+    ::= { mySMPMIBObjects 3 }    
+    
+mySMPPolicyDelete OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-write
+    STATUS      current    
+    DESCRIPTION
+            "该变量设置为非0值表示删除当前所有的策略信息,
+             设置为0不做任何处理"
+    ::= { mySMPMIBObjects 4 }  
+        
+mySMPPolicyChecksum OBJECT-TYPE
+    SYNTAX OCTET STRING(SIZE(16))
+    MAX-ACCESS read-only
+    STATUS      current    
+    DESCRIPTION
+            "当前SMP设置的策略表的校验和信息"
+    ::= { mySMPMIBObjects 5 }     
+
+mySMPPolicyTimeout OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-write
+    STATUS      current    
+    DESCRIPTION
+            "SMP的策略超时时间"
+    ::= { mySMPMIBObjects 6 }    
+    
+mySMPPolicyGroupTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF MySMPPolicyGroupEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "安全策略组"
+    ::= { mySMPMIBObjects 9}
+
+mySMPPolicyGroupEntry OBJECT-TYPE
+        SYNTAX  MySMPPolicyGroupEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "SMP 策略组"
+        INDEX   {mySMPPolicyGroupIndex}
+    ::= { mySMPPolicyGroupTable 1 }
+ 
+    MySMPPolicyGroupEntry ::=
+        SEQUENCE {
+                mySMPPolicyGroupIndex
+                       Unsigned32,        
+                mySMPPolicyGroupCount
+                       Unsigned32,
+                mySMPPolicyGroupChecksum
+                       OCTET STRING(SIZE(16)),           
+                mySMPPolicyGroupStatus
+                       RowStatus
+      }
+
+mySMPPolicyGroupIndex OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "策略组索引" 
+    ::= { mySMPPolicyGroupEntry 1 }
+
+mySMPPolicyGroupCount OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            "策略组包含的策略数"
+    ::= { mySMPPolicyGroupEntry 2 }
+    
+mySMPPolicyGroupChecksum OBJECT-TYPE
+        SYNTAX OCTET STRING(SIZE(16))
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            "策略组唯一标记"
+    ::= { mySMPPolicyGroupEntry 3 }
+
+mySMPPolicyGroupStatus OBJECT-TYPE
+        SYNTAX       RowStatus
+        MAX-ACCESS   read-create
+        STATUS       current
+        DESCRIPTION
+            "The status of this conceptual row."
+    ::= { mySMPPolicyGroupEntry 4 }
+    
+mySMPPolicyTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF MySMPPolicyEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "安全策略表"
+    ::= { mySMPMIBObjects 8}
+
+mySMPPolicyEntry OBJECT-TYPE
+        SYNTAX  MySMPPolicyEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "SMP 策略表"
+        INDEX   {mySMPGroupIndex,mySMPPolicyIndex}
+    ::= { mySMPPolicyTable 1 }
+
+    MySMPPolicyEntry ::=
+        SEQUENCE {
+                mySMPGroupIndex
+                       Unsigned32,
+                mySMPPolicyIndex
+                       Unsigned32,        
+                mySMPPolicyStatus
+                       ConfigStatus,
+                mySMPPolicyNumber
+                       Unsigned32,
+                mySMPPolicyInstallPort
+                       IfIndex,           
+                mySMPPolicyType
+                       INTEGER,  
+                mySMPPolicyContent
+                       OCTET STRING,
+                mySMPPolicyMask
+                       OCTET STRING,
+                mySMPPolicyName
+                       DisplayString
+      }
+
+mySMPGroupIndex OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "当前策略对应策略组的索引" 
+    ::= { mySMPPolicyEntry 1 }
+
+mySMPPolicyIndex OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "策略索引" 
+    ::= { mySMPPolicyEntry 2 }
+
+mySMPPolicyStatus OBJECT-TYPE
+        SYNTAX       ConfigStatus
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            "表项的状态字段,具体含义可查看MY-TC.mib"
+    ::= { mySMPPolicyEntry 3 }
+  
+mySMPPolicyNumber OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+              "策略序号" 
+    ::= { mySMPPolicyEntry 4 }
+    
+mySMPPolicyInstallPort OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+              "该策略应用的端口索引" 
+    ::= { mySMPPolicyEntry 5 }
+    
+mySMPPolicyType OBJECT-TYPE
+        SYNTAX INTEGER{
+        	hi-isolate(1),
+        	isolate(2),
+        	bolcked(3),
+        	addrBind(4)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "策略模板的行为,hi-isolate类型只能够被HI检测失败应用,
+            isolate表示隔离行为,blocked表示阻断行为,
+            addrBind用于地址绑定的行为"
+        ::= { mySMPPolicyEntry 6 }
+        
+mySMPPolicyContent OBJECT-TYPE
+        SYNTAX OCTET STRING(SIZE(80))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "80个字节策略模板的内容信息"
+        ::= { mySMPPolicyEntry 7 }
+        
+mySMPPolicyMask OBJECT-TYPE
+        SYNTAX OCTET STRING(SIZE(80))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "80个字节策略模板的掩码信息"
+        ::= { mySMPPolicyEntry 8 }    
+        
+mySMPPolicyName OBJECT-TYPE
+        SYNTAX       DisplayString(SIZE (0..32))
+        MAX-ACCESS   read-write
+        STATUS       current
+        DESCRIPTION
+            "策略的名称字段"
+    ::= { mySMPPolicyEntry 9 }
+    
+mySMPFrameRelayTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF MySMPFrameRelayEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "SMP报文转发表"
+    ::= { mySMPMIBObjects 7}
+
+mySMPFrameRelayEntry OBJECT-TYPE
+        SYNTAX  MySMPFrameRelayEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+              "SMP报文转发表"
+        INDEX   {mySMPFrameRelayIndex}
+    ::= { mySMPFrameRelayTable 1 }
+
+    MySMPFrameRelayEntry ::=
+        SEQUENCE {
+                mySMPFrameRelayIndex
+                       Unsigned32,        
+                mySMPFrameRelayContent
+                       OCTET STRING,
+                mySMPFrameRelayLength
+                       Unsigned32,           
+                mySMPFrameRelayDestPort
+                		   IfIndex,
+                mySMPFrameRelayDestVlan
+                		   VlanId                                       		   
+      }
+
+mySMPFrameRelayIndex OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              "报文转发表索引" 
+    ::= { mySMPFrameRelayEntry 1 }
+    
+mySMPFrameRelayContent OBJECT-TYPE
+        SYNTAX OCTET STRING(SIZE(0..1024))
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "最长为1024个字节报文内容信息"
+    ::= { mySMPFrameRelayEntry 2 }
+    
+mySMPFrameRelayLength OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-write
+    STATUS      current    
+    DESCRIPTION
+            "报文长度信息"
+    ::= { mySMPFrameRelayEntry 3 } 
+
+mySMPFrameRelayDestPort OBJECT-TYPE
+        SYNTAX  IfIndex
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+              "该报文需要发送的目的端口索引" 
+    ::= { mySMPFrameRelayEntry 4 }
+    
+mySMPFrameRelayDestVlan OBJECT-TYPE
+        SYNTAX  VlanId
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+              "该报文需要发送的目的端口所属的VLAN ID" 
+    ::= { mySMPFrameRelayEntry 5 }    
+      
+
+-- 目前该节点作为同SMP Server约定的接口，以后不在MIB中体现
+  mySMPTraps      OBJECT IDENTIFIER ::= { mySMPMIB 65535}
+        
+  mySMPSwitchIP OBJECT-TYPE
+          SYNTAX IpAddress
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "发送该Trap的交换机的IP地址"
+          ::= { mySMPTraps 1 }          
+        
+  mySMPSwitchInterfaceID OBJECT-TYPE
+          SYNTAX IfIndex
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "接收到需转发报文的交换机的端口"
+          ::= { mySMPTraps 2 }    
+  
+  mySMPSwitchInterfaceVLANID OBJECT-TYPE
+          SYNTAX VlanId
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "接收到需转发报文的交换机的端口对应的VLAN ID"
+          ::= { mySMPTraps 3 }  
+
+  mySMPFrameContentLength OBJECT-TYPE
+          SYNTAX Unsigned32
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "封装的报文的长度,该值不能超过1024"
+          ::= { mySMPTraps 4 }      
+        
+  mySMPFrameContent OBJECT-TYPE
+          SYNTAX OCTET STRING(SIZE(0..1024))
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "封装的报文,该报文的长度不能够超过1024"
+          ::= { mySMPTraps 5 }      
+        
+  mySMPFrameRelayTrap NOTIFICATION-TYPE
+      OBJECTS  {mySMPSwitchIP,mySMPSwitchInterfaceID,mySMPSwitchInterfaceVLANID,
+      			  mySMPFrameContentLength,mySMPFrameContent}
+      STATUS  current
+      DESCRIPTION
+              "Trap信息包含以下内容：接收到指定报文的交换机的IP,
+              接收报文的端口,报文的长度以及报文内容信息"
+      ::= { mySMPTraps 6 }
+
+
+  mySMPArpAttackSubnetIP OBJECT-TYPE
+          SYNTAX OCTET STRING(SIZE(0..40))
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "攻击源所在svi的所有子网ip地址"
+          ::= { mySMPTraps 7 }          
+        
+  mySMPArpAttackSubnetIPNum OBJECT-TYPE
+          SYNTAX Integer32
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "子网ip地址个数"
+          ::= { mySMPTraps 8 }          
+
+  mySMPArpAttackInterfaceSlot OBJECT-TYPE
+          SYNTAX Integer32
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "攻击源所连接设备的插槽号"
+          ::= { mySMPTraps 9 }    
+  
+  mySMPArpAttackInterfacePort OBJECT-TYPE
+          SYNTAX Integer32
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "攻击源所连接设备的端口号"
+          ::= { mySMPTraps 10}  
+
+  mySMPArpAttackInterfaceVlanID OBJECT-TYPE
+          SYNTAX VlanId
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "攻击源所在VLAN的VLAN ID"
+          ::= { mySMPTraps 11 }      
+        
+  mySMPArpAttackFrameContent OBJECT-TYPE
+          SYNTAX OCTET STRING(SIZE(0..64))
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "攻击源发出的ARP报文"
+          ::= { mySMPTraps 12 }      
+
+  mySMPArpAttackStatus OBJECT-TYPE
+          SYNTAX TruthValue
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "设备是否受到该攻击源攻击,true表示出现攻击,false表示攻击解除"
+          ::= { mySMPTraps 13 }
+
+  mySMPArpAttackCriticalStatus OBJECT-TYPE
+          SYNTAX INTEGER{
+             critical(1),          -- ARP轻度攻击，影响网络正常使用，通告SMP服务器
+             emergencies(2)  -- ARP严重攻击，可能导致网络不可用，系统自动阻断该攻击，并通告SMP服务器
+          }
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "设备受攻击源的攻击的严重程度：
+             critical(1),          -- ARP轻度攻击，影响网络正常使用，通告SMP服务器
+             emergencies(2)  -- ARP严重攻击，可能导致网络不可用，系统自动阻断该攻击，并通告SMP服务器"
+          ::= { mySMPTraps 14 }
+
+  mySMPArpAttackMac OBJECT-TYPE
+          SYNTAX MacAddress
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "攻击源所在连接设备的MAC地址"
+          ::= { mySMPTraps 15 }      
+
+  mySMPArpAttackInterfaceIndex OBJECT-TYPE
+          SYNTAX Integer32
+          MAX-ACCESS accessible-for-notify
+          STATUS current
+          DESCRIPTION
+            "攻击源所连接设备的接口索引"
+          ::= { mySMPTraps 16 }      
+        
+  mySMPArpAttackTrap NOTIFICATION-TYPE
+      OBJECTS  {mySMPArpAttackSubnetIP, mySMPArpAttackSubnetIPNum, mySMPArpAttackInterfaceSlot,
+               mySMPArpAttackInterfacePort, mySMPArpAttackInterfaceVlanID, mySMPArpAttackFrameContent,
+               mySMPArpAttackStatus, mySMPArpAttackCriticalStatus, mySMPArpAttackMac, 
+               mySMPArpAttackInterfaceIndex}
+      STATUS  current
+      DESCRIPTION
+              "Trap信息包含以下内容：
+                  攻击源所在svi的所有子网ip地址,
+                  子网ip地址个数,
+                  攻击源进入的插槽号,
+                  攻击源进入的端, 
+                  攻击源所属vlan的vid, 
+                  64字节arp报文, 
+                  通告攻击出现和攻击解除
+                  攻击源连接设备的mac地址
+                  攻击源连接设备的接口索引"
+      ::= { mySMPTraps 17 }        
+
+mySMPMIBConformance OBJECT IDENTIFIER ::= { mySMPMIB 3 }
+mySMPMIBCompliances OBJECT IDENTIFIER ::= { mySMPMIBConformance 1 }
+mySMPMIBGroups      OBJECT IDENTIFIER ::= { mySMPMIBConformance 2 }
+
+-- compliance statements
+myDeviceMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My SMP MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { mySMPServerMibGroup,
+                                   mySMPClientMibGroup,
+                                   mySMPPolicyMibGroup,
+                                   mySMPFrameRelayMibGroup}
+        ::= { mySMPMIBCompliances 1 }
+        
+mySMPServerMibGroup    OBJECT-GROUP
+    OBJECTS {
+    					mySMPServer,
+    					mySMPServerKey
+            }
+    STATUS  current
+    DESCRIPTION
+            "SMP服务器信息集合"
+    ::= { mySMPMIBGroups 1 }
+    
+mySMPClientMibGroup    OBJECT-GROUP
+    OBJECTS {
+    					mySMPEventSendSlice
+            }
+    STATUS  current
+    DESCRIPTION
+            "SMP所管理的客户端的约束信息集合"
+    ::= { mySMPMIBGroups 2 }    
+    
+mySMPPolicyMibGroup    OBJECT-GROUP
+    OBJECTS {
+    					mySMPPolicyDelete,
+    					mySMPPolicyChecksum,
+              mySMPPolicyIndex,
+              mySMPPolicyStatus,
+              mySMPPolicyInstallPort,
+              mySMPPolicyType,
+              mySMPPolicyContent,
+              mySMPPolicyMask,
+              mySMPPolicyName
+            }
+    STATUS  current
+    DESCRIPTION
+            "策略信息集合"
+    ::= { mySMPMIBGroups 3 }       
+    
+mySMPFrameRelayMibGroup    OBJECT-GROUP
+    OBJECTS {
+              mySMPFrameRelayIndex,
+              mySMPFrameRelayContent,
+              mySMPFrameRelayLength,
+              mySMPFrameRelayDestPort,
+              mySMPFrameRelayDestVlan
+            }
+    STATUS  current
+    DESCRIPTION
+            "报文转发表的信息集合"
+    ::= { mySMPMIBGroups 4 }         
+
+
+END

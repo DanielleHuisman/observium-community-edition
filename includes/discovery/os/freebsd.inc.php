@@ -16,7 +16,7 @@
 
 if ($os) { return; }
 
-if (str_contains($sysDescr, 'FreeBSD') ||
+if (str_exists($sysDescr, 'FreeBSD') ||
     str_starts($sysObjectID, array('.1.3.6.1.4.1.8072.3.2.8',      // NET-SNMP
                                    '.1.3.6.1.4.1.12325.1.1.2.1'))) // BSNMP daemon
 {

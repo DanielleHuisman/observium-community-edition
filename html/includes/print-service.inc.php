@@ -1,19 +1,18 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 if (!$samehost)
 {
-  if ($bg == $list_colour_a) { $bg = $list_colour_b; } else { $bg = $list_colour_a; }
+  if ($bg == OBS_COLOUR_LIST_A) { $bg = OBS_COLOUR_LIST_B; } else { $bg = OBS_COLOUR_LIST_A; }
 }
 
 $service_type = strtolower($service['service_type']);

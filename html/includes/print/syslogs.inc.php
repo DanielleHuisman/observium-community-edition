@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -23,7 +22,7 @@
  * print_syslogs(array('short' => TRUE)) - show small block with last syslog messages
  *
  * @param array $vars
- * @return none
+ * @return null
  *
  */
 function print_syslogs($vars)
@@ -36,8 +35,6 @@ function print_syslogs($vars)
   $pageno   = $vars['pageno'];
   $pagesize = $vars['pagesize'];
   $start = $pagesize * $pageno - $pagesize;
-
-  $priorities = $GLOBALS['config']['syslog']['priorities'];
 
   $device_single = FALSE; // Show syslog entries for single device or multiple (use approximate counts for multiple)
 
@@ -56,7 +53,7 @@ function print_syslogs($vars)
           $where .= generate_query_values($value, 'device_id');
           break;
         case 'priority':
-          if (!is_array($value)) { $value = explode(',', $value); }
+          $value = get_var_csv($value);
           foreach ($value as $k => $v)
           {
             // Rewrite priority strings to numbers
@@ -65,10 +62,8 @@ function print_syslogs($vars)
           $where .= generate_query_values($value, $var);
           break;
         case 'tag':
-          if (!is_array($value)) { $value = explode(',', $value); }
-          $where .= generate_query_values($value, $var);
-          break;
         case 'program':
+          $value = get_var_csv($value);
           $where .= generate_query_values($value, $var);
           break;
         case 'message':
@@ -109,10 +104,10 @@ function print_syslogs($vars)
   // Query syslog count
   if ($pagination && !$short)
   {
-    dbQuery('SET SESSION MAX_EXECUTION_TIME=300;'); // Set 0.3 sec maximum query execution time
+    dbSetVariable('MAX_EXECUTION_TIME', 500); // Set 0.5 sec maximum query execution time
     // Exactly count, but it's very SLOW on huge tables
     $count = dbFetchCell($query_count, $param);
-    dbQuery('SET SESSION MAX_EXECUTION_TIME=0;'); // Reset maximum query execution time
+    dbSetVariable('MAX_EXECUTION_TIME', 0); // Reset maximum query execution time
     //r($count);
     if (!is_numeric($count))
     {
@@ -132,95 +127,54 @@ function print_syslogs($vars)
     print_warning('<h4>No syslog entries found!</h4>
 Check that the syslog daemon and Observium configuration options are set correctly, that your devices are configured to send syslog to Observium and that there are no firewalls blocking the messages.
 
-See <a href="'.OBSERVIUM_URL.'/wiki/Category:Documentation" target="_blank">documentation</a> and <a href="'.OBSERVIUM_URL.'/wiki/Configuration_Options#Syslog_Settings" target="_blank">configuration options</a> for more information.');
+See <a href="'.OBSERVIUM_DOCS_URL.'/syslog/" target="_blank">Syslog Integration</a> guide and <a href="'.OBSERVIUM_DOCS_URL.'/config_options/#syslog-settings" target="_blank">configuration options</a> for more information.');
 
   } else {
     // Entries have been returned. Print the table.
 
     $list = array('device' => FALSE, 'priority' => TRUE); // For now (temporarily) priority always displayed
-    if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'syslog') { $list['device'] = TRUE; }
+    if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] === 'syslog') { $list['device'] = TRUE; }
     if ($short || !isset($vars['priority']) || empty($vars['priority'])) { $list['priority'] = TRUE; }
 
 
     $string = generate_box_open($vars['header']);
+    if((isset($vars['short']) && $vars['short'])) {
+        $string .= '<table class="' . OBS_CLASS_TABLE_STRIPED_MORE . '">' . PHP_EOL;
+    } else {
+        $string .= '<table class="' . OBS_CLASS_TABLE_STRIPED . '">' . PHP_EOL;
 
-    $string .= '<table class="'.OBS_CLASS_TABLE_STRIPED_MORE.'">' . PHP_EOL;
+    }
+    // Generate table header
     if (!$short)
     {
-      $string .= '  <thead>' . PHP_EOL;
-      $string .= '    <tr>' . PHP_EOL;
-      $string .= '      <th class="state-marker"></th>' . PHP_EOL;
-  #    $string .= '      <th></th>' . PHP_EOL;
-      $string .= '      <th>Date</th>' . PHP_EOL;
-      if ($list['device']) { $string .= '      <th>Device</th>' . PHP_EOL; }
-      if ($list['priority']) { $string .= '      <th>Priority</th>' . PHP_EOL; }
-      $string .= '      <th>[Program] [Tags] Message</th>' . PHP_EOL;
-      $string .= '    </tr>' . PHP_EOL;
-      $string .= '  </thead>' . PHP_EOL;
-    }
-    $string .= '  <tbody>' . PHP_EOL;
-
-    foreach ($entries as $entry)
-    {
-      $string .= '  <tr class="'.$priorities[$entry['priority']]['row-class'].'">' . PHP_EOL;
-      $string .= '<td class="state-marker"></td>' . PHP_EOL;
-
-      if ($short)
-      {
-        $string .= '    <td class="syslog text-nowrap">';
-        $timediff = $GLOBALS['config']['time']['now'] - strtotime($entry['timestamp']);
-        $string .= generate_tooltip_link('', format_uptime($timediff, "short-3"), format_timestamp($entry['timestamp']), NULL) . '</td>' . PHP_EOL;
-      } else {
-        $string .= '    <td style="width: 130px">';
-        $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
-      }
-
+      $cols = [];
+      $cols[]              = [ NULL, 'class="state-marker"' ];
+      //$cols[]              = [ NULL, 'class="no-width"' ]; // Measured entity link
+      $cols[]              = [ 'Date' ];
       if ($list['device'])
       {
-        $dev = device_by_id_cache($entry['device_id']);
-        $device_vars = array('page'    => 'device',
-                             'device'  => $entry['device_id'],
-                             'tab'     => 'logs',
-                             'section' => 'syslog');
-        $string .= '    <td class="entity">' . generate_device_link($dev, short_hostname($dev['hostname']), $device_vars) . '</td>' . PHP_EOL;
+        //$cols['device']    = [ 'Device' ];
+        $cols[]            = [ 'Device' ];
       }
       if ($list['priority'])
       {
-        if (!$short) { $string .= '    <td style="width: 95px"><span class="label label-' . $priorities[$entry['priority']]['label-class'] . '">' . nicecase($priorities[$entry['priority']]['name']) . ' (' . $entry['priority'] . ')</span></td>' . PHP_EOL; }
+        //$cols['priority']  = [ 'Priority' ];
+        $cols[]            = [ 'Priority' ];
       }
-      $entry['program'] = (empty($entry['program'])) ? '[[EMPTY]]' : $entry['program'];
-      if ($short)
-      {
-        $string .= '    <td class="syslog">';
-        $string .= '<span class="label label-' . $priorities[$entry['priority']]['label-class'] . '"><strong>' . $entry['program'] . '</strong></span>';
-      } else {
-        $string .= '    <td>';
-        $string .= '<span class="label label-' . $priorities[$entry['priority']]['label-class'] . '">' . $entry['program'] . '</span>';
+      $cols[]              = [ '[Program] [Tags] Message' ];
 
-        /* Show tags if not short */
-        $tags = array();
-        foreach(explode(',', $entry['tag']) as $tag)
-        {
-          if (!str_istarts($tag, $entry['program']) &&
-              !preg_match('/^(\d+\:|[\da-f]{2})$/i', $tag) &&
-              !preg_match('/^<(Emer|Aler|Crit|Err|Warn|Noti|Info|Debu)/i', $tag)) // Skip tags same as program or old numeric tags or syslog-ng 2x hex numbers
-          {
-            $tags[] = $tag;
-          }
-        }
-        if ($tags)
-        {
-          $string .= '<span class="label">';
-          $string .= implode('</span><span class="label">', $tags);
-          $string .= '</span>';
-        }
-        /* End tags */
-      }
-      $string .= ' ' . escape_html($entry['msg']) . '</td>' . PHP_EOL;
-      $string .= '  </tr>' . PHP_EOL;
+      $string .= get_table_header($cols, $vars);
     }
 
+    // Table body
+    $string .= '  <tbody>' . PHP_EOL;
+    foreach ($entries as $entry)
+    {
+      $string .= generate_syslog_row($entry, $vars, $list);
+    }
+    //print_vars($GLOBALS['cache']['syslog']);
     $string .= '  </tbody>' . PHP_EOL;
+
     $string .= '</table>' . PHP_EOL;
 
     $string .= generate_box_close();
@@ -231,6 +185,208 @@ See <a href="'.OBSERVIUM_URL.'/wiki/Category:Documentation" target="_blank">docu
     // Print syslog
     echo $string;
   }
+}
+
+function generate_syslog_row($entry, $vars, $list = NULL)
+{
+  // Short events? (no pagination, small out)
+  $short = (isset($vars['short']) && $vars['short']);
+  $priorities = $GLOBALS['config']['syslog']['priorities'];
+  $is_alert = isset($entry['la_id']); // This is syslog alert entry?
+
+  // List of displayed columns
+  if (is_null($list))
+  {
+    $list = [ 'device' => FALSE, 'priority' => TRUE ]; // For now (temporarily) priority always displayed
+    if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'syslog')
+    {
+      $list['device'] = TRUE;
+    }
+    if ($short || !isset($vars['priority']) || empty($vars['priority']))
+    {
+      $list['priority'] = TRUE;
+    }
+  }
+
+  $row_class = strlen($entry['html_row_class']) ? $entry['html_row_class'] : $priorities[$entry['priority']]['row-class'];
+
+  $string = '  <tr class="'.$row_class.'">' . PHP_EOL;
+  $string .= '<td class="state-marker"></td>' . PHP_EOL;
+  $timediff = $GLOBALS['config']['time']['now'] - strtotime($entry['timestamp']);
+
+  if ($short || $timediff < 3600)
+  {
+    $string .= '    <td class="syslog text-nowrap">';
+    $timediff = $GLOBALS['config']['time']['now'] - strtotime($entry['timestamp']);
+    $string .= generate_tooltip_link('', format_uptime($timediff, "short-3"), format_timestamp($entry['timestamp']), NULL) . '</td>' . PHP_EOL;
+  } else {
+    //$string .= '    <td style="width: 130px">';
+    $string .= '    <td>';
+    $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
+  }
+
+  // Device column
+  if ($list['device'])
+  {
+    $dev = device_by_id_cache($entry['device_id']);
+    $device_vars = array('page'    => 'device',
+                         'device'  => $entry['device_id'],
+                         'tab'     => 'logs',
+                         'section' => 'syslog');
+    if ($is_alert) { $device_vars['section'] = 'logalert'; }
+    $string .= '    <td class="entity">' . generate_device_link($dev, short_hostname($dev['hostname']), $device_vars) . '</td>' . PHP_EOL;
+  }
+
+  // Alert Rule column (in syslog alerts)
+  if ($list['la_id'])
+  {
+    $syslog_rules = $GLOBALS['cache']['syslog']['syslog_rules']; // Cached syslog rules
+    $string .= '<td><strong><a href="'.generate_url(array('page' => 'syslog_rules', 'la_id' => $entry['la_id'])).'">' .
+               (is_array($syslog_rules[$entry['la_id']]) ? $syslog_rules[$entry['la_id']]['la_name'] : 'Rule Deleted')  . '</td>' . PHP_EOL;
+  }
+
+  // Priority column
+  if ($list['priority'])
+  {
+    if (!$short)
+    {
+      $string .= '    <td style="width: 95px"><span class="label label-' . $priorities[$entry['priority']]['label-class'] . '">' .
+                 nicecase($priorities[$entry['priority']]['name']) . ' (' . $entry['priority'] . ')</span></td>' . PHP_EOL;
+    }
+  }
+
+  // Program and Tags column
+  $entry['program'] = (empty($entry['program'])) ? '[[EMPTY]]' : $entry['program'];
+  if ($short)
+  {
+    $string .= '    <td class="syslog">';
+    $string .= '<span class="label label-' . $priorities[$entry['priority']]['label-class'] . '"><strong>' . escape_html($entry['program']) . '</strong></span>';
+  } else {
+    $string .= '    <td>';
+    $string .= '<span class="label label-' . $priorities[$entry['priority']]['label-class'] . '">' . escape_html($entry['program']) . '</span>';
+
+    /* Show tags if not short */
+    $tags = array();
+    foreach(explode(',', $entry['tag']) as $tag)
+    {
+      if (!str_istarts($tag, $entry['program']) &&
+          !preg_match('/^(\d+\:|[\da-f]{2})$/i', $tag) &&
+          !preg_match('/^<(Emer|Aler|Crit|Err|Warn|Noti|Info|Debu)/i', $tag)) // Skip tags same as program or old numeric tags or syslog-ng 2x hex numbers
+      {
+        $tags[] = escape_html($tag);
+      }
+    }
+    if ($tags)
+    {
+      $string .= '<span class="label">';
+      $string .= implode('</span><span class="label">', $tags);
+      $string .= '</span>';
+    }
+    /* End tags */
+  }
+  if ($list['program'])
+  {
+    // Program in separate column (from message)
+    $string .= $short ? '</td><td class="syslog">' : '</td><td>';
+  }
+
+  // Link with syslog ports cache
+  if (!isset($GLOBALS['cache']['syslog']['ports_links']))
+  {
+    $GLOBALS['cache']['syslog']['ports_links'] = [];
+  }
+  $ports_links = &$GLOBALS['cache']['syslog']['ports_links'];
+
+  // Highlight port links
+  if (!isset($ports_links[$entry['device_id']]))
+  {
+    $ports_links[$entry['device_id']] = [];
+    foreach (dbFetchRows('SELECT `port_id`, `port_label_short`, `ifDescr`, `ifName` FROM `ports` WHERE `device_id` = ? AND `deleted` = ?', [ $entry['device_id'], 0 ]) as $port_descr)
+    {
+      $search = [ $port_descr['ifDescr'], $port_descr['ifName'], $port_descr['port_label_short'] ];
+      // FIXME. Currently as hack for Extreme (should make universal with lots of examples), see:
+      // https://jira.observium.org/browse/OBS-3304
+      if (preg_match('/\s(port\s*\d.*)/i', $port_descr['ifDescr'], $matches))
+      {
+        $search[] = $matches[1];
+      }
+      $ports_links[$entry['device_id']][$port_descr['port_id']] = [
+        'search'  => $search,
+        'replace' => generate_entity_link('port', $port_descr['port_id'], '$2')
+      ];
+    }
+  }
+  $entity_links = $ports_links[$entry['device_id']];
+
+  // Highlight bgp peer links (try only when program match BGP)
+  if (str_iexists($entry['program'], 'bgp'))
+  {
+
+    // Link with syslog bgp cache
+    if (!isset($GLOBALS['cache']['syslog']['bgp_links']))
+    {
+      $GLOBALS['cache']['syslog']['bgp_links'] = [];
+    }
+    $bgp_links = &$GLOBALS['cache']['syslog']['bgp_links'];
+
+    if (!isset($bgp_links[$entry['device_id']]))
+    {
+      $bgp_links[$entry['device_id']] = [];
+      //SELECT `bgpPeer_id`, `bgpPeerRemoteAs`, `bgpPeerIdentifier`, `bgpPeerRemoteAddr` FROM `bgpPeers` WHERE `device_id` = 2
+      foreach (dbFetchRows('SELECT * FROM `bgpPeers` WHERE `device_id` = ?', [ $entry['device_id'] ]) as $bgp_descr)
+      {
+        $search = [];
+        foreach ([ 'bgpPeerIdentifier', 'bgpPeerRemoteAddr' ] as $param)
+        {
+          if ($bgp_descr[$param] == '0.0.0.0') { continue; }
+
+          $search[] = 'Nbr ' . $bgp_descr[$param];
+          $search[] = 'Neighbor ' . $bgp_descr[$param];
+          if (get_ip_version($bgp_descr[$param]) == 6)
+          {
+            // For IPv6 append compressed form
+            $bgp_descr[$param] = Net_IPv6::compress($bgp_descr[$param], TRUE);
+            $search[] = 'Nbr ' . $bgp_descr[$param];
+            $search[] = 'Neighbor ' . $bgp_descr[$param];
+          }
+        }
+        $bgp_links[$entry['device_id']][] = [ 'search'  => $search,
+                                              'replace' => generate_entity_link('bgp_peer', $bgp_descr, '$2') ];
+        // Additionally append AS text
+        if ($bgp_descr['astext'] && !isset($bgp_links[$entry['device_id']]['as'.$bgp_descr['bgpPeerRemoteAs']]))
+        {
+          $bgp_links[$entry['device_id']]['as'.$bgp_descr['bgpPeerRemoteAs']] = [
+            'search'  => [ 'AS ' . $bgp_descr['bgpPeerRemoteAs'], 'AS: ' . $bgp_descr['bgpPeerRemoteAs'], 'AS' . $bgp_descr['bgpPeerRemoteAs'] ],
+            'replace' => generate_tooltip_link('', '$2', $bgp_descr['astext'])
+          ];
+        }
+      }
+    }
+    $entity_links = array_merge($entity_links, $bgp_links[$entry['device_id']]);
+  }
+
+  // Linkify entities in syslog messages
+  if (isset($entry['msg']) && !isset($entry['message']))
+  {
+    // Different field in syslog alerts and syslog
+    $entry['message'] = $entry['msg'];
+  }
+
+  // Restore escaped quotes (for old entries)
+  $entry['message'] = str_replace([ '\"', "\'" ], [ '"', "'" ], $entry['message']);
+
+  $string .= ' ' . html_highlight(escape_html($entry['message']), $entity_links, NULL, TRUE) . '</td>' . PHP_EOL;
+  //$string .= ' ' . escape_html($entry['msg']) . '</td>' . PHP_EOL;
+
+  // if (!$short)
+  // {
+  //   //$string .= '<td>' . escape_html($entry['log_type']) . '</td>' . PHP_EOL;
+  //   //$string .= '<td style="text-align: right">'. ($entry['notified'] == '1' ? '<span class="label label-success">YES</span>' : ($entry['notified'] == '-1' ? '<span class="label">SKIP</span>' : '<span class="label label-warning">NO</span>')) . '</td>' . PHP_EOL;
+  // }
+
+  $string .= '  </tr>' . PHP_EOL;
+
+  return $string;
 }
 
 function generate_syslog_form_values($form_filter = FALSE, $column = NULL)

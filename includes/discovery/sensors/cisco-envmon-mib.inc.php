@@ -26,11 +26,20 @@ foreach ($oids as $index => $entry)
 
   if (isset($entry['ciscoEnvMonTemperatureStatusValue']))
   {
+    // Clean descr:
+    // SW#1, Sensor#1, GREEN
+    $descr_replace = [
+      ', GREEN'  => '', ' GREEN,'  => ',',
+      ', YELLOW' => '', ' YELLOW,' => ',',
+      ', RED'    => '', ' RED,'    => ',',
+    ];
+    $descr = array_str_replace($descr_replace, $descr);
+
     $oid = '.1.3.6.1.4.1.9.9.13.1.3.1.3.'.$index;
     // Exclude duplicated entries from CISCO-ENTITY-SENSOR
     //$ent_exist = dbFetchCell('SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) AND CONCAT(`sensor_limit`) = ?;',
     $ent_exist = dbExist('sensors', '`device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) AND CONCAT(`sensor_limit`) = ?',
-                              array($device['device_id'], 'cisco-entity-sensor', 'temperature', $descr.'%', '%- '.$descr, $entry['ciscoEnvMonTemperatureThreshold']));
+                              array($device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'temperature', $descr.'%', '%- '.$descr, $entry['ciscoEnvMonTemperatureThreshold']));
     if (!$ent_exist && $entry['ciscoEnvMonTemperatureStatusValue'] != 0)
     {
       $options = array();
@@ -39,7 +48,7 @@ foreach ($oids as $index => $entry)
       discover_sensor_ng( $device,'temperature', $mib, 'ciscoEnvMonTemperatureStatusValue', $oid, $index, NULL, $descr, 1, $entry['ciscoEnvMonTemperatureStatusValue'], $options);
     }
   }
-  else if (isset($entry['ciscoEnvMonTemperatureState']))
+  elseif (isset($entry['ciscoEnvMonTemperatureState']))
   {
     $oid = '.1.3.6.1.4.1.9.9.13.1.3.1.6.'.$index;
     // Exclude duplicated entries from CISCO-ENTITY-SENSOR
@@ -72,8 +81,8 @@ foreach ($oids as $index => $entry)
     //$query = 'SELECT COUNT(*) FROM `sensors` WHERE `device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) ';
     $where  = '`device_id` = ? AND `sensor_type` = ? AND `sensor_class` = ? AND (`sensor_descr` LIKE ? OR `sensor_descr` LIKE ?) ';
     $where .= ($entry['ciscoEnvMonVoltageThresholdHigh'] > $entry['ciscoEnvMonVoltageThresholdLow']) ? 'AND CONCAT(`sensor_limit`) = ? AND CONCAT(`sensor_limit_low`) = ?' : 'AND CONCAT(`sensor_limit_low`) = ? AND CONCAT(`sensor_limit`) = ?'; //swich negative numbers
-    //$ent_exist = dbFetchCell($query, array($device['device_id'], 'cisco-entity-sensor', 'voltage', $descr.'%', '%- '.$descr, $entry['ciscoEnvMonVoltageThresholdHigh'] * $scale, $entry['ciscoEnvMonVoltageThresholdLow'] * $scale));
-    $ent_exist = dbExist('sensors', $where, array($device['device_id'], 'cisco-entity-sensor', 'voltage', $descr.'%', '%- '.$descr, $entry['ciscoEnvMonVoltageThresholdHigh'] * $scale, $entry['ciscoEnvMonVoltageThresholdLow'] * $scale));
+    //$ent_exist = dbFetchCell($query, array($device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'voltage', $descr.'%', '%- '.$descr, $entry['ciscoEnvMonVoltageThresholdHigh'] * $scale, $entry['ciscoEnvMonVoltageThresholdLow'] * $scale));
+    $ent_exist = dbExist('sensors', $where, array($device['device_id'], 'CISCO-ENTITY-SENSOR-MIB-entSensorValue', 'voltage', $descr.'%', '%- '.$descr, $entry['ciscoEnvMonVoltageThresholdHigh'] * $scale, $entry['ciscoEnvMonVoltageThresholdLow'] * $scale));
     if (!$ent_exist)
     {
       $options = array('limit_high' => $entry['ciscoEnvMonVoltageThresholdLow']  * $scale,
@@ -116,6 +125,20 @@ foreach ($oids as $index => $entry)
                               array($device['device_id'], 'cisco-entity-state', $descr.'%', '%- '.$descr));
     if (!$ent_exist)
     {
+      // Clean descr:
+      // Sw1, PS1 Normal, RPS NotExist
+      // Switch 1 - Power Supply A, Normal
+      $descr_replace = [
+        ', ' . $entry['ciscoEnvMonSupplyState']      => '',
+        ' ' . $entry['ciscoEnvMonSupplyState'] . ',' => ',',
+        ', RPS NotExist'                             => ''
+      ];
+      $descr = array_str_replace($descr_replace, $descr);
+      if (in_array($entry['ciscoEnvMonSupplySource'], [ 'ac', 'dc' ])) // Exclude poll Source for just AC/DC
+      {
+        $descr .= ' (' . strtoupper($entry['ciscoEnvMonSupplySource']) . ')';
+      }
+
       $options['rename_rrd'] = $sensor_state_type.'-supply-'.$index;
       discover_status_ng($device, $mib, 'ciscoEnvMonSupplyState', $oid, $index, $sensor_state_type, $descr, $entry['ciscoEnvMonSupplyState'], array('entPhysicalClass' => 'powersupply'));
 
@@ -124,8 +147,11 @@ foreach ($oids as $index => $entry)
       $type     = 'ciscoEnvMonSupplySource';
       $value    = $entry[$oid_name];
 
-      $options['rename_rrd'] = 'ciscoEnvMonSupplySource-ciscoEnvMonSupplySource.'.$index;
-      discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr . ' Source', $value, array('entPhysicalClass' => 'powersupply'));
+      if (!in_array($value, [ 'ac', 'dc' ])) // Exclude poll Source for just AC/DC, keep Redundant
+      {
+        $options['rename_rrd'] = 'ciscoEnvMonSupplySource-ciscoEnvMonSupplySource.' . $index;
+        discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr . ' Source', $value, ['entPhysicalClass' => 'powersupply']);
+      }
     }
   }
 }
@@ -150,6 +176,14 @@ foreach ($oids as $index => $entry)
 
     if (!$ent_exist)
     {
+      // Clean descr:
+      // Switch 1 - FAN - T1 3, Normal
+      $descr_replace = [
+        ', ' . $entry['ciscoEnvMonFanState']      => '',
+        ' ' . $entry['ciscoEnvMonFanState'] . ',' => ','
+      ];
+      $descr = array_str_replace($descr_replace, $descr);
+
       $options['rename_rrd'] = $sensor_state_type.'-fan-'.$index;
       discover_status_ng($device, $mib, 'ciscoEnvMonFanState', $oid, $index, $sensor_state_type, $descr, $entry['ciscoEnvMonFanState'], array('entPhysicalClass' => 'fan'));
     }

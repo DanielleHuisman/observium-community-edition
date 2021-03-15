@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -35,15 +34,25 @@ if ($ipmi['host'] = get_dev_attrib($device,'ipmi_hostname'))
   }
 
   $results = external_exec($config['ipmitool'] . $remote . " sensor 2>/dev/null");
+  /*
+  if (strlen($results))
+  {
+    $sdr = external_exec($config['ipmitool'] . $remote . " sdr 2>/dev/null");
+  } else {
+    $sdr = '';
+  }
+  */
 
   $ipmi_sensors = parse_ipmitool_sensor($device, $results);
 }
 
-if (OBS_DEBUG) { print_vars($ipmi_sensors); }
+print_debug_vars($ipmi_sensors, 1);
 
 foreach ($config['ipmi_unit'] as $type)
 {
   check_valid_sensors($device, $type, $ipmi_sensors, 'ipmi');
 }
+
+check_valid_status($device, $ipmi_sensors, 'ipmi');
 
 // EOF

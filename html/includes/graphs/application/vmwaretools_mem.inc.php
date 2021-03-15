@@ -11,19 +11,19 @@
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "app-vmwaretools-".$app['app_id'].".rrd");
+
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 if (is_file($rrd_filename))
 {
   $rrd_options .= " '-b 1024'";
 
-  $rrd_options .= " 'DEF:vmtotalmem=$rrd_filename:vmtotalmem:AVERAGE'";
-  $rrd_options .= " 'DEF:vmmemlimit=$rrd_filename:vmmemlimit:AVERAGE'";
-  $rrd_options .= " 'DEF:vmmemres=$rrd_filename:vmmemres:AVERAGE'";
-  $rrd_options .= " 'DEF:vmswap=$rrd_filename:vmswap:AVERAGE'";
-  $rrd_options .= " 'DEF:vmballoon=$rrd_filename:vmballoon:AVERAGE'";
+  $rrd_options .= " 'DEF:vmtotalmem=$rrd_filename_escape:vmtotalmem:AVERAGE'";
+  $rrd_options .= " 'DEF:vmmemlimit=$rrd_filename_escape:vmmemlimit:AVERAGE'";
+  $rrd_options .= " 'DEF:vmmemres=$rrd_filename_escape:vmmemres:AVERAGE'";
+  $rrd_options .= " 'DEF:vmswap=$rrd_filename_escape:vmswap:AVERAGE'";
+  $rrd_options .= " 'DEF:vmballoon=$rrd_filename_escape:vmballoon:AVERAGE'";
 
   $rrd_options .= " CDEF:vmtotalmemG=vmtotalmem,1048576,*";
   $rrd_options .= " CDEF:vmmemresG=vmmemres,1048576,*";

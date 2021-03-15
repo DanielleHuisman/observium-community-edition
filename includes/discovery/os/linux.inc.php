@@ -26,11 +26,11 @@ if ($os == 'linux')
 {
   // Now network based checks
   if (str_starts($sysObjectId, array('.1.3.6.1.4.1.10002.1', '.1.3.6.1.4.1.41112.1.4')) ||
-      str_contains(snmp_getnext_oid($device, 'dot11manufacturerName', 'IEEE802dot11-MIB'), 'Ubiquiti'))
+      str_exists(snmp_getnext_oid($device, 'dot11manufacturerName', 'IEEE802dot11-MIB'), 'Ubiquiti'))
   {
     $os = 'airos';
     $data = snmp_getnext_oid($device, 'dot11manufacturerProductName', 'IEEE802dot11-MIB');
-    if (str_contains($data, 'UAP'))
+    if (str_exists($data, 'UAP'))
     {
       $os = 'unifi';
     }
@@ -38,7 +38,7 @@ if ($os == 'linux')
     // if ($data)
     // {
     //   $data = current($data);
-    //   if (str_contains($data['dot11manufacturerProductName'], 'UAP'))
+    //   if (str_exists($data['dot11manufacturerProductName'], 'UAP'))
     //   {
     //     $os = 'unifi';
     //   }

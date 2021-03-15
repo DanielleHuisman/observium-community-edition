@@ -1,0 +1,427 @@
+RAD-Etp-MIB DEFINITIONS ::= BEGIN
+
+-- Copyright 2000 RAD Data Communications, Ltd.
+-- All Rights Reserved.
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       InterfaceIndex, ifAlias     FROM  IF-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Integer32, Counter32, Unsigned32, 
+       OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       RowStatus     FROM  SNMPv2-TC
+       ethIf     FROM  RAD-EthIf-MIB
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+	etp MODULE-IDENTITY
+		LAST-UPDATED "201502191801Z"  -- February 19, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "ETP MIB."
+	::= { ethIf 9 }
+
+--
+-- File: Etp2.txt
+-- This file replaces Etp.txt file
+--
+
+
+--------------------------------
+-- ETP object definitions
+--------------------------------
+
+etpEvents OBJECT IDENTIFIER  ::= { etp 0 }
+
+etpPortDown      NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias, etpName } 
+
+	STATUS		current
+	DESCRIPTION
+		"ETP port is down.
+		"
+     ::= { etpEvents 1 }
+
+etpTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EtpEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "EVC Termination Point (ETP) Table."
+    ::= { etp 1 }
+
+etpEntry OBJECT-TYPE
+    SYNTAX  EtpEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  { etpIdx }
+    ::= { etpTable 1 }
+
+EtpEntry ::= SEQUENCE {
+    etpIdx               Unsigned32,
+    etpRowStatus          RowStatus,
+    etpName         SnmpAdminString,
+    etpOperStatus          INTEGER,
+    etpClearStatCounters        INTEGER 
+ }
+
+etpIdx OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This is the unique ETP index.
+    "
+    ::= { etpEntry 1 }
+
+etpRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of entries
+     in the etpTable."
+    ::= { etpEntry 2 }
+
+etpName   OBJECT-TYPE
+   SYNTAX     SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute defines a unique name assigned to the ETP."
+    ::= {etpEntry 3 }
+
+etpOperStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+                up(1),
+                down(2)
+				    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The current operational state of the ETP.  "
+    ::= { etpEntry 4 }
+
+etpClearStatCounters  OBJECT-TYPE
+      SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will enforce a clear
+      operation of ETP statistics Counters.
+      Upon completion, the value will automatically change to off(2)."
+      DEFVAL { off }
+	 ::= { etpEntry 5}
+
+-- etp Port Table
+
+etpPortTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF EtpPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "ETP Port Table."
+    ::= { etp 2 }
+
+etpPortEntry OBJECT-TYPE
+    SYNTAX  EtpPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  { etpPortIfIndex }
+    ::= { etpPortTable 1 }
+
+EtpPortEntry ::= SEQUENCE {
+    etpPortIfIndex     InterfaceIndex,
+    etpPortRowStatus    RowStatus 
+ }
+
+etpPortIfIndex OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The ifIndex of the ETP Port.
+    The index definition is according to 'RAD Entities Index' format 8 type 31.
+	The Index includes etpIdx, etpPortType and etpPortIdx
+	(etpPortType and etpPortIdx is an agent parameter and not MIB parameter)
+     Upon creation of an entry might be not-applicable (=0)."
+    ::= { etpPortEntry 1 }
+
+etpPortRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of entries
+     in the etpPortTable."
+    ::= { etpPortEntry 2 }
+
+
+
+-----------------------------------
+--  ETP Statistics Definitions
+-----------------------------------
+
+etpStatTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF EtpStatEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "ETP statistics table."
+   ::= { etp 3 }
+
+etpStatEntry OBJECT-TYPE
+    SYNTAX     EtpStatEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "An entry in the ETP Statistics Table. "
+    INDEX { etpIdx, etpServiceIndex,etpStatDirection  }
+    ::= { etpStatTable 1 }
+
+EtpStatEntry ::= SEQUENCE {
+    etpServiceIndex      Integer32,
+    etpStatDirection                    INTEGER,
+    etpForwardGreenPackets             Counter32,
+    etpForwardGreenPacketsOverflow     Counter32,
+    etpForwardYellowPackets             Counter32,
+    etpForwardYellowPacketsOverflow     Counter32,
+    etpDiscardGreenPackets              Counter32,
+    etpDiscardGreenPacketsOverflow      Counter32,
+    etpDiscardYellowRedPackets          Counter32,
+    etpDiscardYellowRedPacketsOverflow  Counter32,
+    etpForwardGreenBytes             Counter32,
+    etpForwardGreenBytesOverflow        Counter32,
+    etpForwardYellowBytes               Counter32,
+    etpForwardYellowBytesOverflow       Counter32,
+    etpDiscardGreenBytes             Counter32,
+    etpDiscardGreenBytesOverflow        Counter32,
+    etpDiscardYellowRedBytes            Counter32,
+    etpDiscardYellowRedBytesOverflow    Counter32,
+    etpStatClearCounters                      INTEGER 
+ }
+
+etpServiceIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"This index defines whether the collocted statistics are per ETP or per Class Of Service
+	 whithin the ETP.
+	 255  = ETP statistics.
+	 0..7 = Class Of Service statistics."
+	 ::= { etpStatEntry 1 }
+
+etpStatDirection  OBJECT-TYPE
+    SYNTAX     INTEGER
+    {
+         tx   (1),
+         rx   (2),
+		 notApplicable(255)
+    }
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "The direction in which the measurement is taken.
+       Tx = to the net
+       Rx = from the net."
+    ::= {  etpStatEntry 2 }
+
+etpForwardGreenPackets	   OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded packets
+      that where marked Green."
+    ::= {  etpStatEntry 3 }
+
+etpForwardGreenPacketsOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardGreenPackets counter has overflowed."
+    ::= {  etpStatEntry 4 }
+
+etpForwardYellowPackets  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded packets
+      that where marked Yellow."
+    ::= {  etpStatEntry 5 }
+
+etpForwardYellowPacketsOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardYellowPackets counter has overflowed."
+    ::= {  etpStatEntry 6 }
+
+etpDiscardGreenPackets OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded packets
+      that where marked Green."
+    ::= {  etpStatEntry 7 }
+
+etpDiscardGreenPacketsOverflow  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+       discardGreenPacket counter has overflowed."
+    ::= {  etpStatEntry 8 }
+
+etpDiscardYellowRedPackets OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded packets
+      that where marked Yellow or Red."
+    ::= {  etpStatEntry 9 }
+
+etpDiscardYellowRedPacketsOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+       discardYellowRedPackets counter has overflowed."
+    ::= {  etpStatEntry 10 }
+
+etpForwardGreenBytes	    OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded bytes
+      that where marked Green."
+    ::= {  etpStatEntry 11 }
+
+etpForwardGreenBytesOverflow    OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardGreenBytes counter has overflowed."
+    ::= {  etpStatEntry 12 }
+
+etpForwardYellowBytes   OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded bytes
+      that where marked Yellow."
+    ::= {  etpStatEntry 13 }
+
+etpForwardYellowBytesOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardYellowBytes counter has overflowed."
+    ::= {  etpStatEntry 14 }
+
+etpDiscardGreenBytes  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded bytes
+      that where marked Green."
+    ::= {  etpStatEntry 15 }
+
+etpDiscardGreenBytesOverflow  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         discardGreenBytes counter has overflowed."
+    ::= {  etpStatEntry 16}
+
+etpDiscardYellowRedBytes OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded bytes
+      that where marked Yellow or Red."
+    ::= {  etpStatEntry 17 }
+
+etpDiscardYellowRedBytesOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         discardYellowRedBytes counter has overflowed."
+    ::= {  etpStatEntry 18 }
+
+etpStatClearCounters  OBJECT-TYPE
+      SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will enforce a clear
+      operation of this statistics Counters.
+      Upon completion, the value will automatically change to off(2)."
+      DEFVAL { off }
+	::= { etpStatEntry 19 }
+
+
+
+
+END
+

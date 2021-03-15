@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage geolocation
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -101,10 +99,10 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
             $geo_type = 'reverse';
             break;
           }
-          else if (is_numeric($answer->degree_latitude) && is_numeric($answer->degree_longitude))
+          elseif (is_numeric($answer->degree_latitude) && is_numeric($answer->degree_longitude))
           {
-            $ns_multiplier = ($answer->ns_hem == 'N' ? 1 : -1);
-            $ew_multiplier = ($answer->ew_hem == 'E' ? 1 : -1);
+            $ns_multiplier = ($answer->ns_hem === 'N' ? 1 : -1);
+            $ew_multiplier = ($answer->ew_hem === 'E' ? 1 : -1);
 
             $location['location_lat'] = round($answer->degree_latitude + $answer->min_latitude/60 + $answer->sec_latitude/3600,7) * $ns_multiplier;
             $location['location_lon'] = round($answer->degree_longitude + $answer->min_longitude/60 + $answer->sec_longitude/3600,7) * $ew_multiplier;
@@ -136,7 +134,7 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
      *   33.234,-56.22
      */
     $pattern = '/(?:^|[\[(])\s*(?<lat>[+-]?\d+(?:\.\d+)*)\s*[,:; ]\s*(?<lon>[+-]?\d+(?:\.\d+)*)\s*(?:[\])]|$)/';
-    if ($geo_type == 'forward' && preg_match($pattern, $address, $matches))
+    if ($geo_type === 'forward' && preg_match($pattern, $address, $matches))
     {
       if ($matches['lat'] >= -90  && $matches['lat'] <= 90 &&
           $matches['lon'] >= -180 && $matches['lon'] <= 180)
@@ -148,8 +146,7 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
     }
 
     // Excluded bad location strings like <none>, Unknown, ''
-    $valid_address = strlen($address) > 4 && !preg_match('/^[<\\\(]?(unknown|private|none|office|location|snmplocation)[>\\\)]?$/i', $address);
-    if ($geo_type == 'reverse' || $valid_address)
+    if ($geo_type === 'reverse' || is_valid_location($address))
     {
       // We have correct non empty address or reverse coordinates
 
@@ -157,7 +154,7 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
       $is_geo_def = isset($geo_def[$geo_type]);
       $is_geo_file = is_file($config['install_dir'] . '/includes/geolocation/' . $location['location_geoapi'] . '.inc.php');
 
-      if ($geo_type == 'reverse')
+      if ($geo_type === 'reverse')
       {
         $debug_msg .= '  by REVERSE query (API: '.strtoupper($config['geocoding']['api']).', LAT: '.$location['location_lat'].', LON: '.$location['location_lon'].') - ';
       } else {
@@ -210,17 +207,17 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
             $data = json_decode($mapresponse, TRUE);
         }
 
-        if ($geo_type == 'forward')
+        if ($geo_type === 'forward')
         {
           // We seem to have hit a snag geocoding. It might be that the first element of the address is a business name.
           // Lets drop the first element and see if we get anything better! This works more often than one might expect.
-          if (str_contains($address, ' - '))
+          if (str_exists($address, ' - '))
           {
             // Rack: NK-76 - Nikhef, Amsterdam, NL
             list(, $address_second) = explode(' - ', $address, 2);
             $address_second = trim($address_second);
           }
-          elseif (str_contains($address, ','))
+          elseif (str_exists($address, ','))
           {
             // ZRH2, Badenerstrasse 569, Zurich, Switzerland
             list(, $address_second) = explode(',', $address, 2);
@@ -284,7 +281,7 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
       elseif ($is_geo_def)
       {
         // Set lat/lon and others by definitions
-        if ($geo_type == 'forward')
+        if ($geo_type === 'forward')
         {
           $location['location_lat'] = array_get_nested($data, $geo_def[$geo_type]['location_lat']);
           $location['location_lon'] = array_get_nested($data, $geo_def[$geo_type]['location_lon']);
@@ -330,7 +327,7 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
     $param = 'location_' . $entry;
     $location[$param] = strlen($location[$param]) ? str_ireplace(' '.$entry, '', $location[$param]) : 'Unknown';
   }
-  // Unificate Country name
+  // Unified Country name
   if (strlen($location['location_country']))
   {
     $location['location_country'] = country_from_code($location['location_country']);
@@ -348,7 +345,7 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
   }
   $debug_msg .= '  GEO API REQUEST: ' . $url;
 
-  if ($geo_status == 'FOUND')
+  if ($geo_status === 'FOUND')
   {
     $debug_msg .= PHP_EOL . '  GEO LOCATION: ';
     $debug_msg .= $location['location_country'].' (Country), '.$location['location_state'].' (State), ';
@@ -356,7 +353,7 @@ function get_geolocation($address, $geo_db = array(), $dns_only = FALSE)
     $debug_msg .= PHP_EOL . '  GEO COORDINATES: ';
     $debug_msg .= $location['location_lat'] .' (Latitude), ' .$location['location_lon'] .' (Longitude)';
   } else {
-    $debug_msg .= PHP_EOL . '  QUERY DATE: '.date('r'); // This is requered for increase data in DB
+    $debug_msg .= PHP_EOL . '  QUERY DATE: '.date('r'); // This is required for increase data in DB
   }
   print_debug($debug_msg);
   $location['location_status'] = $debug_msg;

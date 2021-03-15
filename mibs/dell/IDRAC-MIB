@@ -2,8 +2,8 @@
 --
 -- Title: iDRAC MIB
 --
--- Version: 3.2
--- Date: 19 January 2015
+-- Version: 3.4
+-- Date: 21 August 2018
 --
 -- Description: This MIB defines MIB objects that make iDRAC data available
 -- to SNMP management applications.
@@ -12,7 +12,7 @@
 -- of Managed Information) notations: SMIv1 and SMIv2. This copy of the iDRAC
 -- MIB file is the SMIv1 version of the MIB file.
 --
--- Copyright (c) 2012-2015 Dell Inc.
+-- Copyright (c) 2012-2018 Dell Inc.
 -- All Rights Reserved.
 --
 -- Note: The information and functionality described by this MIB file,
@@ -149,6 +149,13 @@ StateCapabilitiesFlags          ::= INTEGER {
     enableAndNotReadyCapable(6)
 }
 
+SystemLockdownModeEnum                             ::= INTEGER {
+    --disabled(0),                             -  LockdownMode disabled
+    enabled(1),                                  -- LockdownMode enabled
+	unknown(2)                                  -- LockdownMode unknown
+}
+
+
 --
 -- Generic State Settings
 --
@@ -221,8 +228,13 @@ RacTypeEnum                 ::= INTEGER {
     unknown(2),             -- the RAC type is unknown
     idrac7monolithic(16),   -- iDRAC7 Monolithic
     idrac7modular(17),      -- iDRAC7 Modular
+    idrac7DCS(21),          -- iDRAC7 DCS
     idrac8monolithic(32),   -- iDRAC8 Monolithic
-    idrac8modular(33)       -- iDRAC8 Modular
+    idrac8modular(33),      -- iDRAC8 Modular
+    idrac8DCS(34),         -- iDRAC8 DCS
+    idrac9Monolithic(48),   -- iDRAC9 Monolothic
+    idrac9Modular(49),      -- iDRAC9 Modular
+    idrac9DCS(50)           -- iDRAC9 DCS
 }
 
 SystemFormFactorEnum   ::= INTEGER {
@@ -538,7 +550,20 @@ systemNodeID OBJECT-TYPE
         provides a unique identifier for the system."
     ::= { systemInfoGroup 18 }
 
-
+systemOEMOSVersion OBJECT-TYPE
+    SYNTAX          StringType
+    ACCESS          read-only
+    STATUS          mandatory
+    DESCRIPTION
+        "This attribute defines the OEM version of the operating system ."
+    ::= { systemInfoGroup 19 }
+systemLockdownMode OBJECT-TYPE
+    SYNTAX          SystemLockdownModeEnum
+    ACCESS          read-only
+    STATUS          mandatory
+    DESCRIPTION
+        "This attribute defines the system Lockdown mode is enabled or disabled."
+    ::= { systemInfoGroup 20 }
 ------------------------------------------------------------------------------
 -- Status Group
 --
@@ -806,7 +831,8 @@ SystemStateTableEntry                              ::= SEQUENCE {
     systemStateIDSDMCardDeviceStatusList           OCTET STRING,
     systemStateTemperatureStatisticsStateDetails   OCTET STRING,
     systemStateTemperatureStatisticsStatusCombined ObjectStatusEnum,
-    systemStateTemperatureStatisticsStatusDetails  OCTET STRING
+    systemStateTemperatureStatisticsStatusDetails  OCTET STRING,
+	systemStateCMCStatus       ObjectStatusEnum
 }
 
 systemStateTable                                OBJECT-TYPE
@@ -1379,7 +1405,13 @@ systemStateTemperatureStatisticsStatusDetails   OBJECT-TYPE
         The bytes have the same definition type as ObjectStatusEnum."
     ::= { systemStateTableEntry 64 }
 
-
+systemStateCMCStatus          OBJECT-TYPE
+    SYNTAX      ObjectStatusEnum
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION
+        "0200.0010.0001.0065 This attribute defines the status of CMC."
+    ::= { systemStateTableEntry 65 }
 -------------------------------------------------------------------------------
 -- Chassis Information Group
 --
@@ -2172,7 +2204,8 @@ FirmwareType                                    ::= INTEGER {
     unknown(2),                                 -- type is unknown
     lifecycleController(20),                    -- type is Lifecycle Controller
     iDRAC7(21),                                 -- type is Integrated Dell Remote Access Controller 7
-    iDRAC8(22)                                  -- type is Integrated Dell Remote Access Controller 8
+    iDRAC8(22),                                 -- type is Integrated Dell Remote Access Controller 8
+    iDRAC9(23)                                  -- type is Integrated Dell Remote Access Controller 9
 }
 
 FirmwareTableEntry                              ::= SEQUENCE {
@@ -4453,6 +4486,7 @@ ProcessorDeviceFamily                           ::= INTEGER {
     deviceFamilyIs68010(99),                    -- family is 68010
     deviceFamilyIs68020(100),                   -- family is 68020
     deviceFamilyIs68030(101),                   -- family is 68030
+    deviceFamilyIsAMDZen(107),                  -- family is AMD Zen Processor Family
     deviceFamilyIsHobbit(112),                  -- family is Hobbit Family
     deviceFamilyIsCrusoeTM5000(120),            -- family is Crusoe TM5000 Family
     deviceFamilyIsCrusoeTM3000(121),            -- family is Crusoe TM3000 Family
@@ -4952,6 +4986,20 @@ processorDeviceStatusLocationName               OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
 
+MemoryTechnologyEnum            ::= INTEGER {
+    other(1),                       -- the memory technology is other than following values
+    unknown(2),                     -- the memory technology is not one of the following:
+    dram(3),                        -- the memory technology is DRAM
+    nvdimm-n(4),                    -- the memory technology is NVDIMM-N
+    nvdimm-f(5),                    -- the memory technology is NVDIMM-F
+    nvdimm-p(6),                    -- the memory technology is NVDIMM-P
+	intelpersistentmemory(7)        -- the memory technology is intelpersistentmemory
+}
+
+MemoryPropertyEnum           ::= INTEGER {
+	notApplicable(255)				-- the memory property is NotApplicable for the device.
+}
+
 MemoryDeviceTypeEnum                            ::= INTEGER {
     deviceTypeIsOther(1),                       -- type is other than following values
     deviceTypeIsUnknown(2),                     -- type is unknown
@@ -4993,7 +5041,12 @@ MemoryDeviceTableEntry                          ::= SEQUENCE {
     memoryDevicePartNumberName                  String64,
     memoryDeviceSerialNumberName                String64,
     memoryDeviceFQDD                            FQDDString,
-    memoryDeviceCurrentOperatingSpeed           Unsigned32BitRange
+    memoryDeviceCurrentOperatingSpeed           Unsigned32BitRange,
+    memoryDeviceTechnology                      MemoryTechnologyEnum,
+    memoryDeviceVolatileSize					Unsigned32BitRange,
+    memoryDeviceNonVolatilesSize				Unsigned32BitRange,
+    memoryDeviceCacheSize						Unsigned32BitRange,
+    memoryDeviceRemainingRatedWriteEndurance    MemoryPropertyEnum
 }
 
 memoryDeviceTable                               OBJECT-TYPE
@@ -5146,6 +5199,46 @@ memoryDeviceCurrentOperatingSpeed               OBJECT-TYPE
         "1100.0050.0001.0027 This attribute defines the current operating speed
         in megahertz (MHz) of the memory device.  Zero indicates an unknown speed."
     ::= { memoryDeviceTableEntry 27 }
+
+memoryDeviceTechnology               OBJECT-TYPE
+    SYNTAX      MemoryTechnologyEnum
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION
+        "1100.0050.0001.0028 This attribute defines the type or technology of the memory device."
+    ::= { memoryDeviceTableEntry 28 }
+
+memoryDeviceVolatileSize               OBJECT-TYPE
+    SYNTAX      Unsigned32BitRange
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION
+        "1100.0050.0001.0029 This attribute defines the volatile size of the memory device in MBs."
+    ::= { memoryDeviceTableEntry 29 }
+
+memoryDeviceNonVolatilesSize               OBJECT-TYPE
+    SYNTAX      Unsigned32BitRange
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION
+        "1100.0050.0001.0030 This attribute defines the Non Volatile size of the memory device in MBs."
+    ::= { memoryDeviceTableEntry 30 }
+
+memoryDeviceCacheSize               OBJECT-TYPE
+    SYNTAX      Unsigned32BitRange
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION
+        "1100.0050.0001.0031 This attribute defines the Cache size of the memory device in MBs."
+    ::= { memoryDeviceTableEntry 31 }
+	
+memoryDeviceRemainingRatedWriteEndurance               OBJECT-TYPE
+    SYNTAX      MemoryPropertyEnum
+    ACCESS      read-only
+    STATUS      mandatory
+    DESCRIPTION
+        "1100.0050.0001.0032 This attribute defines the percent of remaining life for the memory device"
+    ::= { memoryDeviceTableEntry 32 }
 
 
 -------------------------------------------------------------------------------
@@ -9719,6 +9812,41 @@ alertPhysicalDiskFailure TRAP-TYPE
     ::= 2297
 
 ------------------------------------------------------------------------------
+-- System Performance Traps
+--
+-- Category: System/1
+-- Subcategory: PFM/75
+------------------------------------------------------------------------------
+
+alertSystemPerformanceWarning TRAP-TYPE
+    ENTERPRISE  systemAlertTrapGroup
+    VARIABLES { alertMessageID,
+                alertMessage,
+                alertCurrentStatus,
+                alertSystemServiceTag,
+                alertSystemFQDN,
+                alertFQDD,
+                alertDeviceDisplayName,
+                alertMessageArguments,
+                alertChassisServiceTag,
+                alertChassisName,
+                alertRacFQDN }
+    DESCRIPTION
+        "System Performance warning."
+    --#TYPE       "System: Performance Warning"
+    --#SEVERITY   MINOR
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Status Events"
+    --#STATE      DEGRADED
+    --#STATUS     MANDATORY
+    ::= 2650
+
+------------------------------------------------------------------------------
 -- BIOS POST Trap
 --
 -- Category: System/1
@@ -9971,6 +10099,41 @@ alertPowerUsageFailure TRAP-TYPE
     --#STATE      DEGRADED
     --#STATUS     MANDATORY
     ::= 2273
+
+------------------------------------------------------------------------------
+-- RAC Traps
+--
+-- Category: System/1
+-- Subcategory: RAC/60
+------------------------------------------------------------------------------
+
+alertRACInformation TRAP-TYPE
+    ENTERPRISE  systemAlertTrapGroup
+    VARIABLES { alertMessageID,
+                alertMessage,
+                alertCurrentStatus,
+                alertSystemServiceTag,
+                alertSystemFQDN,
+                alertFQDD,
+                alertDeviceDisplayName,
+                alertMessageArguments,
+                alertChassisServiceTag,
+                alertChassisName,
+                alertRacFQDN }
+    DESCRIPTION
+        "RAC information."
+    --#TYPE       "System: RAC information"
+    --#SEVERITY   INFORMATIONAL
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Status Events"
+    --#STATE      OPERATIONAL
+    --#STATUS     MANDATORY
+    ::= 2531
 
 ------------------------------------------------------------------------------
 -- Redundancy Traps
@@ -10554,6 +10717,41 @@ alertSoftwareConfigurationFailure TRAP-TYPE
     ::= 2337
 
 ------------------------------------------------------------------------------
+-- iDRAC Memory Unresponsive Trap
+--
+-- Category: System/1
+-- Subcategory: SYS/48
+------------------------------------------------------------------------------
+
+alertInternaliDRACMemoryUnresponsive TRAP-TYPE
+    ENTERPRISE  systemAlertTrapGroup
+    VARIABLES { alertMessageID,
+              alertMessage,
+              alertCurrentStatus,
+              alertSystemServiceTag,
+              alertSystemFQDN,
+              alertFQDD,
+              alertDeviceDisplayName,
+              alertMessageArguments,
+              alertChassisServiceTag,
+              alertChassisName,
+              alertRacFQDN }
+    DESCRIPTION
+        "Unable to communicate with internal iDRAC memory"
+    --#TYPE       "System: Internal iDRAC Memory Unresponsive"
+    --#SEVERITY   CRITICAL
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Error Events"
+    --#STATE      OPERATIONAL
+    --#STATUS     MANDATORY
+    ::= 2433
+	
+------------------------------------------------------------------------------
 -- Temperature Probe Traps
 --
 -- Category: System/1
@@ -10926,75 +11124,6 @@ alertVoltageProbeFailure TRAP-TYPE
     --#STATUS     MANDATORY
     ::= 2169
 
-------------------------------------------------------------------------------
--- RAC Traps
---
--- Category: System/1
--- Subcategory: RAC/60
-------------------------------------------------------------------------------
-
-alertRACInformation TRAP-TYPE
-    ENTERPRISE  systemAlertTrapGroup
-    VARIABLES { alertMessageID,
-                alertMessage,
-                alertCurrentStatus,
-                alertSystemServiceTag,
-                alertSystemFQDN,
-                alertFQDD,
-                alertDeviceDisplayName,
-                alertMessageArguments,
-                alertChassisServiceTag,
-                alertChassisName,
-                alertRacFQDN }
-    DESCRIPTION
-        "RAC information."
-    --#TYPE       "System: RAC information"
-    --#SEVERITY   INFORMATIONAL
-    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
-    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
-    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
-    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
-    --#SUMMARY    "RAC FQDN: %s"
-    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
-    --#CATEGORY   "Status Events"
-    --#STATE      OPERATIONAL
-    --#STATUS     MANDATORY
-    ::= 2531
-
-------------------------------------------------------------------------------
--- System Performance Traps
---
--- Category: System/1
--- Subcategory: PFM/75
-------------------------------------------------------------------------------
-
-alertSystemPerformanceWarning TRAP-TYPE
-    ENTERPRISE  systemAlertTrapGroup
-    VARIABLES { alertMessageID,
-                alertMessage,
-                alertCurrentStatus,
-                alertSystemServiceTag,
-                alertSystemFQDN,
-                alertFQDD,
-                alertDeviceDisplayName,
-                alertMessageArguments,
-                alertChassisServiceTag,
-                alertChassisName,
-                alertRacFQDN }
-    DESCRIPTION
-        "System Performance warning."
-    --#TYPE       "System: Performance Warning"
-    --#SEVERITY   MINOR
-    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
-    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
-    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
-    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
-    --#SUMMARY    "RAC FQDN: %s"
-    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
-    --#CATEGORY   "Status Events"
-    --#STATE      DEGRADED
-    --#STATUS     MANDATORY
-    ::= 2650
 
 
 ------------------------------------------------------------------------------
@@ -11641,6 +11770,40 @@ alertStorageSecurityFailure TRAP-TYPE
     --#STATE      OPERATIONAL
     --#STATUS     MANDATORY
     ::= 4433
+
+------------------------------------------------------------------------------
+-- Solid State Drive
+--
+-- Category: storage/2
+-- Subcategory: SSD/34
+------------------------------------------------------------------------------
+alertStorageSolidstateDrive TRAP-TYPE
+    ENTERPRISE  storageAlertTrapGroup
+    VARIABLES { alertMessageID,
+              alertMessage,
+              alertCurrentStatus,
+              alertSystemServiceTag,
+              alertSystemFQDN,
+              alertFQDD,
+              alertDeviceDisplayName,
+              alertMessageArguments,
+              alertChassisServiceTag,
+              alertChassisName,
+              alertRacFQDN }
+    DESCRIPTION
+        "SSD is less than the threshold value."
+    --#TYPE       "Storage: SSD Warning"
+    --#SEVERITY   MINOR
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Error Events"
+    --#STATE      OPERATIONAL
+    --#STATUS     MANDATORY
+    ::= 4370
 
 ------------------------------------------------------------------------------
 -- Storage Management Status Traps
@@ -12893,6 +13056,7 @@ alertTestTrapEvent TRAP-TYPE
     --#STATUS     MANDATORY
     ::= 10395
 
+    
 END
 
 ------------------------------------------------------------------------------

@@ -103,7 +103,7 @@ if (!count($fdbs) && $device['os_group'] == 'cisco' && empty($device['snmp_conte
     $dot1dTpFdbEntry_table = snmp_walk_multipart_oid($device_context, 'dot1dTpFdbEntry', array(), 'BRIDGE-MIB', NULL, OBS_SNMP_ALL_TABLE);
 
     // Detection shit snmpv3 authorization errors for contexts
-    if ($exec_status['exitcode'] != 0)
+    if ($GLOBALS['exec_status']['exitcode'] != 0)
     {
       unset($device_context);
       if ($device['snmp_version'] == 'v3')
@@ -188,8 +188,11 @@ if (!count($fdbs) && $device['os_group'] != 'cisco' && is_device_mib($device, 'Q
     }
   }
 
-  $dot1qTpFdbEntry_table = snmpwalk_cache_twopart_oid($device, 'dot1qTpFdbEntry', array(), 'Q-BRIDGE-MIB', NULL, OBS_SNMP_ALL_TABLE);
-
+  // Dell OS10 return strange additional num, see:
+  // https://jira.observium.org/browse/OBS-3213
+  //dot1qTpFdbPort[4][6:0:24:38:93:c8].0 = 59
+  //dot1qTpFdbPort[4][6:0:50:56:95:51].221 = 59
+  $dot1qTpFdbEntry_table = snmpwalk_cache_oid($device, 'dot1qTpFdbEntry', array(), 'Q-BRIDGE-MIB', NULL, OBS_SNMP_ALL_NUMERIC_INDEX);
   if (snmp_status())
   {
     // Build dot1dBasePort
@@ -198,27 +201,38 @@ if (!count($fdbs) && $device['os_group'] != 'cisco' && is_device_mib($device, 'Q
       $dot1dBasePort_table[$dot1dbaseport] = $port_ifIndex_table[$entry['dot1dBasePortIfIndex']];
     }
 
-    foreach ($dot1qTpFdbEntry_table AS $vlan => $mac_list)
+    foreach ($dot1qTpFdbEntry_table as $index => $entry)
     {
+      $index_array = explode('.', $index);
+      $vlan = array_shift($index_array);
+      if (count($index_array) > 6)
+      {
+        // Remove first (strange, incorrect) mac part
+        array_shift($index_array);
+      }
+      // reimplode index to mac
+      $mac = '';
+      foreach ($index_array as $mac_num)
+      {
+        $mac .= dechex($mac_num) . ':';
+      }
+      $mac = mac_zeropad(trim($mac, ':'));
+
       // if we have a translated vlan id for Juniper, use it
       if (isset($juniper_vlans[$vlan]))
       {
         $vlan = $juniper_vlans[$vlan];
       }
 
-      foreach($mac_list as $mac => $entry)
-      {
-        $mac = mac_zeropad($mac);
-        $fdb_port = $entry['dot1qTpFdbPort'];
+      $fdb_port = $entry['dot1qTpFdbPort'];
 
-        $data = array();
+      $data = array();
+      $data['port_id']    = $dot1dBasePort_table[$fdb_port]['port_id'];
+      $data['port_index'] = $dot1dBasePort_table[$fdb_port]['ifIndex'];
+      $data['fdb_status'] = $entry['dot1qTpFdbStatus'];
 
-        $data['port_id']    = $dot1dBasePort_table[$fdb_port]['port_id'];
-        $data['port_index'] = $dot1dBasePort_table[$fdb_port]['ifIndex'];
-        $data['fdb_status'] = $entry['dot1qTpFdbStatus'];
+      $fdbs[$vlan][$mac]  = $data;
 
-        $fdbs[$vlan][$mac]  = $data;
-      }
     }
   }
 }
@@ -406,9 +420,7 @@ if (is_numeric($fdb_count['total']) && $fdb_count['total'] > 0)
 
 $alert_metrics['fdb_count'] = $fdb_count['total']; // Append fdb count to device metrics
 
-// FIXME should non-global fdb count be in the ports poller?
-$fdbcount_module = 'enable_ports_fdbcount';
-if ($attribs[$fdbcount_module] || ($config[$fdbcount_module] && !isset($attribs[$fdbcount_module])))
+if (is_module_enabled($device, 'ports_fdbcount'))
 {
   foreach ($fdb_count['ports'] as $port_id => $count)
   {

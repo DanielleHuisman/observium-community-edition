@@ -32,4 +32,4 @@ if ($rrd_list)
   include($config['html_dir']."/includes/graphs/generic_multi_line.inc.php");
 }
 
-?>
+// EOF

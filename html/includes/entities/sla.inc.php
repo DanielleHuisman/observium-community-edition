@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -183,6 +182,20 @@ function humanize_sla(&$sla)
   global $config;
 
   if (isset($sla['humanized'])) { return; }
+
+  $sla['sla_descr'] = 'SLA #' . $sla['sla_index'];
+  if (!empty($sla['sla_target']) && ($sla['sla_target'] != $sla['sla_tag']))
+  {
+    if (get_ip_version($sla['sla_target']) === 6)
+    {
+      $sla_target = Net_IPv6::compress($sla['sla_target'], TRUE);
+    } else {
+      $sla_target = $sla['sla_target'];
+    }
+    $sla['sla_descr']   .= ' (' . $sla['sla_tag'] . ': ' . $sla_target . ')';
+  } else {
+    $sla['sla_descr']   .= ' (' . $sla['sla_tag'] . ')';
+  }
 
   if (isset($config['entity_events'][$sla['rtt_event']]))
   {

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage definitions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -40,17 +39,20 @@ define('OBS_SNMP_TABLE',         512); // Force Program Like output (-OX)
 define('OBS_SNMP_DISPLAY_HINT', 1024); // Disables the use of DISPLAY-HINT information when assigning values (-Ih). This would then require providing the raw value.
 define('OBS_SNMP_TIMETICKS',    2048); // Force TimeTicks values as raw numbers (-Ot)
 define('OBS_SNMP_ASCII',        4096); // Force all string values as ASCII strings
-#define('OBS_',                 8192); // Reserved
-#define('OBS_',                16384); // Reserved
-#define('OBS_',                32768); // Reserved
+define('OBS_SNMP_NOINDEX',      8192); // Allow to walk tables without indexes, like snmpwalk_cache_bare_oid()
+define('OBS_SNMP_NOINCREASE',  16384); // Do not check returned OIDs are increasing in snmpwalk (-Cc)
+define('OBS_SNMP_INDEX_PARTS', 32768); // Use this to split index parts by arrow (->), actually for strings in index part and/or for OBS_SNMP_TABLE flag
+
 define('OBS_SNMP_ALL',               OBS_QUOTES_TRIM | OBS_QUOTES_STRIP);    // Set of common snmp options
 define('OBS_SNMP_ALL_MULTILINE',     OBS_QUOTES_TRIM | OBS_SNMP_CONCAT);     // Set of common snmp options with concatenate multiline snmp variable
 define('OBS_SNMP_ALL_ASCII',         OBS_QUOTES_TRIM | OBS_SNMP_ASCII);      // Set of common snmp options with forcing string values as ASCII strings
-define('OBS_SNMP_ALL_HEX',           OBS_SNMP_ALL | OBS_SNMP_HEX);           // Set of common snmp options forcing HEX output
+define('OBS_SNMP_ALL_UTF8',          OBS_SNMP_ALL_ASCII | OBS_SNMP_HEX | OBS_DECODE_UTF8); // Set of common snmp options with forcing string values as UTF8 strings
+define('OBS_SNMP_ALL_HEX',           OBS_SNMP_ALL_MULTILINE | OBS_SNMP_HEX); // Set of common snmp options forcing HEX output
 define('OBS_SNMP_ALL_ENUM',          OBS_SNMP_ALL | OBS_SNMP_ENUM);          // Set of common snmp options without enumerating values
 define('OBS_SNMP_ALL_NUMERIC',       OBS_SNMP_ALL | OBS_SNMP_NUMERIC);       // Set of common snmp options with numeric OIDs
 define('OBS_SNMP_ALL_NUMERIC_INDEX', OBS_SNMP_ALL | OBS_SNMP_NUMERIC_INDEX); // Set of common snmp options with numeric indexes
-define('OBS_SNMP_ALL_TABLE',         OBS_SNMP_ALL | OBS_SNMP_TABLE);         // Set of common snmp options with Program Like (help for MAC parse in indexes)
+define('OBS_SNMP_ALL_NOINDEX',       OBS_SNMP_ALL | OBS_SNMP_NOINDEX);       // Set of common snmp options with ability collect table without indexes
+define('OBS_SNMP_ALL_TABLE',         OBS_QUOTES_TRIM | OBS_SNMP_TABLE);      // Set of common snmp options with Program Like (help for MAC parse in indexes)
 define('OBS_SNMP_ALL_TIMETICKS',     OBS_SNMP_ALL | OBS_SNMP_TIMETICKS);     // Set of common snmp options with TimeTicks as raw numbers
 
 // Bits 16-19 network flags
@@ -74,9 +76,9 @@ define('OBS_CONFIG_ADVANCED',       3); // 0011: Advanced view, includes basic
 define('OBS_CONFIG_EXPERT',         7); // 0111: Expert view, includes advanced and basic
 
 // Common regex patterns
-define('OBS_PATTERN_START', '%(?:^|[\s\"\(=])');    // Begining of any pattern, matched string can start from newline, space, double quote, opening parenthesis, equal sign
-define('OBS_PATTERN_END',   '(?:[\s\"\),]|\:\ |$)%i'); // End of any pattern, matched string can ended with endline, space, double quote, closing parenthesis, comma
-define('OBS_PATTERN_END_U', OBS_PATTERN_END . 'u'); // ++Unicode
+define('OBS_PATTERN_START', '%(?:^|[\s\"\(=])');       // Beginning of any pattern, matched string can start from newline, space, double quote, opening parenthesis, equal sign
+define('OBS_PATTERN_END',   '(?:[\s\"\),]|[\:\.]\ |\.?$)%i'); // End of any pattern, matched string can ended with endline, space, double quote, closing parenthesis, comma, dot
+define('OBS_PATTERN_END_U', OBS_PATTERN_END . 'u');    // ++Unicode
 
 // IPv4 string in group \1 or 'ipv4'
 define('OBS_PATTERN_IPV4',      '(?<ipv4>(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9]))');
@@ -99,6 +101,9 @@ define('OBS_PATTERN_IPV6_NET_FULL', OBS_PATTERN_START . OBS_PATTERN_IPV6_NET . O
 // IPv4 or IPv6 string in group \1 or 'ip'
 define('OBS_PATTERN_IP',        '(?<ip>' . OBS_PATTERN_IPV4 . '|' . OBS_PATTERN_IPV6 . ')');
 define('OBS_PATTERN_IP_FULL',   OBS_PATTERN_START . OBS_PATTERN_IP . OBS_PATTERN_END);
+// IPv4 or IPv6 network string in group \1 or 'ip_network'
+define('OBS_PATTERN_IP_NET',      '(?<ip_network>' . OBS_PATTERN_IPV4_NET . '|' . OBS_PATTERN_IPV6_NET . ')');
+define('OBS_PATTERN_IP_NET_FULL', OBS_PATTERN_START . OBS_PATTERN_IP_NET . OBS_PATTERN_END);
 
 // MAC string in group \1 or 'mac'
 define('OBS_PATTERN_MAC',       '(?<mac>(?:[a-f\d]{1,2}(?:\:[a-f\d]{1,2}){5}|[a-f\d]{2}(?:\-[a-f\d]{2}){5}|[a-f\d]{2}(?:\ [a-f\d]{2}){5}|[a-f\d]{4}(?:\.[a-f\d]{4}){2}|(?:0x)?[a-f\d]{12}))');
@@ -121,6 +126,9 @@ define('OBS_PATTERN_EMAIL_LONG_FULL', OBS_PATTERN_START . OBS_PATTERN_EMAIL_LONG
 
 //define('OBS_PATTERN_URL',       '(?<url>(?:(?:https?|ftp)://)(?:\S+(?::\S*)?@|\d{1,3}(?:\.\d{1,3}){3}|(?:(?:[a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)(?:\.(?:[a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)*(?:\.[a-z\x{00a1}-\x{ffff}]{2,6}))(?::\d+)?(?:[^\s]*)?)');
 //define('OBS_PATTERN_URL_FULL',  OBS_PATTERN_START . OBS_PATTERN_URL . OBS_PATTERN_END_U);
+
+// SNMP HEX-STRING group \1 or 'hex'
+define('OBS_PATTERN_SNMP_HEX',  '(?<hex>[a-f\d]{2}(\ +[a-f\d]{2})*)\ ?');
 
 // Json flags
 define('OBS_JSON_BIGINT_AS_STRING', version_compare(PHP_VERSION, '5.4.0', '>=') && !(defined('JSON_C_VERSION') && PHP_INT_SIZE > 4)); // Check if BIGINT supported
@@ -169,8 +177,20 @@ elseif (defined('GMP_VERSION'))
 //var_dump(OBS_MATH);
 
 // Minimum supported versions
-define('OBS_MIN_PHP_VERSION',   '5.6.26'); // PHP
-define('OBS_MIN_MYSQL_VERSION', '5.1.59'); // MySQL, really 5.6+
+define('OBS_MIN_PHP_VERSION',     '5.6.26'); // PHP (15 Sep 2016, https://www.php.net/releases/index.php)
+define('OBS_MIN_PYTHON2_VERSION', '2.7.12'); // Python 2 (26 June 2016, https://www.python.org/doc/versions/)
+define('OBS_MIN_PYTHON3_VERSION', '3.5.2');  // Python 3 (27 June 2016, https://www.python.org/doc/versions/)
+define('OBS_MIN_MYSQL_VERSION',   '5.6.5');  // https://stackoverflow.com/questions/4489548/why-there-can-be-only-one-timestamp-column-with-current-timestamp-in-default-cla
+define('OBS_MIN_MARIADB_VERSION', '10.0');   // MySQL 5.6 mostly equals with MariaDB 10.0: https://mariadb.com/kb/en/timestamp/
+define('OBS_MIN_RRD_VERSION',     '1.5.5');  // RRDTool (10 Nov 2015, https://github.com/oetiker/rrdtool-1.x/tags)
+
+// Minimum possible unixtime, only for validate passed unixtime
+//define('OBS_MIN_UNIXTIME', 946684800); // 01/01/2000 @ 12:00am (UTC), just in most cases unixtime not possible less than this date (net-snmp released in 2000, any network device not have uptime longest)
+define('OBS_MIN_UNIXTIME', 504921600); // 01/01/1986 @ 12:00am (UTC), not network devices produces before this date :)
+
+// OBSERVIUM URLs
+define('OBSERVIUM_URL',          'https://www.observium.org');
+define('OBSERVIUM_DOCS_URL',     'https://docs.observium.org');
 
 // Set QUIET
 define('OBS_QUIET', isset($options['q']));
@@ -191,9 +211,9 @@ if (isset($options['d']))
     ini_set('error_reporting', E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR); // Only various errors
   }
 }
-else if ($debug_web_requested = (isset($_REQUEST['debug']) && $_REQUEST['debug']) ||
+elseif ($debug_web_requested = ((isset($_REQUEST['debug']) && $_REQUEST['debug']) ||
                                 (isset($_SERVER['PATH_INFO']) && strpos($_SERVER['PATH_INFO'], 'debug')) ||
-                                (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'debug')))
+                                (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'debug'))))
 {
   // WEB
 
@@ -322,68 +342,87 @@ $config['alert_graphs']['processor']['processor_usage']  = array('type' => 'proc
 $config['alert_graphs']['storage']['storage_perc']  = array('type' => 'storage_usage', 'id' => '@storage_id');
 
 // IP types
-
+// https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
 $config['ip_types']['unspecified']    = array('networks' => array('0.0.0.0', '::/128'),
                                               'name'     => 'Unspecified', 'subtext' => 'Example: ::/128, 0.0.0.0',
+                                              'label-class' => 'error',
                                               'descr'    => 'This address may only be used as a source address by an initialising host before it has learned its own address. Example: ::/128, 0.0.0.0');
 $config['ip_types']['loopback']       = array('networks' => array('127.0.0.0/8', '::1/128'),
                                               'name'     => 'Loopback', 'subtext' => 'Example: ::1/128, 127.0.0.1',
+                                              'label-class' => 'info',
                                               'descr'    => 'This address is used when a host talks to itself. Example: ::1/128, 127.0.0.1');
 $config['ip_types']['private']        = array('networks' => array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'),
                                               'name'     => 'Private Local Addresses', 'subtext' => 'Example: fdf8:f53b:82e4::53, 192.168.0.1',
+                                              'label-class' => 'warning',
                                               'descr'    => 'These addresses are reserved for local use in home and enterprise environments and are not public address space. Example: fdf8:f53b:82e4::53, 192.168.0.1');
 $config['ip_types']['multicast']      = array('networks' => array('224.0.0.0/4', 'ff00::/8'),
                                               'name'     => 'Multicast', 'subtext' => 'Example: ff01:0:0:0:0:0:0:2, 224.0.0.1',
+                                              'label-class' => 'inverse',
                                               'descr'    => 'These addresses are used to identify multicast groups. Example: ff01:0:0:0:0:0:0:2, 224.0.0.1');
 $config['ip_types']['link-local']     = array('networks' => array('169.254.0.0/16', 'fe80::/10'),
                                               'name'     => 'Link-Local Addresses', 'subtext' => 'Example: fe80::200:5aee:feaa:20a2, 169.254.3.1',
+                                              'label-class' => 'suppressed',
                                               'descr'    => 'These addresses are used on a single link or a non-routed common access network, such as an Ethernet LAN. Example: fe80::200:5aee:feaa:20a2, 169.254.3.1');
 $config['ip_types']['ipv4mapped']     = array('networks' => array('::ffff/96'),
-                                              'name'     => 'IPv6 IPv4-Mapped', 'subtext' => '::ffff:192.0.2.47',
-                                              'descr'    => 'These addresses are used to embed IPv4 addresses in an IPv6 address. Example: ::ffff:192.0.2.47');
+                                              'name'     => 'IPv6 IPv4-Mapped', 'subtext' => 'Example: ::ffff:192.0.2.47',
+                                              'label-class' => 'primary',
+                                              'descr'    => 'These addresses are used to embed IPv4 addresses in an IPv6 address. Example: 64:ff9b::192.0.2.33');
+$config['ip_types']['ipv4embedded']   = array('networks' => array('64:ff9b::/96'),
+                                              'name'     => 'IPv6 IPv4-Embedded', 'subtext' => 'Example: ::ffff:192.0.2.47',
+                                              'label-class' => 'primary',
+                                              'descr'    => 'IPv4-converted IPv6 addresses and IPv4-translatable IPv6 addresses. Example: 64:ff9b::192.0.2.33');
 $config['ip_types']['6to4']           = array('networks' => array('192.88.99.0/24', '2002::/16'),
                                               'name'     => 'IPv6 6to4', 'subtext' => 'Example: 2002:cb0a:3cdd:1::1, 192.88.99.1',
+                                              'label-class' => 'primary',
                                               'descr'    => 'A 6to4 gateway adds its IPv4 address to this 2002::/16, creating a unique /48 prefix. Example: 2002:cb0a:3cdd:1::1, 192.88.99.1');
 $config['ip_types']['documentation']  = array('networks' => array('192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24', '2001:db8::/32'),
                                               'name'     => 'Documentation', 'subtext' => 'Example: 2001:db8:8:4::2, 203.0.113.1',
+                                              'label-class' => 'primary',
                                               'descr'    => 'These addresses are used in examples and documentation. Example: 2001:db8:8:4::2, 203.0.113.1');
 $config['ip_types']['teredo']         = array('networks' => array('2001:0000::/32'),
                                               'name'     => 'IPv6 Teredo', 'subtext' => 'Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2',
+                                              'label-class' => 'primary',
                                               'descr'    => 'This is a mapped address allowing IPv6 tunneling through IPv4 NATs. The address is formed using the Teredo prefix, the servers unique IPv4 address, flags describing the type of NAT, the obfuscated client port and the client IPv4 address, which is probably a private address. Example: 2001:0000:4136:e378:8000:63bf:3fff:fdd2');
 $config['ip_types']['benchmark']      = array('networks' => array('198.18.0.0/15', '2001:0002::/48'),
                                               'name'     => 'Benchmarking', 'subtext' => 'Example: 2001:0002:6c::430, 198.18.0.1',
+                                              'label-class' => 'error',
                                               'descr'    => 'These addresses are reserved for use in documentation. Example: 2001:0002:6c::430, 198.18.0.1');
 $config['ip_types']['orchid']         = array('networks' => array('2001:0010::/28', '2001:0020::/28'),
                                               'name'     => 'IPv6 Orchid', 'subtext' => 'Example: 2001:10:240:ab::a',
+                                              'label-class' => 'primary',
                                               'descr'    => 'These addresses are used for a fixed-term experiment. Example: 2001:10:240:ab::a');
 $config['ip_types']['reserved']       = array(//'networks' => array(),
-                                              'name'     => 'Reserved',
+                                              'name'     => 'Reserved', 'subtext' => 'Address in reserved address space',
+                                              'label-class' => 'error',
                                               'descr'    => 'Reserved address space');
 $config['ip_types']['broadcast']      = array(//'networks' => array(),
                                               'name'     => 'IPv4 Broadcast', 'subtext' => 'Example: 255.255.255.255',
+                                              'label-class' => 'disabled',
                                               'descr'    => 'IPv4 broadcast address. Example: 255.255.255.255');
 $config['ip_types']['anycast']        = array(//'networks' => array(),
                                               'name'     => 'Anycast',
+                                              'label-class' => 'primary',
                                               'descr'    => 'Anycast is a network addressing and routing methodology in which a single destination address has multiple routing paths to two or more endpoint destinations.');
 // Keep this at last!
 $config['ip_types']['unicast']        = array('networks' => array('2000::/3'), // 'networks' => array('0.0.0.0/0', '2000::/3'),'
                                               'name'     => 'Global Unicast', 'subtext' => 'Example: 2a02:408:7722::, 80.94.60.2', 'disabled' => 1,
+                                              'label-class' => 'success',
                                               'descr'    => 'Global Unicast addresses. Example: 2a02:408:7722::, 80.94.60.2');
 
 // Syslog colour and name translation
 
-$config['syslog']['priorities'][0] = array('name' => 'emergency',     'color' => '#D94640', 'label-class' => 'inverse',    'row-class' => 'error');
-$config['syslog']['priorities'][1] = array('name' => 'alert',         'color' => '#D94640', 'label-class' => 'delayed',    'row-class' => 'error');
-$config['syslog']['priorities'][2] = array('name' => 'critical',      'color' => '#D94640', 'label-class' => 'error',      'row-class' => 'error');
-$config['syslog']['priorities'][3] = array('name' => 'error',         'color' => '#E88126', 'label-class' => 'error',      'row-class' => 'error');
-$config['syslog']['priorities'][4] = array('name' => 'warning',       'color' => '#F2CA3F', 'label-class' => 'warning',    'row-class' => 'warning');
-$config['syslog']['priorities'][5] = array('name' => 'notification',  'color' => '#107373', 'label-class' => 'success',    'row-class' => 'recovery');
-$config['syslog']['priorities'][6] = array('name' => 'informational', 'color' => '#499CA6', 'label-class' => 'primary',    'row-class' => ''); //'row-class' => 'info');
-$config['syslog']['priorities'][7] = array('name' => 'debugging',     'color' => '#5AA637', 'label-class' => 'suppressed', 'row-class' => 'suppressed');
+$config['syslog']['priorities'][0] = array('name' => 'emergency',     'color' => '#D94640', 'label-class' => 'inverse',    'row-class' => 'error',      'emoji' => 'red_circle');
+$config['syslog']['priorities'][1] = array('name' => 'alert',         'color' => '#D94640', 'label-class' => 'delayed',    'row-class' => 'error',      'emoji' => 'red_circle');
+$config['syslog']['priorities'][2] = array('name' => 'critical',      'color' => '#D94640', 'label-class' => 'error',      'row-class' => 'error',      'emoji' => 'red_circle');
+$config['syslog']['priorities'][3] = array('name' => 'error',         'color' => '#E88126', 'label-class' => 'error',      'row-class' => 'error',      'emoji' => 'red_circle');
+$config['syslog']['priorities'][4] = array('name' => 'warning',       'color' => '#F2CA3F', 'label-class' => 'warning',    'row-class' => 'warning',    'emoji' => 'large_yellow_circle');
+$config['syslog']['priorities'][5] = array('name' => 'notification',  'color' => '#107373', 'label-class' => 'success',    'row-class' => 'recovery',   'emoji' => 'large_orange_circle'); // large_green_circle
+$config['syslog']['priorities'][6] = array('name' => 'informational', 'color' => '#499CA6', 'label-class' => 'primary',    'row-class' => '',           'emoji' => 'large_blue_circle'); //'row-class' => 'info');
+$config['syslog']['priorities'][7] = array('name' => 'debugging',     'color' => '#5AA637', 'label-class' => 'suppressed', 'row-class' => 'suppressed', 'emoji' => 'large_purple_circle');
 
 for ($i = 8; $i < 16; $i++)
 {
-  $config['syslog']['priorities'][$i] = array('name' => 'other',        'color' => '#D2D8F9', 'label-class' => 'disabled',   'row-class' => 'disabled');
+  $config['syslog']['priorities'][$i] = array('name' => 'other',        'color' => '#D2D8F9', 'label-class' => 'disabled',   'row-class' => 'disabled', 'emoji' => 'large_orange_circle');
 }
 
 // https://tools.ietf.org/html/draft-ietf-netmod-syslog-model-14
@@ -412,12 +451,20 @@ $config['syslog']['facilities'][21] = array('name' => 'local5',   'descr' => 'lo
 $config['syslog']['facilities'][22] = array('name' => 'local6',   'descr' => 'local use 6 (local6)');
 $config['syslog']['facilities'][23] = array('name' => 'local7',   'descr' => 'local use 7 (local7)');
 
+// Alert severities (emoji used _only_ as notification icon)
+// Recover emoji is white_check_mark
+$config['alert']['severity']['crit'] = [ 'name' => 'Critical',      'color' => '#D94640', 'label-class' => 'error',   'row-class' => 'error',   'icon' => $config['icon']['critical'],      'emoji' => 'fire' ];
+$config['alert']['severity']['warn'] = [ 'name' => 'Warning',       'color' => '#F2CA3F', 'label-class' => 'warning', 'row-class' => 'warning', 'icon' => $config['icon']['warning'],       'emoji' => 'warning' ];
+//$config['alert']['severity']['info'] = [ 'name' => 'Informational', 'color' => '#499CA6', 'label-class' => 'primary', 'row-class' => 'info',    'icon' => $config['icon']['informational'], 'emoji' => 'information_source' ];
+
 // Possible transports for net-snmp, used for enumeration in several functions
 $config['snmp']['transports'] = array('udp', 'udp6', 'tcp', 'tcp6');
 
 // 'count' is min total errors count, after which autodisable this MIB/oid pair
 // 'rate' is min total rate (per poll), after which autodisable this MIB/oid pair
 // note, rate not fully correct after server reboot (it will less than really)
+$config['snmp']['errorcodes'][-1]   = array('reason' => 'Cached', // snmp really not requested, but gets from cache
+                                            'msg'    => '');
 $config['snmp']['errorcodes'][0]    = array('reason' => 'OK',
                                             'msg'    => '');
 
@@ -439,6 +486,8 @@ $config['snmp']['errorcodes'][4]    = array('reason' => 'Too big max-repetition 
 $config['snmp']['errorcodes'][900]  = array('reason' => 'isSNMPable',               // Device up/down test, not used for counting
                                             'msg'    => '');
 $config['snmp']['errorcodes'][991]  = array('reason' => 'Authentication failure',   // Snmp auth errors
+                                            'msg'    => '');
+$config['snmp']['errorcodes'][994]  = array('reason' => 'Unknown host',             // Unknown host
                                             'msg'    => '');
 $config['snmp']['errorcodes'][995]  = array('reason' => 'Incorrect arguments',      // Incorrect arguments passed to snmpcmd
                                             'msg'    => '');
@@ -590,6 +639,9 @@ if (!isset($config['template_dir']))  { $config['template_dir'] = $config['insta
 else                                  { $config['template_dir'] = rtrim($config['template_dir'], ' /'); }
 if (!isset($config['cache_dir']))     { $config['cache_dir']    = $config['temp_dir'] . '/observium_cache'; }
 else                                  { $config['cache_dir']    = rtrim($config['cache_dir'], ' /'); }
+if (!isset($config['nagplug_dir']))   { $config['nagplug_dir']   = '/usr/lib/nagios/plugins'; }
+else                                  { $config['nagplug_dir']   = rtrim($config['nagplug_dir'], ' /'); }
+
 
 // Connect to database
 $GLOBALS[OBS_DB_LINK] = dbOpen($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
@@ -688,6 +740,11 @@ $config['obsolete_config'][] = array('old' => 'discovery_modules->ipv4-addresses
 $config['obsolete_config'][] = array('old' => 'discovery_modules->ipv6-addresses', 'new' => 'discovery_modules->ip-addresses', 'info' => 'changed since r7565');
 $config['obsolete_config'][] = array('old' => 'location_map',        'new' => 'location->map',       'info' => 'changed since r8021');
 $config['obsolete_config'][] = array('old' => 'geocoding->api_key',  'new' => 'geo_api->google->key', 'info' => 'DEPRECATED since 19.8.10000');
+$config['obsolete_config'][] = array('old' => 'snmp->snmp_sysorid',  'new' => 'discovery_modules->mibs', 'info' => 'Migrated to separate module since 19.10.10091');
+
+$config['obsolete_config'][] = array('old' => 'bad_xdp',             'new' => 'xdp->ignore_hostname',       'info' => 'changed since 20.6.10520');
+$config['obsolete_config'][] = array('old' => 'bad_xdp_regexp',      'new' => 'xdp->ignore_hostname_regex', 'info' => 'changed since 20.6.10520');
+$config['obsolete_config'][] = array('old' => 'bad_xdp_platform',    'new' => 'xdp->ignore_platform',       'info' => 'changed since 20.6.10520');
 
 // Here whitelist of base definitions keys which can be overridden by config.php file
 // Note, this required only for override already exist definitions, for additions not required

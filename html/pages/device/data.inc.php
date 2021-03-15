@@ -11,7 +11,8 @@
  *
  */
 
-if ($_SESSION['userlevel'] < 10)
+// Print permission error and exit if the user doesn't have write permissions
+if (!is_entity_write_permitted($device['device_id'], 'device'))
 {
   print_error_permission();
   return;

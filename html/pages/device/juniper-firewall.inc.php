@@ -46,7 +46,7 @@ if(isset($attribs['juniper-firewall-mib']))
 
         print_graph_row($graph_array);
 
-        echo '<h4>Bytes</h4>';;
+        echo '<h4>Bytes</h4>';
 
         $graph_array = array('type'    => 'device_juniper-firewall-bits',
                              'device'  => $device['device_id'],

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -16,21 +15,18 @@ function print_logalert_log($vars)
 
   global $config;
 
-  foreach(dbFetchRows("SELECT * FROM `syslog_rules` ORDER BY `la_name`") AS $la)
-  {
-    $syslog_rules[$la['la_id']] = $la;
-  }
-
   $entries = get_logalert_log($vars);
 
   if (!$entries['count'])
   {
     // There have been no entries returned. Print the warning.
     print_warning('<h4>No logging alert entries found!</h4>');
+    return;
+
   } else {
 
     // Entries have been returned. Print the table.
-    $list = array('device' => FALSE);
+    $list = array('device' => FALSE, 'program' => TRUE);
     if (!isset($vars['device']) || empty($vars['device']) || $vars['page'] == 'alert_log') { $list['device'] = TRUE; }
     if (!isset($vars['la_id']) || empty($vars['la_id'])) { $list['la_id'] = TRUE; }
 
@@ -58,44 +54,24 @@ function print_logalert_log($vars)
     }
     $string   .= '  <tbody>' . PHP_EOL;
 
+    // Cache syslog rules
+    if (!isset($GLOBALS['cache']['syslog']['syslog_rules']))
+    {
+      $GLOBALS['cache']['syslog']['syslog_rules'] = [];
+      foreach (dbFetchRows("SELECT * FROM `syslog_rules` ORDER BY `la_name`") as $la)
+      {
+        $syslog_rules[$la['la_id']]                               = $la;
+        $GLOBALS['cache']['syslog']['syslog_rules'][$la['la_id']] = $la;
+      }
+    }
 
+    if ($entries['short'])
+    {
+      $vars['short'] = $entries['short'];
+    }
     foreach ($entries['entries'] as $entry)
     {
-      $string .= '  <tr class="'.$entry['html_row_class'].'">' . PHP_EOL;
-      $string .= '<td class="state-marker"></td>' . PHP_EOL;
-
-      if ($entries['short'])
-      {
-        $string .= '    <td class="syslog" style="white-space: nowrap">';
-        $timediff = $GLOBALS['config']['time']['now'] - strtotime($entry['timestamp']);
-        $string .= generate_tooltip_link('', format_uptime($timediff, "short-3"), format_timestamp($entry['timestamp']), NULL) . '</td>' . PHP_EOL;
-      } else {
-        $string .= '    <td>';
-        $string .= format_timestamp($entry['timestamp']) . '</td>' . PHP_EOL;
-      }
-
-      if ($list['device'])
-      {
-        $dev = device_by_id_cache($entry['device_id']);
-        $device_vars = array('page'    => 'device',
-                             'device'  => $entry['device_id'],
-                             'tab'     => 'logs',
-                             'section' => 'alertlog');
-        $string .= '    <td class="entity">' . generate_device_link($dev, short_hostname($dev['hostname']), $device_vars) . '</td>' . PHP_EOL;
-      }
-
-      if ($list['la_id']) { $string .= '<td><strong><a href="'.generate_url(array('page' => 'syslog_rules', 'la_id' => $entry['la_id'])).'">' .
-                                       (is_array($syslog_rules[$entry['la_id']]) ? $syslog_rules[$entry['la_id']]['la_name'] : 'Rule Deleted')  . '</td>' . PHP_EOL;}
-      $string .= '<td>'. (strlen($entry['program']) ? '<span class="label">'.$entry['program'].'</span> ' : '') . '</td>' . PHP_EOL;
-      $string .= '<td>'. escape_html($entry['message']) . '</td>' . PHP_EOL;
-      if(!$vars['short'])
-      {
-        //$string .= '<td>' . escape_html($entry['log_type']) . '</td>' . PHP_EOL;
-        //$string .= '<td style="text-align: right">'. ($entry['notified'] == '1' ? '<span class="label label-success">YES</span>' : ($entry['notified'] == '-1' ? '<span class="label">SKIP</span>' : '<span class="label label-warning">NO</span>')) . '</td>' . PHP_EOL;
-      }
-
-      $string .= '  </tr>' . PHP_EOL;
-
+      $string .= generate_syslog_row($entry, $vars, $list);
     }
 
     $string .= '  </tbody>' . PHP_EOL;
@@ -104,13 +80,12 @@ function print_logalert_log($vars)
     $string .= generate_box_close();
 
   }
-    // Print pagination header
-    if ($entries['pagination_html']) { $string = $entries['pagination_html'] . $string . $entries['pagination_html']; }
 
-    // Print events
-    echo $string;
+  // Print pagination header
+  if ($entries['pagination_html']) { $string = $entries['pagination_html'] . $string . $entries['pagination_html']; }
 
-
+  // Print events
+  echo $string;
 }
 
 function get_logalert_log($vars)

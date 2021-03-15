@@ -129,47 +129,6 @@ if (!$readonly)
         set_obs_attrib('syslog_rules_changed', time()); // Trigger reload syslog script
 
         break;
-
-      case 'update-contact-entry':
-        $update_state = array();
-        $contact = get_contact_by_id($vars['contact_id']);
-
-        foreach (json_decode($contact['contact_endpoint']) as $field => $value)
-        {
-          $contact['endpoint_parameters'][$field] = $value;
-        }
-
-        $update_state['contact_disabled'] = $vars['contact_enabled'] == '1' ? 0 : 1;
-
-        if (strlen($vars['contact_descr']) && $vars['contact_descr'] != $contact['contact_descr'])
-        {
-          $update_state['contact_descr'] = $vars['contact_descr'];
-        }
-
-        $data = $config['transports'][$contact['contact_method']];
-        if (!count($data['parameters']['global']))   { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
-        if (!count($data['parameters']['optional'])) { $data['parameters']['optional'] = array(); }
-        // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
-        // This needs supporting code in the transport to check for set variable and if not, use the global default
-
-        $update_endpoint = $contact['endpoint_parameters'];
-        foreach (array_merge($data['parameters']['required'], $data['parameters']['global'], $data['parameters']['optional']) as $parameter => $param_data)
-        {
-          if (strlen($vars['contact_endpoint_'.$parameter]) && $vars['contact_endpoint_'.$parameter] != $contact['endpoint_parameters'][$parameter])
-          {
-            $update_endpoint[$parameter] = $vars['contact_endpoint_'.$parameter];
-          }
-        }
-        $update_endpoint = json_encode($update_endpoint);
-        if ($update_endpoint != $contact['contact_endpoint'])
-        {
-          //r($update_endpoint);
-          //r($contact['contact_endpoint']);
-          $update_state['contact_endpoint'] = $update_endpoint;
-        }
-
-        $rows_updated = dbUpdate($update_state, 'alert_contacts', 'contact_id = ?', array($vars['contact_id']));
-        break;
     }
     // Clean common action vars
     //unset($vars['submit'], $vars['action'], $vars['confirm']);

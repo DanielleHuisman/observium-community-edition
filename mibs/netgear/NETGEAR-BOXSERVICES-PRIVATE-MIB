@@ -1,17 +1,17 @@
 -- Box Services MIB overview:
--- Box Services MIB falls under fastPath MIB node of the private subtree.
+-- Box Services MIB falls under ng7000managedswitch MIB node of the private subtree.
 
 NETGEAR-BOXSERVICES-PRIVATE-MIB DEFINITIONS ::= BEGIN
 
--- Broadcom Corporation FASTPATH Box Services MIB
--- Copyright Broadcom Corporation(2004-2008) All rights reserved.
+-- Netgear Inc NETGEAR Box Services MIB
+-- Copyright Netgear Inc(2004-2008) All rights reserved.
 
 -- This SNMP Management Information Specification
--- embodies Broadcom Corporation's confidential and proprietary
--- intellectual property.  Broadcom Corporation retains all title
+-- embodies Netgear Inc's confidential and proprietary
+-- intellectual property.  Netgear Inc retains all title
 -- and ownership in the Specification including any revisions.
 
--- This Specification is supplied "AS IS", Broadcom Corporation
+-- This Specification is supplied "AS IS", Netgear Inc
 -- makes no warranty, either expressed or implied,
 -- as to the use, operation, condition, or performance of the
 -- Specification.
@@ -20,26 +20,47 @@ NETGEAR-BOXSERVICES-PRIVATE-MIB DEFINITIONS ::= BEGIN
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
     Unsigned32, Integer32               FROM SNMPv2-SMI
-    TEXTUAL-CONVENTION                          FROM SNMPv2-TC
-    DisplayString                                   FROM RFC1213-MIB
+    TEXTUAL-CONVENTION		             	FROM SNMPv2-TC
+    DisplayString		                    FROM RFC1213-MIB
     ng7000managedswitch                            FROM NETGEAR-REF-MIB;
 
     fastPathBoxServices MODULE-IDENTITY
-           LAST-UPDATED "200802220000Z" -- 22 Feb 2008 12:00:00 GMT
-           ORGANIZATION "Netgear"
-           CONTACT-INFO
-           ""
+           LAST-UPDATED "201101260000Z" -- 26 Jan 2011 12:00:00 GMT
+           ORGANIZATION "Netgear Inc"
+           CONTACT-INFO ""
  
      DESCRIPTION
-          "The NETGEAR Private MIB for FASTPATH Box Services Feature."
+          "The Netgear Private MIB for NETGEAR Box Services Feature."
 
       -- Revision history.
+      REVISION
+          "201101260000Z" -- 26 Jan 2011 12:00:00 GMT
+      DESCRIPTION
+          "Postal address updated."
       REVISION
           "200802220000Z" -- 22 Feb 2008 12:00:00 GMT
       DESCRIPTION
           "Netgear branding related changes."
+      REVISION
+          "201912230000Z" -- 23 Dec 2019 12:00:00 GMT
+      DESCRIPTION
+          "Support for Fiber port optics."
 
       ::= { ng7000managedswitch 43 }
+
+BoxsTemperatureStatus ::= TEXTUAL-CONVENTION
+   STATUS  current
+   DESCRIPTION
+           "The temperature state"
+   SYNTAX      INTEGER {
+                        low(0),
+                        normal(1),
+                        warning(2),
+                        critical(3),
+                        shutdown(4),
+                        notpresent(5),
+                        notoperational(6)
+                       }
 
 --**************************************************************************************
 --    boxServicesGroup
@@ -49,13 +70,13 @@ IMPORTS
 --
 --**************************************************************************************
 
-        boxServicesGroup               OBJECT IDENTIFIER ::= { fastPathBoxServices 1 }
+	boxServicesGroup               OBJECT IDENTIFIER ::= { fastPathBoxServices 1 }
   
    --**************************************************************************************
    -- Some scalars
    
     boxServicesNormalTempRangeMin OBJECT-TYPE
-      SYNTAX     INTEGER (-100..100)
+      SYNTAX     Integer32 (-100..100)
       MAX-ACCESS read-write
       STATUS     current
       DESCRIPTION
@@ -64,7 +85,7 @@ IMPORTS
     ::= { boxServicesGroup 1 }
 
     boxServicesNormalTempRangeMax OBJECT-TYPE
-      SYNTAX     INTEGER (-100..100)
+      SYNTAX     Integer32 (-100..100)
       MAX-ACCESS read-write
       STATUS     current
       DESCRIPTION
@@ -108,14 +129,26 @@ IMPORTS
       DEFVAL { enable }
     ::= { boxServicesGroup 5 }
 
-    boxServicesCPLDCodeVersion OBJECT-TYPE
-      SYNTAX      Integer32
-      MAX-ACCESS  read-only
-      STATUS      current
-      DESCRIPTION
-       "The CPLD code version of the unit."
-    ::= { boxServicesGroup 9}
-    
+
+
+    boxServicesThermalShutdownSensor         OBJECT-TYPE 
+         SYNTAX      Unsigned32
+         MAX-ACCESS  accessible-for-notify
+         STATUS      current
+         DESCRIPTION
+            "The number of the sensor which initiated thermal shutdown."
+
+         ::= { boxServicesGroup 13 }
+
+    boxServicesThermalShutdownTemperature    OBJECT-TYPE 
+         SYNTAX      Unsigned32
+         MAX-ACCESS  accessible-for-notify
+         STATUS      current
+         DESCRIPTION
+            "The temperature of the sensor which initiated thermal shutdown."
+
+         ::= { boxServicesGroup 14 }
+
    --**************************************************************************************
    -- boxServicesFans
 
@@ -133,21 +166,31 @@ IMPORTS
          STATUS      current
          DESCRIPTION
                      "Box Services Fan Entry"
-         INDEX { boxServicesFansIndex }
+         INDEX { boxServicesFanUnitIndex , boxServicesFansIndex }
          ::= { boxServicesFansTable 1 }
 
     BoxServicesFansEntry ::= SEQUENCE {
-                boxServicesFansIndex
+          boxServicesFanUnitIndex
+              Unsigned32,
+	  boxServicesFansIndex
               Integer32,
           boxServicesFanItemType
               INTEGER,
           boxServicesFanItemState
               INTEGER,
           boxServicesFanSpeed
-              Integer32,
+              OCTET STRING,
           boxServicesFanDutyLevel
-              Integer32
+              OCTET STRING
           }
+
+    boxServicesFanUnitIndex OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Unit index for an entry in the Box Services Fan Table"
+         ::= { boxServicesFansEntry 6 }
 
     boxServicesFansIndex OBJECT-TYPE
          SYNTAX      Integer32 (0..2147483647)
@@ -160,7 +203,11 @@ IMPORTS
     boxServicesFanItemType OBJECT-TYPE
              SYNTAX      INTEGER {
                                   fixed(1),
-                                  removable(2)
+                                  removable(2),
+                                  fixedAC(3),
+                                  removableDC(4),
+                                  fixedDC(5),
+                                  removableAC(6)
                                  }
          MAX-ACCESS  read-only
          STATUS      current
@@ -171,21 +218,23 @@ IMPORTS
 
     boxServicesFanItemState OBJECT-TYPE
              SYNTAX      INTEGER {
-                                  operational(1),
-                                  failed(2),
-                                  powering(3),
-                                  notpowering(4),
-                                  notpresent(5)
+                                  notpresent(1),
+                                  operational(2),
+                                  failed(3),
+                                  powering(4),
+                                  nopower(5),
+                                  notpowering(6),
+                                  incompatible(7)
                                  }
          MAX-ACCESS  read-only
          STATUS      current
          DESCRIPTION
-                     "The status of fan"
+                     "The status of fan. nopower(4) - This state means the fan is present but no AC is connected."
          ::= { boxServicesFansEntry 3 }
 
 
       boxServicesFanSpeed OBJECT-TYPE
-             SYNTAX      Integer32
+             SYNTAX      OCTET STRING (SIZE(0..13))
              MAX-ACCESS  read-only
              STATUS      current
              DESCRIPTION
@@ -193,7 +242,7 @@ IMPORTS
          ::= { boxServicesFansEntry 4}
          
       boxServicesFanDutyLevel OBJECT-TYPE
-             SYNTAX      Integer32
+             SYNTAX      OCTET STRING (SIZE(0..13))
              MAX-ACCESS  read-only
              STATUS      current
              DESCRIPTION
@@ -218,17 +267,27 @@ IMPORTS
          STATUS      current
          DESCRIPTION
                      "Box Services Power Supply Entry"
-         INDEX { boxServicesPowSupplyIndex }
+         INDEX { boxServicesPowerSuppUnitIndex, boxServicesPowSupplyIndex }
          ::= { boxServicesPowSuppliesTable 1 }
 
     BoxServicesPowSuppliesEntry ::= SEQUENCE {
-          boxServicesPowSupplyIndex
+          boxServicesPowerSuppUnitIndex
+              Unsigned32,
+	  boxServicesPowSupplyIndex
               Integer32,
           boxServicesPowSupplyItemType
               INTEGER,
           boxServicesPowSupplyItemState
               INTEGER
           }
+
+    boxServicesPowerSuppUnitIndex OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Unit index for an entry in the Box Services Power Supply Table"
+         ::= { boxServicesPowSuppliesEntry 4 }
 
     boxServicesPowSupplyIndex OBJECT-TYPE
          SYNTAX      Integer32 (0..2147483647)
@@ -241,7 +300,11 @@ IMPORTS
     boxServicesPowSupplyItemType OBJECT-TYPE
              SYNTAX      INTEGER {
                                   fixed(1),
-                                  removable(2)
+                                  removable(2),
+                                  fixedAC(3),
+                                  removableDC(4),
+                                  fixedDC(5),
+                                  removableAC(6) 
                                  }
          MAX-ACCESS  read-only
          STATUS      current
@@ -252,19 +315,23 @@ IMPORTS
 
     boxServicesPowSupplyItemState OBJECT-TYPE
              SYNTAX      INTEGER {
-                                  operational(1),
-                                  failed(2),
-                                  powering(3),
-                                  notpowering(4),
-                                  notpresent(5)
+                                  notpresent(1),
+                                  operational(2),
+                                  failed(3),
+                                  powering(4),
+                                  nopower(5),
+                                  notpowering(6),
+                                  incompatible(7)
                                  }
          MAX-ACCESS  read-only
          STATUS      current
          DESCRIPTION
-                     "The status of power supply"
+                     "The status of power supply. nopower(5) - This state means the power supply is present but no AC is connected.
+                                                  incompatible(7) - This state is possible on boards capable of pluggable Power supplies"
          ::= { boxServicesPowSuppliesEntry 3 }
 
 
+         
    --**************************************************************************************
    -- boxServicesTempSensors
 
@@ -284,55 +351,62 @@ IMPORTS
          STATUS      current
          DESCRIPTION
                      "Box Services Temperature Sensor Entry"
-         INDEX { boxServicesTempSensorIndex }
+         INDEX { boxServicesUnitIndex, boxServicesTempSensorIndex }
          ::= { boxServicesTempSensorsTable 1 }
 
     BoxServicesTempSensorsEntry ::= SEQUENCE {
-                boxServicesTempSensorIndex
-              Integer32,
+          boxServicesUnitIndex
+              Unsigned32,
+          boxServicesTempSensorIndex
+              Unsigned32,
           boxServicesTempSensorType
               INTEGER,
           boxServicesTempSensorState
-              INTEGER,
+              BoxsTemperatureStatus,
           boxServicesTempSensorTemperature
               Integer32
           }
+    
+    boxServicesUnitIndex OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+		     "Unit index for an entry in the Box Services Temperature Sensor Table"
+         ::= { boxServicesTempSensorsEntry 1 }
 
     boxServicesTempSensorIndex OBJECT-TYPE
-         SYNTAX      Integer32 (0..2147483647)
+         SYNTAX      Unsigned32
          MAX-ACCESS  read-only
          STATUS      current
          DESCRIPTION
                      "Unique index of temperature sensor table entry"
-         ::= { boxServicesTempSensorsEntry 1 }
+         ::= { boxServicesTempSensorsEntry 2 }
 
 
     boxServicesTempSensorType OBJECT-TYPE
              SYNTAX      INTEGER {
                                   fixed(1),
-                                  removable(2)
+                                  removable(2),
+                                  fixedAC(3),
+                                  removableDC(4),
+                                  fixedDC(5),
+                                  removableAC(6)
                                  }
          MAX-ACCESS  read-only
          STATUS      current
          DESCRIPTION
                      "The type of temperature sensor"
-         ::= { boxServicesTempSensorsEntry 2 }
+         ::= { boxServicesTempSensorsEntry 3 }
 
 
     boxServicesTempSensorState OBJECT-TYPE
-             SYNTAX      INTEGER {
-                                  normal(1),
-                                  warning(2),
-                                  critical(3),
-                                  shutdown(4),
-                                  notpresent(5),
-                                  notoperational(6)
-                                 }
+         SYNTAX      BoxsTemperatureStatus 
          MAX-ACCESS  read-only
-         STATUS      current
+         STATUS      obsolete
          DESCRIPTION
                      "The state of temperature sensor"
-         ::= { boxServicesTempSensorsEntry 3 }
+         ::= { boxServicesTempSensorsEntry 4 }
 
 
       boxServicesTempSensorTemperature OBJECT-TYPE
@@ -341,8 +415,177 @@ IMPORTS
              STATUS      current
              DESCRIPTION
                           "The temperature value reported by sensor"
-         ::= { boxServicesTempSensorsEntry 4}
+         ::= { boxServicesTempSensorsEntry 5 }
 
+    boxServicesTempUnitTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF BoxServicesTempUnitEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Temperature status table"
+        ::= { boxServicesGroup 15 }
+
+    boxServicesTempUnitEntry OBJECT-TYPE
+        SYNTAX      BoxServicesTempUnitEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Box Services Temperature Unit Entry"
+        INDEX { boxServicesTempUnitIndex }
+        ::= { boxServicesTempUnitTable 1 }
+
+    BoxServicesTempUnitEntry ::= SEQUENCE {
+        boxServicesTempUnitIndex
+           Unsigned32,
+        boxServicesTempUnitState
+           BoxsTemperatureStatus,
+        boxServicesTempUnitTemperature
+           Integer32
+        }
+
+    boxServicesTempUnitIndex OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only 
+        STATUS      current
+        DESCRIPTION
+            "Unit index for an entry in the Box Services Temperature Unit Table"
+        ::= { boxServicesTempUnitEntry 1 }
+
+    boxServicesTempUnitState OBJECT-TYPE
+        SYNTAX      BoxsTemperatureStatus 
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The temperature state of the unit"
+        ::= { boxServicesTempUnitEntry 2 }
+
+    boxServicesTempUnitTemperature OBJECT-TYPE
+        SYNTAX      Integer32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The highest temperature currently reported by any sensor on the unit"
+        ::= { boxServicesTempUnitEntry 3 }
+
+    boxServicesFiberPortsOpticsTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF BoxServicesFiberPortsOpticsEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "Fiber ports optics data table"
+        ::= { boxServicesGroup 16 }
+
+    boxServicesFiberPortsOpticsEntry OBJECT-TYPE
+        SYNTAX      BoxServicesFiberPortsOpticsEntry 
+        MAX-ACCESS  not-accessible 
+        STATUS      current
+        DESCRIPTION
+            "Box Services Fiber ports optics Entry"
+        INDEX { boxServicesFiberPortIndex }
+        ::= { boxServicesFiberPortsOpticsTable 1 }
+
+    BoxServicesFiberPortsOpticsEntry ::= SEQUENCE {
+        boxServicesFiberPortIndex
+           Unsigned32,
+        boxServicesFiberPortOpticsTemperature
+           DisplayString,
+        boxServicesFiberPortOpticsVoltage
+           DisplayString,
+        boxServicesFiberPortOpticsCurrent
+           DisplayString,
+        boxServicesFiberPortOpticsPowerOut
+           DisplayString,
+        boxServicesFiberPortOpticsPowerIn
+           DisplayString,
+        boxServicesFiberPortOpticsTxFault
+           DisplayString, 
+        boxServicesFiberPortOpticsLos
+           DisplayString,
+        boxServicesFiberPortOpticsFaultStatus
+           DisplayString  
+        }
+
+    boxServicesFiberPortIndex  OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only 
+        STATUS      current
+        DESCRIPTION
+            "Port index for an entry in the Box Services Fiber ports optics table"
+        ::= { boxServicesFiberPortsOpticsEntry 1 }
+
+    boxServicesFiberPortOpticsTemperature OBJECT-TYPE
+        SYNTAX      DisplayString 
+        UNITS       "DEGREES"
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The temperature measured at this fiber port. It is
+             measured in degree celcius."
+        ::= { boxServicesFiberPortsOpticsEntry 2 }
+
+    boxServicesFiberPortOpticsVoltage  OBJECT-TYPE
+        SYNTAX      DisplayString 
+        UNITS       "Volts"
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "The voltage measured at this fiber port. It is
+             measured in volts."
+        ::= { boxServicesFiberPortsOpticsEntry 3 }
+
+    boxServicesFiberPortOpticsCurrent  OBJECT-TYPE
+       SYNTAX      DisplayString 
+       UNITS       "Milliamps"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The current measured at this fiber port. It is
+            measured in milli amps."
+       ::= { boxServicesFiberPortsOpticsEntry 4 }
+
+    boxServicesFiberPortOpticsPowerOut OBJECT-TYPE
+       SYNTAX      DisplayString 
+       UNITS       "dBm"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The output power measured at this fiber port. It is
+            measured in dBm."
+       ::= { boxServicesFiberPortsOpticsEntry 5 }
+
+    boxServicesFiberPortOpticsPowerIn OBJECT-TYPE
+       SYNTAX      DisplayString 
+       UNITS       "dBm"
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The input power measured at this fiber port. It is
+            measured in dBm."
+       ::= { boxServicesFiberPortsOpticsEntry 6 }
+
+    boxServicesFiberPortOpticsTxFault OBJECT-TYPE
+       SYNTAX      DisplayString
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The tx fault status of fiber port."
+       ::= { boxServicesFiberPortsOpticsEntry 7 }
+
+    boxServicesFiberPortOpticsLos OBJECT-TYPE
+       SYNTAX      DisplayString 
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+           "The Los status of fiber port."
+       ::= { boxServicesFiberPortsOpticsEntry 8 }
+
+    boxServicesFiberPortOpticsFaultStatus OBJECT-TYPE
+      SYNTAX      DisplayString 
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+          "The fault status of fiber port."
+      ::= { boxServicesFiberPortsOpticsEntry 9 }
 
 --**************************************************************************************
 --    boxServicesNotificationsGroup
@@ -352,7 +595,7 @@ IMPORTS
 --
 --**************************************************************************************
 
-        boxServicesNotificationsGroup               OBJECT IDENTIFIER ::= { fastPathBoxServices 2 }
+	boxServicesNotificationsGroup               OBJECT IDENTIFIER ::= { fastPathBoxServices 2 }
 
    --**************************************************************************************
    -- boxServices notification definitions
@@ -362,9 +605,10 @@ IMPORTS
              insertion(1),
              removal(2),
              becomeoperational(3),
-             failure(4)
+             failure(4),
+	     losepower(5)
         }
-        MAX-ACCESS  read-only
+        MAX-ACCESS  accessible-for-notify
         STATUS  current
         DESCRIPTION
            "This event describes states of the fan or power supply.
@@ -372,7 +616,8 @@ IMPORTS
              insertion          - hot-pluggable fan or power supply was inserted
              removal            - hot-pluggable fan or power supply was removed
              becomeoperational  - fan or power supply became operational after failure state
-             failure            - fan or power supply failure happened, i.e. it is not able to perform its functions"
+             failure            - fan or power supply failure happened, i.e. it is not able to perform its functions
+             losepower          - a power supply was operational, but the power to it has been disconnected or has failed"
         ::= { boxServicesNotificationsGroup 1 }
 
       boxsTemperatureChangeEvent OBJECT-TYPE
@@ -381,7 +626,7 @@ IMPORTS
              belowthreshold(2),
              withinnormalrange(3)
         }
-        MAX-ACCESS  read-only
+        MAX-ACCESS  accessible-for-notify
         STATUS  current
         DESCRIPTION
            "This event describes change of the temperature. 
@@ -393,6 +638,21 @@ IMPORTS
              withinnormalrange  - temperature returned to normal range (between threshold)"
         ::= { boxServicesNotificationsGroup 2 }
 
+    boxsTemperatureStatusCurrentEvent OBJECT-TYPE
+        SYNTAX      BoxsTemperatureStatus
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION
+            "This event describes the current status of a switch."
+        ::= { boxServicesNotificationsGroup 3 }
+
+    boxsTemperatureStatusPreviousEvent OBJECT-TYPE
+        SYNTAX      BoxsTemperatureStatus
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION
+            "This event describes the previous status of a switch."
+        ::= { boxServicesNotificationsGroup 4 }
 
 
 
@@ -430,9 +690,81 @@ IMPORTS
                       boxServicesTempSensorIndex,
                       boxsTemperatureChangeEvent
                  }
-         STATUS             current
+         STATUS             obsolete
          DESCRIPTION
              "Trap is sent when temperature is changing and crossing any of the thresholds"
          ::= { fastPathBoxServicesTraps 3 }
+
+
+     boxsThermalShutdown NOTIFICATION-TYPE
+         OBJECTS {
+                   boxServicesThermalShutdownSensor,
+                   boxServicesThermalShutdownTemperature
+                 }
+         STATUS             current
+         DESCRIPTION
+             "Trap is sent when thermal shutdown is initiated."
+         ::= { fastPathBoxServicesTraps 4 }
+
+
+    boxsTemperatureStateChange NOTIFICATION-TYPE
+        OBJECTS {
+                     boxServicesTempUnitIndex,
+                     boxsTemperatureStatusCurrentEvent,
+                     boxsTemperatureStatusPreviousEvent
+                }
+        STATUS             current
+        DESCRIPTION
+            "Trap is sent when the system temperature crosses a threshold. 
+            To avoid rapid flapping between states, a hysteresis may
+            be applied."
+        ::= { fastPathBoxServicesTraps 5 }
+
+--**************************************************************************************
+--    Locator LED manage group
+--
+--    This group provides manage definitions for the Locator LED feature.  
+--
+--**************************************************************************************
+
+    boxsLocatorLedConfigGroup                 OBJECT IDENTIFIER ::= { fastPathBoxServices 4 }
+
+    boxsLocatorLedUnit OBJECT-TYPE
+         SYNTAX      INTEGER
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Spesifies unit number where Locator LED should blink on.
+                      This is write-only value. It always returns '0' on request
+                      if the Locator Led feature is supported."
+          ::= { boxsLocatorLedConfigGroup 1 }
+
+    boxsLocatorLedTime OBJECT-TYPE
+         SYNTAX      INTEGER
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Indicates time period in seconds for Locator LED blinking.
+                      The range is from 20 to 3600 seconds.
+                      The dafault value is 20 seconds.
+                      This is write-only value. It always returns '0' on request
+                      if the Locator Led feature is supported."
+         DEFVAL { 20 }
+          ::= { boxsLocatorLedConfigGroup 2 }
+
+    boxsLocatorLedEnable OBJECT-TYPE
+         SYNTAX      INTEGER {
+                       disable(0), 
+                       enable(1)
+                     }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "Starts the Locator LED blinking.
+                      If boxsLocatorLedUnit has not been set current(manager) unit number will be used.
+                      If boxsLocatorLedTime has not been set default value(20 seconds) will be used.
+                      This is write-only value. It always returns '0' on request
+                      if the Locator Led feature is supported."
+         ::= { boxsLocatorLedConfigGroup 3 }
 
 END

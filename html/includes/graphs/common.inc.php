@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage graphs
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -60,26 +59,27 @@ else
    $inverse = FALSE;
 }
 
-if ($vars['legend'] == 'no')
+
+if ($vars['legend'] === 'no')
 {
    $rrd_options .= ' -g';
    $legend      = 'no';
 }
-if ($vars['title'] == 'yes')
+if ($vars['title'] === 'yes')
 {
    $rrd_options .= " --title='" . $graph_title . "' ";
 }
 
 if (isset($vars['graph_title']))
 {
-   $rrd_options .= " --title='" . $vars['graph_title'] . "' ";
+   $rrd_options .= " --title='" . rrdtool_escape($vars['graph_title']) . "' ";
 }
 
 if (isset($log_y))
 {
    $rrd_options .= ' --logarithmic';
 }  /// FIXME. Newer used
-if ((isset($alt_y) && !$alt_y) || $vars['alt_y'] == 'no')
+if ((isset($alt_y) && !$alt_y) || $vars['alt_y'] === 'no')
 {
 }
 else
@@ -92,7 +92,7 @@ if (isset($vars['zoom']) && is_numeric($vars['zoom']))
    $rrd_options .= " --zoom='" . $vars['zoom'] . "' ";
 }
 
-if (isset($vars['yscale']) && $vars['yscale'] == 'none')
+if (isset($vars['yscale']) && $vars['yscale'] === 'none')
 {
    $rrd_options .= " --y none";
 }
@@ -101,16 +101,14 @@ if (isset($vars['yscale']) && $vars['yscale'] == 'none')
 if (isset($vars['style']) && $vars['style'])
 {
    $graph_style = strtolower($vars['style']);
-}
-else
-{
+} else {
    $graph_style = strtolower($config['graphs']['style']);
 }
 
 // Autoscale
 if (!isset($scale_min) && !isset($scale_max))
 {
-   if ($graph_style == 'mrtg' && !isset($log_y)) // Don't use this if we're doing logarithmic scale, else it breaks.
+   if ($graph_style === 'mrtg' && !isset($log_y)) // Don't use this if we're doing logarithmic scale, else it breaks.
    {
       $rrd_options .= ' --lower-limit 0 --alt-autoscale-max';
    }
@@ -127,7 +125,7 @@ else
 {
    if (isset($scale_min))
    {
-      if ($graph_style == 'mrtg' && $scale_min < 0)
+      if ($graph_style === 'mrtg' && $scale_min < 0)
       {
          // Reset min scale for mrtg style, since it always above zero
          $scale_min = 0;
@@ -152,7 +150,7 @@ else
    }
 }
 
-if (isset($vars['max']) && $vars['max'] == 'yes')
+if (isset($vars['max']) && $vars['max'] === 'yes')
 {
    $graph_max = TRUE;
 }
@@ -173,7 +171,15 @@ if($config['graphs']['always_draw_max'] !== 1)
 }
 
 $rrd_options .= '  --start ' . $from . ' --end ' . $to . ' --width ' . $width . ' --height ' . $height . ' ';
-$rrd_options .= $config['rrdgraph_def_text'];
+
+if ($config['themes'][$_SESSION['theme']]['type'] == 'dark')
+{
+  $rrd_options .= str_replace("  ", " ", $config['rrdgraph']['dark']);
+  $nan_colour = "#FF000020";
+} else {
+  $rrd_options .= str_replace("  ", " ", $config['rrdgraph']['light']);
+  $nan_colour = "#FFAAAA20";
+}
 
 if ($vars['bg'])
 {
@@ -207,6 +213,12 @@ if ($step != TRUE)
 if ($kibi == TRUE)
 {
    $rrd_options .= ' -b 1024';
+}
+
+// When IPv6 host is used, need escaping for filename path
+if (isset($rrd_filename))
+{
+  $rrd_filename_escape = rrdtool_escape($rrd_filename);
 }
 
 // EOF

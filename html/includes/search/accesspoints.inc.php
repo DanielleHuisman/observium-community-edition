@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage search
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -30,7 +29,7 @@ if (count($results))
       'url'    => generate_url(array('page' => 'device', 'device' => $result['device_id'], 'tab' => 'wifi', 'view' => 'accesspoint', 'accesspoint' => $result['wifi_accesspoint_id'])),
       'name'   => $name,
       'colour' => $tab_colour,
-      'icon'   => '<img src="images/icons/wifi.png" />',
+      'icon'   => $config['icon']['wifi'],
       'data'   => array(
         $result['hostname'],
         escape_html($result['location']) . ' | Access point'),

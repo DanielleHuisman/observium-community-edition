@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -35,38 +34,34 @@ switch ($device['os'])
       }
 
       // If these exclude lists grow any further we should move them to definitions...
-      if (isset($agent_data['dmi']['system-serial-number'])
-        && $agent_data['dmi']['system-serial-number'] != '............'
-        && $agent_data['dmi']['system-serial-number'] != 'Not Specified'
-        && $agent_data['dmi']['system-serial-number'] != '0123456789')
+      if (isset($agent_data['dmi']['system-serial-number']) &&
+          is_valid_serial($agent_data['dmi']['system-serial-number']))
       {
         $serial = $agent_data['dmi']['system-serial-number'];
       }
 
-      if (isset($agent_data['dmi']['chassis-asset-tag'])
-        && $agent_data['dmi']['chassis-asset-tag'] != '....................'
-        && strcasecmp($agent_data['dmi']['chassis-asset-tag'], 'To be filled by O.E.M.') != 0
-        && $agent_data['dmi']['chassis-asset-tag'] != 'No Asset Tag')
+      if (isset($agent_data['dmi']['chassis-asset-tag']) &&
+          is_valid_serial($agent_data['dmi']['chassis-asset-tag']))
       {
         $asset_tag = $agent_data['dmi']['chassis-asset-tag'];
       }
-      elseif (isset($agent_data['dmi']['baseboard-asset-tag'])
-        && $agent_data['dmi']['baseboard-asset-tag'] != '....................'
-        && strcasecmp($agent_data['dmi']['baseboard-asset-tag'], 'To be filled by O.E.M.') != 0
-        && $agent_data['dmi']['baseboard-asset-tag'] != 'Tag 12345')
+      elseif (isset($agent_data['dmi']['baseboard-asset-tag']) &&
+              is_valid_serial($agent_data['dmi']['baseboard-asset-tag']))
       {
         $asset_tag = $agent_data['dmi']['baseboard-asset-tag'];
       }
     }
 
+    /* FIXME. I not found any of this os with ENTITY-MIB::entPhysicalTable
     if (is_array($entPhysical) && !$hw)
     {
       $hw = $entPhysical['entPhysicalDescr'];
-      if (!empty($entPhysical['entPhysicalSerialNum']))
+      if (!empty($entPhysical['entPhysicalSerialNum']) && is_valid_serial($entPhysical['entPhysicalSerialNum']))
       {
         $serial = $entPhysical['entPhysicalSerialNum'];
       }
     }
+    */
     
     if (!$hardware)
     {
@@ -82,12 +77,12 @@ switch ($device['os'])
       $version = $matches[1] . $matches[2] . $matches[3] . $matches[4];
     }
 
-    $hardware_model = snmp_get($device, 'aixSeMachineType.0', '-Oqv', 'IBM-AIX-MIB');
+    $hardware_model = snmp_get_oid($device, 'aixSeMachineType.0', 'IBM-AIX-MIB');
     if ($hardware_model)
     {
       list(,$hardware_model) = explode(',', $hardware_model);
 
-      $serial = snmp_get($device, 'aixSeSerialNumber.0', '-Oqv', 'IBM-AIX-MIB');
+      $serial = snmp_get_oid($device, 'aixSeSerialNumber.0', 'IBM-AIX-MIB');
       list(,$serial) = explode(',', $serial);
 
       $hardware .= " ($hardware_model)";
@@ -95,7 +90,7 @@ switch ($device['os'])
     break;
 
   case 'freebsd':
-    preg_match('/FreeBSD ([\d\.]+-[\w\d-]+)/i', $poll_device['sysDescr'], $matches);
+    preg_match('/FreeBSD ([\d\.]+\-[\w\-]+)/i', $poll_device['sysDescr'], $matches);
     $kernel = $matches[1];
     $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
     break;
@@ -107,8 +102,7 @@ switch ($device['os'])
 
   case 'netbsd':
     list(,,$version,,,$features) = explode (' ', $poll_device['sysDescr']);
-    $features = str_replace('(', '', $features);
-    $features = str_replace(')', '', $features);
+    $features = str_replace([ '(', ')' ], '', $features);
     $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
     break;
 
@@ -116,13 +110,60 @@ switch ($device['os'])
   case 'solaris':
   case 'opensolaris':
     list(,,$version,$features) = explode (' ', $poll_device['sysDescr']);
-    $features = str_replace('(', '', $features);
-    $features = str_replace(')', '', $features);
+    $features = str_replace([ '(', ')' ], '', $features);
     $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
     break;
 
   case 'darwin':
-    list(,,$version) = explode (' ', $poll_device['sysDescr']);
+    // Darwin backup01.local 9.8.0 Darwin Kernel Version 9.8.0: Wed Jul 15 16:55:01 PDT 2009; root:xnu-1228.15.4~1/RELEASE_I386 i386
+    // Darwin high-web.local 10.8.0 Darwin Kernel Version 10.8.0: Tue Jun 7 16:32:41 PDT 2011; root:xnu-1504.15.3~1/RELEASE_X86_64 x86_64
+    // Darwin mks-mac.local 14.4.0 Darwin Kernel Version 14.4.0: Thu May 28 11:35:04 PDT 2015; root:xnu-2782.30.5~1/RELEASE_X86_64 x86_64
+    // Darwin main.local 18.7.0 Darwin Kernel Version 18.7.0: Sat Oct 12 00:02:19 PDT 2019; root:xnu-4903.278.12~1/RELEASE_X86_64 x86_64
+    // Darwin dmm26.local 19.4.0 Darwin Kernel Version 19.4.0: Wed Mar 4 22:28:40 PST 2020; root:xnu-6153.101.6~15/RELEASE_X86_64 x86_64
+    // Darwin mks-space.local 19.5.0 Darwin Kernel Version 19.5.0: Tue May 26 20:41:44 PDT 2020; root:xnu-6153.121.2~2/RELEASE_X86_64 x86_64
+    if (preg_match('/Darwin Kernel Version (?<kernel>\d\S+): .* root\S+ (?<arch>\S+)/', $poll_device['sysDescr'], $matches))
+    {
+      $kernel = $matches['kernel'];
+      $arch   = $matches['arch'];
+
+      $macos_kernels = [
+        // Cats
+        9  => [ 'version' => '10.5',  'name' => 'Leopard',       'icon' => '' ],
+        10 => [ 'version' => '10.6',  'name' => 'Snow Leopard',  'icon' => '' ],
+        11 => [ 'version' => '10.7',  'name' => 'Lion',          'icon' => 'macos-lion' ],
+        12 => [ 'version' => '10.8',  'name' => 'Mountain Lion', 'icon' => 'macos-mountain-lion' ],
+        // Mountains
+        13 => [ 'version' => '10.9',  'name' => 'Mavericks',     'icon' => 'macos-mavericks' ],
+        14 => [ 'version' => '10.10', 'name' => 'Yosemite',      'icon' => 'macos-yosemite' ],
+        15 => [ 'version' => '10.11', 'name' => 'El Capitan',    'icon' => 'macos-el-capitan' ],
+        16 => [ 'version' => '10.12', 'name' => 'Sierra',        'icon' => 'macos-sierra' ],
+        17 => [ 'version' => '10.13', 'name' => 'High Sierra',   'icon' => 'macos-high-sierra' ],
+        18 => [ 'version' => '10.14', 'name' => 'Mojave',        'icon' => 'macos-mojave' ],
+        19 => [ 'version' => '10.15', 'name' => 'Catalina',      'icon' => 'macos-catalina' ],
+        20 => [ 'version' => '11.0',  'name' => 'Big Sur',       'icon' => 'macos-big-sur' ],
+      ];
+
+      // 19.5.0 -> 10.15.5, 14.0.0 -> 10.10
+      list($k1, $k2, $k3) = explode('.', $kernel);
+      if (isset($macos_kernels[$k1]))
+      {
+        $version = $macos_kernels[$k1]['version'] . '.' . $k2;
+        if ($k3 > 0)
+        {
+          $version .= '.' . $k3;
+        }
+        $features = $macos_kernels[$k1]['name'];
+        if (strlen($macos_kernels[$k1]['icon']))
+        {
+          $icon = $macos_kernels[$k1]['icon'];
+        }
+        //$icon = 'macos-' . strtolower(str_replace(' ', '-', $macos_kernels[$k1]['name']));
+      } else {
+        $version = $kernel;
+      }
+    } else {
+      list(,,$version) = explode (' ', $poll_device['sysDescr']);
+    }
     $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
     break;
 
@@ -136,15 +177,9 @@ switch ($device['os'])
   case 'freenas':
   case 'nas4free':
   case 'xigmanas':
-    preg_match('/Software: FreeBSD ([\d\.]+-[\w\d-]+)/i', $poll_device['sysDescr'], $matches);
+    preg_match('/Software: FreeBSD ([\d\.]+\-[\w\-]+)/i', $poll_device['sysDescr'], $matches);
     $version = $matches[1];
     $hardware = rewrite_unix_hardware($poll_device['sysDescr']);
-    break;
-
-  case 'qnap':
-    $hardware = $entPhysical['entPhysicalName'];
-    $version  = $entPhysical['entPhysicalFirmwareRev'];
-    $serial   = $entPhysical['entPhysicalSerialNum'];
     break;
 
   case 'ipso':
@@ -206,12 +241,12 @@ switch ($device['os'])
       switch ($matches['hw1'])
       {
         case 'sg':
-          if (isset($matches['hw2']) && $matches['hw2'] == 'dns')
+          if (isset($matches['hw2']) && $matches['hw2'] === 'dns')
           {
             $hw = 'DNS Server';
             $type = 'server';
           }
-          else if (isset($matches['hw2']) && $matches['hw2'] == 'mep')
+          elseif (isset($matches['hw2']) && $matches['hw2'] === 'mep')
           {
             $hw = 'Mobile Entry Point';
             $type = 'network';
@@ -319,7 +354,7 @@ if (isset($agent_data['distro']) && isset($agent_data['distro']['SCRIPTVER']))
   {
     unset($os_data);
   }
-  else if (str_contains($os_data, '|'))
+  elseif (str_exists($os_data, '|'))
   {
     // distro version less than 1.2: "Linux|3.2.0-4-amd64|amd64|Debian|7.5"
     // distro version 1.2 and above: "Linux|4.4.0-53-generic|amd64|Ubuntu|16.04|kvm"
@@ -350,8 +385,8 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
       $vendor = snmp_get_oid($device, '.1.3.6.1.4.1.2021.7890.3.3.1.1.12.109.97.110.117.102.97.99.116.117.114.101.114', 'UCD-SNMP-MIB');
     }
     $serial = snmp_get_oid($device, '.1.3.6.1.4.1.2021.7890.4.3.1.1.6.115.101.114.105.97.108', 'UCD-SNMP-MIB');
-    if (str_contains($serial, 'denied') ||
-        $serial == '0123456789' || $serial == '............' || $serial == 'Not Specified')
+    //if (str_exists($serial, 'denied') || str_starts($serial, [ '0123456789', '..', 'Not Specified' ]))
+    if (!is_valid_serial($serial))
     {
       unset($serial);
     }
@@ -375,6 +410,7 @@ if (isset($agent_data['virt']['what']))
     {
       //$hardware = $config['virt-what'][$virtwhat];
       $hardware = rewrite_unix_hardware($poll_device['sysDescr'], $config['virt-what'][$virtwhat]);
+      $vendor = ''; // Always reset vendor for VMs, while this doesn't make sense
     }
   }
 }

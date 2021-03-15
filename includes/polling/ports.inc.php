@@ -13,7 +13,7 @@
 
 // Include description parser (usually ifAlias) if config option set
 $custom_port_parser = FALSE;
-if (isset($config['port_descr_parser']) && is_file($config['install_dir'] . "/" . $config['port_descr_parser']))
+if (isset($config['port_descr_parser']) && $config['port_descr_parser'] != FALSE && is_file($config['install_dir'] . "/" . $config['port_descr_parser']))
 {
   include_once($config['install_dir'] . "/" . $config['port_descr_parser']);
 
@@ -22,7 +22,7 @@ if (isset($config['port_descr_parser']) && is_file($config['install_dir'] . "/" 
     $custom_port_attribs = array('type', 'descr', 'circuit', 'speed', 'notes');
     $custom_port_parser = TRUE;
   } else {
-    print_warning("WARNING: Rewrite your custom ports parser in file [".$config['install_dir'] . "/" . $config['port_descr_parser']."], using a function custom_port_parser().");
+    print_error("ERROR: Rewrite your custom ports parser in file [".$config['install_dir'] . "/" . $config['port_descr_parser']."], using a function custom_port_parser().");
     $custom_port_parser = 'old';
   }
 }
@@ -58,11 +58,14 @@ foreach (array_keys($config) as $ports_module)
   if (!str_starts($ports_module, 'enable_ports_')) { continue; } // Filter only enable_ports_* config entries
   $ports_module = str_replace('enable_ports_', '', $ports_module);
 
-  $ports_modules[$ports_module] = isset($attribs['enable_ports_' . $ports_module]) ? (bool)$attribs['enable_ports_' . $ports_module] : $config['enable_ports_' . $ports_module];
+  //$ports_modules[$ports_module] = isset($attribs['enable_ports_' . $ports_module]) ? (bool)$attribs['enable_ports_' . $ports_module] : $config['enable_ports_' . $ports_module];
+  $ports_modules[$ports_module] = is_module_enabled($device, 'ports_'.$ports_module);
 }
 // Additionally force enable separate walk feature for some device oses, but only if ports total count >10
 $ports_module = 'separate_walk';
-if (!$ports_modules[$ports_module] && $config['os'][$device['os']]['ports_'.$ports_module])
+// Model definition can override os definition
+$model_separate_walk = isset($model['ports_'.$ports_module]) ? $model['ports_'.$ports_module] : $config['os'][$device['os']]['ports_'.$ports_module];
+if (!$ports_modules[$ports_module] && $model_separate_walk)
 {
   if (isset($attribs['enable_ports_' . $ports_module]) && !$attribs['enable_ports_' . $ports_module]) {} // forcing disabled in device config
   else
@@ -207,7 +210,7 @@ if (is_device_mib($device, "IF-MIB"))
     {
       echo("$oid ");
       $port_stats = snmpwalk_cache_oid($device, $oid, $port_stats, "IF-MIB");
-      $has_ifXEntry = $has_ifXEntry || $GLOBALS['snmp_status'];
+      $has_ifXEntry = $has_ifXEntry || snmp_status();
     }
 
     // Per port snmpget
@@ -279,7 +282,7 @@ $data_oids_db = array_merge($data_oids_db, array('port_label', 'port_label_short
 $process_port_functions = array('label' => TRUE); // collect processing functions
 $process_port_db        = array();                // collect processing db fields
 
-// Additionaly include per MIB functions and snmpwalks (uses include_once)
+// Additionally include per MIB functions and snmpwalks (uses include_once)
 $port_stats_count = count($port_stats);
 $include_lib = TRUE;
 $include_dir = "includes/polling/ports/";
@@ -404,12 +407,13 @@ foreach ($ports as $port)
     // ifAlias.3 = Conexi<F3>n de <E1>rea local* 3
     foreach (array('ifAlias', 'ifDescr', 'ifName') as $oid_fix)
     {
-      if (isset($this_port[$oid_fix])) { $this_port[$oid_fix] = snmp_fix_string($this_port[$oid_fix]); }
-      /// DEVEL, test escaping
-      if ($this_port['port_id'] == 42430)
+      if (!isset($this_port[$oid_fix]) ||
+          ($oid_fix != 'ifAlias' && isHexString($this_port[$oid_fix]))) // In cases, when device have memory leak, they return hex string instead UTF, rewritten in process_port_label()
       {
-        $this_port[$oid_fix] .= ' <>';
+        continue;
       }
+
+      $this_port[$oid_fix] = snmp_fix_string($this_port[$oid_fix]);
     }
 
     //print_vars($process_port_functions);
@@ -854,10 +858,14 @@ foreach ($ports as $port)
     }
 
     // If we have a valid ifSpeed we should populate the percentage stats for checking.
+    // FIXME. Why we check percentage as int? (ie 1Mbit over 10Gbit = 0.01%, but in our calc 0%)
     if (is_numeric($this_port['ifSpeed']))
     {
-      $port['stats']['ifInBits_perc'] = round($port['stats']['ifInBits_rate'] / $this_port['ifSpeed'] * 100);
-      $port['stats']['ifOutBits_perc'] = round($port['stats']['ifOutBits_rate'] / $this_port['ifSpeed'] * 100);
+      //$port['stats']['ifInBits_perc'] = round($port['stats']['ifInBits_rate'] / $this_port['ifSpeed'] * 100);
+      //$port['stats']['ifOutBits_perc'] = round($port['stats']['ifOutBits_rate'] / $this_port['ifSpeed'] * 100);
+      $port['stats']['ifInBits_perc'] = percent($port['stats']['ifInBits_rate'], $this_port['ifSpeed']);
+      $port['stats']['ifOutBits_perc'] = percent($port['stats']['ifOutBits_rate'], $this_port['ifSpeed']);
+
       $port['alert_array']['ifSpeed'] = $this_port['ifSpeed'];
     }
 

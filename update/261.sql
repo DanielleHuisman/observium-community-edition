@@ -1,4 +1,4 @@
---IGNORE_ERROR
+-- IGNORE_ERROR
 ALTER TABLE `pseudowires` DROP `pwMplsPeerLdpID`;
 ALTER TABLE `pseudowires` CHANGE `pwIndex` `pwIndex` VARCHAR(128) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL, CHANGE `pwLocalIfMtu` `pwLocalIfMtu` INT(11) UNSIGNED NULL DEFAULT NULL, CHANGE `pwRemoteIfMtu` `pwRemoteIfMtu` INT(11) UNSIGNED NULL DEFAULT NULL;
 ALTER TABLE `pseudowires` ADD `pwOutboundLabel` INT(11) UNSIGNED NOT NULL AFTER `pwID`, ADD `pwInboundLabel` INT(11) UNSIGNED NOT NULL AFTER `pwOutboundLabel`;

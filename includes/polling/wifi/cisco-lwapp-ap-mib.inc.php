@@ -63,10 +63,10 @@
 	$uptime_show = format_uptime($uptime, "long");
 
 	$control_uptime = uptime_to_seconds($aps['cLLwappUpTime']);
-  $control_uptime_show = format_uptime($control_uptime, "long");
+        $control_uptime_show = format_uptime($control_uptime, "long");
 
 	$control_latency = uptime_to_seconds($aps['cLLwappJoinTakenTime']);
-  $control_latency_show = format_uptime($control_latency, "long");
+        $control_latency_show = format_uptime($control_latency, "long");
 
 	if (is_array($aps_db[$mac_index]))
 	{

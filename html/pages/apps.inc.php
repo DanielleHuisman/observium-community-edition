@@ -55,7 +55,7 @@ foreach ($app_list as $app)
 print_navbar($navbar);
 unset($navbar);
 
-if ($vars['app'])
+if ($vars['app'] && is_alpha($vars['app']))
 {
   $include = $config['html_dir'].'/pages/apps/'.$vars['app'].'.inc.php';
   if (is_file($include))

@@ -155,19 +155,19 @@ class IncludesSnmpTest2 extends \PHPUnit\Framework\TestCase
     $sysdescr_ftos     .= "Copyright (c) 1999-2015 by Dell Inc. All Rights Reserved.\r\n";
     $sysdescr_ftos     .= "Build Time: Thu Feb  4 06:57:34 2016";
     // Note, here \n as line ends!
-    $sysdescr_ftos_hex  = "\"44 65 6C 6C 20 4E 65 74 77 6F 72 6B 69 6E 67 20 \n";
-    $sysdescr_ftos_hex .= "4F 53 0D 0A 4F 70 65 72 61 74 69 6E 67 20 53 79 \n";
-    $sysdescr_ftos_hex .= "73 74 65 6D 20 56 65 72 73 69 6F 6E 3A 20 32 2E \n";
-    $sysdescr_ftos_hex .= "30 0D 0A 41 70 70 6C 69 63 61 74 69 6F 6E 20 53 \n";
-    $sysdescr_ftos_hex .= "6F 66 74 77 61 72 65 20 56 65 72 73 69 6F 6E 3A \n";
-    $sysdescr_ftos_hex .= "20 39 2E 39 28 30 2E 30 50 39 29 0D 0A 53 65 72 \n";
-    $sysdescr_ftos_hex .= "69 65 73 3A 20 53 34 38 31 30 0D 0A 43 6F 70 79 \n";
-    $sysdescr_ftos_hex .= "72 69 67 68 74 20 28 63 29 20 31 39 39 39 2D 32 \n";
-    $sysdescr_ftos_hex .= "30 31 35 20 62 79 20 44 65 6C 6C 20 49 6E 63 2E \n";
-    $sysdescr_ftos_hex .= "20 41 6C 6C 20 52 69 67 68 74 73 20 52 65 73 65 \n";
-    $sysdescr_ftos_hex .= "72 76 65 64 2E 0D 0A 42 75 69 6C 64 20 54 69 6D \n";
-    $sysdescr_ftos_hex .= "65 3A 20 54 68 75 20 46 65 62 20 20 34 20 30 36 \n";
-    $sysdescr_ftos_hex .= "3A 35 37 3A 33 34 20 32 30 31 36 \"";
+    $sysdescr_ftos_hex  = "\"44 65 6C 6C 20 4E 65 74 77 6F 72 6B 69 6E 67 20 ";
+    $sysdescr_ftos_hex .= "4F 53 0D 0A 4F 70 65 72 61 74 69 6E 67 20 53 79 ";
+    $sysdescr_ftos_hex .= "73 74 65 6D 20 56 65 72 73 69 6F 6E 3A 20 32 2E ";
+    $sysdescr_ftos_hex .= "30 0D 0A 41 70 70 6C 69 63 61 74 69 6F 6E 20 53 ";
+    $sysdescr_ftos_hex .= "6F 66 74 77 61 72 65 20 56 65 72 73 69 6F 6E 3A ";
+    $sysdescr_ftos_hex .= "20 39 2E 39 28 30 2E 30 50 39 29 0D 0A 53 65 72 ";
+    $sysdescr_ftos_hex .= "69 65 73 3A 20 53 34 38 31 30 0D 0A 43 6F 70 79 ";
+    $sysdescr_ftos_hex .= "72 69 67 68 74 20 28 63 29 20 31 39 39 39 2D 32 ";
+    $sysdescr_ftos_hex .= "30 31 35 20 62 79 20 44 65 6C 6C 20 49 6E 63 2E ";
+    $sysdescr_ftos_hex .= "20 41 6C 6C 20 52 69 67 68 74 73 20 52 65 73 65 ";
+    $sysdescr_ftos_hex .= "72 76 65 64 2E 0D 0A 42 75 69 6C 64 20 54 69 6D ";
+    $sysdescr_ftos_hex .= "65 3A 20 54 68 75 20 46 65 62 20 20 34 20 30 36 ";
+    $sysdescr_ftos_hex .= "3A 35 37 3A 33 34 20 32 30 31 36 ";
     $distro_ubuntu_hex  = "4C 69 6E 75 78 7C 34 2E 34 2E 30 2D 37 37 2D 67 \n";
     $distro_ubuntu_hex .= "65 6E 65 72 69 63 7C 61 6D 64 36 34 7C 55 62 75 \n";
     $distro_ubuntu_hex .= "6E 74 75 7C 31 36 2E 30 34 7C 6B 76 6D ";
@@ -305,6 +305,43 @@ DI-1705 (RISC)
   }
 
   /**
+   * @dataProvider providerSnmpWalkBareOid
+   * @group snmpwalk_new
+   */
+  public function testSnmpWalkBareOid($community, $flags, $oids, $mib, $result_file)
+  {
+    global $snmpsimd_ip, $snmpsimd_port;
+
+    $device = build_initial_device_array($snmpsimd_ip, $community, 'v2c', $snmpsimd_port, 'udp');
+    $device['snmp_timeout'] = 2;
+    $device['snmp_retries'] = 1;
+    //var_dump($device);
+    $test = array();
+    foreach ((array)$oids as $oid)
+    {
+      $test = snmpwalk_cache_bare_oid($device, $oid, $test, $mib, NULL, $flags);
+    }
+    //echo PHP_EOL . json_encode($test, JSON_PRETTY_PRINT) . PHP_EOL;
+    //var_dump($test);
+    //$result = array();
+    // Fetch array from JSON file
+    $result = json_decode(file_get_contents(dirname(__FILE__) . '/data/snmp/' . $result_file), TRUE);
+    $this->assertSame($result, $test);
+  }
+
+  public function providerSnmpWalkBareOid()
+  {
+    $community  = 'delta-rt-ups';
+
+    return array(
+
+      array( $community,                OBS_QUOTES_TRIM,   array('dupsIdentManufacturer', 'dupsIdentModel', 'wrongOid'), 'DeltaUPS-MIB',
+             'snmp_walk_bare_oid-1.json' // Link to result json
+      ),
+    );
+  }
+
+  /**
   * @dataProvider providerSnmpWalkMultiPartOid
   * @group snmpwalk_new
   */
@@ -323,9 +360,9 @@ DI-1705 (RISC)
     }
     //echo PHP_EOL . json_encode($test, JSON_PRETTY_PRINT) . PHP_EOL;
     //var_dump($test);
+    //$result = array();
     // Fetch array from JSON file
     $result = json_decode(file_get_contents(dirname(__FILE__) . '/data/snmp/' . $result_file), TRUE);
-    //$result = array();
     $this->assertSame($result, $test);
   }
 
@@ -335,6 +372,7 @@ DI-1705 (RISC)
     $community_ubuntu   = 'ubuntu-16.04';
     $community_lldp     = 'lldp1';
     $community_prnt     = 'prnt';
+    $community_delta    = 'delta-rt-ups';
 
     return array(
 
@@ -347,6 +385,10 @@ DI-1705 (RISC)
 
       array( $community_ubuntu,              OBS_QUOTES_TRIM,   array('nsExtendNumEntries', 'nsExtendOutputFull', 'nsExtendOutLine'), 'NET-SNMP-EXTEND-MIB',
             'snmp_walk_multipart_oid-3.json' // Link to result json
+      ),
+
+      array( $community_delta, OBS_SNMP_ALL | OBS_SNMP_NOINDEX,   array('dupsIdentManufacturer', 'dupsIdentModel'), 'DeltaUPS-MIB',
+             'snmp_walk_multipart_oid-4.json' // Link to result json
       ),
 
       array( $community_lldp,         OBS_SNMP_ALL_MULTILINE,   array('lldpRemChassisIdSubtype', 'lldpRemChassisId', 'lldpRemPortIdSubtype', 'lldpRemPortId', 'lldpRemPortDesc', 'lldpRemSysName', 'lldpRemSysDesc'), 'LLDP-MIB',

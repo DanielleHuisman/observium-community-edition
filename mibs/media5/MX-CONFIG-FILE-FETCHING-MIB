@@ -1,0 +1,570 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--
+--             Copyright(c) 2003-2005 Mediatrix Telecom, Inc.
+--             Copyright(c) 2010 Media5 Corporation ("Media5")
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary to
+--   Media5.
+--
+--   Media5 reserves all rights to this document as well as to the Intellectual
+--   Property of the document and the technology and know-how that it includes
+--   and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in any
+--   form whatsoever without prior written approval by Media5.
+--
+--   Media5 reserves the right to revise this publication and make changes at
+--   any time and without the obligation to notify any person and/or entity of
+--   such revisions and/or changes.
+--
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-CONFIG-FILE-FETCHING-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE
+    FROM SNMPv2-CONF
+        MxIpHostName,
+        MxIpConfigSource,
+        MxIpPort,
+        MxEnableState,
+        MxIpSelectConfigSource,
+        MxIpDhcpSiteSpecificCode
+    FROM MX-TC
+        ipAddressStatus,
+        ipAddressConfig,
+        mediatrixConfig
+    FROM MX-SMI;
+
+configFileFetchingMIB MODULE-IDENTITY
+    LAST-UPDATED "201012150000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION "This MIB describes the parameters to configure to fetch
+                 configuration files. The unit is the initiator of the transfer session."
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "201012150000Z"
+    DESCRIPTION "Added the configFileAutoUpdateTimeRange variable.
+                 configFileAutoUpdateTimeOfDay is now deprecated."
+
+    REVISION    "200603060000Z"
+    DESCRIPTION "Removed 'seconds' as a selectable time unit for the
+                 configFileAutoUpdateTimeUnit variable."
+
+    REVISION    "200504250000Z"
+    DESCRIPTION "Added the HTTPS option in configFileTransferProtocol."
+
+    REVISION    "200404270000Z"
+    DESCRIPTION "Updated the configFileAutoUpdateTimeUnit syntax and description.
+                 Updated the configFileFetchingFileName description.
+                 Added configFileFetchingSpecificFileName, configFilePrivacyEnable,
+                 configFilePrivacyGenericSecret and configFilePrivacySpecificSecret."
+
+    REVISION    "200403100000Z"
+    DESCRIPTION "Updated the configFileAutoUpdateOnRestartEnable and
+                 configFileAutoUpdatePeriodicEnable descriptions."
+
+    REVISION    "200402120000Z"
+    DESCRIPTION "Updated the configFileFetchingFileName description.
+                 Added configFileTransferProtocol, configFileTransferUsername,
+                 configFileTransferPassword, configFileAutoUpdateOnRestartEnable,
+                 configFileAutoUpdatePeriodicEnable, configFileAutoUpdateTimeUnit,
+                 configFileAutoUpdatePeriod and configFileAutoUpdateTimeOfDay.
+                 Removed reference to TFTP server."
+
+    REVISION    "200311140000Z"
+    DESCRIPTION "Creation"
+    ::= { mediatrixConfig 11 }
+
+configFileFetchingMIBObjects  OBJECT IDENTIFIER ::= { configFileFetchingMIB 50 }
+configFileFetchingConformance OBJECT IDENTIFIER ::= { configFileFetchingMIB 100 }
+
+-- Add the configuration file fetching general parameters
+
+    configFileFetchingFileName OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The name of the generic configuration file fetched by the unit
+                     (see sysConfigDownloadConfigFile). This file should be used to
+                     update a large number of units with the same configuration.
+
+                     If this field is empty, no generic configuration is fetched.
+
+                     Note that when both generic and specific configuration files
+                     are downloaded, settings from the specific file always override
+                     the settings from the generic file."
+        DEFVAL { "" }
+        ::= { configFileFetchingMIBObjects 50 }
+
+    configFileFetchingSpecificFileName OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The name of the specific configuration file fetched by the unit
+                     (see sysConfigDownloadConfigFile). This file should be used to
+                     update the configuration of a single unit.
+
+                     This field may contain macros that are substituted by actual
+                     values at the moment of fetching the configuration file.
+                     Supported macros are:
+
+                     %mac% - the mac address of the unit
+
+                     %% - the character '%'
+
+                     Note: When the character '%' is not part of a macro, it is not
+                     replaced.
+
+                     If this field is empty (after macro substitution), no specific
+                     configuration file is fetched.
+
+                     Note that when both generic and specific configuration files are
+                     downloaded, settings from the specific file always override the
+                     settings from the generic file."
+        DEFVAL { "%mac%.cfg" }
+        ::= { configFileFetchingMIBObjects 60 }
+
+    configFileFetchingFileLocation OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The path of the configuration files (configFileFetchingFileName)
+                     location. The path is relative to the root of the transfer server
+                     (configFileFetchingHost).
+
+                     Use '/' to separate subdirectories."
+        DEFVAL { "" }
+        ::= { configFileFetchingMIBObjects 100 }
+
+configFileTransfer  OBJECT IDENTIFIER ::= { configFileFetchingMIBObjects 150 }
+
+    configFileTransferProtocol OBJECT-TYPE
+        SYNTAX      INTEGER  {
+                              tftp(0),
+                              http(1),
+                              https(2)
+                             }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The protocol to use for transferring the configuration files.
+
+                     tftp: Trivial File Transfer Protocol
+
+                     http: Hypertext Transfer Protocol
+
+                     https: Hypertext Transfer Protocol over Transport Layer Security (HTTP over TLS)
+                     This option requires that the appropriate security certificate be installed on the unit.
+                     Furthermore, because HTTPS relies on the system clock for server authentication, the
+                     SNTP client (see sntpMIB) must be enabled and properly configured.
+
+                     Please refer to the documentation shipped with your device for more details."
+        DEFVAL { tftp }
+        ::= { configFileTransfer 50 }
+
+    configFileTransferUsername OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The user name to use for authentification when transferring the configuration files.
+                     Only applies when using HTTP or HTTPS as the transfer protocol."
+        DEFVAL { "" }
+        ::= { configFileTransfer 100 }
+
+    configFileTransferPassword OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The password to use for authentification when transferring the configuration files.
+                     Only applies when using HTTP or HTTPS as the transfer protocol."
+        DEFVAL { "" }
+        ::= { configFileTransfer 150 }
+
+configFileAutomaticUpdate  OBJECT IDENTIFIER ::= { configFileFetchingMIBObjects 200 }
+
+    configFileAutoUpdateOnRestartEnable OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables the automatic update of the unit configuration on restart.
+
+                     disable: The unit configuration is not automatically updated at each restart.
+
+                     enable : If sysConfigDownloadConfigFile is set to 'automaticInitiateFileDownload',
+                              the unit configuration is updated with fetched configuration files at
+                              each restart. The unit is automatically restarted after a successful
+                              unit configuration update. The update is only performed if at least one
+                              parameter value defined in the fetched configuration files is different
+                              from the actual unit configuration."
+        DEFVAL { enable }
+        ::= { configFileAutomaticUpdate 50 }
+
+    configFileAutoUpdatePeriodicEnable OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables the periodic update of the unit configuration.
+
+                     disable: The unit configuration is not periodically updated.
+
+                     enable : If sysConfigDownloadConfigFile is set to 'automaticInitiateFileDownload',
+                              the unit configuration is periodically updated with fetched configuration
+                              files. The unit is automatically restarted after a successful unit
+                              configuration update. The update is only performed if at least one parameter
+                              value defined in the fetched configuration files is different from the actual
+                              unit configuration."
+        DEFVAL { disable }
+        ::= { configFileAutomaticUpdate 100 }
+
+    configFileAutoUpdateTimeUnit OBJECT-TYPE
+        SYNTAX      INTEGER  {
+                              hours(0),
+                              days(1),
+                              minutes(20)
+                             }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The time base for periodic unit configuration updates.
+                     Modification to this setting resets the update timer.
+
+                     minutes: The unit configuration is updated every x minutes.
+
+                     hours  : The unit configuration is updated every x hours.
+
+                     days   : The unit configuration is updated every x days.
+
+                     Note that x is defined by configFileAutoUpdatePeriod."
+        DEFVAL { days }
+        ::= { configFileAutomaticUpdate 150 }
+
+    configFileAutoUpdatePeriod OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..48)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The period at which the configuration files are automatically fetched
+                     by the unit in order to update the unit configuration.
+                     Modification to this setting resets the update timer.
+
+                     This value is expressed in units defined by configFileAutoUpdateTimeUnit."
+        DEFVAL { 1 }
+        ::= { configFileAutomaticUpdate 200 }
+
+    configFileAutoUpdateTimeOfDay OBJECT-TYPE
+        SYNTAX      Integer32 (-1| 0..23)
+        MAX-ACCESS  read-write
+        STATUS      deprecated
+        DESCRIPTION "This object is deprecated. It is recommended to use the
+                     variable configFileAutoUpdateTimeRange because it has precedence
+                     over this variable.
+
+                     The time of the day, based on sntpTimeZoneString, when the unit periodically
+                     fetches the configuration files in order to update the unit configuration.
+
+                     The configuration files are fetched at the first occurrence of this value
+                     and thereafter with a period defined by configFileAutoUpdatePeriod. Let's say
+                     for instance the automatic unit configuration update is set with the time of
+                     day at 14h00 and the update period at every 2 days. If the automatic update
+                     is enabled before 14h00, the first update will take place the same day at 14h00,
+                     then the second update two days later at the same hour, and so on.
+
+                     Note that the SNTP server needs to be enabled (see sntpEnable).
+                     Modification to this setting resets the update timer.
+
+                     -1: The time of the day at which the unit first fetches the configuration files
+                         is randomly selected.
+
+                     Only applies when configFileAutoUpdateTimeUnit is set to 'days'."
+        DEFVAL { -1 }
+        ::= { configFileAutomaticUpdate 250 }
+
+    configFileAutoUpdateTimeRange OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..24))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The time of the day, based on sntpTimeZoneString, when the unit periodically
+                     fetches the configuration files in order to update the unit configuration.
+
+                     If a time range is specified, the unit will fetch the configuration files
+                     at a random time within the interval specified.
+
+                     The format should be one of the following:
+                         hh[:mm[:ss]]
+                         hh[:mm[:ss]] - hh[:mm[:ss]]
+
+                     Where:
+                         hh: Hours.
+                         mm: Minutes.
+                         ss: Seconds.
+
+                     The configuration files are fetched at the first occurrence of this value
+                     and thereafter with a period defined by configFileAutoUpdatePeriod. Let's say
+                     for instance the automatic unit configuration update is set with the time of
+                     day at 14h00 and the update period at every 2 days. If the automatic update
+                     is enabled before 14h00, the first update will take place the same day at 14h00,
+                     then the second update two days later at the same hour, and so on.
+
+                     If the time range is set to '14:00 - 15:00' and the automatic unit configuration update
+                     is enabled within those hours, the first update will take place the following
+                     day. This means that a range of '00:00:00 - 23:59:59' will always take place
+                     the next day.
+
+                     Note that the SNTP server needs to be enabled (see sntpEnable).
+                     Modification to this setting resets the update timer.
+
+                     It only applies when configFileAutoUpdateTimeUnit is set to 'days'."
+        DEFVAL { "" }
+        ::= { configFileAutomaticUpdate 300 }
+
+configFilePrivacy   OBJECT IDENTIFIER ::= { configFileFetchingMIBObjects 250 }
+
+    configFilePrivacyEnable OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables the decryption of the configuration files.
+
+                     enable  : The configuration files are decrypted by the unit.
+                     disable : The configuration file are not decrypted by the unit.
+
+                     When enabled, the configuration files must be encrypted with keys
+                     matching the secrets set in the variables configFilePrivacyGenericSecret
+                     and configFilePrivacySpecificSecret."
+        DEFVAL { disable }
+        ::= { configFilePrivacy 50 }
+
+    configFilePrivacyGenericSecret OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..128))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The secret key used to decrypt the generic configuration file.
+
+                     The key is encoded in hexadecimal notation, meaning only characters
+                     in the range 0-9,A-F can be used. Each character encodes 4 bits of
+                     the key. If too many bits are supplied for a given cipher algorithm,
+                     the key is truncated. If not enough bits are provided, the key is padded
+                     with zeros.
+
+                     For example, a 32 bits key could look like: A36CB299.
+
+                     This key must match the key used for encryption of the generic
+                     configuration file in order for the settings to be applied.
+
+                     The generic configuration file is decrypted only if configFilePrivacyEnable
+                     is enabled and this value is not empty"
+        DEFVAL { "" }
+        ::= { configFilePrivacy 100 }
+
+    configFilePrivacySpecificSecret OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..128))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The secret key used to decrypt the specific configuration file.
+
+                     The key is encoded in hexadecimal notation, meaning only characters
+                     in the range 0-9,A-F can be used. Each character encodes 4 bits of
+                     the key. If too many bits are supplied for a given cipher algorithm,
+                     the key is truncated. If not enough bits are provided, the key is padded
+                     with zeros.
+
+                     For example, a 32 bits key could look like: A36CB299.
+
+                     This key must match the key used for encryption of the specific
+                     configuration file in order for the settings to be applied.
+
+                     The specific configuration file is decrypted only if configFilePrivacyEnable
+                     is enabled and this value is not empty"
+        DEFVAL { "" }
+        ::= { configFilePrivacy 150 }
+
+-- Add the configFileFetching ip addresses specifics parameters
+
+    ipAddressStatusConfigFileFetching OBJECT IDENTIFIER ::= { ipAddressStatus 9 }
+    ipAddressConfigFileFetching OBJECT IDENTIFIER ::= { ipAddressConfig 9 }
+
+-- Add the Status information
+    configFileFetchingConfigSource OBJECT-TYPE
+        SYNTAX      MxIpConfigSource
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Indicates the source used for the provisioning of
+                     the transfer server MIB objects. This server is used
+                     by the unit when fetching configuration files."
+        DEFVAL      { dhcp }
+        ::=  {  ipAddressStatusConfigFileFetching  50  }
+
+    configFileFetchingHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Transfer server IP address or domain name used when
+                     the unit is fetching configuration files."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressStatusConfigFileFetching  100  }
+
+    configFileFetchingPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Transfer server IP port number used when the unit
+                     is fetching configuration files."
+        DEFVAL      { 69 }
+        ::=  {    ipAddressStatusConfigFileFetching  150  }
+
+
+-- Add the configuration information
+    configFileFetchingSelectConfigSource OBJECT-TYPE
+        SYNTAX      MxIpSelectConfigSource
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The source to use for the provisioning of the transfer server MIB objects.
+                     This server is used by the unit when fetching configuration files."
+        DEFVAL      { dhcp }
+        ::=  {  ipAddressConfigFileFetching  50  }
+
+    ipAddressConfigFileFetchingStatic OBJECT IDENTIFIER ::= { ipAddressConfigFileFetching 100 }
+
+    -- Add the static parameters
+    configFileFetchingStaticHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static transfer server IP address or domain name
+                     to use when fetching configuration files."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressConfigFileFetchingStatic  50  }
+
+    configFileFetchingStaticPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static transfer server IP port number to use
+                     when fetching configuration files."
+        DEFVAL      { 69 }
+        ::=  {    ipAddressConfigFileFetchingStatic  100  }
+
+
+    ipAddressConfigFileFetchingDhcp OBJECT IDENTIFIER ::= { ipAddressConfigFileFetching 150 }
+
+    -- Add the DHCP parameters
+    configFileFetchingDhcpSiteSpecificCode OBJECT-TYPE
+        SYNTAX      MxIpDhcpSiteSpecificCode
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "DHCP transfer server site specific code to use
+                     when fetching configuration files.
+                     If set to 0, use vendor-specific code #201."
+        DEFVAL      { 0 }
+        ::=  {    ipAddressConfigFileFetchingDhcp  50 }
+
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    configFileFetchingCompliances OBJECT IDENTIFIER ::= { configFileFetchingConformance 50 }
+
+    configFileFetchingBasicComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "Basic configuration file fetching requirements."
+        MODULE -- This Module
+            MANDATORY-GROUPS {
+                                configFileFetchingBasicGroupVer1,
+                                configFileTransferGroupVer1,
+                                configFileAutomaticUpdateGroupVer1,
+                                configFilePrivacyGroupVer1,
+                                configFileFetchingTransferServerGroupVer1
+                             }
+        ::= { configFileFetchingCompliances 50 }
+
+
+    -- ************************************************************************
+    -- MIB variable grouping
+    -- ************************************************************************
+    configFileFetchingGroups OBJECT IDENTIFIER ::= { configFileFetchingConformance 100 }
+
+    configFileFetchingBasicGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  configFileFetchingFileName,
+                  configFileFetchingSpecificFileName,
+                  configFileFetchingFileLocation
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects to initiate a configuration file
+             download where the unit is the initiator of the transfer session."
+        ::= { configFileFetchingGroups 50 }
+
+    configFileTransferGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  configFileTransferProtocol,
+                  configFileTransferUsername,
+                  configFileTransferPassword
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects that define the transfer of the
+             configuration file fetching."
+        ::= { configFileFetchingGroups 65 }
+
+    configFileAutomaticUpdateGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  configFileAutoUpdateOnRestartEnable,
+                  configFileAutoUpdatePeriodicEnable,
+                  configFileAutoUpdateTimeUnit,
+                  configFileAutoUpdatePeriod,
+                  configFileAutoUpdateTimeOfDay,
+                  configFileAutoUpdateTimeRange
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects that define the automatic configuration
+             update following the fetching of a configuration file."
+        ::= { configFileFetchingGroups 85 }
+
+    configFilePrivacyGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  configFilePrivacyEnable,
+                  configFilePrivacyGenericSecret,
+                  configFilePrivacySpecificSecret
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects that define the privacy of the
+             fetching of a configuration file."
+        ::= { configFileFetchingGroups 105 }
+
+
+    configFileFetchingTransferServerGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  configFileFetchingConfigSource,
+                  configFileFetchingHost,
+                  configFileFetchingPort,
+                  configFileFetchingSelectConfigSource,
+                  configFileFetchingStaticHost,
+                  configFileFetchingStaticPort,
+                  configFileFetchingDhcpSiteSpecificCode
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects that define the transfer server
+             used for the configuration file fetching."
+        ::= { configFileFetchingGroups 100 }
+
+END

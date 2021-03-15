@@ -68,10 +68,10 @@ except:
 
 try:
     # Required modules
-    import threading, sys, subprocess, os, json
+    import threading, sys, subprocess, os, json, stat
 except:
     print("ERROR: missing one or more of the following python modules:")
-    print("threading, sys, subprocess, os, json")
+    print("threading, sys, subprocess, os, json, stat")
     sys.exit(2)
 
 """
@@ -104,9 +104,17 @@ class bcolors:
 
 def logfile(msg):
     msg = "[%s] %s(%s): %s/%s: %s\n" % (time.strftime("%Y/%m/%d %H:%M:%S %z"), scriptname, os.getpid(), config['install_dir'], scriptname, msg)
-    f = open(log_path,'a')
-    f.write(msg)
-    f.close()
+
+    # https://jira.observium.org/browse/OBS-2631
+    # if the log file is a "character special device file" or a "FIFO (named pipe)" we must use mode 'w'
+    fstat = os.stat(log_path).st_mode
+    if stat.S_ISCHR(fstat) or stat.S_ISFIFO(fstat):
+        fmode = 'w'
+    else:
+        fmode = 'a'
+
+    with open(log_path, fmode) as f:
+        f.write(msg)
 
 # base script name
 scriptname      = os.path.basename(sys.argv[0])
@@ -950,19 +958,31 @@ if process == 'poller' and stats:
     #print(instances_clean)
 
     # write instance and total stats into db
-    cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s", (json.dumps(instance_stats), 'poller_wrapper_instance_' + str(instance_number)))
-    #db.commit()
-    #print("Number of rows updated: %d" % cursor.rowcount)
-    if cursor.rowcount == 0:
-        cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)", (json.dumps(instance_stats), 'poller_wrapper_instance_' + str(instance_number)))
-        #db.commit()
+    cursor.execute("SELECT EXISTS (SELECT 1 FROM `observium_attribs` WHERE `attrib_type` = %s)",
+                   ('poller_wrapper_instance_' + str(instance_number),))
+    row = cursor.fetchone()
+    if int(row[0]) > 0:
+        cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s",
+                       (json.dumps(instance_stats), 'poller_wrapper_instance_' + str(instance_number)))
+        # db.commit()
+        # print("Number of rows updated: %d" % cursor.rowcount)
+    else:
+        cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)",
+                       (json.dumps(instance_stats), 'poller_wrapper_instance_' + str(instance_number)))
+        # db.commit()
 
-    cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s", (json.dumps(poller_stats), 'poller_wrapper_stats'))
-    #db.commit()
-    print("Number of rows updated: %d" % cursor.rowcount)
-    if cursor.rowcount == 0:
-        cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)", (json.dumps(poller_stats), 'poller_wrapper_stats'))
-        #db.commit()
+    cursor.execute("SELECT EXISTS (SELECT 1 FROM `observium_attribs` WHERE `attrib_type` = %s)",
+                   ('poller_wrapper_stats',))
+    row = cursor.fetchone()
+    if int(row[0]) > 0:
+        cursor.execute("UPDATE `observium_attribs` SET `attrib_value` = %s WHERE `attrib_type` = %s",
+                       (json.dumps(poller_stats), 'poller_wrapper_stats'))
+        # db.commit()
+        print("Number of rows updated: %d" % cursor.rowcount)
+    else:
+        cursor.execute("INSERT INTO `observium_attribs` (`attrib_value`,`attrib_type`) VALUES (%s,%s)",
+                       (json.dumps(poller_stats), 'poller_wrapper_stats'))
+        # db.commit()
 
     # clean stale instance stats
     for row in instances_clean:

@@ -11,7 +11,7 @@
  *
  */
 
-include($config['html_dir'].'/pages/usermenu.inc.php');
+include($config['html_dir'].'/includes/user_menu.inc.php');
 
 if ($_SESSION['userlevel'] < 10)
 {

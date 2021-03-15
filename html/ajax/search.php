@@ -5,11 +5,11 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage ajax
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
+
 $config['install_dir'] = "../..";
 
 include_once("../../includes/sql-config.inc.php");
@@ -73,10 +73,10 @@ if (isset($_REQUEST['queryString']))
         echo('<li class="divider" style="margin: 0px;"></li>' . PHP_EOL);
         echo('<li style="margin: 0px;">' . PHP_EOL . '  <a href="'.$result['url'].'">' . PHP_EOL);
         echo('    <dl style="border-left: 10px solid '.$result['colour'].'; " class="dl-horizontal dl-search">' . PHP_EOL);
-        echo('  <dt style="width: 64px; text-align: center; line-height: 41.5px;">' . $result['icon'] . '</dt>' . PHP_EOL);
+        echo('  <dt style="width: 64px; text-align: center; line-height: 41.5px;">' . get_icon($result['icon']) . '</dt>' . PHP_EOL);
         echo('    <dd>' . PHP_EOL);
-        echo('      <strong>'.highlight_search(escape_html($result['name'])) . PHP_EOL);
-        echo('        <small>'.  implode($result['data'], '<br />') . '</small>' . PHP_EOL);
+        echo('      <strong>'.html_highlight(escape_html($result['name']), $queryString) . PHP_EOL);
+        echo('        <small>'.  implode('<br />', $result['data']) . '</small>' . PHP_EOL);
         echo('      </strong>' . PHP_EOL);
         echo('    </dd>' . PHP_EOL);
         echo('</dl>' . PHP_EOL);
@@ -93,13 +93,6 @@ if (isset($_REQUEST['queryString']))
 } else {
   // There is no queryString, we shouldn't get here.
   echo('<li class="nav-header">There should be no direct access to this script! Please reload the page.</li>');
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function highlight_search($text)
-{
-  return preg_replace("/".preg_quote($GLOBALS['queryString'], "/")."/i", "<em class='text-danger'>$0</em>", $text);
 }
 
 // EOF

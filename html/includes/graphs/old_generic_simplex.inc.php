@@ -21,10 +21,10 @@ $line_text = str_pad(truncate($line_text,12,''),12);
 
 if ($multiplier)
 {
-  $rrd_options .= " DEF:".$ds."_o=".$rrd_filename.":".$ds.":AVERAGE";
+  $rrd_options .= " DEF:".$ds."_o=".$rrd_filename_escape.":".$ds.":AVERAGE";
   $rrd_options .= " CDEF:".$ds."=".$ds."_o,$multiplier,*";
 } else {
-  $rrd_options .= " DEF:".$ds."=".$rrd_filename.":".$ds.":AVERAGE";
+  $rrd_options .= " DEF:".$ds."=".$rrd_filename_escape.":".$ds.":AVERAGE";
 }
 if ($print_total)
 {
@@ -40,11 +40,11 @@ if ($vars['previous'] == "yes")
 {
   if ($multiplier)
   {
-    $rrd_options .= " DEF:".$ds."_oX=".$rrd_filename.":".$ds.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:".$ds."_oX=".$rrd_filename_escape.":".$ds.":AVERAGE:start=".$prev_from.":end=".$from;
     $rrd_options .= " SHIFT:".$ds."_oX:$period";
     $rrd_options .= " CDEF:".$ds."X=".$ds."_oX,$multiplier,*";
   } else {
-    $rrd_options .= " DEF:".$ds."X=".$rrd_filename.":".$ds.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:".$ds."X=".$rrd_filename_escape.":".$ds.":AVERAGE:start=".$prev_from.":end=".$from;
     $rrd_options .= " SHIFT:".$ds."X:$period";
   }
   if ($print_total)

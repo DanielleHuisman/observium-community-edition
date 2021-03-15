@@ -1,0 +1,278 @@
+-- *****************************************************************
+-- MY-REDUNDANCY-MIB.mib:  My redundancy and pluggable MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+MY-REDUNDANCY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        myMgmt
+                FROM MY-SMI;
+
+myRedundancyMIB MODULE-IDENTITY
+        LAST-UPDATED "200309100000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "This module defines my redundancy mibs."
+        REVISION      "200309200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 34}
+
+myRedundancyMIBObjects OBJECT IDENTIFIER ::= { myRedundancyMIB 1 }
+
+myRedundancyForceSwitchover OBJECT-TYPE
+        SYNTAX INTEGER 
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "将该对象设为任何的非0值，都将使当前管理板复位，
+             同时处于冗余备份状态的管理板开始工作.
+             如果查询该对象的值时,总是得到0."
+        ::= { myRedundancyMIBObjects 1 }
+
+myMainCPU OBJECT-TYPE
+   	SYNTAX  INTEGER {
+                increasing(0), -- 插槽号小的管理板优先进入管理状态
+                decreasing(1)  -- 插槽号大的管理板优先进入管理状态
+             }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "当管理板冗余时，该对象决定下次启动时哪个管理板优先进入
+           管理状态。该对象只是管理者的期望，实际进入管理状态的管
+           理板可以与此不一致（例如优先的管理板可能无法启动）。"
+        ::= { myRedundancyMIBObjects 2 }
+
+
+myPluggableMIBObjects OBJECT IDENTIFIER ::= { myRedundancyMIB 2 } 
+
+myPluggableModuleInfoTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyPluggableModuleInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "模块配置信息入口表."
+        ::= { myPluggableMIBObjects  1 }
+    
+myPluggableModuleInfoEntry OBJECT-TYPE
+        SYNTAX MyPluggableModuleInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "模块配置信息的入口."
+        INDEX { myPluggableModuleInfoDeviceIndex, myPluggableModuleInfoSlotIndex }
+        ::= { myPluggableModuleInfoTable 1 }
+
+MyPluggableModuleInfoEntry ::= 
+        SEQUENCE {
+             myPluggableModuleInfoDeviceIndex Integer32,
+             myPluggableModuleInfoSlotIndex Integer32,
+             myPluggableModuleStatus INTEGER,
+             myPluggableModuleConfigType INTEGER,
+             myPluggableModuleConfigSwVer DisplayString,
+             myPluggableModuleOnlineSwVer DisplayString,
+             myPluggableModuleConfigInfoDescr DisplayString,
+             myPluggableModuleOnlineInfoDescr DisplayString,
+             myPluggableModuleConfigPortsNum Integer32,
+             myPluggableModuleOnlinePortsNum Integer32,
+             myPluggableModuleAction  INTEGER
+        }
+    
+myPluggableModuleInfoDeviceIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "模块所在设备索引."
+        ::= { myPluggableModuleInfoEntry 1 }
+    
+myPluggableModuleInfoSlotIndex OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "模块所在插槽索引."
+        ::= { myPluggableModuleInfoEntry 2 }
+
+myPluggableModuleStatus  OBJECT-TYPE
+        SYNTAX  INTEGER {
+                none(0),          --模块不存在,也没有预配置模块类型
+                ok(1),            --模块正常工作
+                installed(2),     --预配置该模块,实际没有
+                conflict(3),      --预配置模块与实际插入模块类型冲突
+                removed(4),       --模块被热拔出
+                uninstalled(5),   --模块配置被卸载，但模块没有被拔出
+                verIncompatible(6), --版本不兼容
+                cannot-myup(7),  --模块无法启动
+                resetting(8),       --模块正在复位
+                master(9),          --管理板处于管理状态
+                backup(10)          --管理板处于冗余备份状态
+                
+             }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "模块的状态."
+        ::= { myPluggableModuleInfoEntry 3 }
+
+
+
+myPluggableModuleConfigType OBJECT-TYPE
+        SYNTAX INTEGER{
+                none(0),     --没有插入模块
+                m6800-24T-4SFP-4GT(1),
+                m6800-32T-4SFP-GT(2), 
+                m6800-32FMT(3), 
+                m6800-12GB(4),
+                m6800-24SFP(5), 
+                m6800-12SFP-GT(6),
+                m6800-1XENPAK(7),
+                m6800-2XENPAK(8),
+                m6800-MSC(9),
+                m6800-CM(10),
+                m6800-24GT-8SFP(11)
+             }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "该对象用于添加模块配置.设置该对象时,如果没有配置任何
+             类型(值为none),系统按照模块类型自动配置所有参数成
+             缺省值;否则返回不成功.
+             该对象在读取时,返回已经配置的类型或none"
+	::= { myPluggableModuleInfoEntry 4 }
+
+myPluggableModuleConfigSwVer OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "已配置模块的版本."
+        ::= { myPluggableModuleInfoEntry 5 }
+
+
+myPluggableModuleOnlineSwVer OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "实际插入模块的版本."
+        ::= { myPluggableModuleInfoEntry 6 }
+
+
+myPluggableModuleConfigInfoDescr OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "配置的模块名.不同类型模块的模块名不同.如果没有
+             配置模块时为空."
+        ::= { myPluggableModuleInfoEntry 7 }
+    
+myPluggableModuleOnlineInfoDescr  OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "实际插入的模块名.不同类型模块的模块名不同.
+             如果没有配置模块时为空."
+        ::= { myPluggableModuleInfoEntry 8 }           
+
+myPluggableModuleConfigPortsNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "配置模块的端口数."
+        ::= { myPluggableModuleInfoEntry 9 }
+
+myPluggableModuleOnlinePortsNum OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "实际插入模块的端口数."
+        ::= { myPluggableModuleInfoEntry 10 }
+
+myPluggableModuleAction  OBJECT-TYPE
+        SYNTAX INTEGER{
+                none(0),         --用于读取
+                reset(1),        --模块复位
+                clearAllConf(2), --模块所有配置恢复缺省
+                uninstall(3)     --删除该模块
+              }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "该对象包含了对模块进行的操作，支持操作包括模块的复位(1),
+            使所有配置恢复缺省(2)，删除该模块(3)。
+            读取该对象值时，总是返回0。"
+        ::= { myPluggableModuleInfoEntry 11 }           
+
+
+myRedundancyMIBConformance OBJECT IDENTIFIER ::= { myRedundancyMIB 3 }
+myRedundancyMIBCompliances OBJECT IDENTIFIER ::= { myRedundancyMIBConformance 1 }
+myRedundancyMIBGroups      OBJECT IDENTIFIER ::= { myRedundancyMIBConformance 2 }
+
+
+-- compliance statements
+
+myRedundancyMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My System MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { myRedundancyMIBGroup
+                 }
+        ::= { myRedundancyMIBCompliances 1 }
+                
+-- units of conformance
+
+myRedundancyMIBGroup OBJECT-GROUP
+        OBJECTS {
+               myRedundancyForceSwitchover, 
+               myMainCPU,
+               myPluggableModuleInfoDeviceIndex,
+               myPluggableModuleInfoSlotIndex,
+               myPluggableModuleStatus,
+               myPluggableModuleConfigType,
+               myPluggableModuleConfigSwVer,
+               myPluggableModuleOnlineSwVer,
+               myPluggableModuleConfigInfoDescr,
+               myPluggableModuleOnlineInfoDescr,
+               myPluggableModuleConfigPortsNum,
+               myPluggableModuleOnlinePortsNum,
+               myPluggableModuleAction
+
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing system information and
+                opertion to a My agent."
+        ::= { myRedundancyMIBGroups  1 } 
+  
+END
+

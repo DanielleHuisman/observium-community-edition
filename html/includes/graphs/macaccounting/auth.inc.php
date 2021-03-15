@@ -51,4 +51,5 @@ if (is_numeric($vars['id']))
 } else {
 #  graph_error("invalid id");
 }
-?>
+
+// EOF

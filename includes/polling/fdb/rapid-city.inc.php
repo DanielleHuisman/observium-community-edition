@@ -51,6 +51,49 @@ if (snmp_status())
     }
   }
 }
+else
+{
+  // if its not rcBridge then may be its spbm
+
+  // rcBridgeSpbmMacStatus[1500050][14:61:2f:ec:49:1] = learned
+  // rcBridgeSpbmMacCPort[1500050][14:61:2f:ec:49:1] = 50
+  $entries = snmpwalk_cache_twopart_oid($device, 'rcBridgeSpbmMacCPort', array(), 'RAPID-CITY',  NULL, OBS_SNMP_ALL_TABLE);
+  if (snmp_status())
+  {
+    $entries = snmpwalk_cache_twopart_oid($device, 'rcBridgeSpbmMacStatus', $entries, 'RAPID-CITY',  NULL, OBS_SNMP_ALL_TABLE);
+    print_debug_vars($entries);
+    
+    $entries = snmpwalk_cache_twopart_oid($device, 'rcBridgeSpbmMacType', $entries, 'RAPID-CITY',  NULL, OBS_SNMP_ALL_TABLE);
+    print_debug_vars($entries);
+    
+    $entries = snmpwalk_cache_twopart_oid($device, 'rcBridgeSpbmMacCVlanId', $entries, 'RAPID-CITY',  NULL, OBS_SNMP_ALL_TABLE);
+    print_debug_vars($entries);
+    
+    foreach($entries as $isid => $data1)
+    {
+      foreach ($data1 as $mac => $entry)
+      {
+   
+        // Make sure the ifIndex is actually valid
+        if ($entry['rcBridgeSpbmMacType'] == "local" && is_array($port_ifIndex_table[$entry['rcBridgeSpbmMacCPort']]))
+        {
+          $port = $port_ifIndex_table[$entry['rcBridgeSpbmMacCPort']];
+   
+          $mac = mac_zeropad($mac);
+   
+          $data = array();
+   
+          $data['port_id']    = $port['port_id'];
+          $data['port_index'] = $entry['rcBridgeSpbmMacCPort'];
+          $data['fdb_status'] = $entry['rcBridgeSpbmMacStatus'];
+          $vlan = $entry['rcBridgeSpbmMacCVlanId'];
+  
+          $fdbs[$vlan][$mac] = $data;
+        }
+      }
+    }
+  }
+}
 
 unset($entries);
 

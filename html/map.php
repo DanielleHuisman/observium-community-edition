@@ -6,9 +6,8 @@
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage map
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -55,7 +54,13 @@ if (is_array($config['branding']))
   }
 }
 
-if (isset($vars['device']) && is_numeric($vars['device'])) { $where = "WHERE D.`device_id` = ".$vars['device']; } else { $where = "WHERE 1"; }
+if (isset($vars['device']) && is_numeric($vars['device']))
+{
+  $where = "WHERE D.`device_id` = ".$vars['device'];
+} else {
+  $where = "WHERE 1";
+}
+$where .= " AND L.`active` = '1'";
 
 // FIXME this shit probably needs tidied up.
 
@@ -80,7 +85,7 @@ if (isset($vars['format']) && preg_match("/^[a-z]*$/", $vars['format']))
     {
       if ($device)
       {
-        $links = dbFetch("SELECT * from ports AS I, neighbours AS L WHERE I.device_id = ? AND L.port_id = I.port_id ORDER BY L.remote_hostname", array($device['device_id']));
+        $links = dbFetch("SELECT * FROM ports AS I, neighbours AS L WHERE I.device_id = ? AND L.port_id = I.port_id ORDER BY L.remote_hostname", array($device['device_id']));
         if (count($links))
         {
           $ranktype = substr($device['hostname'], 0, 2);

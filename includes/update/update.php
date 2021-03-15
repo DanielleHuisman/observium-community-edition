@@ -1,11 +1,12 @@
 <?php
-
-/* Observium Network Management and Monitoring System
+/**
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage updater
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage db
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -14,6 +15,30 @@ if (!defined('OBS_DEBUG'))
   // Direct call not allowed.
   echo("WARNING. Direct call to this script is no longer supported, please use './discovery.php -u' from main observium directory.\n");
   exit(2);
+}
+
+// One time alert about deprecated (eol) mysql version
+get_versions();
+if ($GLOBALS['cache']['versions']['mysql_old'])
+{
+  $mysql_name    = $GLOBALS['cache']['versions']['mysql_name'];
+  $mysql_version = $GLOBALS['cache']['versions']['mysql_version'];
+  print_message("
+
++---------------------------------------------------------+
+|                                                         |
+|                %rDANGER! ACHTUNG! BHUMAHUE!%n               |
+|                                                         |
+".
+                str_pad("| %WYour ".$mysql_name." version is too old (%r".$mysql_version."%W),", 64, ' ')."%n|
+| %Wfunctionality may be broken. Please update your ".$mysql_name."!%n  |
+|                                                         |
+| See additional information here:                        |
+| %c".
+                str_pad(OBSERVIUM_DOCS_URL . '/software_requirements/' , 56, ' ')."%n|
+|                                                         |
++---------------------------------------------------------+
+", 'color');
 }
 
 /**
@@ -101,17 +126,26 @@ if ($db_rev > 272) // observium_processes added in db version 272
   add_process_info(-1); // Store process info
 }
 
+// Note, undocumented ability for force update from db schema (not more than 10)
+$update_force = isset($options['U']) && is_numeric($options['U']) &&
+                $db_rev >= $options['U'] && ($db_rev - $options['U']) <= 10;
+if ($update_force)
+{
+  print_debug("Forced update from DB schema ".$options['U']);
+  $db_rev = (int)$options['U'] - 1;
+}
+
 $updating = 0;
 
 // Only numeric filenames (001.sql, 013.php)
-$sql_regexp = "/^\d+\.sql$/";
-$php_regexp = "/^\d+\.php$/";
+$sql_regexp = "/^\d{3,4}\.sql$/";
+$php_regexp = "/^\d{3,4}\.php$/";
 
 if ($handle = opendir($config['install_dir'] . '/update'))
 {
-  while (false !== ($file = readdir($handle)))
+  while (FALSE !== ($file = readdir($handle)))
   {
-    if (filetype($config['install_dir'] . '/update/' . $file) == 'file' && (preg_match($sql_regexp, $file) || preg_match($php_regexp, $file)))
+    if (filetype($config['install_dir'] . '/update/' . $file) === 'file' && (preg_match($sql_regexp, $file) || preg_match($php_regexp, $file)))
     {
       $filelist[] = $file;
     }
@@ -133,9 +167,9 @@ foreach ($filelist as $file)
       echo('-- Updating database/file schema' . PHP_EOL);
     }
 
-    $error_ignore = FALSE; // Stop update if errors not ignored
+    $error_ignore = $update_force; // Stop update if errors not ignored
 
-    if ($extension == "php")
+    if ($extension === "php")
     {
       $log_msg = sprintf("%03d",$db_rev) . " -> " . sprintf("%03d", $filename) . " # (php) ";
       echo($log_msg);
@@ -161,9 +195,9 @@ foreach ($filelist as $file)
         exit(1);
       }
     }
-    else if ($extension == "sql")
+    elseif ($extension === "sql")
     {
-      $log_msg = sprintf("%03d",$db_rev) . " -> " . sprintf("%03d", $filename) . " # (db) ";
+      $log_msg = sprintf("%03d", $db_rev) . " -> " . sprintf("%03d", $filename) . " # (db) ";
       echo($log_msg);
 
       $err   = 0;
@@ -183,14 +217,13 @@ foreach ($filelist as $file)
           if (trim($line))
           {
             // Skip comments
-            if ($line[0] == '#' || $line[0] == '-' || $line[0] == '/')
+            if (str_starts($line, [ '#', '-', '/' ]))
             {
-              if ((strpos($line, 'ERROR_IGNORE') !== FALSE) ||
-                  (strpos($line, 'IGNORE_ERROR') !== FALSE))
+              if (str_exists($line, [ 'ERROR_IGNORE', 'IGNORE_ERROR' ]))
               {
                 $error_ignore = TRUE;
               }
-              else if (strpos($line, 'NOTE') !== FALSE)
+              elseif (str_exists($line, 'NOTE'))
               {
                 list(, $note) = explode('NOTE', $line, 2);
                 echo('('.trim($note).')');
@@ -240,7 +273,7 @@ foreach ($filelist as $file)
           log_event("Observium schema updated: " . $log_msg . "($update_time).", NULL, NULL, NULL, 5);
           echo(" Done ($update_time)." . PHP_EOL);
         }
-        else if ($err)
+        elseif ($err)
         {
           if ($error_ignore)
           {

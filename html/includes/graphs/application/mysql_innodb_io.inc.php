@@ -11,8 +11,6 @@
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $mysql_rrd = get_rrd_path($device, "app-mysql-".$app['app_id'].".rrd");
 
 if (is_file($mysql_rrd))
@@ -20,10 +18,12 @@ if (is_file($mysql_rrd))
   $rrd_filename = $mysql_rrd;
 }
 
-$rrd_options .= ' DEF:a='.$rrd_filename.':IBIRd:AVERAGE ';
-$rrd_options .= ' DEF:b='.$rrd_filename.':IBIWr:AVERAGE ';
-$rrd_options .= ' DEF:c='.$rrd_filename.':IBILg:AVERAGE ';
-$rrd_options .= ' DEF:d='.$rrd_filename.':IBIFSc:AVERAGE ';
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
+
+$rrd_options .= ' DEF:a='.$rrd_filename_escape.':IBIRd:AVERAGE ';
+$rrd_options .= ' DEF:b='.$rrd_filename_escape.':IBIWr:AVERAGE ';
+$rrd_options .= ' DEF:c='.$rrd_filename_escape.':IBILg:AVERAGE ';
+$rrd_options .= ' DEF:d='.$rrd_filename_escape.':IBIFSc:AVERAGE ';
 
 $rrd_options .= 'COMMENT:"    Current    Average   Maximum\n" ';
 

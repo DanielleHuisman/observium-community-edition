@@ -1,0 +1,949 @@
+LUM-MPLSOAM-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, Unsigned32
+            FROM SNMPv2-SMI
+        OBJECT-GROUP, MODULE-COMPLIANCE
+            FROM SNMPv2-CONF
+        TEXTUAL-CONVENTION, DisplayString, DateAndTime, RowStatus
+            FROM SNMPv2-TC
+        lumModules, lumMplsOamMIB
+            FROM LUM-REG
+        FaultStatus, MgmtNameString, CommandString
+            FROM LUM-TC;
+
+
+lumMplsOamMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201706150000Z" -- June 15th 2017
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+            "MPLS OAM Management Information Base
+
+                The tables contained in this MIB are:
+
+                    (1) Bidirectional forwarding table.
+                        BFD is a protocol intended to detect faults in the bidirectional path
+                        between two forwarding engines. It operates independently of media,
+                        data protocols, and routing protocols.
+
+                    (2) Template for bidirectional forwarding.
+                        Templates used for setting up a BFD sessions.
+
+"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "Changes made for release r29.0:
+         - Changed ORGANIZATION and CONTACT-INFO"
+    REVISION "201212251200Z" -- 25 December 2012 12:00:00 CET
+    DESCRIPTION "Release r20:
+                - Updated alarm descriptions for BFD."
+    REVISION "201203011200Z" -- 1 March 2012 12:00:00 CET
+    DESCRIPTION
+            "Initial revision of the MIB Model of Bidirectional Forwarding (BFD) for MPLS-TP.
+             Reference RFC5880, RFC6428."
+    ::= { lumModules 44 }
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and compliance
+-- specifications.
+-- ----------------------------------------------------
+
+lumMplsOamConfs OBJECT IDENTIFIER ::= { lumMplsOamMIB 1 }
+lumMplsOamGroups OBJECT IDENTIFIER ::= { lumMplsOamConfs 1 }
+lumMplsOamCompl OBJECT IDENTIFIER ::= { lumMplsOamConfs 2 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the MPLS OAM MIB
+-- ----------------------------------------------------
+
+lumMplsOamMIBObjects OBJECT IDENTIFIER ::= { lumMplsOamMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+mplsOamGeneral OBJECT IDENTIFIER ::= { lumMplsOamMIBObjects 1 }
+mplsOamBfdSess OBJECT IDENTIFIER ::= { lumMplsOamMIBObjects 2 }
+mplsOamBfdTemplate OBJECT IDENTIFIER ::= { lumMplsOamMIBObjects 3 }
+
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+BfdSessStateTC ::= TEXTUAL-CONVENTION
+    STATUS         current
+    DESCRIPTION
+        "BFD session state. State failing(5) is only applicable if
+        corresponding session is running in BFD version 0."
+    SYNTAX INTEGER {
+        none(0),    -- Added for remote state when not connected to a remote BFD session
+        adminDown(1),
+        down(2),
+        init(3),
+        up(4),
+        failing(5)
+    }
+
+BfdMultiplierTC ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS          current
+    DESCRIPTION
+        "The BFD failure detection multiplier. Number of
+        failed/missed messages before an alarm."
+    SYNTAX Unsigned32 (1..255)
+
+BfdIntervalTC ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS        current
+    DESCRIPTION
+        "The BFD interval in microseconds."
+    SYNTAX Unsigned32 (0..1000000)
+
+BfdDiagTC ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "A common BFD diagnostic code."
+    SYNTAX INTEGER {
+        noDiagnostic(0),
+        controlDetectionTimeExpired(1),
+        echoFunctionFailed(2),
+        neighborSignaledSessionDown(3),
+        forwardingPlaneReset(4),
+        pathDown(5),
+        concatenatedPathDown(6),
+        administrativelyDown(7),
+        reverseConcatenatedPathDown(8),
+        misconnectionDefect(9)  -- Added by RFC6428
+    }
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+mplsOamGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the configuration of the MIB was
+        last changed.
+"
+    ::= { mplsOamGeneral 1 }
+
+mplsOamGeneralStateLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the state of the MIB was last
+        changed.
+"
+    ::= { mplsOamGeneral 2 }
+
+mplsOamGeneralmplsOamBfdSessTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of BFD session table.
+"
+    ::= { mplsOamGeneral 3 }
+
+mplsOamGeneralmplsOamBfdTemplateTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of BFD template table.
+"
+    ::= { mplsOamGeneral 4 }
+
+
+-- ------------------------------------------------------
+ -- The BFD Session Table specifies BFD session specific
+-- ------------------------------------------------------
+
+mplsOamBfdSessTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF MplsOamBfdSessEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "The BFD Session Table describes the BFD sessions."
+    ::= { mplsOamBfdSess 1 }
+
+mplsOamBfdSessEntry OBJECT-TYPE
+    SYNTAX     MplsOamBfdSessEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "The BFD Session Entry describes a single BFD session.
+"
+    INDEX { mplsOamBfdSessIndex }
+    ::= { mplsOamBfdSessTable 1 }
+
+MplsOamBfdSessEntry ::= SEQUENCE {
+    mplsOamBfdSessIndex                     Unsigned32,
+    mplsOamBfdSessInternalReference         Unsigned32,
+    mplsOamBfdSessName                      MgmtNameString,
+    mplsOamBfdSessAdminStatus               INTEGER,
+    mplsOamBfdSessState                     BfdSessStateTC,
+    mplsOamBfdSessRemoteState               BfdSessStateTC,
+    mplsOamBfdSessDiag                      BfdDiagTC,
+    mplsOamBfdSessRemoteDiag                BfdDiagTC,
+    mplsOamBfdSessNegotiatedTxInterval      BfdIntervalTC,
+    mplsOamBfdSessNegotiatedRxInterval      BfdIntervalTC,
+    mplsOamBfdSessMonitoringPath            DisplayString,
+    mplsOamBfdSessMonitoringPathType        INTEGER,
+    mplsOamBfdSessMonitoringPathIndex       Unsigned32,
+    mplsOamBfdSessTemplate                  DisplayString,
+    mplsOamBfdSessTemplateIndex             Unsigned32,
+    mplsOamBfdSessSourceMepId               DisplayString,
+    mplsOamBfdSessTargetMepId               DisplayString,
+    mplsOamBfdSessRcvTargetMepId            DisplayString,
+    mplsOamBfdSessMepNotConfigured          FaultStatus,
+    mplsOamBfdSessLocalNotConnected         FaultStatus,
+    mplsOamBfdSessLocalMisConnectivity      FaultStatus,
+    mplsOamBfdSessLocalTimerExpired         FaultStatus,
+    mplsOamBfdSessRemoteMisConnectivity     FaultStatus,
+    mplsOamBfdSessRemoteTimerExpired        FaultStatus,
+    mplsOamBfdSessRemoteAdminDown           FaultStatus,
+    mplsOamBfdSessRowStatus                 RowStatus,
+    mplsOamBfdSessDesiredMinTxInterval      BfdIntervalTC,
+    mplsOamBfdSessReqMinRxInterval          BfdIntervalTC,
+    mplsOamBfdSessTrafficClass              Unsigned32}
+
+mplsOamBfdSessIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { mplsOamBfdSessEntry 1 }
+
+mplsOamBfdSessInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+"
+    DEFVAL { 0 }
+    ::= { mplsOamBfdSessEntry 2 }
+
+mplsOamBfdSessName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the BFD session, for example
+        'bfdSess:1:2:myIdentifier', where the first number indicates
+        subrack and the second slot number. For LSPs 'myIdentifier'
+        is set to the LSP identifier.
+"
+    ::= { mplsOamBfdSessEntry 3 }
+
+mplsOamBfdSessAdminStatus OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        up(1),
+                        down(2)
+               }
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "A transition from 'down' to 'up' will start
+         the BFD state machine for the session. The state
+         machine will have an initial state of down.
+         A transition from 'up' to 'down' will cause
+         the BFD session to be brought down to
+         adminDown(1).
+"
+    DEFVAL { 1 }
+    ::= { mplsOamBfdSessEntry 4 }
+
+mplsOamBfdSessState OBJECT-TYPE
+    SYNTAX     BfdSessStateTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "BFD session state.
+        none -      Locally indicated state of the remote
+                    BFD session before connection is made.
+
+        adminDown - State the BFD session is in when
+                    the requested BFD administrative state
+                    is down.
+
+        down - State of the BFD session during failure.
+
+        init - State of the BFD session when trying to
+               connect to remote BFD session.
+
+        up - Working state of the BFD session.
+
+"
+    ::= { mplsOamBfdSessEntry 5 }
+
+mplsOamBfdSessRemoteState OBJECT-TYPE
+    SYNTAX     BfdSessStateTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "BFD session state.
+        none -      Locally indicated state of the remote
+                    BFD session before connection is made.
+
+        adminDown - State the BFD session is in when
+                    the requested BFD administrative state
+                    is down.
+
+        down - State of the BFD session during failure.
+
+        init - State of the BFD session when trying to
+               connect to remote BFD session.
+
+        up - Working state of the BFD session.
+
+"
+    ::= { mplsOamBfdSessEntry 6 }
+
+mplsOamBfdSessDiag OBJECT-TYPE
+    SYNTAX     BfdDiagTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "A diagnostic code specifying the local systems reason
+             for the last transition of the session from up
+             to some other state.
+
+        noDiagnostic
+        - Normal state of session when no fault detected.
+
+        controlDetectionTimeExpired
+        - No continuity check messages received. Connection to
+          remote BFD session broken.
+
+        echoFunctionFailed
+        - Not used
+
+        neighborSignaledSessionDown
+        - Remote BFD session is in state down
+
+        forwardingPlaneReset
+        - not used
+
+        pathDown
+        - not used
+
+        concatenatedPathDown
+        - not used
+
+        administrativelyDown
+        - BFD session is in administrative down state
+
+        reverseConcatenatedPathDown
+        - Not used
+
+        misconnectionDefect
+        - BFD session has detected a misconnectivity defect. MPLS-TP
+        MEP IDs does not match between local and remote session.
+
+"
+    ::= { mplsOamBfdSessEntry 7 }
+
+mplsOamBfdSessRemoteDiag OBJECT-TYPE
+    SYNTAX     BfdDiagTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+            "A diagnostic code specifying the remote systems reason
+             for the last transition of the session from up
+             to some other state.
+
+        noDiagnostic
+        - Normal state of session when no fault detected.
+
+        controlDetectionTimeExpired
+        - No continuity check messages received. Connection to
+          remote BFD session broken.
+
+        echoFunctionFailed
+        - Not used
+
+        neighborSignaledSessionDown
+        - Remote BFD session is in state down
+
+        forwardingPlaneReset
+        - not used
+
+        pathDown
+        - not used
+
+        concatenatedPathDown
+        - not used
+
+        administrativelyDown
+        - BFD session is in administrative down state
+
+        reverseConcatenatedPathDown
+        - Not used
+
+        misconnectionDefect
+        - BFD session has detected a misconnectivity defect. MPLS-TP
+        MEP IDs does not match between local and remote session.
+
+"
+    ::= { mplsOamBfdSessEntry 8 }
+
+
+mplsOamBfdSessNegotiatedTxInterval OBJECT-TYPE
+    SYNTAX     BfdIntervalTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object specifies the negotiated interval
+        that the local system is transmitting
+        BFD Control packets. Display unit is milliseconds
+        but the storage type is microseconds.
+"
+    ::= { mplsOamBfdSessEntry 9 }
+
+mplsOamBfdSessNegotiatedRxInterval OBJECT-TYPE
+    SYNTAX     BfdIntervalTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object specifies the negotiated interval
+        that the local system is receiving
+        BFD Control packets. Display unit is milliseconds
+        but the storage type is microseconds.
+"
+    ::= { mplsOamBfdSessEntry 10 }
+
+mplsOamBfdSessMonitoringPath OBJECT-TYPE
+   SYNTAX           DisplayString
+   MAX-ACCESS       read-create
+   STATUS           current
+   DESCRIPTION
+        "Name of the path the BFD object is monitoring.
+"
+    DEFVAL { "" }
+    ::= { mplsOamBfdSessEntry 11 }
+
+mplsOamBfdSessMonitoringPathType OBJECT-TYPE
+    SYNTAX INTEGER {
+             notSelected(0),  -- no type selected
+             lsp(1)           -- mapping into LSPs in MPLS-TP
+    }
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+      "This object indicates the type of path being monitored by this
+      BFD session entry, LSP, PW, or MEP.
+"
+    DEFVAL { 1 }
+   ::= { mplsOamBfdSessEntry 12 }
+
+mplsOamBfdSessMonitoringPathIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Index of the path of the BFD object is monitoring.
+"
+    ::= { mplsOamBfdSessEntry 13 }
+
+mplsOamBfdSessTemplate OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "ID of the associated LSP that is active, if exists.
+"
+    DEFVAL { "" }
+    ::= { mplsOamBfdSessEntry 14 }
+
+mplsOamBfdSessTemplateIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The index of the associated LSP that is active,
+        if exists.
+"
+    ::= { mplsOamBfdSessEntry 15 }
+
+mplsOamBfdSessSourceMepId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Actual configuration of source MEP ID for current
+        BFD session received from traffic unit. The identifier of
+        the tunnel and LSP.
+
+        '[Global ID]:[Node ID]:[Tunnel Id]:[LSP ID]'
+
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    ::= { mplsOamBfdSessEntry 16 }
+
+mplsOamBfdSessTargetMepId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Actual configuration of target MEP ID for current
+        BFD session received from traffic unit. The identifier of
+        the tunnel and LSP.
+
+        '[Global ID]:[Node ID]:[Tunnel Id]:[LSP ID]'
+
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    ::= { mplsOamBfdSessEntry 17 }
+
+mplsOamBfdSessRcvTargetMepId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Actual configuration of target MEP ID for current
+        BFD session received from traffic unit of corresponding BFD
+        session via CV packages.The identifier of
+        the tunnel and LSP.
+
+        '[Global ID]:[Node ID]:[Tunnel Id]:[LSP ID]'
+
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    ::= { mplsOamBfdSessEntry 18 }
+
+
+mplsOamBfdSessMepNotConfigured OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "MEP-ID for tunnel, node or LSP are set to zero, source or remote.
+        The CV messages will be transmitted but the connectivity verification
+        will have degraded function.
+"
+    ::= { mplsOamBfdSessEntry 19 }
+
+mplsOamBfdSessLocalNotConnected OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "No packages received from remote BFD session.
+"
+    ::= { mplsOamBfdSessEntry 20 }
+
+mplsOamBfdSessLocalMisConnectivity OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Invalid MEP-ID-TLV received by local session.
+        MPLS-TP MEP-ID-TLV does from CV messages does
+        not match local configuration. BFD session is
+        connected to wrong peer BFD session or MEP IDs
+        are not configured correctly. BFD session
+        will display expected and actual values.
+        Check configuration of MPLS-TP MEP ID
+        for remote and peer end.
+        Check MPLS-TP network set-up for
+        misconfiguration.
+"
+    ::= { mplsOamBfdSessEntry 21 }
+
+mplsOamBfdSessLocalTimerExpired OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Local BFD session has not received valid CC
+        packages for an interval of more than detection
+        multiplier times the negotiated RX interval.
+        Check for layer 1 problems
+        Check port settings
+        Check MPLS-TP network set-up for misconfiguration.
+"
+    ::= { mplsOamBfdSessEntry 22 }
+
+mplsOamBfdSessRemoteMisConnectivity OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The local BFD session has received an indication that the
+        peer BFD session is in down state due to an invalid
+        received MPLS-TP MEP-ID-TLV.
+        Check local source and peer remote MEP-ID-TLV configuration.
+"
+    ::= { mplsOamBfdSessEntry 23 }
+
+mplsOamBfdSessRemoteTimerExpired OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Remote time-out for CC packages.
+"
+    ::= { mplsOamBfdSessEntry 24 }
+
+mplsOamBfdSessRemoteAdminDown OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The local BFD session has received an indication
+        that the peer BFD session is in administrative down
+        state.
+        Check peer BFD session
+"
+    ::= { mplsOamBfdSessEntry 25 }
+
+mplsOamBfdSessRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This variable is used to create, modify, and/or
+         delete a row in this table.
+"
+    ::= { mplsOamBfdSessEntry 26 }
+
+mplsOamBfdSessDesiredMinTxInterval OBJECT-TYPE
+    SYNTAX     BfdIntervalTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object specifies the minimum interval, in
+         microseconds, that the local system would like to use
+         when transmitting BFD Control packets. The value of
+         zero(0) is reserved, and should not be used. Display unit
+         is milliseconds but the storage type is microseconds.
+"
+    DEFVAL { 100000 }
+    ::= { mplsOamBfdSessEntry 27 }
+
+mplsOamBfdSessReqMinRxInterval OBJECT-TYPE
+    SYNTAX     BfdIntervalTC
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "This object specifies the minimum interval, in
+         microseconds, between received  BFD Control packets the
+         local system is capable of supporting. The value of
+         zero(0) is not supported. Display unit is milliseconds
+         but the storage type is microseconds.
+"
+    REFERENCE
+        "RFC5880, Section 4.1"
+    DEFVAL { 100000 }
+    ::= { mplsOamBfdSessEntry 28 }
+
+mplsOamBfdSessTrafficClass OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "
+        The entry signifies the Traffic Class used on the
+        traffic generated by the BFD session CV and CC messages.
+"
+    DEFVAL { 4 }
+    ::= { mplsOamBfdSessEntry 29 }
+
+
+
+
+-- ---------------------------------------------------------
+ -- The BFD Template Table common settings for BFD sessions
+-- ---------------------------------------------------------
+
+mplsOamBfdTemplateTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF MplsOamBfdTemplateEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "The BFD template table describes the common templates for BFD sessions."
+    ::= { mplsOamBfdTemplate 2 }
+
+mplsOamBfdTemplateEntry OBJECT-TYPE
+    SYNTAX     MplsOamBfdTemplateEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+        "The BFD template entry describes the common templates for BFD sessions.
+"
+    INDEX { mplsOamBfdTemplateIndex }
+    ::= { mplsOamBfdTemplateTable 1 }
+
+MplsOamBfdTemplateEntry ::= SEQUENCE {
+    mplsOamBfdTemplateIndex                    Unsigned32,
+    mplsOamBfdTemplateInternalReference        Unsigned32,
+    mplsOamBfdTemplateName                     MgmtNameString,
+    mplsOamBfdTemplateIdentifier               DisplayString,
+    mplsOamBfdTemplateDesiredMinTxInterval     BfdIntervalTC,
+    mplsOamBfdTemplateDetectMult               BfdMultiplierTC,
+    mplsOamBfdTemplateReqMinRxInterval         BfdIntervalTC,
+    mplsOamBfdTemplateRowStatus                RowStatus,
+    mplsOamBfdTemplateCreateNewTemplate        CommandString
+}
+
+mplsOamBfdTemplateIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+        ::= { mplsOamBfdTemplateEntry 1 }
+
+mplsOamBfdTemplateInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+"
+    DEFVAL { 0 }
+    ::= { mplsOamBfdTemplateEntry 2 }
+
+mplsOamBfdTemplateName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the BFD session, for example
+         'bfdSess:1:2:myIdentifier', where the first number indicates
+         subrack and the second slot number.
+"
+    ::= { mplsOamBfdTemplateEntry 3 }
+
+
+mplsOamBfdTemplateIdentifier OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A unique identifier for template object.
+"
+    DEFVAL { "" }
+    ::= { mplsOamBfdTemplateEntry 4 }
+
+mplsOamBfdTemplateDesiredMinTxInterval OBJECT-TYPE
+    SYNTAX     BfdIntervalTC
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This object specifies the minimum interval, in
+         microseconds, that the local system would like to use
+         when transmitting BFD Control packets. The value of
+         zero(0) is reserved, and should not be used. Display unit
+         is milliseconds but the storage type is microseconds.
+"
+    DEFVAL { 100000 }
+    ::= { mplsOamBfdTemplateEntry 5 }
+
+
+mplsOamBfdTemplateDetectMult OBJECT-TYPE
+    SYNTAX     BfdMultiplierTC
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This object specifies the 'detect time' multiplier for
+        raising an alarm. Number of loss BFD CC packets.
+        This parameter is not configurable.
+"
+    DEFVAL { 3 }
+    ::= { mplsOamBfdTemplateEntry 6 }
+
+mplsOamBfdTemplateReqMinRxInterval OBJECT-TYPE
+    SYNTAX     BfdIntervalTC
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This object specifies the minimum interval, in
+         microseconds, between received  BFD Control packets the
+         local system is capable of supporting. The value of
+         zero(0) is not supported. Display unit is milliseconds
+         but the storage type is microseconds.
+"
+    REFERENCE
+        "RFC5880, Section 4.1"
+    DEFVAL { 100000 }
+    ::= { mplsOamBfdTemplateEntry 7 }
+
+mplsOamBfdTemplateCreateNewTemplate OBJECT-TYPE
+    SYNTAX     CommandString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Internal command for creating a new BFD template.
+
+         Identifier - The unique identifier for the template.
+
+         Tx Interval - Minimum interval for sending BFD control packets.
+                       Configurable in intervals of 100 ms.
+
+         Rx Interval - Minimum interval for receiving BFD control packets.
+                       Configurable in intervals of 100 ms.
+"
+    ::= { mplsOamBfdTemplateEntry 8 }
+
+mplsOamBfdTemplateRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This variable is used to create, modify, and/or
+         delete a row in this table. When a row in this
+         table has a row in the active(1) state, no
+         objects in this row can be modified except the
+         mplsOamBfdTemplateRowStatus and mplsOamBfdTemplateStorageType.
+"
+    ::= { mplsOamBfdTemplateEntry 9 }
+
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+mplsIOamGeneralGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsOamGeneralLastChangeTime,
+        mplsOamGeneralStateLastChangeTime,
+        mplsOamGeneralmplsOamBfdSessTableSize}
+    STATUS      current
+    DESCRIPTION
+        "The general objects.
+"
+    ::= { lumMplsOamGroups 1 }
+
+mplsBfdSessGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsOamBfdSessIndex,
+        mplsOamBfdSessInternalReference,
+        mplsOamBfdSessName,
+        mplsOamBfdSessAdminStatus,
+        mplsOamBfdSessState,
+        mplsOamBfdSessRemoteState,
+        mplsOamBfdSessDiag,
+        mplsOamBfdSessRemoteDiag,
+        mplsOamBfdSessNegotiatedTxInterval,
+        mplsOamBfdSessNegotiatedRxInterval,
+        mplsOamBfdSessMonitoringPath,
+        mplsOamBfdSessMonitoringPathType,
+        mplsOamBfdSessMonitoringPathIndex,
+        mplsOamBfdSessTemplate,
+        mplsOamBfdSessTemplateIndex,
+        mplsOamBfdSessSourceMepId,
+        mplsOamBfdSessTargetMepId,
+        mplsOamBfdSessRcvTargetMepId,
+        mplsOamBfdSessMepNotConfigured,
+        mplsOamBfdSessLocalNotConnected,
+        mplsOamBfdSessLocalMisConnectivity,
+        mplsOamBfdSessLocalTimerExpired,
+        mplsOamBfdSessRemoteMisConnectivity,
+        mplsOamBfdSessRemoteTimerExpired,
+        mplsOamBfdSessRemoteAdminDown,
+        mplsOamBfdSessRowStatus}
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS OAM BFD Session objects (R19.0)."
+    ::= { lumMplsOamGroups 2 }
+
+mplsBfdTemplateGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsOamBfdTemplateIndex,
+        mplsOamBfdTemplateInternalReference,
+        mplsOamBfdTemplateName,
+        mplsOamBfdTemplateIdentifier,
+        mplsOamBfdTemplateDesiredMinTxInterval,
+        mplsOamBfdTemplateDetectMult,
+        mplsOamBfdTemplateReqMinRxInterval,
+        mplsOamBfdTemplateCreateNewTemplate,
+        mplsOamBfdTemplateRowStatus}
+    STATUS      current
+    DESCRIPTION
+        "The MPLS OAM BFD template objects (R19.0)."
+    ::= { lumMplsOamGroups 3 }
+
+mplsBfdSessGroupV2 OBJECT-GROUP
+    OBJECTS {
+        mplsOamBfdSessIndex,
+        mplsOamBfdSessInternalReference,
+        mplsOamBfdSessName,
+        mplsOamBfdSessAdminStatus,
+        mplsOamBfdSessState,
+        mplsOamBfdSessRemoteState,
+        mplsOamBfdSessDiag,
+        mplsOamBfdSessRemoteDiag,
+        mplsOamBfdSessNegotiatedTxInterval,
+        mplsOamBfdSessNegotiatedRxInterval,
+        mplsOamBfdSessMonitoringPath,
+        mplsOamBfdSessMonitoringPathType,
+        mplsOamBfdSessMonitoringPathIndex,
+        mplsOamBfdSessTemplate,
+        mplsOamBfdSessTemplateIndex,
+        mplsOamBfdSessSourceMepId,
+        mplsOamBfdSessTargetMepId,
+        mplsOamBfdSessRcvTargetMepId,
+        mplsOamBfdSessMepNotConfigured,
+        mplsOamBfdSessLocalNotConnected,
+        mplsOamBfdSessLocalMisConnectivity,
+        mplsOamBfdSessLocalTimerExpired,
+        mplsOamBfdSessRemoteMisConnectivity,
+        mplsOamBfdSessRemoteTimerExpired,
+        mplsOamBfdSessRemoteAdminDown,
+        mplsOamBfdSessRowStatus,
+        mplsOamBfdSessDesiredMinTxInterval,
+        mplsOamBfdSessReqMinRxInterval,
+        mplsOamBfdSessTrafficClass}
+    STATUS      current
+    DESCRIPTION
+        "The MPLS OAM BFD Session objects (R20.0)."
+    ::= { lumMplsOamGroups 4 }
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+
+lumMplsBasicComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS OAM MIB. (R19)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsIOamGeneralGroupV1,
+            mplsBfdSessGroupV1,
+            mplsBfdTemplateGroupV1}
+    ::= { lumMplsOamCompl 1 }
+
+lumMplsBasicComplV2 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS OAM MIB. (R20)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsIOamGeneralGroupV1,
+            mplsBfdSessGroupV2,
+            mplsBfdTemplateGroupV1}
+    ::= { lumMplsOamCompl 2 }
+
+END
+

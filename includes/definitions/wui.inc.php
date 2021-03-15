@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage definitions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -27,13 +26,39 @@ define('OBS_CLASS_TABLE_STRIPED',      OBS_CLASS_TABLE . ' table-striped');
 define('OBS_CLASS_TABLE_STRIPED_TWO',  OBS_CLASS_TABLE . ' table-striped-two');
 define('OBS_CLASS_TABLE_STRIPED_MORE', OBS_CLASS_TABLE . ' table-condensed-more table-striped');
 
+// Colours
+// FIXME, we still use this somewhere? :O
+define('OBS_COLOUR_LIST_A',         '#ffffff'); //$list_colour_a   = "#ffffff";
+define('OBS_COLOUR_LIST_B',         '#eeeeee'); //$list_colour_b   = "#eeeeee";
+define('OBS_COLOUR_LIST_B_B',       '#e3e3e3'); //$list_colour_b_b = "#e3e3e3";
+define('OBS_COLOUR_LIST_HIGHLIGHT', '#ffcccc'); //$list_highlight  = "#ffcccc";
+define('OBS_COLOUR_WARN_A',         '#ffeeee'); //$warn_colour_a   = "#ffeeee";
+define('OBS_COLOUR_WARN_B',         '#ffcccc'); //$warn_colour_b   = "#ffcccc";
+
 /* After this line keep only WUI specific definitions, not required in cli! */
 //if (is_cli()) { return; }
 
 // List of allowed (un-escaped) tags in escape_html(): <tag>..</tag>
-$config['escape_html']['tags']            = array('sup', 'sub');
+$config['escape_html']['tags']            = []; // prevent change by config
+$config['escape_html']['tags'][]          = 'sup';
+$config['escape_html']['tags'][]          = 'sub';
+
 // List of allowed (un-escaped) entities in escape_html(): &entity;
-$config['escape_html']['entities']        = array('deg', 'omega');
+$config['escape_html']['entities']        = []; // prevent change by config
+$config['escape_html']['entities'][]      = 'deg';    // °
+$config['escape_html']['entities'][]      = 'omega';  // ω
+$config['escape_html']['entities'][]      = 'Omega';  // Ω
+$config['escape_html']['entities'][]      = 'mu';     // μ
+$config['escape_html']['entities'][]      = 'pi';     // π
+$config['escape_html']['entities'][]      = 'hellip'; // …
+$config['escape_html']['entities'][]      = 'mldr';   // …
+$config['escape_html']['entities'][]      = 'nldr';   // ‥
+$config['escape_html']['entities'][]      = 'plusmn'; // ±
+$config['escape_html']['entities'][]      = 'pm';     // ±
+$config['escape_html']['entities'][]      = 'micro';  // µ
+// HEX/UNICODE entities (probably need more generic way, also for emoji)
+$config['escape_html']['entities'][]      = '#x200B'; // &#x200B; U+200B ZERO WIDTH SPACE (HTML &#8203;)
+$config['escape_html']['entities'][]      = '#8203';  // &#x200B; U+200B ZERO WIDTH SPACE (HTML &#8203;)
 
 $config['pages']['gridstack']['no_panel'] = TRUE;
 $config['pages']['dashboard']['no_panel'] = TRUE;
@@ -75,13 +100,19 @@ $config['wui']['refresh_disabled'][]  = array('page' => 'customoids');
 $config['wui']['refresh_disabled'][]  = array('page' => 'log');
 
 // Search modules used by the ajax search, in order.
-$config['wui']['search_modules'] = array('devices', 'ports', 'slas', 'sensors', 'status', 'accesspoints', 'ip-addresses', 'inventory');
+$config['wui']['search_modules'] = array('devices', 'ports', 'slas', 'sensors', 'status', 'accesspoints', 'ip-addresses', 'inventory', 'loadbalancers');
 
 // Default groups list (on status page and default panel)
 //$config['wui']['groups_list'] = array('device', 'port', 'processor', 'mempool', 'sensor', 'bgp_peer');
 $config['wui']['groups_list'] = array('device', 'port', 'processor', 'mempool', 'sensor');
 
-// Define Icons used by the user interface
+// Themes (dark not exist in community edition)
+
+$config['themes']['light']    = array('name' => "Light Mode",     'type' => 'light',  'css' => 'observium.css',          'icon' => 'sprite-sun');
+$config['themes']['dark']     = array('name' => "Dark Mode",      'type' => 'dark',   'css' => 'observium-dark.css',     'icon' => 'sprite-moon');
+$config['themes']['darkblue'] = array('name' => "Dark Blue Mode", 'type' => 'dark',   'css' => 'observium-darkblue.css', 'icon' => 'sprite-moon');
+
+// Define Icons used by the user interface, emoji icons see in emoji.inc.php
 
 $config['icon']['globe']             = "sprite-globe-light";
 $config['icon']['overview']          = "sprite-overview";
@@ -101,6 +132,10 @@ $config['icon']['help']              = "sprite-support";
 $config['icon']['info']              = "sprite-info";
 $config['icon']['ignore']            = "sprite-shutdown";
 $config['icon']['exclamation']       = "sprite-exclamation-mark";
+
+$config['icon']['critical']          = $config['icon']['exclamation']; // red exclamation mark in a circle
+$config['icon']['warning']           = $config['icon']['error'];       // yellow exclamation mark in a triangle
+$config['icon']['informational']     = $config['icon']['info'];        // blue exclamation mark in a circle
 
 $config['icon']['flag']              = "sprite-flag";
 $config['icon']['plus']              = "sprite-plus";
@@ -218,6 +253,7 @@ $config['icon']['volume']            = "sprite-volume";
 $config['icon']['lflux']             = "sprite-light-bulb";
 $config['icon']['clock']             = "sprite-clock";
 $config['icon']['wavelength']        = "sprite-laser"; // FIXME need other icon
+$config['icon']['gauge']             = "sprite-data"; // FIXME need other icon
 
 // Status classes
 $config['icon']['battery']           = "sprite-capacity";
@@ -255,14 +291,13 @@ $config['icon']['vlan']              = "sprite-vlan";
 $config['icon']['switching']         = "sprite-switching";
 $config['icon']['crossbar']          = $config['icon']['switching'];
 
-$config['icon']['database']          = "sprite-storage-test2";
-
 $config['icon']['nfsen']             = "sprite-funnel";
 $config['icon']['device-data']       = "sprite-data";
 
 $config['icon']['device-poller']     = "sprite-performance";
 $config['icon']['techsupport']       = "sprite-support";
 $config['icon']['tools']             = "sprite-tools";
+$config['icon']['hardware']          = "sprite-cogs"; // FIXME
 
 $config['icon']['linecard']          = "sprite-nic";
 
@@ -292,10 +327,21 @@ $config['icon']['user-edit']         = "sprite-user-edit";
 $config['icon']['user-log']          = "sprite-user-log";
 $config['icon']['lock']              = "sprite-lock";
 
+//$config['icon']['database']          = "sprite-storage-test2";
 $config['icon']['databases']         = "sprite-databases";
 $config['icon']['database']          = "sprite-database";
 
 $config['icon']['mibs']              = "sprite-map-2";
 
+// Font icons
+$config['icon']['edit']              = "icon-cog";
+$config['icon']['delete']            = "icon-trash";
+$config['icon']['add']               = "icon-plus-sign";
+$config['icon']['remove']            = "icon-minus-sign";
+
+$config['icon']['arrow-up']          = "icon-circle-arrow-up";
+$config['icon']['arrow-down']        = "icon-circle-arrow-down";
+$config['icon']['arrow-right']       = "icon-circle-arrow-right";
+$config['icon']['arrow-left']        = "icon-circle-arrow-left";
 
 // EOF

@@ -1,0 +1,448 @@
+-- *****************************************************************
+-- MY CLUSTER MIB V1.0
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+
+DES7200-LLDP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+	MODULE-IDENTITY, OBJECT-TYPE, Integer32, Counter32
+		FROM SNMPv2-SMI
+	MacAddress, TimeStamp, DisplayString, RowStatus
+        	FROM SNMPv2-TC
+	MODULE-COMPLIANCE, OBJECT-GROUP
+		FROM SNMPv2-CONF
+	VlanId
+                FROM Q-BRIDGE-MIB
+	ConfigStatus, IfIndex
+                FROM DES7200-TC
+        EnabledStatus
+        	FROM P-BRIDGE-MIB
+        myMgmt
+                FROM DES7200-SMI;
+
+myLldpMIB MODULE-IDENTITY
+	LAST-UPDATED "200304010000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+	DESCRIPTION
+		"The MIB module for managing the Physical Topology Discovery
+	 	Protocol."
+    	REVISION  "200304010000Z"
+	DESCRIPTION
+		""
+::= { myMgmt 32 }
+
+lldpMibObjects OBJECT IDENTIFIER ::= { myLldpMIB 1 }
+
+-- MIB groups
+
+lldpConfig OBJECT IDENTIFIER 		::= { lldpMibObjects 1 }
+lldpStats OBJECT IDENTIFIER  		::= { lldpMibObjects 2 }
+lldpRcvObjects OBJECT IDENTIFIER 	::= { lldpMibObjects 3 }
+
+--
+-- ***********************************************************
+--
+-- L L D P C O N F I G
+--
+-- ***********************************************************
+--
+
+--
+-- The Physical Topology Discovery Protocol Configuration Group
+--
+
+lldpAdminStatus OBJECT-TYPE
+	SYNTAX EnabledStatus
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The administratively desired status of the the local LLDP
+		 agent."
+        DEFVAL { 1 }
+::= { lldpConfig 1 }
+
+lldpOperStatus OBJECT-TYPE
+	SYNTAX EnabledStatus
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The current operational status of the local LLDP agent."
+::= { lldpConfig 2 }
+
+lldpMessageTxInterval OBJECT-TYPE
+	SYNTAX Integer32 (5..299)
+	UNITS "seconds"
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The interval at which LLDP frames are transmitted on
+		 behalf of this LLDP agent."
+	DEFVAL { 60 }
+::= { lldpConfig 3 }
+
+lldpMessageTxHoldTime OBJECT-TYPE
+	SYNTAX Integer32 (10..300)
+	UNITS "seconds"
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The time at which the cache entry in lldpRcvTable will be 
+		invalid after this timer expired."
+	DEFVAL { 180 }
+::= { lldpConfig 4 }
+
+lldpDeviceID OBJECT-TYPE
+	SYNTAX MacAddress
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"LLDP used device identifier(ID). In specification CPU MAC address
+		is used to idendify the device."
+::= { lldpConfig 5 }
+
+--
+-- LLDPSuppressTable:
+-- Disable LLDP activity on individual local ports
+--
+lldpSuppressTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF LldpSuppressEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"A table controlling LLDP frame transmission on individual
+		interfaces, ports, or backplanes."
+::= { lldpConfig 6 }
+	
+lldpSuppressEntry OBJECT-TYPE
+	SYNTAX LldpSuppressEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"LLDP frame configuration information for a particular
+		 port. The port must be contained in the same chassis as the
+		 LLDP agent. LLDP frames will not be transmitted or received
+		 on the indicated port, even if the port is enabled."
+	INDEX {
+		lldpSuppressPortIfIndex
+	      }
+::= { lldpSuppressTable 1 }
+
+LldpSuppressEntry ::= 
+SEQUENCE {
+	lldpSuppressPortIfIndex IfIndex,
+	lldpSuppressPortStatus EnabledStatus
+}
+
+lldpSuppressPortIfIndex OBJECT-TYPE
+	SYNTAX IfIndex
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The index value used to identify the port component of this entry. 
+		"
+::= { lldpSuppressEntry 1 }
+
+lldpSuppressPortStatus OBJECT-TYPE
+	SYNTAX EnabledStatus
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"The status of lldp on port."
+	DEFVAL { 1 }
+::= { lldpSuppressEntry 2 }
+--
+-- ***********************************************************
+--
+-- L L D P S T A T S
+--
+-- ***********************************************************
+--
+-- LLDP Stats Group
+--
+lldpStatsTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF LldpStatsEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"A table containing LLDP statistics for individual ports.
+		Entries are not required to exist in this table while the
+		LLDPAdminStatus or LLDPOperStatus objects are equal to
+		'disabled(2)'.
+		Entries are not required to exist in this table if a
+		corresponding entry (with identical index values) exists in
+		the LLDPSuppressTable."
+::= { lldpStats 1 }
+
+lldpStatsEntry OBJECT-TYPE
+	SYNTAX LldpStatsEntry
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"LLDP frame statistics for a particular port. The port
+		must be contained in the same chassis as the LLDP agent."
+	INDEX {
+		lldpStatsPortIfIndex
+	      }
+::= { lldpStatsTable 1 }
+
+LldpStatsEntry ::= SEQUENCE {
+	lldpStatsPortIfIndex IfIndex,
+	lldpStatsInGoodPkts Counter32,
+	lldpStatsInErrors Counter32,
+	lldpStatsOutPkts Counter32,
+	lldpStatsClear Integer32
+}
+
+lldpStatsPortIfIndex OBJECT-TYPE
+	SYNTAX IfIndex
+	MAX-ACCESS not-accessible
+	STATUS current
+	DESCRIPTION
+		"The index value used to identify the port component of this
+		entry."
+::= { lldpStatsEntry 1 }
+
+lldpStatsInGoodPkts OBJECT-TYPE
+	SYNTAX Counter32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The number of valid LLDP frames received by this LLDP agent
+		on the indicated port, while this LLDP agent is enabled."
+::= { lldpStatsEntry 2 }
+
+lldpStatsInErrors OBJECT-TYPE
+	SYNTAX Counter32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The number of invalid LLDP frames received by this LLDP
+		agent on the indicated port, while this LLDP agent is
+		enabled. A LLDP frame may be invalid for several reasons,
+		including:
+		- invalid MAC header; length or DA fields
+		- invalid LLDP header; version or flags fields
+		- invalid LLDP VarBindList ASN.1/BER encoding
+		- invalid or missing LLDP VarBindList data elements"
+::= { lldpStatsEntry 3 }
+
+lldpStatsOutPkts OBJECT-TYPE
+	SYNTAX Counter32
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+		"The number of LLDP frames transmitted by this LLDP agent on
+		the indicated port."
+::= { lldpStatsEntry 4 }
+
+lldpStatsClear OBJECT-TYPE
+	SYNTAX Integer32
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+		"Use this object to clear the statistics of this row 
+		When setting this object's value to nono 0, such as 1, will 
+		clear all the statistics of this row. when access, always
+		return 0."
+::= {lldpStatsEntry 5 }
+
+--
+-- ***********************************************************
+--
+-- L L D P received objects
+--
+-- ***********************************************************
+lldpRcvTable OBJECT-TYPE
+	SYNTAX SEQUENCE OF LldpRcvEntry
+    	MAX-ACCESS not-accessible
+    	STATUS current
+    	DESCRIPTION
+            	"The (conceptual) table containing the status of LLDP on
+            	the device's interfaces."
+    ::= { lldpRcvObjects 1 }
+
+lldpRcvEntry OBJECT-TYPE
+    SYNTAX LldpRcvEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "An entry (conceptual row) in the lldpRcvTable,
+            containing the information received via LLDP on one
+            interface from one device.  Entries appear when
+            a LLDP advertisement is received from a neighbor
+            device.  Entries disappear when LLDP is disabled
+            on the interface, or globally."
+    INDEX      { lldpRcvIfIndex, lldpRcvDeviceID }
+    ::= { lldpRcvTable 1 }
+
+LldpRcvEntry ::= SEQUENCE {
+    lldpRcvIfIndex           IfIndex, 
+    lldpRcvDeviceID	     MacAddress,
+    lldpRcvMgmtAddress       MacAddress,
+    lldpRcvPortIDSubtype     INTEGER,
+    lldpRcvPortInfo	     DisplayString,
+    lldpRcvClusterMode       INTEGER,
+    lldpRcvClusterStatus     EnabledStatus,
+    lldpRcvClusterName       DisplayString,
+    lldpRcvHostName          DisplayString,
+    lldpRcvCommandAddress    MacAddress
+}
+
+lldpRcvIfIndex OBJECT-TYPE
+    SYNTAX IfIndex
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+    	    "The Port Index in system of the LLDP PDU come in."
+    ::= { lldpRcvEntry 1 }
+
+lldpRcvDeviceID OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+    	    "Device ID in received LLDP PDU TLV as defined
+    	    in 802.1ab d3."
+    ::= { lldpRcvEntry 2 }
+
+lldpRcvMgmtAddress OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+    	    "Management address in received LLDP PDU TLV as defined
+    	    in 802.1ab d3."
+    ::= { lldpRcvEntry 3 }
+
+lldpRcvPortIDSubtype OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+    	    "Always return 6 in this lldp version."
+    ::= { lldpRcvEntry 4 }
+
+lldpRcvPortInfo OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..32))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+    	    "Port description in received LLDP PDU TLV as defined
+    	    in 802.1ab d3."
+    ::= { lldpRcvEntry 5 }
+
+lldpRcvClusterMode OBJECT-TYPE
+    SYNTAX       INTEGER {
+                           commandDevice(1),
+                           memberDevice(2),
+                           none(3)
+                          }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+    	    "Cluster mode in received LLDP PDU vendor TLV."
+    ::= { lldpRcvEntry 6 }
+    
+lldpRcvClusterStatus OBJECT-TYPE
+    SYNTAX EnabledStatus
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    	"Wether the device can be added to a cluster."
+    ::= { lldpRcvEntry 7 }
+
+lldpRcvClusterName OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..16))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+    	    "Cluster name in received LLDP PDU vendor TLV."
+    ::= { lldpRcvEntry 8 }
+
+lldpRcvHostName OBJECT-TYPE
+    SYNTAX DisplayString (SIZE (0..22))
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION 
+    	    "Host name in received LLDP PDU vendor TLV."
+    ::= { lldpRcvEntry 9 }
+    
+lldpRcvCommandAddress OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    	    "The command switch address in the cluster of this 
+    	    device belong to."
+    ::= { lldpRcvEntry 10 }
+
+lldpRcvTableClear OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+    	   "Use this object to clear the lldpRcvTable.When setting
+    	   this object's value to none 0, such as 1, will clear
+    	   all receive information in lldpRcvTable. when access,
+    	   will always return 0."
+    ::= { lldpRcvObjects 2 }
+    
+
+    
+
+-- conformance information
+
+lldpMIBConformance OBJECT IDENTIFIER ::= { myLldpMIB 2 }
+lldpMIBCompliances OBJECT IDENTIFIER ::= { lldpMIBConformance 1 }
+lldpMIBGroups OBJECT IDENTIFIER      ::= { lldpMIBConformance 2 }
+
+-- compliance statements
+
+lldpCompliances MODULE-COMPLIANCE
+	STATUS current
+	DESCRIPTION
+		"The compliance statement for SNMP entities which implement
+		the LLDP MIB."
+	MODULE -- this module
+	MANDATORY-GROUPS { lldpConfigGroup, lldpStatsGroup }
+::= { lldpMIBCompliances 1 }
+
+-- MIB groupings
+lldpConfigGroup OBJECT-GROUP
+	OBJECTS {
+		lldpAdminStatus,
+		lldpOperStatus,
+		lldpMessageTxInterval,
+		lldpMessageTxHoldTime,
+		lldpSuppressTable
+	}
+	STATUS current
+	DESCRIPTION
+		"The collection of objects which are used to configure the
+		Link Layer Discovery Protocol implementation behavior.
+		This group is mandatory for agents which implement the Link Layer
+		Discovery Protocol."
+::= { lldpMIBGroups 1 }
+
+lldpStatsGroup OBJECT-GROUP
+	OBJECTS {
+		lldpStatsInGoodPkts,
+		lldpStatsInErrors,
+		lldpStatsOutPkts
+	}
+	STATUS current
+	DESCRIPTION
+		"The collection of objects which are used to represent Link Layer
+		Discovery Protocol statistics.
+		This group is mandatory for agents which implement the Link Layer
+		Discovery Protocol."
+::= { lldpMIBGroups 2 }
+END

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -19,20 +18,22 @@ unset($index); // Clean accidentally global vars
 $total_start = utime();
 
 // Init global var for information about generated graph
-$graph_return = array('status'        => FALSE,   // --> $GLOBALS['rrd_status']
-                      'command'       => '',      // --> $GLOBALS['exec_status']['command'] added in rrdtool_graph()
-                      'output'        => '',      // --> $GLOBALS['exec_status']['stdout']  added in rrdtool_graph()
-                      'runtime'       => 0,       // --> $GLOBALS['exec_status']['runtime'] added in rrdtool_graph()
-                      'total'         => 0,       // total runtime for graph script
-                      'rrds'          => array(), // list of used rrd files           added in get_rrd_path()
-                      'filename'      => '',      // Generated image filename
-                      'descr'         => '',      // graph description if exist
-                      'valid_options' => array(), // hrm, used somewhere
-                      );
+$graph_return = [
+  'status'        => FALSE, // --> $GLOBALS['rrd_status']
+  'command'       => '',    // --> $GLOBALS['exec_status']['command'] added in rrdtool_graph()
+  'output'        => '',    // --> $GLOBALS['exec_status']['stdout']  added in rrdtool_graph()
+  'runtime'       => 0,     // --> $GLOBALS['exec_status']['runtime'] added in rrdtool_graph()
+  'total'         => 0,     // total runtime for graph script
+  'rrds'          => [],    // list of used rrd files           added in get_rrd_path()
+  'filename'      => '',    // Generated image filename
+  'descr'         => '',    // graph description if exist
+  'valid_options' => [],    // hrm, used somewhere
+];
 
 preg_match('/^(?P<type>[a-z0-9A-Z-]+)_(?P<subtype>[a-z0-9A-Z-_]+)/', $vars['type'], $graphtype);
 
-if (isset($vars['format']) && in_array($vars['format'], array_keys($config['graph_formats']))) {
+if (isset($vars['format']) && in_array($vars['format'], array_keys($config['graph_formats'])))
+{
   $extension = $config['graph_formats'][$vars['format']]['extension'];
   $mimetype  = $config['graph_formats'][$vars['format']]['mimetype'];
   $img_format = strtoupper($vars['format']);

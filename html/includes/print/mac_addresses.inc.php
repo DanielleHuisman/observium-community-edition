@@ -102,7 +102,7 @@ function print_mac_addresses($vars)
       {
         $port_error = generate_port_link($entry, '<span class="label label-important">Errors</span>', 'port_errors');
       }
-      $string .= '    <td class="entity">' . generate_port_link($entry, $entry['port_label_short']) . ' ' . $port_error . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . generate_port_link_short($entry) . ' ' . $port_error . '</td>' . PHP_EOL;
       $string .= '    <td style="width: 160px;">' . generate_popup_link('mac', $entry['human_mac'], array('page' => 'search', 'search' => 'mac', 'address' => $entry['human_mac'])) . '</td>' . PHP_EOL;
       $string .= '    <td>' . $entry['ifAlias'] . '</td>' . PHP_EOL;
       $string .= '  </tr>' . PHP_EOL;

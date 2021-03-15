@@ -46,7 +46,7 @@ if (isset($endpoint['server']))
           }
         }
       }
-    } catch (\Exception $e) { print_debug("Error while resolving: " . $e->getMessage()); } // Continue when error resolving
+    } catch (Exception $e) { print_debug("Error while resolving: " . $e->getMessage()); } // Continue when error resolving
   }
 }
 
@@ -79,7 +79,7 @@ if ($hostname != '')
     $client->disconnect();
 
     $notify_status['success'] = TRUE;
-  } catch (\Exception $e) {
+  } catch (Exception $e) {
     // reason:  $e->getMessage()
     $notify_status['success'] = FALSE;
   }

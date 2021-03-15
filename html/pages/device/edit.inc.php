@@ -11,7 +11,7 @@
  *
  */
 
-if ($_SESSION['userlevel'] < 7)
+if ($_SESSION['userlevel'] < 7 && !is_entity_write_permitted($device['device_id'], 'device'))
 {
   print_error_permission();
   return;
@@ -19,6 +19,9 @@ if ($_SESSION['userlevel'] < 7)
 
 // User level 7-9 only can see config
 $readonly = $_SESSION['userlevel'] < 10;
+
+// Allow write for users with write permission to this entity
+$readonly = !is_entity_write_permitted($device['device_id'], 'device');
 
 $link_array = array('page'    => 'device',
                     'device'  => $device['device_id'],
@@ -47,10 +50,12 @@ $link_array = array('page'    => 'device',
 
   $panes['modules']  = 'Modules';
 
-  if ($config['enable_services'])
-  {
-    $panes['services'] = 'Services';
-  }
+  //if ($config['enable_services'])
+  //{
+ //$panes['services'] = 'Services';
+  //}
+
+  $panes['probes'] = 'Probes';
 
   if ($device_loadbalancer_count['netscaler_vsvr'])    { $panes['netscaler_vsvrs'] = 'NS vServers'; }
   if ($device_loadbalancer_count['netscaler_services']) { $panes['netscaler_svcs'] = 'NS Services'; }
@@ -95,6 +100,8 @@ $link_array = array('page'    => 'device',
   if (is_file($filename))
   {
     $vars = get_vars('POST'); // Note, on edit pages use only method POST!
+    $attribs = get_dev_attribs($device['device_id']);
+    $model = get_model_array($device);
 
     include($filename);
   } else {

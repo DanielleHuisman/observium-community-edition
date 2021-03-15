@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -23,97 +21,138 @@
 // mtxrNeighborSoftwareID.1 = STRING:
 // mtxrNeighborInterfaceID.1 = INTEGER: 2
 
+/*
+MIKROTIK-MIB:
+[1502] => array(
+  [mtxrNeighborIpAddress]   => string(11) "10.24.99.65"
+  [mtxrNeighborMacAddress]  => string(15) "0:4:56:ef:f1:c9"
+  [mtxrNeighborVersion]     => string(5) "3.5.2"
+  [mtxrNeighborPlatform]    => string(18) "5G Force 200 (ROW)"
+  [mtxrNeighborIdentity]    => string(20) "Fortuna_Skladskaya28"
+  [mtxrNeighborSoftwareID]  => string(10) "MAC-Telnet"
+  [mtxrNeighborInterfaceID] => string(1) "9"
+)
+
+LLDP-MIB:
+[1502] => array(
+  [lldpRemChassisIdSubtype] => string(10) "macAddress"
+  [lldpRemChassisId]        => string(17) "00:04:56:EF:F1:C9"
+  [lldpRemPortIdSubtype]    => string(13) "interfaceName"
+  [lldpRemPortId]           => string(9) "br-lan.98"
+  [lldpRemSysName]          => string(20) "Fortuna_Skladskaya28"
+  [lldpRemManAddr]          => string(11) "10.24.99.65"
+  [lldpRemSysDesc]          => string(0) ""
+)
+ */
 $mtxr_array = snmpwalk_cache_oid($device, "mtxrNeighbor", array(), "MIKROTIK-MIB", NULL, OBS_SNMP_ALL | OBS_SNMP_CONCAT);
 
 if ($mtxr_array)
 {
-  if (OBS_DEBUG > 1) { print_vars($mtxr_array); }
+  print_debug_vars($mtxr_array);
+
+  // Extend remote port names by discovery in LLDP-MIB (but do not use this MIB self, mikrotik not reports local port there)
+  $lldp_array = snmpwalk_cache_oid($device, 'lldpRemChassisId', [], "LLDP-MIB");
+  if (snmp_status())
+  {
+    $lldp_array = snmpwalk_cache_oid($device, 'lldpRemPortIdSubtype', $lldp_array, "LLDP-MIB");
+    $lldp_array = snmpwalk_cache_oid($device, 'lldpRemPortId', $lldp_array, "LLDP-MIB");
+    $lldp_array = snmpwalk_cache_oid($device, 'lldpRemSysDesc', $lldp_array, "LLDP-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
+    print_debug_vars($lldp_array);
+  }
 
   foreach ($mtxr_array as $key => $entry)
   {
+    if (isset($lldp_array[$key]))
+    {
+      // older fw versions
+      $entry = array_merge($entry, $lldp_array[$key]);
+    }
+    elseif (isset($lldp_array['0.0.'.$key]))
+    {
+      // latest fw versions
+      $entry = array_merge($entry, $lldp_array['0.0.'.$key]);
+    }
+
     // Need to straighten out the MAC first for use later. Mikrotik does not pad the numbers! (i.e. 0:12:23:3:5c:6b)
-    // FIXME move this to a smarter function?
-    list($a,$b,$c,$d,$e,$f) = explode(':', $entry['mtxrNeighborMacAddress'],6);
-    $entry['mtxrNeighborMacAddress'] = zeropad($a) . ':' . zeropad($b) . ':' . zeropad($c) . ':' . zeropad($d) . ':' . zeropad($e) . ':' . zeropad($f);
+    //$remote_mac = mac_zeropad($entry['mtxrNeighborMacAddress']);
+    $entry['mtxrNeighborMacAddress'] = format_mac($entry['mtxrNeighborMacAddress']);
 
-    $ifIndex = $entry['mtxrNeighborInterfaceID'];
+    // Note, mtxrNeighborInterfaceID really hex number, ie:
+    // mtxrNeighborInterfaceID.1 = a
+    $ifIndex = hexdec($entry['mtxrNeighborInterfaceID']);
+    $remote_platform = strlen($entry['mtxrNeighborPlatform']) ? $entry['mtxrNeighborPlatform'] : $entry['lldpRemSysDesc'];
+    $remote_port     = strlen($entry['lldpRemPortId']) ? $entry['lldpRemPortId'] : format_mac($entry['mtxrNeighborMacAddress'], ' ');
 
-    // Get the port using BRIDGE-MIB
-    $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ? AND `ifDescr` NOT LIKE 'Vlan%'", array($device['device_id'], $ifIndex));
+    // Get the port using BRIDGE-MIB (Why without Vlan?)
+    //$port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ? AND `ifDescr` NOT LIKE 'Vlan%'", array($device['device_id'], $ifIndex));
+    $port = get_port_by_index_cache($device, $ifIndex);
 
-    $remote_device_id = FALSE;
+    $remote_device_id = NULL;
     $remote_port_id   = NULL;
 
-    if (is_valid_hostname($entry['mtxrNeighborIdentity']))
+    // Try find remote device and check if already cached
+    $remote_device_id = get_autodiscovery_device_id($device, $entry['mtxrNeighborIdentity'], $entry['mtxrNeighborIpAddress'], $entry['mtxrNeighborMacAddress']);
+    if (is_null($remote_device_id) &&                                                         // NULL - never cached in other rounds
+        check_autodiscovery($entry['mtxrNeighborIdentity'], $entry['mtxrNeighborIpAddress'])) // Check all previous autodiscovery rounds
     {
-      if (isset($GLOBALS['cache']['discovery-protocols'][$entry['mtxrNeighborIdentity']]))
-      {
-        // This hostname already checked, skip discover
-        $remote_device_id = $GLOBALS['cache']['discovery-protocols'][$entry['mtxrNeighborIdentity']];
-      } else {
-        $remote_device = dbFetchRow("SELECT `device_id`, `hostname` FROM `devices` WHERE `sysName` = ? OR `hostname` = ?", array($entry['mtxrNeighborIdentity'], $entry['mtxrNeighborIdentity']));
-        $remote_device_id = $remote_device['device_id'];
+      // Neighbour never checked, try autodiscovery
+      $remote_device_id = autodiscovery_device($entry['mtxrNeighborIdentity'], $entry['mtxrNeighborIpAddress'], 'MNDP', $remote_platform, $device, $port);
+    }
 
-        // If we don't know this device, try to discover it, as long as it's not matching our exclusion filters
-        if (!$remote_device_id && !is_bad_xdp($entry['mtxrNeighborIdentity'], $entry['mtxrNeighborPlatform']))
-        {
-          $remote_device_id = discover_new_device($entry['mtxrNeighborIdentity'], 'xdp', 'MNDP', $device, $port);
-        }
-
-        // Cache remote device ID for other protocols
-        $GLOBALS['cache']['discovery-protocols'][$entry['mtxrNeighborIdentity']] = $remote_device_id;
-      }
-    } else {
-      // Try to find remote host by remote chassis mac address from DB
-      $remote_mac = str_replace(':', '', strtolower($entry['mtxrNeighborMacAddress']));
-      $remote_device_id = dbFetchCell("SELECT `device_id` FROM `ports` WHERE `deleted` = '0' AND `ifPhysAddress` = ? LIMIT 1;", array($remote_mac));
-      if (!$remote_device_id)
+    if ($remote_device_id)
+    {
+      // Detect remote port by LLDP
+      if (strlen($entry['lldpRemPortId']))
       {
-        // We can also use IP address from mtxrNeighborIpAddress to find remote device.
-        //$remote_device_id = dbFetchCell("SELECT `device_id` FROM `ports` LEFT JOIN `ipv4_addresses` on `ports`.`port_id`=`ipv4_addresses`.`port_id` WHERE `deleted` = '0' AND `ipv4_address` = ? LIMIT 1;", array($entry['mtxrNeighborIpAddress']));
-        $peer_where = generate_query_values($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
-        // Fetch all devices with peer IP and filter by UP
-        if ($ids = get_entity_ids_ip_by_network('device', $entry['mtxrNeighborIpAddress'], $peer_where))
+        $id = $entry['lldpRemPortId'];
+        switch ($entry['lldpRemPortIdSubtype'])
         {
-          $remote_device = $ids[0];
-          if (count($ids) > 1)
-          {
-            // If multiple same IPs found, get first NOT disabled or down
-            foreach ($ids as $id)
+          case 'interfaceAlias':
+            $remote_port_id = dbFetchCell("SELECT `port_id` FROM `ports` WHERE `ifAlias` = ? AND `device_id` = ?", [ $id, $remote_device_id ]);
+            break;
+          case 'interfaceName':
+            // Try lldpRemPortId
+            $query          = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ?';
+            $remote_port_id = dbFetchCell($query, [ $id, $id, $id, $remote_device_id ]);
+            break;
+          case 'macAddress':
+            $remote_port_id = get_port_id_by_mac($remote_device_id, $id);
+            break;
+          case 'networkAddress':
+            $ip_version = get_ip_version($id);
+            if ($ip_version)
             {
-              $tmp_device = device_by_id_cache($id);
-              if (!$tmp_device['disabled'] && $tmp_device['status'])
-              {
-                $remote_device = $id;
-                break;
-              }
+              $ip             = ip_uncompress($id);
+              $remote_port_id = dbFetchCell("SELECT `port_id` FROM `ipv" . $ip_version . "_addresses` LEFT JOIN `ports` USING (`port_id`) WHERE `ipv" . $ip_version . "_address` = ? AND `device_id` = ?",
+                                            [ $ip, $remote_device_id ]);
             }
-          }
+            break;
+          case 'local':
+            // local not always ifIndex or FIXME (see: http://jira.observium.org/browse/OBSERVIUM-1716)
+            if (!ctype_digit($id))
+            {
+              // Not sure what should be if $id ifName and it just numeric
+              $query          = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ?';
+              $remote_port_id = dbFetchCell($query, [ $id, $id, $id, $remote_device_id ]);
+            }
+            break;
         }
+      } else {
+        // No way to find a remote port other than by MAC address, with the data we're getting from Mikrotik. Only proceed when only one remote port matches...
+        $remote_port_id = get_port_id_by_mac($remote_device_id, $entry['mtxrNeighborMacAddress']);
       }
     }
 
-    if ($remote_device_id)
-    {
-      $remote_device_hostname = device_by_id_cache($remote_device_id);
+    $neighbour = [
+      'remote_port_id'  => $remote_port_id,
+      'remote_hostname' => $entry['mtxrNeighborIdentity'],
+      'remote_port'     => $remote_port,
+      'remote_platform' => $remote_platform,
+      'remote_version'  => $entry['mtxrNeighborVersion'],
+      'remote_address'  => $entry['mtxrNeighborIpAddress']
+    ];
+    discover_neighbour($port, 'mndp', $neighbour);
 
-      // Overwrite remote hostname with the one we know, for devices that we identify by sysName
-      if ($remote_device_hostname['hostname']) { $entry['mtxrNeighborIdentity'] = $remote_device_hostname['hostname']; }
-    }
-
-    if ($remote_device_id)
-    {
-      // No way to find a remote port other than by MAC address, with the data we're getting from Mikrotik. Only proceed when only one remote port matches...
-      $remote_chassis_id = strtolower(str_replace(':','',$entry['mtxrNeighborMacAddress']));
-      $remote_port_ids = dbFetchRows("SELECT `port_id` FROM `ports` WHERE `ifPhysAddress` = ? AND `device_id` = ?", array($remote_chassis_id, $remote_device_id));
-      if (count($remote_port_ids) == 1) { $remote_port_id = $remote_port_ids[0]['port_id']; }
-    }
-
-    if (!is_bad_xdp($entry['mtxrNeighborIdentity']) && is_numeric($port['port_id']) && !empty($entry['mtxrNeighborIdentity']))
-    {
-      // We format the remote MAC just like lldpRemPortId macAddress (I think) (00 11 22 33 44 55) - we don't have an actual remote port name or ifIndex or anything in this MIB.
-      discover_link($port, 'mndp', $remote_port_id, $entry['mtxrNeighborIdentity'], strtoupper(str_replace(':', ' ',$entry['mtxrNeighborMacAddress'])), $entry['mtxrNeighborPlatform'], $entry['mtxrNeighborVersion']);
-    }
   }
 }
 

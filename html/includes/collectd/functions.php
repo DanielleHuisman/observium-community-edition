@@ -599,7 +599,8 @@ function collectd_draw_rrd($host, $plugin, $pinst = null, $type, $tinst = null, 
           $rrd_cmd = array_merge($rrd_cmd, $small_opts);
         }
 
-	$rrd_cmd = array_merge($rrd_cmd, $config['rrd_opts_array'], $opts['rrd_opts'], $graph);
+	//$rrd_cmd = array_merge($rrd_cmd, $config['rrd_opts_array'], $opts['rrd_opts'], $graph);
+	$rrd_cmd = collectd_rrdcmd($rrd_cmd, $opts['rrd_opts'], $graph);
 
 	$cmd = RRDTOOL; $cmd = '';
 	for ($i = 1; $i < count($rrd_cmd); $i++)
@@ -641,7 +642,8 @@ function collectd_draw_generic($timespan, $host, $plugin, $pinst = null, $type, 
           $rrd_cmd = array_merge($rrd_cmd, $small_opts);
         }
 
-	$rrd_cmd  = array_merge($rrd_cmd, $config['rrd_opts_array']);
+	//$rrd_cmd  = array_merge($rrd_cmd, $config['rrd_opts_array']);
+  $rrd_cmd = collectd_rrdcmd($rrd_cmd);
 	$rrd_args = $GraphDefs[$type];
 
 	foreach ($config['datadirs'] as $datadir) {
@@ -701,7 +703,8 @@ function collectd_draw_meta_stack(&$opts, &$sources) {
         }
 
 
-	$cmd = array_merge($cmd, $config['rrd_opts_array'], $opts['rrd_opts']);
+	//$cmd = array_merge($cmd, $config['rrd_opts_array'], $opts['rrd_opts']);
+  $cmd = collectd_rrdcmd($cmd, $opts['rrd_opts']);
 	$max_inst_name = 0;
 
 	foreach($sources as &$inst_data) {
@@ -800,7 +803,8 @@ function collectd_draw_meta_line(&$opts, &$sources) {
         }
 
 
-	$cmd = array_merge($cmd, $config['rrd_opts_array'], $opts['rrd_opts']);
+	//$cmd = array_merge($cmd, $config['rrd_opts_array'], $opts['rrd_opts']);
+  $cmd = collectd_rrdcmd($cmd, $opts['rrd_opts']);
 	$max_inst_name = 0;
 
 	foreach ($sources as &$inst_data) {
@@ -846,4 +850,18 @@ function collectd_draw_meta_line(&$opts, &$sources) {
 	return $rrdargs;
 }
 
-?>
+// DERP compatibility
+function collectd_rrdcmd($rrd_cmd, $rrd_opts = [], $graph = [])
+{
+	if ($_SESSION['dark_mode'])
+	{
+		$rrd_opts_array = str_replace("  ", " ", $GLOBALS['config']['rrdgraph']['dark']);
+	} else {
+		$rrd_opts_array = str_replace("  ", " ", $GLOBALS['config']['rrdgraph']['light']);
+	}
+	$rrd_opts_array = explode(" ", trim($rrd_opts_array));
+
+	return array_merge($rrd_cmd, $rrd_opts_array, $rrd_opts, $graph);
+}
+
+// EOF

@@ -1,13 +1,13 @@
 NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
 
--- Copyright Broadcom Corporation (2003-2007) All rights reserved.
+-- Copyright Netgear Inc (2003-2013) All rights reserved.
 
 -- This SNMP Management Information Specification
--- embodies Broadcom Corporation's confidential and proprietary
--- intellectual property.  Broadcom Corporation retains all title
+-- embodies Netgear Inc's confidential and proprietary
+-- intellectual property.  Netgear Inc retains all title
 -- and ownership in the Specification including any revisions.
 
--- This Specification is supplied "AS IS", Broadcom Corporation
+-- This Specification is supplied "AS IS", Netgear Inc
 -- makes no warranty, either expressed or implied,
 -- as to the use, operation, condition, or performance of the
 -- Specification.
@@ -19,19 +19,26 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
         RowStatus                                 FROM SNMPv2-TC
         MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
                                                   FROM SNMPv2-CONF
-        ng7000managedswitch                       FROM NETGEAR-REF-MIB;
+        ng7000managedswitch                                  FROM NETGEAR-REF-MIB;
 
     fastPathInventory MODULE-IDENTITY
-        LAST-UPDATED "200705230000Z" -- 23 May 2007 12:00:00 GMT
-        ORGANIZATION "Netgear"
-        CONTACT-INFO
-            ""
+        LAST-UPDATED "201310150000Z" -- 15 Oct 2013 12:00:00 GMT
+        ORGANIZATION "Netgear Inc"
+        CONTACT-INFO ""
         DESCRIPTION
             "This MIB defines the objects used for FastPath to 
             configure and report information and status of units, 
             slots and supported cards."
         
-        -- Revision history.      
+        -- Revision history.	  
+        REVISION
+            "201310150000Z" -- 15 Oct 2013 12:00:00 GMT
+        DESCRIPTION
+            "Object support modifications for LinuxHost systems."
+        REVISION
+            "201101260000Z" -- 26 Jan 2011 12:00:00 GMT
+        DESCRIPTION
+            "Postal address updated."
         REVISION
             "200705230000Z" -- 23 May 2007 12:00:00 GMT
         DESCRIPTION
@@ -44,6 +51,14 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
             "200305261930Z" -- Thu Jun 26 19:30:54 2003 GMT
         DESCRIPTION
             "Initial version."
+        REVISION
+            "201909031930Z" -- Tue Sept 03 19:30:54 2019 GMT
+        DESCRIPTION
+            "Added slot specific objects"
+        REVISION
+            "201909241930Z" -- Tue Sept 24 19:30:54 2019 GMT
+        DESCRIPTION
+            "Added slot specific object Card Description"
  
         ::= { ng7000managedswitch 13 }
 
@@ -77,9 +92,7 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
     -- agentInventoryStackGroup
     --
     --**************************************************************************************
-
     agentInventoryStackGroup                      OBJECT IDENTIFIER ::= { fastPathInventory 1 }
-
     agentInventoryStackReplicateSTK OBJECT-TYPE
         SYNTAX      INTEGER {
                     enable(1),
@@ -160,7 +173,15 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
             "Deletes the specified STK file from all units on the stack."
         ::= { agentInventoryStackGroup 7 }
 
-
+    agentInventoryStackTemplateId OBJECT-TYPE
+        SYNTAX      Unsigned32 
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Sets the stack template ID on all units in the stack. Deletes the startup configuration 
+             on all affected units and resets all units in the stack.
+             This is write-only value. It always returns '0' on request."
+        ::= { agentInventoryStackGroup 8 }
     --**************************************************************************************
     -- agentInventoryUnitGroup
     --
@@ -229,11 +250,12 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
     agentInventorySupportedUnitExpectedCodeVer OBJECT-TYPE
         SYNTAX      DisplayString
         MAX-ACCESS  read-only
-        STATUS      current
+        STATUS      obsolete
         DESCRIPTION
             "The expected code version."
         ::= { agentInventorySupportedUnitEntry 6 }
-        
+
+
     --**************************************************************************************
     -- agentInventoryUnitTable
     --
@@ -308,6 +330,10 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
                  INTEGER,
          agentInventoryUnitStandby
                  INTEGER
+         ,agentInventoryUnitSFSTransferStatus
+                 INTEGER
+         ,agentInventoryUnitSFSLastAttemptStatus
+                 INTEGER
          }
 
     agentInventoryUnitNumber OBJECT-TYPE
@@ -325,7 +351,11 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
             "Allows setting the unit number associated with this unit.  This number must 
             be less than the value returned by agentInventoryStackMaxUnitNumber. Setting 
-            this object to a non-zero value will initate changing the unit number."
+            this object to a non-zero value will initate unit renumbering. The switch will 
+            be reset to perform unit renumbering and the configuration of switch interfaces 
+            will be cleared. If the unit being renumbered is the manager of the stack, then
+            all the switches in the stack will be reset to perform Manager unit renumbering 
+            and the configuration of Manager switch interfaces will be cleared."
         ::= { agentInventoryUnitEntry 2 }
 
     agentInventoryUnitType OBJECT-TYPE
@@ -362,29 +392,31 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
             stackUnit(2) and mgmtUnassigned(3) cannot be set."
         ::= { agentInventoryUnitEntry 6 }
 
+
+
     agentInventoryUnitHWMgmtPref OBJECT-TYPE
         SYNTAX      AgentInventoryUnitPreference
         MAX-ACCESS  read-only
-        STATUS      current
+        STATUS      obsolete
         DESCRIPTION
             "Indicates the default preference assigned to the unit."
         ::= { agentInventoryUnitEntry 7 }
 
     agentInventoryUnitHWMgmtPrefValue OBJECT-TYPE
-        SYNTAX      Unsigned32 (0|1..15)
+        SYNTAX      Unsigned32 (1..15)
         MAX-ACCESS  read-only
-        STATUS      current
+        STATUS      obsolete
         DESCRIPTION
-            "Indicates the default preference value assigned to the unit. 
-            The preference value indicates how likely this unit is to be 
-            chosen as the management unit.  A value of 0 indicates a disabled
-            or unassigned preference."
+            "Indicates the default preference value assigned to the unit.
+            The preference value indicates how likely this unit is to be
+            chosen as the management unit."
         ::= { agentInventoryUnitEntry 8 }
 
-    agentInventoryUnitAdminMgmtPref OBJECT-TYPE
+
+     agentInventoryUnitAdminMgmtPref OBJECT-TYPE
         SYNTAX      AgentInventoryUnitPreference
         MAX-ACCESS  read-create
-        STATUS      current
+        STATUS      obsolete
         DESCRIPTION
             "Indicates the configured preference assigned to the unit. This object
             can not be set to assigned(3).  Setting this object to disabled(1),
@@ -392,19 +424,18 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
         ::= { agentInventoryUnitEntry 9 }
 
     agentInventoryUnitAdminMgmtPrefValue OBJECT-TYPE
-        SYNTAX      Unsigned32 (0|1..15)
+        SYNTAX      Unsigned32 (1..15)
         MAX-ACCESS  read-create
-        STATUS      current
+        STATUS      obsolete
         DESCRIPTION
-            "Indicates the configured preference value assigned to the unit. 
-            The preference value indicates how likely this unit is to be 
-            chosen as the management unit.  A value of 0 indicates a disabled
-            or unassigned preference.  Setting this object to 0 will also set
-            agentInventoryUnitHWMgmtPref to unassigned(2).  Setting this object
+            "Indicates the configured preference value assigned to the unit.
+            The preference value indicates how likely this unit is to be
+            chosen as the management unit. Setting this object
             to a non-zero value will set agentInventoryUnitHWMgmtPref to
-            assigned(3).  This value overrides the value of 
+            assigned(3).  This value overrides the value of
             agentInventoryUnitHWMgmtPref if assigned."
         ::= { agentInventoryUnitEntry 10 }
+
 
     agentInventoryUnitStatus OBJECT-TYPE
         SYNTAX      INTEGER {
@@ -412,7 +443,10 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
                     unsupported(2),
                     codeMismatch(3),
                     configMismatch(4),
-                    notPresent(5)
+                    sdmMismatch(5),
+                    notPresent(6),
+                    codeUpdate(7)
+                    ,stmMismatch(8)
                     }
         MAX-ACCESS  read-only
         STATUS      current
@@ -577,6 +611,39 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
              standby configuration.  A unit that is standby_opr(2) may NOT be set to
              unassigned(1)."
         ::= { agentInventoryUnitEntry 26 }
+        
+    agentInventoryUnitSFSTransferStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+                    noAction(1),
+                    inProgress(2)
+                    }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Status parameter to indicate stack firmware synchronization operation status for a particular unit.
+			If SFS transfer is in progress for a particular unit status will be inProgress(2),otherwise status will
+			be noAction(1)."
+        ::= { agentInventoryUnitEntry 27 }
+		
+    agentInventoryUnitSFSLastAttemptStatus OBJECT-TYPE
+        SYNTAX      INTEGER {
+                    none(1),
+                    success(2),
+                    failure(3),
+					          min-bootcode-version-not-present(4)
+                    }
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Status parameter to indicate whether the last synchronization attempt 
+             succeeded or failed.If SFS is initated for a particular unit and if it 
+             completes successfully this object will return success(2),if SFS operation 
+             failed lasttime for this unit,this object will return failure(3).if SFS did 
+             not initiate for this unit,this object will retunrn none(1). If activation of
+             the image failed because the underlying bootcode version is older than the minimum boot 
+             code version specified in the image, this object returns min-bootcode-version-not-met(4)"
+        ::= { agentInventoryUnitEntry 28 }
+
 
     --**************************************************************************************
     -- agentInventorySlotGroup
@@ -622,7 +689,23 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
          agentInventorySlotConfiguredCardType
                  AgentInventoryCardType,
          agentInventorySlotCapabilities
-                 BITS
+                 BITS,
+         agentInventorySlotSerialNumber
+                 DisplayString,
+         agentInventorySlotVendorName
+                 DisplayString,
+         agentInventorySlotManufacturerId
+                 DisplayString,
+         agentInventorySlotFPGAVersion
+                 DisplayString,
+         agentInventorySlotSoftwareVersion
+                 DisplayString,
+         agentInventorySlotBoardRevisionId
+                 DisplayString,
+         agentInventorySlotProductName
+                 DisplayString,
+         agentInventorySlotProductDescription
+                 DisplayString
          }
 
     agentInventorySlotNumber OBJECT-TYPE
@@ -702,7 +785,79 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
                              agentInventorySlotPowerMode
             "
         ::= { agentInventorySlotEntry 8 }
-        
+
+    agentInventorySlotSerialNumber OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..64))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the serial number of the slot.
+            "
+        ::= { agentInventorySlotEntry 9 }
+
+
+    agentInventorySlotVendorName OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..64))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the vendor name of the slot.
+            "
+        ::= { agentInventorySlotEntry 10 }
+
+    agentInventorySlotManufacturerId OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..16))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the manufacturer id of the slot.
+            "
+        ::= { agentInventorySlotEntry 11 }
+
+    agentInventorySlotFPGAVersion OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..64))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the FPGA version of the slot.
+            "
+        ::= { agentInventorySlotEntry 12 }
+
+    agentInventorySlotSoftwareVersion OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..64))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the software version of the slot.
+            "
+        ::= { agentInventorySlotEntry 13 }
+
+    agentInventorySlotBoardRevisionId OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..16))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the board revision id of the slot.
+            "
+        ::= { agentInventorySlotEntry 14 }
+
+    agentInventorySlotProductName OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..64))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the product name of the slot.
+            "
+        ::= { agentInventorySlotEntry 15 }
+
+    agentInventorySlotProductDescription OBJECT-TYPE
+        SYNTAX      DisplayString (SIZE(1..64))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION
+            "Indicates the card description of the slot.
+            "
+        ::= { agentInventorySlotEntry 16 }
     --**************************************************************************************
     -- agentInventoryCardGroup
     --
@@ -841,12 +996,11 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
         ::= { agentInventoryComponentEntry 3 }
 
     --**************************************************************************************
-    -- agentInventoryComponentGroup
+    -- agentInventoryStackPortGroup
     --
     --**************************************************************************************
 
     agentInventoryStackPortGroup                  OBJECT IDENTIFIER ::= { fastPathInventory 7 }
-    
 
     agentInventoryStackPortIpTelephonyQOSSupport OBJECT-TYPE
         SYNTAX      INTEGER {
@@ -858,7 +1012,57 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
             "Controls whether the Stack Ports give higher priority to IP Telephony traffic."
         ::= { agentInventoryStackPortGroup 1 }
+
+  --**************************************************************************************
+    -- agentInventorySFSGroup
+    --
+    --**************************************************************************************
+
+    agentInventorySFSGroup                  OBJECT IDENTIFIER ::= { fastPathInventory 8 }
+
+
+    agentInventoryStackUnitNumber OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION
+            "The unit number associated with stack unit ."
+        ::= { agentInventorySFSGroup 1 }
+ 
+    agentInventorySFS OBJECT-TYPE
+        SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Controls whether the Stack Firmware Synchronization is enabled or disabled."
+        ::= { agentInventorySFSGroup 2 }
+
+    agentInventorySFSAllowDowngrade OBJECT-TYPE
+    SYNTAX      INTEGER {
+                 enable(1),
+                 disable(2)
+                }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Controls whether downgrading the image on the stack member is allowed or not if the firmware version of manager is older to firmware version of stack member"
+        ::= { agentInventorySFSGroup 3 }
         
+    agentInventorySFSTrap OBJECT-TYPE
+        SYNTAX      INTEGER {
+                     enable(1),
+                     disable(2)
+                    }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "Controls sending of traps during Stack firmware synchronization operation"            
+        ::= { agentInventorySFSGroup 4 }
+       
+
     --**************************************************************************************
     -- agentInventoryStackPortTable
     --
@@ -999,6 +1203,7 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
             "Number of errors since boot. The counter may wrap. Ports 
             which are in ethernet mode will return 0."
         ::= { agentInventoryStackPortEntry 10 }
+
         
     --**************************************************************************************
     -- agentInventory   Traps
@@ -1051,6 +1256,34 @@ NETGEAR-INVENTORY-MIB DEFINITIONS ::= BEGIN
         DESCRIPTION
             "Sent when a Stack Port is disconnected from annother Stack Member."
          ::= { agentInventoryTraps 4 }
+
+agentInventorySFSStart NOTIFICATION-TYPE
+        OBJECTS {
+			agentInventoryStackUnitNumber
+                }
+        STATUS  current
+        DESCRIPTION
+            "Sent when Stack Firmware Synchronization operation is started on a Stack Member."
+         ::= { agentInventoryTraps 5 }
+
+agentInventorySFSComplete NOTIFICATION-TYPE
+        OBJECTS {
+			agentInventoryStackUnitNumber
+                }
+        STATUS  current
+        DESCRIPTION
+            "Sent when Stack Firmware Synchronization operation is complete on a Stack Member."
+         ::= { agentInventoryTraps 6 }
+
+		 
+agentInventorySFSFail NOTIFICATION-TYPE
+        OBJECTS {
+			agentInventoryStackUnitNumber
+                }
+        STATUS  current
+        DESCRIPTION
+            "Sent when Stack Firmware Synchronization operation failed for a Stack Member."
+         ::= { agentInventoryTraps 7 }
 
 
 -- conformance information
@@ -1125,13 +1358,13 @@ fastPathInventoryUnitGroup    OBJECT-GROUP
                  agentInventoryUnitUpTime,
                  agentInventoryUnitDescription,
                  agentInventoryUnitReplicateSTK,
-                 agentInventoryUnitRowStatus,
-                 agentInventoryUnitImage1Version,
-                 agentInventoryUnitImage2Version,
-                 agentInventoryUnitSTKname,
-                 agentInventoryUnitActivateSTK,
-                 agentInventoryUnitDeleteSTK,
-                 agentInventoryUnitSTKname
+                 agentInventoryUnitRowStatus
+                 ,agentInventoryUnitImage1Version
+                 ,agentInventoryUnitImage2Version
+                 ,agentInventoryUnitSTKname
+                 ,agentInventoryUnitActivateSTK
+                 ,agentInventoryUnitDeleteSTK
+                 ,agentInventoryUnitSTKname
             }
     STATUS  current
     DESCRIPTION
@@ -1146,7 +1379,17 @@ fastPathInventorySlotGroup    OBJECT-GROUP
                  agentInventorySlotPowerMode,
                  agentInventorySlotAdminMode,
                  agentInventorySlotInsertedCardType,
-                 agentInventorySlotConfiguredCardType
+                 agentInventorySlotConfiguredCardType,
+                 agentInventorySlotCapabilities,
+                 agentInventorySlotSerialNumber,
+                 agentInventorySlotVendorName,
+                 agentInventorySlotManufacturerId,
+                 agentInventorySlotFPGAVersion,
+                 agentInventorySlotSoftwareVersion,
+                 agentInventorySlotBoardRevisionId,
+                 agentInventorySlotProductName,
+                 agentInventorySlotProductDescription
+ 
             }
     STATUS  current
     DESCRIPTION
@@ -1177,5 +1420,5 @@ fastPathInventoryNotificationsGroup NOTIFICATION-GROUP
             "The collection of notifications used to indicate problems
             associated with the insertion of cards."
     ::= { fastPathInventoryGroups 5 }
-    
+
 END

@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage config
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage definitions
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -32,6 +30,99 @@ $config_variable[$setting]['subsection'] = 'General';
 $config_variable[$setting]['name']       = 'Require valid hostname';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'If TRUE, devices must have valid resolvable hostname (in DNS or /etc/hosts). Default is FALSE allowing addition of devices by IP address.';
+
+$setting = 'timestamp_format';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Datetime';
+$config_variable[$setting]['name']       = "Time format";
+//$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['type']       = 'enum'; // Normally this setting is just string, but we limit it with a pre-defined list
+$params = [
+  'Y-m-d H:i:s'     => [ 'name' => 'Default' ],
+  'Y-m-d H:i:s T'   => [ 'name' => 'Default with TZ' ],
+  'd/m/Y h:i:s A'   => [ 'name' => 'GB' ],
+  'd/m/Y h:i:s A T' => [ 'name' => 'GB with TZ' ],
+  'n/j/Y g:i:s A'   => [ 'name' => 'US' ],
+  'j F Y, g:i:s A'  => [ 'name' => 'US Full' ],
+  'n/j/Y g:i:s A T' => [ 'name' => 'US with TZ' ],
+  'd.m.Y H:i:s'     => [ 'name' => 'EU' ],
+  'd.m.Y H:i:s T'   => [ 'name' => 'EU with TZ' ],
+  ];
+foreach ($params as $key => $param)
+{
+  $params[$key]['name'] .= ' ('.date($key).')';
+}
+if (!isset($params[$config['timestamp_format']]))
+{
+  $params[$config['timestamp_format']] = [ 'name' => 'Current ('.date($config['timestamp_format']).')' ];
+}
+$config_variable[$setting]['params']     = $params; // 'icon' => 'icon-refresh'));
+$config_variable[$setting]['shortdesc']  = 'Default time format.';
+
+/* This config not used (only in reformat_us_date())
+$setting = 'date_format';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Datetime';
+$config_variable[$setting]['name']       = "Date format";
+$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['shortdesc']  = 'Default time format ('.date($config['date_format']).')';
+*/
+
+$setting = 'db|debug';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'Database errors logging';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Store errors in DB queries into logs/db.log.';
+
+$setting = 'profile_sql';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'Profile SQL';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Store SQL queries and performance data.';
+
+$setting = 'snmp|hide_auth';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'Hide SNMP auth';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Hide SNMPv1/2 community and SNMPv3 auth from debug and web output.';
+
+$setting = 'snmp|errors';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'Collect SNMP Errors';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Collect SNMP errors into DB and (auto)disable SNMP queries with invalid response (empty/broken/etc).';
+
+$setting = 'ping|debug';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'Ping debug';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Store ping errors into logs/debug.log.';
+
+$setting = 'syslog|debug';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'Syslog debug';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Store RAW syslog entries into logs/debug.log.';
+
+$setting = 'rrd|debug';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'RRD debug';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Store RRD errors into logs/rrd.log.';
+
+$setting = 'web_debug_unprivileged';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Debugging / Profiling';
+$config_variable[$setting]['name']       = 'Web UI debug Unprivileged';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = '[WARNING] Allow show debug information for Unprivileged (userlevel < 7) users in Web UI.';
 
 /// WEB UI //////////////////////////////////////////////////////////
 
@@ -225,6 +316,7 @@ $config_variable[$setting]['name']       = 'Map Tiles (except Google)';
 $config_variable[$setting]['type']       = 'enum';
 $config_variable[$setting]['params']['carto-base-light']   = array('name' => 'Carto Basemap Light');
 $config_variable[$setting]['params']['carto-base-dark']    = array('name' => 'Carto Basemap Dark');
+$config_variable[$setting]['params']['carto-base-auto']    = array('name' => 'Carto Basemap Auto Light/Dark');
 $config_variable[$setting]['params']['esri-worldgraycanvas']    = array('name' => 'ESRI World Gray Canvas');
 $config_variable[$setting]['params']['opentopomap'] = array('name' => 'OpenTopoMap');
 $config_variable[$setting]['params']['wikimedia'] = array('name' => 'Wikimedia');
@@ -441,6 +533,13 @@ $config_variable[$setting]['name']       = 'ServersCheck Fahrenheit units';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Specifies that any ServersCheck devices will return temperature sensors in Fahrenheit.';
 
+$setting = 'sensors|port|ignore_shutdown';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Ports';
+$config_variable[$setting]['name']       = 'Ignore alert state for Administrative Down ports';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'When measured port Shutdown ignore sensor alerts.';
+
 $setting = 'sensors|port|power_to_dbm';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Ports';
@@ -448,6 +547,12 @@ $config_variable[$setting]['name']       = 'Convert Port DOM power sensors to dB
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'When device provide port DOM power sensors in Watts, set to TRUE for convert it to dBm sensors. NOTE: power DOM sensors in Watts will removed.';
 
+$setting = 'ipmi_unit|discrete';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Statuses';
+$config_variable[$setting]['name']       = 'Enable polling IPMI "discrete" sensors';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable experimental support for IPMI discrete sensors. NOTE: very unstable, many false positive alerts.';
 
 /// ALERTING /////////////////////////////////////////////////////////
 
@@ -568,8 +673,14 @@ $setting = 'web_remote_addr_header';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Sessions';
 $config_variable[$setting]['name']       = 'Remote Address HTTP header for Web session logging';
-$config_variable[$setting]['type']       = 'enum|default|CF-Connecting-IP|X-Real-IP|Client-IP|X-Forwarded-For';
-$config_variable[$setting]['shortdesc']  = 'This HTTP header will logged in user auth. Additionally it can used as Session identification address (not by default).';
+//$config_variable[$setting]['type']       = 'enum|default|CF-Connecting-IP|X-Real-IP|Client-IP|X-Forwarded-For';
+$config_variable[$setting]['type']       = 'enum';
+$config_variable[$setting]['params']['default']           = [ 'name' => 'Auto Detect' ];
+$config_variable[$setting]['params']['CF-Connecting-IP']  = [ 'name' => 'CF-Connecting-IP (Cloudflare Proxy)' ];
+$config_variable[$setting]['params']['X-Real-IP']         = [ 'name' => 'X-Real-IP (Nginx HTTP Proxy)' ];
+$config_variable[$setting]['params']['Client-IP']         = [ 'name' => 'Client-IP (NetScaler Load Balancer)' ];
+$config_variable[$setting]['params']['X-Forwarded-For']   = [ 'name' => 'X-Forwarded-For (HTTP Proxy or Load Balancer)' ];
+$config_variable[$setting]['shortdesc']  = 'This HTTP header will logged in user auth. NOTE: Additionally it can used as Session Identification address (NOT BY default, see above).';
 
 $setting = 'web_session_cidr';
 $config_variable[$setting]['section']    = $section;
@@ -696,6 +807,32 @@ $config_variable[$setting]['shortdesc']  = 'Number of times to try to connect to
 
 $section = 'discovery';
 $config_sections[$section]['text'] = 'Discovery';
+
+// Modules
+
+$setting = 'discovery_modules|os';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Modules';
+$config_variable[$setting]['name']       = 'os';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['locked']     = TRUE; // Always locked, just display
+
+$setting = 'discovery_modules|mibs';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Modules';
+$config_variable[$setting]['name']       = 'mibs';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['locked']     = TRUE; // Always locked, just display
+
+foreach ($config['discovery_modules'] as $key => $value)
+{
+  $setting = 'discovery_modules|'.$key;
+  if (isset($config_variable[$setting])) { continue; }
+  $config_variable[$setting]['section']    = $section;
+  $config_variable[$setting]['subsection'] = 'Modules';
+  $config_variable[$setting]['name']       = $key;
+  $config_variable[$setting]['type']       = 'bool';
+}
 
 // Ports
 
@@ -997,7 +1134,7 @@ $config_variable[$setting]['shortdesc']  = 'When discovering new devices, Observ
                                             before trying to add them. Currently only IPv4 is supported.';
 $config_variable[$setting]['longdesc']   = ''; // FIXME please note this is not snmp scanning range
 
-$setting = 'bad_xdp';
+$setting = 'xdp|ignore_hostname';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Device Autodiscovery Options';
 $config_variable[$setting]['name']       = 'Block autodiscovery of device by hostname';
@@ -1005,7 +1142,7 @@ $config_variable[$setting]['type']       = 'enum-freeinput';
 $config_variable[$setting]['example']    = 'badhost.domain.com';
 $config_variable[$setting]['shortdesc']  = 'Prevent Observium from trying to auto-discover any device which matches a configured hostname.';
 
-$setting = 'bad_xdp_regexp';
+$setting = 'xdp|ignore_hostname_regex';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Device Autodiscovery Options';
 $config_variable[$setting]['name']       = 'Block autodiscovery of device by hostname (Regular Expression)';
@@ -1013,7 +1150,7 @@ $config_variable[$setting]['type']       = 'enum-freeinput';
 $config_variable[$setting]['example']    = '/^badhost.*/';
 $config_variable[$setting]['shortdesc']  = 'Prevent Observium from trying to auto-discover any device whose hostname matches a configured regular expression.';
 
-$setting = 'bad_xdp_platform';
+$setting = 'xdp|ignore_platform';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'Device Autodiscovery Options';
 $config_variable[$setting]['name']       = 'Block autodiscovery of device by platform';
@@ -1021,6 +1158,26 @@ $config_variable[$setting]['type']       = 'enum-freeinput';
 $config_variable[$setting]['example']    = 'Cisco IP Phone';
 $config_variable[$setting]['shortdesc']  = 'Prevent Observium from trying to auto-discover any device whose reported platform matches a configured string.';
 
+$setting = 'xdp|ignore_platform_regex';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Device Autodiscovery Options';
+$config_variable[$setting]['name']       = 'Block autodiscovery of device by platform (Regular Expression)';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['example']    = '/^Cisco IP Phone/';
+$config_variable[$setting]['shortdesc']  = 'Prevent Observium from trying to auto-discover any device whose reported platform matches a configured regular expression.';
+
+/// WMI
+
+$section = 'WMI';
+$config_sections[$section]['text'] = 'WMI';
+
+$setting = 'wmi|service_permit';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Device Autodiscovery Options';
+$config_variable[$setting]['name']       = 'WMI Services allowed to be Discovered';
+$config_variable[$setting]['type']       = 'enum-freeinput';
+$config_variable[$setting]['example']    = 'Dnscache';
+$config_variable[$setting]['shortdesc']  = 'Prevent Observium from trying to auto-discover all WMI services. Only defined names will be discovered instead.';
 
 
 
@@ -1064,12 +1221,14 @@ $config_variable[$setting]['name']       = 'Enable use of max-rep values for SNM
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'This enables the use of max-rep values defined per-OS to help optimise the performance of SNMP BULKGET operations and can vastly speed up the poller.';
 
+/*
 $setting = 'snmp|snmp_sysorid';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'SNMP';
 $config_variable[$setting]['name']       = 'Enable autodiscovery of supported MIBs via sysORID';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'This enables (extra) autodiscovery of supported MIBs on devices which report this information via the sysORID table in SNMP.';
+*/
 
 $setting = 'snmp|retries';
 $config_variable[$setting]['section']    = $section;
@@ -1085,6 +1244,14 @@ $config_variable[$setting]['name']       = 'SNMP timeout in seconds';
 $config_variable[$setting]['type']       = 'int';
 $config_variable[$setting]['shortdesc']  = 'Specifies the timeout in seconds between retries in snmp requests. The default is 1.';
 
+$setting = 'http_ip_version';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'HTTP';
+$config_variable[$setting]['name']       = 'HTTP(S) IP version';
+//$config_variable[$setting]['type']       = 'string';
+$config_variable[$setting]['type']       = 'enum|IPv4|IPv6';
+$config_variable[$setting]['shortdesc']  = 'HTTP(S) force resolve names to specified addresses only (IPv4 or IPv6). When not specified try in default order (IPv6 than IPv4).';
+
 $setting = 'http_proxy'; // FIXME should be renamed to proxy|hostname
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'HTTP';
@@ -1092,6 +1259,13 @@ $config_variable[$setting]['name']       = 'HTTP(S) Proxy hostname';
 $config_variable[$setting]['type']       = 'string';
 $config_variable[$setting]['example']    = 'yourproxy:3128';
 $config_variable[$setting]['shortdesc']  = 'Specifies an HTTP(S) proxy to be used for external HTTP requests. Used primarily for geolocation and other external data lookups.';
+
+$setting = 'proxy_fulluri';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'HTTP';
+$config_variable[$setting]['name']       = 'HTTP(S) Proxy use Full URI';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'When set to TRUE, the entire URI will be used when constructing the request. (i.e. GET http://www.example.com/path/to/file.html HTTP/1.0). While this is a non-standard request format, some proxy servers require it.';
 
 $setting = 'proxy_user'; // FIXME should be renamed to proxy|username
 $config_variable[$setting]['section']    = $section;
@@ -1144,6 +1318,7 @@ $config_variable[$setting]['subsection'] = 'GEO Coding';
 $config_variable[$setting]['name']       = 'GEO API to use';
 $config_variable[$setting]['type']       = 'enum';
 $config_variable[$setting]['params']['geocodefarm']   = array('name' => 'Geocode.Farm', 'allowed'  => 'geo_api|geocodefarm|key', 'subtext' => 'Free users have 250 req/day and 4 req/sec limit (IP based). Allowed to use GEO API KEY', 'desc' => 'Request a KEY <a href="https://geocode.farm/" target="_blank">here</a>');
+$config_variable[$setting]['params']['arcgis']        = array('name' => 'ArcGIS',        'subtext' => 'Free users have 25000 req/day limit.', 'desc' => 'Please see geocode quality <a href="https://developers.arcgis.com/rest/geocode/api-reference/geocode-coverage.htm" target="_blank">here</a>');
 $config_variable[$setting]['params']['openstreetmap'] = array('name' => 'OpenStreetMap', 'subtext' => 'Rate limit 150 req/day', 'desc' => 'See the usage limits <a href="http://wiki.openstreetmap.org/wiki/Nominatim_usage_policy" target="_blank">here</a>');
 $config_variable[$setting]['params']['google']        = array('name' => 'Google',   'required' => 'geo_api|google|key', 'subtext' => 'Require to use GEO API KEY', 'desc' => 'Request a KEY <a href="https://developers.google.com/maps/documentation/geocoding/get-api-key" target="_blank">here</a>');
 $config_variable[$setting]['params']['yandex']        = array('name' => 'Yandex',   'allowed'  => 'geo_api|yandex|key', 'subtext' => 'Free users have 25000 req/day limit. Allowed to use GEO API KEY', 'desc' => 'Request a KEY <a href="https://tech.yandex.ru/maps/commercial/doc/concepts/how-to-buy-docpage" target="_blank">here</a>');
@@ -1454,6 +1629,99 @@ $config_variable[$setting]['name']       = 'BGP 32bit ASN in asdot format';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Show BGP 32bit ASNs in asdot format (ie AS5.20 instead AS327700).';
 
+/// API //////////////////////////////////////////////////////////
+
+$section = 'api';
+$config_sections[$section]['text'] = 'API';
+
+$setting = 'api|enable';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'General';
+$config_variable[$setting]['name']       = 'Enable API';
+$config_variable[$setting]['type']       = 'bool';
+$config_variable[$setting]['shortdesc']  = 'Enable or disable the API.';
+
+// Endpoints
+
+$setting = 'api|endpoints|alerts';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Alerts';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|bills';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Billing';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|devices';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Devices';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|ports';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Ports';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|sensors';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Sensors';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|status';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Statuses';
+$config_variable[$setting]['type']       = 'bool';
+/*
+$setting = 'api|endpoints|counter';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Counters';
+$config_variable[$setting]['type']       = 'bool';
+*/
+$setting = 'api|endpoints|storage';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Storages';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|mempools';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Memory Pools';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|address';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'IP Addresses';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|printersupplies';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Printer Supplies';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|inventory';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Inventories';
+$config_variable[$setting]['type']       = 'bool';
+
+$setting = 'api|endpoints|neighbours';
+$config_variable[$setting]['section']    = $section;
+$config_variable[$setting]['subsection'] = 'Endpoints';
+$config_variable[$setting]['name']       = 'Neighbours';
+$config_variable[$setting]['type']       = 'bool';
+
+
 /// BILLING //////////////////////////////////////////////////////////
 
 $section = 'billing';
@@ -1543,7 +1811,7 @@ $config_variable[$setting]['name']       = 'Delete invalid RRD files';
 $config_variable[$setting]['type']       = 'bool';
 $config_variable[$setting]['shortdesc']  = 'Delete .rrd files that are not valid RRD files (eg created with a full disk)';
 
-$setting = 'housekeeping|alertlog|age';
+$setting = 'housekeeping|rrd|age';
 $config_variable[$setting]['section']    = $section;
 $config_variable[$setting]['subsection'] = 'RRD Files';
 $config_variable[$setting]['name']       = 'RRD File Max Age';

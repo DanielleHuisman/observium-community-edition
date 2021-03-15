@@ -1,0 +1,2585 @@
+ --
+
+ -- CIENA-CES-PBT-MIB.my
+
+ --
+
+ --
+
+
+
+ CIENA-CES-PBT-MIB DEFINITIONS ::= BEGIN
+
+
+
+ IMPORTS                
+
+   NOTIFICATION-GROUP, OBJECT-GROUP
+
+        FROM SNMPv2-CONF
+
+   Unsigned32, Counter32, NOTIFICATION-TYPE, OBJECT-TYPE, MODULE-IDENTITY                       
+
+        FROM SNMPv2-SMI                 
+
+   TruthValue, DisplayString, MacAddress
+
+        FROM SNMPv2-TC
+
+    cienaGlobalSeverity, cienaGlobalMacAddress
+
+   		FROM CIENA-GLOBAL-MIB    
+
+   CienaGlobalState
+
+   		FROM CIENA-TC
+
+   --cienaModulesCesNotifications, cienaModulesCesConfig
+
+   cienaCesConfig,cienaCesNotifications           
+
+        FROM CIENA-SMI;
+
+                    
+
+ cienaCesPbtMIB MODULE-IDENTITY
+
+			LAST-UPDATED "201012150000Z"
+
+			ORGANIZATION
+
+				"Ciena Corp."
+
+			CONTACT-INFO
+
+        	"  Mib Meister
+
+               115 North Sullivan Road
+
+               Spokane Valley, WA 99037
+
+               USA            
+
+               Phone:  +1 509 242 9000
+
+               Email:  support@ciena.com"
+
+            DESCRIPTION
+
+		   		"New tables cienaCesPbtDecapTnlTable, cienaCesPbtRemoteBridgeNameMacMapTable,cienaCesPbtLocalBridgeNameMacMapTable,
+
+		   		 cienaCesPbtServiceTable have been added. cienaCesPbtEncapTnlTable and cienaCesPbtTnlGroupTable have been modified and
+
+		   		 new objects have been added. cienaCesPbtServiceTagEtype,cienaCesPbtTunnelTagEtype,cienaCesPbtTunnelReversionState,
+
+		   		 cienaCesPbtTunnelReversionHoldTime and cienaCesPbtTunnelSwitchOverHoldTime objects have been added under
+
+		   		 cienaCesPbtGlobalAttrs. cienaCesPbtTunnelReversionNotification has been added."
+
+            REVISION    "201012150000Z"
+
+            DESCRIPTION
+
+		       "Initial creation. This MIB module defines the mgmt objects for the PBT 
+
+                     (Provider Backbone Transport) feature."
+
+          ::= { cienaCesConfig 6}
+
+
+
+ --
+
+ -- Node definitions
+
+ --
+
+ cienaCesPbtMIBObjects OBJECT IDENTIFIER ::= { cienaCesPbtMIB 1 }
+
+ cienaCesPbt           OBJECT IDENTIFIER ::= { cienaCesPbtMIBObjects 1 } 
+
+  
+
+ -- Notifications   
+
+ cienaCesPbtMIBNotificationPrefix  OBJECT IDENTIFIER ::=  { cienaCesNotifications 6 } 
+
+ cienaCesPbtMIBNotifications       OBJECT IDENTIFIER ::=  { cienaCesPbtMIBNotificationPrefix 0 }
+
+
+
+ -- Conformance information  
+
+ cienaCesPbtMIBConformance OBJECT IDENTIFIER ::= { cienaCesPbtMIB 3 } 
+
+ cienaCesPbtMIBCompliances OBJECT IDENTIFIER ::= { cienaCesPbtMIBConformance 1 }                
+
+ cienaCesPbtMIBGroups      OBJECT IDENTIFIER ::= { cienaCesPbtMIBConformance 2 } 
+
+
+
+ --
+
+ -- Pbt Global Attrs
+
+ --                                                           
+
+ cienaCesPbtGlobalAttrs  OBJECT IDENTIFIER ::= { cienaCesPbt 1 } 
+
+ 
+
+ cienaCesPbtBridgeMac OBJECT-TYPE
+
+     SYNTAX      MacAddress
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the provider MAC address used as source MAC during PBB-TE encapsulation.
+
+         By default it returns the MAC address derived from the chassis MAC."
+
+     ::= { cienaCesPbtGlobalAttrs 1 }
+
+ 
+
+cienaCesPbtServiceTagEtype OBJECT-TYPE
+
+     SYNTAX      OCTET STRING 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the Ethertype value used in the I-Tag (service tag) section of PBB-TE encapsulation.
+
+		The default Ethertype used by SAOS is 0x88-C8.
+
+		This is the Ethertype used for encapsulating the egressing frames as well as for classifying the ingressing frames." 
+
+     ::= { cienaCesPbtGlobalAttrs 2 }
+
+ 
+
+ cienaCesPbtTunnelTagEtype OBJECT-TYPE
+
+     SYNTAX      OCTET STRING 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the Ethertype value used in the B-Tag (backbone tag) section of PBB-TE encapsulation.
+
+        The default Ethertype is 0x88-A8 for 802.1ah encapsulated frame.
+
+        This is the Ethertype used for encapsulating the egressing frames as well as for classifying the ingressing frames."
+
+     ::= { cienaCesPbtGlobalAttrs 3 }                                     
+
+                               
+
+ cienaCesPbtTunnelReversionState OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState  			 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "Protection of the transport mechanism in PBB-TE is achieved using redundant tunnels. A protected PBB-TE tunnel
+
+         is backed up by a standby PBB-TE tunnel serving the same destination. The former is marked as the primary 
+
+         tunnel and the latter as the backup tunnel. Protection switching in PBB-TE requires both the ingress
+
+         and egress nodes to have matching configurations. Upon the failure of the primary tunnel, traffic is moved 
+
+         over to the backup tunnel at the tunnel ingress. Tunnel reversion signifies the restoration of traffic 
+
+         from this backup tunnel (now active) to the primary (now standby) after the primary tunnel is restored.
+
+         Two common methods are used - automatic and manual. In automatic reversion the traffic is automatically
+
+         reverted back to the primary after it is restored. The manual method, on the other hand, requires the 
+
+         operator to explicitly revert the traffic back to the primary. Manual reversion allows the network 
+
+         operator to perform the task when the impact to the service is minimal and to schedule it. It also prevents 
+
+         flip-flopping between the two tunnels if the primary is not entirely stable. 
+
+         This object indicates whether to enable/disable automatic tunnel reversion from backup to primary if primary 
+
+         comes back up. The device will wait for cienaCesPbtTunnelReversionHoldTime before automatically switching the 
+         data traffic back to primary."  
+
+     DEFVAL     {disabled}
+
+     ::= { cienaCesPbtGlobalAttrs 4 } 
+
+     
+
+ cienaCesPbtTunnelReversionHoldTime OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     UNITS       "milliseconds"
+
+     MAX-ACCESS  read-only
+
+     STATUS      current     
+
+     DESCRIPTION
+
+        "Protection of the transport mechanism in PBB-TE is achieved using redundant tunnels. A protected PBB-TE tunnel
+
+         is backed up by a standby PBB-TE tunnel serving the same destination. The former is marked as the primary 
+
+         tunnel and the latter as the backup tunnel. Protection switching in PBB-TE requires both the ingress
+
+         and egress nodes to have matching configurations. Upon the failure of the primary tunnel, traffic is moved 
+
+         over to the backup tunnel at the tunnel ingress. Tunnel reversion signifies the restoration of traffic 
+
+         from this backup tunnel (now active) to the primary (now standby) after the primary tunnel is restored.
+
+         Two common methods are used - automatic and manual. In automatic reversion, the traffic is automatically
+
+         reverted back to the primary after it is restored. The manual method, on the other hand, requires the 
+
+         operator to explicitly revert the traffic back to the primary. Manual reversion allows the network 
+
+         operator to perform the task when the impact to the service is minimal and to schedule it. It also prevents 
+
+         flip-flopping between the two tunnels if the primary is not entirely stable. 
+
+         This object represents the hold time before data traffic on the backup tunnel automatically 
+
+         reverts to the primary tunnel."
+
+     DEFVAL     {3000}     
+
+     ::= { cienaCesPbtGlobalAttrs 5 }
+
+
+
+ cienaCesPbtTunnelSwitchOverHoldTime OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     UNITS       "milliseconds"
+
+     MAX-ACCESS  read-only
+
+     STATUS      current     
+
+     DESCRIPTION
+
+        "Protection of the transport mechanism in PBB-TE is achieved using redundant tunnels. A protected PBB-TE tunnel
+
+         is backed up by a standby PBB-TE tunnel serving the same destination. The former is marked as the primary 
+
+         tunnel and the latter as the backup tunnel. Protection switching in PBB-TE requires both the ingress
+
+         and egress nodes to have matching configurations. Upon the failure of the primary tunnel, traffic is moved 
+
+         over to the backup tunnel at the tunnel ingress. 
+
+         When such a failure occurs on the primary tunnel, this object represents the hold time before data traffic 
+
+         on the primary tunnel automatically switches over to the backup tunnel."
+
+     DEFVAL     {0}     
+
+     ::= { cienaCesPbtGlobalAttrs 6 }
+
+
+
+
+
+ --
+
+ --PBB-TE tunnel group table
+
+ --
+
+ 
+
+  cienaCesPbtTnlGroupTable OBJECT-TYPE
+
+     SYNTAX     SEQUENCE OF CienaCesPbtTnlGroupEntry
+
+     MAX-ACCESS not-accessible
+
+     STATUS     current
+
+     DESCRIPTION
+
+            "The (conceptual) table listing the PBB-TE tunnel group table."
+
+     ::= { cienaCesPbt 2 }
+
+     
+
+ cienaCesPbtTnlGroupEntry  OBJECT-TYPE
+
+     SYNTAX       CienaCesPbtTnlGroupEntry
+
+     MAX-ACCESS   not-accessible
+
+     STATUS       current
+
+     DESCRIPTION
+
+             "This object represents an entry in the PBB-TE tunnel group table.
+
+             A maximum of 4 tunnel pairs is allowed to be added to a tunnel group."
+
+     INDEX { cienaCesPbtTnlGroupIndex }
+
+     ::= { cienaCesPbtTnlGroupTable 1 }
+
+     
+
+ CienaCesPbtTnlGroupEntry ::=  SEQUENCE {
+
+     cienaCesPbtTnlGroupIndex                    Unsigned32,
+
+     cienaCesPbtTnlGroupName                     DisplayString,
+
+     cienaCesPbtTnlGroupOperState                CienaGlobalState,
+
+     cienaCesPbtTnlGroupActivePair               Unsigned32,
+
+     cienaCesPbtTnlGroupSyncEnabled              CienaGlobalState,
+
+     cienaCesPbtTnlGroupUseCount                 Unsigned32,
+
+     cienaCesPbtTnlGroupReverting                TruthValue
+
+ }
+
+
+
+ cienaCesPbtTnlGroupIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  not-accessible
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the unique index in the PBB-TE tunnel group table."
+
+     ::= { cienaCesPbtTnlGroupEntry 1 }
+
+  
+
+ cienaCesPbtTnlGroupName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE tunnel group name."
+
+     ::= { cienaCesPbtTnlGroupEntry 2 }
+
+
+
+  cienaCesPbtTnlGroupOperState OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the operational state of the PBB-TE tunnel group.
+
+        A tunnel group is considered operational only if it has at least one 
+
+        operational tunnel pair."
+
+     ::= { cienaCesPbtTnlGroupEntry 3 }
+
+  
+
+ cienaCesPbtTnlGroupActivePair OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "An active PBB-TE tunnel pair is two bidirectional tunnels, one inbound and 
+
+		 the other outbound between the same pair of devices paired together
+
+		 to represent a bidirectional PBB-TE trunk. Each PBB-TE tunnel (inbound or outbound)
+
+		 is unidirectional. An inbound and an outbound tunnel must map to the same 
+
+		 physical port of the device to qualify for the pairing. "
+
+     ::= { cienaCesPbtTnlGroupEntry 4 }
+
+  
+
+  cienaCesPbtTnlGroupSyncEnabled OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object indicates whether the group sync is enabled. 
+
+         When there are multiple tunnel pairs between the same end-points, then one pair 
+
+         becomes the primary and the other the backup. If at one end the primary is active and at 
+
+         the other end the backup is active, it leads to traffic loss. To avoid this traffic loss, 
+
+         when this object is enabled, the active tunnel in a group is changed, and CFM CCM 
+         messages with fault are sent out on the non-active tunnels of the group to 
+
+         force tunnel synchronization."
+
+     DEFVAL     {disabled}
+
+     ::= { cienaCesPbtTnlGroupEntry 5 }
+
+  
+
+  cienaCesPbtTnlGroupUseCount OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object indicates the number of PBB-TE services running in this PBB-TE tunnel group.
+
+        A maximum of 4 tunnels is allowed to be added to a tunnel group."
+
+     ::= { cienaCesPbtTnlGroupEntry 6 }
+
+  
+
+  cienaCesPbtTnlGroupReverting OBJECT-TYPE
+
+     SYNTAX      TruthValue
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object indicates if the PBB-TE tunnel group reversion is on or off."
+
+     ::= { cienaCesPbtTnlGroupEntry 7}
+
+ 
+
+ 
+
+ --
+
+ -- Pbt Encap tunnel table
+
+ --
+
+
+
+ cienaCesPbtEncapTnlTable OBJECT-TYPE
+
+     SYNTAX     SEQUENCE OF CienaCesPbtEncapTnlEntry
+
+     MAX-ACCESS not-accessible
+
+     STATUS     current
+
+     DESCRIPTION
+
+            "The (conceptual) table listing the PBB-TE encap tunnels."
+
+
+
+     ::= { cienaCesPbt 3 }
+
+     
+
+ cienaCesPbtEncapTnlEntry  OBJECT-TYPE
+
+     SYNTAX       CienaCesPbtEncapTnlEntry
+
+     MAX-ACCESS   not-accessible
+
+     STATUS       current
+
+     DESCRIPTION
+
+             "This object represents an entry in the PBB-TE encap tunnel table. "
+
+     INDEX {cienaCesPbtEncapTnlIndex}
+
+     ::= { cienaCesPbtEncapTnlTable 1 }
+
+     
+
+ CienaCesPbtEncapTnlEntry ::=  SEQUENCE { 
+
+     cienaCesPbtEncapTnlIndex                 	Unsigned32,
+
+     cienaCesPbtEncapTnlName                  	DisplayString,
+
+     cienaCesPbtEncapTnlGroupIndex            	Unsigned32,
+
+     cienaCesPbtEncapTnlGroupName             	DisplayString,
+
+     cienaCesPbtEncapTnlFwdState              	INTEGER,
+
+     cienaCesPbtEncapTnlNotifIndex            	Unsigned32,
+
+     cienaCesPbtEncapTnlBvid					Unsigned32,
+
+     cienaCesPbtEncapTnlRemoteBridgeIndex    	Unsigned32,
+
+     cienaCesPbtEncapTnlRemoteBridgeName      	DisplayString,
+
+     cienaCesPbtEncapTnlPgId                  	Unsigned32,
+
+     cienaCesPbtEncapTnlPortName              	DisplayString,
+
+     cienaCesPbtEncapTnlFaults                	Unsigned32,
+
+     cienaCesPbtEncapTnlAdminState            	CienaGlobalState,
+
+     cienaCesPbtEncapTnlOperState             	CienaGlobalState,
+
+     cienaCesPbtEncapTnlPaired                	TruthValue,
+
+     cienaCesPbtEncapTnlPairIndex             	INTEGER,
+
+     cienaCesPbtEncapTnlPairOperState         	CienaGlobalState,
+
+     cienaCesPbtEncapTnlFrameCosPolicy        	INTEGER,
+
+     cienaCesPbtEncapTnlFrameCosMapIndex      	Unsigned32,
+
+     cienaCesPbtEncapTnlFrameCosMapName       	DisplayString,
+
+     cienaCesPbtEncapTnlFixedPcp              	INTEGER,
+
+     cienaCesPbtEncapTnlCfmConfigured         	TruthValue,
+
+     cienaCesPbtEncapTnlPairedDecapIndex      	Unsigned32,
+
+     cienaCesPbtEncapTnlPairedDecapName       	DisplayString,
+
+     cienaCesPbtEncapTnlWeight                	Unsigned32,
+
+     cienaCesPbtEncapTnlLocalBridgeIndex      	Unsigned32,
+
+     cienaCesPbtEncapTnlLocalBridgeName       	DisplayString,
+
+     cienaCesPbtEncapTnlReversionToPairIndex	Unsigned32,
+
+     cienaCesPbtEncapTnlReversionFromPairIndex	Unsigned32
+
+     }
+
+
+
+ cienaCesPbtEncapTnlIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  not-accessible
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the unique index in the PBB-TE encap tunnel table."
+
+     ::= { cienaCesPbtEncapTnlEntry 1 }
+
+  
+
+ cienaCesPbtEncapTnlName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE encap tunnel name."
+
+     ::= { cienaCesPbtEncapTnlEntry 2 }
+
+  
+
+ cienaCesPbtEncapTnlGroupIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the index of the group to which this PBB-TE encap tunnel belongs."
+
+     ::= { cienaCesPbtEncapTnlEntry 3 }
+
+  
+
+ cienaCesPbtEncapTnlGroupName OBJECT-TYPE
+
+     SYNTAX      DisplayString (SIZE (1..31))
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the group name to which this PBB-TE encap tunnel belongs."
+
+     ::= { cienaCesPbtEncapTnlEntry 4 }
+
+
+
+ cienaCesPbtEncapTnlFwdState OBJECT-TYPE
+
+     SYNTAX      INTEGER {
+
+                    active(1),
+
+                    standby(2)
+
+                 }
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the forwarding state of the PBB-TE encap tunnel.
+
+        If an encap tunnel is made the active tunnel, the decap tunnel that is 
+
+        paired (if any) with it is implicitly be the active decap tunnel."
+
+     ::= { cienaCesPbtEncapTnlEntry 5 }
+
+  
+
+ cienaCesPbtEncapTnlNotifIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  accessible-for-notify
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the unique index in the table used in the trap definition."
+
+     ::= { cienaCesPbtEncapTnlEntry 6 }   
+
+     
+
+ cienaCesPbtEncapTnlBvid OBJECT-TYPE
+
+ 	 SYNTAX		Unsigned32
+
+ 	 MAX-ACCESS read-only
+
+ 	 STATUS		current
+
+ 	 DESCRIPTION
+
+ 	 	"This object represents the B-VID value of the PBB-TE encap tunnel. A group of VIDs
+
+ 	 	are reserved for PBB-TE. The range is 1-4094. However, the same B-VID can be used 
+
+ 	 	to set up multiple tunnels provided the destination MAC is different for each tunnel.
+
+ 	 	<B-DA,B-VID>, where B-DA is the remote MAC address, is unique."
+
+ 	 ::= {  cienaCesPbtEncapTnlEntry 7 }
+
+   
+
+ cienaCesPbtEncapTnlRemoteBridgeIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the remote bridge index of the PBB-TE encap tunnel."
+
+     ::= { cienaCesPbtEncapTnlEntry 8 }
+
+  
+
+ cienaCesPbtEncapTnlRemoteBridgeName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the remote bridge name of the PBB-TE encap tunnel."
+
+     ::= { cienaCesPbtEncapTnlEntry 9 }
+
+ 
+
+ cienaCesPbtEncapTnlPgId OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the port group ID (PGID) of the PBB-TE encap tunnel. 
+
+        The PGID is a logical identifier for a logical port."
+
+     ::= { cienaCesPbtEncapTnlEntry 10 }
+
+  
+
+ cienaCesPbtEncapTnlPortName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the port group name of the PBB-TE encap tunnel.
+
+        A port name is in the format <SlotNumber>/<PortNumber>. SlotNumber 
+
+        represents the module slot where the port resides. For single module devices,
+
+        the SlotNumber is always 1. PortNumber represents the port's location 
+
+        on the module."
+
+     ::= { cienaCesPbtEncapTnlEntry 11 }
+
+  
+
+ cienaCesPbtEncapTnlFaults OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "Each bit represents a fault. Value 0 represents no fault. 
+
+        First LSB represents a port fault. Second LSB represents a CFM fault.
+
+        Third LSB represents an administrative Fault."
+
+     ::= { cienaCesPbtEncapTnlEntry 12 }
+
+  
+
+ cienaCesPbtEncapTnlAdminState OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the administrative state of the PBB-TE encap tunnel. " 
+
+     DEFVAL		 {enabled}
+
+     ::= { cienaCesPbtEncapTnlEntry 13 }
+
+  
+
+ cienaCesPbtEncapTnlOperState OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the operational state of the PBB-TE encap tunnel.
+
+         The operational state is 'disabled' when one of the following is true:
+
+         - The tunnel is administratively disabled.
+
+         - The out-going port is not operational.
+
+         - The CFM service has been configured on the tunnel and CFM detects a 
+
+            fault along the path of the tunnel. 
+
+         - The CFM service has been configured on the tunnel and CFM has not
+
+           yet discovered the remote MEP."
+
+     ::= { cienaCesPbtEncapTnlEntry 14 }
+
+  
+
+ cienaCesPbtEncapTnlPaired OBJECT-TYPE
+
+     SYNTAX      TruthValue
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object indicates whether the PBB-TE encap tunnel is paired or not."
+
+     ::= { cienaCesPbtEncapTnlEntry 15 }
+
+  
+
+ cienaCesPbtEncapTnlPairIndex OBJECT-TYPE
+
+     SYNTAX      INTEGER 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE encap tunnel pair index."
+
+     ::= { cienaCesPbtEncapTnlEntry 16 }
+
+
+
+ cienaCesPbtEncapTnlPairOperState OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the operational state of the PBB-TE encap tunnel pair.
+
+        The operational state of the tunnel-pair is 'down' if either the encap or 
+
+        decap tunnel or both are down."
+
+     ::= { cienaCesPbtEncapTnlEntry 17 }
+
+  
+
+ cienaCesPbtEncapTnlFrameCosPolicy OBJECT-TYPE
+
+     SYNTAX      INTEGER {
+
+                     fixed(1),
+
+                     bvidPcPMap(2)
+
+                 }
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the frame CoS policy of the PBB-TE encap tunnel.
+
+         The PCP/L2 CoS value is mapped from the Backbone VID tag or CoS values 
+
+         in the frame are ignored and fixed R-CoS and R-COLOR are applied to the 
+
+		 frame from a specified Resolved CoS Profile."  
+
+	 DEFVAL 	{bvidPcPMap}
+
+     ::= { cienaCesPbtEncapTnlEntry 18 }
+
+  
+
+ cienaCesPbtEncapTnlFrameCosMapIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the frame CoS map index of the PBB-TE encap tunnel. "
+
+     ::= { cienaCesPbtEncapTnlEntry 19 }
+
+  
+
+ cienaCesPbtEncapTnlFrameCosMapName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the frame CoS map name of the PBB-TE encap tunnel."
+
+     ::= { cienaCesPbtEncapTnlEntry 20 }
+
+  
+
+ cienaCesPbtEncapTnlFixedPcp OBJECT-TYPE
+
+     SYNTAX      INTEGER 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the fixed value of the B-Tag PCP value 
+
+        in frames egressing over a PBB-TE encap tunnel. " 
+
+     DEFVAL		{2}
+
+     ::= { cienaCesPbtEncapTnlEntry 21 }
+
+  
+
+ cienaCesPbtEncapTnlCfmConfigured OBJECT-TYPE
+
+     SYNTAX      TruthValue
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents whether or not CFM is configured on the PBB-TE encap tunnel."
+
+     ::= { cienaCesPbtEncapTnlEntry 22 }
+
+  
+
+ cienaCesPbtEncapTnlPairedDecapIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "If this encap tunnel belongs to a tunnel pair, this object represents 
+
+        the index of the corresponding decap tunnel. "
+
+     ::= { cienaCesPbtEncapTnlEntry 23 }
+
+
+
+ cienaCesPbtEncapTnlPairedDecapName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "If this encap tunnel belongs to a tunnel pair, this object represents 
+
+        the name of the corresponding decap tunnel. "
+
+     ::= { cienaCesPbtEncapTnlEntry 24 }
+
+  
+
+ cienaCesPbtEncapTnlWeight OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the weight of the PBB-TE encap tunnel in the tunnel group.
+
+        The weight decides the order in which tunnels are chosen during switchover.
+
+        The tunnel with the maximum weight in a tunnel group acts as the de facto
+
+        'primary' tunnel in the group. "
+
+     ::= { cienaCesPbtEncapTnlEntry 25 }
+
+  
+
+ cienaCesPbtEncapTnlLocalBridgeIndex     OBJECT-TYPE
+
+ 	 SYNTAX 	Unsigned32
+
+ 	 MAX-ACCESS read-only
+
+ 	 STATUS 	current
+
+ 	 DESCRIPTION
+
+ 	 	"This object represents the local bridge index of the PBB-TE encap tunnel. "
+
+ 	 ::= {cienaCesPbtEncapTnlEntry 26 }
+
+ 
+
+ cienaCesPbtEncapTnlLocalBridgeName      OBJECT-TYPE
+
+   SYNTAX 	  DisplayString
+
+   MAX-ACCESS read-only
+
+   STATUS     current
+
+   DESCRIPTION
+
+   		"This object represents the local bridge name of the PBB-TE encap tunnel. "
+
+   ::= { cienaCesPbtEncapTnlEntry 27 }
+
+ 
+
+  cienaCesPbtEncapTnlReversionToPairIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  accessible-for-notify
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "Reversion occurs to this tunnel pair index in a tunnel group 
+
+        and is used in the trap definition."
+
+     ::= { cienaCesPbtEncapTnlEntry 28 }   
+
+
+
+ cienaCesPbtEncapTnlReversionFromPairIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  accessible-for-notify
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "Reversion occurs from this tunnel pair index in a tunnel group
+
+         and is used in the trap definition."
+
+     ::= { cienaCesPbtEncapTnlEntry 29 }   
+
+
+
+ --
+
+ -- PBB-TE Decap tunnel table
+
+ --
+
+
+
+ cienaCesPbtDecapTnlTable OBJECT-TYPE
+
+     SYNTAX     SEQUENCE OF CienaCesPbtDecapTnlEntry
+
+     MAX-ACCESS not-accessible
+
+     STATUS     current
+
+     DESCRIPTION
+
+            "The (conceptual) table listing the PBB-TE decap tunnels."
+
+    ::= { cienaCesPbt 4 }
+
+     
+
+ cienaCesPbtDecapTnlEntry  OBJECT-TYPE
+
+     SYNTAX       CienaCesPbtDecapTnlEntry
+
+     MAX-ACCESS   not-accessible
+
+     STATUS       current
+
+     DESCRIPTION
+
+             "This object represents an entry in the PBB-TE decap tunnel table. "
+
+     INDEX {cienaCesPbtDecapTnlIndex}
+
+     ::= { cienaCesPbtDecapTnlTable 1 }
+
+     
+
+ CienaCesPbtDecapTnlEntry ::=  SEQUENCE { 
+
+     cienaCesPbtDecapTnlIndex                 Unsigned32,
+
+     cienaCesPbtDecapTnlName                  DisplayString,
+
+     cienaCesPbtDecapTnlSourceBridgeIndex     Unsigned32,
+
+     cienaCesPbtDecapTnlSourceBridgeName      DisplayString,
+
+     cienaCesPbtDecapTnlGroupIndex            Unsigned32,
+
+     cienaCesPbtDecapTnlGroupName             DisplayString,
+
+     cienaCesPbtDecapTnlBvid                  Unsigned32,
+
+     cienaCesPbtDecapTnlPgId                  Unsigned32,
+
+     cienaCesPbtDecapTnlPortName              DisplayString,
+
+     cienaCesPbtDecapTnlFaults                Unsigned32,
+
+     cienaCesPbtDecapTnlOperState             CienaGlobalState,
+
+     cienaCesPbtDecapTnlFwdState              INTEGER,
+
+     cienaCesPbtDecapTnlPaired                TruthValue,
+
+     cienaCesPbtDecapTnlPairIndex             INTEGER,
+
+     cienaCesPbtDecapTnlPairOperState         CienaGlobalState,
+
+     cienaCesPbtDecapTnlResolvedCosPolicy     INTEGER,
+
+     cienaCesPbtDecapTnlResolvedCosMapIndex   Unsigned32,
+
+     cienaCesPbtDecapTnlResolvedCosMapName    DisplayString,
+
+     cienaCesPbtDecapTnlCfmConfigured         TruthValue,
+
+     cienaCesPbtDecapTnlPairedEncapIndex      Unsigned32,
+
+     cienaCesPbtDecapTnlPairedEncapName       DisplayString
+
+   }
+
+
+
+ cienaCesPbtDecapTnlIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  not-accessible
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the unique index in the PBB-TE decap tunnel table."
+
+     ::= { cienaCesPbtDecapTnlEntry 1 }
+
+  
+
+ cienaCesPbtDecapTnlName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE decap tunnel name. "
+
+     ::= { cienaCesPbtDecapTnlEntry 2 }
+
+  
+
+ cienaCesPbtDecapTnlSourceBridgeIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only 
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the source bridge index of the PBB-TE decap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 3 }
+
+  
+
+ cienaCesPbtDecapTnlSourceBridgeName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the source bridge name of the PBB-TE decap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 4 }
+
+  
+
+ cienaCesPbtDecapTnlGroupIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the index of the group to which this PBB-TE decap tunnel belongs."
+
+     ::= { cienaCesPbtDecapTnlEntry 5 }
+
+  
+
+ cienaCesPbtDecapTnlGroupName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the name of the group to which this PBB-TE decap tunnel belongs. "
+
+     ::= { cienaCesPbtDecapTnlEntry 6 }
+
+  
+
+ cienaCesPbtDecapTnlBvid OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the B-VID value of the PBB-TE decap tunnel. A group of VIDs
+
+ 	 	is reserved for PBB-TE."
+
+     ::= { cienaCesPbtDecapTnlEntry 7 }
+
+  
+
+ cienaCesPbtDecapTnlPgId OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the port group ID (PGID) of the PBB-TE decap tunnel. 
+
+        The PGID is a logical identifier for a logical port."
+
+     ::= { cienaCesPbtDecapTnlEntry 8 }
+
+  
+
+ cienaCesPbtDecapTnlPortName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the port name of the PBB-TE decap tunnel.
+
+        A port name is in the format <SlotNumber>/<PortNumber>. SlotNumber 
+
+        represents the module slot where the port resides. For single module devices,
+
+        the SlotNumber is always 1. PortNumber represents the port's location 
+
+        on the module. "
+
+     ::= { cienaCesPbtDecapTnlEntry 9 }
+
+  
+
+
+
+ cienaCesPbtDecapTnlFaults OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE decap tunnel faults. Each bit represents a fault. 
+
+	     Value 0 represents no fault. First LSB represents a port fault. Second LSB represents 
+	     a CFM fault."
+
+     ::= { cienaCesPbtDecapTnlEntry 10 }
+
+  
+
+ cienaCesPbtDecapTnlOperState OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the operational state of the PBB-TE decap tunnel.
+
+        The operational state of a decap tunnel is 'disabled' if its incoming port
+        is not operational or if it is paired with an encap tunnel and CFM either
+
+        detects a fault on that encap tunnel or if CFM has not yet discovered the 
+        remote MEP. "
+
+     ::= { cienaCesPbtDecapTnlEntry 11 }
+
+  
+
+ cienaCesPbtDecapTnlFwdState OBJECT-TYPE
+
+     SYNTAX      INTEGER {
+
+                    active(1),
+
+                    standby(2)
+
+                 }
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the forwarding state of the PBB-TE decap tunnel.
+
+        If this decap tunnel is paired with an encap tunnel the value of this object is
+
+        same as cienaCesPbtEncapTnlFwdState in the encap tunnel table."
+
+     ::= { cienaCesPbtDecapTnlEntry 12 }
+
+  
+
+ cienaCesPbtDecapTnlPaired OBJECT-TYPE
+
+     SYNTAX      TruthValue
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object indicates whether the PBB-TE decap tunnel is paired."
+
+     ::= { cienaCesPbtDecapTnlEntry 13 }
+
+  
+
+ cienaCesPbtDecapTnlPairIndex OBJECT-TYPE
+
+     SYNTAX      INTEGER 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE decap tunnel pair index."
+
+     ::= { cienaCesPbtDecapTnlEntry 14 }
+
+
+
+ cienaCesPbtDecapTnlPairOperState OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the operational state of the PBB-TE decap tunnel pair.
+
+        The operational state of the tunnel pair is 'down' if either the encap or 
+
+        decap tunnel or both are down."
+
+     ::= { cienaCesPbtDecapTnlEntry 15 }
+
+  
+
+ cienaCesPbtDecapTnlResolvedCosPolicy OBJECT-TYPE
+
+     SYNTAX      INTEGER {
+
+                        ignore(1),
+
+                        fixed(2),
+
+                        bvidPcpMap(3)
+
+                 }
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the resolved CoS policy of the PBB-TE decap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 16 }
+
+  
+
+ cienaCesPbtDecapTnlResolvedCosMapIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the resolved CoS map index of the PBB-TE decap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 17 }
+
+  
+
+ cienaCesPbtDecapTnlResolvedCosMapName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the resolved CoS map name of the PBB-TE decap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 18 }
+
+    
+
+ cienaCesPbtDecapTnlCfmConfigured OBJECT-TYPE
+
+     SYNTAX      TruthValue
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents whether CFM is configured on the PBB-TE decap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 19 }
+
+  
+
+ cienaCesPbtDecapTnlPairedEncapIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "If this decap tunnel belongs to a tunnel pair, this object represents 
+
+        the index of the corresponding encap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 20 }
+
+
+
+ cienaCesPbtDecapTnlPairedEncapName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "If this decap tunnel belongs to a tunnel pair, this object represents 
+
+        the name of the corresponding encap tunnel."
+
+     ::= { cienaCesPbtDecapTnlEntry 21 }
+
+  
+
+ --
+
+ -- PBB-TE remote host name to mac table
+
+ -- 
+
+ cienaCesPbtRemoteBridgeNameMacMapTable OBJECT-TYPE
+
+     SYNTAX     SEQUENCE OF CienaCesPbtRemoteBridgeNameMacMapEntry
+
+     MAX-ACCESS not-accessible
+
+     STATUS     current
+
+     DESCRIPTION
+
+        "The (conceptual) table listing the host names to MAC address mapping table."
+
+     ::= { cienaCesPbt 5 }
+
+     
+
+ cienaCesPbtRemoteBridgeNameMacMapEntry  OBJECT-TYPE
+
+     SYNTAX       CienaCesPbtRemoteBridgeNameMacMapEntry
+
+     MAX-ACCESS   not-accessible
+
+     STATUS       current
+
+     DESCRIPTION
+
+        "The host name to MAC address table entry indexed by cienaCesPbtRemoteBridgeNameMacMapIndex."
+
+     INDEX { cienaCesPbtRemoteBridgeNameMacMapIndex }
+
+     ::= { cienaCesPbtRemoteBridgeNameMacMapTable 1 }
+
+     
+
+ 
+
+ CienaCesPbtRemoteBridgeNameMacMapEntry ::=  SEQUENCE {
+
+     cienaCesPbtRemoteBridgeNameMacMapIndex                     INTEGER,
+
+     cienaCesPbtRemoteBridgeNameMacMapBridgeName                DisplayString,
+
+     cienaCesPbtRemoteBridgeNameMacMapMacAddr                   MacAddress,
+
+     cienaCesPbtRemoteBridgeNameMacMapUseCount				    Counter32
+
+    }
+
+ 
+
+ cienaCesPbtRemoteBridgeNameMacMapIndex OBJECT-TYPE
+
+     SYNTAX      INTEGER
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the unique index in the table."
+
+     ::= { cienaCesPbtRemoteBridgeNameMacMapEntry 1 }
+
+  
+
+ cienaCesPbtRemoteBridgeNameMacMapBridgeName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the host name of the Provider Edge (PE) device."
+
+     ::= { cienaCesPbtRemoteBridgeNameMacMapEntry 2 }
+
+  
+
+ cienaCesPbtRemoteBridgeNameMacMapMacAddr OBJECT-TYPE
+
+     SYNTAX      MacAddress
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the MAC address of the Provider Edge (PE) device."
+
+     ::= { cienaCesPbtRemoteBridgeNameMacMapEntry 3 }
+
+ 
+
+ cienaCesPbtRemoteBridgeNameMacMapUseCount OBJECT-TYPE
+
+     SYNTAX      Counter32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the total number of encap tunnels using this entry."
+
+     ::= { cienaCesPbtRemoteBridgeNameMacMapEntry 4 }
+
+ 
+
+ --
+
+ -- Local Bridge
+
+ --        
+
+ 
+
+ cienaCesPbtLocalBridgeNameMacMapTable OBJECT-TYPE
+
+     SYNTAX     SEQUENCE OF CienaCesPbtLocalBridgeNameMacMapEntry
+
+     MAX-ACCESS not-accessible
+
+     STATUS     current
+
+     DESCRIPTION
+
+            "The (conceptual) table listing the host names to MAC address mapping table."
+
+     ::= { cienaCesPbt 7}
+
+     
+
+ cienaCesPbtLocalBridgeNameMacMapEntry  OBJECT-TYPE
+
+     SYNTAX       CienaCesPbtLocalBridgeNameMacMapEntry
+
+     MAX-ACCESS   not-accessible
+
+     STATUS       current
+
+     DESCRIPTION
+
+             "The local bridge name to MAC address table entry indexed by cienaCesPbtLocalBridgeNameMacMapIndex."
+
+     INDEX { cienaCesPbtLocalBridgeNameMacMapIndex }
+
+     ::= { cienaCesPbtLocalBridgeNameMacMapTable 1 }
+
+     
+
+ CienaCesPbtLocalBridgeNameMacMapEntry ::=  SEQUENCE {
+
+     cienaCesPbtLocalBridgeNameMacMapIndex                     INTEGER,
+
+     cienaCesPbtLocalBridgeNameMacMapBridgeName                DisplayString,
+
+     cienaCesPbtLocalBridgeNameMacMapMacAddr                   MacAddress,
+
+     cienaCesPbtLocalBridgeNameMacMapUseCount				   Counter32
+
+ }
+
+ 
+
+ cienaCesPbtLocalBridgeNameMacMapIndex OBJECT-TYPE
+
+     SYNTAX      INTEGER
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the unique index in the table."
+
+     ::= { cienaCesPbtLocalBridgeNameMacMapEntry 1 }
+
+  
+
+ cienaCesPbtLocalBridgeNameMacMapBridgeName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the host name of the local bridge."
+
+     ::= { cienaCesPbtLocalBridgeNameMacMapEntry 2 }
+
+  
+
+ cienaCesPbtLocalBridgeNameMacMapMacAddr OBJECT-TYPE
+
+     SYNTAX      MacAddress
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the MAC address of the local bridge."
+
+     ::= { cienaCesPbtLocalBridgeNameMacMapEntry 3 }
+
+ 
+
+ cienaCesPbtLocalBridgeNameMacMapUseCount OBJECT-TYPE
+
+     SYNTAX      Counter32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the total number of encap tunnels using this entry."
+
+     ::= { cienaCesPbtLocalBridgeNameMacMapEntry 4 }
+
+ 
+
+ --
+
+ -- PBB-TE service table
+
+ --
+
+ cienaCesPbtServiceTable OBJECT-TYPE
+
+     SYNTAX     SEQUENCE OF CienaCesPbtServiceEntry
+
+     MAX-ACCESS not-accessible
+
+     STATUS     current
+
+     DESCRIPTION
+
+            "The (conceptual) table listing the PBB-TE services."
+
+    ::= { cienaCesPbt 8 }
+
+     
+
+ cienaCesPbtServiceEntry  OBJECT-TYPE
+
+     SYNTAX       CienaCesPbtServiceEntry
+
+     MAX-ACCESS   not-accessible
+
+     STATUS       current
+
+     DESCRIPTION
+
+             "The PBB-TE service table entry indexed by cienaCesPbtServiceIndex.
+
+             Each encap and decap tunnel pair is part of a tunnel group. An operational 
+
+             tunnel group must be associated with a PBB-TE service to be operational
+
+             and pass traffic. Also, the PBB-TE service is attached to a virtual switch 
+
+             as a logical interface. "
+
+     INDEX { cienaCesPbtServiceIndex }
+
+     ::= { cienaCesPbtServiceTable 1 }
+
+     
+
+ CienaCesPbtServiceEntry ::=  SEQUENCE {
+
+     cienaCesPbtServiceIndex                     Unsigned32,
+
+     cienaCesPbtServiceName                      DisplayString,
+
+     cienaCesPbtServiceOperStatus                CienaGlobalState,
+
+     cienaCesPbtServiceFloodContProfileId        INTEGER,
+
+     cienaCesPbtServiceFloodContProfileName      DisplayString,
+
+     cienaCesPbtServiceVsIndex                   Unsigned32,
+
+     cienaCesPbtServiceVsName                    DisplayString,
+
+     cienaCesPbtServiceTnlGroupIndex             Unsigned32,
+
+     cienaCesPbtServiceTnlGroupName              DisplayString,
+
+     cienaCesPbtServiceIngressIsId               Unsigned32,
+
+     cienaCesPbtServiceEgressIsId                Unsigned32,
+
+     cienaCesPbtServiceFixedEgressPcp            INTEGER,
+
+     cienaCesPbtServiceFrameCosPolicy            INTEGER,
+
+     cienaCesPbtServiceFrameCosMapIndex          INTEGER,
+
+     cienaCesPbtServiceFrameCosMapName           DisplayString,
+
+     cienaCesPbtServiceResolvedCosPolicy         INTEGER,
+
+     cienaCesPbtServiceResolvedCosProfileIndex   INTEGER,
+
+     cienaCesPbtServiceResolvedCosProfileName    DisplayString, 
+
+     cienaCesPbtServiceIngressMeterProfileId	 INTEGER,
+
+     cienaCesPbtServiceIngressMeterProfileName   DisplayString,
+
+     cienaCesPbtServiceIngressMeterPolicy	   	 INTEGER,
+
+     cienaCesPbtServiceEgressL2UserFrameTransform  OCTET STRING,
+
+     cienaCesPbtServiceIngressL2UserFrameTransform OCTET STRING
+
+ }
+
+ 
+
+ cienaCesPbtServiceIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  not-accessible
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the unique index in the PBB-TE service entry table."
+
+     ::= { cienaCesPbtServiceEntry 1 }
+
+  
+
+ cienaCesPbtServiceName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service name." 
+
+     ::= { cienaCesPbtServiceEntry 2 }
+
+  
+
+  cienaCesPbtServiceOperStatus OBJECT-TYPE
+
+     SYNTAX      CienaGlobalState
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the operational state of this PBB-TE service.
+
+        The operational state of the PBB-TE service depends on the operational 
+
+        state of the tunnel group to which it is bound."
+
+     ::= { cienaCesPbtServiceEntry 3 }
+
+    
+
+ cienaCesPbtServiceFloodContProfileId OBJECT-TYPE
+
+     SYNTAX      INTEGER 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the ingress flood container profile index of the PBB-TE service."
+
+     ::= { cienaCesPbtServiceEntry 4 }
+
+  
+
+ cienaCesPbtServiceFloodContProfileName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the ingress flood container profile name of the PBB-TE service."
+
+     ::= { cienaCesPbtServiceEntry 5 }
+
+  
+
+ cienaCesPbtServiceVsIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the virtual switch index to which this PBB-TE service is attached."
+
+     ::= { cienaCesPbtServiceEntry 6 }
+
+  
+
+ cienaCesPbtServiceVsName OBJECT-TYPE
+
+     SYNTAX      DisplayString 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the virtual switch name to which this PBB-TE service is attached."
+
+     ::= { cienaCesPbtServiceEntry 7 }
+
+  
+
+ cienaCesPbtServiceTnlGroupIndex OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service tunnel group index."
+
+     ::= { cienaCesPbtServiceEntry 8 }
+
+  
+
+ cienaCesPbtServiceTnlGroupName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service tunnel group name."
+
+     ::= { cienaCesPbtServiceEntry 9 }
+
+  
+
+ cienaCesPbtServiceIngressIsId OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service ingress I-SID.
+
+        The I-SID is a 24-bit field in the PBB-TE header that uniquely identifies
+
+        an S-VID of the Provider Bridge Network in the Provider Backbone Network."
+
+     ::= { cienaCesPbtServiceEntry 10 }
+
+  
+
+ cienaCesPbtServiceEgressIsId OBJECT-TYPE
+
+     SYNTAX      Unsigned32
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service egress I-SID.
+
+        The I-SID is a 24-bit field in the PBB-TE header that uniquely identifies 
+
+        an S-VID of the Provider Bridge Network in the Provider Backbone Network."
+
+     ::= { cienaCesPbtServiceEntry 11 }
+
+  
+
+ cienaCesPbtServiceFixedEgressPcp OBJECT-TYPE
+
+     SYNTAX      INTEGER
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service fixed egress PCP."
+
+     DEFVAL     {2}
+
+     ::= { cienaCesPbtServiceEntry 12 }
+
+  
+
+ cienaCesPbtServiceFrameCosPolicy OBJECT-TYPE
+
+     SYNTAX      INTEGER {
+
+                     fixed(1),
+
+                     isidPcPMap(2)
+
+                 }
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service frame CoS policy."
+
+     DEFVAL     {isidPcPMap}
+
+     ::= { cienaCesPbtServiceEntry 13 }
+
+  
+
+ cienaCesPbtServiceFrameCosMapIndex OBJECT-TYPE
+
+     SYNTAX      INTEGER 
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service frame CoS map index."
+
+     DEFVAL     {1}
+
+     ::= { cienaCesPbtServiceEntry 14 }
+
+  
+
+ cienaCesPbtServiceFrameCosMapName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service frame CoS map name."
+
+     ::= { cienaCesPbtServiceEntry 15 }
+
+  
+
+ cienaCesPbtServiceResolvedCosPolicy OBJECT-TYPE
+
+     SYNTAX      INTEGER {
+
+                        ignore(1),
+
+                        fixed(2),
+
+                        isidPcpMap(3)
+
+                 }
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service resolved CoS policy.
+
+        When the resolved CoS policy is 'ignore', this object derives the policy
+
+        from that of the associated decap tunnel."
+
+     DEFVAL     {isidPcpMap}
+
+     ::= { cienaCesPbtServiceEntry 16 }
+
+  
+
+ cienaCesPbtServiceResolvedCosProfileIndex OBJECT-TYPE
+
+     SYNTAX      INTEGER
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service resolved CoS profile index."
+
+     DEFVAL     {1}
+
+     ::= { cienaCesPbtServiceEntry 17 }
+
+  
+
+ cienaCesPbtServiceResolvedCosProfileName OBJECT-TYPE
+
+     SYNTAX      DisplayString
+
+     MAX-ACCESS  read-only
+
+     STATUS      current
+
+     DESCRIPTION
+
+        "This object represents the PBB-TE service resolved CoS profile name."
+
+     ::= { cienaCesPbtServiceEntry 18 }   
+
+  
+
+ cienaCesPbtServiceIngressMeterProfileId OBJECT-TYPE
+
+ 	SYNTAX   	INTEGER
+
+ 	MAX-ACCESS 	read-only
+
+ 	STATUS 		current
+
+ 	DESCRIPTION
+
+ 		"This object represents the PBB-TE service ingress meter profile ID."
+
+ 	::= {cienaCesPbtServiceEntry 19 }
+
+ 
+
+ cienaCesPbtServiceIngressMeterProfileName OBJECT-TYPE
+
+ 	SYNTAX 		DisplayString
+
+ 	MAX-ACCESS 	read-only
+
+ 	STATUS 		current
+
+ 	DESCRIPTION 
+
+ 		"This object represents the PBB-TE service ingress meter profile name."
+
+ 	::= {cienaCesPbtServiceEntry 20} 
+
+
+
+ cienaCesPbtServiceIngressMeterPolicy OBJECT-TYPE
+
+ 	SYNTAX INTEGER {  
+
+ 			unknown(0),  
+
+ 			nonhierarchical(1),
+
+ 			hierarchical(2)
+
+ 			}
+
+ 	MAX-ACCESS read-only
+
+ 	STATUS current
+
+ 	DESCRIPTION 
+
+ 			"This object represents the PBB-TE ingress meter policy."
+
+ 	::= { cienaCesPbtServiceEntry 21}			
+
+ 			
+
+  cienaCesPbtServiceEgressL2UserFrameTransform  OBJECT-TYPE
+
+ 	SYNTAX OCTET STRING
+
+ 	MAX-ACCESS read-only
+
+ 	STATUS current
+
+ 	DESCRIPTION 
+
+ 			"This object represents the PBB-TE service egress L2 user frame transform."
+
+ 	::= { cienaCesPbtServiceEntry 22}			
+
+   
+
+   cienaCesPbtServiceIngressL2UserFrameTransform  OBJECT-TYPE
+
+ 	SYNTAX OCTET STRING
+
+ 	MAX-ACCESS read-only
+
+ 	STATUS current
+
+ 	DESCRIPTION 
+
+ 			"This object represents the PBB-TE service ingress L2 user frame transform."
+
+ 	::= { cienaCesPbtServiceEntry 23}
+
+ 	
+
+  --
+
+  -- Notifications
+
+  --   
+
+
+
+  cienaCesPbtTunnelActivateNotification NOTIFICATION-TYPE
+
+     	OBJECTS  {                        
+
+     			 cienaGlobalSeverity,
+
+     			 cienaGlobalMacAddress,
+
+                 cienaCesPbtEncapTnlNotifIndex,
+
+                 cienaCesPbtEncapTnlName,
+
+                 cienaCesPbtTnlGroupIndex,
+
+                 cienaCesPbtTnlGroupName,
+
+                 cienaCesPbtEncapTnlFwdState,
+
+                 cienaCesPbtEncapTnlBvid
+
+                 }
+
+    	STATUS   current
+
+    	DESCRIPTION
+
+       	"This notification is sent when a PBB-TE tunnel of the given tunnel group 
+
+       	is activated. A tunnel is said to be activated when its forwarding 
+
+        state becomes enabled. To send this trap, the SNMP global trap state 
+
+        'cienaCesPbtFaultTrapState' needs to be set to enabled. This state is 
+        'enabled' by default. Variable bindings include: cienaGlobalSeverity, 
+        cienaGlobalMacAddress, cienaCesPbtEncapTnlNotifIndex, 
+        cienaCesPbtEncapTnlName, cienaCesPbtTnlGroupIndex, cienaCesPbtTnlGroupName, 
+        cienaCesPbtEncapTnlFwdState, and cienaCesPbtEncapTnlBvid."
+
+    ::= { cienaCesPbtMIBNotifications 1 }                               
+
+     
+
+
+
+  cienaCesPbtTunnelDeactivateNotification NOTIFICATION-TYPE
+
+     	OBJECTS  {        
+
+     			 cienaGlobalSeverity,  
+
+     			 cienaGlobalMacAddress,
+
+                 cienaCesPbtEncapTnlNotifIndex,
+
+                 cienaCesPbtEncapTnlName,
+
+                 cienaCesPbtTnlGroupIndex,
+
+                 cienaCesPbtTnlGroupName,
+
+                 cienaCesPbtEncapTnlFwdState,
+
+                 cienaCesPbtEncapTnlBvid
+
+                 }
+
+    	STATUS   current
+
+    	DESCRIPTION
+
+       	"This notification is sent when a PBB-TE tunnel of the given tunnel group 
+
+       	is deactivated. A tunnel is said to be deactivated when its forwarding 
+
+        state becomes disabled. To send this trap, the SNMP global trap state 
+
+        'cienaCesPbtFaultTrapState' needs to be set to enabled. This state is 'enabled' 
+        by default. Variable bindings include: cienaGlobalSeverity, cienaGlobalMacAddress,
+        cienaCesPbtEncapTnlNotifIndex, cienaCesPbtEncapTnlName, cienaCesPbtTnlGroupIndex, 
+        cienaCesPbtTnlGroupName, cienaCesPbtEncapTnlFwdState, and cienaCesPbtEncapTnlBvid."
+
+    ::= { cienaCesPbtMIBNotifications 2 }                               
+
+          
+
+   cienaCesPbtTunnelReversionNotification NOTIFICATION-TYPE
+
+     	OBJECTS  {      
+
+     	     	 cienaGlobalSeverity,  
+
+     			 cienaGlobalMacAddress,
+
+                 cienaCesPbtTnlGroupIndex,
+
+                 cienaCesPbtTnlGroupName,
+
+                 cienaCesPbtEncapTnlReversionToPairIndex,
+
+                 cienaCesPbtEncapTnlReversionFromPairIndex
+
+                 }
+
+    	STATUS   current
+
+    	DESCRIPTION
+
+       	"Upon failure of the primary tunnel, traffic is moved over to the backup 
+
+       	 tunnel at the tunnel ingress. Tunnel reversion signifies the restoration of
+
+       	 traffic from this backup tunnel (now active) to the primary (now standby)
+
+       	 after the primary tunnel is restored. This notification is generated when
+       	 this reversion occurs. To send this trap, the SNMP global trap state
+       	 'cienaCesPbtFaultTrapState' needs to be set to enabled. This state is 'enabled'
+         by default. Variable bindings include: cienaGlobalSeverity, cienaGlobalMacAddress, 
+         cienaCesPbtTnlGroupIndex, cienaCesPbtTnlGroupName, 
+         cienaCesPbtEncapTnlReversionToPairIndex, and cienaCesPbtEncapTnlReversionFromPairIndex."
+
+    ::= { cienaCesPbtMIBNotifications 3 }                               
+
+                
+
+ --
+
+ -- Groups definition
+
+ --   
+
+ pbtGlobalConfigGroup    OBJECT-GROUP
+
+       OBJECTS { cienaCesPbtBridgeMac,
+
+       			 cienaCesPbtServiceTagEtype, 
+
+       			 cienaCesPbtTunnelTagEtype, 
+
+                 cienaCesPbtTunnelReversionState, 
+
+                 cienaCesPbtTunnelReversionHoldTime,
+
+                 cienaCesPbtTunnelSwitchOverHoldTime }
+
+       STATUS  current
+
+       DESCRIPTION
+
+               "A collection of objects providing information
+
+               about applicable global PBB-TE configuration."
+
+       ::= { cienaCesPbtMIBGroups 1 }
+
+
+
+  pbtNotificationGroups NOTIFICATION-GROUP
+
+  	   NOTIFICATIONS { 
+
+                       cienaCesPbtTunnelActivateNotification,
+
+                       cienaCesPbtTunnelDeactivateNotification,
+
+                       cienaCesPbtTunnelReversionNotification}
+
+       STATUS        current
+
+       DESCRIPTION
+
+            "Contains notifications supported for PBB-TE."
+
+       ::= { cienaCesPbtMIBGroups 2 }
+
+   
+
+END
+

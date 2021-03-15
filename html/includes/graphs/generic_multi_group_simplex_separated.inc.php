@@ -48,7 +48,7 @@ $rrd_multi = array();
 $i = 1;
 
 
-foreach($groups AS $id => $group)
+foreach($groups as $id => $group)
 {
 
  foreach ($group['list'] as $rrd)
@@ -59,7 +59,7 @@ foreach($groups AS $id => $group)
   $ds = $rrd['ds']."_".$i;
   $orig_ds = $ds;
 
-  $rrd_options .= " DEF:".$ds."=".$rrd['filename'].":".$rrd['ds'].":AVERAGE ";
+  $rrd_options .= " DEF:".$ds."=".rrdtool_escape($rrd['filename']).":".$rrd['ds'].":AVERAGE ";
 
   # if we've been passed a multiplier we must make a CDEF based on it!
   if (is_numeric($multiplier) || is_numeric($divider) || is_numeric($divisor))

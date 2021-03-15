@@ -1,0 +1,3718 @@
+RAD-SubRtr-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       IANAipRouteProtocol     FROM  IANA-RTPROTO-MIB
+       InterfaceIndex, ifAlias, ifIndex, 
+       InterfaceIndexOrZero     FROM  IF-MIB
+       InetAddressType, InetAddress, InetAddressPrefixLength, 
+       InetAutonomousSystemNumber, InetAddressIPv4     FROM  INET-ADDRESS-MIB
+       VlanIndex     FROM  Q-BRIDGE-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Integer32, IpAddress, Gauge32, 
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE, Counter32, Counter64     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, DisplayString, RowStatus, 
+       RowPointer     FROM  SNMPv2-TC
+       rad, rtrBridge     FROM  RAD-SMI-MIB
+       radSysRtrEvents, alarmEventLogSourceName, alarmEventLogAlarmOrEventId, 
+       alarmEventLogDescription, alarmEventLogSeverity, alarmEventLogDateAndTime, 
+       alarmEventReason     FROM  RAD-GEN-MIB
+       isdnSignalingEntry     FROM  ISDN-MIB
+       TruthValue     FROM  SNMPv2-TC
+       sysName     FROM  SNMPv2-MIB
+       bfdSessXDescription     FROM  RAD-GEN-MIB
+       ipIfStatsEntry, ipSystemStatsEntry     FROM  IP-MIB
+       bfdSessDstAddr     FROM  BFD-STD-MIB-R
+       IANAtunnelType     FROM  IANAifType-MIB; 
+
+    radRouter MODULE-IDENTITY
+        LAST-UPDATED "201610131311Z"  -- October 13, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Router MIB."
+    ::= { rad 11 }
+
+
+-- ************************************************
+-- Interfaces Group
+-- Link Layer (layer 2) Configuration MIB
+-- ************************************************
+
+-- The following MIB group is used by the Management/Configuration
+-- station to configure the device interfaces,
+-- physicals as well as virtuals.
+-- Each entry in the rtrDynamicIfConfigTable should have one of
+-- the extended rtType.
+-- It will also have a corresponding entry in the standard iftable.
+-- The implementation uses these inputs to build the interface
+-- layer of the device. The output is reflected in the
+-- ifTable and ifStackTable which are implementation dependent.
+
+rtrEvents  OBJECT IDENTIFIER ::= {radRouter 0 }
+
+-- Protocol Allocation Memory Error
+systemTraceMsgProtoMemAllocErr  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, rtrInformationProtMemAllocStatus, rtrInformationProtMemAllocInfo } 
+      STATUS  current
+      DESCRIPTION
+      "Protocol Allocation Memory Error
+      "
+      ::= { rtrEvents  1 }
+
+rtrInterfaces  OBJECT IDENTIFIER  ::= { radRouter 1 }
+
+RtrIfConfigTYPE ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+           "This type defines what type of sub-layer is used
+            in each entr of rtrDynamicIfConfigTable.
+            It should contain values from IANAifType
+            type for standard sub-layer, and values (starting from 999
+            decimal) for private sub-layers.
+            The values of the ifType field in ifTable should be taken
+            from IANAifType only."
+    SYNTAX      INTEGER
+           {
+            other(1),
+            ethernetLan(6),          -- From IANAifType
+            iso88023Csmacd(7),
+            tokenRingLan(9),
+            fddi(15),
+            basicISDN(20),
+            primaryISDN(21),
+            propPointToPoint(22),    -- rndWAN
+            slip(28),
+            ppp(23),                 -- From IANAifType
+            frameRelay(32),
+            rs232(33),
+            atm(37),
+            x25ple(40),
+            v35(45),
+            fastEther(62),           -- Fast Ethernet (100BaseT)
+            fastEtherFX(69),         -- Fast Ethernet (100BaseFX)
+            virtualNet(500),
+
+            cod(1001),               -- Rad/Rnd private
+            backUp(1002),
+            dialUp(1004),
+            b1isdn(1010),
+            b2isdn(1011),
+            ipBcst(1020),
+            ipPtp(1021),
+            ipxRaw(1022),
+            ipxEtType(1023),
+            ipxLlcSap(1024),
+            ipxLlcSnap(1025),
+            ipxPtp(1026),
+            brgUnder(1027),
+            wanDriver(1060),
+            ethernetDriver(1061),
+            tokenRingDriver(1062),
+            fddiDriver     (1064),   -- RAD private FDDI driver
+            virtualLan(1080),
+            unknown(1100)
+
+           }
+
+
+
+
+AdminDistance ::= TEXTUAL-CONVENTION
+  STATUS       current
+  DESCRIPTION
+       "The adminstrative distance used in prioritizing routes from
+        different sources when selecting active routes in  RTM.
+
+        The active route is chosen from those available routes which
+        have the lowest associated administrative distance."
+  SYNTAX       Integer32 (0..255)
+
+
+
+  RtrSafi ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "The representation of a Router Safi (Sub-Address Family Identifier)"
+    SYNTAX      INTEGER {
+                  unicast(1),
+                  multicast(2),
+                  both(3),
+                  mplsBgpVpn(128)
+                }
+
+
+
+InfoSourceDest ::= TEXTUAL-CONVENTION
+      STATUS      current
+      DESCRIPTION
+           "A source of, or destination for, routing information.  These
+           values are used when redistributing routing information."
+      SYNTAX     INTEGER {
+                  infoSourceAll(0),              -- all values excluding connected
+                  infoSourceAllInclConnected(1), -- all values including connected
+                  infoSourceOther(65536),        -- not specified
+                  infoSourceConnected(131072),   -- directly connected network
+                  infoSourceStatic(196608),      -- static route
+                  infoSourceIcmp(262144),        -- ICMP redirect
+                  infoSourceEgp(327680),         -- Exterior Gateway Protocol
+                  infoSourceGgp(393216),         -- Gateway-Gateway Protocol
+                  infoSourceHello(458752),       -- FuzzBall HelloSpeak
+                  infoSourceRip(524288),         -- RIP
+                  infoSourceIsis(589824),        -- IS-IS
+                  infoSourceEsis(655360),        -- ISO 9542
+                  infoSourceIgrp(720896),        -- IGRP
+                  infoSourceBbnSpfIgp(786432),   -- BBN SPF IGP
+                  infoSourceOspf(851968),        -- OSPF
+                  infoSourceBgp(917504),         -- BGP
+                  infoSourceIdpr(983040),        -- InterDomain Policy Routing
+                  infoSourceEigrp(1048576),      -- EIGRP
+                  infoSourceDvmrp(1114112),      -- DVMRP
+                  infoSourceDdrp(1179648)        -- DDRP
+                }
+
+rtrConfigIfTable  OBJECT-TYPE     
+       SYNTAX  SEQUENCE OF RtrConfigIfEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Table of configured interfaces." 
+      ::= { rtrInterfaces 1 }
+
+rtrConfigIfEntry  OBJECT-TYPE     
+       SYNTAX  RtrConfigIfEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Each entry defines a configured interface." 
+       INDEX { rtrConfigIfIndex }
+      ::= { rtrConfigIfTable 1 }
+
+
+RtrConfigIfEntry ::= SEQUENCE {
+       rtrConfigIfIndex
+           InterfaceIndex,
+       rtrConfigIfType
+           RtrIfConfigTYPE,
+       rtrConfigIfName
+           DisplayString,
+       rtrConfigIfStatus
+           RowStatus
+       }
+
+rtrConfigIfIndex   OBJECT-TYPE
+       SYNTAX  InterfaceIndex
+       MAX-ACCESS  read-only
+       STATUS  current
+       DESCRIPTION
+           "This variable uniquely identifies the interface. 
+            It is used as a cross reference in other system tables"
+      ::= { rtrConfigIfEntry 1 }
+
+rtrConfigIfType   OBJECT-TYPE
+       SYNTAX  RtrIfConfigTYPE
+       MAX-ACCESS  read-create
+       STATUS  current
+       DESCRIPTION
+           "This variable identifies the type of the specific 
+            entry in the rtrDynamicIfConfigTable.
+            This field is writable only at creation time 
+            (i.e., when value of status is underCreation)."
+       ::= { rtrConfigIfEntry 2 }
+
+rtrConfigIfName   OBJECT-TYPE
+       SYNTAX  DisplayString
+       MAX-ACCESS  read-create
+       STATUS  current
+       DESCRIPTION
+           "This variable provides a logical name to a specific entry in     
+             rtrConfigIfTable. It is also used in identifying the Driver
+             interfaces."
+      ::= { rtrConfigIfEntry 3 }
+
+rtrConfigIfStatus  OBJECT-TYPE
+       SYNTAX  RowStatus
+       MAX-ACCESS  read-create
+       STATUS  current
+       DESCRIPTION
+          "The status of the ConfigEntry.  The choices are those 
+           defined in SNMPv2-TC. Only: active, createAndWait, and destroy
+           will be used.
+           active - The conceptual row is available for use by the managed device.
+           createAndWait - A new instance of a conceptual row is desired, but
+                           not to have it available for use by the managed device.
+           destroy - Delete all instances associated with an existing conceptual row."     
+       ::= { rtrConfigIfEntry 4 }
+
+
+-- Router Interface Configuration Table
+
+rtrIfCfgTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF RtrIfCfgEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Router Interface Configuration Table."
+      ::= { rtrInterfaces 2 }
+
+rtrIfCfgEntry  OBJECT-TYPE
+       SYNTAX  RtrIfCfgEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "An entry in the Router Interface Configuration Table."
+       INDEX { rtrIfCfgIndex, rtrIfCfgIpAddress }
+      ::= { rtrIfCfgTable 1 }
+
+RtrIfCfgEntry ::= SEQUENCE {
+    rtrIfCfgIndex                    Integer32,
+    rtrIfCfgIpAddress                IpAddress,
+    rtrIfCfgRowStatus                RowStatus,
+    rtrIfCfgIpMask                   IpAddress,
+    rtrIfCfgIfIndex                  Integer32,
+    rtrIfCfgType                     INTEGER,
+    rtrIfCfgVlanId                   VlanIndex,
+    rtrIfCfgMtu                      Integer32,
+    rtrIfCfgName                     SnmpAdminString,
+    rtrIfCfgConnectionPointer        RowPointer,
+    rtrIfCfgVlanTagging              INTEGER,
+    rtrIfCfgVlanPriority             Unsigned32,
+    rtrIfCfgParams                   Unsigned32,
+    rtrIfCfgMngAccess                INTEGER,
+    rtrIfCfgLlcSnapEncaps            INTEGER,
+    rtrIfCfgDhcp                     INTEGER,
+    rtrIfCfgIfIpAddressType          InetAddressType,
+    rtrIfCfgIfIpAddress              InetAddress,
+    rtrIfCfgICMPUnreachable          INTEGER,
+    rtrIfCfgIpv6AutoConfig           INTEGER,
+    rtrIfCfgDhcpRelay                INTEGER,
+    rtrIfCfgDhcpv6ClientAdminStatus  INTEGER,
+    rtrIfCfgIpForwarding             INTEGER 
+ }
+
+rtrIfCfgIndex OBJECT-TYPE
+       SYNTAX Integer32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+       "This object indicates the Router Interface Index.
+        (In some cases it will be equal to the Router Interface ifIndex)."
+       ::= { rtrIfCfgEntry 1 }
+
+rtrIfCfgIpAddress OBJECT-TYPE
+       SYNTAX IpAddress
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+       "IP Address of the Router Interface. - original description - deprecated.
+       For new applications, this object will be dummy index with constant value 0.0.0.0 .
+       "
+       ::= { rtrIfCfgEntry 2 }
+
+rtrIfCfgRowStatus OBJECT-TYPE
+      SYNTAX  RowStatus
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object enables the user to
+       create/delete entries of this table."
+      ::= { rtrIfCfgEntry 3 }
+
+rtrIfCfgIpMask OBJECT-TYPE
+       SYNTAX IpAddress
+       MAX-ACCESS read-create
+       STATUS deprecated
+       DESCRIPTION
+           "IP Mask Address Router Interface."
+       ::= { rtrIfCfgEntry 4 }
+
+rtrIfCfgIfIndex OBJECT-TYPE
+       SYNTAX Integer32
+       MAX-ACCESS read-create
+       STATUS current
+       DESCRIPTION
+       "ifIndex of the device interface connected
+        to this Router Interface."
+       ::= { rtrIfCfgEntry 5 }
+
+rtrIfCfgType OBJECT-TYPE
+       SYNTAX INTEGER {
+           notApplicable(1),
+           atm     (2),
+           lis     (3),
+       ethernet(4),
+       loopback(5),
+       unmunbered(6)
+       }
+       MAX-ACCESS read-create
+       STATUS current
+       DESCRIPTION
+       "The Router Interface Type. By default it shall be notApplicabe(1).
+       atm       - ATM router interface
+       lis       - Logical IP Subnet router interface.
+       ethernet  - Ethernet router interface.
+       loopback  - indicates whether the interface is a loopback
+                   interface or not.
+       unmunbered - indicates whether the interface is unnumbered
+                   interface or not.
+       "
+       ::= { rtrIfCfgEntry 6 }
+
+rtrIfCfgVlanId OBJECT-TYPE
+       SYNTAX      VlanIndex
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "The VLAN ID assigned to Tagged frames transmitted
+        from this Router Interface.
+        The value inserted should be a defined VLAN."
+       ::= { rtrIfCfgEntry 7 }
+
+rtrIfCfgMtu OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "The size of the largest packet which can be sent/received
+            on the interface, specified in octets.  For interfaces that
+            are used for transmitting network datagrams, this is the
+            size of the largest network datagram that can be sent on the
+            interface."
+    ::= { rtrIfCfgEntry 8}
+
+rtrIfCfgName OBJECT-TYPE
+       SYNTAX      SnmpAdminString
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "The Router Interface Name."
+       ::= { rtrIfCfgEntry 9 }
+
+rtrIfCfgConnectionPointer OBJECT-TYPE
+       SYNTAX      RowPointer
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This parameter represents the entity that is connected
+        to this Router Interface.
+
+        The value of this parameter is a pointer to an existing row of a table,
+        where the entity connected to this Router Interface is defined.
+
+        Examples:
+
+        In case of an interface (from 2863.ifTable):
+            points to 'ifEntry' of corresponding row
+            = <ifEntry OID>.<ifIndex>
+
+        In case of a VPI/VCI (from 2515.atmVclTable):
+            points to 'atmVclEntry' of corresponding row
+            = <atmVclEntry OID>.<ATM>.VPI.VCI
+
+        In case of a Pseudo-Wire (from pwTable):
+            points to 'pwEntry' of corresponding row
+            = <pwEntry OID>.<pwIndex>
+
+        In Case of Access Port of Ethernet Ring (RFER) (from ethIfRingTable):
+            points to 'ethIfRingEntry' of corresponding row
+            = <ethIfRingEntry OID>.<ethIfRingIdx> "
+
+       ::= { rtrIfCfgEntry 10 }
+
+rtrIfCfgVlanTagging OBJECT-TYPE
+       SYNTAX      INTEGER
+       {
+       notApplicable    (1),
+       untag            (2),
+       tag              (3)
+       }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "The VLAN Tagging."
+       ::= { rtrIfCfgEntry 11 }
+
+rtrIfCfgVlanPriority OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "The VLAN Priority."
+       ::= { rtrIfCfgEntry 12 }
+
+rtrIfCfgParams OBJECT-TYPE
+       SYNTAX      Unsigned32
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This object represents one or more parameters of the Router Interface.
+       Each group of bits (one or more bits) represents a specific parameter
+       and its possible values.
+       This object's mapping and interpretation will be specified in each
+       device's specification documents."
+       ::= { rtrIfCfgEntry 13 }
+
+rtrIfCfgMngAccess OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable   (1),
+        disable         (2),
+        enable          (3),
+        pingAllow       (4)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object represents Management Access availability via
+            this Router Interface.
+            disable     (2) - the access is disabled
+            enable      (3) - the access is enabled
+            pingAllow   (4) - the ping access only is allowed."
+    ::= { rtrIfCfgEntry 14 }
+
+rtrIfCfgLlcSnapEncaps OBJECT-TYPE
+       SYNTAX      INTEGER
+       {
+       notApplicable    (1),
+       bridgedPdu       (2),
+       routedPdu        (3)
+       }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This object represents the LLC/SNAP Encapsulation."
+       ::= { rtrIfCfgEntry 15 }
+
+rtrIfCfgDhcp OBJECT-TYPE
+       SYNTAX      INTEGER
+       {
+       notApplicable    (1),
+       disable          (2),
+       enable           (3)
+       }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This object indicates whether DHCP is enabled for this Router Interface."
+       ::= { rtrIfCfgEntry 16 }
+
+rtrIfCfgIfIpAddressType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS  read-create
+       STATUS      deprecated
+       DESCRIPTION
+       "This object indicates IP Address Type (v4, v6) of rtrIfIpAddress
+        for this Router Interface."
+       ::= { rtrIfCfgEntry 17 }
+
+rtrIfCfgIfIpAddress  OBJECT-TYPE
+       SYNTAX      InetAddress
+       MAX-ACCESS  read-create
+       STATUS      deprecated
+       DESCRIPTION
+       "This object indicates IP address of this Router Interface."
+       ::= { rtrIfCfgEntry 18 }
+
+rtrIfCfgICMPUnreachable OBJECT-TYPE
+       SYNTAX      INTEGER
+       {
+       disable          (2),
+       enable           (3)
+       }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This object indicates whether sending ICMP Unreachable message
+       is enabled for this Router Interface."
+       ::= { rtrIfCfgEntry 19 }
+
+rtrIfCfgIpv6AutoConfig OBJECT-TYPE
+    SYNTAX      INTEGER {
+        disable         (2),
+        enable          (3)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object determines whether IPv6 auto-configuration
+            is enabled for this Router Interface.
+            disable     (2) - IPv6 auto-configuration is disabled
+            enable      (3) - IPv6 auto-configuration is enabled
+            "
+    ::= { rtrIfCfgEntry 20 }
+
+--  ::= { rtrIfCfgEntry 24 } !!! DO NOT USE THIS NODE !!! it is used in Private_Device_MIBs: rtrIfCfgAddressPrefixLen
+--  ::= { rtrIfCfgEntry 25 } !!! DO NOT USE THIS NODE !!! it is used in Private_Device_MIBs: rtrIfCfgLinkLocalAddress
+
+rtrIfCfgDhcpRelay OBJECT-TYPE
+       SYNTAX      INTEGER
+       {
+       disable  (2),
+       enable   (3)
+       }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This object indicates whether DHCP Relay is enabled
+        for this Router Interface."
+       DEFVAL  { disable }
+       ::= { rtrIfCfgEntry 26 }
+
+rtrIfCfgDhcpv6ClientAdminStatus OBJECT-TYPE
+       SYNTAX      INTEGER
+       {
+       disable          (2),
+       enable           (3)
+       }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This object defines the administrative status of DHCPv6 client for
+       Router Interface."
+       DEFVAL  { disable }
+       ::= { rtrIfCfgEntry 27 }
+       
+rtrIfCfgIpForwarding OBJECT-TYPE
+       SYNTAX      INTEGER
+       {
+       disable      (2),
+       enable       (3)
+       }
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+       "This object defines whether received traffic into specific interface
+        is forwarded to other Router Interfaces or not."
+       DEFVAL  { enable }
+       ::= { rtrIfCfgEntry 28 }
+       
+       
+
+rtrStaticRouteTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF RtrStaticRouteEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "This entity's IP Routing table."
+       REFERENCE
+              "RFC 1213 Section 6.6, The IP Group"
+       ::= { rtrInterfaces 3 }
+
+rtrStaticRouteEntry OBJECT-TYPE
+       SYNTAX     RtrStaticRouteEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "A particular route to a particular destination, under a
+               particular policy (as reflected in the
+               rtrStaticRoutePolicy object).
+
+               Dynamically created rows will survive an agent reboot.
+
+               Implementers need to be aware that if the total number
+               of elements (octets or sub-identifiers) in
+               rtrStaticRouteDest, rtrStaticRoutePolicy, and
+               rtrStaticRouteNextHop exceeds 111, then OIDs of column
+               instances in this table will have more than 128 sub-
+               identifiers and cannot be accessed using SNMPv1,
+               SNMPv2c, or SNMPv3."
+       INDEX {
+           rtrStaticRouteDestType,
+           rtrStaticRouteDest,
+           rtrStaticRoutePfxLen,
+           rtrStaticRoutePolicy,
+           rtrStaticRouteNextHopType,
+           rtrStaticRouteNextHop
+           }
+       ::= { rtrStaticRouteTable 1 }
+
+RtrStaticRouteEntry ::= SEQUENCE {
+    rtrStaticRouteDestType     InetAddressType,
+    rtrStaticRouteDest         InetAddress,
+    rtrStaticRoutePfxLen       InetAddressPrefixLength,
+    rtrStaticRoutePolicy       OBJECT IDENTIFIER,
+    rtrStaticRouteNextHopType  InetAddressType,
+    rtrStaticRouteNextHop      InetAddress,
+    rtrStaticRouteRtRIfIndex   Integer32,
+    rtrStaticRouteType         INTEGER,
+    rtrStaticRouteProto        IANAipRouteProtocol,
+    rtrStaticRouteAge          Gauge32,
+    rtrStaticRouteNextHopAS    InetAutonomousSystemNumber,
+    rtrStaticRouteMetric1      Integer32,
+    rtrStaticRouteMetric2      Integer32,
+    rtrStaticRouteMetric3      Integer32,
+    rtrStaticRouteMetric4      Integer32,
+    rtrStaticRouteMetric5      Integer32,
+    rtrStaticRouteStatus       RowStatus,
+    rtrStaticRouteNoInstall    TruthValue 
+ }
+
+   rtrStaticRouteDestType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "The type of the rtrStaticRouteDest address, as defined
+               in the InetAddress MIB.
+
+               Only those address types that may appear in an actual
+               routing table are allowed as values of this object."
+       REFERENCE "RFC 4001"
+       ::= { rtrStaticRouteEntry 1 }
+
+   rtrStaticRouteDest OBJECT-TYPE
+       SYNTAX     InetAddress
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "The destination IP address of this route.
+
+               The type of this address is determined by the value of
+               the rtrStaticRouteDestType object.
+
+               The values for the index objects rtrStaticRouteDest and
+               rtrStaticRoutePfxLen must be consistent.  When the value
+               of rtrStaticRouteDest (excluding the zone index, if one
+               is present) is x, then the bitwise logical-AND
+               of x with the value of the mask formed from the
+               corresponding index object rtrStaticRoutePfxLen MUST be
+               equal to x.  If not, then the index pair is not
+               consistent and an inconsistentName error must be
+               returned on SET or CREATE requests."
+
+       ::= { rtrStaticRouteEntry 2 }
+
+   rtrStaticRoutePfxLen OBJECT-TYPE
+       SYNTAX     InetAddressPrefixLength
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "Indicates the number of leading one bits that form the
+               mask to be logical-ANDed with the destination address
+               before being compared to the value in the
+               rtrStaticRouteDest field.
+
+               The values for the index objects rtrStaticRouteDest and
+               rtrStaticRoutePfxLen must be consistent.  When the value
+               of rtrStaticRouteDest (excluding the zone index, if one
+               is present) is x, then the bitwise logical-AND
+               of x with the value of the mask formed from the
+               corresponding index object rtrStaticRoutePfxLen MUST be
+               equal to x.  If not, then the index pair is not
+               consistent and an inconsistentName error must be
+               returned on SET or CREATE requests."
+
+       ::= { rtrStaticRouteEntry 3 }
+
+   rtrStaticRoutePolicy OBJECT-TYPE
+       SYNTAX     OBJECT IDENTIFIER
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "This object is an opaque object without any defined
+               semantics.  Its purpose is to serve as an additional
+               index that may delineate between multiple entries to
+               the same destination.  The value { 0 0 } shall be used
+               as the default value for this object."
+       ::= { rtrStaticRouteEntry 4 }
+
+   rtrStaticRouteNextHopType OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "The type of the rtrStaticRouteNextHop address, as
+               defined in the InetAddress MIB.
+
+               Value should be set to unknown(0) for non-remote
+               routes.
+
+               Only those address types that may appear in an actual
+               routing table are allowed as values of this object."
+       REFERENCE "RFC 4001"
+       ::= { rtrStaticRouteEntry 5 }
+
+   rtrStaticRouteNextHop OBJECT-TYPE
+       SYNTAX     InetAddress
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+              "On remote routes, the address of the next system en
+               route.  For non-remote routes, a zero length string.
+
+               The type of this address is determined by the value of
+               the rtrStaticRouteNextHopType object."
+       ::= { rtrStaticRouteEntry 6 }
+
+
+   rtrStaticRouteRtRIfIndex OBJECT-TYPE
+       SYNTAX     Integer32
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "This object is the Router IP Interface corresponding to
+          rtrIfCfgEntry.rtrIfCfgIndex in opposite to the RFC4292
+          that define the object inetCidrRouteIfIndex - which is the ifIndex
+          of the interface"
+       ::= { rtrStaticRouteEntry 7 }
+
+   rtrStaticRouteType OBJECT-TYPE
+       SYNTAX     INTEGER {
+                   other    (1), -- not specified by this MIB
+                   reject   (2), -- route that discards traffic and
+                                 --   returns ICMP notification
+                   local    (3), -- local interface
+                   remote   (4), -- remote destination
+                   blackhole(5)  -- route that discards traffic
+                                 --   silently
+                }
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+              "The static Routing table shall have the type of route
+          equal to remote(4) by default and cannot be changed by the
+          user.
+          Note that the other values are specified in order
+          to keep consistency with the RFC4292."
+    DEFVAL { 4 }
+       ::= { rtrStaticRouteEntry 8 }
+
+   rtrStaticRouteProto OBJECT-TYPE
+       SYNTAX     IANAipRouteProtocol
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+              "The routing mechanism via which this route was learned.
+               Inclusion of values for gateway routing protocols is
+               not intended to imply that hosts should support those
+               protocols.
+           The default value shall be netmgmt(3) corresponding to
+           static route"
+       DEFVAL { 3 }
+       ::= { rtrStaticRouteEntry 9 }
+
+   rtrStaticRouteAge OBJECT-TYPE
+       SYNTAX     Gauge32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+              "The number of seconds since this route was last updated
+               or otherwise determined to be correct.  Note that no
+               semantics of 'too old' can be implied, except through
+               knowledge of the routing protocol by which the route
+               was learned."
+       ::= { rtrStaticRouteEntry 10 }
+
+   rtrStaticRouteNextHopAS OBJECT-TYPE
+       SYNTAX     InetAutonomousSystemNumber
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "The Autonomous System Number of the Next Hop.  The
+               semantics of this object are determined by the routing-
+               protocol specified in the route's rtrStaticRouteProto
+               value.  When this object is unknown or not relevant, its
+               value should be set to zero."
+       DEFVAL { 0 }
+       ::= { rtrStaticRouteEntry 11 }
+
+   rtrStaticRouteMetric1 OBJECT-TYPE
+       SYNTAX     Integer32
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "The primary routing metric for this route.  The
+               semantics of this metric are determined by the routing-
+               protocol specified in the route's rtrStaticRouteProto
+               value.  If this metric is not used, its value should be
+               set to -1."
+       DEFVAL { -1 }
+       ::= { rtrStaticRouteEntry 12 }
+
+   rtrStaticRouteMetric2 OBJECT-TYPE
+       SYNTAX     Integer32
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "An alternate routing metric for this route.  The
+               semantics of this metric are determined by the routing-
+               protocol specified in the route's rtrStaticRouteProto
+               value.  If this metric is not used, its value should be
+               set to -1."
+       DEFVAL { -1 }
+       ::= { rtrStaticRouteEntry 13 }
+
+   rtrStaticRouteMetric3 OBJECT-TYPE
+       SYNTAX     Integer32
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "An alternate routing metric for this route.  The
+               semantics of this metric are determined by the routing-
+               protocol specified in the route's rtrStaticRouteProto
+               value.  If this metric is not used, its value should be
+               set to -1."
+       DEFVAL { -1 }
+       ::= { rtrStaticRouteEntry 14 }
+
+   rtrStaticRouteMetric4 OBJECT-TYPE
+       SYNTAX     Integer32
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "An alternate routing metric for this route.  The
+               semantics of this metric are determined by the routing-
+               protocol specified in the route's rtrStaticRouteProto
+               value.  If this metric is not used, its value should be
+               set to -1."
+       DEFVAL { -1 }
+       ::= { rtrStaticRouteEntry 15 }
+
+   rtrStaticRouteMetric5 OBJECT-TYPE
+       SYNTAX     Integer32
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "An alternate routing metric for this route.  The
+               semantics of this metric are determined by the routing-
+               protocol specified in the route's rtrStaticRouteProto
+               value.  If this metric is not used, its value should be
+               set to -1."
+       DEFVAL { -1 }
+       ::= { rtrStaticRouteEntry 16 }
+
+   rtrStaticRouteStatus OBJECT-TYPE
+       SYNTAX     RowStatus
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "The row status variable, used according to row
+               installation and removal conventions.
+
+               A row entry cannot be modified when the status is
+               marked as active(1)."
+       ::= { rtrStaticRouteEntry 17 }
+
+   rtrStaticRouteNoInstall OBJECT-TYPE
+       SYNTAX     TruthValue
+       MAX-ACCESS read-create
+       STATUS     current
+       DESCRIPTION
+              "Static Route entry option to not install the route 
+               into forwarding table."
+       DEFVAL { false }
+       ::= { rtrStaticRouteEntry 18 }
+
+
+-- Augment of RFC4293.ipIfStatsTable
+
+ipIfStatsXTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF IpIfStatsXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An Augment of RFC4293.ipIfStatsTable"
+    ::= { rtrInterfaces 4 }
+
+ipIfStatsXEntry OBJECT-TYPE
+    SYNTAX      IpIfStatsXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry in the table."
+    AUGMENTS    { ipIfStatsEntry }
+    ::= { ipIfStatsXTable 1 }
+
+IpIfStatsXEntry ::= SEQUENCE {
+    ipIfStatsXClearStatisticsCmd     TruthValue 
+ }
+
+
+ipIfStatsXClearStatisticsCmd OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "Indicates a user command to clear all counters in row. "
+       DEFVAL { false }
+    ::= { ipIfStatsXEntry 1 }
+
+
+-- Augment of RFC4293.ipSystemStatsTable
+
+ipSystemStatsXTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF IpSystemStatsXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An Augment of RFC4293.ipSystemStatsTable"
+    ::= { rtrInterfaces 5 }
+
+ipSystemStatsXEntry OBJECT-TYPE
+    SYNTAX      IpSystemStatsXEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry in the table."
+    AUGMENTS    { ipSystemStatsEntry }
+    ::= { ipSystemStatsXTable 1 }
+
+IpSystemStatsXEntry ::= SEQUENCE {
+    ipSystemStatsXClearStatisticsCmd     TruthValue,
+    ipSystemStatsXClearAllStatisticsCmd  INTEGER 
+ }
+
+
+ipSystemStatsXClearStatisticsCmd OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "Indicates a user command to clear all counters in row."
+       DEFVAL { false }
+    ::= { ipSystemStatsXEntry 1 }
+
+ipSystemStatsXClearAllStatisticsCmd OBJECT-TYPE
+    SYNTAX      INTEGER{
+                off(2),
+                all(3),
+                ip-traffic(4),
+                access-list(5)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "Clear action to be performed on one of the router's componenet's
+           Statistics, or on all router component statistics."
+       DEFVAL { off }
+    ::= { ipSystemStatsXEntry 2 }
+
+--- IP Address association to Router Interface  Table
+
+ifIpAddressTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF IfIpAddressEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This table associates IP Address to Router Interface.
+            "
+    ::= { rtrInterfaces 7 }
+
+ifIpAddressEntry OBJECT-TYPE
+    SYNTAX     IfIpAddressEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "An entry in the Table."
+    INDEX { ifIpAddressAddrType, ifIpAddressAddr, ifIpAddressPrefixLength, ifIpAddressIfIndex }
+    ::= { ifIpAddressTable 1 }
+
+IfIpAddressEntry ::= SEQUENCE {
+    ifIpAddressAddrType       InetAddressType,
+    ifIpAddressAddr           InetAddress,
+    ifIpAddressPrefixLength   InetAddressPrefixLength,
+    ifIpAddressIfIndex        InterfaceIndex,
+    ifIpAddressRowStatus      RowStatus,
+    ifIpAddressPrefix         InetAddress,
+    ifIpAddressOrigin         INTEGER 
+ }
+
+ifIpAddressAddrType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The address type of IP Address associated to a Router Interface."
+    ::= { ifIpAddressEntry 1 }
+
+ifIpAddressAddr OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The IP address associated to the Router Interface."
+    ::= { ifIpAddressEntry 2 }
+
+
+ifIpAddressPrefixLength OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "The prefix length associated with this prefix.
+          "
+    ::= { ifIpAddressEntry 3 }
+
+ifIpAddressIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndex
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The ifIndex of the Router Interface
+           to which the IP Address is associated."
+    ::= { ifIpAddressEntry 4 }
+
+ifIpAddressRowStatus OBJECT-TYPE
+    SYNTAX     RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+           "The status of this conceptual row.
+            This object allows creating and deleting rows in
+            this table."
+    ::= { ifIpAddressEntry 5 }
+
+ifIpAddressPrefix OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "Indicates a the Prefix of the configured Address.
+          IP Address and Prefix must have the same type (IPv4/IPv6).
+          The address type of this object is specified in ipAddressAddrType.
+          The length of this object is the standard length for objects of
+          that type (4 or 16 bytes).
+          "
+    ::= { ifIpAddressEntry 6 }
+
+ifIpAddressOrigin OBJECT-TYPE
+    SYNTAX      INTEGER
+        {
+            other       (1),
+            manual      (2),
+            dhcp        (4),
+            linklayer   (5),
+            random      (6),
+            nat         (7)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "The Origin of the IP Address.
+         
+          manual    (2) indicates that the address was manually configured
+          to a specified address, e.g., by user configuration.
+
+          dhcp      (4) indicates an address that was assigned to this
+          system by a DHCP server.
+
+          linklayer (5) indicates an address created by IPv6 stateless
+          auto-configuration.
+
+          random    (6) indicates an address chosen by the system at
+          random, e.g., an IPv4 address within 169.254/16, or an RFC
+          3041 privacy address.
+          
+          nat       (7) indicates an address that was assigned to this
+          router interface by a NAT rule.
+          
+          other     (1) none of the specified above."
+    ::= { ifIpAddressEntry 7 }
+
+
+-- Router Interface BFD Session Table
+-- The Router Interface BFD Session Table specifies specific
+-- information for BFD sessions attached to this Router Interface.
+
+    rtrIfCfgBfdSessTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF RtrIfCfgBfdSessEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+            "The Router Interface BFD Session Table specifies information
+             on BFD sessions attached to this Router Interface."
+        ::= { rtrInterfaces 8 }
+
+    rtrIfCfgBfdSessEntry OBJECT-TYPE
+        SYNTAX     RtrIfCfgBfdSessEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+
+        DESCRIPTION
+            "The Router Interface BFD Session Table specifies information
+             on BFD sessions attached to this Router Interface."
+        INDEX { rtrIfCfgIndex }
+        ::= { rtrIfCfgBfdSessTable 1 }
+
+RtrIfCfgBfdSessEntry ::= SEQUENCE {
+    rtrIfCfgBfdSessDesiredMinTxInterval     INTEGER,
+    rtrIfCfgBfdSessReqMinRxInterval         INTEGER,
+    rtrIfCfgBfdSessDetectMult               Integer32 
+ }
+
+
+    rtrIfCfgBfdSessDesiredMinTxInterval OBJECT-TYPE
+        SYNTAX     INTEGER
+        {
+            interval3300microsec        (3300),
+            interval10000microsec       (10000),
+            interval100000microsec      (100000),
+            interval1000000microsec     (1000000),
+            interval10000000microsec    (10000000)
+        }
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "This object specifies the minimum interval, in
+             microseconds, that the local system would like to use
+             when transmitting BFD Control packets. The value of
+             zero(0) is reserved, and should not be used."
+        REFERENCE
+            "Section 4.1 from Katz, D. and D. Ward, Bidirectional
+             Forwarding Detection (BFD), RFC 5880, June 2012."
+        ::= { rtrIfCfgBfdSessEntry 1 }
+
+    rtrIfCfgBfdSessReqMinRxInterval OBJECT-TYPE
+        SYNTAX     INTEGER
+        {
+            interval3300microsec        (3300),
+            interval10000microsec       (10000),
+            interval100000microsec      (100000),
+            interval1000000microsec     (1000000),
+            interval10000000microsec    (10000000)
+        }
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "This object specifies the minimum interval, in
+             microseconds, between received  BFD Control packets the
+             local system is capable of supporting. The value of
+             zero(0) can be specified when the transmitting system
+             does not want the remote system to send any periodic BFD
+             control packets."
+        REFERENCE
+            "Section 4.1 from Katz, D. and D. Ward, Bidirectional
+             Forwarding Detection (BFD), RFC 5880, June 2012."
+        ::= { rtrIfCfgBfdSessEntry 2 }
+
+    rtrIfCfgBfdSessDetectMult OBJECT-TYPE
+        SYNTAX     Integer32
+        MAX-ACCESS read-create
+        STATUS     current
+        DESCRIPTION
+            "This object specifies the Detect time multiplier."
+        ::= { rtrIfCfgBfdSessEntry 3 }
+
+
+-- ****************  Interfaces Groups End  *******************
+ 
+
+-- ****************  IP Groups  ******************
+
+-- IP Group
+
+-- ************************************************
+--      IP Interface Configuration MIB
+-- ************************************************
+
+
+ipSpec                 OBJECT IDENTIFIER ::= { radRouter 2 }              
+
+rtrIpAddrTable OBJECT-TYPE
+    SYNTAX  SEQUENCE  OF RtrIpAddrEntry 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+       "This table is parralel to MIB II IpAddrTable, and is used to
+        add/delete entries to/from that table. In addition it contains
+        private objects."
+    ::=  { ipSpec 1 }
+
+rtrIpAddrEntry   OBJECT-TYPE
+    SYNTAX  RtrIpAddrEntry 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+            "The addressing information for one of this
+            entity's IP addresses."
+    INDEX  {rtrIpAdEntAddr}
+    ::=  { rtrIpAddrTable 1 }
+
+RtrIpAddrEntry ::= SEQUENCE {
+    rtrIpAdEntAddr                IpAddress,
+    rtrIpAdEntIfIndex             Integer32,
+    rtrIpAdEntNetMask             IpAddress,
+    rtrIpAdEntForwardIpBroadcast  INTEGER,
+    rtrIpAdEntBackupAddr          IpAddress,
+    rtrIpAdEntStatus              RowStatus
+    }
+
+rtrIpAdEntAddr OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+            "The IP address to which this entry's addressing
+            information pertains."
+    ::= { rtrIpAddrEntry 1 }
+
+rtrIpAdEntIfIndex OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+            "The index value which uniquely identifies the
+            interface to which this entry is applicable.  The
+            interface identified by a particular value of this
+            index is the same interface as identified by the
+            same value of ifIndex."
+    ::= { rtrIpAddrEntry 2 }
+
+rtrIpAdEntNetMask OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+            "The subnet mask associated with the IP address of
+            this entry.  The value of the mask is an IP
+            address with all the network bits set to 1 and all
+            the hosts bits set to 0."
+    ::= { rtrIpAddrEntry 3 }
+
+rtrIpAdEntForwardIpBroadcast OBJECT-TYPE
+    SYNTAX INTEGER {
+       enable(1),
+       disable(2)
+       }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+        " This variable controls forwarding of IP (sub)net-directed 
+          broadcasts destined for an attached sub(net). "
+    DEFVAL  { enable }
+    ::=   { rtrIpAddrEntry 4 }
+
+rtrIpAdEntBackupAddr OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+            " "
+    ::= { rtrIpAddrEntry 5 }
+
+rtrIpAdEntStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+        " The Status variable is used to create and destroy a Ip Addresses."
+    ::=   { rtrIpAddrEntry 6 }
+
+icmpSpec               OBJECT IDENTIFIER ::= { ipSpec 2 }
+  
+rtrIcmpGenErrMsgEnable   OBJECT-TYPE
+    SYNTAX INTEGER {
+       enable(1),
+       disable(2)
+   }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+           "This variable controlls the ability to generate ICMP error messages"
+    DEFVAL  { enable }
+    ::= { icmpSpec 1 }
+
+rtrIcmpRdTable OBJECT-TYPE
+    SYNTAX  SEQUENCE  OF RtrIcmpRdEntry 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+       "This table contains ICMP Router Discovery parameters
+        configurated per IP interface."
+    ::=  {icmpSpec 2}
+
+rtrIcmpRdEntry   OBJECT-TYPE
+    SYNTAX  RtrIcmpRdEntry 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+           "The ICMP parameters configurated for IP interface."
+    INDEX  {rtrIcmpRdIpAddr}
+    ::=  {rtrIcmpRdTable 1}
+
+RtrIcmpRdEntry ::= SEQUENCE {
+    rtrIcmpRdIpAddr             IpAddress,
+    rtrIcmpRdIpAdvertAddr       IpAddress,
+    rtrIcmpRdMaxAdvertInterval  Integer32,
+    rtrIcmpRdMinAdvertInterval  Integer32,
+    rtrIcmpRdAdvertLifetime     Integer32,
+    rtrIcmpRdAdvertise          INTEGER,
+    rtrIcmpRdPreferenceLevel    Integer32,
+    rtrIcmpRdEntStatus          Integer32
+    }
+
+rtrIcmpRdIpAddr OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+            "The IP address to which this entry's information pertains."
+    ::= {rtrIcmpRdEntry 1}
+
+rtrIcmpRdIpAdvertAddr OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+            " The IP destination address to be used for multicast
+              Router Advertisements sent from the interface. The
+              only permissible values are the all-systems multicast
+              address, 224.0.0.1, or the limited-broadcast address,
+              255.255.255.255."
+--    DEFVAL  {224.0.0.1}
+    ::= {rtrIcmpRdEntry 2}
+
+rtrIcmpRdMaxAdvertInterval OBJECT-TYPE
+    SYNTAX  Integer32 (4..1800)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+            "The maximum time allowed between sending multicast
+             Router Advertisements from the interface, in seconds.
+             Must be no less than 4 seconds and no greater than 1800
+             seconds."
+    DEFVAL  {600}
+    ::= {rtrIcmpRdEntry 3}
+
+rtrIcmpRdMinAdvertInterval OBJECT-TYPE
+    SYNTAX  Integer32 (3..1800)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+            "The minimum time allowed between sending unsolicited
+             multicast Router Advertisements from the interface, in
+             seconds.  Must be no less than 3 seconds and no greater
+             than rtrIcmpRdMaxAdvertInterval.
+             Default: 0.75 * rtrIcmpRdMaxAdvertInterval."
+    ::= {rtrIcmpRdEntry 4}
+
+rtrIcmpRdAdvertLifetime OBJECT-TYPE
+    SYNTAX  Integer32 (4..9000)
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+             "The maximum length of time that the advertised addresses
+             are to be considered as valid. Must be no less than 
+             rtrIcmpRdMaxAdvertInterval and no greater than 9000 seconds.
+             Default: 3 * rtrIcmpRdMaxAdvertInterval."
+    ::= {rtrIcmpRdEntry 5}
+
+rtrIcmpRdAdvertise OBJECT-TYPE
+    SYNTAX  INTEGER {
+       enable  (1),
+       disable (2)
+       }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+             "A flag indicating whether or not the address is to be
+              advertised."
+    DEFVAL  {enable}
+    ::= {rtrIcmpRdEntry 6}
+
+rtrIcmpRdPreferenceLevel OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+             "The preferability of the address as a default router
+             address, relative to other router addresses on the same
+             subnet."
+    DEFVAL  {0}
+    ::= {rtrIcmpRdEntry 7}
+
+rtrIcmpRdEntStatus  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+            "Setting of any value to this object set values of
+             all fields to the default values."
+    ::=   {rtrIcmpRdEntry 8}
+
+
+rip2Spec              OBJECT IDENTIFIER ::= { ipSpec  3 }
+
+rtrRip2IfConfTable OBJECT-TYPE
+    SYNTAX  SEQUENCE  OF RtrRip2IfConfEntry 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This table is an extension of rip2IfConfTable (RFC 1724 ,RIP 2).
+     It means that every time somebody creates/destroys a row in the
+     rip2IfConfTable, the same row should be automatically created/destroyed  
+     in this table."
+    ::=  { rip2Spec 1  }
+
+rtrRip2IfConfEntry   OBJECT-TYPE
+    SYNTAX  RtrRip2IfConfEntry 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+	DESCRIPTION
+	"An entry in table rtrRip2IfConfTable."
+    INDEX  { rtrRip2IfConfAddress }
+    ::=  {  rtrRip2IfConfTable 1  }
+
+RtrRip2IfConfEntry  ::= SEQUENCE { 
+    rtrRip2IfConfAddress          IpAddress,
+    rtrRip2IfConfVirtualDis       Integer32,
+    rtrRip2IfConfAutoSend         INTEGER,
+	rtrRip2IfConfRipEnable        INTEGER 	
+ 	}
+
+rtrRip2IfConfAddress  OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+      " The IP Address of this system on the indicated subnet.
+        For unnumbered interfaces, the value 0.0.0.N,
+        where the least significant 24 bits (N) is the ifIndex
+        for the IP Interface in network byte order "
+    ::=  { rtrRip2IfConfEntry 1 }
+
+rtrRip2IfConfVirtualDis OBJECT-TYPE
+    SYNTAX Integer32 
+    MAX-ACCESS  read-write 
+    STATUS  deprecated
+    DESCRIPTION
+         "This variable defines the virtual number of hops assigned to 
+          the interface specified by rtrIfIpAddrIndex. This enables 
+          fine-tuning of the RIP routing algorithm."
+    DEFVAL  { 1 }
+    ::=   { rtrRip2IfConfEntry  2  }
+
+rtrRip2IfConfAutoSend OBJECT-TYPE
+    SYNTAX INTEGER  {
+       enable(1),
+       disable(2)
+    }
+    MAX-ACCESS  read-write
+    STATUS  deprecated
+    DESCRIPTION
+         "When set to enable only the default route is sent through
+          the interface. When set to disable, regular RIPs are sent."
+    DEFVAL  { disable }
+    ::=   { rtrRip2IfConfEntry  3  }
+ 
+rtrRip2IfConfRipEnable OBJECT-TYPE
+    SYNTAX INTEGER  {
+       no  (2),
+       yes (3)
+    }
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object shows whether RIP Protocol is enabled on the current interface."   
+    ::=   { rtrRip2IfConfEntry  4  }
+
+ 
+
+arpSpec                OBJECT IDENTIFIER ::= { ipSpec 4 }
+
+rtrArpDeleteTable OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+         "Setting this object to any not-null value has the effect of deleting 
+          all entries of the ARP table."
+    ::= { arpSpec 1  }
+
+rtrArpInactiveTimeOut OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+         "This variable defines the maximum time period (in second) that can
+          pass between ARP requests concerning an entry in the ARP table.
+          After this time period, the entry is deleted from the table."
+    DEFVAL  { 60000 }
+    ::= { arpSpec 2  }
+
+rtrArpProxy OBJECT-TYPE
+    SYNTAX INTEGER {
+       enable(1),
+       disable(2)
+    }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+         "When ARP Proxy is enabled, the router can respond to 
+          ARP requests for nodes located on a different sub-net, 
+          provided they are it its network table. The router responds 
+          with its own MAC address. 
+          When ARP Proxy is disabled, the router responds only
+          to ARP requests for its own IP addresses."
+    DEFVAL  { disable }
+    ::= { arpSpec 3  }
+
+
+-- ****************************************
+--      NAT    Network Address Translation 
+-- *****************************************
+
+rtrNat     OBJECT IDENTIFIER ::= { ipSpec 5 }
+
+rtrNatIfConfTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF RtrNatIfConfEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "A list of interfaces which require separate NAT configuration."  
+       ::= {rtrNat 1}
+
+rtrNatIfConfEntry OBJECT-TYPE
+       SYNTAX      RtrNatIfConfEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "A single routing domain in a single subnet."
+       INDEX   { ifIndex, rtrNatIfVirtualAddress, rtrNatIfVirtualMask }
+       ::= { rtrNatIfConfTable 1 }
+
+
+RtrNatIfConfEntry ::=
+      SEQUENCE {
+        rtrNatIfVirtualAddress IpAddress,
+        rtrNatIfVirtualMask    IpAddress,
+        rtrNatIfConfStatus     RowStatus,
+        rtrNatIfRealAddress    IpAddress,
+        rtrNatIfRealMask	   IpAddress,
+		rtrNatIfType           INTEGER
+}
+
+
+rtrNatIfVirtualAddress OBJECT-TYPE
+   SYNTAX  IpAddress
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+   "The IP Address of the virtual subnet to be translated by the 'NAT box' 
+    attached to this interface.
+    For some devices/cases, it might represent the Virtual Lowest IP Address."
+   ::= { rtrNatIfConfEntry 1 }
+
+rtrNatIfVirtualMask OBJECT-TYPE
+   SYNTAX  IpAddress
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+   "The subnet Mask of the virtual subnet.
+    For some devices/cases, it might represent the Virtual Highest IP Address."
+   ::= { rtrNatIfConfEntry 2 }
+
+rtrNatIfConfStatus OBJECT-TYPE
+   SYNTAX  RowStatus
+   MAX-ACCESS read-create
+   STATUS  current
+   DESCRIPTION
+   "Writing 'destroy' has the effect of deleting this interface."
+   ::= { rtrNatIfConfEntry 3 }
+
+rtrNatIfRealAddress OBJECT-TYPE
+   SYNTAX  IpAddress
+   MAX-ACCESS read-create
+   STATUS  current
+   DESCRIPTION
+   " The IP Address of the real subnet which is used by 'NAT box' for translation.
+    For some devices/cases, it might represent the Real Lowest IP Address."
+   ::= { rtrNatIfConfEntry 4 }
+
+rtrNatIfRealMask OBJECT-TYPE
+   SYNTAX  IpAddress
+   MAX-ACCESS read-create
+   STATUS  current
+   DESCRIPTION
+   " The subnet Mask of the real subnet.
+    For some devices/cases, it might represent the Real Highest IP Address."
+   ::= { rtrNatIfConfEntry 5 }
+
+rtrNatIfType OBJECT-TYPE
+   SYNTAX INTEGER { 
+	              static      (1), 
+				  dynamic     (2), 
+	              pat         (3),
+	              transparent (4) 
+				   }
+   MAX-ACCESS read-create
+   STATUS  current
+   DESCRIPTION
+   "NAT type.
+    
+    static - Translate a specific virtual IP network to a specific real IP 
+             network. TCP, UDP and ICMP sessions originated both in real and 
+             virtual networks will be translated.
+	dynamic - (Concurrent) Translate real IP network to larger or equal virtual 
+	         IP network. TCP, UDP and ICMP sessions originated in virtual 
+	         networks only	can be translated and sessions originated in real 
+	         networks will be rejected. A session that starts in the NAT system 
+	         will be active until there will be no traffic for aging timeout 
+	         period.         
+    pat    - (Port Address Translation/ Single IP).
+             Translate one real IP address to virtual IP network. TCP, UDP and 
+             ICMP sessions originated in virtual network only can be translated, 
+             sessions originated in real network will be rejected. A session 
+             that starts in the NAT system will be active until there will be no 
+             traffic for aging timeout period.
+    transparent - In transparent mode all frames belonging to the defined IP 
+             network will be forwarded with no translation: virtual = real."     
+   ::= { rtrNatIfConfEntry 6 }
+
+
+-- *************************************
+--           Port Address Translation
+-- *************************************
+
+rtrPatTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF RtrPatEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "Port Address Translation (PAT -  single IP NAT) configuration Table."  
+       ::= {rtrNat 2}
+
+rtrPatEntry OBJECT-TYPE
+       SYNTAX      RtrPatEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "Each entry describe unique mapping between real IP address, 
+       range of ports and protocol, to local (virtual) IP address.
+       Ports are used in the TCP (rfc793) to name the ends of logical
+       connections which carry long term conversations.  
+       For the purpose of providing services to unknown callers, 
+       a service contact port is defined. "
+       INDEX   { rtrPatIdx }
+       ::= { rtrPatTable 1 }
+
+RtrPatEntry ::=
+      SEQUENCE {
+        rtrPatIdx             Integer32,
+        rtrPatRealAddress     IpAddress,
+        rtrPatVirtualAddress  IpAddress,
+        rtrPatLowestPort      Integer32,
+        rtrPatHighestPort     Integer32,
+		rtrPatProtocol		  Integer32,
+		rtrPatStatus		  RowStatus
+               }								
+
+rtrPatIdx OBJECT-TYPE
+   SYNTAX  Integer32 (1..30)
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+   "Running index for PAT table."
+   ::= { rtrPatEntry 1 }
+			  
+rtrPatRealAddress OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  read-create
+   STATUS  current
+   DESCRIPTION
+   "The real IP Address used for translation "
+   ::= { rtrPatEntry 2 }
+
+rtrPatVirtualAddress OBJECT-TYPE
+   SYNTAX      IpAddress
+   MAX-ACCESS  read-create
+   STATUS  current
+   DESCRIPTION
+   "The virtual IP Address used for translation"
+   ::= { rtrPatEntry 3 }
+
+rtrPatLowestPort OBJECT-TYPE
+   SYNTAX      Integer32 (0..65535)
+   MAX-ACCESS  read-create
+   STATUS  current
+   DESCRIPTION
+   "Lowest Port number for this PAT entry "
+   ::= { rtrPatEntry 4 }
+
+rtrPatHighestPort OBJECT-TYPE
+   SYNTAX      Integer32 (0..65535)
+   MAX-ACCESS  read-create
+   STATUS  current
+   DESCRIPTION
+   "Highest Port number for this PAT entry "
+   ::= { rtrPatEntry 5 }
+
+rtrPatProtocol OBJECT-TYPE
+   SYNTAX  Integer32
+   MAX-ACCESS read-create
+   STATUS  current
+   DESCRIPTION
+   "Protocol selected.
+    This Protocol and port range (lowest port - highest port)
+    define the application (FTP, Telnet, SMTP etc.).
+    Protocol enumaration numbers correspond to IP header 'protocol' field
+	(e.g. 6 means TCP, 17 means UDP)."
+   ::= { rtrPatEntry 6 }
+
+rtrPatStatus OBJECT-TYPE
+   SYNTAX  RowStatus
+   MAX-ACCESS read-create
+   STATUS  current
+   DESCRIPTION
+   "This object enables creating and deleting 
+    entries of the table."
+   ::= { rtrPatEntry 7 }
+
+
+
+-- ************************************************
+--                        FACS MIB
+-- ************************************************
+
+
+rtrFACS    OBJECT IDENTIFIER ::=  { radRouter 5 }
+
+rtrFACSDefaultAction OBJECT-TYPE
+   SYNTAX  INTEGER {
+      block(1),
+      forward(2),
+      blockAndReport(129)
+   }
+   MAX-ACCESS  read-write  
+   STATUS  current
+   DESCRIPTION
+         "Used to define the default action for the device, when no
+          FACS statements applicable to a given frame are defined."
+                
+--  DEFVAL  { 1 }
+  ::= { rtrFACS 1 }
+
+rtrFACSActTable OBJECT-TYPE
+   SYNTAX  SEQUENCE OF RtrFACSActEntry
+   MAX-ACCESS  not-accessible
+   STATUS  current
+   DESCRIPTION
+        "The table of  FACS action."
+   ::= { rtrFACS 2 }
+
+rtrFACSActEntry OBJECT-TYPE
+   SYNTAX  RtrFACSActEntry
+   MAX-ACCESS  not-accessible
+   STATUS  current
+   DESCRIPTION
+        "Each rtrFACSActEntry consist of the following parameters"
+   INDEX   {rtrFACSActType,
+            rtrFACSActIfIndex}
+   ::= { rtrFACSActTable 1 }
+
+RtrFACSActEntry ::= SEQUENCE {
+   rtrFACSActType    INTEGER,
+   rtrFACSActIfIndex Integer32,
+   rtrFACSAction     INTEGER,
+   rtrFACSActiveDB   INTEGER
+}
+
+rtrFACSActType OBJECT-TYPE
+   SYNTAX  INTEGER {
+      tx(1),
+      rx(2)
+            }
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+        "This parameter indicates on which FACS Table the FACS 
+        action will preform."
+   ::= { rtrFACSActEntry 1 }
+
+rtrFACSActIfIndex OBJECT-TYPE
+   SYNTAX  Integer32
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+         "The interface to which this FACS entry is applicable."
+   ::= { rtrFACSActEntry 2 }
+
+rtrFACSAction OBJECT-TYPE
+   SYNTAX  INTEGER {
+       none(1),
+       eraseIP(2),
+       eraseDECnet(3),
+       eraseIPX(4),
+       eraseBrg(5),
+       replaceIP(6),
+       replaceIPX(8),
+       replaceBrg(9),
+       backupIP(10),
+       backupIPX(12),
+       backupBrg(13)
+   }
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+       "The management station that sends a SET request for one of these actions
+       with indexes  rtrFACSType and rtrFACSIfIndex defines the type and the
+       interface  Id for which all FACS statements are to be erased. 
+       If no interface or no type  is specified, all FACS statements for a 
+       protocol are erased."
+-- DEFVAL  { 1 }
+   ::= { rtrFACSActEntry 3 }
+
+rtrFACSActiveDB OBJECT-TYPE
+   SYNTAX INTEGER {
+      active(1),
+      temporary(2)
+   }
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+        "This parameter will point on which Facs DataBase the SNMP agent 
+         read. The Active dataBase is Read Only. The user may change FACS 
+         statements in the temporary DataBase and then write it to the 
+         Active DB."
+      ::= { rtrFACSActEntry 4}
+     
+rtrFACSTable OBJECT-TYPE
+  SYNTAX  SEQUENCE OF RtrFACSEntry
+  MAX-ACCESS  not-accessible
+  STATUS  current
+  DESCRIPTION
+       "The table of  FACS statment."
+  ::= { rtrFACS 3 }
+
+rtrFACSEntry OBJECT-TYPE
+  SYNTAX  RtrFACSEntry
+  MAX-ACCESS  not-accessible
+  STATUS  current
+  DESCRIPTION
+         "Each FACS statment consists of the following parameters"
+  INDEX  {rtrFACSIfIndex,
+          rtrFACSProtocolType,
+          rtrFACSType,
+          rtrFACSIndex } 
+  ::= { rtrFACSTable 1 }
+
+RtrFACSEntry ::= SEQUENCE {
+   rtrFACSIfIndex      Integer32,
+   rtrFACSProtocolType INTEGER,
+   rtrFACSType         INTEGER,
+   rtrFACSIndex        Integer32,
+   rtrFACSSrcAdd       OCTET STRING ,
+   rtrFACSSrcAddMask   OCTET STRING,
+   rtrFACSDesAdd       OCTET STRING,
+   rtrFACSDesAddMask   OCTET STRING,
+   rtrFACSOperation    INTEGER,
+   rtrFACSNetFiltering INTEGER,
+   rtrFACSSocketNum     Integer32,
+   rtrFACSMask1Id      Integer32,
+   rtrFACSMask2Id      Integer32,
+   rtrFACSStatus       INTEGER
+  }
+
+rtrFACSIfIndex OBJECT-TYPE
+  SYNTAX  Integer32  
+  MAX-ACCESS  read-only
+  STATUS  current
+  DESCRIPTION
+         "The interface to which this FACS entry is applicable.
+          For applications this variables is always 0."
+  ::= { rtrFACSEntry 1 }
+
+rtrFACSProtocolType OBJECT-TYPE
+  SYNTAX  INTEGER{
+     ip(1),
+     ipx(2),
+     dec(3),
+     bridge(4)
+  }
+  MAX-ACCESS  read-only
+  STATUS  current
+  DESCRIPTION
+       "This parameter define the protocol the Security  Access Control
+       is applicable."
+  ::= { rtrFACSEntry 2 }
+
+rtrFACSType OBJECT-TYPE
+  SYNTAX  INTEGER {
+      tx(1),
+      rx(2),
+      cod(3)
+  }
+  MAX-ACCESS  read-only
+  STATUS  current
+  DESCRIPTION
+       " The Mode of in which this FACS statement operates.
+         For applications this variable is always rx(2)."
+  ::= { rtrFACSEntry 3 }
+
+rtrFACSIndex OBJECT-TYPE
+  SYNTAX  Integer32
+  MAX-ACCESS  read-only
+  STATUS  current
+  DESCRIPTION
+       "Index to the FACS  Table. "
+  ::= { rtrFACSEntry 4 }
+
+rtrFACSSrcAdd OBJECT-TYPE
+  SYNTAX  OCTET STRING 
+  MAX-ACCESS  read-write
+  STATUS  current
+  DESCRIPTION
+       "The size of the octet string will be according to the protocol type 
+        defined in rtrFACSProtocolType."
+  ::= { rtrFACSEntry 5 }
+
+rtrFACSSrcAddMask OBJECT-TYPE
+  SYNTAX   OCTET STRING 
+  MAX-ACCESS  read-write
+  STATUS  current
+  DESCRIPTION
+         "Source-address mask ."
+  ::= { rtrFACSEntry 6 }
+
+rtrFACSDesAdd OBJECT-TYPE
+  SYNTAX   OCTET STRING
+  MAX-ACCESS  read-write
+  STATUS  current
+  DESCRIPTION
+      "Destination-address The size of the octet string will be according to the
+      protocol type define in rtrFACSProtocolType ."
+  ::= { rtrFACSEntry 7 }
+
+
+rtrFACSDesAddMask OBJECT-TYPE
+   SYNTAX   OCTET STRING
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+       "Destination-address mask ."
+   ::= { rtrFACSEntry 8 }
+
+
+rtrFACSOperation OBJECT-TYPE
+   SYNTAX  INTEGER {
+       block(1),
+       forward(2),
+       permit(3),        -- For Connect On demand Only
+       deny(4),          -- For Connect On demand Only
+       blockAndReport(129)
+   }
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+               "... ."
+   ::= { rtrFACSEntry 9 }
+
+rtrFACSNetFiltering OBJECT-TYPE
+   SYNTAX  INTEGER {
+       none(1), 
+       l2multicast(2), --applicable for Bridge protocol 
+       arp(3),      --applicable for ip protocol 
+       icmp(4),     --applicable for ip protocol 
+       ip(5),       --applicable for ip protocol 
+       udp(6),      --applicable for ip protocol 
+       tcp(7),      --applicable for ip protocol 
+       decnet(8),   --applicable for decnet protocol 
+       ipx(9)      --applicable for ipx protocol 
+   }
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+      "... ."
+   ::= { rtrFACSEntry 10 }
+
+
+rtrFACSSocketNum OBJECT-TYPE   --applicable for ip,ipx protocol 
+   SYNTAX  Integer32 
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+       " Port/socket  number for different applications
+       0 is default meaning not applicable.
+       none(1),
+       ftp(21),
+       telnet(23),
+       smtp(25),
+       tftp(69),
+       snmp(161),
+       snmpTrap(162),
+       rip(520),
+       sapIPX(1106),
+       ripIPX(1107)    "
+   ::= { rtrFACSEntry 11}
+
+rtrFACSMask1Id OBJECT-TYPE
+   SYNTAX  Integer32
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+       " Index into RND mask table FACS/COD Type) ."
+   ::= { rtrFACSEntry 12}
+
+rtrFACSMask2Id OBJECT-TYPE
+   SYNTAX  Integer32
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+       " Index into RND mask table FACS/COD according to
+       the value of rtrFACSType ."
+   ::= { rtrFACSEntry 13}
+
+rtrFACSStatus OBJECT-TYPE
+   SYNTAX  INTEGER {
+      valid(1),
+      createRequest(2),  
+      underCreation(3), 
+      invalid(4)          -- logically deleted
+   }
+
+   MAX-ACCESS  read-write
+   STATUS  current
+   DESCRIPTION
+       "The status of a table entry."
+   ::= { rtrFACSEntry 14}
+
+
+rtrFACSFrameData OBJECT-TYPE
+   SYNTAX  OCTET STRING (SIZE(0..256))
+   MAX-ACCESS  read-only
+   STATUS  current
+   DESCRIPTION
+         "Data from the frame that violated a FACS Filter."
+  ::= { rtrFACS 4 }
+
+-- ****************  FACS Group Ends  *******************
+
+
+--  RTM Entity Table- moved from RadOspf.mib
+-- This table is used to create and manage  RTM entities.
+
+  rtrRtmEntityTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME qcr_ent
+       SYNTAX      SEQUENCE OF RtrRtmEntityEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+          "The table of  RTM entities."
+       ::= { radRouter 6 }
+
+  rtrRtmEntityEntry OBJECT-TYPE
+       SYNTAX      RtrRtmEntityEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+          "Each entry represents an instance of the  RTM entity."
+       INDEX { rtrRtmEntityAfiType,
+                rtrRtmEntitySafi }
+       ::= { rtrRtmEntityTable 1 }
+
+RtrRtmEntityEntry ::= SEQUENCE {
+    rtrRtmEntityAfiType            InetAddressType,
+    rtrRtmEntitySafi               RtrSafi,
+    rtrRtmEntityDsStatDf        AdminDistance,
+    rtrRtmEntityDsOspfInt       AdminDistance,
+    rtrRtmEntityDsOspfExt       AdminDistance,
+    rtrRtmEntityDsIntBgp        AdminDistance,
+    rtrRtmEntityDsExtBgp        AdminDistance 
+ }
+
+  rtrRtmEntityAfiType OBJECT-TYPE
+    SYNTAX      InetAddressType
+       MAX-ACCESS   not-accessible
+       STATUS       current
+    DESCRIPTION "The AFI index of the rtrRtmEntityTable."
+       ::= { rtrRtmEntityEntry 1 }
+
+  rtrRtmEntitySafi OBJECT-TYPE
+    SYNTAX      RtrSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The SAFI index of the rtrRtmEntityTable."
+    ::= { rtrRtmEntityEntry 2 }
+
+  rtrRtmEntityDsStatDf OBJECT-TYPE
+       SYNTAX       AdminDistance
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+          "The default administrative distance used for statically
+           defined routes in the static routes MIB table.  It can be
+           overridden for individual static routes.  The lower the
+           distance for a given route, the more likely that route is to
+           be used by  RTM as the active route for the given
+           destination.  See the  RTM Architecture Guide for more
+           information about the use of administrative distances."
+       DEFVAL { 1 }
+       ::= { rtrRtmEntityEntry 3 }
+
+  rtrRtmEntityDsOspfInt OBJECT-TYPE
+       SYNTAX       AdminDistance
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+          "The administrative distance used for OSPF internal routes.
+           The lower the distance for a given type of route,
+           the more likely a route of this type is to be used by  RTM
+           as the active route for the given destination."
+       DEFVAL { 30 }
+       ::= { rtrRtmEntityEntry 4 }
+
+  rtrRtmEntityDsOspfExt OBJECT-TYPE
+       SYNTAX       AdminDistance
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+          "The administrative distance used for OSPF Autonomous System
+           external routes.  The lower the distance for a given type of route,
+           the more likely a route of this type is to be used by  RTM
+           as the active route for the given destination."
+       DEFVAL { 110 }
+       ::= { rtrRtmEntityEntry 5 }
+
+  rtrRtmEntityDsIntBgp OBJECT-TYPE
+       SYNTAX       AdminDistance
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+          "The administrative distance used for internal and VPN BGP routes.
+           The lower the distance for a given type of route,
+           the more likely a route of this type is to be used by RTM
+           as the active route for the given destination."
+       DEFVAL { 200 }
+       ::= { rtrRtmEntityEntry 6 }
+
+  rtrRtmEntityDsExtBgp OBJECT-TYPE
+       SYNTAX       AdminDistance
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+          "The administrative distance used for external BGP routes.
+           The lower the distance for a given type of route,
+           the more likely a route of this type is to be used by RTM
+           as the active route for the given destination."
+       DEFVAL { 20 }
+       ::= { rtrRtmEntityEntry 7 }
+   
+-- ************************************************
+-- Bridge ports Configuration MIB
+-- ************************************************
+
+-- rtrBridge    OBJECT IDENTIFIER ::= { radRouter 7 }
+
+        
+rtrBridgePortConfigTable  OBJECT-TYPE     
+       SYNTAX  SEQUENCE OF RtrBridgePortConfigEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Table of the bridge ports" 
+      ::= { rtrBridge 1 }
+
+rtrBridgePortConfigEntry  OBJECT-TYPE     
+       SYNTAX  RtrBridgePortConfigEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "Each entry defines a bridge port " 
+       INDEX { rtrBridgePortCIndex }
+      ::= { rtrBridgePortConfigTable 1 }
+
+RtrBridgePortConfigEntry ::= SEQUENCE {
+        rtrBridgePortCIndex
+                Integer32,
+        rtrBridgePortCIf
+                Integer32,
+        rtrBridgePortCStatus
+                RowStatus
+        }
+
+
+
+rtrBridgePortCIndex OBJECT-TYPE
+        SYNTAX  Integer32
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+                "This is the index of the bridge port. It is the same
+                 as 'dot1dBasePort' of the Bridge MIB."
+        ::= {rtrBridgePortConfigEntry 1}
+
+rtrBridgePortCIf OBJECT-TYPE
+        SYNTAX  Integer32
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+                "The config ifIndex the bridge port is sitting on. "
+        ::= {rtrBridgePortConfigEntry 2}
+
+rtrBridgePortCStatus OBJECT-TYPE
+        SYNTAX  RowStatus
+        MAX-ACCESS  read-create
+        STATUS  current
+        DESCRIPTION
+          "The status of the RtrBridgePortConfigEntry.  
+           Creating and destroying the bridge port is done by this
+           variable."
+        ::= {rtrBridgePortConfigEntry 3}
+
+-- *****************************************
+--      Router Information Table
+-- *****************************************
+   
+rtrInformationTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RtrInformationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table traces the agent fatal error. "
+    ::= { radRouter 3 }
+
+rtrInformationEntry OBJECT-TYPE
+    SYNTAX      RtrInformationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION  "This table has a single row entry and provides
+                  Information related to the last reboot."
+    INDEX {  rtrInformationId }
+    ::= { rtrInformationTable  1 }
+
+RtrInformationEntry ::= SEQUENCE {
+    rtrInformationId                  Unsigned32,
+    rtrInformationProtMemAllocStatus  INTEGER,
+    rtrInformationProtMemAllocInfo    SnmpAdminString 
+ }
+
+rtrInformationId       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "rtrInformationId =1"
+    ::= {rtrInformationEntry  1 }
+
+rtrInformationProtMemAllocStatus OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    error           (1),
+    clearError      (2),
+    fatalError      (3)
+
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Protocol Memory Allocation Alarm Status."
+    ::= {rtrInformationEntry  2 }
+
+rtrInformationProtMemAllocInfo OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Protocol Memory Allocation Alarm additional information."
+    ::= {rtrInformationEntry  3 }
+
+
+
+radRouterConfig  OBJECT IDENTIFIER  ::= { radRouter 9 }
+
+
+-- The Router's Configuration Table
+
+rtrConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RtrConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Router's Configuration table."
+    ::= {  radRouterConfig 1 }
+
+rtrConfigEntry  OBJECT-TYPE
+    SYNTAX      RtrConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the Router's Configuration table."
+    INDEX   { rtrConfigIndex }
+    ::= { rtrConfigTable 1 }
+
+RtrConfigEntry ::= SEQUENCE {
+    rtrConfigIndex                          Integer32,
+    rtrConfigDefaultGateway                 IpAddress,
+    rtrConfigArpAgingTime                   Integer32,
+    rtrConfigClassifierTosMask              Integer32,
+    rtrConfigRIPMode                        INTEGER,
+    rtrConfigRoutingName                    SnmpAdminString,
+    rtrConfigRowStatus                      RowStatus,
+    rtrConfigDhcpClientOpHostNameType       INTEGER,
+    rtrConfigDhcpClientOpHostName           SnmpAdminString,
+    rtrConfigDhcpClientOpVendorClassIdType  INTEGER,
+    rtrConfigDhcpClientOpVendorClassId      SnmpAdminString,
+    rtrConfigDhcpClientOpControl            BITS,
+    rtrConfigClearIpv4ArpCmd                INTEGER,
+    rtrConfigClearIpv6NeighborCmd           INTEGER,
+    rtrConfigRouterDscp                     Unsigned32 
+ }
+
+rtrConfigIndex OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Router's Index."
+    ::= { rtrConfigEntry 1 }
+
+rtrConfigDefaultGateway  OBJECT-TYPE
+       SYNTAX  IpAddress
+       MAX-ACCESS  read-create
+       STATUS  current
+       DESCRIPTION
+       "Router Default Gateway."
+      ::= { rtrConfigEntry 2 }
+
+rtrConfigArpAgingTime OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "ARP Aging Time."
+    ::= { rtrConfigEntry 3 }
+
+-- { rtrConfigEntry 4 } is NOT used
+
+rtrConfigClassifierTosMask OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Classifier's TOS Mask,
+     as follows:
+     0x1C for DTR           -- rfc795
+     0x1E for Cisco
+     0xE0 for Precedence    -- rfc795
+     0xFC for Diffserv
+     Else for Manual
+     ."
+    ::= { rtrConfigEntry 5 }
+
+rtrConfigRIPMode OBJECT-TYPE
+    SYNTAX INTEGER {
+        notApplicable(1),
+        rip1(2),
+        rip2(3),
+        rip1And2(4)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object determines the Router Information Protocol
+     to measure the shortest path between 2 positions
+     on the network."
+    ::= { rtrConfigEntry 6 }
+
+rtrConfigRoutingName OBJECT-TYPE
+    SYNTAX  SnmpAdminString (SIZE (1..64))
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "The unique name given to a specific virtual Router instance."
+    ::= { rtrConfigEntry 7 }
+
+rtrConfigRowStatus  OBJECT-TYPE
+       SYNTAX  RowStatus
+       MAX-ACCESS  read-create
+       STATUS  current
+       DESCRIPTION
+          "This object enables creating and deleting rows in table."
+       ::= { rtrConfigEntry 8 }
+
+rtrConfigDhcpClientOpHostNameType  OBJECT-TYPE
+    SYNTAX INTEGER {
+        userId (0),
+        sysName (1)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "DHCP Host Name type according to option 12
+          This parameters holds the type of the name.
+         (the name itself is set in dhcpClientOpHostName).
+          0 - user-configured identifier
+          1 - sysName
+          "
+    ::= { rtrConfigEntry 9 }
+
+rtrConfigDhcpClientOpHostName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The DHCP Host Name.
+         Name should include at least 1 character."
+    REFERENCE
+        "RFC-2132, Option 12, Host."
+    ::= { rtrConfigEntry 10 }
+
+rtrConfigDhcpClientOpVendorClassIdType  OBJECT-TYPE
+    SYNTAX INTEGER {
+        userId (0),
+        entPhysicalName  (1)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "DHCP Vendor ClassId type
+          This parameters holds the type of the name.
+          (the name itself is set in dhcpClientOpVendorClassId).
+          0 - user-configured identifier
+          1 - entPhysicalName
+          ."
+    ::= { rtrConfigEntry 11 }
+
+rtrConfigDhcpClientOpVendorClassId OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The Vendor Class Identifier.
+         Identifier should include at least 1 character."
+    REFERENCE
+        "RFC-2132, Option 60, Identifier."
+    ::= { rtrConfigEntry 12 }
+
+rtrConfigDhcpClientOpControl OBJECT-TYPE
+    SYNTAX      BITS
+    {
+        vendorClassId       (0),  -- Vendor Class Identifier (option 60)
+        hostName            (1)   -- Host Name               (option 12)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The Administrative Status of the different options.
+         Bit=1 means that respective option is enabled/activated."
+    REFERENCE
+        "RFC-2132."
+    ::= { rtrConfigEntry 13 }
+
+rtrConfigClearIpv4ArpCmd  OBJECT-TYPE
+    SYNTAX   INTEGER
+          {
+            off(2),
+            on (3)
+          }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+        "Clear action to be performed on IPv4 ARP Table associate to the Router."
+        DEFVAL  { off }
+    ::= { rtrConfigEntry 14 }
+
+rtrConfigClearIpv6NeighborCmd  OBJECT-TYPE
+    SYNTAX   INTEGER
+          {
+            off(2),
+            on (3)
+          }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+        "Clear action to be performed on IPv6 Neighbor Table associate to the Router."
+        DEFVAL  { off }
+    ::= { rtrConfigEntry 15 }
+
+rtrConfigRouterDscp OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..63)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The DSCP value of any packet generated in the related Router Entity.
+        Router Entity traffic includes control protocols."
+        DEFVAL  { 0 }
+    ::= { rtrConfigEntry 16 }
+
+rtrSystemAddress OBJECT-TYPE
+	SYNTAX      IpAddress
+	MAX-ACCESS  read-write
+	STATUS      current
+	DESCRIPTION
+	"This object represents the System Address."
+    ::= { radRouterConfig 2 }
+
+
+-- The Router's Forwarding Table
+
+rtrFwdTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RtrFwdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Router's Forwarding Table."
+    ::= {  radRouterConfig 3 }
+
+rtrFwdEntry  OBJECT-TYPE
+    SYNTAX      RtrFwdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the Router's Forwarding table."
+    INDEX   { rtrFwdIdx, rtrFwdIpAddress, 
+    			rtrFwdIpMask, rtrFwdRuleIdx }
+    ::= { rtrFwdTable 1 }
+
+RtrFwdEntry ::=
+	SEQUENCE { 
+        rtrFwdIdx				Integer32,
+        rtrFwdIpAddress			IpAddress,
+		rtrFwdIpMask			IpAddress,
+		rtrFwdRuleIdx			Integer32,
+		rtrFwdRowStatus	  		RowStatus,
+		rtrFwdNextHop			IpAddress,			
+		rtrFwdIfIndex			Integer32,
+		rtrFwdType				INTEGER,
+		rtrFwdProto				INTEGER,
+		rtrFwdEthQueue			Integer32,
+		rtrFwdMetric1			Integer32
+    	}
+
+rtrFwdIdx OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Router Index."
+    ::= { rtrFwdEntry 1 }
+
+rtrFwdIpAddress OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Destination IP Address."
+    ::= { rtrFwdEntry 2 }
+
+rtrFwdIpMask OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Mask IP address."
+    ::= { rtrFwdEntry 3 }
+
+rtrFwdRuleIdx OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Rule's Number."
+    ::= { rtrFwdEntry 4 }
+
+rtrFwdRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables the user to 
+     create/delete entries in this table.
+     
+     Entry of Type rtrFwdType = staticRouting(3)
+	 are created by the user.
+	 Only this type of entries can be deleted by the user.
+
+	 Entry of Type rtrFwdType = interface(2)
+	 are created/deleted automatically by the Agent
+	 when the user creates/deletes an interface of the Router."
+    ::= { rtrFwdEntry 5 }
+
+rtrFwdNextHop OBJECT-TYPE
+    SYNTAX  IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the IP Address of the Next Hop."
+    ::= { rtrFwdEntry 6 }
+
+rtrFwdIfIndex OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Interface Index."
+    ::= { rtrFwdEntry 7 }
+
+rtrFwdType OBJECT-TYPE
+    SYNTAX  INTEGER {
+		other    (1), -- not specified by this MIB
+		reject   (2), -- route which discards traffic
+		local    (3), -- local interface
+		remote   (4)  -- remote destination
+		}
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+       "The type of route.  Note that local(3)  refers
+       to  a route for which the next hop is the final
+       destination; remote(4) refers to  a  route  for
+       which  the  next  hop is not the final destina-
+       tion.
+
+       Routes which do not result in traffic forwarding or
+       rejection should not be displayed even if the
+       implementation keeps them stored internally.
+	   
+       reject (2) refers to a route which, if matched, discards
+       the message as unreachable. This is used in some
+       protocols as a means of correctly aggregating routes."
+    ::= { rtrFwdEntry 8 }
+
+rtrFwdProto OBJECT-TYPE
+    SYNTAX   INTEGER {
+		other	(1),  -- not specified
+		local	(2),  -- local interface
+  		netmgmt	(3),  -- static route
+ 		rip		(8),  -- Berkeley RIP or RIP-II
+		lis		(41)  -- Logical IP Subnet
+		}
+    MAX-ACCESS read-only
+    STATUS   current
+    DESCRIPTION
+	"The routing mechanism via which this route was
+	learned.  Inclusion of values for gateway routing 
+	protocols is not intended to imply that
+	hosts should support those protocols."
+    ::= { rtrFwdEntry 9 }
+
+rtrFwdEthQueue OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the ETH Queue number."
+    ::= { rtrFwdEntry 10 }
+
+rtrFwdMetric1 OBJECT-TYPE
+    SYNTAX   Integer32
+    MAX-ACCESS read-create
+    STATUS   current
+    DESCRIPTION
+	"The primary routing metric for this route.
+	 The semantics of this metric are determined by
+	 the routing-protocol specified in the route's
+	 rtrFwdProto value. If this metric is not
+	 used, its value should be set to -1."
+    DEFVAL { -1 }
+    ::= { rtrFwdEntry 11 }
+
+
+rtrPbrTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RtrPbrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The Router's Forwarding Table."
+    ::= {  radRouterConfig 4 }
+
+rtrPbrEntry  OBJECT-TYPE
+    SYNTAX      RtrPbrEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the Router's Policy Based Routing (PBR) table."
+    INDEX   { rtrPbrIdx,rtrPbrInterface, rtrPbrRuleIdx }
+    ::= { rtrPbrTable 1 }
+
+RtrPbrEntry ::=
+	SEQUENCE { 
+        rtrPbrIdx				  Unsigned32,
+		rtrPbrInterface			  InterfaceIndex,
+		rtrPbrRuleIdx			  Unsigned32,
+		rtrPbrRowStatus	  		  RowStatus,
+		rtrPbrMatchAllFrames   	  INTEGER,
+ 		rtrPbrSourceIpAddress     IpAddress,
+		rtrPbrSourceIpMask        IpAddress,
+		rtrPbrDestIpAddress       IpAddress,
+		rtrPbrDestIpMask          IpAddress,
+		rtrPbrIpProtocol		  Unsigned32,
+		rtrPbrMinFrameLength      Unsigned32,
+		rtrPbrMaxFrameLength      Unsigned32,
+        rtrPbrDiscardFrame		  INTEGER,	
+        rtrPbrForwardingInterface InterfaceIndexOrZero,
+		rtrPbrNextHop			  IpAddress
+          	}
+
+rtrPbrIdx OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Router Index."
+    ::= { rtrPbrEntry 1 }
+
+rtrPbrInterface OBJECT-TYPE
+    SYNTAX InterfaceIndex
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Router interface for which this match-set 
+     rule applies."
+    ::= { rtrPbrEntry 2 }
+
+rtrPbrRuleIdx OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Policy Based Routing (PBR) 
+      match-set rule index."
+    ::= { rtrPbrEntry 3 }
+
+rtrPbrRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+      "This object enables the user to 
+       create/delete entries of this table."
+    ::= { rtrPbrEntry 4 }
+
+rtrPbrMatchAllFrames OBJECT-TYPE
+    SYNTAX INTEGER
+	{
+	notApplicable (1),
+	no            (2), 
+	yes           (3)
+	}
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Forwarding decision is made regardless PBR Rule 
+     (as if all conditions are matched)"
+    ::= { rtrPbrEntry 5 }
+
+rtrPbrSourceIpAddress OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Received frame source IP Address."
+    ::= { rtrPbrEntry 6 }
+
+rtrPbrSourceIpMask  OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "The subnet mask of the source IP Address."
+    ::= { rtrPbrEntry 7 }
+
+rtrPbrDestIpAddress OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Received frame destination IP Address."
+    ::= { rtrPbrEntry 8 }
+
+rtrPbrDestIpMask OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "The subnet mask of the destination IP Address."
+    ::= { rtrPbrEntry 9 }
+
+rtrPbrIpProtocol OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Value of Protocol field in IP Frame header."
+    ::= { rtrPbrEntry 10 }
+
+rtrPbrMinFrameLength OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "."
+    ::= { rtrPbrEntry 11 }
+
+rtrPbrMaxFrameLength OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "."
+    ::= { rtrPbrEntry 12 }
+
+rtrPbrDiscardFrame OBJECT-TYPE
+    SYNTAX INTEGER
+    {
+	notApplicable (1),
+	no            (2), 
+	yes           (3)
+    }	
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Discard a frame when rule is matched ."
+    ::= { rtrPbrEntry 13 }
+
+rtrPbrForwardingInterface OBJECT-TYPE
+    SYNTAX InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "The router Interface through which the frame 
+     should be forwarded, when rule is matched.
+     If there's no forwarding interface, 
+     then this object has a value of zero"
+    ::= { rtrPbrEntry 14 }
+
+rtrPbrNextHop OBJECT-TYPE
+    SYNTAX IpAddress
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "IP Address of Next Hop, when Forwarding Interface is LAN, 
+     or has BridgePDU (BVI) encapsulation."
+    ::= { rtrPbrEntry 15 }
+
+-- ****************  Router Bridge Port Group Ends  *******************
+
+rtrSourceAddressTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF RtrSourceAddressEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Source Address Table."
+    ::= {  radRouterConfig 6 }
+
+rtrSourceAddressEntry  OBJECT-TYPE
+    SYNTAX      RtrSourceAddressEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the Source Address Table."
+    INDEX       { rtrSourceAddressApp, rtrSourceAddressType, rtrSourceAddress,
+                  rtrSourceAddressIfIndex }
+    ::= { rtrSourceAddressTable 1 }
+
+RtrSourceAddressEntry ::= SEQUENCE {
+    rtrSourceAddressApp                 INTEGER,
+    rtrSourceAddressType                InetAddressType,
+    rtrSourceAddress                    InetAddress,
+    rtrSourceAddressIfIndex             Unsigned32,
+    rtrSourceAddressRowStatus           RowStatus 
+ }
+
+rtrSourceAddressApp OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+        other       (1),
+        trap        (2),
+        loopback    (3),
+        clock       (4),
+        managementAll (255)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Application Type."
+    ::= { rtrSourceAddressEntry 1 }
+
+rtrSourceAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Address Type.
+         Value of 'unknown(0)' means that address is irrelevant."
+    ::= { rtrSourceAddressEntry 2 }
+
+rtrSourceAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Address.
+         Value of '0' means that address is irrelevant."
+    ::= { rtrSourceAddressEntry 3 }
+
+rtrSourceAddressIfIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the ifIndex of the Interface,
+         whose address will be used.
+         Value of '0' means that ifIndex is irrelevant."
+    ::= { rtrSourceAddressEntry 4 }
+
+rtrSourceAddressRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object enables the user to create/delete entries in this table."
+    ::= { rtrSourceAddressEntry 5 }
+
+
+
+  rtrRedistTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF RtrRedistEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+          "The table of rtr redistribution information entries.
+          This table is used to determine how routing information is
+          redistributed to routing protocol managers (RPMs) using rtr's
+          Routing Protocol Input interface.  The RPM to which the information
+          may be redistributed is called the destination RPM.  Routing
+          information is received from RPMs and from the MIB (for static
+          routes); these are referred to as the routing information source."
+       ::= { radRouterConfig 7 }
+
+  rtrRedistEntry OBJECT-TYPE
+       SYNTAX      RtrRedistEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+          "Information defining how routing information is redistributed
+          to routing protocol managers (RPMs)by rtr on its Routing
+          Protocol Input interface.
+
+          There are two key aspects to an entry in this table.
+
+          Firstly, it contains a set of filters which determine whether or not
+          the entry applies to a given pairing of a given set of routing
+          information and a given destination RPM.  There is a filter priority
+          to determine which entry to use if there are multiple entries whose
+          filters match a given pairing.
+
+          Secondly, it contains parameters to use when redistributing the
+          routing information to the destination RPM, including a flag which
+          determines whether or not to redistribute at all."
+        INDEX {
+                rtrRedistAfiType,
+                rtrRedistSafi,
+                rtrRedistInfoSrc,
+                rtrRedistInfoDest
+              }
+       ::= { rtrRedistTable 1 }
+
+RtrRedistEntry ::= SEQUENCE {
+    rtrRedistAfiType                InetAddressType,
+    rtrRedistSafi                   RtrSafi,
+    rtrRedistInfoSrc                InfoSourceDest,
+    rtrRedistInfoDest               InfoSourceDest,
+    rtrRedistRowStatus              RowStatus 
+ }
+  rtrRedistAfiType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The AFI index into the rtr redistribute table."
+    ::= { rtrRedistEntry 1 }
+  rtrRedistSafi OBJECT-TYPE
+    SYNTAX      RtrSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The SAFI index into the rtr redistribute table."
+    ::= { rtrRedistEntry 2 }
+
+  rtrRedistInfoSrc OBJECT-TYPE
+       SYNTAX       InfoSourceDest
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The source of the routing information.  This is one of:
+          -  an RPM, joined to rtr on the Routing Protocol Input
+             interface
+          -  statically defined routes, defined in the static routes
+             table
+          -  connected routes, learnt via interface configuration, or
+         defined in the static route table
+          -  all, meaning that this entry applies to all RPMs and static
+             routes, but not routes learnt via interface configuration."
+       DEFVAL       { infoSourceAll }
+       ::= { rtrRedistEntry 3 }
+
+  rtrRedistInfoDest OBJECT-TYPE
+       SYNTAX       InfoSourceDest
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "The destination of the routing information.  This is usually an
+          RPM, joined to rtr on the Routing Protocol Input
+          interface.  It can also be set to 'all', meaning that this
+          entry applies to all routing information destinations."
+       DEFVAL       { infoSourceAll }
+       ::= { rtrRedistEntry 4 }
+
+  rtrRedistRowStatus OBJECT-TYPE
+       SYNTAX       RowStatus
+       MAX-ACCESS   read-create
+       STATUS       current
+       DESCRIPTION
+          "Used to create and delete a rtr redistribution table entry."
+       ::= { rtrRedistEntry 5 }
+
+ipBfdDetectionTimeExpired     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     bfdSessXDescription, bfdSessDstAddr } 
+      STATUS  current
+      DESCRIPTION
+      "The trap alarm is sent when IP-BFD session detection Time
+      has expired ."
+      ::= { radSysRtrEvents 6 }
+
+ipBfdNeighborShutdown     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     bfdSessXDescription, bfdSessDstAddr } 
+      STATUS  current
+      DESCRIPTION
+      "The trap event is sent when IP-BFD session was shut down
+      by neighbor, meaning bfgSessXRemoteDiag=administrativelyDown(7)"
+      ::= { radSysRtrEvents 7 }
+
+ipBfdNeighborAddressChange     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     bfdSessXDescription, bfdSessDstAddr } 
+                      STATUS  current
+      DESCRIPTION
+      "The trap is sent when IP-BFD session neighbor's
+      IP Address was changed."
+      ::= { radSysRtrEvents 8 }
+
+-- ===================================================================
+-- ==                   Router Policy Data Tables                   ==
+-- ===================================================================
+
+
+-- ------------------
+-- rtrPolicyMain
+-- ------------------
+
+rtrPolicy   OBJECT IDENTIFIER ::= { radRouter 13 }
+
+rtrPolicyMainTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF RtrPolicyMainEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "Router Policy Configuration Table."
+       ::= { rtrPolicy 1 }
+
+rtrPolicyMainEntry OBJECT-TYPE
+       SYNTAX RtrPolicyMainEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "An entry in the Router Policy main table"
+       INDEX   { rtrPolicyName }
+       ::= { rtrPolicyMainTable 1 }
+
+RtrPolicyMainEntry ::= SEQUENCE {
+    rtrPolicyName                   SnmpAdminString,
+    rtrPolicyNumberOfRules          Unsigned32,
+    rtrPolicyLastSeqeunceNumber     Unsigned32,
+    rtrPolicyResequenceCmd          Unsigned32,
+    rtrPolicyType                   INTEGER,
+    rtrPolicyRowStatus              RowStatus 
+ }
+
+
+rtrPolicyName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..80))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Router Policy profile name"
+    ::= { rtrPolicyMainEntry 1 }
+
+rtrPolicyNumberOfRules OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of policy rule entries in this policy profile"
+    ::= { rtrPolicyMainEntry 2 }
+
+rtrPolicyLastSeqeunceNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sequence Number of the last Rule in this policy profile. "
+    ::= { rtrPolicyMainEntry 3 }
+
+rtrPolicyResequenceCmd OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS read-create
+    STATUS      current
+    DESCRIPTION
+        "Resequence Command, specifying step between policy rule sequence numbers.
+        For example, when resequence command with value of 100 is given,
+        new sequence number will be  100 200 300 400 etc.
+        Default Value - 10. Possible Set values - 1....10000.
+
+        Upon resequence action completion,  Agent will reset this object value
+        to '0'- to indicate the resequence action is finished,
+        and to  allow the user to set the same (or other) value (e.g. 10) again.
+        The value 0 can only be set by agent."
+    ::= { rtrPolicyMainEntry 4 }
+
+rtrPolicyType   OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    bgpPrefixListIpv4   (2),
+    bgpPrefixListIpv6   (3),
+    bgpRouteMap         (4)
+    }
+    MAX-ACCESS read-create
+    STATUS      current
+    DESCRIPTION
+    "Router Policy profile type."
+    ::= { rtrPolicyMainEntry 5 }
+
+rtrPolicyRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Create/Destroy Router Policy profile.
+        When removing policy profile which has associated policy rule
+        entries, all associated entries  (in rtrPolicyRuleTable and in
+        all auxiliary (per protocol) tables) MUST  be removed before
+        destroying policy profile entry."
+    ::= { rtrPolicyMainEntry 6}
+
+
+-- ------------------
+-- rtrPolicyRule
+-- ------------------
+
+rtrPolicyRuleTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF RtrPolicyRuleEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "Router policy rule Table "
+       ::= { rtrPolicy 2 }
+
+rtrPolicyRuleEntry OBJECT-TYPE
+       SYNTAX RtrPolicyRuleEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "Policy rule entry -  general policy rule parameters , and pointer to
+          Auxillary table."
+       INDEX   {rtrPolicyRuleIdx  }
+       ::= { rtrPolicyRuleTable 1 }
+
+RtrPolicyRuleEntry ::= SEQUENCE {
+    rtrPolicyRuleIdx                    Unsigned32,
+    rtrPolicyRuleName                   SnmpAdminString (SIZE (1..252)),
+    rtrPolicyRuleSequenceNumber         Unsigned32,
+    rtrPolicyRuleType                   INTEGER,
+    rtrPolicyRulePointer                RowPointer,
+    rtrPolicyRuleRowStatus              RowStatus 
+ }
+
+rtrPolicyRuleIdx                OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+            "Policy rule running Index . "
+    ::= { rtrPolicyRuleEntry 1 }
+
+rtrPolicyRuleName       OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS read-create
+    STATUS      current
+    DESCRIPTION
+        " The name of the policy profile to which this policy rule belongs.
+          Policy profile Name MUST exists in rtrPolicyMainTable.
+          Upon deletion of an policy profile, all entries with deleted
+          policy profile Name must be deleted."
+    ::= { rtrPolicyRuleEntry 2 }
+
+rtrPolicyRuleSequenceNumber     OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+            "Policy rule Sequence Number "
+    ::= { rtrPolicyRuleEntry 3 }
+
+rtrPolicyRuleType OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    remark  (1),
+    deny    (2),
+    permit  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specify policy rule type:
+        Remark, Deny or Permit.
+        Remark type policy rule  must include pointer (rtrPolicyRulePointer)
+        to rtrPolicyRuleRemarkTable
+        Permit or Deny type policy rule must include pointer to one of the other
+        auxilliary tables (bgp route map table)."
+    ::= { rtrPolicyRuleEntry 4 }
+
+rtrPolicyRulePointer OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "Pointer to entry in one of the auxilary tables:
+            bgp route map table.
+            When an entry is created in this table,
+            Agent must create associated entry in one of the  auxilary accroding
+            to this pointer "
+    ::= { rtrPolicyRuleEntry 5 }
+
+rtrPolicyRuleRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "Create or Destroy router policy rule "
+    ::= { rtrPolicyRuleEntry 6 }
+
+
+-- ------------------
+-- rtrPolicyInvRule
+-- ------------------
+
+rtrPolicyInvRuleTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF RtrPolicyInvRuleEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "Inverse table for Policy Rule Table.
+        This table is used for displaying policy rules ordered according their
+        sequence number. "
+       ::= { rtrPolicy 3 }
+
+rtrPolicyInvRuleEntry OBJECT-TYPE
+       SYNTAX RtrPolicyInvRuleEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "Policy Rule Table inverse entry -  general Policy Rule parameters,
+          indexed by policy profile Name and Sequence Number, used for display
+          sorted according to sequence number purpose."
+       INDEX   { rtrPolicyName ,  rtrPolicyRuleSequenceNumber }
+       ::= { rtrPolicyInvRuleTable 1 }
+
+RtrPolicyInvRuleEntry ::= SEQUENCE {
+    rtrPolicyInvRuleIdx             Unsigned32,
+    rtrPolicyInvRuleType            INTEGER,
+    rtrPolicyInvRulePointer         RowPointer 
+ }
+
+rtrPolicyInvRuleIdx         OBJECT-TYPE
+    SYNTAX                  Unsigned32
+    MAX-ACCESS          read-only
+    STATUS              current
+    DESCRIPTION
+            "Policy Rule running Index ."
+    ::= { rtrPolicyInvRuleEntry 1 }
+
+rtrPolicyInvRuleType OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    remark  (1),
+    deny    (2),
+    permit  (3)
+    }
+    MAX-ACCESS read-only
+    STATUS      current
+    DESCRIPTION
+            "This object specify policy rule type:
+            Remark, Deny or Permit.
+            Remark type policy rule  must include pointer (rtrPolicyRulePointer)
+            to rtrPolicyRuleRemarkTable
+            Permit or Deny type policy rule must include pointer to one of the other
+            auxilliary tables (bgp route map table)."
+            ::= { rtrPolicyInvRuleEntry 2 }
+
+rtrPolicyInvRulePointer OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Pointer to entry in one of the auxilary tables:
+            bgp route map table."
+    ::= { rtrPolicyInvRuleEntry 3 }
+
+
+-- ---------------------
+-- rtrPolicyRuleRemark
+-- ---------------------
+
+rtrPolicyRuleRemarkTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF RtrPolicyRuleRemarkEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+       "Policy Rules remark Table.
+        This table containing all remarks (free text which may describe
+        Policy Rules) for all Policy Profiles"
+       ::= { rtrPolicy 4 }
+
+rtrPolicyRuleRemarkEntry OBJECT-TYPE
+       SYNTAX RtrPolicyRuleRemarkEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "Policy Rules remarks "
+       INDEX   { rtrPolicyRuleIdx }
+       ::= { rtrPolicyRuleRemarkTable 1 }
+
+RtrPolicyRuleRemarkEntry ::= SEQUENCE {
+    rtrPolicyRuleRemark         SnmpAdminString (SIZE (1..252)) 
+ }
+
+rtrPolicyRuleRemark         OBJECT-TYPE
+    SYNTAX          SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+            "Free text describing following Policy Rules"
+    ::= {  rtrPolicyRuleRemarkEntry 1 }
+
+
+-- ===================================================================
+-- ==               VRRP (Virtual Router Redundancy Protocol        ==
+-- ===================================================================
+
+-- See Vrrp.mib
+-- vrrp MODULE-IDENTITY...
+-- ::= { radRouter 14 }
+
+
+
+-- ===================================================================
+-- ==                              Router DHCP                      ==
+-- ===================================================================
+
+rtrDhcp       OBJECT IDENTIFIER  ::= { radRouter 15 }
+rtrDhcpRelay  OBJECT IDENTIFIER  ::= { rtrDhcp 1 }
+
+
+-- DHCP Relay Server Table
+
+dhcpRelayServerTable  OBJECT-TYPE
+       SYNTAX  SEQUENCE OF DhcpRelayServerEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "DHCP Relay Server Table."
+      ::= { rtrDhcpRelay 2 }
+
+dhcpRelayServerEntry  OBJECT-TYPE
+       SYNTAX  DhcpRelayServerEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+           "An entry in the DHCP Relay Server Table."
+       INDEX { dhcpRelayServerRtrIfIndex, dhcpRelayServerAddrType, dhcpRelayServerAddr }
+      ::= { dhcpRelayServerTable 1 }
+
+DhcpRelayServerEntry ::= SEQUENCE {
+    dhcpRelayServerRtrIfIndex        InterfaceIndex,
+    dhcpRelayServerAddrType          InetAddressType,
+    dhcpRelayServerAddr              InetAddress,
+    dhcpRelayServerRowStatus         RowStatus 
+ }
+
+dhcpRelayServerRtrIfIndex OBJECT-TYPE
+       SYNTAX InterfaceIndex
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+       "The ifIndex of the Router Interface to which the
+        DHCP Relay Server is associated.
+        Value of 0x00000001 represents a server definition
+        per router entity, serving all router interfaces."
+       ::= { dhcpRelayServerEntry 1 }
+
+dhcpRelayServerAddrType OBJECT-TYPE
+       SYNTAX      InetAddressType
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "The address type of IP Address associated to the
+        DHCP Relay Server."
+       ::= { dhcpRelayServerEntry 2 }
+
+dhcpRelayServerAddr  OBJECT-TYPE
+       SYNTAX      InetAddress
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+       "The IP address associated to the DHCP Relay Server."
+       ::= { dhcpRelayServerEntry 3 }
+
+dhcpRelayServerRowStatus OBJECT-TYPE
+       SYNTAX  RowStatus
+       MAX-ACCESS  read-create
+       STATUS  current
+       DESCRIPTION
+       "This object enables the user to create/delete
+        entries of this table."
+       ::= { dhcpRelayServerEntry 4 }
+
+       
+-- ===================================================================
+-- ==                              Router Entity                    ==
+-- ===================================================================
+
+rtrRouterEntity       OBJECT IDENTIFIER  ::= { radRouter 16 }
+
+  rtrRibTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF RtrRibEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+         "Router entity RIB (Routing Information Base) table."
+       ::= { rtrRouterEntity 1 }
+
+  rtrRibEntry OBJECT-TYPE
+       SYNTAX      RtrRibEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+          "Route entry in Router entity RIB table."
+      INDEX {
+          rtrRibDestType,
+          rtrRibDest,
+          rtrRibDestLen,
+          rtrRibTos,
+          rtrRibNextHopType,
+          rtrRibNextHop,
+          rtrRibIfIndex,
+          rtrRibProto,
+          rtrRibRpmIndex
+          }
+       ::= { rtrRibTable 1 }
+
+RtrRibEntry ::= SEQUENCE {
+    rtrRibDestType          InetAddressType,
+    rtrRibDest              InetAddress,
+    rtrRibDestLen           Integer32,
+    rtrRibTos               Integer32,
+    rtrRibNextHopType       InetAddressType,
+    rtrRibNextHop           InetAddress,
+    rtrRibIfIndex           Integer32,
+    rtrRibProto             IANAipRouteProtocol,
+    rtrRibRpmIndex          Integer32,
+    rtrRibMetric1           Integer32,
+    rtrRibFibRoute          TruthValue 
+ }
+
+  rtrRibDestType OBJECT-TYPE
+      SYNTAX      InetAddressType
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "The type of the address used as the destination IP address
+          for this route."
+      ::= { rtrRibEntry 1 }
+
+  rtrRibDest OBJECT-TYPE
+      SYNTAX      InetAddress (SIZE(4|16))
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+         "Destination internetwork address or subnet address.  The
+          destination prefix length is applied to this value, and to a
+          particular destination address, to determine whether the route
+          applies to the particular address.
+
+          If the prefix length is L, then applying the length to an address
+          means taking the first L bits of the address."
+      ::= { rtrRibEntry 2 }
+
+  rtrRibDestLen OBJECT-TYPE
+      SYNTAX   Integer32  (0..128)
+      MAX-ACCESS not-accessible
+      STATUS   current
+      DESCRIPTION
+         "Prefix length (in bits) to apply to the rtmRibDest object,
+         to obtain the set of addresses to which this route applies.
+
+         If the prefix length is L, then applying the length to an address
+         means taking the first L bits of the address."
+      ::= { rtrRibEntry 3 }
+
+  -- The following convention is included for specification
+  -- of TOS Field contents.  At this time, the Host Requirements
+  -- and the Router Requirements documents disagree on the width
+  -- of the TOS field.  This mapping describes the Router
+  -- Requirements mapping, and leaves room to widen the TOS field
+  -- without impact to fielded systems.
+
+  rtrRibTos OBJECT-TYPE
+      SYNTAX   Integer32 (0..15)
+      MAX-ACCESS not-accessible
+      STATUS   current
+      DESCRIPTION
+         "The policy specifier is the IP TOS Field.  The encoding
+         of IP TOS is as specified by the following convention.
+         Zero indicates the default path if no more specific
+         policy applies.
+
+         +=====+=====+=====+=====+=====+=====+=====+=====+
+         |                 |                       |     |
+         |   PRECEDENCE    |    TYPE OF SERVICE    |  0  |
+         |                 |                       |     |
+         +=====+=====+=====+=====+=====+=====+=====+=====+
+
+                  IP TOS                IP TOS
+             Field     Policy      Field     Policy
+             Contents    Code      Contents    Code
+             0 0 0 0  ==>   0      0 0 0 1  ==>   2
+             0 0 1 0  ==>   4      0 0 1 1  ==>   6
+             0 1 0 0  ==>   8      0 1 0 1  ==>  10
+             0 1 1 0  ==>  12      0 1 1 1  ==>  14
+             1 0 0 0  ==>  16      1 0 0 1  ==>  18
+             1 0 1 0  ==>  20      1 0 1 1  ==>  22
+             1 1 0 0  ==>  24      1 1 0 1  ==>  26
+             1 1 1 0  ==>  28      1 1 1 1  ==>  30
+
+         RTM always returns a default value of 0 for this field."
+      ::= { rtrRibEntry 4 }
+
+  rtrRibNextHopType OBJECT-TYPE
+      SYNTAX     InetAddressType
+      MAX-ACCESS not-accessible
+      STATUS     current
+      DESCRIPTION
+         "The type of the address used as the next-hop address
+          for this route."
+      ::= { rtrRibEntry 5 }
+
+  rtrRibNextHop OBJECT-TYPE
+      SYNTAX     InetAddress (SIZE(4|16))
+      MAX-ACCESS not-accessible
+      STATUS     current
+      DESCRIPTION
+         "On remote routes, the address of the next system en route;
+         Otherwise, zero."
+      ::= { rtrRibEntry 6 }
+
+  rtrRibIfIndex OBJECT-TYPE
+      SYNTAX   Integer32 (0..2147483647)
+      MAX-ACCESS not-accessible
+      STATUS   current
+      DESCRIPTION
+         "The ifIndex value which identifies the local
+         interface through which the next hop of this
+         route should be reached."
+      ::= { rtrRibEntry 7 }
+
+  rtrRibProto OBJECT-TYPE
+      SYNTAX   IANAipRouteProtocol
+      MAX-ACCESS not-accessible
+      STATUS   current
+      DESCRIPTION
+         "The routing mechanism via which this route was learned.  Inclusion
+         of values for gateway routing protocols is not intended to imply that
+         hosts should support those protocols."
+      ::= { rtrRibEntry 8 }
+
+  rtrRibRpmIndex OBJECT-TYPE
+    SYNTAX      Integer32 (0..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The HAF entity index for the RPM that supplied this route,
+                or zero for static routes or automatically configured routes.
+                This is used to distinguish routes in the system where
+                multiple copies of a given protocol (for example BGP) are
+                providing routes to DC-RTM."
+    ::= { rtrRibEntry 9 }
+
+  rtrRibMetric1 OBJECT-TYPE
+      SYNTAX   Integer32
+      MAX-ACCESS read-only
+      STATUS   current
+      DESCRIPTION
+         "The primary routing metric for this route.
+         The semantics of this metric are determined by
+         the routing-protocol specified in the route's
+         rtmRibProto value.  If this metric is not used,
+         its value is returned as -1."
+      DEFVAL { -1 }
+      ::= { rtrRibEntry 10 }
+
+  rtrRibFibRoute OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Flag indicating whether or not this route has been
+                 programmed either to a forwarding table, or to a partner
+                 that queries route information (such as BGP or PIM).
+
+                 If there is no forwarding table and no partners are
+                 querying route information then this object is set to
+                 'false' for every route.
+
+                 If this route has rtmRibLooseNextHop set to 'true', it is
+                 possible that RTM knows of more than one explicit next hop to
+                 the loose next hop address.  If so, RTM programs these
+                 explicit next hops separately to a forwarding table (unless
+                 the forwarding table registers to receive loose next hops)
+                 and to a partner that queries route information; in this
+                 case the rtmRibFibRoute flag is set to 'true' if and only
+                 if one or more of these explicit next hops has been
+                 programmed."
+    ::= { rtrRibEntry 11 }
+
+-- Traps
+
+rtrFACSViolation NOTIFICATION-TYPE
+      OBJECTS  { rtrFACSFrameData, rtrFACSProtocolType }
+      STATUS  current
+      DESCRIPTION
+	  "The trap is sent for every violation of a FACS filter."
+      ::= { radSysRtrEvents 1 }
+
+rtrSwDwnLoadTrap NOTIFICATION-TYPE
+      OBJECTS  { fileName }
+      STATUS  current
+      DESCRIPTION
+	  "The trap is sent after the tftp download of the software
+	   and before the decompression and reset operations."
+      ::= { radSysRtrEvents 2 }
+
+END
+

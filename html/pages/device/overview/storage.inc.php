@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -35,7 +34,7 @@ if (count($drives))
   {
     $skipdrive = FALSE;
 
-    if ($device["os"] == "junos")
+    if ($device["os"] === "junos")
     {
       foreach ($config['ignore_junos_os_drives'] as $jdrive)
       {
@@ -44,10 +43,10 @@ if (count($drives))
           $skipdrive = TRUE;
         }
       }
-      $drive["storage_descr"] = preg_replace("/.*mounted on: (.*)/", "\\1", $drive["storage_descr"]);
+      //$drive["storage_descr"] = preg_replace("/.*mounted on: (.*)/", "\\1", $drive["storage_descr"]);
     }
 
-    if ($device['os'] == "freebsd")
+    if ($device['os'] === "freebsd")
     {
       foreach ($config['ignore_bsd_os_drives'] as $jdrive)
       {
@@ -60,8 +59,10 @@ if (count($drives))
     if ($drive['storage_ignore']) { $skipdrive = TRUE; }
 
     if ($skipdrive) { continue; }
-    $drive["storage_descr"] = preg_replace("/(.*), type: (.*), dev: (.*)/", "\\1", $drive["storage_descr"]); // '/mnt/Media, type: zfs, dev: Media'
-    $drive["storage_descr"] = preg_replace("/(.*) Label:(.*) Serial Number (.*)/", "\\1", $drive["storage_descr"]); // E:\ Label:Large Space Serial Number 26ad0d98
+
+    $drive["storage_descr"] = rewrite_entity_name($drive["storage_descr"], 'storage', FALSE);
+    //$drive["storage_descr"] = preg_replace("/(.*), type: (.*), dev: (.*)/", "\\1", $drive["storage_descr"]); // '/mnt/Media, type: zfs, dev: Media'
+    //$drive["storage_descr"] = preg_replace("/(.*) Label:(.*) Serial Number (.*)/", "\\1", $drive["storage_descr"]); // E:\ Label:Large Space Serial Number 26ad0d98
     $percent  = round($drive['storage_perc'], 0);
     $total = formatStorage($drive['storage_size']);
     $free = formatStorage($drive['storage_free']);

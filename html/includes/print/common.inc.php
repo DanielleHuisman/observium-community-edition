@@ -51,6 +51,56 @@ function build_table($array, $options = [])
    return $html;
 }
 
+function build_table_row($array, $options = [])
+{
+  // Calculate max columns
+  $cols = 0;
+  foreach ($array as $entry)
+  {
+    $cols = max(count((array)$entry), $cols);
+  }
+
+  // start table
+  $html = '<table class="table table-condensed table-striped">';
+  // header row
+  /*
+  $html .= '<thead><tr>';
+  foreach($array[0] as $key => $value)
+  {
+    $html .= '<th>' . $key . '</th>';
+  }
+  $html .= '</tr></thead>';
+  */
+
+  // data rows
+  foreach($array as $key => $entry)
+  {
+    $html .= '<tr>';
+    $html .= '<td><strong>' . $key . '</strong></td>';
+    $values = array_values((array)$entry);
+
+    for ($i = 0; $i <= $cols; $i++)
+    {
+      $value = $values[$i];
+      switch ($options[$key])
+      {
+        case 'unixtime':
+          $value = format_unixtime($value);
+          break;
+        case 'device':
+          $value = generate_device_link($value);
+          break;
+      }
+      $html .= '<td>' . $value . '</td>';
+    }
+    $html .= '</tr>';
+  }
+
+  // finish table and return it
+
+  $html .= '</table>';
+  return $html;
+}
 
 /**
  * Print refresh meta header
@@ -366,38 +416,96 @@ function get_button_group($params = [], $opt = [], $escape = TRUE) {
  *
  * @param string $icon  Icon name in definitions (ie: flag) or by css class (ie: sprite-flag)
  * @param string $class Additional class(es) for changing main icon view
+ * @param array  $attribs Url/link extended attributes (ie data-*, class, style)
  *
- * @return string HTML icon tag like <i class="sprite-flag"></i>
+ * @return string HTML icon tag like <i class="sprite-flag"></i> or emoji style :flag-us: -> <span class="icon-emoji">&#x1F1FA;&#x1F1F8;</span>
  */
-function get_icon($icon, $class = '') {
+function get_icon($icon, $class = '', $attribs = [])
+{
   global $config;
 
+  // Passed already html icon tag, return as is
+  if (str_exists($icon, [ '<', '>' ])) { return $icon; }
+
   $icon = trim(strtolower($icon));
-  $html = '';
-  if (isset($config['icon'][$icon])) {
+  if (isset($config['icon'][$icon]))
+  {
     // Defined icons
-    $html = '<i class="'.$config['icon'][$icon].'"></i>';
     $icon = $config['icon'][$icon];
   }
-  else if (!strlen($icon))
+  elseif (!strlen($icon))
   {
     // Empty icon, return empty string
     return '';
   }
 
+  // Emoji styled icons, ie :flag-us:
+  if (preg_match('/^:[\w\-_]+:$/', $icon))
+  {
+    // icon-emoji is pseudo class, for styling emoji as other icons
+    return '<span class="icon-emoji">' . get_icon_emoji($icon) . '</span>';
+  }
+
   // Append glyphicon main class if these icons used
-  if (str_starts($icon, 'glyphicon-')) {
+  if (str_starts($icon, 'glyphicon-'))
+  {
     $icon = 'glyphicon '.$icon;
   }
 
-  if ($class) {
+  if ($class)
+  {
     // Additional classes
-    $html = '<i class="' . $icon . ' ' . $class . '"></i>';
-  } else {
-    $html = '<i class="' . $icon . '"></i>';
+    $attribs['class'] = array_merge((array)$class, (array)$attribs['class']);
+  }
+  $attribs['class'] = array_merge([ $icon ], (array)$attribs['class']);
+
+  return '<i ' . generate_html_attribs($attribs) . '></i>';
+}
+
+/**
+ * Generate emoji icon (ie html hex entity)
+ *
+ * @param string $emoji Emoji name in definitions (ie: flag-us or :flag-us:)
+ * @param string $type  Type of emoji for return (currently only html supported)
+ * @param array  $attribs Url/link extended attributes (currently unused)
+ *
+ * @return string Emoji in requested type, for html ie: :flag-us: -> &#x1F1FA;&#x1F1F8;
+ */
+function get_icon_emoji($emoji, $type = 'html', $attribs = [])
+{
+  global $config;
+
+  // Emoji definitions not loaded by default!
+  // Load of first request
+  if (!isset($config['emoji']['zero']))
+  {
+    include_once $config['install_dir'] . '/includes/definitions/emoji.inc.php';
   }
 
-  return $html;
+  $emoji_name = strtolower(trim($emoji, ": \t\n\r\0\x0B"));
+
+  // Unknown emoji name, return original string
+  if (!isset($config['emoji'][$emoji_name]))
+  {
+    return $emoji;
+  }
+  $type  = strtolower($type);
+  $entry = $config['emoji'][$emoji_name];
+
+  switch ($type)
+  {
+    case 'unified':
+    case 'non_qualified':
+      $return = escape_html($entry[$type]);
+      break;
+    case 'html':
+    default:
+      // 26A0-FE0F -> &#x26A0;&#xFE0F;
+      $emoji_html = explode('-', escape_html($entry['unified'])); // escaping for prevent pass to definitions html code
+      $return = '&#x' . implode(';&#x', $emoji_html) . ';';
+  }
+
+  return $return;
 }
 
 /**

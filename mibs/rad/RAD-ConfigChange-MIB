@@ -1,0 +1,283 @@
+RAD-ConfigChange-MIB DEFINITIONS ::= BEGIN
+
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       sysName     FROM  SNMPv2-MIB
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       systemsEvents     FROM  RAD-GEN-MIB
+       agnt     FROM  RAD-SMI-MIB; 
+
+
+	agnConfigChange MODULE-IDENTITY
+		LAST-UPDATED "201502191800Z"  -- February 19, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Configuration Change MIB."
+	::= { agnt 75 }
+
+
+--  NE (Network Element) Configuration Change (Sync between NMS and Device)
+--
+
+-- The ConfigChange Notifications exist under the systemsEvents Node (RadGen.txt)
+configChange   	   OBJECT IDENTIFIER ::= { agnConfigChange 1 }
+-- Additional nodes in the future can be added as { agnConfigChange 2, 3, 4 etc. }
+
+--
+-- Configuration Change Table --
+--
+configurationChangeTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF ConfigurationChangeEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "This table includes all Configuration Tables OIDs that are supported by the device.
+        When a configuration change is performed on a table, the configuration change ID shall be incremented
+        and saved for this Table.
+		Note that the configuration change ID is a global parameter and will be incremented whenever a change
+		is made on any configuration table in the device.
+       "
+   ::= { configChange 1 }
+
+configurationChangeEntry OBJECT-TYPE
+   SYNTAX      ConfigurationChangeEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "Entries for configurationChangeTable.
+       "
+   INDEX   { configurationChangeFamilyOid }
+   ::= { configurationChangeTable 1 }
+
+ConfigurationChangeEntry ::= SEQUENCE {
+    configurationChangeFamilyOid  OBJECT IDENTIFIER,
+    configurationChangeLastChangeId Unsigned32,
+    configurationChangeOIDType  INTEGER 
+ }
+
+configurationChangeFamilyOid		OBJECT-TYPE
+   SYNTAX     	OBJECT IDENTIFIER
+   MAX-ACCESS   not-accessible
+   STATUS       current
+   DESCRIPTION
+		"Object Identifier of the current configuration table's family.
+		 This is the OID of the table that was configured without its row indices.
+		 For scalars, the object identifier shall be the OID of the family/tree
+		 that contains the changed scalar.
+        "
+   ::= { configurationChangeEntry 1 }
+
+configurationChangeLastChangeId	  OBJECT-TYPE
+   SYNTAX     	Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "Configuration Change Id of the current configuration table.
+        Each time a change is performed on the table (or scalars), the device shall increment
+        its configurationChangeId and save it in this MIB object for the changed table.
+       "
+   ::= { configurationChangeEntry 2 }
+
+configurationChangeOIDType OBJECT-TYPE
+      SYNTAX   INTEGER  {
+         tableOID (2),
+         scalarOID (3)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This MIB object indicates whether the familyOID that was sent is an OID of a table or of a scalar.
+      "
+   ::= { configurationChangeEntry 3 }
+
+
+
+configurationChangeId OBJECT-TYPE
+      SYNTAX   Unsigned32
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+       "Number of configuration change in the device.
+	   "
+       ::= { configChange 2 }
+
+-- Reserved       ::= { configChange 3 }
+
+configurationChangeTrapsEnable OBJECT-TYPE
+      SYNTAX   INTEGER  {
+         off (2),
+         on  (3)
+      }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+      "This MIB object indicates whether a configurationChange Trap will be sent.
+       off (2) -  configurationChangeTrap will not be sent.
+       on  (3) -  configurationChangeTrap will be sent.
+      "
+     ::= { configChange 4 }
+
+configurationChangeEnd OBJECT-TYPE
+      SYNTAX   INTEGER {
+	  start       (1),
+	  end         (2),
+	  startAndEnd (3),
+	  continue    (4)
+	  }
+      MAX-ACCESS  accessible-for-notify
+      STATUS  current
+      DESCRIPTION
+       "This MIB object shall be attached as a varbind to the configurationChange Trap.
+        It indicates whether the current configuration change trap has ended or whether it will be
+		continued in the next trap.
+        start       (1) - the current configuration change trap is 1st in a sequence of configuration change traps.
+		end         (2) - the current configuration change is the last in sequence of configuration change traps.
+        startAndEnd (3) - the current configuration change is a single trap.
+		continue    (4) - the current configuration change is within a trap sequence, not 1st and not last.
+	   "
+       ::= { configChange 5 }
+
+
+configChangeNotificationTable     OBJECT-TYPE
+   SYNTAX       SEQUENCE OF ConfigChangeNotificationEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION "This table is used for marking the added, changed and removed instances.
+                 In addition, it points to removed/added rows.
+                 This table is used for notifications only.
+				"
+    ::= { configChange 6 }
+
+configChangeNotificationEntry     OBJECT-TYPE
+    SYNTAX       ConfigChangeNotificationEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION "An entry in the configChangeNotificationTable.
+         		 Each entry contains the OID that is used for the changed/removed/added MIB object/row.
+                "
+    INDEX       { configChangeNotificationFamilyOid }
+    ::= { configChangeNotificationTable 1 }
+
+ConfigChangeNotificationEntry ::= SEQUENCE {
+    configChangeNotificationFamilyOid     OBJECT IDENTIFIER,
+    configChangeNotificationAdd           OBJECT IDENTIFIER,
+    configChangeNotificationChange        OBJECT IDENTIFIER,
+    configChangeNotificationRemove        OBJECT IDENTIFIER 
+ }
+
+configChangeNotificationFamilyOid  OBJECT-TYPE
+    SYNTAX        	OBJECT IDENTIFIER
+    MAX-ACCESS   	not-accessible
+    STATUS       	current
+    DESCRIPTION 	"Family OID of the entry (row) that was removed or added to a configuration table.
+	                 The Family OID consists of the configured table OID without the row indices segment.
+                 	 For a changed MIB object, the index will have a value of 0.0 ."
+    ::= { configChangeNotificationEntry 1 }
+
+configChangeNotificationAdd  	OBJECT-TYPE
+    SYNTAX       	OBJECT IDENTIFIER
+    MAX-ACCESS   	accessible-for-notify
+    STATUS       	current
+    DESCRIPTION 	"This MIB object shall be attached to the configurationChange notification
+                     when a row is added to a table.
+                 	 The value of this MIB object will be 0.0 .
+					 The index (configChangeNotificationFamilyOid) will be 0.0 too.
+					 This MIB object marks the beginning of the Add section in the notification.
+					 It shows that a cluster of additions is now beginning.
+					 After this variable, all the added variables with their values will follow.
+                	"
+    ::= { configChangeNotificationEntry 2 }
+
+configChangeNotificationChange 	OBJECT-TYPE
+    SYNTAX       	OBJECT IDENTIFIER
+    MAX-ACCESS   	accessible-for-notify
+    STATUS       	current
+    DESCRIPTION 	"This MIB object shall be attached to the configurationChange notification
+                     when a MIB object has been changed.
+                 	 The value of this MIB object will be 0.0 .
+					 The index (configChangeNotificationFamilyOid) will be 0.0 too.
+					 This MIB object marks the beginning of the Change section in the notification.
+					 It shows that a cluster of changes is now beginning.
+					 After this variable, all the changed variables with their new values will follow.
+                	"
+    ::= { configChangeNotificationEntry 3 }
+
+configChangeNotificationRemove  OBJECT-TYPE
+    SYNTAX       	OBJECT IDENTIFIER
+    MAX-ACCESS   	accessible-for-notify
+    STATUS       	current
+    DESCRIPTION 	"This MIB object shall be attached to the configurationChange notification
+                     when a row is removed from a table. Its value is the indices of the removed row.
+                 	 configChangeNotificationFamilyOid with the configChangeNotificationRemove OIDs
+                 	 point to the removed row.
+                 	"
+    ::= { configChangeNotificationEntry 4 }
+
+
+configChangeTransactionKey OBJECT-TYPE
+    SYNTAX  OCTET STRING (SIZE(0..64))
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+       "This MIB object defines the unique information specifically associated with a configuration
+        SET PDU. The agent will return the transaction key as a varbind in the
+        systemConfigurationChange trap."
+    ::= { configChange 7 }
+
+
+--------------------------------------------
+-- Configuration Change Common Trap Definitions
+--------------------------------------------
+
+systemConfigurationChange           NOTIFICATION-TYPE
+	OBJECTS { configurationChangeId, configChangeTransactionKey } 
+-- Additional attached variables:    configChangeNotificationAdd,
+--                                   List of Added rows fields with their values,
+--                                   configChangeNotificationChange,
+--                                   List of MIB objects that were changed with their new values,
+--                                   For each removed row: configChangeNotificationRemove,
+--                                   configurationChangeEnd,  -> for last trap only
+--                                   trapSeqId
+      STATUS  current
+      DESCRIPTION
+      "This Trap shall be sent upon any configuration change in the device. "
+      ::= { systemsEvents 79}
+
+systemConfigChangeEnableTraps       NOTIFICATION-TYPE
+	OBJECTS { sysName, configurationChangeId, configurationChangeTrapsEnable } 
+      STATUS  current
+      DESCRIPTION
+      "This Trap shall be sent when the user enables/disables the configurationChange Trap.
+       configurationChange traps will not be sent."
+      ::= { systemsEvents 80}
+
+-- Reserved      ::= { systemsEvents 81}
+
+
+END
+

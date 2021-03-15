@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage common
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -25,7 +23,7 @@ function observium_autoload($class_name)
   $base_dir    = $GLOBALS['config']['install_dir'] . '/libs/';
 
   $class_array = explode('\\', $class_name);
-  $class_file  = str_replace('_', '/', implode($class_array, '/')) . '.php';
+  $class_file  = str_replace('_', '/', implode('/', $class_array)) . '.php';
   //print_vars($class_array);
   switch ($class_array[0])
   {
@@ -40,22 +38,31 @@ function observium_autoload($class_name)
       if ($class_array[1] == 'Cache')
       {
         $class_file = array_pop($class_array) . '.php';
-        $class_file = 'phpFastCache/legacy/' . implode($class_array, '/') . '/src/' . $class_file;
+        $class_file = 'phpFastCache/legacy/' . implode('/', $class_array) . '/src/' . $class_file;
         // print_vars($class_file);
       }
       break;
 
     case 'Flight':
       $class_file = array_pop($class_array) . '.php';
-      $class_file = 'flight/flight/' . $class_file;
+      $class_file = 'flight/' . $class_file;
       break;
 
     case 'Ramsey':
-      $class_file = str_replace('Ramsey/', '', $class_file);
-      break;
-
     case 'Defuse':
-      $class_file = str_replace('Defuse/', '', $class_file);
+    case 'donatj':
+      $class_file = str_replace($class_array[0] . '/', '', $class_file);
+
+      // Initial base class file
+      $class_file_base = $base_dir . end($class_array) . '.php';
+      if (is_file($class_file_base))
+      {
+        $base_status = include_once($class_file_base);
+        if (OBS_DEBUG > 1)
+        {
+          print_message("%WLoad base file for class '$class_name' from '$class_file_base': " . ($base_status ? '%gOK' : '%rFAIL'), 'console');
+        }
+      }
       break;
 
     case 'PhpUnitsOfMeasure':
@@ -68,12 +75,12 @@ function observium_autoload($class_name)
         // By default try Pear file
         $class_file = 'pear/' . $class_file;
       }
-      else if (is_dir($base_dir . 'pear/' . $class_name))
+      elseif (is_dir($base_dir . 'pear/' . $class_name))
       {
         // And Pear dir
         $class_file = 'pear/' . $class_name . '/' . $class_file;
       }
-      //else if (!is_cli() && is_file($GLOBALS['config']['html_dir'] . '/includes/' . $class_file))
+      //elseif (!is_cli() && is_file($GLOBALS['config']['html_dir'] . '/includes/' . $class_file))
       //{
       //  // For WUI check class files in html_dir
       //  $base_dir   = $GLOBALS['config']['html_dir'] . '/includes/';
@@ -394,6 +401,16 @@ function get_alert_entry_by_id($id)
                     " WHERE  `alert_table`.`alert_table_id` = ?", array($id));
 }
 
+function percent($value, $max, $precision = 0)
+{
+  if ($max == 0) { return 0; } // prevent false division by zero
+
+  $percent = $value / $max * 100;
+
+  if (is_numeric($precision)) { return round($percent, $precision); }
+  return $percent;
+}
+
 /**
  * Percent Class
  *
@@ -426,7 +443,7 @@ function percent_class($percent)
  * This function returns a colour based on a 0-100 value
  * It scales from green to red from 0-100 as default.
  *
- * @param integer $percent
+ * @param integer $value
  * @param integer $brightness
  * @param integer $max
  * @param integer $min
@@ -474,11 +491,13 @@ function range_to_list($arr, $separator = ',', $sort = TRUE)
 {
   if ($sort) { sort($arr, SORT_NUMERIC); }
 
-  for ($i = 0; $i < count($arr); $i++)
+  $ranges = [];
+  $count = count($arr);
+  for ($i = 0; $i < $count; $i++)
   {
     $rstart = $arr[$i];
     $rend  = $rstart;
-    while (isset($arr[$i+1]) && $arr[$i+1] - $arr[$i] == 1)
+    while (isset($arr[$i+1]) && ($arr[$i+1] - $arr[$i]) === 1)
     {
       $rend = $arr[$i+1];
       $i++;
@@ -490,9 +509,63 @@ function range_to_list($arr, $separator = ',', $sort = TRUE)
       return ''; // Not numeric value(s)
     }
   }
-  $list = implode($separator, $ranges);
 
-  return $list;
+  return implode($separator, $ranges);
+}
+
+// '1-3,5,7,9-12,14' -> array(1,2,3,5,7,9,10,11,12,14)
+function list_to_range($str, $separator = ',', $sort = TRUE)
+{
+  if (!is_string($str)) { return $str; }
+
+  // Clean spaces while separator not with spaces
+  if (strpos($separator, ' ') === FALSE)
+  {
+    $str = str_replace(' ', '', $str);
+  }
+
+  $arr = [];
+  foreach (explode($separator, trim($str)) as $list)
+  {
+    $negative = FALSE;
+    if ($list[0] == '-')
+    {
+      $negative = TRUE;
+      $list = substr($list, 1);
+    }
+    if (strpos($list, '-') !== FALSE)
+    {
+      list($min, $max) = explode('-', $list, 2);
+      if (!is_numeric($min) || !is_numeric($max)) { continue; }
+      if ($negative)
+      {
+        $min = '-' . $min;
+      }
+      if ($min > $max)
+      {
+        // ie 10-3
+        list($min, $max) = [ $max, $min ];
+      }
+      elseif ($min == $max)
+      {
+        // ie 1-1
+        $arr[] = intval($min);
+        continue;
+      }
+      for ($i = $min; $i <= $max; $i++)
+      {
+        $arr[] = intval($i);
+      }
+    }
+    elseif (is_numeric($list))
+    {
+      $arr[] = $negative ? intval('-' . $list) : intval($list);
+    }
+  }
+
+  if ($sort) { sort($arr, SORT_NUMERIC); }
+
+  return $arr;
 }
 
 // DOCME needs phpdoc block
@@ -565,6 +638,7 @@ function get_versions()
   $php_version = PHP_VERSION;
   $versions['php_full'] = $php_version;
   $versions['php_version'] = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
+  $versions['php_old'] = version_compare($versions['php_version'], OBS_MIN_PHP_VERSION, '<');
   // PHP OPcache
   $versions['php_opcache'] = FALSE;
   if (extension_loaded('Zend OPcache'))
@@ -576,7 +650,7 @@ function get_versions()
       $php_version  .= 'ENABLED)';
       $versions['php_opcache'] = 'ENABLED';
     }
-    else if ($opcache && !is_cli()) // WUI
+    elseif ($opcache && !is_cli()) // WUI
     {
       $php_version  .= 'ENABLED)';
       $versions['php_opcache'] = 'ENABLED';
@@ -586,9 +660,9 @@ function get_versions()
     }
   }
   $versions['php_text'] = $php_version;
-  /*
+
   // PHP memory_limit
-  $php_memory_limit = ini_get('memory_limit');
+  $php_memory_limit = unit_string_to_numeric(ini_get('memory_limit'));
   $versions['php_memory_limit'] = $php_memory_limit;
   if ($php_memory_limit < 0)
   {
@@ -596,27 +670,54 @@ function get_versions()
   } else {
     $versions['php_memory_limit_text'] = formatStorage($php_memory_limit);
   }
-  */
 
-  // Python
+  /** Python
+   * I.e.:
+   * python_version = 2.7.5
+   * python_text    = 2.7.5
+   */
   $python_version  = str_replace('Python ', '', external_exec('/usr/bin/env python --version 2>&1'));
   $versions['python_version'] = $python_version;
+  if (str_starts($python_version, '2.'))
+  {
+    $versions['python_old'] = version_compare($versions['python_version'], OBS_MIN_PYTHON2_VERSION, '<');
+  } else {
+    $versions['python_old'] = version_compare($versions['python_version'], OBS_MIN_PYTHON3_VERSION, '<');
+  }
   $versions['python_text']    = $python_version;
 
-  // MySQL
+  /** MySQL
+   * I.e.:
+   * mysql_client  = 5.0.12-dev
+   * mysql_full    = 10.3.23-MariaDB-log
+   * mysql_name    = MariaDB
+   * mysql_version = 10.3.23
+   * mysql_text    = 10.3.23-MariaDB-log (extension: mysqli 5.0.12-dev)
+   */
   $mysql_client    = dbClientInfo();
-  if (preg_match('/(\d+\.[\d\w\.\-]+)/', $mysql_client, $matches))
+  if (preg_match('/(\d+\.[\w\.\-]+)/', $mysql_client, $matches))
   {
     $mysql_client  = $matches[1];
   }
   $versions['mysql_client']  = $mysql_client;
   $mysql_version   = dbFetchCell("SELECT version();");
   $versions['mysql_full']    = $mysql_version;
+  $versions['mysql_name']    = str_iexists($mysql_version, 'Maria') ? 'MariaDB' : 'MySQL';
   list($versions['mysql_version']) = explode('-', $mysql_version);
+  if ($versions['mysql_name'] === 'MariaDB')
+  {
+    $versions['mysql_old'] = version_compare($versions['mysql_version'], OBS_MIN_MARIADB_VERSION, '<');
+  } else {
+    $versions['mysql_old'] = version_compare($versions['mysql_version'], OBS_MIN_MYSQL_VERSION, '<');
+  }
   $mysql_version  .= ' (extension: ' . OBS_DB_EXTENSION . ' ' . $mysql_client . ')';
   $versions['mysql_text']    = $mysql_version;
 
-  // SNMP
+  /** SNMP
+   * I.e.:
+   * snmp_version = 5.7.2
+   * snmp_text    = NET-SNMP 5.7.2
+   */
   if (is_executable($GLOBALS['config']['snmpget']))
   {
     $snmp_version  = str_replace(' version:', '', external_exec($GLOBALS['config']['snmpget'] . " --version 2>&1"));
@@ -626,11 +727,17 @@ function get_versions()
   $versions['snmp_version'] = str_replace('NET-SNMP ', '', $snmp_version);
   $versions['snmp_text']    = $snmp_version;
 
-  // RRDtool
+  /** RRDtool
+   * I.e.:
+   * rrdtool_version   = 1.5.5
+   * rrdcached_version = 1.5.5
+   * rrdtool_text      = 1.5.5 (rrdcached 1.5.5: unix:/var/run/rrdcached.sock)
+   */
   if (is_executable($GLOBALS['config']['rrdtool']))
   {
     list(,$rrdtool_version) = explode(' ', external_exec($GLOBALS['config']['rrdtool'] . ' --version | head -n1'));
     $versions['rrdtool_version'] = $rrdtool_version;
+    $versions['rrdtool_old'] = version_compare($versions['rrdtool_version'], OBS_MIN_RRD_VERSION, '<');
 
     if (strlen($GLOBALS['config']['rrdcached']))
     {
@@ -651,10 +758,15 @@ function get_versions()
   } else {
     $rrdtool_version = 'not found';
     $versions['rrdtool_version'] = $rrdtool_version;
+    $versions['rrdtool_old'] = TRUE;
   }
   $versions['rrdtool_text'] = $rrdtool_version;
 
-  // Fping
+  /** Fping
+   * I.e.:
+   * fping_version = 3.13
+   * fping_text    = 3.13 (IPv4 and IPv6)
+   */
   $fping_version = 'not found';
   if (is_executable($GLOBALS['config']['fping']))
   {
@@ -708,7 +820,7 @@ function get_versions()
 }
 
 /**
- * Print version information about used Observium and additional softwares.
+ * Print version information about used Observium and additional software.
  *
  * @return NULL
  */
@@ -720,10 +832,15 @@ function print_versions()
   $php_version     = $GLOBALS['cache']['versions']['php_text'];
   $python_version  = $GLOBALS['cache']['versions']['python_text'];
   $mysql_version   = $GLOBALS['cache']['versions']['mysql_text'];
+  $mysql_name      = $GLOBALS['cache']['versions']['mysql_name'];
   $snmp_version    = $GLOBALS['cache']['versions']['snmp_text'];
   $rrdtool_version = $GLOBALS['cache']['versions']['rrdtool_text'];
   $fping_version   = $GLOBALS['cache']['versions']['fping_text'];
   $http_version    = $GLOBALS['cache']['versions']['http_text'];
+
+  // PHP memory_limit
+  $php_memory_limit      = $GLOBALS['cache']['versions']['php_memory_limit'];
+  $php_memory_limit_text = $GLOBALS['cache']['versions']['php_memory_limit_text'];
 
   if (is_cli())
   {
@@ -731,18 +848,23 @@ function print_versions()
     //print_vars($timezone);
 
     $mysql_mode    = dbFetchCell("SELECT @@SESSION.sql_mode;");
-    $mysql_charset = dbShowVariables('SESSION', "LIKE 'character_set_connection'");
+    $mysql_charset = dbShowVariables("LIKE 'character_set_connection'");
 
-    // PHP memory_limit
-    //$php_memory_limit      = $GLOBALS['cache']['versions']['php_memory_limit'];
-    //$php_memory_limit_text = $GLOBALS['cache']['versions']['php_memory_limit_text'];
-
-    $php_memory_limit = unit_string_to_numeric(ini_get('memory_limit'));
-    if ($php_memory_limit < 0)
+    if ($GLOBALS['cache']['versions']['php_old'])
     {
-      $php_memory_limit_text = 'Unlimited';
-    } else {
-      $php_memory_limit_text = formatStorage($php_memory_limit);
+      $php_version = '%r' . $php_version;
+    }
+    if ($GLOBALS['cache']['versions']['python_old'])
+    {
+      $python_version = '%r' . $python_version;
+    }
+    if ($GLOBALS['cache']['versions']['mysql_old'])
+    {
+      $mysql_version = '%r' . $mysql_version;
+    }
+    if ($GLOBALS['cache']['versions']['rrdtool_old'])
+    {
+      $rrdtool_version = '%r' . $rrdtool_version;
     }
 
     echo(PHP_EOL);
@@ -751,7 +873,7 @@ function print_versions()
     print_cli_data("Apache",  $http_version);
     print_cli_data("PHP",     $php_version);
     print_cli_data("Python",  $python_version);
-    print_cli_data("MySQL",   $mysql_version);
+    print_cli_data($mysql_name, $mysql_version);
     print_cli_data("SNMP",    $snmp_version);
     print_cli_data("RRDtool", $rrdtool_version);
     print_cli_data("Fping",   $fping_version);
@@ -763,24 +885,73 @@ function print_versions()
     print_cli_data("PHP",     ($php_memory_limit >= 0 && $php_memory_limit < 268435456 ? '%r' : '') . $php_memory_limit_text, 3);
 
     echo(PHP_EOL);
-    print_cli_heading("MySQL mode", 3);
-    print_cli_data("MySQL",   $mysql_mode, 3);
+    print_cli_heading("$mysql_name mode", 3);
+    print_cli_data($mysql_name, $mysql_mode, 3);
 
     echo(PHP_EOL);
     print_cli_heading("Charset info", 3);
     print_cli_data("PHP",     ini_get("default_charset"), 3);
-    print_cli_data("MySQL",   $mysql_charset['character_set_connection'], 3);
+    print_cli_data($mysql_name, $mysql_charset['character_set_connection'], 3);
 
     echo(PHP_EOL);
     print_cli_heading("Timezones info", 3);
     print_cli_data("Date",    date("l, d-M-y H:i:s T"), 3);
     print_cli_data("PHP",     $timezone['php'], 3);
-    print_cli_data("MySQL",   ($timezone['diff'] !== 0 ? '%r' : '') . $timezone['mysql'], 3);
+    print_cli_data($mysql_name, ($timezone['diff'] !== 0 ? '%r' : '') . $timezone['mysql'], 3);
     echo(PHP_EOL);
 
   } else {
     $observium_date  = format_unixtime(strtotime(OBSERVIUM_DATE), 'jS F Y');
-    
+
+    if ($php_memory_limit >= 0 && $php_memory_limit < 268435456)
+    {
+      $php_memory_limit_text = '<span class="text-danger">'.$php_memory_limit_text.'</span>';
+    }
+
+    // Check minimum versions
+    if ($GLOBALS['cache']['versions']['php_old'])
+    {
+      $php_class = 'error';
+      $php_version = generate_tooltip_link(NULL, $php_version, 'Minimum supported: ' . OBS_MIN_PHP_VERSION);
+    } else {
+      $php_class = '';
+      $php_version = escape_html($php_version);
+    }
+    if ($GLOBALS['cache']['versions']['python_old'])
+    {
+      $python_class = 'error';
+      if (str_starts($python_version, '2.'))
+      {
+        $python_version = generate_tooltip_link(NULL, $python_version, 'Minimum supported: ' . OBS_MIN_PYTHON2_VERSION . ' or ' . OBS_MIN_PYTHON3_VERSION);
+      } else {
+        $python_version = generate_tooltip_link(NULL, $python_version, 'Minimum supported: ' . OBS_MIN_PYTHON3_VERSION);
+      }
+    } else {
+      $python_class = '';
+      $python_version = escape_html($python_version);
+    }
+    if ($GLOBALS['cache']['versions']['mysql_old'])
+    {
+      $mysql_class = 'error';
+      if ($mysql_name === 'MariaDB')
+      {
+        $mysql_version = generate_tooltip_link(NULL, $mysql_version, 'Minimum supported: ' . OBS_MIN_MARIADB_VERSION);
+      } else {
+        $mysql_version = generate_tooltip_link(NULL, $mysql_version, 'Minimum supported: ' . OBS_MIN_MYSQL_VERSION);
+      }
+    } else {
+      $mysql_class = '';
+      $mysql_version = escape_html($mysql_version);
+    }
+    if ($GLOBALS['cache']['versions']['rrdtool_old'])
+    {
+      $rrdtool_class = 'error';
+      $rrdtool_version = generate_tooltip_link(NULL, $rrdtool_version, 'Minimum supported: ' . OBS_MIN_RRD_VERSION);
+    } else {
+      $rrdtool_class = '';
+      $rrdtool_version = escape_html($rrdtool_version);
+    }
+
     echo generate_box_open(array('title' => 'Version Information'));
     echo('
         <table class="table table-striped table-condensed-more">
@@ -788,11 +959,11 @@ function print_versions()
             <tr><td><b>'.escape_html(OBSERVIUM_PRODUCT).'</b></td><td>'.escape_html(OBSERVIUM_VERSION).' ('.escape_html($observium_date).')</td></tr>
             <tr><td><b>OS</b></td><td>'.escape_html($os_version).'</td></tr>
             <tr><td><b>Apache</b></td><td>'.escape_html($http_version).'</td></tr>
-            <tr><td><b>PHP</b></td><td>'.escape_html($php_version).'</td></tr>
-            <tr><td><b>Python</b></td><td>'.escape_html($python_version).'</td></tr>
-            <tr><td><b>MySQL</b></td><td>'.escape_html($mysql_version).'</td></tr>
+            <tr class="'.$php_class.'"><td><b>PHP</b></td><td>'.$php_version.' (Memory: '.$php_memory_limit_text.')</td></tr>
+            <tr class="'.$python_class.'"><td><b>Python</b></td><td>'.$python_version.'</td></tr>
+            <tr class="'.$mysql_class.'"><td><b>'.$mysql_name.'</b></td><td>'.$mysql_version.'</td></tr>
             <tr><td><b>SNMP</b></td><td>'.escape_html($snmp_version).'</td></tr>
-            <tr><td><b>RRDtool</b></td><td>'.escape_html($rrdtool_version).'</td></tr>
+            <tr class="'.$rrdtool_class.'"><td><b>RRDtool</b></td><td>'.$rrdtool_version.'</td></tr>
             <tr><td><b>Fping</b></td><td>'.escape_html($fping_version).'</td></tr>
           </tbody>
         </table>'.PHP_EOL);
@@ -957,6 +1128,7 @@ function timeticks_to_sec($timetick, $float = FALSE)
     //print_vars($timetick_array);
   }
   $time  = ($float ? (float)$secs + $microsecs/100 : (int)$secs);
+  print_debug("Timeticks converted $timetick -> $time");
 
   return $time;
 }
@@ -1024,28 +1196,6 @@ function datetime_to_unixtime($datetime, $use_gmt = FALSE)
     return ($time_gmt);
   } else {
     return ($time_local);
-  }
-}
-
-// DOCME needs phpdoc block
-# If a device is up, return its uptime, otherwise return the
-# time since the last time we were able to poll it.  This
-# is not very accurate, but better than reporting what the
-# uptime was at some time before it went down.
-// TESTME needs unit testing
-function deviceUptime($device, $format = "long")
-{
-  if ($device['status'] == 0) {
-    if ($device['last_polled'] == 0) {
-      return "Never polled";
-    }
-    $since = time() - strtotime($device['last_polled']);
-    //$reason = isset($device['status_type']) && $format == 'long' ? '('.strtoupper($device['status_type']).') ' : '';
-    $reason = isset($device['status_type']) ? '('.strtoupper($device['status_type']).') ' : '';
-
-    return "Down $reason" . format_uptime($since, $format);
-  } else {
-    return format_uptime($device['uptime'], $format);
   }
 }
 
@@ -1134,7 +1284,8 @@ function format_uptime($uptime, $format = "long")
  */
 function uptime_to_seconds($uptime)
 {
-  if (str_contains($uptime, ':')) {
+  if (str_exists($uptime, ':'))
+  {
     $seconds = timeticks_to_sec($uptime);
   } else {
     $seconds = age_to_seconds($uptime);
@@ -1159,17 +1310,18 @@ function uptime_to_seconds($uptime)
  *  [diff] => 0
  * )
  *
+ * @param bool $refresh Refresh timezones
+ *
  * @return array Timezones info
  */
-// MOVEME to includes/functions.inc.php
-function get_timezone()
+function get_timezone($refresh = FALSE)
 {
   global $cache;
 
-  if (!isset($cache['timezone']))
+  if ($refresh || !isset($cache['timezone']))
   {
     $timezone = array();
-    $timezone['system'] = external_exec('date "+%:z"');                         // return '+03:00'
+    $timezone['system'] = external_exec('date "+%:z"');                            // return '+03:00'
     if (!OBS_DB_SKIP)
     {
       $timezone['mysql']  = dbFetchCell('SELECT TIMEDIFF(NOW(), UTC_TIMESTAMP);'); // return '03:00:00'
@@ -1249,20 +1401,31 @@ function mac_zeropad($mac)
   {
     $mac_clean = $mac;
   } else {
-    $mac_clean = NULL;
+    // Strip out non-hex digits (Not sure when this required, copied for compat with old format_mac())
+    $mac = preg_replace('/[[:^xdigit:]]/', '', $mac);
+    $mac_clean = (strlen($mac) == 12) ? $mac : NULL;
+    //$mac_clean = NULL;
   }
 
   return $mac_clean;
 }
 
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function format_mac($mac)
+/**
+ * Format any mac address string.
+ *
+ * @param string $mac        MAC address string in any known format
+ * @param string $split_char Allowed split chars for specific formats: ':', '', ' ', '0x'
+ *
+ * @return string
+ */
+function format_mac($mac, $split_char = ':')
 {
-  // Strip out non-hex digits
-  $mac = preg_replace('/[[:^xdigit:]]/', '', strtolower($mac));
+  // Clean MAC string
+  $mac = mac_zeropad($mac);
+
   // Add colons
   $mac = preg_replace('/([[:xdigit:]]{2})(?!$)/', '$1:', $mac);
+
   // Convert fake MACs to IP
   //if (preg_match('/ff:fe:([[:xdigit:]]+):([[:xdigit:]]+):([[:xdigit:]]+):([[:xdigit:]]{1,2})/', $mac, $matches))
   if (preg_match('/ff:fe:([[:xdigit:]]{2}):([[:xdigit:]]{2}):([[:xdigit:]]{2}):([[:xdigit:]]{2})/', $mac, $matches))
@@ -1273,6 +1436,25 @@ function format_mac($mac)
     } else {
       $mac = hexdec($matches[1]).'.'.hexdec($matches[2]).'.'.hexdec($matches[3]).'.'.hexdec($matches[4]);
     }
+  }
+
+  if ($split_char === '')
+  {
+    $mac = str_replace(':', $split_char, $mac);
+  }
+  elseif ($split_char == ' ')
+  {
+    $mac = strtoupper(str_replace(':', $split_char, $mac));
+  }
+  elseif ($split_char == '.')
+  {
+    // Cisco like format
+    $parts = explode(':', $mac, 6);
+    $mac = $parts[0].$parts[1] . '.' . $parts[2].$parts[3] . '.' . $parts[4].$parts[5];
+  }
+  elseif ($split_char == '0x')
+  {
+    $mac = '0x' . strtoupper(str_replace(':', '', $mac));
   }
 
   return $mac;
@@ -1292,7 +1474,7 @@ function format_number_short($number, $sf)
   {
     $number = $whole;
   }
-  else if ($whole_len < $sf)
+  elseif ($whole_len < $sf)
   {
     $number  = $whole;
     $diff    = $sf - $whole_len;
@@ -1361,6 +1543,12 @@ function external_exec($command, $timeout = NULL)
       // for help users who want send debug output to developers
       $pattern = "/\s+(?:(-[uxXaA])\s*(?:'.*?')|(-c)\s*(?:'.*?(@\S+)?'))/"; // do not hide contexts, only community and v3 auth
       $debug_command = preg_replace($pattern, ' \1\2 ***\3', $debug_command);
+    }
+    elseif (OBS_DEBUG < 2 && preg_match("!\ --(user(?:name)?|password)=!", $debug_command))
+    {
+      // Hide any username/password in debug output, ie in WMIC
+      $pattern = "/ --(user(?:name)?|password)=(\S+|\'[^\']*\')/";
+      $debug_command = preg_replace($pattern, ' --\1=***', $debug_command);
     }
     print_message(PHP_EOL . 'CMD[%y' . $debug_command . '%n]' . PHP_EOL, 'console');
   }
@@ -1518,13 +1706,15 @@ function external_exec($command, $timeout = NULL)
                   'CMD RUNTIME['.($runtime > 7 ? '%r' : '%g').round($runtime, 4).'s%n]', 'console');
     if ($exec_status['exitdelay'] > 0)
     {
-      print_message("CMD EXITDELAY[%r".$exec_status['exitdelay']."ms%n]", 'console', FALSE);
+      print_message("CMD EXITDELAY[%r".$exec_status['exitdelay']."ms%n]", 'console');
     }
-    print_message("STDOUT[\n".$stdout."\n]", 'console', FALSE);
+    //print_message("STDOUT[\n".$stdout."\n]", 'console', FALSE);
+    echo("STDOUT[\n".$stdout."\n]\n"); // Do not colouring stdout
     if ($exec_status['exitcode'] && $exec_status['stderr'])
     {
       // Show stderr if exitcode not 0
-      print_message("STDERR[\n".$exec_status['stderr']."\n]", 'console', FALSE);
+      //print_message("STDERR[\n".$exec_status['stderr']."\n]", 'console', FALSE);
+      echo("STDERR[\n".$exec_status['stderr']."\n]\n"); // Do not colouring stdout
     }
   }
 
@@ -1536,7 +1726,7 @@ function external_exec($command, $timeout = NULL)
  *
  * @param int     $pid    The process identifier.
  * @param boolean $stats  If true, additionally show cpu/memory stats
- * @return array          Array with information about process, If process not found, return FALSE
+ * @return array|false  Array with information about process, If process not found, return FALSE
  */
 function get_pid_info($pid, $stats = FALSE)
 {
@@ -1642,14 +1832,27 @@ function get_pid_info($pid, $stats = FALSE)
 /**
  * Add information about process into DB
  *
- * @param string $process_name Process identicator
- * @param array  $device       Device array
- * @param int    $pid          PID for process. If empty used current PHP process ID
- * @return int                 DB id for inserted row
+ * @param array   $device Device array
+ * @param integer $pid    PID for process. If empty used current PHP process ID
+ * @return integer        DB id for inserted row
  */
 function add_process_info($device, $pid = NULL)
 {
-  global $argv;
+  global $argv, $config;
+
+  $process_name = basename($argv[0]);
+
+  // Ability for skip any process checking
+  // WARNING. USE AT OWN RISK
+  $process = str_replace('.php', '', $process_name);
+  if (isset($config['check_process'][$process]) && !$config['check_process'][$process])
+  {
+    if (OBS_DEBUG)
+    {
+      print_error("WARNING. Process '$process_name' adding disabled.");
+    }
+    return NULL;
+  }
 
   // Check if device_id passed instead array
   if (is_numeric($device))
@@ -1664,8 +1867,7 @@ function add_process_info($device, $pid = NULL)
 
   if (is_array($pid_info))
   {
-    $process_name = basename($argv[0]);
-    if ($process_name == 'poller.php' || $process_name == 'alerter.php')
+    if ($process_name === 'poller.php' || $process_name === 'alerter.php')
     {
       // Try detect parent poller wrapper
       $parent_info = $pid_info;
@@ -1695,11 +1897,34 @@ function add_process_info($device, $pid = NULL)
     return dbInsert($update_array, 'observium_processes');
   }
   print_debug("Process info not added for PID: $pid");
+
+  return NULL;
 }
 
+/**
+ * Delete information about process from DB
+ *
+ * @param array  $device       Device array
+ * @param int    $pid          PID for process. If empty used current PHP process ID
+ * @return int                 DB id for inserted row
+ */
 function del_process_info($device, $pid = NULL)
 {
-  global $argv;
+  global $argv, $config;
+
+  $process_name = basename($argv[0]);
+
+  // Ability for skip any process checking
+  // WARNING. USE AT OWN RISK
+  $process = str_replace('.php', '', $process_name);
+  if (isset($config['check_process'][$process]) && !$config['check_process'][$process])
+  {
+    if (OBS_DEBUG)
+    {
+      print_error("WARNING. Process '$process_name' delete disabled.");
+    }
+    return NULL;
+  }
 
   // Check if device_id passed instead array
   if (is_numeric($device))
@@ -1711,15 +1936,28 @@ function del_process_info($device, $pid = NULL)
     $pid = getmypid();
   }
 
-  return dbDelete('observium_processes', '`process_pid` = ? AND `process_name` = ? AND `device_id` = ?', array($pid, basename($argv[0]), $device['device_id']));
+  return dbDelete('observium_processes', '`process_pid` = ? AND `process_name` = ? AND `device_id` = ?', array($pid, $process_name, $device['device_id']));
 }
 
 function check_process_run($device, $pid = NULL)
 {
-  global $argv;
+  global $config, $argv;
+
+  $check = FALSE;
 
   $process_name = basename($argv[0]);
-  $check = FALSE;
+
+  // Ability for skip any process checking
+  // WARNING. USE AT OWN RISK
+  $process = str_replace('.php', '', $process_name);
+  if (isset($config['check_process'][$process]) && !$config['check_process'][$process])
+  {
+    if (OBS_DEBUG)
+    {
+      print_error("WARNING. Process '$process_name' checking disabled.");
+    }
+    return $check;
+  }
 
   // Check if device_id passed instead array
   if (is_numeric($device))
@@ -1779,6 +2017,7 @@ function array_get_nested($array, $string, $delimiter = '->')
 
 /**
  * Fast string compare function, checks if string contain $needle
+ * Note: function renamed from str_contains() for not to intersect with php8 function in future.
  *
  * @param string $string              The string to search in
  * @param mixed  $needle              If needle is not a string, it is converted to an string
@@ -1786,14 +2025,14 @@ function array_get_nested($array, $string, $delimiter = '->')
  * @param bool   $case_insensitivity  If case_insensitivity is TRUE, comparison is case insensitive
  * @return bool                       Returns TRUE if $string starts with $needle or FALSE otherwise
  */
-function str_contains($string, $needle, $encoding = FALSE, $case_insensitivity = FALSE)
+function str_exists($string, $needle, $encoding = FALSE, $case_insensitivity = FALSE)
 {
   // If needle is array, use recursive compare
   if (is_array($needle))
   {
     foreach ($needle as $findme)
     {
-      if (str_contains($string, (string)$findme, $encoding, $case_insensitivity))
+      if (str_exists($string, (string)$findme, $encoding, $case_insensitivity))
       {
         return TRUE;
       }
@@ -1822,9 +2061,9 @@ function str_contains($string, $needle, $encoding = FALSE, $case_insensitivity =
   }
 }
 
-function str_icontains($string, $needle, $encoding = FALSE)
+function str_iexists($string, $needle, $encoding = FALSE)
 {
-  return str_contains($string, $needle, $encoding, TRUE);
+  return str_exists($string, $needle, $encoding, TRUE);
 }
 
 /**
@@ -1833,8 +2072,8 @@ function str_icontains($string, $needle, $encoding = FALSE)
  * @param string $string              The string to search in
  * @param mixed  $needle              If needle is not a string, it is converted to an string
  * @param mixed  $encoding            For use "slow" multibyte compare, pass required encoding here (ie: UTF-8)
- * @param binary $case_insensitivity  If case_insensitivity is TRUE, comparison is case insensitive
- * @return binary                     Returns TRUE if $string starts with $needle or FALSE otherwise
+ * @param boolean $case_insensitivity If case_insensitivity is TRUE, comparison is case insensitive
+ * @return boolean                    Returns TRUE if $string starts with $needle or FALSE otherwise
  */
 function str_starts($string, $needle, $encoding = FALSE, $case_insensitivity = FALSE)
 {
@@ -1885,8 +2124,8 @@ function str_istarts($string, $needle, $encoding = FALSE)
  * @param string $string              The string to search in
  * @param mixed  $needle              If needle is not a string, it is converted to an string
  * @param mixed  $encoding            For use "slow" multibyte compare, pass required encoding here (ie: UTF-8)
- * @param binary $case_insensitivity  If case_insensitivity is TRUE, comparison is case insensitive
- * @return binary                     Returns TRUE if $string ends with $needle or FALSE otherwise
+ * @param boolean $case_insensitivity If case_insensitivity is TRUE, comparison is case insensitive
+ * @return boolean                    Returns TRUE if $string ends with $needle or FALSE otherwise
  */
 function str_ends($string, $needle, $encoding = FALSE, $case_insensitivity = FALSE)
 {
@@ -2191,6 +2430,168 @@ function print_cli($text, $colour = TRUE)
   print $msg->convert($text, $colour);
 }
 
+/**
+ * Determine if poller/discovery module enabled for device
+ *
+ * @param array       $device Device array
+ * @param string      $module Module name
+ * @param string|null $process Process name (poller, discovery). Try to detect if not passed.
+ *
+ * @return bool
+ */
+function is_module_enabled($device, $module, $process = NULL)
+{
+  global $config;
+
+  // Detect used process (poller, discovery, etc)
+  if (is_null($process) || !in_array($process, [ 'poller', 'discovery' ]))
+  {
+    list($process) = explode('.', basename($GLOBALS['argv'][0]));
+  }
+  if (!in_array($process, [ 'poller', 'discovery' ]))
+  {
+    print_debug("Module [$module] skipped. Not specified process name (poller or discovery).");
+    return FALSE;
+  }
+
+  // Detect if need to check submodule, ie: ports_ifstats
+  list($module, $submodule) = explode('_', $module, 2);
+  /* Allow specify module name with process prefix (poller_, discovery_), currently disabled
+  if (in_array($module, ['poller', 'discovery']))
+  {
+    $process = $module;
+    list($module, $submodule) = explode('_', $submodule, 2);
+  }
+  */
+
+  //print_debug_vars($process);
+  //print_debug_vars($module);
+  //print_debug_vars($submodule);
+
+  // Pre check if module is known (discovery_modules or poller_modules global config)
+  if (!isset($config[$process . '_modules'][$module]))
+  {
+    print_debug("Module [$module] not exist.");
+    return FALSE;
+  }
+
+  if (strlen($submodule))
+  {
+    // Check enabled only submodule
+
+    // Ie: $config['enable_ports_ipifstats']
+    $module_name = $module.'_'.$submodule;
+    $setting_name = 'enable_'.$module_name;
+    if (isset($config[$setting_name]))
+    {
+      // Globally enabled/disabled submodule
+      $ok = boolval($config[$setting_name]);
+      $debug_reason = "disabled globally by config";
+    } else {
+      // Unknown Submodule
+      print_debug("Submodule [$module_name] not exist.");
+      return FALSE;
+    }
+
+    $attrib = get_entity_attrib('device', $device, $setting_name);
+    if ($module_name === 'ports_junoseatmvp' && $device['os'] !== 'junose')
+    {
+      // Some hardcoded excludes
+      $ok = FALSE;
+      $debug_reason = "excluded for device os";
+    }
+    elseif (strlen($attrib))
+    {
+      // Submodule set by device setting
+      $ok = boolval($attrib);
+      $debug_reason = "disabled by device setting";
+    }
+    elseif (isset($config['os'][$device['os']]['modules'][$module_name]))
+    {
+      // Submodule set by os definition
+      $ok = boolval($config['os'][$device['os']]['modules'][$module_name]);
+      $debug_reason = "disabled by os definition";
+    }
+
+  } else {
+    // Check main module
+    $module_name = $module;
+
+    // Globally enabled/disabled module
+    $ok = boolval($config[$process . '_modules'][$module]);
+    $debug_reason = "disabled globally by config";
+
+    if ($process === 'poller')
+    {
+      if ($module === 'os' || $module === 'system')
+      {
+        // os, system modules always enabled for poller
+        //print_debug("Module [$module] always enabled in process [$process].");
+        $GLOBALS['cache']['devices'][$process.'_modules'][$device['device_id']]['enabled'][] = $module;
+        return TRUE;
+      }
+      if (!function_exists('poller_module_excluded'))
+      {
+        // In discovery this function missed
+        include_once($config['install_dir'] . "/includes/polling/functions.inc.php");
+      }
+      if (poller_module_excluded($device, $module))
+      {
+        // Module excluded
+        print_debug("Module [$module] excluded in process [$process].");
+        $GLOBALS['cache']['devices'][$process.'_modules'][$device['device_id']]['excluded'][] = $module;
+        return FALSE;
+      }
+      $setting_name = 'poll_'.$module;
+    }
+    elseif ($process === 'discovery')
+    {
+      if ($module === 'os') // || $module == 'mibs')
+      {
+        // os module always enabled for discovery
+        //print_debug("Module [$module] always enabled in process [$process].");
+        $GLOBALS['cache']['devices'][$process.'_modules'][$device['device_id']]['enabled'][] = $module;
+        return TRUE;
+      }
+      $setting_name = 'discover_'.$module;
+    }
+
+    $attrib = get_entity_attrib('device', $device, $setting_name);
+    if (strlen($attrib))
+    {
+      // Module set by device setting
+      $ok = boolval($attrib);
+      $debug_reason = "disabled by device setting";
+    }
+    elseif (in_array($module, $config['os'][$device['os']][$process.'_blacklist']))
+    {
+      // Module blacklisted by os definition
+      // $config['os'][$os]['poller_blacklist']     (array)  list of blacklisted poller modules
+      // $config['os'][$os]['discovery_blacklist']  (array)  list of blacklisted discovery modules
+      //$ok = FALSE;
+      //$debug_reason = "blacklisted by os definition";
+      $GLOBALS['cache']['devices'][$process.'_modules'][$device['device_id']]['excluded'][] = $module;
+      print_debug("Module [$module] blacklisted by os definition in process [$process].");
+      return FALSE;
+    }
+    elseif (isset($config['os'][$device['os']]['modules'][$module_name]))
+    {
+      // Module set by os definition
+      $ok = boolval($config['os'][$device['os']]['modules'][$module_name]);
+      $debug_reason = "disabled by os definition";
+    }
+  }
+
+  if (!$ok)
+  {
+    print_debug("Module [$module_name] $debug_reason in process [$process].");
+    $GLOBALS['cache']['devices'][$process.'_modules'][$device['device_id']]['disabled'][] = $module;
+  } else {
+    $GLOBALS['cache']['devices'][$process.'_modules'][$device['device_id']]['enabled'][] = $module;
+  }
+  return $ok;
+}
+
 // TESTME needs unit testing
 /**
  * Print an discovery/poller module stats
@@ -2231,32 +2632,26 @@ function print_obsolete_config($filter = '')
   {
     if ($filter && strpos($entry['old'], $filter) === FALSE) { continue; }
     $old = explode('->', $entry['old']);
-    switch (count($old))
+    // Founded obsolete config in overall $config
+    $found = !is_null(array_get_nested($config, $entry['old']));
+    if ($found && is_null(array_get_nested(get_defined_settings(), $entry['old'])))
     {
-      case 1:
-        $entry['isset'] = isset($config[$old[0]]);
-        break;
-      case 2:
-        $entry['isset'] = isset($config[$old[0]][$old[1]]);
-        break;
-      case 3:
-        $entry['isset'] = isset($config[$old[0]][$old[1]][$old[2]]);
-        break;
-      case 4:
-        $entry['isset'] = isset($config[$old[0]][$old[1]][$old[2]][$old[3]]);
-        break;
+      // Check if this is in config.php or in DB config
+      $found = FALSE;
+      // FIXME need migrate old DB config to new
     }
-    if ($entry['isset'])
+
+    if ($found)
     {
       $new  = explode('->', $entry['new']);
-      $info = (isset($entry['info']) ? ' ('.$entry['info'].')' : '');
-      $list[] = "  %r\$config['".implode("']['", $old)."']%n --> %g\$config['".implode("']['", $new)."']%n".$info;
+      $info = strlen($entry['info']) ? ' ('.$entry['info'].')' : '';
+      $list[] = "  %r\$config['".implode("']['", $old)."']%n -> %g\$config['".implode("']['", $new)."']%n".$info;
     }
   }
 
   if ($list)
   {
-    $msg = "%WWARNING.%n Found obsolete configurations in config.php, please rename respectively:\n".implode(PHP_EOL, $list);
+    $msg = "%WWARNING%n Obsolete configuration(s) found in config.php file, please rename respectively:\n".implode(PHP_EOL, $list);
     print_message($msg, 'color');
     return TRUE;
   } else {
@@ -2269,24 +2664,34 @@ function print_obsolete_config($filter = '')
 // TESTME needs unit testing
 function check_extension_exists($extension, $text = FALSE, $fatal = FALSE)
 {
-  $exist = FALSE;
   $extension = strtolower($extension);
-  $extension_functions = array(
-    'ldap'     => 'ldap_connect',
-    'mysql'    => 'mysql_connect',
-    'mysqli'   => 'mysqli_connect',
-    'mbstring' => 'mb_detect_encoding',
-    'mcrypt'   => 'mcrypt_encrypt', // CLEANME, mcrypt not used anymore (deprecated since php 7.1, removed since php 7.2)
-    'posix'    => 'posix_isatty',
-    'session'  => 'session_name',
-    'svn'      => 'svn_log'
-  );
 
-  if (isset($extension_functions[$extension]))
+  if (isset($GLOBALS['cache']['extension'][$extension]))
   {
-    $exist = @function_exists($extension_functions[$extension]);
+    // Cached
+    $exist = $GLOBALS['cache']['extension'][$extension];
   } else {
-    $exist = @extension_loaded($extension);
+
+    $extension_functions = array(
+      'ldap'     => 'ldap_connect',
+      'mysql'    => 'mysql_connect',
+      'mysqli'   => 'mysqli_connect',
+      'mbstring' => 'mb_detect_encoding',
+      'mcrypt'   => 'mcrypt_encrypt', // CLEANME, mcrypt not used anymore (deprecated since php 7.1, removed since php 7.2)
+      'posix'    => 'posix_isatty',
+      'session'  => 'session_name',
+      'svn'      => 'svn_log'
+    );
+
+    if (isset($extension_functions[$extension]))
+    {
+      $exist = @function_exists($extension_functions[$extension]);
+    } else {
+      $exist = @extension_loaded($extension);
+    }
+
+    // Cache
+    $GLOBALS['cache']['extension'][$extension] = $exist;
   }
 
   if (!$exist)
@@ -2335,38 +2740,6 @@ function sgn($int)
   }
 }
 
-// Get port array by ID (using cache)
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_port_by_id_cache($port_id)
-{
-  return get_entity_by_id_cache('port', $port_id);
-}
-
-// Get port array by ID (with port state)
-// NOTE get_port_by_id(ID) != get_port_by_id_cache(ID)
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_port_by_id($port_id)
-{
-  if (is_numeric($port_id))
-  {
-    //$port = dbFetchRow("SELECT * FROM `ports` LEFT JOIN `ports-state` ON `ports`.`port_id` = `ports-state`.`port_id`  WHERE `ports`.`port_id` = ?", array($port_id));
-    $port = dbFetchRow("SELECT * FROM `ports`  WHERE `ports`.`port_id` = ?", array($port_id));
-  }
-
-  if (is_array($port))
-  {
-    //$port['port_id'] = $port_id; // It corrects the situation, when `ports-state` is empty
-    humanize_port($port);
-    return $port;
-  }
-
-  return FALSE;
-}
-
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 // MOVEME to includes/functions.inc.php
@@ -2381,39 +2754,6 @@ function get_bill_by_id($bill_id)
     return FALSE;
   }
 
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_all_devices()
-{
-  global $cache;
-
-  // FIXME needs access control checks!
-  // FIXME respect $type (server, network, etc) -- needs an array fill in topnav.
-
-  $devices = array();
-  if (isset($cache['devices']['hostname']))
-  {
-    foreach ($cache['devices']['hostname'] as $hostname => $device_id)
-    {
-      $devices[$device_id] = $hostname;
-    }
-    //$devices = array_keys($cache['devices']['hostname']);
-  }
-  else
-  {
-    foreach (dbFetchRows("SELECT `device_id`, `hostname` FROM `devices` ORDER BY `hostname`") as $data)
-    {
-      $devices[$data['device_id']] = $data['hostname'];
-    }
-  }
-  //r($devices);
-  //asort($devices);
-  //r($devices);
-
-  return $devices;
 }
 
 // DOCME needs phpdoc block
@@ -2436,70 +2776,6 @@ function get_application_by_id($application_id)
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 // MOVEME to includes/functions.inc.php
-function get_device_id_by_port_id($port_id)
-{
-  if (is_numeric($port_id))
-  {
-    $device_id = dbFetchCell("SELECT `device_id` FROM `ports` WHERE `port_id` = ?", array($port_id));
-  }
-  if (is_numeric($device_id))
-  {
-    return $device_id;
-  } else {
-    return FALSE;
-  }
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_device_id_by_app_id($app_id)
-{
-  if (is_numeric($app_id))
-  {
-    $device_id = dbFetchCell("SELECT `device_id` FROM `applications` WHERE `app_id` = ?", array($app_id));
-  }
-  if (is_numeric($device_id))
-  {
-    return $device_id;
-  } else {
-    return FALSE;
-  }
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME html/includes/functions.inc.php BUT this used in includes/rewrites.inc.php
-function port_html_class($ifOperStatus, $ifAdminStatus, $encrypted = FALSE)
-{
-  $ifclass = "interface-upup";
-  if      ($ifAdminStatus == "down")            { $ifclass = "gray"; }
-  else if ($ifAdminStatus == "up")
-  {
-    if      ($ifOperStatus == "down")           { $ifclass = "red"; }
-    else if ($ifOperStatus == "lowerLayerDown") { $ifclass = "orange"; }
-    else if ($ifOperStatus == "monitoring")     { $ifclass = "green"; }
-    //else if ($encrypted === '1')                { $ifclass = "olive"; }
-    else if ($encrypted)                        { $ifclass = "olive"; }
-    else if ($ifOperStatus == "up")             { $ifclass = ""; }
-    else                                        { $ifclass = "purple"; }
-  }
-
-  return $ifclass;
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function device_by_name($name, $refresh = 0)
-{
-  // FIXME - cache name > id too.
-  return device_by_id_cache(get_device_id_by_hostname($name), $refresh);
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
 function accesspoint_by_id($ap_id, $refresh = '0')
 {
   $ap = dbFetchRow("SELECT * FROM `accesspoints` WHERE `accesspoint_id` = ?", array($ap_id));
@@ -2509,40 +2785,19 @@ function accesspoint_by_id($ap_id, $refresh = '0')
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function device_by_id_cache($device_id, $refresh = '0')
-{
-  global $cache;
-
-  if (!$refresh && isset($cache['devices']['id'][$device_id]) && is_array($cache['devices']['id'][$device_id]))
-  {
-    $device = $cache['devices']['id'][$device_id];
-  } else {
-    $device = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", array($device_id));
-  }
-
-  if (!empty($device))
-  {
-    humanize_device($device);
-    if ($refresh || !isset($device['graphs']))
-    {
-      // Fetch device graphs
-      $device['graphs'] = dbFetchRows("SELECT * FROM `device_graphs` WHERE `device_id` = ?", array($device_id));
-    }
-    $cache['devices']['id'][$device_id] = $device;
-
-    return $device;
-  } else {
-    return FALSE;
-  }
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
 function truncate($substring, $max = 50, $rep = '...')
 {
+  if ($rep === '...' && !is_cli())
+  {
+    // in html use entities triple dot
+    $rep_len = 1;
+    //$rep = '&hellip;';
+    $rep = '&mldr;';
+  } else {
+    $rep_len = strlen($rep);
+  }
   if (strlen($substring) < 1) { $string = $rep; } else { $string = $substring; }
-  $leave = $max - strlen ($rep);
+  $leave = $max - $rep_len;
   if (strlen($string) > $max) { return substr_replace($string, $rep, $leave); } else { return $string; }
 }
 
@@ -2550,6 +2805,9 @@ function truncate($substring, $max = 50, $rep = '...')
  * Wrapper to htmlspecialchars()
  *
  * @param string $string
+ * @param int    $flags
+ *
+ * @return string|string[]
  */
 // TESTME needs unit testing
 function escape_html($string, $flags = ENT_QUOTES)
@@ -2558,37 +2816,24 @@ function escape_html($string, $flags = ENT_QUOTES)
   $string = htmlspecialchars($string, $flags, 'UTF-8');
 
   // Un-escape allowed tags
-  foreach($GLOBALS['config']['escape_html']['tags'] as $tag)
+  if (str_exists($string, $GLOBALS['config']['escape_html']['tags']))
   {
-    $string = str_ireplace('&lt;' .$tag.'&gt;', '<' .$tag.'>', $string);
-    $string = str_ireplace('&lt;/'.$tag.'&gt;', '</'.$tag.'>', $string);
+    foreach ($GLOBALS['config']['escape_html']['tags'] as $tag)
+    {
+      $string = str_replace([ '&lt;' . $tag . '&gt;', '&lt;/' . $tag . '&gt;' ],
+                            [ '<' . $tag . '>',       '</' . $tag . '>'], $string);
+    }
   }
   // Un-escape allowed entities
-  foreach($GLOBALS['config']['escape_html']['entities'] as $tag)
+  if (str_exists($string, $GLOBALS['config']['escape_html']['entities']))
   {
-    $string = str_ireplace('&amp;'.$tag.';', '&'.$tag.';', $string);
+    foreach ($GLOBALS['config']['escape_html']['entities'] as $tag)
+    {
+      $string = str_replace('&amp;' . $tag . ';', '&' . $tag . ';', $string);
+    }
   }
 
   return $string;
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_device_by_device_id($id)
-{
-  global $cache;
-
-  if (isset($cache['devices']['id'][$id]['hostname']))
-  {
-    $hostname = $cache['devices']['id'][$id]['hostname'];
-  }
-  else
-  {
-    $hostname = dbFetchCell("SELECT `hostname` FROM `devices` WHERE `device_id` = ?", array($id));
-  }
-
-  return $hostname;
 }
 
 // Return random string with optional character list
@@ -2622,57 +2867,6 @@ function strgen($length = 16)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function getpeerhost($id)
-{
-  return dbFetchCell("SELECT `device_id` from `bgpPeers` WHERE `bgpPeer_id` = ?", array($id));
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function get_device_id_by_hostname($hostname)
-{
-  global $cache;
-
-  if (isset($cache['devices']['hostname'][$hostname]))
-  {
-    $id = $cache['devices']['hostname'][$hostname];
-  }
-  else
-  {
-    $id = dbFetchCell("SELECT `device_id` FROM `devices` WHERE `hostname` = ?", array($hostname));
-  }
-
-  if (is_numeric($id))
-  {
-    return $id;
-  } else {
-    return FALSE;
-  }
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// MOVEME to includes/functions.inc.php
-function gethostosbyid($id)
-{
-  global $cache;
-
-  if (isset($cache['devices']['id'][$id]['os']))
-  {
-    $os = $cache['devices']['id'][$id]['os'];
-  }
-  else
-  {
-    $os = dbFetchCell("SELECT `os` FROM `devices` WHERE `device_id` = ?", array($id));
-  }
-
-  return $os;
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
 function safename($filename)
 {
   return preg_replace('/[^a-zA-Z0-9._\-]/', '_', $filename);
@@ -2686,48 +2880,11 @@ function zeropad($num, $length = 2)
   return str_pad($num, $length, '0', STR_PAD_LEFT);
 }
 
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-// RENAME to get_device_entphysical_state
-// MOVEME to includes/functions.inc.php
-function get_dev_entity_state($device)
-{
-  $state = array();
-  foreach (dbFetchRows("SELECT * FROM `entPhysical-state` WHERE `device_id` = ?", array($device)) as $entity)
-  {
-    $state['group'][$entity['group']][$entity['entPhysicalIndex']][$entity['subindex']][$entity['key']] = $entity['value'];
-    $state['index'][$entity['entPhysicalIndex']][$entity['subindex']][$entity['group']][$entity['key']] = $entity['value'];
-  }
-
-  return $state;
-}
-
 // OBSOLETE, remove when all function calls will be deleted
 function get_dev_attrib($device, $attrib_type)
 {
   // Call to new function
   return get_entity_attrib('device', $device, $attrib_type);
-}
-
-// OBSOLETE, remove when all function calls will be deleted
-function get_dev_attribs($device_id)
-{
-  // Call to new function
-  return get_entity_attribs('device', $device_id);
-}
-
-// OBSOLETE, remove when all function calls will be deleted
-function set_dev_attrib($device, $attrib_type, $attrib_value)
-{
-  // Call to new function
-  return set_entity_attrib('device', $device, $attrib_type, $attrib_value);
-}
-
-// OBSOLETE, remove when all function calls will be deleted
-function del_dev_attrib($device, $attrib_type)
-{
-  // Call to new function
-  return del_entity_attrib('device', $device, $attrib_type);
 }
 
 /**
@@ -2771,15 +2928,38 @@ function get_model_array($device, $sysObjectID_new = NULL)
       // Do not set cache for unknown device_id (not added device) or phpunit
       $set_cache = FALSE;
     }
+
+    // Exactly sysObjectID match
     if (isset($models[$sysObjectID]))
     {
-      // Exactly match
+      // Check by device params, ie os version (see Juniper EX model definitions)
+      if (isset($models[$sysObjectID]['test']))
+      {
+        // Single associated array with test condition
+        $models[$sysObjectID] = [ $models[$sysObjectID] ];
+      }
+      if (!is_array_assoc($models[$sysObjectID]))
+      {
+        // For cases when multiple test conditions for same sysObjectID
+        $model = FALSE;
+        foreach ($models[$sysObjectID] as $def)
+        {
+          if (discovery_check_requires($device, $def, $device, 'device')) { continue; }
+
+          $model = $def;
+          break;
+        }
+        $models[$sysObjectID] = $model;
+      }
+
       if ($set_cache)
       {
         $cache['devices']['model'][$device['device_id']] = $models[$sysObjectID];
       }
+      //r($models[$sysObjectID]);
       return $models[$sysObjectID];
     }
+
     // Resort sysObjectID array by oids with from high to low order!
     //krsort($config['model'][$model]);
     uksort($config['model'][$model], 'compare_numeric_oids_reverse');
@@ -2787,6 +2967,26 @@ function get_model_array($device, $sysObjectID_new = NULL)
     {
       if (strpos($sysObjectID, $key) === 0)
       {
+        // Check by device params, ie os version (see Juniper EX model definitions)
+        if (isset($entry['test']))
+        {
+          // Single associated array with test condition
+          $entry = [ $entry ];
+        }
+        if (!is_array_assoc($entry))
+        {
+          // For cases when multiple test conditions for same sysObjectID
+          $model = FALSE;
+          foreach ($entry as $def)
+          {
+            if (discovery_check_requires($device, $def, $device, 'device')) { continue; }
+
+            $model = $def;
+            break;
+          }
+          $entry = $model;
+        }
+
         if ($set_cache)
         {
           $cache['devices']['model'][$device['device_id']] = $entry;
@@ -2825,26 +3025,35 @@ function formatStorage($value, $round = 2, $sf = 3)
 // TESTME needs unit testing
 function format_si($value, $round = 2, $sf = 3)
 {
-  if ($value < "0")
+  if ($value < 0)
   {
     $neg = 1;
     $value = $value * -1;
   }
 
-  if ($value >= "0.1")
+  // https://physics.nist.gov/cuu/Units/prefixes.html
+  if ($value >= 0.1)
   {
-    $sizes = Array('', 'k', 'M', 'G', 'T', 'P', 'E');
+    $sizes = [ '', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' ];
     $ext = $sizes[0];
-    for ($i = 1; (($i < count($sizes)) && ($value >= 1000)); $i++) { $value = $value / 1000; $ext = $sizes[$i]; }
-  }
-  else
-  {
-    $sizes = Array('', 'm', 'u', 'n');
+    for ($i = 1; (($i < count($sizes)) && ($value >= 1000)); $i++)
+    {
+      $value = $value / 1000;
+      $ext = $sizes[$i];
+    }
+  } else {
+    //$sizes = [ '', 'm', 'u', 'n' ];
+    $sizes = [ '', 'm', 'µ', 'n', 'p', 'f', 'a', 'z', 'y' ];
     $ext = $sizes[0];
-    for ($i = 1; (($i < count($sizes)) && ($value != 0) && ($value <= 0.1)); $i++) { $value = $value * 1000; $ext = $sizes[$i]; }
+    for ($i = 1; (($i < count($sizes)) && ($value != 0) && ($value <= 0.1)); $i++)
+    {
+      $value = $value * 1000;
+      $ext = $sizes[$i];
+    }
   }
 
   if ($neg) { $value = $value * -1; }
+  //print_warning("$value " . round($value, $round));
 
   return format_number_short(round($value, $round), $sf).$ext;
 }
@@ -2908,8 +3117,13 @@ function format_value($value, $format = '', $round = 2, $sf = 3)
       if (is_numeric($value))
       {
         $value = sprintf("%01.{$round}f", $value);
+        //r($value);
         $value = preg_replace(array('/\.0+$/', '/(\.\d)0+$/'), '\1', $value);
       }
+      elseif ($value === TRUE)  { $value = 'TRUE'; }
+      elseif ($value === FALSE) { $value = 'FALSE'; }
+      elseif (is_null($value))  { $value = 'NULL'; }
+      elseif ($value === '')    { $value = '""'; }
   }
 
   return $value;
@@ -2932,21 +3146,51 @@ function format_value($value, $format = '', $round = 2, $sf = 3)
  * such as the underscore character (_), other DNS names may contain the underscore
  *
  * @param string $hostname
+ * @param bool   $fqdn
+ *
  * @return bool
  */
-function is_valid_hostname($hostname)
+function is_valid_hostname($hostname, $fqdn = FALSE)
 {
+  // Pre check if hostname is FQDN
+  if ($fqdn && !preg_match('/\.(xn\-\-[a-z0-9]{2,}|[a-z]{2,})$/i', $hostname))
+  {
+    return FALSE;
+  }
+
   return (preg_match("/^(_?[a-z\d](-*[_a-z\d])*)(\.(_?[a-z\d](-*[_a-z\d])*))*$/i", $hostname) // valid chars check
           && preg_match("/^.{1,253}$/", $hostname)                                      // overall length check
           && preg_match("/^[^\.]{1,63}(\.[^\.]{1,63})*$/", $hostname));                 // length of each label
-  /* check for invalid starting characters
-  if (preg_match('/^[_.-]/', $hostname))
-  {
-    return FALSE;
-  } else {
-    return ctype_alnum(str_replace('_','',str_replace('-','',str_replace('.','',$hostname))));
-  }
-  */
+}
+
+/**
+ * Validate for poor Locations string, ie: <none>, Unknown, ''
+ *
+ * @param $location string Location
+ *
+ * @return bool
+ */
+function is_valid_location($location)
+{
+  $poor_locations_pattern = 'unknown|private|none|office|location|snmplocation|Sitting on the Dock of the Bay';
+
+  return strlen($location) > 4 && !preg_match('/^[<\\\(]?('.$poor_locations_pattern.')[>\\\)]?$/i', $location);
+}
+
+function is_valid_serial($serial)
+{
+  // Common wrong serials: ***********, n/a, N/A, <EMPTY>, empty, Not Avail, 1234567890
+  return !(str_istarts($serial, [ '..', '***', 'Not Avail', 'Not Specified', 'To be filled by O.E.M.' ]) ||
+           str_exists($serial, [ 'denied' ]) ||
+           in_array($serial, [ '<EMPTY>', 'empty', 'n/a', 'N/A', '1234567890', '0123456789', 'No Asset Tag', 'Tag 12345' ]));
+}
+
+// BOOLEAN safe function to check if hostname resolves as IPv4 or IPv6 address
+// DOCME needs phpdoc block
+// TESTME needs unit testing
+function is_domain_resolves($hostname, $flags = OBS_DNS_ALL)
+{
+  return (is_valid_hostname($hostname) && gethostbyname6($hostname, $flags));
 }
 
 // get $host record from /etc/hosts
@@ -2961,21 +3205,76 @@ function is_valid_hostname($hostname)
 //
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function ipFromEtcHosts($host)
+function ip_from_hosts($host, $flags = OBS_DNS_ALL)
 {
   $host = strtolower($host);
+  /* getent also return dns entries, but we need only hosts
+  if (is_executable('/usr/bin/getent'))
+  {
+    $hosts = external_exec('/usr/bin/getent hosts '.escapeshellarg($host));
+    if ($hosts)
+    {
+      $hosts = explode("\n", $hosts); // only first entry
+      list($ip) = explode(' ', $hosts);
+
+      $try_a =is_flag_set(OBS_DNS_A, $flags);
+
+      if (str_exists($ip, ':'))
+      {
+        // IPv6 returned
+        if ($try_a)
+        {
+          // if IPv6, try to fetch IPv4
+          // ::1             localhost ip6-localhost ip6-loopback
+          // 127.0.0.1       STREAM localhost
+          $ahosts = external_exec('/usr/bin/getent ahostsv4 ' . escapeshellarg($host));
+          if ($ahosts)
+          {
+            $ahosts = explode("\n", $ahosts); // only first entry
+            list($ip4) = explode(' ', $ahosts);
+
+            if ($ip4)
+            {
+              // By default prefer IPv4
+              return $ip4;
+            }
+          }
+        }
+
+        if (is_flag_set(OBS_DNS_AAAA, $flags))
+        {
+          // IPv6 returned and requested
+          return $ip;
+        }
+      }
+      elseif ($try_a)
+      {
+        // requested only IPv4
+        return $ip;
+      }
+    }
+
+    return FALSE;
+  }
+  */
+
+  // getent not found, try old hosts reading
   try {
     foreach (new SplFileObject('/etc/hosts') as $line)
     {
       $d = preg_split('/\s/', $line, -1, PREG_SPLIT_NO_EMPTY);
-      if (empty($d) || substr(reset($d), 0, 1) == '#') { continue; }
+      if (empty($d) || substr(reset($d), 0, 1) == '#') { continue; } // skip empty and comments
       //print_vars($d);
       $ip = array_shift($d);
       $hosts = array_map('strtolower', $d);
       if (in_array($host, $hosts))
       {
-        print_debug("Host '$host' found in hosts");
-        return $ip;
+        if ((is_flag_set(OBS_DNS_A, $flags) && str_exists($ip, '.')) ||
+            (is_flag_set(OBS_DNS_AAAA, $flags) && str_exists($ip, ':')))
+        {
+          print_debug("Host '$host' found in hosts");
+          return $ip;
+        }
       }
     }
   }
@@ -3026,16 +3325,17 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
   $ip4 = array();
 
   // First try /etc/hosts
-  $etc = ipFromEtcHosts($host);
+  //$etc = ip_from_hosts($host);
+  $etc6 = is_flag_set(OBS_DNS_AAAA, $flags) ? ip_from_hosts($host, OBS_DNS_AAAA) : FALSE;
 
   $try_a = is_flag_set(OBS_DNS_A, $flags);
   if ($try_a === TRUE)
   {
-    if ($etc)
-    {
-      if      (str_contains($etc, '.')) { $ip4[] = $etc; }
-      else if (str_contains($etc, ':')) { $ip6[] = $etc; }
-    }
+    $etc4 = ip_from_hosts($host, OBS_DNS_A);
+
+    if ($etc4) { $ip4[] = $etc4; }
+    if ($etc6) { $ip6[] = $etc6; }
+
     // Separate A and AAAA queries, see: https://www.mail-archive.com/observium@observium.org/msg09239.html
     $dns = dns_get_record($host, DNS_A);
     if (!is_array($dns)) { $dns = array(); }
@@ -3045,7 +3345,7 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
       $dns = array_merge($dns, $dns6);
     }
   } else {
-    if ($etc && str_contains($etc, ':')) { $ip6[] = $etc; }
+    if ($etc6) { $ip6[] = $etc6; }
     $dns = dns_get_record($host, DNS_AAAA);
   }
 
@@ -3082,8 +3382,6 @@ function gethostbynamel6($host, $flags = OBS_DNS_ALL)
 // TESTME needs unit testing
 function gethostbyaddr6($ip)
 {
-  //include_once('Net/DNS2.php');
-  //include_once('Net/DNS2/RR/PTR.php');
 
   $ptr = FALSE;
   $resolver = new Net_DNS2_Resolver();
@@ -3124,7 +3422,7 @@ function add_service($device, $service, $descr)
  *                                              code (HTTP code status), status (HTTP status description) and all other
  * @global boolean $GLOBALS['request_status'] TRUE if response code is 2xx or 3xx
  *
- * @return string|boolean Return response content or FALSE 
+ * @return string|boolean Return response content or FALSE
  */
 function get_http_request($request, $context = array(), $rate_limit = FALSE)
 {
@@ -3137,15 +3435,15 @@ function get_http_request($request, $context = array(), $rate_limit = FALSE)
     $ok = FALSE;
     $GLOBALS['response_headers'] = array('code' => 408, 'descr' => 'Request Timeout');
   }
-  else if (!ini_get('allow_url_fopen'))
+  elseif (!ini_get('allow_url_fopen'))
   {
     print_debug('HTTP requests disabled, since PHP config option "allow_url_fopen" set to off. Please enable this option in your PHP config.');
     $ok = FALSE;
     $GLOBALS['response_headers'] = array('code' => 400, 'descr' => 'HTTP Method Disabled');
   }
-  else if (preg_match('/^https/i', $request) && !check_extension_exists('openssl'))
+  elseif (str_istarts($request, 'https') && !check_extension_exists('openssl'))
   {
-    // Check if Secure requests allowed, but ssl extensin not exist
+    // Check if Secure requests allowed, but ssl extension not exist
     print_debug(__FUNCTION__.'() wants to connect with https but https is not enabled on this server. Please check your PHP settings, the openssl extension must exist and be enabled.');
     logfile(__FUNCTION__.'() wants to connect with https but https is not enabled on this server. Please check your PHP settings, the openssl extension must exist and be enabled.');
     $ok = FALSE;
@@ -3157,7 +3455,7 @@ function get_http_request($request, $context = array(), $rate_limit = FALSE)
     // Check limit rates to this domain (per/day)
     if (preg_match('/^https?:\/\/([\w\.]+[\w\-\.]*(:\d+)?)/i', $request, $matches))
     {
-      $date    = format_unixtime($config['time']['now'], 'Y-m-d');
+      $date    = format_unixtime(get_time(), 'Y-m-d');
       $domain  = $matches[0]; // base domain (with http(s)): https://test-me.com/ -> https://test-me.com
       $rate_db = json_decode(get_obs_attrib('http_rate_' . $domain), TRUE);
       //print_vars($date); print_vars($rate_db);
@@ -3175,7 +3473,7 @@ function get_http_request($request, $context = array(), $rate_limit = FALSE)
         $GLOBALS['response_headers'] = array('code' => 429, 'descr' => 'Too Many Requests');
         $ok = FALSE;
       }
-      else if (OBS_DEBUG > 1)
+      elseif (OBS_DEBUG > 1)
       {
         print_debug("HTTP rate count for domain '$domain': $rate_count ($rate_limit/day)");
       }
@@ -3210,11 +3508,70 @@ function get_http_request($request, $context = array(), $rate_limit = FALSE)
   // Add common http context
   $opts = array('http' => generate_http_context_defaults($context));
 
+  // Force IPv4 or IPv6
+  if (isset($config['http_ip_version']))
+  {
+    $bindto = str_contains($config['http_ip_version'], '6') ? '[::]:0' : '0:0';
+    $opts['socket'] = [ 'bindto' => $bindto ];
+    //$opts['socket'] = [ 'bindto' => '0:0' ]; // IPv4
+    //$opts['socket'] = [ 'bindto' => '[::]:0' ]; // IPv6
+  }
+
+  // HTTPS
+  // if ($parse_url = parse_url($request))
+  // {
+  //   if ($parse_url['scheme'] == 'https')
+  //   {
+  //     $opts['ssl'] = [ 'SNI_enabled' => TRUE, 'SNI_server_name' => $parse_url['host'] ];
+  //   }
+  // }
+
+  // DEBUG, generate curl cmd for testing:
+  if (OBS_DEBUG)
+  {
+    $curl_cmd = 'curl';
+    if (OBS_DEBUG > 1)
+    {
+      // Show response headers
+      $curl_cmd .= ' -i';
+    }
+    if (isset($config['http_ip_version']))
+    {
+      $curl_cmd .= str_contains($config['http_ip_version'], '6') ? ' -6' : ' -4';
+    }
+    if (isset($opts['http']['timeout']))
+    {
+      $curl_cmd .= ' --connect-timeout '.$opts['http']['timeout'];
+    }
+    if (isset($opts['http']['method']))
+    {
+      $curl_cmd .= ' -X '.$opts['http']['method'];
+    }
+    if (isset($opts['http']['header']))
+    {
+      foreach (explode("\r\n", $opts['http']['header']) as $curl_header)
+      {
+        if (!strlen($curl_header)) { continue; }
+        $curl_cmd .= ' -H \'' . $curl_header . '\'';
+      }
+    }
+    if (isset($opts['http']['content']))
+    {
+      $curl_cmd .= ' -d \''.$opts['http']['content'].'\'';
+    }
+    print_debug("HTTP CURL cmd:\n$curl_cmd $request");
+  }
+
   // Process http request and calculate runtime
   $start = utime();
   $context = stream_context_create($opts);
   $response = file_get_contents($request, FALSE, $context);
-  $runtime = utime() - $start;
+  $end = utime();
+  $runtime = $end - $start;
+
+  // Request end unixtime and runtime
+  $GLOBALS['request_unixtime'] = $end;
+  $GLOBALS['request_runtime'] = $runtime;
 
   // Parse response headers
   // Note: $http_response_header - see: http://php.net/manual/en/reserved.variables.httpresponseheader.php
@@ -3231,7 +3588,7 @@ function get_http_request($request, $context = array(), $rate_limit = FALSE)
       if (preg_match("!HTTP/([\d\.]+)\s+(\d+)(.*)!", $v, $matches))
       {
         $head['http']   = $matches[1];
-        $head['code']   = intval($matches[2]);
+        $head['code']   = (int)$matches[2];
         $head['descr']  = trim($matches[3]);
       } else {
         $head[] = $v;
@@ -3292,7 +3649,7 @@ function get_http_request($request, $context = array(), $rate_limit = FALSE)
                   'RESPONSE CODE[' . $GLOBALS['response_headers']['code'] . ' ' . $GLOBALS['response_headers']['descr'] . ']', 'console');
     if (OBS_DEBUG > 1)
     {
-      print_message("RESPONSE[\n".$response."\n]", 'console', FALSE);
+      echo("RESPONSE[\n".$response."\n]");
       print_vars($http_response_header);
       print_vars($opts);
     }
@@ -3305,7 +3662,7 @@ function get_http_request($request, $context = array(), $rate_limit = FALSE)
  * Process HTTP request by definition array and process it for valid status.
  * Used definition params in response key.
  *
- * @param string $def       Definition array or alert transport key (see transports definitions)
+ * @param string|array $def       Definition array or alert transport key (see transports definitions)
  * @param string $response  Response from get_http_request()
  * @return boolean          Return TRUE if request processed with valid HTTP code (2xx, 3xx) and API response return valid param
  */
@@ -3327,7 +3684,7 @@ function test_http_request($def, $response)
   {
     // Decode if request OK
     $is_response_array = FALSE;
-    if (strtolower($def['response_format']) == 'json')
+    if (strtolower($def['response_format']) === 'json')
     {
       $response = json_decode($response, TRUE);
       $is_response_array = TRUE;
@@ -3408,6 +3765,9 @@ function generate_http_context_defaults($context = array())
 
   // Defaults
   $context['timeout'] = '15';
+  // HTTP/1.1
+  $context['protocol_version'] = 1.1;
+  //$context['ignore_errors'] = TRUE;
 
   // User agent (required for some type of queries, ie geocoding)
   if (!isset($context['header']))
@@ -3419,7 +3779,7 @@ function generate_http_context_defaults($context = array())
   if (isset($config['http_proxy']) && $config['http_proxy'])
   {
     $context['proxy'] = 'tcp://' . $config['http_proxy'];
-    $context['request_fulluri'] = TRUE;
+    $context['request_fulluri'] = isset($config['proxy_fulluri']) ? (bool)$config['proxy_fulluri'] : TRUE;
   }
 
   // Basic proxy auth
@@ -3439,13 +3799,13 @@ function generate_http_context_defaults($context = array())
  * Generate HTTP context based on passed params, tags and definition.
  * This context will used in get_http_request_test() (or get_http_request())
  *
- * @global array $config
- * @param string $def      Definition array or alert transport key (see transports definitions)
+ * @global array       $config
+ * @param string|array $def      Definition array or alert transport key (see transports definitions)
  * @param array  $tags     (optional) Contact array and other tags
  * @param array  $params   (optional) Array of requested params with key => value entries (used with request method POST)
  * @return array           HTTP Context which can used in get_http_request_test() or get_http_request()
  */
-function generate_http_context($def, $tags = array(), $params = array())
+function generate_http_context($def, $tags = [], $params = [])
 {
   global $config;
 
@@ -3467,7 +3827,7 @@ function generate_http_context($def, $tags = array(), $params = array())
   $header = "Connection: close\r\n";
 
   // Add encode $params for POST request inside http headers
-  if ($context['method'] == 'POST')
+  if ($context['method'] === 'POST' || $context['method'] === 'PUT')
   {
     // Generate request params
     foreach ($def['request_params'] as $param => $entry)
@@ -3486,7 +3846,7 @@ function generate_http_context($def, $tags = array(), $params = array())
       if ($params[$param] === '' || $params[$param] === []) { unset($params[$param]); }
     }
 
-    if (strtolower($def['request_format']) == 'json')
+    if (strtolower($def['request_format']) === 'json')
     {
       // Encode params as json string
       $data   = json_encode($params);
@@ -3521,7 +3881,7 @@ function generate_http_context($def, $tags = array(), $params = array())
  * This context will used in get_http_request_test() (or get_http_request())
  *
  * @global array $config
- * @param string $def       Definition array or alert transport key (see transports definitions)
+ * @param string|array $def       Definition array or alert transport key (see transports definitions)
  * @param array  $tags      (optional) Contact array, used only if transport required additional headers (ie hipchat)
  * @param array  $params    (optional) Array of requested params with key => value entries (used with request method GET)
  * @return string           URL which can used in get_http_request_test() or get_http_request()
@@ -3546,7 +3906,7 @@ function generate_http_url($def, $tags = array(), $params = array())
   }
 
   // Add GET params to url
-  if ($def['method'] == 'GET')
+  if ($def['method'] === 'GET' || $def['method'] === 'DELETE')
   {
     // Generate request params
     foreach ($def['request_params'] as $param => $entry)
@@ -3569,7 +3929,7 @@ function generate_http_url($def, $tags = array(), $params = array())
     if (count($params))
     {
       $data   = http_build_query($params);
-      if (str_contains($url, '?'))
+      if (str_exists($url, '?'))
       {
         // Append additional params to url string
         $url .= '&' . $data;
@@ -3584,7 +3944,81 @@ function generate_http_url($def, $tags = array(), $params = array())
 }
 
 /**
+ * Return named unix times from now
+ *
+ * @param string $str Named time from now, ie: fiveminute, twelvehour, year
+ * @param bool   $future If TRUE, return unix time in future.
+ *
+ * @return int
+ */
+function get_time($str = 'now', $future = FALSE)
+{
+  global $config;
+
+  // Set some times needed by loads of scripts (it's dynamic, so we do it here!)
+  $config['time']['now'] = time();
+  /*
+  $config['time']['fiveminute'] = $config['time']['now'] - 300;      //time() - (5 * 60);
+  $config['time']['fourhour']   = $config['time']['now'] - 14400;    //time() - (4 * 60 * 60);
+  $config['time']['sixhour']    = $config['time']['now'] - 21600;    //time() - (6 * 60 * 60);
+  $config['time']['twelvehour'] = $config['time']['now'] - 43200;    //time() - (12 * 60 * 60);
+  $config['time']['day']        = $config['time']['now'] - 86400;    //time() - (24 * 60 * 60);
+  $config['time']['twoday']     = $config['time']['now'] - 172800;   //time() - (2 * 24 * 60 * 60);
+  $config['time']['week']       = $config['time']['now'] - 604800;   //time() - (7 * 24 * 60 * 60);
+  $config['time']['twoweek']    = $config['time']['now'] - 1209600;  //time() - (2 * 7 * 24 * 60 * 60);
+  $config['time']['month']      = $config['time']['now'] - 2678400;  //time() - (31 * 24 * 60 * 60);
+  $config['time']['twomonth']   = $config['time']['now'] - 5356800;  //time() - (2 * 31 * 24 * 60 * 60);
+  $config['time']['threemonth'] = $config['time']['now'] - 8035200;  //time() - (3 * 31 * 24 * 60 * 60);
+  $config['time']['sixmonth']   = $config['time']['now'] - 16070400; //time() - (6 * 31 * 24 * 60 * 60);
+  $config['time']['year']       = $config['time']['now'] - 31536000; //time() - (365 * 24 * 60 * 60);
+  $config['time']['twoyear']    = $config['time']['now'] - 63072000; //time() - (2 * 365 * 24 * 60 * 60);
+  $config['time']['threeyear']  = $config['time']['now'] - 94608000; //time() - (3 * 365 * 24 * 60 * 60);
+  */
+
+  $str = strtolower(trim($str));
+
+  if ($str == 'now' || empty($str))
+  {
+    return $config['time']['now'];
+  }
+  $time = $config['time']['now'];
+
+  $multipliers = [
+    'two' => 2, 'three' => 3, 'four' => 4,
+    'five' => 5, 'six' => 6, 'seven' => 7,
+    'eight' => 8, 'nine' => 9, 'ten' => 10,
+    'eleven' => 11, 'twelve' => 12
+  ];
+  $times = [
+    'year'  => 31536000,
+    'month' => 2678400,
+    'week'  => 604800,
+    'day'   => 86400,
+    'hour'  => 3600,
+    'minute' => 60
+  ];
+  $time_pattern = '/^(?<multiplier>' . implode('|', array_keys($multipliers)) . ')?(?<time>'  . implode('|', array_keys($times)) . ')$/';
+  //$time_pattern = '/^(?<multiplier>two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)?(?<time>year|month|week|day|hour|minute)$/';
+  if (preg_match($time_pattern, $str, $matches))
+  {
+    $multiplier = isset($multipliers[$matches['multiplier']]) ? $multipliers[$matches['multiplier']] : 1;
+
+    $diff = $multiplier * $times[$matches['time']];
+
+    if ($future)
+    {
+      $time += $diff;
+    } else {
+      $time -= $diff;
+    }
+  }
+
+  return intval($time);
+}
+
+/**
  * Format date string.
+ * If passed 'now' return formatted current datetime.
  *
  * This function convert date/time string to format from
  * config option $config['timestamp_format'].
@@ -3594,6 +4028,7 @@ function generate_http_url($def, $tags = array(), $params = array())
  * 'Star wars' -> 'Star wars'
  *
  * @param string $str
+ *
  * @return string
  */
 // TESTME needs unit testing
@@ -3601,12 +4036,17 @@ function format_timestamp($str)
 {
   global $config;
 
-  if (($timestamp = strtotime($str)) === FALSE)
+  if ($str == 'now')
+  {
+    // Use for get formatted current time
+    $timestamp = get_time($str);
+  }
+  elseif (($timestamp = strtotime($str)) === FALSE)
   {
     return $str;
-  } else {
-    return date($config['timestamp_format'], $timestamp);
   }
+
+  return date($config['timestamp_format'], $timestamp);
 }
 
 /**
@@ -3638,9 +4078,14 @@ function format_unixtime($time, $format = NULL)
   // Set correct timezone
   $tz = get_timezone();
   //r($tz);
-  $date_timezone = new DateTimeZone($tz['php']);
-  //$date_timezone = new DateTimeZone($tz['php_name']);
-  $date->setTimeZone($date_timezone);
+  try
+  {
+    $date_timezone = new DateTimeZone(str_replace(':', '', $tz['php']));
+    //$date_timezone = new DateTimeZone($tz['php_name']);
+    $date->setTimeZone($date_timezone);
+  } catch(Exception $e) {
+    print_debug($e->getMessage());
+  }
   //r($date);
 
   if (strlen($format))
@@ -3698,6 +4143,7 @@ function reformat_us_date($date)
  * With wrong and negative returns 0
  *
  * '3y 4M 6w 5d 3h 1m 3s' -> 109191663
+ * '184 days 22 hrs 02 min 38 sec' ->
  * '3y4M6w5d3h1m3s'       -> 109191663
  * '1.5w'                 -> 907200
  * -886732     -> 0
@@ -3727,7 +4173,7 @@ function age_to_seconds($age)
   $pattern .= '(?:(?<months>\d+(?:\.\d)*)\ ?(?:months?|M)[,\ ]*)*';       // M (months)
   $pattern .= '(?:(?<weeks>\d+(?:\.\d)*)\ ?(?:weeks?|w)[,\ ]*)*';         // w (weeks)
   $pattern .= '(?:(?<days>\d+(?:\.\d)*)\ ?(?:days?|d)[,\ ]*)*';           // d (days)
-  $pattern .= '(?:(?<hours>\d+(?:\.\d)*)\ ?(?:hours?|h)[,\ ]*)*';         // h (hours)
+  $pattern .= '(?:(?<hours>\d+(?:\.\d)*)\ ?(?:hours?|hrs|h)[,\ ]*)*';     // h (hours)
   $pattern .= '(?:(?<minutes>\d+(?:\.\d)*)\ ?(?:minutes?|min|m)[,\ ]*)*'; // m (minutes)
   $pattern .= '(?:(?<seconds>\d+(?:\.\d)*)\ ?(?:seconds?|sec|s))*';       // s (seconds)
   $pattern .= '$/';
@@ -3841,8 +4287,8 @@ function var_decode($string, $method = 'json')
   {
     case 'serialize':
     case 'unserialize':
-      if ($value === 'b:0;') { return FALSE; };
-      $decoded = @unserialize($value);
+      if ($value === 'b:0;') { return FALSE; }
+    $decoded = @unserialize($value);
       if ($decoded !== FALSE)
       {
         // Serialized encoded string detected
@@ -3850,7 +4296,7 @@ function var_decode($string, $method = 'json')
       }
       break;
     default:
-      if ($string === 'bnVsbA==') { return NULL; };
+      if ($string === 'bnVsbA==') { return NULL; }
       if (OBS_JSON_DECODE > 0)
       {
         $decoded = @json_decode($value, TRUE, 512, OBS_JSON_DECODE);
@@ -3880,6 +4326,61 @@ function var_decode($string, $method = 'json')
 }
 
 /**
+ * Convert CSV like string to array or keep as is if not csv.
+ *
+ * @param mixed $str String probably CSV list or encoded.
+ * @param bool $encoded If TRUE and string is encoded (by var_encode()) decode it
+ *
+ * @return array|mixed
+ */
+function get_var_csv($str, $encoded = FALSE)
+{
+  if (is_string($str))
+  {
+    // Better to understand quoted vars
+    $values = str_getcsv($str);
+    if (count($values) === 1)
+    {
+      // not comma list, but can be quoted value
+      $values = $values[0];
+
+      // Try decode var if original value not csv
+      if ($encoded && $str === $values)
+      {
+        $values = var_decode($str);
+      } else {
+        $values = var_comma_safe($values);
+      }
+    } else {
+      $values = var_comma_safe($values);
+    }
+  } else {
+    // If variable already array, keep as is
+    $values = $str;
+  }
+
+  return $values;
+}
+
+function var_comma_safe($value)
+{
+  if (is_array($value))
+  {
+    foreach ($value as &$entry)
+    {
+      $entry = var_comma_safe($entry);
+    }
+    return $value;
+  }
+
+  if (strpos($value, '%1F') !== FALSE)
+  {
+    $value = str_replace('%1F', ',', $value); // %1F (US, unit separator) - not defined in HTML 4 standard
+  }
+  return $value;
+}
+
+/**
  * Parse number with units to numeric.
  *
  * This function converts numbers with units (e.g. 100MB) to their value
@@ -3891,95 +4392,96 @@ function var_decode($string, $method = 'json')
  */
 function unit_string_to_numeric($str, $unit_base = NULL)
 {
-  // If it's already a number, return original string
-  if (is_numeric($str)) { return (float)$str; }
+  $value = is_string($str) ? trim($str) : $str;
 
-  preg_match('/(\d+\.?\d*)\ ?(\w+)/', $str, $matches);
+  // If it's already a number, return original value
+  if (is_numeric($value)) { return (float)$value; }
+  // Any not numeric values return as is (array, booleans)
+  if (!is_string($value)) { return $str; }
+
+  //preg_match('/(\d+\.?\d*)\ ?(\w+)/', $str, $matches);
+  $pattern = '/^(?<number>\d+\.?\d*)\ ?(?<prefix>[kmgtpezy]i?)?(?<unit>[a-z]*)$/i';
+  preg_match($pattern, $value, $matches);
 
   // Error, return original string
-  if (!is_numeric($matches[1])) { return $str; }
+  if (!is_numeric($matches['number'])) { return $str; }
 
-  if (is_numeric($unit_base) && ($unit_base == 1000 || $unit_base == 1024))
+  // Unit base 1000 or 1024
+  $prefix_len = strlen($matches['prefix']);
+  if (in_array($unit_base, [ 1000, 1024 ]))
   {
     // Use rigid unit base, this interprets any units with hard multiplier base
     $base = $unit_base;
   }
+  elseif ($prefix_len === 2)
+  {
+    // IEC prefixes Ki, Gi, Ti, etc
+    $base = 1024;
+  } else {
+    switch ($matches['unit'])
+    {
+      case '':
+      case 'B':
+      case 'Byte':
+      case 'byte':
+        $base = 1024;
+        break;
+      case 'b':
+      case 'Bps':
+      case 'bit':
+      case 'bps':
+        $base = 1000;
+        break;
+      default:
+        $base = 1024;
+    }
+  }
 
-  switch ($matches[2])
+  // https://en.wikipedia.org/wiki/Binary_prefix
+  $prefixes = [ //'b' => 0,
+                'k' => 1, 'ki' => 1,
+                'm' => 2, 'mi' => 2,
+                'g' => 3, 'gi' => 3,
+                't' => 4, 'ti' => 4,
+                'p' => 5, 'pi' => 5,
+                'e' => 6, 'ei' => 6,
+                'z' => 7, 'zi' => 7,
+                'y' => 8, 'yi' => 8 ];
+
+  $power = 0;
+  if ($prefix_len)
+  {
+    $prefix = strtolower($matches['prefix']);
+    if (isset($prefixes[$prefix]))
+    {
+      $power = $prefixes[$prefix];
+    } else {
+      // incorrect prefixes, return original value
+      return $str;
+    }
+  }
+  switch ($matches['unit'])
   {
     case '':
     case 'B':
-    case 'b':
-    case 'bit':
-    case 'bps':
-    case 'Bps':
-    case 'byte':
     case 'Byte':
-      $power = 0;
+    case 'Bytes':
+    case 'byte':
+    case 'bytes':
       $base = isset($base) ? $base : 1024;
       break;
-    case 'K':
-    case 'k':
-    case 'kB':
-    case 'kByte':
-    case 'kbyte':
-      $power = 1;
-      $base = isset($base) ? $base : 1024;
-      break;
-    case 'kb':
-    case 'kBps':
-    case 'kbit':
-    case 'kbps':
-      $power = 1;
-      $base = isset($base) ? $base : 1000;
-      break;
-    case 'M':
-    case 'MB':
-    case 'MByte':
-    case 'Mbyte':
-      $power = 2;
-      $base = isset($base) ? $base : 1024;
-      break;
-    case 'Mb':
-    case 'MBps':
-    case 'Mbit':
-    case 'Mbps':
-      $power = 2;
-      $base = isset($base) ? $base : 1000;
-      break;
-    case 'G':
-    case 'GB':
-    case 'GByte':
-    case 'Gbyte':
-      $power = 3;
-      $base = isset($base) ? $base : 1024;
-      break;
-    case 'Gb':
-    case 'GBps':
-    case 'Gbit':
-    case 'Gbps':
-      $power = 3;
-      $base = isset($base) ? $base : 1000;
-      break;
-    case 'T':
-    case 'TB':
-    case 'TByte':
-    case 'Tbyte':
-      $power = 4;
-      $base = isset($base) ? $base : 1024;
-      break;
-    case 'Tb':
-    case 'TBps':
-    case 'Tbit':
-    case 'Tbps':
-      $power = 4;
+    case 'b':
+    case 'Bps':
+    case 'bit':
+    case 'bits':
+    case 'bps':
       $base = isset($base) ? $base : 1000;
       break;
     default:
-      $power = 0;
-      $base = isset($base) ? $base : 1024;
-      break;
+      // unknown unit, return original value
+      return $str;
   }
+
   $multiplier = pow($base, $power);
 
   return (float)($matches[1] * $multiplier);
@@ -4043,11 +4545,18 @@ function value_to_si($value, $unit, $type = NULL)
         // https://www.everythingrf.com/rf-calculators/watt-to-dbm
         if ($value > 0)
         {
-          $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, $unit);
+          $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Power($value, 'W');
           $si_value = $value_from->toUnit('dBm');
 
-          $from  = $value    . " $unit";
-          $to    = $si_value . ' dBm';
+          $from     = $value . " $unit";
+          $to       = $si_value . ' dBm';
+        }
+        elseif (strlen($value) && $value == 0)
+        {
+          // See: https://jira.observium.org/browse/OBS-3200
+          $si_value = -99; // This is incorrect, but minimum possible value for dBm
+          $from  = $value    . ' W';
+          $to = $si_value . ' dBm';
         } else {
           $si_value = FALSE;
           $from  = $value    . ' W';
@@ -4149,6 +4658,15 @@ function value_to_si($value, $unit, $type = NULL)
         //$type  = $unit;
         $from  = $value . " $unit";
         $to    = $si_value;
+      }
+      elseif ($type == 'pressure' && str_ends($unit_lower, [ 'pa', 'si' ]))
+      {
+        // Any of pressure unit, like hPa
+        $value_from = new PhpUnitsOfMeasure\PhysicalQuantity\Pressure($value, $unit);
+        $si_value = $value_from->toUnit('Pa');
+
+        $from  = $value    . " $unit";
+        $to    = $si_value . ' Pa';
       }
   }
 
@@ -4310,20 +4828,39 @@ function is_flag_set($flag, $param, $all = FALSE)
   return FALSE;
 }
 
+/**
+ * Checks if a string is composed solely of lower case letters.
+ * Primarily used to sanitise strings used for file inclusion
+ *
+ * @param $string
+ * @return false|int
+ */
+function is_alpha($string)
+{
+  return preg_match('/^[\w\.]+$/', $string);
+}
+
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 function is_ssl()
 {
   if (isset($_SERVER['HTTPS']))
   {
-    if ('on' == strtolower($_SERVER['HTTPS'])) { return TRUE; }
-    if ('1' == $_SERVER['HTTPS']) { return TRUE; }
+    if ('on' === strtolower($_SERVER['HTTPS']) || '1' === $_SERVER['HTTPS'])
+    {
+      return TRUE;
+    }
   }
-  else if (isset($_SERVER['SERVER_PORT']) && ('443' == $_SERVER['SERVER_PORT']))
+  elseif (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
   {
     return TRUE;
   }
-  else if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) == 'https')
+  elseif (isset($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) === 'on')
+  {
+    return TRUE;
+  }
+  //elseif (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') { return TRUE; }
+  elseif (isset($_SERVER['SERVER_PORT']) && ('443' == $_SERVER['SERVER_PORT']))
   {
     return TRUE;
   }
@@ -4374,6 +4911,17 @@ if (!function_exists('array_key_last'))
   function array_key_last($array)
   {
     return $array && is_array($array) ? array_keys($array)[count($array) - 1] : NULL;
+  }
+}
+
+// Nice PHP (8.0) compat functions
+
+if (!function_exists('str_contains'))
+{
+  // Note. We use better implementation str_exists()
+  function str_contains($haystack, $needle)
+  {
+    return '' === $needle || false !== strpos($haystack, $needle);
   }
 }
 

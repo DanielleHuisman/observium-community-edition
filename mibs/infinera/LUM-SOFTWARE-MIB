@@ -1,0 +1,1690 @@
+LUM-SOFTWARE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32, IpAddress, NOTIFICATION-TYPE
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE
+        FROM SNMPv2-CONF
+    DisplayString, TestAndIncr, DateAndTime
+        FROM SNMPv2-TC
+    lumModules, lumSoftwareMIB
+        FROM LUM-REG
+    FaultStatus, CommandString, BoardOrInterfaceAdminStatus
+        FROM LUM-TC;
+
+lumSoftwareMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201809280000Z" -- September 28th 2018
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+        "The software MIB. Provides configuration, status and commands for SW upgrade and other
+        maintenance operations.
+
+        The tables and groups contained in this MIB are:
+
+        (1) The General group contains some general attributes such
+                as timestamps and table sizes.
+
+        (2) The Software versions table contains a list of software versions installed on the node.
+
+        (3) The Command group allows an SNMP client to perform SW upgrade and other maintenance actions.
+
+        (4) The Software Log table contains SNMP-readable log entries for an ongoing upgrade operation
+
+        (5) The Notifications group contains trap definitions for software status
+                notifications.
+
+        (6) The Spare Part contains configuration and status used during spare part process.
+
+        (7) The Expected Software table contains a listing of expected software during an ongoing
+                upgrade operation.
+
+        (8) The CU Replacement group contains configuration, status and alarms related
+                to the CU replacement process.
+
+"
+    REVISION
+        "201809280000Z" -- September 28th 2018
+    DESCRIPTION
+        "Changes made for release 31.1:
+         - Added rebootPendingBoards as new softwareCommandOperation option"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "Changes made for release r29.0:
+         - Changed ORGANIZATION and CONTACT-INFO.
+         - Added removeBoardNeeded to softwareCommandEnmState."
+    REVISION
+        "201504280000Z" -- April 28 2015
+    DESCRIPTION
+        "Added a new software command: rebootAllCold
+        This command will do a cold restart for all boards."
+    REVISION
+        "201312220000Z" -- December 22th 2013
+    DESCRIPTION
+        "Added a new state, upgradeWithouRebootNeeded, for softwareCommandEnm-
+        State. This state shows that the node is already running on the SW stated
+        in enm-spec. The enm-spec version is not correct although. To get the correct
+	enm-spec an upgrade without reboot is needed."
+    REVISION
+        "201311120000Z" -- November 12th 2013
+    DESCRIPTION
+        "Added a new state, filesNeeded, for softwareCommandEnmState. This
+        state shows that the node has all the software needed for the cards
+        currently installed, but software for other cards are not installed."
+    REVISION
+        "201112200000Z" -- December 20th 2011
+    DESCRIPTION
+        "Added softwareCuRepSwNotDistributed (warning that CU SW is not distributed)
+               softwareCuRepSupportedReplacements (set what CU SW should be required)."
+    REVISION
+        "201001290000Z" -- January 29th 2010
+    DESCRIPTION
+        "CuRep as own group + some corrections."
+    REVISION
+        "200411220000Z" -- November 22nd 2004
+    DESCRIPTION
+        "Added configure command for spare parts."
+    REVISION
+        "200406150000Z" -- June 15th 2004
+    DESCRIPTION
+        "The initial revision of this module."
+    ::= { lumModules 28 }
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and complicance
+-- specifications.
+-- ----------------------------------------------------
+
+lumSoftwareConfs OBJECT IDENTIFIER ::= { lumSoftwareMIB 1 }
+lumSoftwareGroups OBJECT IDENTIFIER ::= { lumSoftwareConfs 1 }
+lumSoftwareCompl OBJECT IDENTIFIER ::= { lumSoftwareConfs 2 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the software MIB
+-- ----------------------------------------------------
+
+lumSoftwareMIBObjects OBJECT IDENTIFIER ::= { lumSoftwareMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+softwareGeneral OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 1 }
+softwareVersionList OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 2 }
+softwareCommand OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 3 }
+softwareLogList OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 4 }
+lumentisSoftwareNotifications OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 5 }
+softwareSpare OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 6 }
+softwareExpectedSwList OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 7 }
+softwareCuRep OBJECT IDENTIFIER ::= { lumSoftwareMIBObjects 8 }
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+-- n/a
+
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+
+softwareGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the log table was last
+        changed.
+
+"
+    ::= { softwareGeneral 1 }
+
+softwareGeneralConfigLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the following data
+        was last changed:
+        - command
+        - version
+        - expected
+"
+    ::= { softwareGeneral 2 }
+
+softwareGeneralSoftwareVersionTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of table
+
+"
+    ::= { softwareGeneral 3 }
+
+softwareGeneralSoftwareLogTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of table
+
+"
+    ::= { softwareGeneral 4 }
+
+softwareGeneralSoftwareExpectedSwTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of table
+
+"
+    ::= { softwareGeneral 5 }
+
+-- ----------------------------------------------------
+-- Command group
+-- ----------------------------------------------------
+
+softwareCommandServerIp OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the host to retrieve the file from.
+
+"
+    DEFVAL { "" }
+    ::= { softwareCommand 1 }
+
+softwareCommandEnmFile OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Full path to the ENM-spec to use.
+
+"
+    DEFVAL { "" }
+    ::= { softwareCommand 2 }
+
+softwareCommandIncludeFs OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   true (1),
+                   false (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Shall the file system be included in the operation?
+
+"
+    DEFVAL { false }
+    ::= { softwareCommand 3 }
+
+softwareCommandCleanFirst OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   noClean (1),
+                   normalClean (2),
+                   culessClean (3) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Shall the file system be 'cleaned' before the operation?
+
+        noClean      - do not clean
+        normalClean  - equivalent to 'swu clean all all'
+        culessClean  - this will also remove the previous
+                       version of appl.
+
+"
+    DEFVAL { normalClean }
+    ::= { softwareCommand 4 }
+
+softwareCommandForce OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   true (1),
+                   false (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Ignore minor failures.
+
+"
+    DEFVAL { false }
+    ::= { softwareCommand 5 }
+
+softwareCommandOperation OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   test (1),
+                   check (2),
+                   install (3),
+                   upgrade (4),
+                   rebootAfter (5),
+                   rebootCu (6),
+                   rebootAll (7),
+                   revert (8),
+                   abort (9),
+                   unlock (10),
+                   clean (11),
+                   forcedUnlock (12),
+                   rebootAllCold (13),
+                   rebootExpr (14),
+                   rebootCold (15),
+                   rebootPendingBoards (16)}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The operation to perform.
+
+        test  - A no operation - test semaphore.
+                Optional use.
+
+        check - do not install anything, just show what needs
+                to be done.
+
+        install - install but do not activate.
+
+        upgrade - install and activate
+
+        rebootAfter - install, activate and reboot.
+                      This should not be used by SNMP.
+
+        rebootCu - reboot the main CU.
+
+        rebootAll - reboot all boards.
+
+        revert    - 'Undo' an upgrade operation and set the
+                    'next' to be the same as 'executing'.
+                    This has to be done before reboot.
+                    Revert does not work if the file system has
+                    been upgraded.
+
+        abort     - release the transaction.
+
+        unlock    - release the transaction.
+
+        clean     - prepare space by cleaning (FTP)
+
+        forcedUnlock - node internal operation.
+                       Release transaction without passwd.
+
+        rebootAllCode - reboot all Cold.
+
+        rebootExpr - reboot card(s) specified by the subrack slot expr.
+
+        rebootCold - cold reboot of card(s) specified by the subrack slot expr.
+
+        rebootPendingBoards - Only boards that have activated new software are rebooted.
+        					  If the activated software is already running,
+        					  the board is not rebooted.
+
+"
+    DEFVAL { test }
+    ::= { softwareCommand 6 }
+
+softwareCommandOperationTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32(0..300)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Delay (in seconds) until the operation is started.
+
+"
+    DEFVAL { 0 }
+    ::= { softwareCommand 7 }
+
+softwareCommandTestAndIncr OBJECT-TYPE
+    SYNTAX      TestAndIncr
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Protection against simultaneous access from
+        multiple managers. See SNMPv2-TC.
+
+        Setting this variable implies that a transaction
+        starts. The provided newPasswd will be secret passwd
+        of the transaction.
+
+"
+    DEFVAL { 0 }
+    ::= { softwareCommand 8 }
+
+softwareCommandSemaphore OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   open (1),
+                   locked (2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The primary state of the SWU-server
+
+        NOTE that this variable will change state without
+        affecting the lastChange time stamp.
+
+        Test this variable before starting a transaction.
+
+        open - no transaction is started
+
+        locked - transaction is started
+
+"
+    ::= { softwareCommand 9 }
+
+softwareCommandOperationState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   idle (1),
+                   pending(2),
+                   cleaning (3),
+                   checking (4),
+                   downloading (5),
+                   installing (6),
+                   preparing (7),
+                   activating (8),
+                   installingFs(9),
+                   reverting (10),
+                   rebooting (11) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "State to show the progress of the operation.
+
+        idle           - when no operation is in progress.
+
+        pending        - operation is ordered but will start later
+
+        cleaning       - cleaning all boards.
+
+        checking       - checking which SW packages that need to be
+                         downloaded.
+
+        downloading    - downloading SW packages from server.
+
+        installing     - distributing and unpacking packages within
+                         the node.
+
+        preparing      - performing a test activate
+
+        activating     - activating all SW packages.
+
+        installingFs   - distributing and unpacking filesystem.
+
+        reverting      - reverting to executing
+
+        rebooting      - ordering reboot to all nodes.
+
+"
+    ::= { softwareCommand 10 }
+
+softwareCommandProgressMax OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Show the maximum value of the progressCounter
+
+"
+    ::= { softwareCommand 11 }
+
+softwareCommandResult OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   none (1),
+                   success (2),
+                   failed (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The result of the operation
+
+        none    -  no result
+
+        success - the latest operation was successful.
+
+        failed  - the latest operation failed.
+
+"
+    ::= { softwareCommand 12 }
+
+softwareCommandEnmState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   none (1),
+                   upToDate (2),
+                   rebootNeeded (3),
+                   activateNeeded (4),
+                   upgradeNeeded (5),
+                   done (6),
+                   filesNeeded (7),
+                   upgradeWithoutRebootNeeded (8),
+                   removeBoardNeeded (9) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "
+        Only applicable if result != none.
+
+        none                       - no state
+
+        upToDate                   - no upgrade needed
+
+        rebootNeeded               - all software is activated, but reboot of
+                                     some boards are required
+
+        activateNeeded             - all software is installed, but activation of
+                                     new software required
+
+        upgradeNeeded              - installation of new software required
+
+        done                       - the new software is installed and activated,
+                                     and, the updated board are rebooted.
+
+        filesNeeded                - Software for all boards currently installed
+                                     in the node is up to date. filesNeeded
+                                     indicates that a software download might be
+                                     needed for a board that is added or
+                                     replaced.
+
+        upgradeWithoutRebootNeeded - This state shows that the node already runs on
+                                     on the software stated in enm-spec. To update
+                                     the enm-spec although, an upgrade without reboot
+                                     is needed.
+
+        removeBoardNeeded          - This state shows that the node contains a board
+                                     that is too old to upgrade. The board must be
+                                     removed.
+"
+    ::= { softwareCommand 13 }
+
+softwareCommandErrorCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows the number of minor erros encountered.
+
+"
+    ::= { softwareCommand 14 }
+
+softwareCommandProgressCounter OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows the progress of the ongoing
+         ENM upgrade.
+
+"
+    ::= { softwareCommand 15 }
+
+softwareCommandNewPassword OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This is a secret, write-only, parameter.
+
+         This is set in the same multi-set as testAndIncr
+         and will be used as the client password to the
+         transaction.
+
+         It must be supplied in all operations in
+         'passwd'.
+
+"
+    DEFVAL { 0 }
+    ::= { softwareCommand 16 }
+
+softwareCommandPassword OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This is a secret, write-only, parameter.
+
+         This parameter will trigger the operation.
+
+         Use the same value as set in newPasswd.
+
+"
+    DEFVAL { 0 }
+    ::= { softwareCommand 17 }
+
+softwareCommandReleaseAfterOperation OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   true (1),
+                   false (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Release lock after operation.
+
+"
+    DEFVAL { false }
+    ::= { softwareCommand 18 }
+
+softwareCommandSendTraps OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   true (1),
+                   false (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Set this to indicate whether you want traps or not.
+
+"
+    DEFVAL { false }
+    ::= { softwareCommand 19 }
+
+softwareCommandClientOperationId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This value is set by the SNMP client
+         for each operation. The value is
+         sent back in the traps generated
+         by the operation.
+
+"
+    DEFVAL { 0 }
+    ::= { softwareCommand 20 }
+
+softwareCommandTftpTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..20000)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This parameter stipulates the timeout
+         used by TFTP when downloading from
+         the network.
+
+         Normally, you do not have to use this!
+
+         If the circumstances are extreme, you
+         might have to set the timeout.
+
+        0 = use predefined defaults.
+
+"
+    DEFVAL { 0 }
+    ::= { softwareCommand 21 }
+
+softwareCommandLocalFtpDirectory OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Full path to the directory where files
+         should be FTPd from TNM.
+
+"
+    DEFVAL { "" }
+    ::= { softwareCommand 22 }
+
+softwareCommandWarningCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Shows the number of warnings encountered.
+
+"
+    ::= { softwareCommand 23 }
+
+softwareCommandEnmRelease OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current ENM release.
+
+"
+    DEFVAL { "" }
+    ::= { softwareCommand 24 }
+
+
+softwareCommandSubrackSlotExpr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The subrack and slot expression to perform action on
+
+        If value is empty, 'all' is assumed.
+
+        Expression follows mibsh swu command, accepting '<subrack> <slot>'
+        or '<subrack>.<slots>' where <slots> is '<slot>' or
+        '<slot>,<slot> | <slot>-<slot> | *'
+
+"
+    DEFVAL { "" }
+    ::= { softwareCommand 25 }
+
+-- ----------------------------------------------------
+-- Software versions list
+-- ----------------------------------------------------
+
+softwareVersionTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SoftwareVersionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The list of software versions."
+    ::= { softwareVersionList 1 }
+
+softwareVersionEntry OBJECT-TYPE
+    SYNTAX      SoftwareVersionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the software version list.
+
+"
+    INDEX { softwareVersionIndex }
+    ::= { softwareVersionTable 1 }
+
+SoftwareVersionEntry ::=
+    SEQUENCE {
+        softwareVersionIndex                    Unsigned32,
+        softwareVersionName                     DisplayString,
+        softwareVersionSubrack                  Unsigned32,
+        softwareVersionSlot                     Unsigned32,
+        softwareVersionCategory                 INTEGER,
+        softwareVersionVersion                  DisplayString,
+        softwareVersionStatus                   Unsigned32 }
+
+softwareVersionIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each
+        software version entry.
+
+"
+    ::= { softwareVersionEntry 1 }
+
+softwareVersionName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the version entry.
+
+"
+    ::= { softwareVersionEntry 2 }
+
+softwareVersionSubrack OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The subrack for this version
+
+"
+    ::= { softwareVersionEntry 3 }
+
+softwareVersionSlot OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The slot for this version
+
+"
+    ::= { softwareVersionEntry 4 }
+
+softwareVersionCategory OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    boot (0),
+                    kernel (1),
+                    appl (2),
+                    fs (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The category for this version
+
+"
+    ::= { softwareVersionEntry 5 }
+
+
+softwareVersionVersion OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The version.
+
+"
+    ::= { softwareVersionEntry 6 }
+
+softwareVersionStatus OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The status of this version
+
+        A bit mask
+        Bit 0 (lowest) = 1 => isExecuting
+        Bit 1          = 1 => isPrevious
+        Bit 2          = 1 => isCurrent (not used)
+        Bit 3          = 1 => isNext
+        Bit 4          = 1 => isIncomplete (not used)
+        Bit 5          = 1 => isOnlyVirtual
+        Bit 6          = 1 => isExpected
+
+"
+    ::= { softwareVersionEntry 7 }
+
+-- ----------------------------------------------------
+-- Software log list
+-- ----------------------------------------------------
+softwareLogTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SoftwareLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The list of software command log entries."
+    ::= { softwareLogList 1 }
+
+softwareLogEntry OBJECT-TYPE
+    SYNTAX      SoftwareLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the command log list.
+
+"
+    INDEX { softwareLogIndex }
+    ::= { softwareLogTable 1 }
+
+SoftwareLogEntry ::=
+    SEQUENCE {
+        softwareLogIndex                    Unsigned32,
+        softwareLogName                     DisplayString,
+        softwareLogTransaction              Unsigned32,
+        softwareLogString                   DisplayString }
+
+softwareLogIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each
+        log entry.
+
+"
+    ::= { softwareLogEntry 1 }
+
+softwareLogName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the log entry.
+
+"
+    ::= { softwareLogEntry 2 }
+
+softwareLogTransaction OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The ID of the transaction generating the
+         log entry.
+
+"
+    ::= { softwareLogEntry 3 }
+
+softwareLogString OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The actual log string
+
+"
+    ::= { softwareLogEntry 4 }
+
+-- ----------------------------------------------------
+-- SparePart group
+-- ----------------------------------------------------
+
+softwareSpareBoardAddr OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the node.
+
+"
+    DEFVAL { "" }
+    ::= { softwareSpare 1 }
+
+softwareSpareBoardMask OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The net mask of the node.
+
+"
+    DEFVAL { "" }
+    ::= { softwareSpare 2 }
+
+softwareSpareMasterAddr OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the CU.
+
+"
+    DEFVAL { "" }
+    ::= { softwareSpare 3 }
+
+softwareSpareMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   undef (0),
+                   tu (1),
+                   standalone (2),
+                   slave (3) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates how the spare part shall be configured.
+
+        tu         - normal TU
+
+        standalone - boardAddress/mask will be set
+                     together with standalone attribute
+
+        slave      - boardAddress/mask will be set
+                     together with standalone attribute and
+                     masterAddress.
+
+"
+    DEFVAL { undef }
+    ::= { softwareSpare 4 }
+
+softwareSpareBackupServer OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The IP address of the server storing backups.
+
+"
+    ::= { softwareSpare 5 }
+
+softwareSpareBackupFile OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Full path to the backup file on remote server.
+
+"
+    ::= { softwareSpare 6 }
+
+softwareSpareState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   undef (0),
+                   waiting (1),
+                   contactingCu (2),
+                   installBoot (3),
+                   installKernel (4),
+                   installAppl (5),
+                   installFs (6),
+                   activating (7),
+                   clearSparepart (8),
+                   done (9),
+                   publicAddress (10) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "State of the spare part.
+
+        waiting     - trying to find CU
+        installBoot - in progress of installing the boot
+        installKernel - in progress of installing the kernel
+        installAppl - in progress of installing the application
+        installFs - in progress of installing the file system
+        activating - install ready => activate
+        clearSparepart - clear flash parameter
+        done       - about to reboot
+        publicAddress - changed to public address
+"
+    ::= { softwareSpare 7 }
+
+softwareSpareResult OBJECT-TYPE
+    SYNTAX      INTEGER {
+                   none (1),
+                   ok (2),
+                   cuNotFound (3),
+                   autoUpgradeNotSupported (4),
+                   bootNotFound (5),
+                   kernelNotFound (6),
+                   applNotFound (7),
+                   fsNotFound (8),
+                   bootActivateFailed (9),
+                   kernelActivateFailed (10),
+                   applActivateFailed (11),
+                   flashUpdateFailed (12) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Result of the spare part operation
+
+"
+    ::= { softwareSpare 8 }
+
+softwareSpareCommentString OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Display comment about the state.
+
+"
+    ::= { softwareSpare 9 }
+
+softwareSpareConfigure OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configure a spare part.
+        Run automatically when in spare part mode.
+        Asks for the following:
+
+        mode
+
+        boardAddress - if mode is 'standalone'
+        or 'slave'
+
+        mask - if mode is 'standalone'
+        or 'slave'
+
+        masterAddress - if mode is 'slave'
+
+"
+    ::= { softwareSpare 10 }
+
+-- ----------------------------------------------------
+-- Expected Software list
+-- ----------------------------------------------------
+
+softwareExpectedSwTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SoftwareExpectedSwEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The list of software versions."
+    ::= { softwareExpectedSwList 1 }
+
+softwareExpectedSwEntry OBJECT-TYPE
+    SYNTAX      SoftwareExpectedSwEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the software version list.
+
+"
+    INDEX { softwareExpectedSwIndex }
+    ::= { softwareExpectedSwTable 1 }
+
+SoftwareExpectedSwEntry ::=
+    SEQUENCE {
+        softwareExpectedSwIndex                 Unsigned32,
+        softwareExpectedSwName                  DisplayString,
+        softwareExpectedSwCategory              INTEGER,
+        softwareExpectedSwBoardType             INTEGER,
+        softwareExpectedSwFileName              DisplayString,
+        softwareExpectedSwPresent               INTEGER }
+
+softwareExpectedSwIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each
+        expected software entry.
+
+"
+    ::= { softwareExpectedSwEntry 1 }
+
+softwareExpectedSwName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the expected sw entry.
+
+"
+    ::= { softwareExpectedSwEntry 2 }
+
+softwareExpectedSwCategory OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    boot (0),
+                    kernel (1),
+                    appl (2),
+                    fs (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The category for this version
+
+"
+    ::= { softwareExpectedSwEntry 3 }
+
+softwareExpectedSwBoardType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    cu (0),
+                    tu (1),
+                    all (2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The board type that this applies to.
+
+"
+    ::= { softwareExpectedSwEntry 4 }
+
+softwareExpectedSwFileName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the expected sw entry.
+
+"
+    ::= { softwareExpectedSwEntry 5 }
+
+softwareExpectedSwPresent OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    yes (1),
+                    no (2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates if the file already is present in the node.
+
+"
+    ::= { softwareExpectedSwEntry 6 }
+
+-- ----------------------------------------------------
+-- CUReplacement group
+-- ----------------------------------------------------
+
+softwareCuRepAdminStatus OBJECT-TYPE
+    SYNTAX      	 BoardOrInterfaceAdminStatus
+    MAX-ACCESS  	 read-write
+    STATUS      	 current
+    DESCRIPTION
+        "The administrative state for the alarm.
+
+        down - No alarm will be rasied if SW packages are missing.
+
+        service - No alarm will be rasied if SW packages are missing.
+
+        up - Alarms are not suppressed.
+
+"
+    DEFVAL { up }
+    ::= { softwareCuRep 1 }
+
+softwareCuRepUnSaved OBJECT-TYPE
+    SYNTAX           INTEGER {
+                     true (1),
+                     false (2) }
+    MAX-ACCESS       read-only
+    STATUS           current
+    DESCRIPTION
+        "If the configuration is saved or not.
+
+"
+    DEFVAL { false }
+    ::= { softwareCuRep 2 }
+
+softwareCuRepSystemMode OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "If dipswitch is changed or not.
+
+"
+    DEFVAL { 1 }
+    ::= { softwareCuRep 3 }
+
+softwareCuRepRebootCu OBJECT-TYPE
+    SYNTAX      INTEGER {
+                true (1),
+                false (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If the CU should be rebooted or not.
+
+"
+    DEFVAL { false }
+    ::= { softwareCuRep 4 }
+
+softwareCuRepOkConfigure OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Configure an CU that has correct SW.
+        Run automatically when in CU replacement mode
+        when CU is an CU-SFP AND SW is correct.
+        Asks for the following:
+
+        Configuration not saved. Do you want to continue anyway? (yes/no)
+
+        Dipswitch is not changed. Do you want to continue anyaway? (yes/no)
+
+        To fulfill CU-replacement, the main CU must be rebooted. Continue
+        with reboot? (yes/no)
+
+"
+    ::= { softwareCuRep 5 }
+
+softwareCuRepSwPackagesMissing OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Software package file(s) are missing on master CU.
+
+         When replacing or introducing CU or TU units some software
+         packages needs to be downloaded to the master CU in order to
+         automatically upgrade the software running on the replacement
+         unit.
+
+         Please perform an upgrade (or download) to current
+         enm-release spec file (without rebooting). The alarm should
+         then be cleared within 5 minutes.
+         Note that when this alarm is cleared, the alarm 'SW not
+         distributed' might be seen in up to approximately 5 minutes
+         before the system has assured that CU SW packages are
+         transferred to TU units.
+
+"
+    ::= { softwareCuRep 6 }
+
+softwareCuRepSwNotDistributed OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Some SW package(s) needed to perform a CU replacement with
+    	automatic upgrade are not transferred to a traffic unit. This
+    	means that CU replacement with auto-upgrade will not work on
+    	this node.
+
+        Note that this alarm might be seen in up to approximately 5
+        minutes after a 'SW not downloaded' alarm is cleared to inform
+        that SW packages are not yet distributed.
+
+        Possible reasons:
+        1. If parts of the master CU software were updated without an
+           enm-spec file there might be a mismatch between executing
+           and expected software resulting in this alarm. If so
+           perform a full upgrade to preferred enm-spec version.
+        2. More than one traffic unit might be needed to distribute
+           software, insert another traffic unit into the node main
+           subrack or if running CU-SFP as master CU, reconfigure the
+           'Supported replacement CUs' attribute to the control unit
+           type(s) appropriate for your system.
+
+"
+    ::= { softwareCuRep 7 }
+
+
+softwareCuRepSupportedReplacements OBJECT-TYPE
+    SYNTAX	INTEGER {
+    		all (1),
+                cuSfp (2),
+                cuSfpii (3),
+                cuSfpiii (4) }
+    MAX-ACCESS  read-write
+    STATUS	current
+    DESCRIPTION
+	"The types of control unit boards which should be supported as
+	replacements for the current main control unit.
+
+	The system will transfer the software packages for the board
+	types configured by this attribute to the traffic units. These
+	software packages will be used for automatic upgrade during CU
+	replacement.
+
+	If some SW packages needed by the control unit types
+	configured by this attribute cannot be distributed to a
+	traffic unit, alarms will be raised according to the cause:
+
+        a) Some software package(s) has not been downloaded:
+            a 'Replacement CU SW not downloaded' alarm will be raised.
+
+        b) Some software package(s) could not be distributed, e.g. due to
+           lack of free space on the traffic units:
+            a 'Replacement CU SW not distributed' alarm will be raised.
+
+	Allowed values:
+
+        all 	All compatible CU replacements supported
+
+	cuSfp   Only replacement with a CU-SFP supported
+
+        cuSfpii Only replacement with a CU-SFP/II supported
+
+        cuSfpiii Only replacement with a CU-SFP/III supported
+
+	NOTE: Automatic upgrade is NEVER performed if the current
+	control unit or the replacement control unit is of type CU or
+	CU-OSC.
+
+"
+    DEFVAL { all }
+    ::= { softwareCuRep 8 }
+
+-- ----------------------------------------------------
+-- Notifications
+-- ----------------------------------------------------
+softwareNotifyPrefix OBJECT IDENTIFIER ::= { lumentisSoftwareNotifications 0 }
+
+softwareResultTrap NOTIFICATION-TYPE
+    OBJECTS {
+            softwareCommandOperationState,
+            softwareCommandProgressMax,
+            softwareCommandResult,
+            softwareCommandEnmState,
+            softwareCommandErrorCount,
+            softwareCommandProgressCounter,
+            softwareCommandNewPassword,
+            softwareCommandClientOperationId
+    }
+    STATUS      current
+    DESCRIPTION
+        "Sent when the software upgrade
+         operation changes state.
+
+"
+    ::= { softwareNotifyPrefix 1 }
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+softwareGeneralGroup OBJECT-GROUP
+    OBJECTS {
+        softwareGeneralLastChangeTime,
+        softwareGeneralConfigLastChangeTime }
+    STATUS      deprecated
+    DESCRIPTION
+        "The software general objects."
+    ::= { lumSoftwareGroups 1 }
+
+softwareVersionGroup OBJECT-GROUP
+    OBJECTS {
+        softwareVersionIndex,
+        softwareVersionName,
+        softwareVersionSubrack,
+        softwareVersionSlot,
+        softwareVersionCategory,
+        softwareVersionVersion,
+        softwareVersionStatus }
+    STATUS      current
+    DESCRIPTION
+        "The software version objects."
+    ::= { lumSoftwareGroups 2 }
+
+softwareCommandGroup OBJECT-GROUP
+    OBJECTS {
+         softwareCommandServerIp,
+         softwareCommandEnmFile,
+         softwareCommandIncludeFs,
+         softwareCommandCleanFirst,
+         softwareCommandForce,
+         softwareCommandOperation,
+         softwareCommandOperationTimeout,
+         softwareCommandTestAndIncr,
+         softwareCommandSemaphore,
+         softwareCommandOperationState,
+         softwareCommandProgressCounter,
+         softwareCommandResult,
+         softwareCommandEnmState,
+         softwareCommandErrorCount }
+    STATUS      deprecated
+    DESCRIPTION
+        "The software command objects."
+    ::= { lumSoftwareGroups 3 }
+
+softwareLogGroup OBJECT-GROUP
+    OBJECTS {
+        softwareLogIndex,
+        softwareLogName,
+        softwareLogTransaction,
+        softwareLogString }
+    STATUS      current
+    DESCRIPTION
+        "The software log objects."
+    ::= { lumSoftwareGroups 4 }
+
+softwareCommandGroupV2 OBJECT-GROUP
+    OBJECTS {
+         softwareCommandServerIp,
+         softwareCommandEnmFile,
+         softwareCommandIncludeFs,
+         softwareCommandCleanFirst,
+         softwareCommandForce,
+         softwareCommandOperation,
+         softwareCommandOperationTimeout,
+         softwareCommandTestAndIncr,
+         softwareCommandSemaphore,
+         softwareCommandOperationState,
+         softwareCommandProgressMax,
+         softwareCommandResult,
+         softwareCommandEnmState,
+         softwareCommandErrorCount,
+         softwareCommandProgressCounter,
+         softwareCommandNewPassword,
+         softwareCommandPassword,
+         softwareCommandReleaseAfterOperation,
+         softwareCommandSendTraps,
+         softwareCommandClientOperationId,
+         softwareCommandTftpTimeout }
+    STATUS      deprecated
+    DESCRIPTION
+        "The software command objects (3.1)."
+    ::= { lumSoftwareGroups 5 }
+
+softwareSpareGroup OBJECT-GROUP
+    OBJECTS {
+            softwareSpareBoardAddr,
+            softwareSpareBoardMask,
+            softwareSpareMasterAddr,
+            softwareSpareMode,
+            softwareSpareBackupServer,
+            softwareSpareBackupFile,
+            softwareSpareState,
+            softwareSpareResult,
+            softwareSpareCommentString,
+            softwareSpareConfigure }
+    STATUS      current
+    DESCRIPTION
+        "The spare part objects."
+    ::= { lumSoftwareGroups 6 }
+
+softwareGeneralGroupV2 OBJECT-GROUP
+    OBJECTS {
+        softwareGeneralLastChangeTime,
+        softwareGeneralConfigLastChangeTime,
+        softwareGeneralSoftwareVersionTableSize,
+        softwareGeneralSoftwareLogTableSize }
+    STATUS      deprecated
+    DESCRIPTION
+        "The software general objects."
+    ::= { lumSoftwareGroups 7 }
+
+softwareGeneralGroupV3 OBJECT-GROUP
+    OBJECTS {
+        softwareGeneralLastChangeTime,
+        softwareGeneralConfigLastChangeTime,
+        softwareGeneralSoftwareVersionTableSize,
+        softwareGeneralSoftwareLogTableSize,
+        softwareGeneralSoftwareExpectedSwTableSize }
+    STATUS      current
+    DESCRIPTION
+        "The software general objects. (5.0)"
+    ::= { lumSoftwareGroups 8 }
+
+softwareCommandGroupV3 OBJECT-GROUP
+    OBJECTS {
+         softwareCommandServerIp,
+         softwareCommandEnmFile,
+         softwareCommandIncludeFs,
+         softwareCommandCleanFirst,
+         softwareCommandForce,
+         softwareCommandOperation,
+         softwareCommandOperationTimeout,
+         softwareCommandTestAndIncr,
+         softwareCommandSemaphore,
+         softwareCommandOperationState,
+         softwareCommandProgressMax,
+         softwareCommandResult,
+         softwareCommandEnmState,
+         softwareCommandErrorCount,
+         softwareCommandProgressCounter,
+         softwareCommandNewPassword,
+         softwareCommandPassword,
+         softwareCommandReleaseAfterOperation,
+         softwareCommandSendTraps,
+         softwareCommandClientOperationId,
+         softwareCommandTftpTimeout,
+         softwareCommandLocalFtpDirectory,
+         softwareCommandWarningCount,
+	 softwareCommandEnmRelease }
+    STATUS      deprecated
+    DESCRIPTION
+        "The software command objects (5.0)."
+    ::= { lumSoftwareGroups 9 }
+
+softwareExpectedSwGroup OBJECT-GROUP
+    OBJECTS {
+         softwareExpectedSwIndex,
+         softwareExpectedSwName,
+         softwareExpectedSwCategory,
+         softwareExpectedSwBoardType,
+         softwareExpectedSwFileName
+    }
+    STATUS      deprecated
+    DESCRIPTION
+        "The expected software objects (5.0)."
+    ::= { lumSoftwareGroups 10 }
+
+softwareExpectedSwGroupV2 OBJECT-GROUP
+    OBJECTS {
+         softwareExpectedSwIndex,
+         softwareExpectedSwName,
+         softwareExpectedSwCategory,
+         softwareExpectedSwBoardType,
+         softwareExpectedSwFileName,
+         softwareExpectedSwPresent
+    }
+    STATUS      current
+    DESCRIPTION
+        "The expected software objects (11.0)."
+    ::= { lumSoftwareGroups 11 }
+
+softwareCuRepGroup OBJECT-GROUP
+    OBJECTS {
+         softwareCuRepAdminStatus,
+         softwareCuRepUnSaved,
+         softwareCuRepSystemMode,
+         softwareCuRepRebootCu,
+         softwareCuRepOkConfigure,
+         softwareCuRepSwPackagesMissing
+    }
+    STATUS      deprecated
+    DESCRIPTION
+        "The cu replacement software objects (13.0)."
+    ::= { lumSoftwareGroups 12 }
+
+softwareCuRepGroupV2 OBJECT-GROUP
+    OBJECTS {
+         softwareCuRepAdminStatus,
+         softwareCuRepUnSaved,
+         softwareCuRepSystemMode,
+         softwareCuRepRebootCu,
+         softwareCuRepOkConfigure,
+         softwareCuRepSwPackagesMissing,
+	 softwareCuRepSwNotDistributed,
+	 softwareCuRepSupportedReplacements
+    }
+    STATUS      current
+    DESCRIPTION
+        "The cu replacement software objects (18.0)."
+    ::= { lumSoftwareGroups 13 }
+
+softwareCommandGroupV4 OBJECT-GROUP
+    OBJECTS {
+         softwareCommandServerIp,
+         softwareCommandEnmFile,
+         softwareCommandIncludeFs,
+         softwareCommandCleanFirst,
+         softwareCommandForce,
+         softwareCommandOperation,
+         softwareCommandOperationTimeout,
+         softwareCommandTestAndIncr,
+         softwareCommandSemaphore,
+         softwareCommandOperationState,
+         softwareCommandProgressMax,
+         softwareCommandResult,
+         softwareCommandEnmState,
+         softwareCommandErrorCount,
+         softwareCommandProgressCounter,
+         softwareCommandNewPassword,
+         softwareCommandPassword,
+         softwareCommandReleaseAfterOperation,
+         softwareCommandSendTraps,
+         softwareCommandClientOperationId,
+         softwareCommandTftpTimeout,
+         softwareCommandLocalFtpDirectory,
+         softwareCommandWarningCount,
+	     softwareCommandEnmRelease,
+	     softwareCommandSubrackSlotExpr}
+    STATUS      current
+    DESCRIPTION
+        "The software command objects (30.0)."
+    ::= { lumSoftwareGroups 14 }
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+lumSoftwareBasicComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v1 (3.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroup,
+            softwareVersionGroup,
+            softwareCommandGroup,
+            softwareLogGroup }
+    ::= { lumSoftwareCompl 1 }
+
+lumSoftwareBasicComplV2 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v2 (3.1)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroupV2,
+            softwareVersionGroup,
+            softwareCommandGroupV2,
+            softwareLogGroup,
+            softwareSpareGroup }
+    ::= { lumSoftwareCompl 2 }
+
+lumSoftwareBasicComplV3 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v3 (5.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroupV3,
+            softwareVersionGroup,
+            softwareCommandGroupV3,
+            softwareLogGroup,
+            softwareSpareGroup,
+            softwareExpectedSwGroup }
+    ::= { lumSoftwareCompl 3 }
+
+lumSoftwareBasicComplV4 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v3 (11.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroupV3,
+            softwareVersionGroup,
+            softwareCommandGroupV3,
+            softwareLogGroup,
+            softwareSpareGroup,
+            softwareExpectedSwGroupV2 }
+    ::= { lumSoftwareCompl 4 }
+
+lumSoftwareBasicComplV5 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v3 (13.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroupV3,
+            softwareVersionGroup,
+            softwareCommandGroupV3,
+            softwareLogGroup,
+            softwareSpareGroup,
+            softwareExpectedSwGroupV2,
+            softwareCuRepGroup }
+    ::= { lumSoftwareCompl 5 }
+
+lumSoftwareBasicComplV6 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v6 (18.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroupV3,
+            softwareVersionGroup,
+            softwareCommandGroupV3,
+            softwareLogGroup,
+            softwareSpareGroup,
+            softwareExpectedSwGroupV2,
+            softwareCuRepGroupV2 }
+    ::= { lumSoftwareCompl 6 }
+
+lumSoftwareBasicComplV7 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v7 (30.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroupV3,
+            softwareVersionGroup,
+            softwareCommandGroupV4,
+            softwareLogGroup,
+            softwareSpareGroup,
+            softwareExpectedSwGroupV2,
+            softwareCuRepGroupV2 }
+    ::= { lumSoftwareCompl 7 }
+
+
+lumSoftwareBasicComplV8 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the software MIB v8 (30.1)."
+    MODULE
+        MANDATORY-GROUPS {
+            softwareGeneralGroupV3,
+            softwareVersionGroup,
+            softwareCommandGroupV4,
+            softwareLogGroup,
+            softwareSpareGroup,
+            softwareExpectedSwGroupV2,
+            softwareCuRepGroupV2 }
+    ::= { lumSoftwareCompl 8 }
+
+END
+

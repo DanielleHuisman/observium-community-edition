@@ -72,7 +72,7 @@ unset($navbar);
                                       'fieldset'    => 'body',
                                       'name'        => 'Transport',
                                       'width'       => '270px',
-                                      'live-search' => FALSE,
+                                      //'live-search' => FALSE,
                                       //'values'      => $form_params['method'],
                                       'value'       => 'email');
     $row_tmp = $row; // Store row number
@@ -80,7 +80,13 @@ unset($navbar);
     {
       $form_params['method'][$transport] = $config['transports'][$transport]['name'];
 
-      $docs_link = OBSERVIUM_URL . '/docs/alerting_transports/#' . str_replace(' ', '-', strtolower($config['transports'][$transport]['name']));
+      if (isset($config['transports'][$transport]['docs']))
+      {
+        // Known key in docs page (use if transport name is different with docs page)
+        $docs_link = OBSERVIUM_DOCS_URL . '/alerting_transports/#' . $config['transports'][$transport]['docs'];
+      } else {
+        $docs_link = OBSERVIUM_DOCS_URL . '/alerting_transports/#' . str_replace(' ', '-', strtolower($config['transports'][$transport]['name']));
+      }
       $form['row'][++$row]['contact_' . $transport . '_doc'] = array(
                                       'type'        => 'html',
                                       'fieldset'    => 'body',
@@ -112,14 +118,49 @@ unset($navbar);
         // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
         // This needs supporting code in the transport to check for set variable and if not, use the global default
 
-        foreach (array_merge($data['parameters']['required'], $data['parameters']['global']) as $parameter => $param_data) // Temporary merge req & global
+        foreach (array_merge((array)$data['parameters']['required'], $data['parameters']['global']) as $parameter => $param_data) // Temporary merge req & global
         {
-          $form['row'][$row]['contact_' . $transport . '_' . $parameter] = array(
-                                      'type'        => 'text',
-                                      'fieldset'    => 'body',
-                                      'name'        => $param_data['description'],
-                                      'class'       => 'input-xlarge',
-                                      'value'       => isset($param_data['default']) ? $param_data['default'] : '');
+          switch($param_data['type'])
+          {
+            case 'enum-freeinput':
+              $form_param = [
+                'type'     => 'tags',
+                'fieldset' => 'body',
+                'name'     => $param_data['description'],
+                'width'    => '270px',// '100%',
+                'value'    => isset($param_data['default']) ? $param_data['default'] : '',
+                'values'   => $param_data['params']
+              ];
+              break;
+            case 'bool':
+            case 'boolean':
+              // Boolean type is just select with true/false string
+              if (!isset($param_data['params']))
+              {
+                $param_data['params'] = ['' => 'Unset', 'true' => 'True', 'false' => 'False' ];
+              }
+            // do not break here
+            case 'enum':
+              $form_param = [
+                'type'     => 'select',
+                'fieldset' => 'body',
+                'name'     => $param_data['description'],
+                'width'    => '270px', //'100%',
+                'value'    => isset($param_data['default']) ? $param_data['default'] : '',
+                'values'   => $param_data['params']
+              ];
+              break;
+            default:
+              $form_param = [
+                'type'     => 'text',
+                'fieldset' => 'body',
+                'name'     => $param_data['description'],
+                'class'    => 'input-xlarge',
+                'value'    => isset($param_data['default']) ? $param_data['default'] : ''
+              ];
+          }
+          $form['row'][$row]['contact_' . $transport . '_' . $parameter] = $form_param;
+
           if (isset($param_data['tooltip']))
           {
             //r($param_data);
@@ -143,12 +184,48 @@ unset($navbar);
 
         foreach ($data['parameters']['optional'] as $parameter => $param_data)
         {
-          $form['row'][$row]['contact_' . $transport . '_' . $parameter] = array(
-                                      'type'        => 'text',
-                                      'fieldset'    => 'body',
-                                      'name'        => $param_data['description'],
-                                      'class'       => 'input-xlarge',
-                                      'value'       => isset($param_data['default']) ? $param_data['default'] : '');
+          switch($param_data['type'])
+        {
+            case 'enum-freeinput':
+              $form_param = [
+                'type'     => 'tags',
+                'fieldset' => 'body',
+                'name'     => $param_data['description'],
+                'width'    => '270px',// '100%',
+                //'value'    => isset($param_data['default']) ? $param_data['default'] : '',
+                'value'    => '',
+                'values'   => $param_data['params']
+              ];
+              break;
+          case 'bool':
+          case 'boolean':
+            // Boolean type is just select with true/false string
+            if (!isset($param_data['params']))
+            {
+              $param_data['params'] = ['' => 'Unset', 'true' => 'True', 'false' => 'False' ];
+            }
+          // do not break here
+          case 'enum':
+            $form_param = [
+              'type'     => 'select',
+              'fieldset' => 'body',
+              'name'     => $param_data['description'],
+              'width'    => '270px', //'100%',
+              //'value'    => isset($param_data['default']) ? $param_data['default'] : '',
+              'value'    => '',
+              'values'   => $param_data['params']
+            ];
+            break;
+          default:
+            $form_param = [
+              'type'     => 'text',
+              'fieldset' => 'body',
+              'name'     => $param_data['description'],
+              'class'    => 'input-xlarge',
+              'value'    => isset($param_data['default']) ? $param_data['default'] : ''
+            ];
+        }
+          $form['row'][$row]['contact_' . $transport . '_' . $parameter] = $form_param;
 
           if (isset($param_data['tooltip']))
           {
@@ -192,20 +269,20 @@ $("#contact_method").change(function() {
   // Generate javascript function which hides all configuration part panels except the ones for the currently chosen transport
   // Alternative would be to hide them all, then unhide the one selected. Hmm...
   $count = 0;
-  foreach ($config['transports'] as $transport => $description)
+  foreach (array_keys($config['transports']) as $transport)
   {
     if ($count == 0)
     {
       $script .= "  if (select === '" . $transport . "') {" . PHP_EOL;
     } else {
-      $script .= "  } else if (select === '" . $transport . "') {" . PHP_EOL;
+      $script .= PHP_EOL . "  } else if (select === '" . $transport . "') {" . PHP_EOL;
     }
-    $script .= "    \$('[id^=\"contact_${transport}\"]').show();" . PHP_EOL;
-    foreach ($config['transports'] as $ltransport => $ldescription)
+    $script .= "    \$('div[id^=\"contact_${transport}_\"]').show();" . PHP_EOL . "   ";
+    foreach (array_keys($config['transports']) as $ltransport)
     {
       if ($transport != $ltransport)
       {
-        $script .= "    \$('[id^=\"contact_${ltransport}\"]').hide();" . PHP_EOL;
+        $script .= " \$('div[id^=\"contact_${ltransport}_\"]').hide();";
       }
     }
 
@@ -217,5 +294,98 @@ $("#contact_method").change(function() {
   register_html_resource('script', $script);
 
   // End add contact
+
+// Begin Actions
+$readonly = $_SESSION['userlevel'] < 10; // Currently edit allowed only for Admins
+
+if (!$readonly && isset($vars['action']))
+{
+  switch ($vars['action'])
+  {
+    case 'add_contact':
+      // Only proceed if the contact_method is valid in our transports array
+      if (is_array($config['transports'][$vars['contact_method']]))
+      {
+        foreach ($config['transports'][$vars['contact_method']]['parameters'] as $section => $parameters)
+        {
+          foreach ($parameters as $parameter => $description)
+          {
+            if (isset($vars['contact_' . $vars['contact_method'] . '_' . $parameter]))
+            {
+              $endpoint_data[$parameter] = $vars['contact_' . $vars['contact_method'] . '_' . $parameter];
+            }
+          }
+        }
+
+        if ($endpoint_data)
+        {
+          dbInsert('alert_contacts', [ 'contact_descr' => $vars['contact_descr'], 'contact_endpoint' => json_encode($endpoint_data), 'contact_method' => $vars['contact_method'] ]);
+        }
+      }
+      break;
+
+    case 'edit_contact':
+    case 'update_contact':
+      $update_state = array();
+      $contact = get_contact_by_id($vars['contact_id']);
+
+      foreach (json_decode($contact['contact_endpoint'], TRUE) as $field => $value)
+      {
+        $contact['endpoint_parameters'][$field] = $value;
+      }
+
+      $update_state['contact_disabled'] = $vars['contact_enabled'] == '1' ? 0 : 1;
+
+      if (strlen($vars['contact_descr']) && $vars['contact_descr'] != $contact['contact_descr'])
+      {
+        $update_state['contact_descr'] = $vars['contact_descr'];
+      }
+
+      $data = $config['transports'][$contact['contact_method']];
+      if (!count($data['parameters']['global']))   { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
+      if (!count($data['parameters']['optional'])) { $data['parameters']['optional'] = array(); }
+      // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
+      // This needs supporting code in the transport to check for set variable and if not, use the global default
+
+      $update_endpoint = $contact['endpoint_parameters'];
+      foreach (array_merge($data['parameters']['required'], $data['parameters']['global'], $data['parameters']['optional']) as $parameter => $param_data)
+      {
+        if ((isset($data['parameters']['optional'][$parameter]) || // Allow optional param as empty
+             is_array($vars['contact_endpoint_'.$parameter]) || strlen($vars['contact_endpoint_'.$parameter])) &&
+            $vars['contact_endpoint_'.$parameter] != $contact['endpoint_parameters'][$parameter])
+        {
+          $update_endpoint[$parameter] = $vars['contact_endpoint_'.$parameter];
+        }
+      }
+      //r($update_endpoint);
+      $update_endpoint = json_encode($update_endpoint);
+      if ($update_endpoint != $contact['contact_endpoint'])
+      {
+        //r($update_endpoint);
+        //r($contact['contact_endpoint']);
+        $update_state['contact_endpoint'] = $update_endpoint;
+      }
+
+      $rows_updated = dbUpdate($update_state, 'alert_contacts', 'contact_id = ?', array($vars['contact_id']));
+      break;
+
+    case 'delete_contact':
+      if (in_array($vars['confirm_'.$vars['contact_id']], array('1', 'on', 'yes', 'confirm')))
+      {
+        $rows_deleted  = dbDelete('alert_contacts',       '`contact_id` = ?', array($vars['contact_id']));
+        $rows_deleted += dbDelete('alert_contacts_assoc', '`contact_id` = ?', array($vars['contact_id']));
+
+        if ($rows_deleted)
+        {
+          print_success('Deleted contact and all associations ('.$vars['contact_id'].')');
+        }
+      }
+      unset($vars['contact_id']);
+      break;
+
+  }
+}
+
+// End Actions
 
 // EOF

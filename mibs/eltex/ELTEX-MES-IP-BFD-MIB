@@ -11,7 +11,10 @@ IMPORTS
     Unsigned32,
     MODULE-IDENTITY              FROM SNMPv2-SMI
     TruthValue,
-    RowStatus                    FROM SNMPv2-TC;
+    RowStatus                    FROM SNMPv2-TC
+    InterfaceIndexOrZero         FROM CISCO-TC
+    InetAddressType,              
+    InetAddress                  FROM INET-ADDRESS-MIB;
 
 
 eltMesIpBfd MODULE-IDENTITY
@@ -26,104 +29,411 @@ eltMesIpBfd MODULE-IDENTITY
                       "Initial revision."
     ::= { eltMes 6 }
 
---
--- eltMesIpBfd
---
+   EltIpBfdInterval ::= TEXTUAL-CONVENTION
+      DISPLAY-HINT "d"
+      STATUS       current
+      DESCRIPTION
+         "The BFD interval delay in milliseconds."
+      SYNTAX       Unsigned32 (150..1000)
 
-    eltIpBfdOspfEnable OBJECT-TYPE
-        SYNTAX     INTEGER {
-            enabled(1),
-            disabled(2)
-        }
-        MAX-ACCESS read-write
-        STATUS     current
-        DESCRIPTION
-            ""
-        DEFVAL { disabled }
-        ::= { eltMesIpBfd 1 }
+   EltIpBfdDiag ::= TEXTUAL-CONVENTION
+      STATUS       current
+      DESCRIPTION
+         "A common BFD diagnostic code."
+      SYNTAX       INTEGER {
+                      noDiagnostic(0),
+                      controlDetectionTimeExpired(1),
+                      echoFunctionFailed(2),
+                      neighborSignaledSessionDown(3),
+                      forwardingPlaneReset(4),
+                      pathDown(5),
+                      concatenatedPathDown(6),
+                      administrativelyDown(7),
+                      reverseConcatenatedPathDown(8),
+                      misconnectivity(16),
+                      noContact(255)
+                   }
 
-        eltIpBfdIfTable OBJECT-TYPE
-        SYNTAX     SEQUENCE OF EltIpBfdIfEntry
-        MAX-ACCESS not-accessible
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltMesIpBfd 2 }
+   EltIpBfdState ::= TEXTUAL-CONVENTION
+      STATUS       current
+      DESCRIPTION
+         "A common BFD state code."
+      SYNTAX       INTEGER {
+                      adminDown(1),
+                      down(2),
+                      init(3),
+                      up(4)
+                   }
 
-    eltIpBfdIfEntry OBJECT-TYPE
-        SYNTAX     EltIpBfdIfEntry
-        MAX-ACCESS not-accessible
-        STATUS     current
-        DESCRIPTION
-            "The BFD Session Entry describes BFD session."
-        INDEX { eltIpBfdAddr }
-        ::= { eltIpBfdIfTable 1 }
+  --
+  -- BFD Session Config Table
+  --
 
-    EltIpBfdIfEntry ::= SEQUENCE {
-          eltIpBfdAddr                      IpAddress,
-          eltIpBfdDesiredMinTxInterval      Unsigned32,
-          eltIpBfdReqMinRxInterval          Unsigned32,
-          eltIpBfdDetectMult                Unsigned32,
-          eltIpBfdOspfDisable               TruthValue,
-          eltIpBfdRipDisable                TruthValue,
-          eltIpBfdRowStatus                 RowStatus
+  eltIpBfdSessConfigTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltIpBfdSessConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BFD Session parameter configuration table allows static
+                 configuration of BFD session parameters.
+                 Changing of any configuration parameter in this entry will 
+                 cause an automatic BFD session restart and may result in L3
+                 routing protocol adjacency restart."
+    ::= { eltMesIpBfd 3 }
+
+  eltIpBfdSessConfigEntry OBJECT-TYPE
+    SYNTAX      EltIpBfdSessConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "BFD Session parameter configuration which applies to
+                 BFD sessions matching the identification information."
+    INDEX      { eltIpBfdSessConfigIfIndex,
+                 eltIpBfdSessConfigAddrType,
+                 eltIpBfdSessConfigAddr,
+                 eltIpBfdSessConfigLocalAddrType,
+                 eltIpBfdSessConfigLocalAddr
+               }
+    ::= { eltIpBfdSessConfigTable 1 }
+
+  EltIpBfdSessConfigEntry ::= SEQUENCE {
+      eltIpBfdSessConfigIfIndex           InterfaceIndexOrZero,
+      eltIpBfdSessConfigAddrType          InetAddressType,
+      eltIpBfdSessConfigAddr              InetAddress,
+      eltIpBfdSessConfigLocalAddrType     InetAddressType,
+      eltIpBfdSessConfigLocalAddr         InetAddress,
+      eltIpBfdSessConfigRowStatus         RowStatus,
+      eltIpBfdSessConfigDesiredMinTxIntvl EltIpBfdInterval,
+      eltIpBfdSessConfigReqMinRxInterval  EltIpBfdInterval,
+      eltIpBfdSessConfigDetectMult        Unsigned32
     }
 
-    eltIpBfdAddr OBJECT-TYPE
-        SYNTAX     IpAddress
-        MAX-ACCESS read-only
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltIpBfdIfEntry 1 }
+   eltIpBfdSessConfigIfIndex OBJECT-TYPE
+      SYNTAX       InterfaceIndexOrZero
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This object specifies the interface index of the
+          interface that this configuration applies to."
+      ::= { eltIpBfdSessConfigEntry 1 }
 
-    eltIpBfdDesiredMinTxInterval OBJECT-TYPE
-        SYNTAX     Unsigned32
-        MAX-ACCESS read-write
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltIpBfdIfEntry 2 }
+   eltIpBfdSessConfigAddrType OBJECT-TYPE
+      SYNTAX       InetAddressType
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "The type of the address of the peer associated with this
+          BFD session parameter configuration.
 
-    eltIpBfdReqMinRxInterval OBJECT-TYPE
-        SYNTAX     Unsigned32
-        MAX-ACCESS read-write
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltIpBfdIfEntry 3 }
+          This object specifies how the value of the
+          eltIpBfdSessConfigAddr object should be interpreted.
 
-    eltIpBfdDetectMult OBJECT-TYPE
-        SYNTAX     Unsigned32
-        MAX-ACCESS read-write
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltIpBfdIfEntry 4 }
+          A value of unknown(0) is used if the configuration applies
+          to all peers"
+      ::= { eltIpBfdSessConfigEntry 2 }
 
-    eltIpBfdRowStatus OBJECT-TYPE
-        SYNTAX     RowStatus
-        MAX-ACCESS read-create
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltIpBfdIfEntry 7 }
+   eltIpBfdSessConfigAddr OBJECT-TYPE
+      SYNTAX       InetAddress (SIZE(0|4|16))
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "The address of the peer associated with this BFD session
+          parameter configuration.
 
-    eltIpBfdOspfDisable OBJECT-TYPE
-        SYNTAX     TruthValue
-        MAX-ACCESS read-write
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltIpBfdIfEntry 5 }
+          This field is only valid if eltIpBfdSessConfigAddrType is
+          non-zero.  Otherwise, it should be set to a zero-length
+          address."
+      ::= { eltIpBfdSessConfigEntry 3 }
 
-    eltIpBfdRipDisable OBJECT-TYPE
-        SYNTAX     TruthValue
-        MAX-ACCESS read-write
-        STATUS     current
-        DESCRIPTION
-            ""
-        ::= { eltIpBfdIfEntry 6 }
+   eltIpBfdSessConfigLocalAddrType OBJECT-TYPE
+      SYNTAX       InetAddressType
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "The type of the local IP address associated with this BFD
+          session.
+
+          This object specifies how the value of the
+          eltIpBfdSessConfigLocalAddr object should be interpreted.
+
+          Only values unknown(0), ipv4(1) or ipv6(2) have to be
+          supported."
+      ::= { eltIpBfdSessConfigEntry 4 }
+
+   eltIpBfdSessConfigLocalAddr OBJECT-TYPE
+      SYNTAX       InetAddress (SIZE(0|4|16))
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION
+         "This object specifies the local IP address associated with
+          this BFD session.
+
+          This field is only valid if eltIpBfdSessConfigLocalAddrType
+          is non-zero.  Otherwise, it should be set to a zero-length
+          address."
+      ::= { eltIpBfdSessConfigEntry 5 }
+
+   eltIpBfdSessConfigRowStatus OBJECT-TYPE
+      SYNTAX       RowStatus
+      MAX-ACCESS   read-write
+      STATUS       current
+      DESCRIPTION
+         "This variable is used to create, modify, and/or
+          delete a row in this table."
+      ::= { eltIpBfdSessConfigEntry 6 }
+
+   eltIpBfdSessConfigDesiredMinTxIntvl OBJECT-TYPE
+      SYNTAX       EltIpBfdInterval
+      MAX-ACCESS   read-write
+      STATUS       current
+      DESCRIPTION
+         "This object specifies the minimum interval, in
+          milliseconds, that the local system would like to use
+          when transmitting BFD Control packets."
+      DEFVAL       { 150 }
+      ::= { eltIpBfdSessConfigEntry 7 }
+
+   eltIpBfdSessConfigReqMinRxInterval OBJECT-TYPE
+      SYNTAX       EltIpBfdInterval
+      MAX-ACCESS   read-write
+      STATUS       current
+      DESCRIPTION
+         "This object specifies the minimum interval, in
+          milliseconds, between received BFD Control packets that the
+          local system is willing to accept."
+      DEFVAL       { 150 }
+      ::= { eltIpBfdSessConfigEntry 8 }
+
+   eltIpBfdSessConfigDetectMult OBJECT-TYPE
+      SYNTAX       Unsigned32
+      MAX-ACCESS   read-write
+      STATUS       current
+      DESCRIPTION
+         "This object specifies the Detect time multiplier."
+      DEFVAL       { 3 }
+      ::= { eltIpBfdSessConfigEntry 9 }
+
+  --
+  -- BFD Session Config Table
+  --
+
+  eltIpBfdSessStateTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltIpBfdSessStateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BFD Session state table allows the user to query BFD
+                 protocol session state."
+    ::= { eltMesIpBfd 4 }
+
+  eltIpBfdSessStateEntry OBJECT-TYPE
+    SYNTAX      EltIpBfdSessStateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BFD Session State Table shows the state and
+                 dignostics of the BFD sessions created."
+    INDEX      { eltIpBfdSessStateIfIndex,
+                 eltIpBfdSessStatePeerAddrType,
+                 eltIpBfdSessStatePeerAddr,
+                 eltIpBfdSessStateLocalAddrType,
+                 eltIpBfdSessStateLocalAddr,
+                 eltIpBfdSessStateRemoteDiscr
+               }
+    ::= { eltIpBfdSessStateTable 1 }
+
+  EltIpBfdSessStateEntry ::= SEQUENCE {
+      eltIpBfdSessStateIfIndex            InterfaceIndexOrZero,
+      eltIpBfdSessStatePeerAddrType       InetAddressType,
+      eltIpBfdSessStatePeerAddr           InetAddress,
+      eltIpBfdSessStateLocalAddrType      InetAddressType,
+      eltIpBfdSessStateLocalAddr          InetAddress,
+      eltIpBfdSessStateRemoteDiscr        Unsigned32,
+      eltIpBfdSessStateState              EltIpBfdState,
+      eltIpBfdSessStateDiag               EltIpBfdDiag,
+      eltIpBfdSessStateOperIfIndex        InterfaceIndexOrZero,
+      eltIpBfdSessStateOperPeerAddrType   InetAddressType,
+      eltIpBfdSessStateOperPeerAddr       InetAddress,
+      eltIpBfdSessStateOperLocalAddrType  InetAddressType,
+      eltIpBfdSessStateOperLocalAddr      InetAddress,
+      eltIpBfdSessStateOperRemoteDiscr    Unsigned32
+    }
+
+   eltIpBfdSessStateIfIndex OBJECT-TYPE
+      SYNTAX       InterfaceIndexOrZero
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION "The configured interface index of the interface that reaches
+                   the peer associated with this BFD protocol session, or zero if
+                   no interface index was configured."
+      ::= { eltIpBfdSessStateEntry 1 }
+
+   eltIpBfdSessStatePeerAddrType OBJECT-TYPE
+      SYNTAX       InetAddressType
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION "The type of the configured address of the peer associated with
+                   this BFD protocl session.
+
+                   This object specifies how the value of the
+                   eltIpBfdSessStatePeerAddr object should be interpreted."
+      ::= { eltIpBfdSessStateEntry 2 }
+
+   eltIpBfdSessStatePeerAddr OBJECT-TYPE
+      SYNTAX       InetAddress
+      MAX-ACCESS   not-accessible
+      STATUS       current
+      DESCRIPTION "The configured address of the peer associated with this BFD
+                   protocol session.
+
+                   This field is only valid if eltIpBfdSessStatePeerAddrType is
+                   non-zero.  Otherwise, it should be set to a zero-length
+                   address."
+      ::= { eltIpBfdSessStateEntry 3 }
+
+   eltIpBfdSessStateLocalAddrType OBJECT-TYPE
+     SYNTAX      InetAddressType
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION "The type of the configured local IP address associated with
+                  this BFD protocol session.
+
+                  This object specifies how the value of the
+                  eltIpBfdSessStateLocalAddr object should be interpreted.
+
+                  Only values unknown(0), ipv4(1) or ipv6(2) have to be
+                  supported.
+
+                  A value of unknown(0) is allowed when the outgoing
+                  interface is of type point-to-point, the BFD protocol
+                  session is not associated with a specific interface, or
+                  when the local IP address is not known."
+     ::= { eltIpBfdSessStateEntry 4 }
+
+   eltIpBfdSessStateLocalAddr OBJECT-TYPE
+     SYNTAX      InetAddress (SIZE(0|4|16))
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION "This object specifies the configured local IP address
+                  associated with this BFD protocol session.
+
+                  This field is only valid if eltIpBfdSessStateLocalAddrType is
+                  non-zero.  Otherwise, it should be set to a zero-length
+                  address."
+     ::= { eltIpBfdSessStateEntry 5 }
+
+   eltIpBfdSessStateRemoteDiscr OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION "The session discriminator specified for this BFD session."
+     ::= { eltIpBfdSessStateEntry 6 }
+
+   eltIpBfdSessStateState OBJECT-TYPE
+      SYNTAX       EltIpBfdState
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "The perceived state of the BFD protocol session."
+      ::= { eltIpBfdSessStateEntry 7 }
+
+   eltIpBfdSessStateDiag OBJECT-TYPE
+      SYNTAX       EltIpBfdDiag
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "A diagnostic code specifying the local system's reason for
+                   the last transition of the BFD protocol session from up(1)
+                   to some other state."
+      ::= { eltIpBfdSessStateEntry 8 }
+
+   eltIpBfdSessStateOperIfIndex OBJECT-TYPE
+      SYNTAX       InterfaceIndexOrZero
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "The interface index of the interface that reaches the peer
+                   associated with this BFD protocol session.  If the peer is
+                   not directly connected, then this object has the value
+                   zero.
+
+                   If no interface index was configured for the session, then
+                   this shows the interface index that is actually being used
+                   for the session."
+      ::= { eltIpBfdSessStateEntry 9 }
+
+   eltIpBfdSessStateOperPeerAddrType OBJECT-TYPE
+      SYNTAX       InetAddressType
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "The type of the address of the peer associated with this
+                   BFD protocl session.
+
+                   This object specifies how the value of the
+                   eltIpBfdSessStateOperPeerAddr object should be interpreted.
+
+                   If no peer address was configured for the session, then
+                   this shows the type of the peer address that is actually
+                   being used for the session."
+      ::= { eltIpBfdSessStateEntry 10 }
+
+   eltIpBfdSessStateOperPeerAddr OBJECT-TYPE
+      SYNTAX       InetAddress
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "The address of the peer associated with this BFD protocol
+                   session.
+
+                   This field is only valid if eltIpBfdSessStateOperPeerAddrType
+                   is non-zero.  Otherwise, it should be ignored.
+
+                   If no peer address was configured for the session, then
+                   this shows the peer address that is actually being used
+                   for the session."
+      ::= { eltIpBfdSessStateEntry 11 }
+
+   eltIpBfdSessStateOperLocalAddrType OBJECT-TYPE
+      SYNTAX       InetAddressType
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "The type of the configured local IP address associated
+                   with this BFD protocol session.
+
+                   This object specifies how the value of the
+                   eltIpBfdSessStateOperLocalAddr object should be interpreted.
+
+                   Only values unknown(0), ipv4(1) or ipv6(2) have to be
+                   supported.
+
+                   A value of unknown(0) is allowed when the outgoing
+                   interface is of type point-to-point, the BFD protocol
+                   session is not associated with a specific interface, or
+                   when the local IP address is not known.
+
+                   If no local address was configured for the session, then
+                   this shows the type of the local address that is actually
+                   being used for the session."
+      ::= { eltIpBfdSessStateEntry 12 }
+
+   eltIpBfdSessStateOperLocalAddr OBJECT-TYPE
+      SYNTAX       InetAddress
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "This object specifies the configured local IP address
+                   associated with this BFD protocol session.
+
+                   This field is only valid if eltIpBfdSessStateOperLocalAddrType
+                   is non-zero.  Otherwise, it should be set to a zero-length
+                   address.
+
+                   If no local address was configured for the session, then
+                   this shows the local address that is actually being used
+                   for the session."
+      ::= { eltIpBfdSessStateEntry 13 }
+
+   eltIpBfdSessStateOperRemoteDiscr OBJECT-TYPE
+      SYNTAX       Unsigned32
+      MAX-ACCESS   read-only
+      STATUS       current
+      DESCRIPTION "The session discriminator chosen by the remote system for
+                   this BFD session.
+
+                   If no remote discriminator was configured for the session,
+                   then this shows the remote discriminator that is actually
+                   being used for the session."
+      ::= { eltIpBfdSessStateEntry 14 }
 
 END
-

@@ -47,7 +47,7 @@ foreach ($dbq as $ds)
   $ds_filename = $plugfile."_".$ds['ds_name'].".rrd";
   $ds_name = $ds['ds_name'];
 
-  $cmd_def .= " DEF:".$ds['ds_name']."=".$ds_filename.":val:AVERAGE";
+  $cmd_def .= " DEF:".$ds['ds_name']."=".rrdtool_escape($ds_filename).":val:AVERAGE";
 
   if (!empty($ds['ds_cdef']))
   {

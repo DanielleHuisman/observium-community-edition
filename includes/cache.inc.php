@@ -1,15 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- *   These functions perform rewrites on strings and numbers.
- *
  * @package    observium
  * @subpackage cache
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -67,7 +64,8 @@ function get_cache_key($key, $global = FALSE)
  */
 function get_cache_item($key)
 {
-  if ($GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
+  if (defined('OBS_CACHE_LINK') &&
+      $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
   {
     $observium_cache = $GLOBALS[OBS_CACHE_LINK];
   } else {
@@ -88,7 +86,8 @@ function get_cache_item($key)
  */
 function ishit_cache_item($item)
 {
-  if ($GLOBALS[OBS_CACHE_LINK] !== (object)$GLOBALS[OBS_CACHE_LINK])
+  if (!(defined('OBS_CACHE_LINK') &&
+        $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK]))
   {
     // Cache not enabled
     return;
@@ -105,7 +104,8 @@ function ishit_cache_item($item)
  */
 function get_cache_data($item)
 {
-  if ($GLOBALS[OBS_CACHE_LINK] !== (object)$GLOBALS[OBS_CACHE_LINK])
+  if (!(defined('OBS_CACHE_LINK') &&
+        $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK]))
   {
     // Cache not enabled
     return;
@@ -135,7 +135,8 @@ function get_cache_data($item)
  */
 function set_cache_item($item, $data, $params = array())
 {
-  if ($GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
+  if (defined('OBS_CACHE_LINK') &&
+      $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
   {
     $observium_cache = $GLOBALS[OBS_CACHE_LINK];
   } else {
@@ -171,9 +172,9 @@ function set_cache_item($item, $data, $params = array())
   {
     $ttl = intval($params['ttl']);
   }
-  else if (is_numeric($_GLOBALS['config']['cache']['ttl']))
+  else if (is_numeric($GLOBALS['config']['cache']['ttl']))
   {
-    $ttl = $_GLOBALS['config']['cache']['ttl'];
+    $ttl = $GLOBALS['config']['cache']['ttl'];
   } else {
     // Default TTL (5 min)
     $ttl = 300;
@@ -207,7 +208,8 @@ function set_cache_item($item, $data, $params = array())
  */
 function get_cache_items($tag)
 {
-  if ($GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
+  if (defined('OBS_CACHE_LINK') &&
+      $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
   {
     $observium_cache = $GLOBALS[OBS_CACHE_LINK];
   } else {
@@ -226,7 +228,8 @@ function get_cache_items($tag)
  */
 function del_cache_items($tags)
 {
-  if ($GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
+  if (defined('OBS_CACHE_LINK') &&
+      $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
   {
     $observium_cache = $GLOBALS[OBS_CACHE_LINK];
   } else {
@@ -247,7 +250,8 @@ function del_cache_items($tags)
  */
 function del_cache_expired($tag = '')
 {
-  if ($GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
+  if (defined('OBS_CACHE_LINK') &&
+      $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
   {
     $observium_cache = $GLOBALS[OBS_CACHE_LINK];
   } else {
@@ -325,6 +329,91 @@ function set_cache_clear($target = 'wui')
 }
 */
 
+function get_cache_session($key)
+{
+  // Check if fast cache used
+  $fast_cache = defined('OBS_CACHE_LINK') && $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK];
+
+  if ($fast_cache)
+  {
+    $cache_item = get_cache_item($key);
+    //print_vars($cache_item->isHit());
+
+    $GLOBALS['cache_ishit'] = ishit_cache_item($cache_item);
+    if ($GLOBALS['cache_ishit'])
+    {
+      return get_cache_data($cache_item);
+    }
+
+  } else {
+    // Fallback to session caching
+    //r($_COOKIE);
+    //r($_SESSION);
+    $GLOBALS['cache_ishit'] = isset($_SESSION['cache_session']) && array_key_exists($key, $_SESSION['cache_session']);
+    //r($GLOBALS['cache_ishit']);
+    if ($GLOBALS['cache_ishit'])
+    {
+      // Check cache entry timeout $config['cache']['ttl']
+      $tdiff = time() - $_SESSION['cache_session_time'][$key];
+      if ($tdiff > $GLOBALS['config']['cache']['ttl'])
+      {
+        // Too old cache entry, clear
+        unset($GLOBALS['cache_ishit']);
+        session_unset_var('cache_session->'.$key);
+        session_unset_var('cache_session_time->'.$key);
+        return NULL;
+      }
+      return $_SESSION['cache_session'][$key];
+    }
+  }
+
+  return NULL;
+}
+
+function set_cache_session($key, $data)
+{
+  // Check if fast cache used
+  $fast_cache = defined('OBS_CACHE_LINK') && $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK];
+
+  if ($fast_cache)
+  {
+    $cache_item = get_cache_item($key);
+
+    // Store $cache in fast caching
+    set_cache_item($cache_item, $data);
+
+    // Clear expired cache
+    del_cache_expired();
+
+  } else {
+    // Fallback to session caching
+    session_set_var('cache_session->'.$key, $data);
+    session_set_var('cache_session_time->'.$key, time());
+    //r($data);
+    //$_SESSION['cache_session'][$key] = $data;
+  }
+
+  // Clear hit cache if exist
+  if (isset($GLOBALS['cache_ishit']))
+  {
+    unset($GLOBALS['cache_ishit']);
+  }
+}
+
+function ishit_cache_session()
+{
+  if (isset($GLOBALS['cache_ishit']))
+  {
+    $return = $GLOBALS['cache_ishit'];
+    // Clear hit cache if exist
+    unset($GLOBALS['cache_ishit']);
+  } else {
+    $return = FALSE;
+  }
+
+  return $return;
+}
+
 /**
  * Return total cache size in bytes.
  * Note, this is not user/session specific size, but total for cache system
@@ -333,7 +422,8 @@ function set_cache_clear($target = 'wui')
  */
 function get_cache_stats()
 {
-  if ($GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
+  if (defined('OBS_CACHE_LINK') &&
+      $GLOBALS[OBS_CACHE_LINK] === (object)$GLOBALS[OBS_CACHE_LINK])
   {
     $observium_cache = $GLOBALS[OBS_CACHE_LINK];
   } else {
@@ -374,7 +464,7 @@ if (!$config['cache']['enable'])
   {
     if (version_compare(PHP_VERSION, '5.5.0', '<'))
     {
-      print_error('<span class="text-danger">CACHE DISABLED.</span> You use too old php version, see <a href="' . OBSERVIUM_URL . '/docs/software_requirements/">minimum software requirements</a>.');
+      print_error('<span class="text-danger">CACHE DISABLED.</span> You use too old php version, see <a href="' . OBSERVIUM_DOCS_URL . '/software_requirements/">minimum software requirements</a>.');
     } else {
       print_error('<span class="text-danger">CACHE DISABLED.</span> Disabled in config.');
     }

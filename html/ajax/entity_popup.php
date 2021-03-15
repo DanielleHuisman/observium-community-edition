@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage ajax
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -20,6 +18,8 @@ include($config['html_dir'] . "/includes/functions.inc.php");
 include($config['html_dir'] . "/includes/authenticate.inc.php");
 
 if (!$_SESSION['authenticated']) { print_error('Session expired, please log in again!'); exit; }
+
+ob_start();
 
 $vars = get_vars();
 
@@ -62,10 +62,12 @@ switch ($vars['entity_type'])
 
   // FIXME : mac is not an observium entity. This should go elsewhere!
   case "mac":
-    if (Net_MAC::check($vars['entity_id']))
+    //if (Net_MAC::check($vars['entity_id']))
+    if (preg_match('/^' . OBS_PATTERN_MAC . '$/i', $vars['entity_id']))
     {
+      $mac = format_mac($vars['entity_id']);
       // Other way by using Pear::Net_MAC, see here: http://pear.php.net/manual/en/package.networking.net-mac.importvendors.php
-      $url = 'http://api.macvendors.com/' . urlencode($vars['entity_id']);
+      $url = 'http://api.macvendors.com/' . urlencode($mac);
       $response = get_http_request($url);
       if ($response)
       {
@@ -84,10 +86,13 @@ switch ($vars['entity_type'])
     $ip_version = get_ip_version($ip);
     if ($ip_version)
     {
-      if (isset($_SESSION['cache']['response_' . $vars['entity_type'] . '_' . $ip]))
+      $cache_key = 'response_' . $vars['entity_type'] . '_' . $ip;
+      $cache_entry = get_cache_session($cache_key);
+      //r($cache_entry);
+      if (ishit_cache_session())
       {
-        echo $_SESSION['cache']['response_' . $vars['entity_type'] . '_' . $ip];
         //echo '<h2>CACHED!</h2>';
+        echo $cache_entry;
         exit;
       }
 
@@ -128,11 +133,11 @@ switch ($vars['entity_type'])
                 break;
               }
             }
-            else if (in_array($matches[1], array('Organization', 'org', 'mnt-irt')))
+            elseif (in_array($matches[1], array('Organization', 'org', 'mnt-irt')))
             {
               $org++; // has org info
             }
-            else if ($matches[1] == 'Comment')
+            elseif ($matches[1] == 'Comment')
             {
               continue; // skip comments
             }
@@ -166,12 +171,12 @@ switch ($vars['entity_type'])
                   {
                     break;
                   }
-                  else if (in_array($part['key'], array('Organization', 'org', 'mnt-irt')))
+                  elseif (in_array($part['key'], array('Organization', 'org', 'mnt-irt')))
                   {
                     $org = 1; // has org info
                     $org_name = $part['value'];
                   }
-                  else if ($part['key'] == 'Comment')
+                  elseif ($part['key'] == 'Comment')
                   {
                     continue; // skip comments
                   }
@@ -179,7 +184,7 @@ switch ($vars['entity_type'])
                 }
 
               }
-              else if ($org === 1 && $key == 'OrgName' && strpos($org_name, $parts[0]['value']) === 0)
+              elseif ($org === 1 && $key == 'OrgName' && strpos($org_name, $parts[0]['value']) === 0)
               {
 
                 $whois_parts[1] = '';
@@ -189,7 +194,7 @@ switch ($vars['entity_type'])
                   {
                     break;
                   }
-                  else if ($part['key'] == 'Comment')
+                  elseif ($part['key'] == 'Comment')
                   {
                     continue; // skip comments
                   }
@@ -208,15 +213,99 @@ switch ($vars['entity_type'])
 
       if ($response)
       {
-        @session_start();
-        $_SESSION['cache']['response_' . $vars['entity_type'] . '_' . $ip] = '<pre class="small">' . $response . '</pre>';
-        session_commit();
-        echo $_SESSION['cache']['response_' . $vars['entity_type'] . '_' . $ip];
+        $cache_entry = '<pre class="small">' . $response . '</pre>';
+        // @session_start();
+        // $_SESSION['cache']['response_' . $vars['entity_type'] . '_' . $ip] = '<pre class="small">' . $response . '</pre>';
+        // session_commit();
       } else {
-        echo 'Not Found';
+        $cache_entry = 'Not Found';
+        //echo 'Not Found';
       }
+      set_cache_session($cache_key, $cache_entry);
+      echo $cache_entry;
     } else {
       echo 'Not correct IP address';
+    }
+    exit;
+    break;
+
+  case 'autodiscovery':
+    // if (isset($vars['autodiscovery_id']))
+    // {
+    //   $vars['entity_id'] = $vars['autodiscovery_id'];
+    // }
+    //r($vars);
+    if (is_numeric($vars['entity_id']) &&
+        $_SESSION['userlevel'] > 7)
+    {
+
+      $cache_key = 'response_' . $vars['entity_type'] . '_' . $vars['entity_id'];
+      $cache_entry = get_cache_session($cache_key);
+      //r($cache_entry);
+      if (ishit_cache_session())
+      {
+        //echo '<h2>CACHED!</h2>';
+        echo $cache_entry;
+        exit;
+      }
+
+      $entry = dbFetchRow('SELECT `remote_hostname`, `remote_ip`, `last_reason`, UNIX_TIMESTAMP(`last_checked`) AS `last_checked_unixtime` FROM `autodiscovery` WHERE `autodiscovery_id` = ?', [ $vars['entity_id'] ]);
+      $hostname = $entry['remote_hostname'];
+      $ip = $entry['remote_ip'];
+
+      //r($entry);
+      // 'ok','no_xdp','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+      switch ($entry['last_reason'])
+      {
+        case 'ok':
+          $last_reason = "Remote host $hostname ($ip) successfully added to db.";
+          break;
+
+        case 'no_xdp':
+          $last_reason = 'Remote platform ignored by XDP autodiscovery configuration.';
+          break;
+
+        case 'no_fqdn':
+          $last_reason = "Remote IP $ip does not seem to have FQDN.";
+          break;
+
+        case 'no_dns':
+          $last_reason = "Remote host $hostname not resolved.";
+          break;
+
+        case 'no_ip_permit':
+          $last_reason = "Remote IP $ip not permitted in autodiscovery configuration or invalid.";
+          break;
+
+        case 'no_ping':
+          $last_reason = "Remote host $hostname not pingable.";
+          break;
+
+        case 'no_snmp':
+          $last_reason = "Remote host $hostname not SNMPable by configured auth parameters.";
+          break;
+
+        case 'duplicated':
+          $last_reason = "Remote host $hostname ($ip) already found in db.";
+          break;
+
+        case 'no_db':
+          $last_reason = "Remote host $hostname ($ip) success, but not added by an DB error.";
+          break;
+
+        default:
+          $last_reason = "Remote host $hostname ($ip) not added by unknown reason.";
+          break;
+      }
+      $cache_entry = '<div style="width: 280px;">';
+      $cache_entry .= "<h4>$last_reason</h4><hr />";
+      $cache_entry .= '<strong style="margin-left: 10px;">Autodiscovery checked:</strong> '. format_uptime(time() - $entry['last_checked_unixtime'], 'shorter') . ' ago</span>';
+      $cache_entry .= '</div>';
+      //$cache_entry .= build_table_row($entry);
+      set_cache_session($cache_key, $cache_entry);
+      echo $cache_entry;
+    } else {
+      print_warning("You are not permitted to view this entry.");
     }
     exit;
     break;
@@ -237,7 +326,7 @@ switch ($vars['entity_type'])
       {
         echo generate_entity_popup_multi($entity_ids, $vars);
       //}
-      //else if (is_numeric($vars['entity_id']) && (is_entity_permitted($vars['entity_id'], $vars['entity_type'])))
+      //elseif (is_numeric($vars['entity_id']) && (is_entity_permitted($vars['entity_id'], $vars['entity_type'])))
       //{
       //  $entity = get_entity_by_id_cache($vars['entity_type'], $vars['entity_id']);
       //  echo generate_entity_popup($entity, $vars);

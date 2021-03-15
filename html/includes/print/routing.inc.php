@@ -78,7 +78,7 @@ function print_bgp_peer_table($vars)
         array('Family', 'style="width: 50px;"'),
         'peer_as' => 'Remote AS',
         'state'   => 'State',
-        'Uptime / Updates',
+        'uptime'  => 'Uptime / Updates',
     );
     //if (!$list['device']) { unset($cols['device']); }
     $string .= get_table_header($cols, $vars);
@@ -339,7 +339,36 @@ function get_bgp_array($vars)
     $query .= $where . $query_permitted;
 
     $query = 'SELECT `hostname`, `bgpLocalAs`, bgpPeers.* ' . $query;
-    $query .= ' ORDER BY `hostname`, `bgpPeerRemoteAs`, `bgpPeerRemoteAddr`';
+    
+    if($vars['sort_order'] == 'desc') { $sort_dir = ' DESC'; }
+
+        switch($vars['sort'])
+        {
+            case "device":
+                $sort = " ORDER BY `hostname`".$sort_dir;
+                break;
+
+            case "peer_ip":
+                $sort = " ORDER BY `bgpPeerRemoteAddr`".$sort_dir;
+                break;
+
+            case "peer_as":
+                $sort = " ORDER BY `bgpPeerRemoteAs`".$sort_dir;
+                break;
+
+            case 'state':
+                $sort = " ORDER BY `bgpPeerAdminStatus`".$sort_dir.", `bgpPeerState`".$sort_dir;
+                break;
+
+            case 'uptime':
+                $sort = " ORDER BY `bgpPeerFsmEstablishedTime`".$sort_dir;
+                break;
+
+            default:
+                $sort = " ORDER BY `hostname`".$sort_dir.", `bgpPeerRemoteAs`".$sort_dir.", `bgpPeerRemoteAddr`".$sort_dir;
+        }
+
+    $query .= $sort;
     $query .= " LIMIT $start,$pagesize";
 
     $peer_devices = array();

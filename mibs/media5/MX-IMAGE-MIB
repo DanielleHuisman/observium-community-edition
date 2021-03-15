@@ -1,0 +1,617 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--
+--             Copyright(c) 2003-2005 Mediatrix Telecom, Inc.
+--             Copyright(c) 2010 Media5 Corporation ("Media5")
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary to
+--   Media5.
+--
+--   Media5 reserves all rights to this document as well as to the Intellectual
+--   Property of the document and the technology and know-how that it includes
+--   and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in any
+--   form whatsoever without prior written approval by Media5.
+--
+--   Media5 reserves the right to revise this publication and make changes at
+--   any time and without the obligation to notify any person and/or entity of
+--   such revisions and/or changes.
+--
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-IMAGE-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        NOTIFICATION-TYPE,
+        OBJECT-TYPE,
+        Integer32,
+        Unsigned32
+    FROM SNMPv2-SMI
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE,
+        NOTIFICATION-GROUP
+    FROM SNMPv2-CONF
+        MxIpHostName,
+        MxIpConfigSource,
+        MxIpPort,
+        MxEnableState,
+        MxIpSelectConfigSource,
+        MxIpDhcpSiteSpecificCode
+    FROM MX-TC
+        sysAdminLastDownloadSoftware
+    FROM MX-SYSTEM-ADMIN-MIB
+        ipAddressStatus,
+        ipAddressConfig,
+        mediatrixConfig,
+        mediatrixMgmt
+    FROM MX-SMI;
+
+imageMIB MODULE-IDENTITY
+    LAST-UPDATED "201012150000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION "This MIB is responsible for the update of the binary image
+                 of the application running on the current device. The update
+                 is done through a software download using common file transfer
+                 protocols such as tftp or ftp."
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "201012150000Z"
+    DESCRIPTION "Added the imageAutoUpdateTimeRange variable.
+                 imageAutoUpdateTimeOfDay is now deprecated."
+
+    REVISION    "200603060000Z"
+    DESCRIPTION "Removed 'seconds' as a selectable time unit for the
+                 imageAutoUpdateTimeUnit variable."
+
+    REVISION    "200504250000Z"
+    DESCRIPTION "Added the HTTPS option in imageTransferProtocol."
+
+    REVISION    "200403270000Z"
+    DESCRIPTION "Modified syntax and description of imageAutoUpdateTimeUnit."
+
+    REVISION    "200402100000Z"
+    DESCRIPTION "Added imageSelectionFileLocation, imageLocationProvisionSource,
+                 imageTransferProtocol, imageTransferUsername, imageTransferPassword,
+                 imageAutoUpdateOnRestartEnable, imageAutoUpdatePeriodicEnable,
+                 imageAutoUpdateTimeUnit, imageAutoUpdatePeriod, imageAutoUpdateTimeOfDay
+                 and imageLocationStatus"
+
+    REVISION    "200109060000Z"
+    DESCRIPTION "Creation"
+    ::= { mediatrixConfig 6 }
+
+imageMIBObjects  OBJECT IDENTIFIER ::= { imageMIB 1 }
+imageConformance OBJECT IDENTIFIER ::= { imageMIB 2 }
+imageEvents      OBJECT IDENTIFIER ::= { imageMIB 3 }
+
+-- Add the image general configuration parameters
+
+    imageLocation OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The path of the <<Setup.inf>> file location, and of the
+                     location of the binary image to be downloaded, on the
+                     remote image server.
+
+                     This setting applies when imageLocationProvisionSource is set
+                     to 'static'."
+        DEFVAL { "" }
+        ::= { imageMIBObjects 1 }
+
+    imageSelectionFileLocation OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The path of the image selection file on the remote image server.
+
+                     The selection file is named from concatenation of the product name (see
+                     variable productNamingPlatformName) and the prefix 'targetimage.inf'. All
+                     spaces are stripped and all cases are lowered.
+
+                     For a product named 'Xyz 123', the selection file name would be
+                     'xyz123targetimage.inf'.
+
+                     This file contains the path of the <<Setup.inf>> file location,
+                     and of the location of the binary image to be downloaded.
+
+                     This setting applies when imageLocationProvisionSource is set
+                     to 'remoteFile'."
+        DEFVAL { "" }
+        ::= { imageMIBObjects 50 }
+
+    imageLocationProvisionSource OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             static(0),
+                             remoteFile(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Source of the image location.
+
+                     static    : The image location is defined by imageLocation.
+
+                     remoteFile: The image location is obtained by fetching the information
+                                 present in a file located in imageSelectionFileLocation."
+        DEFVAL { static }
+        ::= { imageMIBObjects 100 }
+
+    imageTransfer    OBJECT IDENTIFIER ::= { imageMIBObjects 150 }
+
+    imageTransferProtocol OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             tftp(0),
+                             http(1),
+                             https(2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The protocol to use for downloading the image.
+
+                     tftp: Trivial File Transfer Protocol
+
+                     http: Hypertext Transfer Protocol
+
+                     https: Hypertext Transfer Protocol over Transport Layer Security (HTTP over TLS)
+                     This option requires that the appropriate security certificate be installed on the unit.
+                     Furthermore, because HTTPS relies on the system clock for server authentication, the
+                     SNTP client (see sntpMIB) must be enabled and properly configured.
+
+                     Please refer to the documentation shipped with your device for more details."
+        DEFVAL { tftp }
+        ::= { imageTransfer 50 }
+
+    imageTransferUsername OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The user name to use for authentification when downloading the image.
+                     Only applies when using HTTP or HTTPS as the transfer protocol."
+        DEFVAL { "" }
+        ::= { imageTransfer 100 }
+
+    imageTransferPassword OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The password to use for authentification when downloading the image.
+                     Only applies when using HTTP or HTTPS as the transfer protocol."
+        DEFVAL { "" }
+        ::= { imageTransfer 150 }
+
+
+
+-- Add the image automatic updates configuration parameters
+
+    imageAutomaticUpdate  OBJECT IDENTIFIER ::= { imageMIBObjects 200 }
+
+    imageAutoUpdateOnRestartEnable OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables the automatic update of the image on restart.
+
+                     disable: The image is not automatically updated at each restart.
+
+                     enable : The image is updated at each restart."
+        DEFVAL { disable }
+        ::= { imageAutomaticUpdate 50 }
+
+     imageAutoUpdatePeriodicEnable OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables the periodic image updates.
+
+                     disable: The image is not periodically updated.
+
+                     enable : The image is periodically updated."
+        DEFVAL { disable }
+        ::= { imageAutomaticUpdate 100 }
+
+     imageAutoUpdateTimeUnit OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             hours(0),
+                             days(1),
+                             minutes(20)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The time base for periodic image updates.
+                     Modification to this setting resets the update timer.
+
+                     minutes: The image is updated every x minutes.
+
+                     hours  : The image is updated every x hours.
+
+                     days   : The image is updated every x days.
+
+                     Note that x is defined by imageAutoUpdatePeriod."
+        DEFVAL { days }
+        ::= { imageAutomaticUpdate 150 }
+
+    imageAutoUpdatePeriod OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..48)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The waiting period between each image update.
+                     Modification to this setting resets the update timer.
+
+                     This value is expressed in units defined by imageAutoUpdateTimeUnit."
+        DEFVAL { 1 }
+        ::= { imageAutomaticUpdate 200 }
+
+    imageAutoUpdateTimeOfDay OBJECT-TYPE
+        SYNTAX      Integer32 (-1| 0..23)
+        MAX-ACCESS  read-write
+        STATUS      deprecated
+        DESCRIPTION "This object is deprecated. It is recommended to use the
+                     variable imageAutoUpdateTimeRange because it has precedence
+                     over this variable.
+
+                     The time of the day, based on sntpTimeZoneString, when the unit periodically
+                     initiate a image software download.
+
+                     The image software download is initiated at the first occurrence of this value
+                     and thereafter with a period defined by imageAutoUpdatePeriod. Let's say for
+                     instance the automatic update is set with the time of day at 14h00 and the
+                     update period at every 2 days. If the automatic update is enabled before 14h00,
+                     the first update will take place the same day at 14h00, then the second update
+                     two days later at the same hour, and so on.
+
+                     Note that the SNTP server needs to be enabled (see sntpEnable).
+                     Modification to this setting resets the update timer.
+
+                     -1: The time of the day at which the unit first fetches the configuration files
+                         is randomly selected.
+
+                     Only applies when imageAutoUpdateTimeUnit is set to 'days'."
+    DEFVAL { -1 }
+        ::= { imageAutomaticUpdate 250 }
+
+    imageAutoUpdateTimeRange OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..24))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The time of the day, based on sntpTimeZoneString, when the unit periodically
+                     initiates an image software download.
+
+                     If a time range is specified, the unit will initiate the image software download
+                     at a random time within the interval specified.
+
+                     The format should be one of the following:
+                         hh[:mm[:ss]]
+                         hh[:mm[:ss]] - hh[:mm[:ss]]
+
+                     Where:
+                         hh: Hours.
+                         mm: Minutes.
+                         ss: Seconds.
+
+                     The image software download is initiated at the first occurrence of this value
+                     and thereafter with a period defined by imageAutoUpdatePeriod. Let's say for
+                     instance the automatic update is set with the time of day at 14h00 and the
+                     update period at every 2 days. If the automatic update is enabled before 14h00,
+                     the first update will take place the same day at 14h00, then the second update
+                     two days later at the same hour, and so on.
+
+                     If the time range is set to '14:00 - 15:00' and the automatic update
+                     is enabled within those hours, the first update will take place the following
+                     day. This means that a range of '00:00:00 - 23:59:59' will always take place
+                     the next day.
+
+                     Note that the SNTP server needs to be enabled (see sntpEnable).
+                     Modification to this setting resets the update timer.
+
+                     It only applies when imageAutoUpdateTimeUnit is set to 'days'."
+        DEFVAL { "" }
+        ::= { imageAutomaticUpdate 300 }
+
+-- Add the image status variable
+
+    imageStatus  OBJECT IDENTIFIER ::= { mediatrixMgmt 75 }
+
+    imageLocationStatus OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "
+                     The path of the <<Setup.inf>> file location, and of the location of the binary
+                     image, that was last successfully downloaded from the remote image server."
+        ::= { imageStatus 10 }
+
+-- Add the image ip addresses specifics parameters
+
+    ipAddressStatusImage OBJECT IDENTIFIER ::= { ipAddressStatus 8 }
+    ipAddressConfigImage OBJECT IDENTIFIER ::= { ipAddressConfig 8 }
+
+-- Add the Status information
+    imageConfigSource OBJECT-TYPE
+        SYNTAX      MxIpConfigSource
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Indicates the source used for the provisioning of
+                     the image MIB objects."
+        DEFVAL      { dhcp }
+        ::=  {  ipAddressStatusImage  1  }
+
+    imagePrimaryHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Image primary server IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressStatusImage  2  }
+
+    imagePrimaryPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Image primary server IP port number."
+        DEFVAL      { 69 }
+        ::=  {    ipAddressStatusImage  3  }
+
+    imageSecondaryHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Image secondary server IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressStatusImage  4  }
+
+    imageSecondaryPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Image secondary server IP port number."
+        DEFVAL      { 69 }
+        ::=  {    ipAddressStatusImage  5  }
+
+-- Add the Configuration information
+    imageSelectConfigSource OBJECT-TYPE
+        SYNTAX      MxIpSelectConfigSource
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The source to use for the provisioning of
+                     the image MIB objects."
+        DEFVAL      { dhcp }
+        ::=  {  ipAddressConfigImage  1  }
+
+    ipAddressConfigImageStatic OBJECT IDENTIFIER ::= { ipAddressConfigImage 5 }
+
+    -- Add the static parameters
+    imageStaticPrimaryHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static primary server IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressConfigImageStatic  1  }
+
+    imageStaticPrimaryPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static primary server IP port number."
+        DEFVAL      { 69 }
+        ::=  {    ipAddressConfigImageStatic  2  }
+
+    imageStaticSecondaryHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static secondary server IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressConfigImageStatic  3  }
+
+    imageStaticSecondaryPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static secondary server IP port number."
+        DEFVAL      { 69 }
+        ::=  {    ipAddressConfigImageStatic  4  }
+
+    ipAddressConfigImageDhcp OBJECT IDENTIFIER ::= { ipAddressConfigImage 6 }
+
+    -- Add the DHCP parameters
+    imageDhcpPrimarySiteSpecificCode OBJECT-TYPE
+        SYNTAX      MxIpDhcpSiteSpecificCode
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "DHCP primary image server site specific code.
+                     If set to 0, use vendor-specific code #117."
+        DEFVAL      { 0 }
+        ::=  {    ipAddressConfigImageDhcp  1    }
+
+    imageDhcpSecondarySiteSpecificCode OBJECT-TYPE
+        SYNTAX      MxIpDhcpSiteSpecificCode
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "DHCP secondary image server site specific code.
+                     If set to 0, use vendor-specific code #118."
+        DEFVAL { 0 }
+        ::=  {    ipAddressConfigImageDhcp  2    }
+
+
+    -- ************************************************************************
+    -- Events
+    -- ************************************************************************
+    imageNotificationsControl OBJECT IDENTIFIER ::= { imageEvents 1 }
+    imageNotifications        OBJECT IDENTIFIER ::= { imageEvents 2 }
+
+    imageCompletionControl OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             disable(0),
+                             enable(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "This value specifies whether or not a notification should be issued on
+                     completion of the software download. If such a notification is desired,
+                     it is the responsibility of the SNMP manager to properly configure the
+                     notification parameters to ensure that the notification will be delivered."
+        DEFVAL      { enable }
+        ::= { imageNotificationsControl 1}
+
+
+    -- Add the status parameters used for the trap
+
+    imageNotificationsParams OBJECT IDENTIFIER ::= { imageEvents 4 }
+
+    imageLocationUsed OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE(0..63))
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION "The path of the <<Setup.inf>> file location, and of the
+                     binary image location, on the remote image server used
+                     in the last software download.
+                     Parameters used in image notifications."
+        ::= { imageNotificationsParams 1 }
+
+    imageServerAddress OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  accessible-for-notify
+        STATUS      current
+        DESCRIPTION "Image server IP address or domain name.
+                     Parameters used in image notifications."
+        ::=  {    imageNotificationsParams  2  }
+
+
+    imageCompletion NOTIFICATION-TYPE
+        OBJECTS {
+                    imageLocationUsed,
+                    imageServerAddress,
+                    sysAdminLastDownloadSoftware
+                }
+        STATUS       current
+        DESCRIPTION "A message notification is sent after the software download completed
+                     successfully or not."
+        ::= { imageNotifications 1 }
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    imageCompliances OBJECT IDENTIFIER ::= { imageConformance 1 }
+
+    imageBasicComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "Basic image download requirements which include only tftp as file transfer
+             protocol for the software download."
+        MODULE -- This Module
+            MANDATORY-GROUPS {
+                                imageBasicGroupVer1,
+                                imageBasicNotificationControlGroupVer1,
+                                imageBasicNotificationParamsGroupVer1,
+                                imageBasicNotificationGroupVer1,
+                                imageTransferGroupVer1,
+                                imageAutomaticUpdateGroupVer1
+                             }
+        ::= { imageCompliances 1 }
+
+
+    -- ************************************************************************
+    -- MIB variable grouping
+    -- ************************************************************************
+    imageGroups OBJECT IDENTIFIER ::= { imageConformance 2 }
+
+    imageBasicGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  imageLocation
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the objects necessary to initiate a software download."
+        ::= { imageGroups 1 }
+
+    imageTFTPGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  imageConfigSource,
+                  imagePrimaryHost,
+                  imagePrimaryPort,
+                  imageSecondaryHost,
+                  imageSecondaryPort,
+                  imageSelectConfigSource,
+                  imageStaticPrimaryHost,
+                  imageStaticPrimaryPort,
+                  imageStaticSecondaryHost,
+                  imageStaticSecondaryPort,
+                  imageDhcpPrimarySiteSpecificCode,
+                  imageDhcpSecondarySiteSpecificCode
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the objects necessary to initiate a software download
+             using the tftp file transfer protocol."
+        ::= { imageGroups 2 }
+
+    imageBasicNotificationControlGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  imageCompletionControl
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the objects necessary to control notification generation."
+        ::= { imageGroups 3 }
+
+    imageBasicNotificationParamsGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  imageLocationUsed,
+                  imageServerAddress
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds parameters needed in notification"
+        ::= { imageGroups 4 }
+
+
+    imageBasicNotificationGroupVer1 NOTIFICATION-GROUP
+        NOTIFICATIONS   {
+                            imageCompletion
+                        }
+        STATUS  current
+        DESCRIPTION
+            "This group contains the objects necessary to realize the basic
+             notification for the software image download."
+        ::= { imageGroups 5 }
+
+    imageTransferGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  imageTransferProtocol,
+                  imageTransferUsername,
+                  imageTransferPassword
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects that define the transfer of the
+             image."
+        ::= { imageGroups 50 }
+
+    imageAutomaticUpdateGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  imageAutoUpdateOnRestartEnable,
+                  imageAutoUpdatePeriodicEnable,
+                  imageAutoUpdateTimeUnit,
+                  imageAutoUpdatePeriod,
+                  imageAutoUpdateTimeOfDay,
+                  imageAutoUpdateTimeRange
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects that define the automatic configuration
+             update following the transfer of an image file."
+        ::= { imageGroups 100 }
+END

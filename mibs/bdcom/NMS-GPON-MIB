@@ -2,7 +2,7 @@ NMS-GPON-MIB  DEFINITIONS ::= BEGIN
 
 	IMPORTS
         MODULE-IDENTITY,
-        OBJECT-TYPE,BITS
+        OBJECT-TYPE,BITS, Counter64
             FROM SNMPv2-SMI
         
      	Gauge,TimeTicks
@@ -39,14 +39,15 @@ gponOltConfigEntry   OBJECT IDENTIFIER ::= { gponOltConfigTable 1 }
           gponOnuAuthenticationMode OBJECT-TYPE
               SYNTAX  INTEGER{
               			serial_number_only(1),
-              			serial_number_and_password(2),
-              			disable(3)
+              			password_only(2),
+              			serial_number_and_password(3),
+              			disable(4)
                              }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "Authentication method:1 Serial number only, 2 Serial number and password, 3 Disabled, so all ONU/ONTs
-                       are allowed to be activated always. When this option is selected. Default value is 3."
+                      "Authentication method:1 Serial number only, 2 password_only, 3 Serial number and password, 4 Disabled, 
+                      so all ONU/ONTs are allowed to be activated always. When this option is selected. Default value is 3."
               ::= { gponOltConfigEntry 1 }
                  
           gponBroadcastGEMPort OBJECT-TYPE
@@ -141,7 +142,7 @@ nmsGponOltPonPortObj  OBJECT IDENTIFIER ::= { nmsGponMIB 2 }
 
           gponOltPonPortOnuDiscoveryMode OBJECT-TYPE
               SYNTAX  INTEGER{
-              		       period(1),
+              		       auto(1),
               		       manual(2),
               		       disable(3)
                               }
@@ -369,11 +370,11 @@ nmsGponOltPonPortObj  OBJECT IDENTIFIER ::= { nmsGponMIB 2 }
                      gponOltPonPortTemperatureAlarmLowLimitClearThreshold
                          INTEGER,
                      gponOltPonPortVoltageAlarmUpLimitEnable
+                         INTEGER,    
+                     gponOltPonPortVoltageAlarmUpLimitThreshold 
                          INTEGER,
                      gponOltPonPortTxPowerAlarmUpLimitThreshold 
-                         INTEGER,    
-                     gponOltPonPortVoltageAlarmUpLimitThreshold  
-                         INTEGER, 
+                         INTEGER,
                      gponOltPonPortVoltageAlarmUpLimitClearThreshold
                          INTEGER,
                      gponOltPonPortVoltageAlarmLowLimitEnable
@@ -594,7 +595,10 @@ nmsGponOltPonPortObj  OBJECT IDENTIFIER ::= { nmsGponMIB 2 }
               ::= { gponOltPonPortOpticalParameterAlarmEntry 22 }
 
           gponOltPonPortCurrentAlarmLowLimitEnable OBJECT-TYPE
-              SYNTAX  INTEGER
+              SYNTAX  INTEGER{
+                              enable(1),
+                              disable(2)
+                             }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
@@ -679,9 +683,9 @@ nmsGponOltPonPortObj  OBJECT IDENTIFIER ::= { nmsGponMIB 2 }
                      gponOltONUBindONUId
                          INTEGER,
                      gponOltONUBindSN 
-                         INTEGER,
+                         OCTET STRING,
                       gponOltONUBindPassword 
-                         INTEGER,
+                         OCTET STRING,
                      gponOltONUBindRowStatus 
                          RowStatus
                       
@@ -707,7 +711,7 @@ nmsGponOltPonPortObj  OBJECT IDENTIFIER ::= { nmsGponMIB 2 }
               ::= { gponOltONUBindEntry 2 }
 
           gponOltONUBindSN OBJECT-TYPE
-              SYNTAX  INTEGER
+              SYNTAX  OCTET STRING
               ACCESS  read-write
               STATUS  mandatory
 
@@ -716,7 +720,7 @@ nmsGponOltPonPortObj  OBJECT IDENTIFIER ::= { nmsGponMIB 2 }
               ::= { gponOltONUBindEntry 3 }
 
           gponOltONUBindPassword OBJECT-TYPE
-              SYNTAX  INTEGER
+              SYNTAX  OCTET STRING
               ACCESS  read-write
               STATUS  mandatory
 
@@ -1188,7 +1192,21 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
               ::= { gponOnuInfoEntry 34 }
 
           onuDeActiveReason OBJECT-TYPE
-              SYNTAX  INTEGER
+              SYNTAX  INTEGER{
+                               none(0),
+                               dying-gasp(1),
+                               laser-always-on(2),
+                               admin-down(3),
+                               omcc-down(4),
+                               unknown(5),
+                               pon-los(6),
+                               lcdg(7),
+                               wire-down(8),
+                               omci-mismatch(9),
+                               password-mismatch(10),
+                               reboot(11),
+                               ranging-failed(12)
+                             }
               ACCESS  read-only
               STATUS  mandatory
 
@@ -1357,7 +1375,7 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
                      gponOnuStatusDeviceIndex
                          INTEGER,
                      gponOnuStatusOnuSn 
-                         INTEGER,
+                         OCTET STRING,
                      gponOnuStatusPonPortID 
                          INTEGER,
                      gponOnuStatusOnuStatus 
@@ -1374,7 +1392,7 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
               ::= { gponOnuStatusEntry 1 }
 
           gponOnuStatusOnuSn OBJECT-TYPE
-              SYNTAX  INTEGER
+              SYNTAX  OCTET STRING
               ACCESS  read-only
               STATUS  mandatory
 
@@ -1393,18 +1411,16 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
 
           gponOnuStatusOnuStatus OBJECT-TYPE
               SYNTAX  INTEGER{
-                              authenticated(0),
-                              registered(1),
-                              deregistered(2),
-                              auto_config(3),
-                              lost(4),
-                              standby(5)
+                              off-line(0),
+                              inactive(1),
+                              disable(2),
+                              active(3)
                               }
               ACCESS  read-only
               STATUS  mandatory
 
               DESCRIPTION
-                      ""
+                      "ONU Status. 0 off-line, 1 inactive,  2 disable, 3 active. "
               ::= { gponOnuStatusEntry 4 }
 
 --ONU PON口光功率
@@ -1453,7 +1469,7 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
               STATUS  mandatory
 
               DESCRIPTION
-                      ""
+                      "unit:0.002dBm."
               ::= { gponOnuOpticalPowerEntry 2 }
 
           gponOnuOpticalPowerTxPower OBJECT-TYPE
@@ -1462,7 +1478,7 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
               STATUS  mandatory
 
               DESCRIPTION
-                      ""
+                      "unit:0.002dBm."
               ::= { gponOnuOpticalPowerEntry 3 }
 
 
@@ -1714,6 +1730,17 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
                       ""
               ::= { gponOnuSfpParameterAlarmTrap 1 }
 
+
+          gponOnuSfpParameterAlarmThreshold OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { gponOnuSfpParameterAlarmTrap 2 }
+
+
                                 
 
 
@@ -1729,7 +1756,7 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
     		STATUS      current
     		DESCRIPTION
         	"The agent generates this notification when ONU SFP parameter alarms ."
-    		::= { gponOnuSfpParameterAlarmTrap 2 }
+    		::= { gponOnuSfpParameterAlarmTrap 3 }
 
 
 -- ONU 状态变化陷阱 
@@ -1743,7 +1770,11 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
                               discovered(1),
                               activated(2),
                               deactivated(3),
-                              disable-conplete(4)
+                              disable-complete(4),
+                              enable-complete(5),
+                              mib-ready(6),
+                              mib-not-ready(7),
+                              onu-los(8)
                               }
               ACCESS  read-only
               STATUS  mandatory
@@ -1760,6 +1791,8 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
                        ifIndex,
                        ifDescr,
                        onuSerialNum,
+                       onuVendorID,
+                       onuEquipmentID,
                        gponOnuStatusChange 
     		}
     		STATUS      current
@@ -1838,7 +1871,7 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
               STATUS  mandatory
 
               DESCRIPTION
-                      "ONU LLID list, which defines the ONU to be updated."
+                      "ONU LLID list, which defines the ONU to be updated. such as (1,3,5,7) Or (1,3-5,7) Or (1-7)"
               ::= { gponOnuBatchUpdateEntry 1 }
 
                  
@@ -1855,13 +1888,16 @@ nmsGponONUObj   OBJECT IDENTIFIER ::= { nmsGponMIB 3 }
           gponOnuBatchUpdateAction OBJECT-TYPE
               SYNTAX  INTEGER{
                                no-action(0),
-                               action(1)
+                               action(1),
+                               action-for-actvie(2)
+                               
                              }
               ACCESS  write-only
               STATUS  mandatory
 
               DESCRIPTION
-                      "The update operation indication. 0-no action for update 1-action for update."
+                      "The update operation indication. 0-no action for update 1-action for update. 2-action for activate.
+                      3-action for commit."
               ::= { gponOnuBatchUpdateEntry 3 }
 
                  
@@ -2018,16 +2054,81 @@ nmsGponUNIPortObj   OBJECT IDENTIFIER ::= { nmsGponMIB 4 }
                          INTEGER,
                      onuUniPortStatisticUniPortIndex
                          INTEGER,
-                     onuUniPortStatisticRxTotalFrames
-                         INTEGER,
-                     onuUniPortStatisticTxTotalFrames
-                         INTEGER,
-                     onuUniPortStatisticRxTotalBytes
-                         INTEGER,
-                     onuUniPortStatisticTxTotalBytes
-                         INTEGER,
-                     onuUniPortStatisticEncryptKeyErrors
-                         RowStatus
+                     onuUniPortStatisticTime
+                         Counter64,
+                     onuUniPortStatisticRxTotalPackets
+                         Counter64,
+                     onuUniPortStatisticRxUnicastPackets
+                         Counter64,
+                     onuUniPortStatisticRxMulticastPackets
+                         Counter64,
+                     onuUniPortStatisticRxBroadcastPackets
+                         Counter64,
+                     onuUniPortStatisticRxDiscardedPackets
+                         Counter64,
+                     onuUniPortStatisticTxTotalPackets
+                         Counter64,
+                     onuUniPortStatisticTxUnicastPackets
+                         Counter64,
+                     onuUniPortStatisticTxMulticastPackets
+                         Counter64,
+                     onuUniPortStatisticTxBroadcastPackets
+                         Counter64,
+                     onuUniPortStatisticTxDiscardedPackets
+                         Counter64,
+                     onuUniPortStatisticRxUndersizePackets
+                         Counter64,
+                     onuUniPortStatisticRxFragments
+                         Counter64,
+                     onuUniPortStatisticRxJabbers
+                         Counter64,
+                     onuUniPortStatisticRxPackets64Octets
+                         Counter64,
+                     onuUniPortStatisticRxPackets65to127Octets
+                         Counter64,
+                     onuUniPortStatisticRxPackets128to255Octets
+                         Counter64,
+                     onuUniPortStatisticRxPackets256to511Octets
+                         Counter64,
+                     onuUniPortStatisticRxPackets512to1023Octets
+                         Counter64,
+                     onuUniPortStatisticRxPackets1024to1518Octets
+                         Counter64,
+                     onuUniPortStatisticRxFcsErrors
+                         Counter64,
+                     onuUniPortStatisticTxFcsErrors
+                         Counter64,
+                     onuUniPortStatisticTxExcessiveCollisions
+                         Counter64,
+                     onuUniPortStatisticTxLateCollisions
+                         Counter64,
+                     onuUniPortStatisticRxPacketsTooLong
+                         Counter64,
+                     onuUniPortStatisticRxBufferOverflows
+                         Counter64,
+                     onuUniPortStatisticTxBufferOverflows
+                         Counter64,
+                     onuUniPortStatisticTxSingleCollisionPackets
+                         Counter64,
+                     onuUniPortStatisticTxMultipleCollisionsPackets
+                         Counter64,
+                     onuUniPortStatisticSQEs
+                         Counter64,
+                     onuUniPortStatisticTxDeferredTransmissio
+                         Counter64,
+                     onuUniPortStatisticTxInternalMACTransmitError
+                         Counter64,
+                     onuUniPortStatisticCarrierSenseError
+                         Counter64,
+                     onuUniPortStatisticRxAlignmentError
+                         Counter64,
+                     onuUniPortStatisticRxInternalMACReceiveError
+                         Counter64,
+                     onuUniPortStatisticRxOctets
+                         Counter64,
+                     onuUniPortStatisticTxOctets
+                         Counter64
+                     
             }
                  
                  
@@ -2050,28 +2151,26 @@ nmsGponUNIPortObj   OBJECT IDENTIFIER ::= { nmsGponMIB 4 }
               ::= { onuUniPortStatisticEntry 2 }
 
 
-          onuUniPortStatisticRxTotalFrames OBJECT-TYPE
-              SYNTAX  INTEGER
+          onuUniPortStatisticTime OBJECT-TYPE
+              SYNTAX  Counter64
               ACCESS  read-only
               STATUS  mandatory
 
               DESCRIPTION
-                      ""
+                      "unit： second"
               ::= { onuUniPortStatisticEntry 3 }
-
-
-          onuUniPortStatisticTxTotalFrames OBJECT-TYPE
-              SYNTAX  INTEGER
+              
+          onuUniPortStatisticRxTotalPackets OBJECT-TYPE
+              SYNTAX  Counter64
               ACCESS  read-only
               STATUS  mandatory
 
               DESCRIPTION
                       ""
               ::= { onuUniPortStatisticEntry 4 }
-
-
-          onuUniPortStatisticRxTotalBytes OBJECT-TYPE
-              SYNTAX  INTEGER
+              
+          onuUniPortStatisticRxUnicastPackets OBJECT-TYPE
+              SYNTAX  Counter64
               ACCESS  read-only
               STATUS  mandatory
 
@@ -2079,9 +2178,8 @@ nmsGponUNIPortObj   OBJECT IDENTIFIER ::= { nmsGponMIB 4 }
                       ""
               ::= { onuUniPortStatisticEntry 5 }
 
-
-          onuUniPortStatisticTxTotalBytes OBJECT-TYPE
-              SYNTAX  INTEGER
+          onuUniPortStatisticRxMulticastPackets OBJECT-TYPE
+              SYNTAX  Counter64
               ACCESS  read-only
               STATUS  mandatory
 
@@ -2089,15 +2187,760 @@ nmsGponUNIPortObj   OBJECT IDENTIFIER ::= { nmsGponMIB 4 }
                       ""
               ::= { onuUniPortStatisticEntry 6 }
 
-
-          onuUniPortStatisticEncryptKeyErrors OBJECT-TYPE
-              SYNTAX  INTEGER
+          onuUniPortStatisticRxBroadcastPackets OBJECT-TYPE
+              SYNTAX  Counter64
               ACCESS  read-only
               STATUS  mandatory
 
               DESCRIPTION
                       ""
               ::= { onuUniPortStatisticEntry 7 }
+
+          onuUniPortStatisticRxDiscardedPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 8 }
+
+          onuUniPortStatisticTxTotalPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 9 }
+
+          onuUniPortStatisticTxUnicastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 10 }
+
+          onuUniPortStatisticTxMulticastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 11 }
+
+          onuUniPortStatisticTxBroadcastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 12 }
+
+          onuUniPortStatisticTxDiscardedPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 13 }
+
+          onuUniPortStatisticRxUndersizePackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 14 }
+
+          onuUniPortStatisticRxFragments OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 15 }
+
+          onuUniPortStatisticRxJabbers OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 16 }
+
+          onuUniPortStatisticRxPackets64Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 17 }
+
+          onuUniPortStatisticRxPackets65to127Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 18 }
+
+          onuUniPortStatisticRxPackets128to255Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 19 }
+
+          onuUniPortStatisticRxPackets256to511Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 20 }
+
+          onuUniPortStatisticRxPackets512to1023Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 21 }
+
+          onuUniPortStatisticRxPackets1024to1518Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 22 }
+
+          onuUniPortStatisticRxFcsErrors OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 23 }
+
+          onuUniPortStatisticTxFcsErrors OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 24 }
+
+          onuUniPortStatisticTxExcessiveCollisions OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 25 }
+
+          onuUniPortStatisticTxLateCollisions OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 26 }
+
+          onuUniPortStatisticRxPacketsTooLong OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 27 }
+
+          onuUniPortStatisticRxBufferOverflows OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 28 }
+
+          onuUniPortStatisticTxBufferOverflows OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 29 }
+
+          onuUniPortStatisticTxSingleCollisionPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 30 }
+
+          onuUniPortStatisticTxMultipleCollisionsPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 31 }
+
+          onuUniPortStatisticSQEs OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 32 }
+
+          onuUniPortStatisticTxDeferredTransmissio OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 33 }
+
+          onuUniPortStatisticTxInternalMACTransmitError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 34 }
+
+          onuUniPortStatisticCarrierSenseError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 35 }
+
+          onuUniPortStatisticRxAlignmentError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 36 }
+
+          onuUniPortStatisticRxInternalMACReceiveError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 37 }
+
+          onuUniPortStatisticRxOctets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 38 }
+
+          onuUniPortStatisticTxOctets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPortStatisticEntry 39 }
+
+
+-- UNI端口15min报文统计表
+
+             onuUniPort15MinStatisticTable OBJECT-TYPE
+                 SYNTAX  SEQUENCE OF OnuUniPort15MinStatisticEntry
+                 ACCESS  not-accessible
+                 STATUS  mandatory
+                 DESCRIPTION
+                          "Onu UNI port 15 minute statistics table."
+                 ::= { nmsGponUNIPortObj 3 }
+
+             onuUniPort15MinStatisticEntry OBJECT-TYPE
+                 SYNTAX OnuUniPort15MinStatisticEntry
+                 ACCESS  not-accessible
+                 STATUS  mandatory
+                 DESCRIPTION
+                          "Onu UNI port 15 minute statistics table entry."
+                 INDEX { onuUniPort15MinStatisticDeviceIndex, onuUniPort15MinStatisticUniPortIndex,onuUniPort15MinStatisticIntervalID }
+             ::= { onuUniPort15MinStatisticTable 1 }
+
+             OnuUniPort15MinStatisticEntry ::=
+                 SEQUENCE {
+                     onuUniPort15MinStatisticDeviceIndex
+                         INTEGER,
+                     onuUniPort15MinStatisticUniPortIndex
+                         INTEGER,
+                     onuUniPort15MinStatisticIntervalID
+                         INTEGER,
+                     onuUniPort15MinStatisticRxTotalPackets
+                         Counter64,
+                     onuUniPort15MinStatisticRxUnicastPackets
+                         Counter64,
+                     onuUniPort15MinStatisticRxMulticastPackets
+                         Counter64,
+                     onuUniPort15MinStatisticRxBroadcastPackets
+                         Counter64,
+                     onuUniPort15MinStatisticRxDiscardedPackets
+                         Counter64,
+                     onuUniPort15MinStatisticTxTotalPackets
+                         Counter64,
+                     onuUniPort15MinStatisticTxUnicastPackets
+                         Counter64,
+                     onuUniPort15MinStatisticTxMulticastPackets
+                         Counter64,
+                     onuUniPort15MinStatisticTxBroadcastPackets
+                         Counter64,
+                     onuUniPort15MinStatisticTxDiscardedPackets
+                         Counter64,
+                     onuUniPort15MinStatisticRxUndersizePackets
+                         Counter64,
+                     onuUniPort15MinStatisticRxFragments
+                         Counter64,
+                     onuUniPort15MinStatisticRxJabbers
+                         Counter64,
+                     onuUniPort15MinStatisticRxPackets64Octets
+                         Counter64,
+                     onuUniPort15MinStatisticRxPackets65to127Octets
+                         Counter64,
+                     onuUniPort15MinStatisticRxPackets128to255Octets
+                         Counter64,
+                     onuUniPort15MinStatisticRxPackets256to511Octets
+                         Counter64,
+                     onuUniPort15MinStatisticRxPackets512to1023Octets
+                         Counter64,
+                     onuUniPort15MinStatisticRxPackets1024to1518Octets
+                         Counter64,
+                     onuUniPort15MinStatisticRxFcsErrors
+                         Counter64,
+                     onuUniPort15MinStatisticTxFcsErrors
+                         Counter64,
+                     onuUniPort15MinStatisticTxExcessiveCollisions
+                         Counter64,
+                     onuUniPort15MinStatisticTxLateCollisions
+                         Counter64,
+                     onuUniPort15MinStatisticRxPacketsTooLong
+                         Counter64,
+                     onuUniPort15MinStatisticRxBufferOverflows
+                         Counter64,
+                     onuUniPort15MinStatisticTxBufferOverflows
+                         Counter64,
+                     onuUniPort15MinStatisticTxSingleCollisionPackets
+                         Counter64,
+                     onuUniPort15MinStatisticTxMultipleCollisionsPackets
+                         Counter64,
+                     onuUniPort15MinStatisticSQEs
+                         Counter64,
+                     onuUniPort15MinStatisticTxDeferredTransmissio
+                         Counter64,
+                     onuUniPort15MinStatisticTxInternalMACTransmitError
+                         Counter64,
+                     onuUniPort15MinStatisticCarrierSenseError
+                         Counter64,
+                     onuUniPort15MinStatisticRxAlignmentError
+                         Counter64,
+                     onuUniPort15MinStatisticRxInternalMACReceiveError
+                         Counter64,
+                     onuUniPort15MinStatisticRxOctets
+                         Counter64,
+                     onuUniPort15MinStatisticTxOctets
+                         Counter64
+                     
+            }
+                 
+                 
+          onuUniPort15MinStatisticDeviceIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 1 }
+
+          onuUniPort15MinStatisticUniPortIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 2 }
+
+          onuUniPort15MinStatisticIntervalID OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 3 }
+
+          onuUniPort15MinStatisticRxTotalPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 4 }
+
+          onuUniPort15MinStatisticRxUnicastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 5 }
+
+          onuUniPort15MinStatisticRxMulticastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 6 }
+
+          onuUniPort15MinStatisticRxBroadcastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 7 }
+
+          onuUniPort15MinStatisticRxDiscardedPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 8 }
+
+          onuUniPort15MinStatisticTxTotalPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 9 }
+
+          onuUniPort15MinStatisticTxUnicastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 10 }
+
+          onuUniPort15MinStatisticTxMulticastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 11 }
+
+          onuUniPort15MinStatisticTxBroadcastPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 12 }
+
+          onuUniPort15MinStatisticTxDiscardedPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 13 }
+
+          onuUniPort15MinStatisticRxUndersizePackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 14 }
+
+          onuUniPort15MinStatisticRxFragments OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 15 }
+
+          onuUniPort15MinStatisticRxJabbers OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 16 }
+
+          onuUniPort15MinStatisticRxPackets64Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 17 }
+
+          onuUniPort15MinStatisticRxPackets65to127Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 18 }
+
+          onuUniPort15MinStatisticRxPackets128to255Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 19 }
+
+          onuUniPort15MinStatisticRxPackets256to511Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 20 }
+
+          onuUniPort15MinStatisticRxPackets512to1023Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 21 }
+
+          onuUniPort15MinStatisticRxPackets1024to1518Octets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 22 }
+              
+          onuUniPort15MinStatisticRxFcsErrors OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 23 }
+              
+          onuUniPort15MinStatisticTxFcsErrors OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 24 }
+              
+          onuUniPort15MinStatisticTxExcessiveCollisions OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 25 }
+              
+          onuUniPort15MinStatisticTxLateCollisions OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 26 }
+              
+          onuUniPort15MinStatisticRxPacketsTooLong OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 27 }
+              
+          onuUniPort15MinStatisticRxBufferOverflows OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 28 }
+              
+          onuUniPort15MinStatisticTxBufferOverflows OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 29 }
+              
+          onuUniPort15MinStatisticTxSingleCollisionPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 30 }
+              
+          onuUniPort15MinStatisticTxMultipleCollisionsPackets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 31 }
+              
+          onuUniPort15MinStatisticSQEs OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 32 }
+              
+          onuUniPort15MinStatisticTxDeferredTransmissio OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 33 }
+              
+          onuUniPort15MinStatisticTxInternalMACTransmitError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 34 }
+              
+          onuUniPort15MinStatisticCarrierSenseError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 35 }
+              
+          onuUniPort15MinStatisticRxAlignmentError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 36 }
+              
+          onuUniPort15MinStatisticRxInternalMACReceiveError OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 37 }
+              
+          onuUniPort15MinStatisticRxOctets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 38 }
+              
+          onuUniPort15MinStatisticTxOctets OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuUniPort15MinStatisticEntry 39 }
+              
+
+
 
 -- nmsGponVirPortObj 虚端口任务 OID:1.3.6.1.4.1.3320.10.5
 
@@ -2260,6 +3103,237 @@ nmsGponVirPortObj   OBJECT IDENTIFIER ::= { nmsGponMIB 5 }
                       ""
               ::= { onuVirPortConfigEntry 12 }
 
+-- 虚端口报文统计表
+
+             onuVirPortStatisticTable OBJECT-TYPE
+                 SYNTAX  SEQUENCE OF OnuVirPortStatisticEntry
+                 ACCESS  not-accessible
+                 STATUS  mandatory
+                 DESCRIPTION
+                          "Onu VIR port statistics table."
+                 ::= { nmsGponVirPortObj 2 }
+
+             onuVirPortStatisticEntry OBJECT-TYPE
+                 SYNTAX OnuVirPortStatisticEntry
+                 ACCESS  not-accessible
+                 STATUS  mandatory
+                 DESCRIPTION
+                          "Onu VIR port statistics table entry."
+                 INDEX { onuVirPortStatisticDeviceIndex, onuVirPortStatisticVirPortIndex }
+             ::= { onuVirPortStatisticTable 1 }
+
+             OnuVirPortStatisticEntry ::=
+                 SEQUENCE {
+                     onuVirPortStatisticDeviceIndex
+                         INTEGER,
+                     onuVirPortStatisticVirPortIndex
+                         INTEGER,
+                     onuVirPortStatisticTime
+                         Counter64,
+                     onuVirPortStatisticRxTotalFrames
+                         Counter64,
+                     onuVirPortStatisticTxTotalFrames
+                         Counter64,
+                     onuVirPortStatisticRxTotalBytes
+                         Counter64,
+                     onuVirPortStatisticTxTotalBytes
+                         Counter64,
+                     onuVirPortStatisticEncryptKeyErrors
+                         Counter64
+            }
+                 
+                 
+          onuVirPortStatisticDeviceIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 1 }
+
+          onuVirPortStatisticVirPortIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 2 }
+
+          onuVirPortStatisticTime OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 3 }
+
+          onuVirPortStatisticRxTotalFrames OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 4 }
+
+          onuVirPortStatisticTxTotalFrames OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 5 }
+
+          onuVirPortStatisticRxTotalBytes OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 6 }
+
+          onuVirPortStatisticTxTotalBytes OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 7 }
+
+          onuVirPortStatisticEncryptKeyErrors OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPortStatisticEntry 8 }
+
+
+
+
+
+
+
+-- 虚端口15Min报文统计表
+
+             onuVirPort15MinStatisticTable OBJECT-TYPE
+                 SYNTAX  SEQUENCE OF OnuVirPort15MinStatisticEntry
+                 ACCESS  not-accessible
+                 STATUS  mandatory
+                 DESCRIPTION
+                          "Onu VIR port 15 minutes statistics table."
+                 ::= { nmsGponVirPortObj 3 }
+
+             onuVirPort15MinStatisticEntry OBJECT-TYPE
+                 SYNTAX OnuVirPort15MinStatisticEntry
+                 ACCESS  not-accessible
+                 STATUS  mandatory
+                 DESCRIPTION
+                          "Onu VIR port minutes statistics table entry."
+                 INDEX { onuVirPort15MinStatisticDeviceIndex, onuVirPort15MinStatisticVirPortIndex, onuVirPort15MinStatisticIntervalID }
+             ::= { onuVirPort15MinStatisticTable 1 }
+
+             OnuVirPort15MinStatisticEntry ::=
+                 SEQUENCE {
+                     onuVirPort15MinStatisticDeviceIndex
+                         INTEGER,
+                     onuVirPort15MinStatisticVirPortIndex
+                         INTEGER,
+                     onuVirPort15MinStatisticIntervalID
+                         INTEGER,
+                     onuVirPort15MinStatisticRxTotalFrames
+                         Counter64,
+                     onuVirPort15MinStatisticTxTotalFrames
+                         Counter64,
+                     onuVirPort15MinStatisticRxTotalBytes
+                         Counter64,
+                     onuVirPort15MinStatisticTxTotalBytes
+                         Counter64,
+                     onuVirPort15MinStatisticEncryptKeyErrors
+                         Counter64
+            }
+                 
+                 
+          onuVirPort15MinStatisticDeviceIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 1 }
+
+          onuVirPort15MinStatisticVirPortIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 2 }
+
+          onuVirPort15MinStatisticIntervalID OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 3 }
+
+          onuVirPort15MinStatisticRxTotalFrames OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 4 }
+
+          onuVirPort15MinStatisticTxTotalFrames OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 5 }
+
+          onuVirPort15MinStatisticRxTotalBytes OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 6 }
+
+          onuVirPort15MinStatisticTxTotalBytes OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 7 }
+
+          onuVirPort15MinStatisticEncryptKeyErrors OBJECT-TYPE
+              SYNTAX  Counter64
+              ACCESS  read-only
+              STATUS  mandatory
+
+              DESCRIPTION
+                      ""
+              ::= { onuVirPort15MinStatisticEntry 8 }
+
+
 
         
         
@@ -2300,7 +3374,13 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                      onuVLANProfilePVID
                          INTEGER,   
                      onuVLANProfileTrunkVlans 
-                         BITS,
+                         OCTET STRING,
+                     onuVLANProfileEtherTypeIPOEVlan
+                         INTEGER,   
+                     onuVLANProfileEtherTypePPPOEVlan
+                         INTEGER,   
+                     onuVLANProfileEtherTypeARPVlan
+                         INTEGER,                            
                      onuVLANProfileRowStatus
                          RowStatus                      
                  }
@@ -2350,13 +3430,41 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ::= { onuVLANProfileEntry 4 }
                  
           onuVLANProfileTrunkVlans OBJECT-TYPE
-              SYNTAX  BITS
+              SYNTAX  OCTET STRING
               ACCESS  read-write
               STATUS  mandatory
 
               DESCRIPTION
-                      "ONU UNI port allowed VLAN in trunk mode. There is totally 4094 bit, and each bit value means allow VLAN or not, 0 mean forbidding VLAN and 1 means allowed VLAN."
+                      "ONU UNI port allowed VLAN in trunk mode. Config allowed VLAN IDs such as (1,3,5,7) Or (1,3-5,7) 
+                      Or (1-7). Default value is 0."
               ::= { onuVLANProfileEntry 5 }
+                 
+          onuVLANProfileEtherTypeIPOEVlan OBJECT-TYPE
+              SYNTAX  INTEGER(1..4094)
+              ACCESS  read-write
+              STATUS  mandatory
+
+              DESCRIPTION
+                      "Config IPOE ethernet type Vlan in tag mode only."
+              ::= { onuVLANProfileEntry 6 }
+                 
+          onuVLANProfileEtherTypePPPOEVlan OBJECT-TYPE
+              SYNTAX  INTEGER(1..4094)
+              ACCESS  read-write
+              STATUS  mandatory
+
+              DESCRIPTION
+                      "Config PPPOE ethernet type Vlan in tag mode only."
+              ::= { onuVLANProfileEntry 7 }
+                 
+          onuVLANProfileEtherTypeARPVlan OBJECT-TYPE
+              SYNTAX  INTEGER(1..4094)
+              ACCESS  read-write
+              STATUS  mandatory
+
+              DESCRIPTION
+                      "Config ARP ethernet type Vlan in tag mode only."
+              ::= { onuVLANProfileEntry 8 }
                  
           onuVLANProfileRowStatus OBJECT-TYPE
               SYNTAX  RowStatus
@@ -2365,8 +3473,9 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
 
               DESCRIPTION
                       ""
-              ::= { onuVLANProfileEntry 6 }
+              ::= { onuVLANProfileEntry 9 }
 
+--ONU VLAN翻译
 
              onuVLANTranslationTable OBJECT-TYPE
                  SYNTAX  SEQUENCE OF OnuVLANTranslationEntry
@@ -2421,7 +3530,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                  
           onuVLANTranslationName OBJECT-TYPE
               SYNTAX  OCTET STRING
-              ACCESS  read-write
+              ACCESS  read-only
               STATUS  mandatory
 
               DESCRIPTION
@@ -2430,7 +3539,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                  
           onuVLANTranslationSrcVlan OBJECT-TYPE
               SYNTAX  INTEGER
-              ACCESS  read-write
+              ACCESS  read-only
               STATUS  mandatory
 
               DESCRIPTION
@@ -2439,7 +3548,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
 
           onuVLANTranslationDstVlan OBJECT-TYPE
               SYNTAX  INTEGER
-              ACCESS  read-write
+              ACCESS  read-only
               STATUS  mandatory
 
               DESCRIPTION
@@ -2452,7 +3561,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               STATUS  mandatory
 
               DESCRIPTION
-                      ""
+                      "Config SrcVlan and DstVlan in translation/vlan-stacking/aggregation modes."
               ::= { onuVLANTranslationEntry 6 }
 
 --ONU T-cont管理表
@@ -2480,10 +3589,14 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                          INTEGER,
                      onuTcontServiceProfileName
                          OCTET STRING,
-                     onuTcontServiceProfileUsBandwidthProID
+                     onuTcontServiceProfileTcontType
                          INTEGER,   
-                     onuTcontServiceProfileUsQueuingSchedulingType 
-                         INTEGER,
+                     onuTcontServiceProfileFir    
+                         INTEGER,   
+                     onuTcontServiceProfileCir    
+                         INTEGER,   
+                     onuTcontServiceProfilePir    
+                         INTEGER,                            
                      onuTcontServiceProfileRowStatus
                          RowStatus                      
                  }
@@ -2506,27 +3619,49 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                       "ONU VLAN T-CONT service profile Name ."
               ::= { onuTCONTServiceProfileEntry 2 }
                  
-          onuTcontServiceProfileUsBandwidthProID OBJECT-TYPE
-              SYNTAX  INTEGER(1..256)
+          onuTcontServiceProfileTcontType OBJECT-TYPE
+              SYNTAX  INTEGER{
+                              t-cont-type1(1),
+                              t-cont-type2(2),
+                              t-cont-type3(3),
+                              t-cont-type4(4),
+                              t-cont-type5(5)                              
+                              }
               ACCESS  read-write
               STATUS  mandatory
 
               DESCRIPTION
-                      "It points to the associated ONU bandwidth profile for upstream. 1 – 256. Default value is 1."
+                      "Traffic type which is equivalent to T-CONT type: 1 T-CONT type 1, 2 T-CONT type 2, 3 T-CONT type 3, 
+                      4 T-CONT type 4, 5 T-CONT type 5. Default value is 1."
               ::= { onuTCONTServiceProfileEntry 3 }
                  
-          onuTcontServiceProfileUsQueuingSchedulingType OBJECT-TYPE
-              SYNTAX  INTEGER{
-              			priority-controlled(1),
-              			rate-controlled(2),
-              			priority-and-rate-controlled(3)
-                             }  
+          onuTcontServiceProfileFir OBJECT-TYPE
+              SYNTAX  INTEGER(256..830976)  
               ACCESS  read-write
               STATUS  mandatory
 
               DESCRIPTION
-                      "1 Flow-based priority-controlled, 2  Flow-based rate-controlled, 3 Flow-based priority-and-rate-controlled. Default value is 1."
+                      "Fixed bandwidth. The unit is Kbps. Range of allowed values, 256 –830976.Using in type 1 and type 5."
               ::= { onuTCONTServiceProfileEntry 4 }
+                 
+          onuTcontServiceProfileCir OBJECT-TYPE
+              SYNTAX  INTEGER(256..1238272)  
+              ACCESS  read-write
+              STATUS  mandatory
+
+              DESCRIPTION
+                      "Assured bandwidth. The unit is Kbps. Range of allowed values, 256 – 1238272. Using in type 2,type 3 and type 5."
+              ::= { onuTCONTServiceProfileEntry 5 }
+                 
+          onuTcontServiceProfilePir OBJECT-TYPE
+              SYNTAX  INTEGER(512..1244160)  
+              ACCESS  read-write
+              STATUS  mandatory
+
+              DESCRIPTION
+                      "Maximum bandwidth. The unit is Kbps. Range of allowed values, 512 – 1244160. Using in type 3,type 4 
+                      and type 5. TCONT"
+              ::= { onuTCONTServiceProfileEntry 6 }
                  
           onuTcontServiceProfileRowStatus OBJECT-TYPE
               SYNTAX  RowStatus
@@ -2535,7 +3670,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
 
               DESCRIPTION
                       ""
-              ::= { onuTCONTServiceProfileEntry 5 }
+              ::= { onuTCONTServiceProfileEntry 7 }
 
 --  ONU 带宽管理表
 
@@ -2619,7 +3754,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ::= { onuBandwidthProfileEntry 4 }
                  
           onuBandwidthProfileAssuredBandwidth OBJECT-TYPE
-              SYNTAX  INTEGER(0,256..2500000)
+              SYNTAX  INTEGER(0..2500000)
               ACCESS  read-write
               STATUS  mandatory
 
@@ -2670,13 +3805,13 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                  SEQUENCE {
                      onuTcontVirportBindProfileIndex
                          INTEGER,
+                     onuTcontVirportBindProfileVirportIndex  
+                         INTEGER,
                      onuTcontVirportBindProfileName
                          OCTET STRING,
                      onuTcontVirportBindProfileTcontID
                          INTEGER,   
                      onuTcontVirportBindProfileTcontServiceProfileID 
-                         INTEGER,
-                     onuTcontVirportBindProfileVirportIndex  
                          INTEGER,
                      onuTcontVirportBindProfileVirportServiceProfileID 
                          INTEGER,
@@ -2692,13 +3827,21 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                       "Index of the table, ONU Tcont Virport Bind Profile INDEX ."
               ::= { onuTcontVirportBindProfileEntry 1 }
                  
+          onuTcontVirportBindProfileVirportIndex OBJECT-TYPE
+              SYNTAX  INTEGER
+              ACCESS  read-only
+              STATUS  mandatory
+              DESCRIPTION
+                      "Virtual port index from ONU’s perspective. Default value is 1."
+              ::= { onuTcontVirportBindProfileEntry 2 }
+                 
           onuTcontVirportBindProfileName OBJECT-TYPE
               SYNTAX  OCTET STRING
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
                       "ONU Tcont Virport Bind Profile name ."
-              ::= { onuTcontVirportBindProfileEntry 2 }
+              ::= { onuTcontVirportBindProfileEntry 3 }
                  
           onuTcontVirportBindProfileTcontID OBJECT-TYPE
               SYNTAX  INTEGER
@@ -2706,7 +3849,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               STATUS  mandatory
               DESCRIPTION
                       "T-CONT index from ONU’s perspective. Default value is 1."
-              ::= { onuTcontVirportBindProfileEntry 3 }
+              ::= { onuTcontVirportBindProfileEntry 4 }
                  
           onuTcontVirportBindProfileTcontServiceProfileID OBJECT-TYPE
               SYNTAX  INTEGER
@@ -2714,14 +3857,6 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               STATUS  mandatory
               DESCRIPTION
                       "It points to the associated ONU T-CONT service profile. Default value is 1."
-              ::= { onuTcontVirportBindProfileEntry 4 }
-                 
-          onuTcontVirportBindProfileVirportIndex OBJECT-TYPE
-              SYNTAX  INTEGER
-              ACCESS  read-write
-              STATUS  mandatory
-              DESCRIPTION
-                      "Virtual port index from ONU’s perspective. Default value is 1."
               ::= { onuTcontVirportBindProfileEntry 5 }
                  
           onuTcontVirportBindProfileVirportServiceProfileID OBJECT-TYPE
@@ -2852,12 +3987,12 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ::= { onuVirtualPortServiceProfileEntry 6 } 	
                  
           onuVirportProfileUsFlowPriority OBJECT-TYPE
-              SYNTAX  INTEGER(0..7)
+              SYNTAX  INTEGER(1..8)
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
                       "It’s valid only in either flow-based priority-controlled or flow-based priority-and-rate-
-		       controlled upstream queuing and scheduling type. Valid range 0 - 7.Default value is 0. "
+		       controlled upstream queuing and scheduling type. Valid range 1 - 8.Default value is 8. "
               ::= { onuVirtualPortServiceProfileEntry 7 } 	
                  
           onuVirportProfileUsFlowWeight OBJECT-TYPE
@@ -2870,12 +4005,12 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ::= { onuVirtualPortServiceProfileEntry 8 } 	
                  
           onuVirportProfileUsRateCtlSchedulerProID OBJECT-TYPE
-              SYNTAX  INTEGER(1..128)
+              SYNTAX  INTEGER
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "It points to the associated ONU upstream rate-control scheduler profile. 1–128.
-                      Default value is 1. "
+                      "It points to the associated ONU upstream rate-control scheduler profile which exist. Default value 
+                      is 1."
               ::= { onuVirtualPortServiceProfileEntry 9 } 	
                  
           onuVirportProfileDsBwProID OBJECT-TYPE
@@ -2898,12 +4033,12 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ::= { onuVirtualPortServiceProfileEntry 11 } 	 
               
           onuVirportProfileDsFlowPriority OBJECT-TYPE
-              SYNTAX  INTEGER(0..7)
+              SYNTAX  INTEGER(1..8)
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
                       "It’s valid only in flow-based priority-controlled downstream queuing and scheduling type. 
-                      Valid range 0 - 7. Default value is 0. "
+                      Valid range 1 - 8. Default value is 8. "
               ::= { onuVirtualPortServiceProfileEntry 12 } 	
               
           onuVirportProfileRowStatus OBJECT-TYPE
@@ -3004,8 +4139,10 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "UNI Port bit map representing 1 or more UNI ports to be associated with a flow. The value 0 will 
-                      indicate the flow applies to all UNI ports of the ONU. Default value is 1."
+                      "UNI Port bit map representing 1 or more UNI ports to be associated with a flow. If the value is set
+                       to 1, it would mean UNI port 1, if the value is set to 2, it would mean UNI port 2, if the value is 
+                       set to 3, it would mean, both UNI port 1 and 2. The value 255 would mean, UNI port 1 through 7. The 
+                       value 0 will indicate the flow applies to all UNI ports of the ONU."
               ::= { onuFlowProfileEntry 5 }
                  
           onuFlowProfileUsMapType OBJECT-TYPE
@@ -3032,8 +4169,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "The beginning of the VLAN Id range to be mapped to the flow. 1..4095. Set this value only if the 
-                      mapping type is VLAN ID or VLAND + PBITS. Default value is 101."
+                      "The beginning of the VLAN Id range to be mapped to the flow. 1..4095."
               ::= { onuFlowProfileEntry 7 }
                  
           onuFlowProfileVlanIdStop OBJECT-TYPE
@@ -3041,8 +4177,8 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "The end of the VLAN Id range. 1..4095. VLAN ID Stop–VLAN ID Start should be less than equal to 12 
-                      for 1 flow. Set this value only if the mapping type is VLAN ID or VLAND + PBITS. Default value is 101."
+                      "The end of the VLAN Id range. 1..4095. VLAN ID Stop–VLAN ID Start should be less than equal to 
+                      12 for 1 flow."
               ::= { onuFlowProfileEntry 8 }
                  
           onuFlowProfilePBITsMap OBJECT-TYPE
@@ -3050,10 +4186,9 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "Bit map representing PBITs that have to be mapped to the flow. If the value is set to 1, it would mean 
-                      PBIT 0, if the value is set to 2, it would mean PBIT 1, if the value is set to 3, it would mean, both 
-                      PBIT 0 and 1. The value 255 would mean, PBITS 0 through 7. Set this value only if the mapping type is 
-                      PBITS  or VLAND + PBITS. efault value is 1."
+                      "Bit map representing PBITs that have to be mapped to the flow. If the value is set to 1, it would 
+                      mean PBIT 0, if the value is set to 2, it would mean PBIT 1, if the value is set to 3, it would 
+                      mean, both PBIT 0 and 1. The value 255 would mean, PBITS 0 through 7. "
               ::= { onuFlowProfileEntry 9 }
                  
           onuFlowProfileVirportNo OBJECT-TYPE
@@ -3098,7 +4233,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                          INTEGER,
                      onuRateCtlProfileName 
                          OCTET STRING,
-                     onuRateCtlProfileSir  
+                     onuRateCtlProfileCir  
                          INTEGER,
                      onuRateCtlProfilePir 
                          INTEGER,
@@ -3124,12 +4259,12 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                       "ONU rate control scheduler profile name."
               ::= { onuRateControlSchedulerProfileEntry 2 }
                  
-          onuRateCtlProfileSir OBJECT-TYPE
-              SYNTAX  INTEGER(128..2500000)
+          onuRateCtlProfileCir OBJECT-TYPE
+              SYNTAX  INTEGER
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "SIR, the granularity is 64Kbps. The unit is Kbps. Range of allowed values, 128 – 2500000. Default value is 128. "
+                      "CIR, the granularity is 64Kbps. The unit is Kbps. Range of allowed values, 256 – PIR. "
               ::= { onuRateControlSchedulerProfileEntry 3 }
                  
           onuRateCtlProfilePir OBJECT-TYPE
@@ -3137,11 +4272,11 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "SIR, the granularity is 64Kbps. The unit is Kbps. Range of allowed values, 128 – 2500000. Default value is 1024. "
+                      "PIR, the granularity is 64Kbps. The unit is Kbps. Range of allowed values, CIR – 1244160.  "
               ::= { onuRateControlSchedulerProfileEntry 4 }
                  
           onuRateCtlProfileScheduleWeight OBJECT-TYPE
-              SYNTAX  INTEGER(128..2500000)
+              SYNTAX  INTEGER(0..255)
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
@@ -3226,6 +4361,7 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
                  
           onuEthernetUNIPortSpeed OBJECT-TYPE
               SYNTAX  INTEGER{
+              			auto(0),
               			s10Mbps(1),
               			s100Mbps(2),
               			s1000Mbps(3)
@@ -3233,18 +4369,19 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "Speed: 1 10Mbps, 2 100Mbps, 3 1000Mbps. Default value is 2. "
+                      "Speed:0 auto, 1 10Mbps, 2 100Mbps, 3 1000Mbps. Default value is 0. "
               ::= { onuEthernetUNIConfigProfileEntry 4 }
                  
           onuEthernetUNIPortDuplex OBJECT-TYPE
               SYNTAX  INTEGER{
+              			auto(0),
               			full(1),
               			half(2)
               			}
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "Duplex: 1 Full, 2 Half. Default value is 1. "
+                      "Duplex: 1 Full, 2 Half. Default value is 0. "
               ::= { onuEthernetUNIConfigProfileEntry 5 }
                  
           onuEthernetUNIPortExpectedType OBJECT-TYPE
@@ -3257,18 +4394,18 @@ onuVLANProfile   OBJECT IDENTIFIER ::= { nmsGponProfile 1 }
               ::= { onuEthernetUNIConfigProfileEntry 6 }
                  
           onuEthernetUNIPortMaxFrameSize OBJECT-TYPE
-              SYNTAX  INTEGER
+              SYNTAX  INTEGER(1500..2048)
               ACCESS  read-write
               STATUS  mandatory
               DESCRIPTION
-                      "This attribute denotes the maximum frame size allowed across this interface. Upon ME instantiation, the ONT 
-                      sets the attribute to 1518. Default value is 1522. "
+                      "This attribute denotes the maximum frame size allowed across this interface.Range 1500-2048.Defult is 1518."
               ::= { onuEthernetUNIConfigProfileEntry 7 }
                  
           onuEthernetUNIPortEthernetInterfaceWiring OBJECT-TYPE
               SYNTAX  INTEGER{
-              			dce(1),
-              			dte(2)
+              			dce(0),
+              			dte(1),
+              			auto(2)
               			}
               ACCESS  read-write
               STATUS  mandatory

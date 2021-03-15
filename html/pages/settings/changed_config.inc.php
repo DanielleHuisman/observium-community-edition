@@ -1,22 +1,22 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-if ($_SESSION['userlevel'] == '10')
+if ($_SESSION['userlevel'] < 10)
 {
-
-  print_warning("This is a dump of your Observium configuration. To adjust it, please modify your <strong>config.php</strong> file.");
-
-  print_vars(get_defined_settings());
+  print_error_permission();
+  return;
 }
+
+print_warning("This is a dump of your Observium configuration. To adjust it, please modify your <strong>config.php</strong> file.");
+print_vars(get_defined_settings());
 
 // EOF

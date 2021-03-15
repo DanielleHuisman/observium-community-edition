@@ -17,7 +17,7 @@ include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $rrd_options .= " COMMENT:'                       Min     Last    Max\\n'";
 
-$rrd_options .= " DEF:sensor=$rrd_filename:sensor:AVERAGE";
+$rrd_options .= " DEF:sensor=$rrd_filename_escape:sensor:AVERAGE";
 $rrd_options .= " LINE1.5:sensor#cc0000:'" . rrdtool_escape($sensor['sensor_descr'],20)."'";
 $rrd_options .= " GPRINT:sensor$current_id:MIN:%5.2lfA";
 $rrd_options .= " GPRINT:sensor:LAST:%5.2lfA";
@@ -28,7 +28,7 @@ if (is_numeric($sensor['sensor_limit_low'])) $rrd_options .= " HRULE:".$sensor['
 
 if ($vars['previous'] == 'yes')
 {
-  $rrd_options .= " DEF:sensorX=$rrd_filename:sensor:AVERAGE:start=".$prev_from.":end=".$from;
+  $rrd_options .= " DEF:sensorX=$rrd_filename_escape:sensor:AVERAGE:start=".$prev_from.":end=".$from;
   $rrd_options .= " LINE1.5:sensorX#0000cc:'Prev " . rrdtool_escape($sensor['sensor_descr'],18)."'";
   $rrd_options .= " SHIFT:sensorX:$period";
   $rrd_options .= " GPRINT:sensorX$current_id:MIN:%5.2lfA";

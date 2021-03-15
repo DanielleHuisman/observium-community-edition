@@ -1,0 +1,1206 @@
+-- **SDOC***********************************************************************
+-- *****************************************************************************
+--
+--             Copyright(c) 2003 Mediatrix Telecom, Inc.
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+--
+-- *****************************************************************************
+-- *****************************************************************************
+--
+-- Registration configuration of a H.323 unit. Applies to H.323 terminals and
+-- H.323 gateways.
+--
+-- A H.323 terminal is a unit with only FXS ports. A H.323 gateway is a unit
+-- with only FXO ports.
+--
+-- *****************************************************************************
+-- **EDOC***********************************************************************
+
+
+MX-H323-REGISTRATION-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE
+    FROM SNMPv2-CONF
+        ifIndex
+    FROM RFC1213-MIB
+        MxIpAddress,
+        MxIpPort,
+        MxIpDhcpSiteSpecificCode,
+        MxEnableState
+    FROM MX-TC
+        ipAddressStatus,
+        ipAddressConfig
+    FROM MX-SMI
+        groupIndex
+    FROM MX-LINE-GROUPING-MIB
+        h323,
+        ipAddressStatusH323,
+        ipAddressConfigH323Static,
+        ipAddressConfigH323Dhcp
+    FROM MX-H323-MIB;
+
+
+h323RegistrationMIB MODULE-IDENTITY
+    LAST-UPDATED "0303280000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749"
+    DESCRIPTION  "This MIB contains H.323 configuration objects for H.323 units."
+
+
+    -- *************************************************************************
+    -- Revision history
+    -- *************************************************************************
+    REVISION    "0303280000Z"
+    DESCRIPTION "March 28th, 2003
+                    Added h323RegistrationTimeToLive in
+                    h323RegistrationStatusIfTable
+                 March 11th, 2003
+                    Added h323RegistrationStatusIfTable
+                 March 5th, 2003
+                    Creation"
+    ::= { h323 1 }
+
+h323RegistrationMIBObjects  OBJECT IDENTIFIER ::= { h323RegistrationMIB 1 }
+h323RegistrationConformance OBJECT IDENTIFIER ::= { h323RegistrationMIB 2 }
+
+    -- *************************************************************************
+    -- General registration variables
+    -- *************************************************************************
+    h323RegMethod OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              none(0),
+                              single(1),
+                              multiple(2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The registration method used by the unit.
+
+                     Specifies how the unit registers its lines and groups of lines. The unit can
+                     register all its lines/groups together or it can register its lines/groups
+                     individually.
+
+                     none     : No gatekeeper registration. The unit does not register any
+                                line/group.
+
+                     single   : The unit registers all its lines and groups of lines together.
+                                The unit registers all the aliases of its lines/groups together
+
+                     multiple : the unit registers its lines/groups of lines individually. For each
+                                line/group, the unit local IP address is used. For each line/group, a
+                                unique RAS port and a unique call signaling port are used. Each
+                                line/group can be configured to register or not."
+        DEFVAL      { none }
+        ::= { h323RegistrationMIBObjects 5 }
+
+
+    -- *************************************************************************
+    -- Single registration variables.
+    --
+    -- By using the single registration method, the unit includes the aliases
+    -- of all its lines and groups of lines on a single registrationRequest
+    -- message or gatekeeperRequest message. The unit registers all its
+    -- lines/groups together.
+    -- *************************************************************************
+    h323RegistrationSingleRegistration OBJECT IDENTIFIER ::= { h323RegistrationMIBObjects 10 }
+
+        h323SingleRegGkDiscoveryMode OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  automatic(0),
+                                  manual(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The gatekeeper discovery method used by the unit.
+
+                         AUTOMATIC GATEKEEPER DISCOVERY METHOD
+
+                         The unit follows these steps until it registers successfully.
+
+                         step 1 : the unit sends a gatekeeperRequest message on the well-known Discovery
+                                  Multicast Address. Every gatekeeper on the same network (as the unit)
+                                  receives the gatekeeperRequest message.
+
+                         step 2 : a gatekeeper that accepts the gatekeeper request sends a
+                                  gatekeeperConfirm message to the unit. The unit then sends a
+                                  registrationRequest message to that gatekeeper. The gatekeeper
+                                  responds with a registrationConfirm message. The unit is now
+                                  registered. If several gatekeepers accept the gatekeeper request, the
+                                  unit registers with the first gatekeeper that accepted the gatekeeper
+                                  request (i.e. the gatekeeper that sent the first gatekeeperConfirm
+                                  message received by the unit).
+
+                         step 3 : a gatekeeper that rejects the gatekeeper request sends a
+                                  gatekeeperReject message to the unit. The unit does not initiate any
+                                  action upon receipt of a gatekeeperReject message.
+
+                         step 4 : if no gatekeeperConfirm message is received within a time-out, the unit
+                                  starts again at step 1. The calculation of the time-out starts as soon
+                                  as the first gatekeeperRequest message is sent.
+
+                         note   : after sending a gatekeeperRequest message, the unit only considers the
+                                  first answer (the first gatekeeperConfirm message or the first
+                                  gatekeeperReject message). If the first answer to be received is a
+                                  gatekeeperReject message, the unit sends another gatekeeperRequest
+                                  message.
+
+                         MANUAL GATEKEEPER DISCOVERY METHOD
+
+                         The unit is configured with a list of gatekeeper IP addresses.
+
+                         The unit follows these steps until it registers successfully.
+
+                         step 1 : the unit sends a registrationRequest message to the first gatekeeper IP
+                                  address of the list.
+
+                         step 2 : if the gatekeeper accepts the registration request, i.e. the
+                                  gatekeeper sends a registrationConfirm message to the unit, the unit is
+                                  now registered.
+
+                         step 3 : if the gatekeeper rejects the registration request, i.e. the
+                                  gatekeeper sends a registrationReject message to the unit, the unit
+                                  sends a registrationRequest message to the next gatekeeper IP address
+                                  of the list.
+
+                         step 4 : if the registration request times-out, i.e. there is no answer from
+                                  the gatekeeper, the unit sends a registrationRequest message to the
+                                  next gatekeeper IP address of the list.
+
+                         step 5 : If the unit reaches the end of the list without registering
+                                  successfully, the unit waits before starting again at step 1. During
+                                  this waiting period, the unit does not send any registrationRequest
+                                  message."
+            DEFVAL { manual }
+            ::=  {  h323RegistrationSingleRegistration 5 }
+
+        h323SingleRegRetryTime OBJECT-TYPE
+            SYNTAX      Unsigned32 (30..3600)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The waiting period, in seconds, between two gatekeeper registration attempts or
+                         two gatekeeper discovery attempts.
+
+                         After an unsuccessful gatekeeper registration (no answer from the gatekeeper),
+                         this waiting period specifies how long the unit waits before trying to register
+                         again.
+
+                         After an unsuccessful gatekeeper discovery, this waiting period specifies how
+                         long the unit waits before starting a new gatekeeper discovery."
+            DEFVAL      { 60 }
+            ::= {  h323RegistrationSingleRegistration 10 }
+
+        h323SingleRegLightweightEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates if the lightweight registration functionality is enabled.
+
+                         disable : the unit does not use the lightweight registration functionality. The
+                                   unit does not include the timeToLive field in the registrationRequest
+                                   message.
+
+                         enable  : the unit uses the lightweight registration functionality. The unit
+                                   includes the timeToLive field in the registrationRequest message.
+
+                         For the lightweight registration functionality, the following RAS message
+                         fields are used:
+
+                         - keepAlive field of the registrationRequest message. The keepAlive field is
+                           either true or false.
+
+                         - timeToLive field of the registrationRequest and registrationConfirm messages.
+                           The timeToLive field is a number of seconds.
+
+                         - A full registrationRequest message has the keepAlive field set to false.
+
+                         - A lightweight registrationRequest message has the keepAlive field set to
+                           true.
+
+                         When the lightweight registration functionality is enabled, the unit follows
+                         these steps:
+
+                         step 1 : the unit sends a first registrationRequest message to the gatekeeper.
+                                  This registrationRequest message has the keepAlive field set to false
+                                  and contains the timeToLive field. The value of the timeToLive field
+                                  is configurable.
+
+                         step 2 : If the registrationConfirm message contains the timeToLive field, the
+                                  unit sends lightweight registrationRequest messages. The interval
+                                  between each lightweight registrationRequest message is one-third of
+                                  the timeToLive value from the gatekeeper (from the registrationConfirm
+                                  message). On a network with heavy traffic, a lightweight
+                                  registrationRequest message could arrive a few seconds late at the
+                                  gatekeeper. Furthermore, since the RAS channel between a unit and a
+                                  gatekeeper is unreliable (UDP), a lightweight registrationRequest
+                                  message may never arrive at the gatekeeper. These problems are avoided
+                                  by using an interval equal to one-third the timeToLive value of the
+                                  registrationConfirm message.
+
+                         step 3 : If the registrationConfirm message does not contain the timeToLive
+                                  field, the unit does not send lightweight registrationRequest messages."
+            DEFVAL { enable }
+            ::=  {  h323RegistrationSingleRegistration 15 }
+
+        h323SingleRegLightweightTimeToLive OBJECT-TYPE
+            SYNTAX      Unsigned32 (30..3600)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The interval, in seconds, proposed to the gatekeeper for the lightweight
+                         registration functionality. When the lightweight registration functionality is
+                         enabled, the unit uses this value for the timeToLive field of the
+                         registrationRequest message."
+            DEFVAL      { 60 }
+            ::= {  h323RegistrationSingleRegistration 20 }
+
+        h323SingleRegRasPortSource OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  dynamic(0),
+                                  static(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates the source of the local RAS port. This applies only if the unit is
+                         configured to register. If the unit is not configured to register, it uses the
+                         well-known RAS port (1719) for its local RAS port.
+
+                         The local RAS port is used to exchange registration, admission and status
+                         messages with a gatekeeper. Examples of RAS messages sent by the unit are
+                         registrationRequest, admissionRequest and disengageRequest. Examples of RAS
+                         messages received by the unit are registrationConfirm, admissionReject and
+                         disengageConfirm.
+
+                         dynamic : the unit chooses its local RAS port at run time.
+
+                         static  : the administrator sets the local RAS port."
+            DEFVAL { dynamic }
+            ::=  {  h323RegistrationSingleRegistration 30 }
+
+        h323SingleRegStaticRasPort OBJECT-TYPE
+            SYNTAX      Unsigned32 ( 1719..1720 | 7000..65535 )
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The local static RAS port number."
+            DEFVAL      { 7000 }
+            ::=  {  h323RegistrationSingleRegistration 35 }
+
+        h323SingleRegCallSignalingPortSource OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  dynamic(0),
+                                  static(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates the source of the local call signaling port. Applies only if the unit
+                         is configured to register. If the unit is not configured to register, it uses
+                         the well-known call signaling port (1720) for its local call signaling port.
+
+                         The local call signaling port is used to exchange Q.931 messages with
+                         gatekeepers and other H.323 endpoints. Examples of Q.931 messages are SETUP,
+                         CONNECT and RELEASE COMPLETE.
+
+                         dynamic : the unit chooses its local call signaling port at run time.
+
+                         static  : the administrator sets the local call signaling port."
+            DEFVAL { dynamic }
+            ::=  {  h323RegistrationSingleRegistration 40 }
+
+        h323SingleRegStaticCallSignalingPort OBJECT-TYPE
+            SYNTAX      Unsigned32 ( 1719..1720 | 7000..65535 )
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The local static call signaling port number."
+            DEFVAL      { 7000 }
+            ::=  {  h323RegistrationSingleRegistration 45 }
+
+
+    -- *************************************************************************
+    -- Line multiple registration table.
+    --
+    -- The configuration of this table only applies to unit of type terminal.
+    --
+    -- With the multiple registration method, the unit registers its
+    -- lines individually. Each line sends its own registrationRequest
+    -- and gatekeeperRequest messages. Each line registers its own
+    -- aliases.
+    --
+    -- For each  line, the local IP address of the unit is used.
+    --
+    -- For each line, a unique RAS port and a unique call signaling port
+    -- are used.
+    --
+    -- Each line can be configured to register or not.
+    -- *************************************************************************
+    h323RegistrationMultipleRegistrationIfTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF H323RegistrationMultipleRegistrationIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table holds the multiple registration configuration. Each row is used to
+                     configure the gatekeeper registration of one line.
+
+                     This table only applies to unit of type terminal."
+        ::= { h323RegistrationMIBObjects 15 }
+
+        h323RegistrationMultipleRegistrationIfEntry OBJECT-TYPE
+            SYNTAX      H323RegistrationMultipleRegistrationIfEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "Each row is used to configure the gatekeeper registration of one line.
+
+                         This table only applies to unit of type terminal."
+            INDEX       { ifIndex }
+            ::= { h323RegistrationMultipleRegistrationIfTable 1 }
+
+            H323RegistrationMultipleRegistrationIfEntry ::= SEQUENCE
+                {
+                    h323MultipleRegGroupIndex              Unsigned32,
+                    h323MultipleRegEnable                  MxEnableState,
+                    h323MultipleRegGkDiscoveryMode         INTEGER,
+                    h323MultipleRegRetryTime               Unsigned32,
+                    h323MultipleRegLightweightEnable       MxEnableState,
+                    h323MultipleRegLightweightTimeToLive   Unsigned32,
+                    h323MultipleRegRasPortSource           INTEGER,
+                    h323MultipleRegStaticRasPort           Unsigned32,
+                    h323MultipleRegCallSignalingPortSource INTEGER,
+                    h323MultipleRegStaticCallSignalingPort Unsigned32
+                }
+
+        h323MultipleRegGroupIndex OBJECT-TYPE
+            SYNTAX      Unsigned32 (0..24)
+                        MAX-ACCESS  read-only
+            STATUS      current
+            DESCRIPTION "Indicates wich group is associated with this line. This variable only applies to
+                         unit of type terminal.
+
+                         A value different than 0 indicates that the registration configuration for this
+                         line is superceded by the corresponding entry in the
+                         h323RegistrationMultipleRegistrationGroupTable.
+
+                         A value of 0 means this line is not part of a group and that it can be
+                         configured using this entry."
+            DEFVAL { 0 }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 5 }
+
+        h323MultipleRegEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates if the line should register with a gatekeeper. This variable only
+                         applies to unit of type terminal.
+
+                         disable : the line does not register with a gatekeeper. There is no gatekeeper
+                                   registration for this line.
+
+                         enable  : the line registers with a gatekeeper."
+            DEFVAL { enable }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 10 }
+
+        h323MultipleRegGkDiscoveryMode OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  automatic(0),
+                                  manual(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The gatekeeper discovery method used by the line. This variable only applies to
+                         unit of type terminal.
+
+                         AUTOMATIC GATEKEEPER DISCOVERY METHOD
+
+                         The line follows these steps until it registers successfully.
+
+                         step 1 : the line sends a gatekeeperRequest message on the well-known Discovery
+                                  Multicast Address. Every gatekeeper on the same network (as the line)
+                                  receives the gatekeeperRequest message.
+
+                         step 2 : a gatekeeper that accepts the gatekeeper request sends a
+                                  gatekeeperConfirm message to the line. The line then sends a
+                                  registrationRequest message to that gatekeeper. The gatekeeper
+                                  responds with a registrationConfirm message. The line is now
+                                  registered. If several gatekeepers accept the gatekeeper request, the
+                                  line registers with the first gatekeeper that accepted the gatekeeper
+                                  request (i.e. the gatekeeper that sent the first gatekeeperConfirm
+                                  message received by the line).
+
+                         step 3 : a gatekeeper that rejects the gatekeeper request sends a
+                                  gatekeeperReject message to the line. The line does not initiate any
+                                  action upon receipt of a gatekeeperReject message.
+
+                         step 4 : if no gatekeeperConfirm message is received within a time-out, the
+                                  line starts again at step 1. The calculation of the time-out starts as
+                                  soon as the first gatekeeperRequest message is sent.
+
+                         note   : after sending a gatekeeperRequest message, the line only considers the
+                                  first answer (the first gatekeeperConfirm message or the first
+                                  gatekeeperReject message). If the first answer to be received is a
+                                  gatekeeperReject message, the line sends another gatekeeperRequest
+                                  message.
+
+                         MANUAL GATEKEEPER DISCOVERY METHOD
+
+                         The unit is configured with a list of gatekeeper IP addresses. Each line uses
+                         the same list of gatekeeper IP addresses.
+
+                         The line follows these steps as long as it does not register successfully.
+
+                         step 1 : the line sends a registrationRequest message to the first gatekeeper
+                                  IP address of the list.
+
+                         step 2 : if the gatekeeper accepts the registration request, i.e. the
+                                  gatekeeper sends a registrationConfirm message to the line, the line
+                                  is now registered.
+
+                         step 3 : if the gatekeeper rejects the registration request, i.e. the
+                                  gatekeeper sends a registrationReject message to the line, the line
+                                  sends a registrationRequest message to the next gatekeeper IP address
+                                  of the list.
+
+                         step 4 : if the registration request times-out, i.e. there is no answer from
+                                  the gatekeeper, the line sends a registrationRequest message to the
+                                  next gatekeeper IP address of the list.
+
+                         step 5 : If the line reaches the end of the list without registering
+                                  successfully, the line waits before starting again at step 1. During
+                                  this waiting period, the line does not send any registrationRequest
+                                  message."
+            DEFVAL { manual }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 15 }
+
+        h323MultipleRegRetryTime OBJECT-TYPE
+            SYNTAX      Unsigned32 (30..3600)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The waiting period, in seconds, between two gatekeeper registration attempts or
+                         two gatekeeper discovery attempts. This variable only applies to unit of type
+                         terminal.
+
+                         After an unsuccessful gatekeeper registration (no answer from the gatekeeper),
+                         this waiting period specifies how long the line waits before trying to register
+                         again.
+
+                         After an unsuccessful gatekeeper discovery (no answer from any gatekeeper or
+                         after receiving a gatekeeperReject message), this waiting period specifies how
+                         long the line waits before starting a new gatekeeper discovery."
+            DEFVAL      { 60 }
+            ::= {  h323RegistrationMultipleRegistrationIfEntry 20 }
+
+        h323MultipleRegLightweightEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates if the lightweight registration functionality is enabled. This
+                         variable only applies to unit of type terminal.
+
+                         disable : the line does not use the lightweight registration functionality. The
+                                   line does not include the timeToLive field in the registrationRequest
+                                   message.
+
+                         enable  : the line uses the lightweight registration functionality. The line
+                                   includes the timeToLive field in the registrationRequest message.
+
+                         For the lightweight registration functionality, the following RAS message
+                         fields are used:
+
+                         - keepAlive field of the registrationRequest message. The keepAlive field is
+                           either true or false.
+
+                         - timeToLive field of the registrationRequest and registrationConfirm messages.
+                           The timeToLive field is a number of seconds.
+
+                         - A full registrationRequest message has the keepAlive field set to false.
+
+                         - lightweight registrationRequest message has the keepAlive field set to true.
+
+                         When the lightweight registration functionality is enabled, the line follows
+                         these steps:
+
+                         step 1 : the line sends a first registrationRequest message to the gatekeeper.
+                                  This registrationRequest message has the keepAlive field set to false
+                                  and contains the timeToLive field. The value of the timeToLive field
+                                  is configurable.
+
+                         step 2 : If the registrationConfirm message contains the timeToLive field, the
+                                  line sends lightweight registrationRequest messages. The interval
+                                  between each lightweight registrationRequest message is one-third of
+                                  the timeToLive value from the gatekeeper (from the registrationConfirm
+                                  message). On a network with heavy traffic, a lightweight
+                                  registrationRequest message could arrive a few seconds late at the
+                                  gatekeeper. Furthermore, since the RAS channel between a line and a
+                                  gatekeeper is unreliable (UDP), a lightweight registrationRequest
+                                  message may never arrive at the gatekeeper. These problems are avoided
+                                  by using an interval equal to one-third the timeToLive value of the
+                                  registrationConfirm message.
+
+                         step 3 : If the registrationConfirm message does not contain the timeToLive
+                                  field, the line does not send lightweight registrationRequest
+                                  messages."
+            DEFVAL { enable }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 25 }
+
+        h323MultipleRegLightweightTimeToLive OBJECT-TYPE
+            SYNTAX      Unsigned32 (30..3600)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The interval, in seconds, proposed to the gatekeeper for the lightweight
+                         registration functionality. This variable only applies to unit of type terminal.
+
+                         When the lightweight registration functionality is enabled, the line uses this
+                         value for the timeToLive field of the registrationRequest message."
+            DEFVAL      { 60 }
+            ::= {  h323RegistrationMultipleRegistrationIfEntry 30 }
+
+        h323MultipleRegRasPortSource OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  dynamic(0),
+                                  static(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates the source of the local RAS port. This applies only if the line is
+                         configured to register. If the line is not configured to register, it uses
+                         the well-known RAS port (1719) for its local RAS port. This variable only
+                         applies to unit of type terminal.
+
+                         The local RAS port is used to exchange registration, admission and status
+                         messages with a gatekeeper. Examples of RAS messages sent by the line are
+                         registrationRequest, admissionRequest and disengageRequest. Examples of RAS
+                         messages received by the line are registrationConfirm, admissionReject and
+                         disengageConfirm.
+
+                         dynamic : the line chooses its local RAS port at run time.
+
+                         static  : the administrator sets the local RAS port."
+            DEFVAL { dynamic }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 35 }
+
+        h323MultipleRegStaticRasPort OBJECT-TYPE
+            SYNTAX      Unsigned32 ( 1719..1720 | 7000..65535 )
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The local static RAS port number of the line. This variable only applies to unit
+                         of type terminal."
+            DEFVAL      { 7000 }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 40 }
+
+        h323MultipleRegCallSignalingPortSource OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  dynamic(0),
+                                  static(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates the source of the local call signaling port. This applies only if the
+                         line is configured to register. If the line is not configured to register, it
+                         uses the well-known call signaling port (1720) for its local call signaling
+                         port. This variable only applies to unit of type terminal.
+
+                         The local call signaling port is used to exchange Q.931 messages with
+                         gatekeepers and other H.323 endpoints. Examples of Q.931 messages are SETUP,
+                         CONNECT and RELEASE COMPLETE.
+
+                         dynamic : the line chooses its local call signaling port at run time.
+
+                         static  : the administrator sets the local call signaling port."
+            DEFVAL { dynamic }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 45 }
+
+        h323MultipleRegStaticCallSignalingPort OBJECT-TYPE
+            SYNTAX      Unsigned32 ( 1719..1720 | 7000..65535 )
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The local static call signaling port number of the line. This variable only
+                         applies to unit of type terminal."
+            DEFVAL      { 7000 }
+            ::=  {  h323RegistrationMultipleRegistrationIfEntry 50 }
+
+
+    -- *************************************************************************
+    -- Group multiple registration table.
+    --
+    -- With the multiple registration method, the unit registers its
+    -- groups of lines individually. Each group sends its own registrationRequest
+    -- and gatekeeperRequest messages. Each group registers its own
+    -- aliases.
+    --
+    -- For each group, the local IP address of the unit is used.
+    --
+    -- For each group, a unique RAS port and a unique call signaling port
+    -- are used.
+    --
+    -- Each group can be configured to register or not.
+    -- *************************************************************************
+    h323RegistrationMultipleRegistrationGroupTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF H323RegistrationMultipleRegistrationGroupEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table holds the multiple registration configuration for group of lines.
+
+                     Each row is used to configure the gatekeeper registration of one group of
+                     lines."
+        ::= { h323RegistrationMIBObjects 17 }
+
+        h323RegistrationMultipleRegistrationGroupEntry OBJECT-TYPE
+            SYNTAX      H323RegistrationMultipleRegistrationGroupEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "Each row is used to configure the gatekeeper registration of one group of
+                         lines."
+            INDEX       { groupIndex }
+            ::= { h323RegistrationMultipleRegistrationGroupTable 1 }
+
+            H323RegistrationMultipleRegistrationGroupEntry ::= SEQUENCE
+                {
+                    h323GroupMultipleRegEnable                  MxEnableState,
+                    h323GroupMultipleRegGkDiscoveryMode         INTEGER,
+                    h323GroupMultipleRegRetryTime               Unsigned32,
+                    h323GroupMultipleRegLightweightEnable       MxEnableState,
+                    h323GroupMultipleRegLightweightTimeToLive   Unsigned32,
+                    h323GroupMultipleRegRasPortSource           INTEGER,
+                    h323GroupMultipleRegStaticRasPort           Unsigned32,
+                    h323GroupMultipleRegCallSignalingPortSource INTEGER,
+                    h323GroupMultipleRegStaticCallSignalingPort Unsigned32
+                }
+
+        h323GroupMultipleRegEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates if the group should register with a gatekeeper.
+
+                         disable : the group does not register with a gatekeeper. There is no gatekeeper
+                                   registration for this group.
+
+                         enable  : the group registers with a gatekeeper."
+            DEFVAL { enable }
+            ::=  {  h323RegistrationMultipleRegistrationGroupEntry 5 }
+
+        h323GroupMultipleRegGkDiscoveryMode OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  automatic(0),
+                                  manual(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The gatekeeper discovery method used by the group of lines.
+
+                         AUTOMATIC GATEKEEPER DISCOVERY METHOD
+
+                         The group follows these steps until it registers successfully.
+
+                         step 1 : the group sends a gatekeeperRequest message on the well-known
+                                  Discovery Multicast Address. Every gatekeeper on the same network
+                                  (as the unit) receives the gatekeeperRequest message.
+
+                         step 2 : a gatekeeper that accepts the gatekeeper request sends a
+                                  gatekeeperConfirm message to the group. The group then sends a
+                                  registrationRequest message to that gatekeeper. The gatekeeper
+                                  responds with a registrationConfirm message. The group is now
+                                  registered. If several gatekeepers accept the gatekeeper request, the
+                                  group registers with the first gatekeeper that accepted the gatekeeper
+                                  request (i.e. the gatekeeper that sent the first gatekeeperConfirm
+                                  message received by the group).
+
+                         step 3 : a gatekeeper that rejects the gatekeeper request sends a
+                                  gatekeeperReject message to the group. The group does not initiate any
+                                  action upon receipt of a gatekeeperReject message.
+
+                         step 4 : if no gatekeeperConfirm message is received within a time-out, the
+                                  group starts again at step 1. The calculation of the time-out starts
+                                  as soon as the first gatekeeperRequest message is sent.
+
+                         note   : after sending a gatekeeperRequest message, the group only considers
+                                  the first answer (the first gatekeeperConfirm message or the first
+                                  gatekeeperReject message). If the first answer to be received is a
+                                  gatekeeperReject message, the group sends another gatekeeperRequest
+                                  message.
+
+                         MANUAL GATEKEEPER DISCOVERY METHOD
+
+                         The unit is configured with a list of gatekeeper IP addresses. Each group uses
+                         the same list of gatekeeper IP addresses.
+
+                         The group follows these steps as long as it does not register successfully.
+
+                         step 1 : the group sends a registrationRequest message to the first gatekeeper
+                                  IP address of the list.
+
+                         step 2 : if the gatekeeper accepts the registration request, i.e. the
+                                  gatekeeper sends a registrationConfirm message to the group, the group
+                                  is now registered.
+
+                         step 3 : if the gatekeeper rejects the registration request, i.e. the
+                                  gatekeeper sends a registrationReject message to the group, the group
+                                  sends a registrationRequest message to the next gatekeeper IP address
+                                  of the list.
+
+                         step 4 : if the registration request times-out, i.e. there is no answer from
+                                  the gatekeeper, the group sends a registrationRequest message to the
+                                  next gatekeeper IP address of the list.
+
+                         step 5 : If the group the end of the list without registering successfully,
+                                  the group waits before starting again at step 1. During this waiting
+                                  period, the group does not send any registrationRequest message."
+            DEFVAL { manual }
+            ::=  {  h323RegistrationMultipleRegistrationGroupEntry 10 }
+
+        h323GroupMultipleRegRetryTime OBJECT-TYPE
+            SYNTAX      Unsigned32 (30..3600)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The waiting period, in seconds, between two gatekeeper registration attempts or
+                         two gatekeeper discovery attempts.
+
+                         After an unsuccessful gatekeeper registration (no answer from the gatekeeper),
+                         this waiting period specifies how long the group of lines waits before trying
+                         to register again.
+
+                         After an unsuccessful gatekeeper discovery (no answer from any gatekeeper or
+                         after receiving a gatekeeperReject message), this waiting period specifies how
+                         long the group waits before starting a new gatekeeper discovery."
+            DEFVAL      { 60 }
+            ::= {  h323RegistrationMultipleRegistrationGroupEntry 15 }
+
+        h323GroupMultipleRegLightweightEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates if the lightweight registration functionality is enabled.
+
+                         disable : the group does not use the lightweight registration functionality.
+                                   The group does not include the timeToLive field in the
+                                   registrationRequest message.
+
+                         enable  : the group uses the lightweight registration functionality. The group
+                                   includes the timeToLive field in the registrationRequest message.
+
+                         For the lightweight registration functionality, the following RAS message
+                         fields are used:
+
+                         - keepAlive field of the registrationRequest message. The keepAlive field is
+                           either true or false.
+
+                         - timeToLive field of the registrationRequest and registrationConfirm messages.
+                           The timeToLive field is a number of seconds.
+
+                         - A full registrationRequest message has the keepAlive field set to false.
+
+                         - lightweight registrationRequest message has the keepAlive field set to true.
+
+                         When the lightweight registration functionality is enabled, the group follows
+                         these steps:
+
+                         step 1 : the group sends a first registrationRequest message to the gatekeeper.
+                                  This registrationRequest message has the keepAlive field set to false
+                                  and contains the timeToLive field. The value of the timeToLive field
+                                  is configurable.
+
+                         step 2 : If the registrationConfirm message contains the timeToLive field, the
+                                  group sends lightweight registrationRequest messages. The interval
+                                  between each lightweight registrationRequest message is one-third of
+                                  the timeToLive value from the gatekeeper (from the registrationConfirm
+                                  message). On a network with heavy traffic, a lightweight
+                                  registrationRequest message could arrive a few seconds late at the
+                                  gatekeeper. Furthermore, since the RAS channel between a group and a
+                                  gatekeeper is unreliable (UDP), a lightweight registrationRequest
+                                  message may never arrive at the gatekeeper. These problems are avoided
+                                  by using an interval equal to one-third the timeToLive value of the
+                                  registrationConfirm message.
+
+                         step 3 : If the registrationConfirm message does not contain the timeToLive
+                                  field, the group does not send lightweight registrationRequest
+                                  messages."
+            DEFVAL { enable }
+            ::=  {  h323RegistrationMultipleRegistrationGroupEntry 20 }
+
+        h323GroupMultipleRegLightweightTimeToLive OBJECT-TYPE
+            SYNTAX      Unsigned32 (30..3600)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The interval, in seconds, proposed to the gatekeeper for the lightweight
+                         registration functionality.
+
+                         When the lightweight registration functionality is enabled, the group uses this
+                         value for the timeToLive field of the registrationRequest message."
+            DEFVAL      { 60 }
+            ::= {  h323RegistrationMultipleRegistrationGroupEntry 25 }
+
+        h323GroupMultipleRegRasPortSource OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  dynamic(0),
+                                  static(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates the source of the local RAS port. This applies only if the group is
+                         configured to register. If the group is not configured to register, it uses the
+                         well-known RAS port (1719) for its local RAS port.
+
+                         The local RAS port is used to exchange registration, admission and status
+                         messages with a gatekeeper. Examples of RAS messages sent by the group are
+                         registrationRequest, admissionRequest and disengageRequest. Examples of RAS
+                         messages received by the group registrationConfirm, admissionReject and
+                         disengageConfirm.
+
+                         dynamic : the group chooses its local RAS port at run time.
+
+                         static  : the administrator sets the local RAS port."
+            DEFVAL { dynamic }
+            ::=  {  h323RegistrationMultipleRegistrationGroupEntry 30 }
+
+        h323GroupMultipleRegStaticRasPort OBJECT-TYPE
+            SYNTAX      Unsigned32 ( 1719..1720 | 7000..65535 )
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The local static RAS port number of the group."
+            DEFVAL      { 7000 }
+            ::=  {  h323RegistrationMultipleRegistrationGroupEntry 35 }
+
+        h323GroupMultipleRegCallSignalingPortSource OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                  dynamic(0),
+                                  static(1)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Indicates the source of the local call signaling port. This applies only if the
+                         group is configured to register. If the group is not configured to register, it
+                         uses the well-known call signaling port (1720) for its local call signaling
+                         port.
+
+                         The local call signaling port is used to exchange Q.931 messages with
+                         gatekeepers and other H.323 endpoints. Examples of Q.931 messages are SETUP,
+                         CONNECT and RELEASE COMPLETE.
+
+                         dynamic : the group chooses its local call signaling port at run time.
+
+                         static  : the administrator sets the local call signaling port."
+            DEFVAL { dynamic }
+            ::=  {  h323RegistrationMultipleRegistrationGroupEntry 40 }
+
+        h323GroupMultipleRegStaticCallSignalingPort OBJECT-TYPE
+            SYNTAX      Unsigned32 ( 1719..1720 | 7000..65535 )
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The local static call signaling port number of the group."
+            DEFVAL      { 7000 }
+            ::=  {  h323RegistrationMultipleRegistrationGroupEntry 45 }
+
+    -- *************************************************************************
+    -- Gatekeeper registration status
+    -- *************************************************************************
+    h323RegistrationStatusIfTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF H323RegistrationStatusIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table holds the IP addresses of the gatekeeper to
+                     which each line is actually registered."
+        ::= { h323RegistrationMIBObjects 19 }
+
+        h323RegistrationStatusIfEntry OBJECT-TYPE
+            SYNTAX      H323RegistrationStatusIfEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "The row holds the IP address of the gatekeeper to which the line is actually
+                         registered.
+
+                         A blank row means that the line is not registered to a gatekeeper."
+            INDEX       { ifIndex }
+            ::= { h323RegistrationStatusIfTable 1 }
+
+            H323RegistrationStatusIfEntry ::= SEQUENCE
+                {
+                    h323RegistrationGkHost MxIpAddress,
+                    h323RegistrationGkPort OCTET STRING,
+                    h323RegistrationTimeToLive OCTET STRING
+                }
+
+            h323RegistrationGkHost OBJECT-TYPE
+                SYNTAX      MxIpAddress
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "The gatekeeper IP address."
+                DEFVAL { "" }
+                ::=  {  h323RegistrationStatusIfEntry 5 }
+
+            h323RegistrationGkPort OBJECT-TYPE
+                SYNTAX      OCTET STRING (SIZE (0..5))
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "The gatekeeper RAS port (well-known gatekeeper RAS Channel TSAP Identifier)."
+                DEFVAL { "" }
+                ::=  {  h323RegistrationStatusIfEntry 10 }
+
+            h323RegistrationTimeToLive OBJECT-TYPE
+                SYNTAX      OCTET STRING (SIZE (0..9))
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "The actual value, in seconds, of the optional time-to-live field sent back by
+                             the gatekeeper upon confirmation of the unit's registration.
+
+                             A blank field means that no time-to-live value has been received from the
+                             gatekeeper."
+                DEFVAL { "" }
+                ::=  {  h323RegistrationStatusIfEntry 15 }
+
+    -- *************************************************************************
+    -- IP address status for registration
+    -- *************************************************************************
+
+    ipAddressStatusH323GatekeeperTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF IpAddressStatusH323GatekeeperEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table holds the gatekeeper IP addresses actually used in the registration
+                     of the unit."
+        ::= { ipAddressStatusH323 20 }
+
+        ipAddressStatusH323GatekeeperEntry OBJECT-TYPE
+            SYNTAX      IpAddressStatusH323GatekeeperEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "This row holds the gatekeeper IP addresses actually used in the registration of
+                         the unit."
+            INDEX       { ipAddressStatusH323GkIndex }
+            ::= { ipAddressStatusH323GatekeeperTable 1 }
+
+            IpAddressStatusH323GatekeeperEntry ::= SEQUENCE
+                {
+                    ipAddressStatusH323GkIndex Unsigned32,
+                    ipAddressStatusH323GkHost  MxIpAddress,
+                    ipAddressStatusH323GkPort  MxIpPort
+                }
+
+            ipAddressStatusH323GkIndex OBJECT-TYPE
+                SYNTAX  Unsigned32
+                MAX-ACCESS  not-accessible
+                STATUS      current
+                DESCRIPTION "Row index."
+                ::= { ipAddressStatusH323GatekeeperEntry 5 }
+
+            ipAddressStatusH323GkHost OBJECT-TYPE
+                SYNTAX      MxIpAddress
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "A gatekeeper IP address."
+                DEFVAL { "" }
+                ::=  {  ipAddressStatusH323GatekeeperEntry 10 }
+
+            ipAddressStatusH323GkPort OBJECT-TYPE
+                SYNTAX      MxIpPort
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "The gatekeeper RAS port (well-known gatekeeper RAS Channel TSAP Identifier,
+                             1719)."
+                DEFVAL { 1719 }
+                ::=  {  ipAddressStatusH323GatekeeperEntry 15 }
+
+    -- *************************************************************************
+    -- Static IP address configuration for registration
+    -- *************************************************************************
+
+    ipAddressConfigH323GatekeeperTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF IpAddressConfigH323GatekeeperEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table holds the gatekeeper IP addresses used in the registration of the
+                     unit."
+        ::= { ipAddressConfigH323Static 15 }
+
+        ipAddressConfigH323GatekeeperEntry OBJECT-TYPE
+            SYNTAX      IpAddressConfigH323GatekeeperEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "This row holds the gatekeeper IP addresses used in the registration of the unit."
+            INDEX       { ipAddressConfigH323GkIndex }
+            ::= { ipAddressConfigH323GatekeeperTable 1 }
+
+            IpAddressConfigH323GatekeeperEntry ::= SEQUENCE
+                {
+                    ipAddressConfigH323GkIndex       Unsigned32,
+                    ipAddressConfigH323GkStaticHost  MxIpAddress,
+                    ipAddressConfigH323GkStaticPort  MxIpPort
+                }
+
+    ipAddressConfigH323GkIndex OBJECT-TYPE
+        SYNTAX  Unsigned32
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Index for this row."
+        ::= { ipAddressConfigH323GatekeeperEntry 5 }
+
+    ipAddressConfigH323GkStaticHost OBJECT-TYPE
+        SYNTAX      MxIpAddress
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "A gatekeeper IP address.
+
+                     When the unit is configured with the single registration method, it uses this
+                     IP address if:
+
+                        - The unit is configured with the manual gatekeeper discovery mode.
+
+                        - The configuration source is static.
+
+                     When the unit is configured with the multiple registration method, it uses this
+                     IP address if:
+
+                        - The line/group of lines is configured with the manual gatekeeper discovery
+                          mode.
+
+                        - The registration for the line/group is enabled.
+
+                        - The configuration source is static."
+        DEFVAL { "" }
+        ::=  {  ipAddressConfigH323GatekeeperEntry 10 }
+
+    ipAddressConfigH323GkStaticPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "The gatekeeper RAS port (well-known gatekeeper RAS Channel TSAP Identifier,
+                     1719)."
+        DEFVAL { 1719 }
+        ::=  {  ipAddressConfigH323GatekeeperEntry 15 }
+
+    -- *************************************************************************
+    -- DHCP IP address configuration for registration
+    -- *************************************************************************
+
+    h323GkDhcpSiteSpecificCode  OBJECT-TYPE
+        SYNTAX      MxIpDhcpSiteSpecificCode
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "DHCP H.323 gatekeeper site-specific code. If the value of this variable is 0,
+                     the unit uses the vendor-specific code #111.
+
+                     The unit expects an array of IP addresses from the DHCP server. This array
+                     contains gatekeeper IP addresses. The unit expects from one to five IP
+                     addresses. If there are more than five IP addresses, the unit ignores the
+                     additional IP addresses.
+
+                     When the unit is configured with the single registration method, it uses these
+                     IP addresses if:
+
+                        - The unit is configured with the manual gatekeeper discovery mode.
+
+                        - The configuration source is dhcp.
+
+                     When the unit is configured with the multiple registration method, it uses these
+                     IP addresses if:
+
+                        - The line/group of lines is configured with the manual gatekeeper discovery
+                          mode.
+
+                        - The registration for the line/group is enabled.
+
+                        - The source is dhcp."
+        DEFVAL { 0 }
+        ::= { ipAddressConfigH323Dhcp 10 }
+
+    -- *************************************************************************
+    -- Conformance information
+    -- *************************************************************************
+    h323RegistrationCompliances OBJECT IDENTIFIER ::= { h323RegistrationConformance 1 }
+
+        h323RegistrationBasicComplVer1 MODULE-COMPLIANCE
+            STATUS      current
+            DESCRIPTION "This is a list of conformance groups. These conformance groups contain the name
+                         of objects necessary to adequately configure a H.323 unit."
+            MODULE      -- MX-H323-REGISTRATION-MIB
+            MANDATORY-GROUPS {
+                               h323RegistrationSingleRegistrationGroupVer1,
+                               h323RegistrationMultipleRegistrationGroupVer1,
+                               h323RegistrationMultipleGroupRegistrationGroupVer1,
+                               h323RegistrationStatusGroupVer1
+                             }
+            ::= { h323RegistrationCompliances 5 }
+
+
+
+
+    -- *************************************************************************
+    -- MIB variable grouping
+    -- *************************************************************************
+    h323RegistrationGroups OBJECT IDENTIFIER ::= { h323RegistrationConformance 2 }
+
+        h323RegistrationSingleRegistrationGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                       h323SingleRegGkDiscoveryMode,
+                       h323SingleRegRetryTime,
+                       h323SingleRegLightweightEnable,
+                       h323SingleRegLightweightTimeToLive,
+                       h323SingleRegRasPortSource,
+                       h323SingleRegStaticRasPort
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the single registration method of a H.323
+                         unit."
+            ::= { h323RegistrationGroups 5 }
+
+        h323RegistrationMultipleRegistrationGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                       h323MultipleRegEnable,
+                       h323MultipleRegGkDiscoveryMode,
+                       h323MultipleRegRetryTime,
+                       h323MultipleRegLightweightEnable,
+                       h323MultipleRegLightweightTimeToLive,
+                       h323MultipleRegRasPortSource,
+                       h323MultipleRegStaticRasPort
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the multiple registration method of a H.323
+                         unit."
+            ::= { h323RegistrationGroups 10 }
+
+        h323RegistrationMultipleGroupRegistrationGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                       h323GroupMultipleRegEnable,
+                       h323GroupMultipleRegGkDiscoveryMode,
+                       h323GroupMultipleRegRetryTime,
+                       h323GroupMultipleRegLightweightEnable,
+                       h323GroupMultipleRegLightweightTimeToLive,
+                       h323GroupMultipleRegRasPortSource,
+                       h323GroupMultipleRegStaticRasPort
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used to configure the multiple registration method of a H.323
+                         unit."
+            ::= { h323RegistrationGroups 15 }
+
+        h323RegistrationStatusGroupVer1 OBJECT-GROUP
+            OBJECTS {
+                       h323RegistrationGkHost,
+                       h323RegistrationGkPort,
+                       h323RegistrationTimeToLive
+                    }
+            STATUS      current
+            DESCRIPTION "A list of objects used show to the registration status of a H.323 unit."
+            ::= { h323RegistrationGroups 20 }
+
+END

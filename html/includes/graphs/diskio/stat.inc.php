@@ -2,14 +2,14 @@
 
 $scale_min = "0";
 
-include($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "diskstat-" . $disk['diskio_descr'] . ".rrd");
 
-$rrd_options .= " DEF:read=$rrd_filename:readcount:AVERAGE";
-$rrd_options .= " DEF:timeread=$rrd_filename:time_reading:AVERAGE";
-$rrd_options .= " DEF:write=$rrd_filename:writecount:AVERAGE";
-$rrd_options .= " DEF:timewrite=$rrd_filename:time_writing:AVERAGE";
+include($config['html_dir']."/includes/graphs/common.inc.php");
+
+$rrd_options .= " DEF:read=$rrd_filename_escape:readcount:AVERAGE";
+$rrd_options .= " DEF:timeread=$rrd_filename_escape:time_reading:AVERAGE";
+$rrd_options .= " DEF:write=$rrd_filename_escape:writecount:AVERAGE";
+$rrd_options .= " DEF:timewrite=$rrd_filename_escape:time_writing:AVERAGE";
 $rrd_options .= " CDEF:a=timeread,read,/,1000,/";
 $rrd_options .= " CDEF:b=timewrite,write,/,1000,/";
 $rrd_options .= " CDEF:cdefd=a,b,+";

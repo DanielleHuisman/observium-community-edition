@@ -58,6 +58,9 @@ function print_addresses($vars)
           $where .= generate_query_values($value, 'I.ifDescr', 'LIKE%');
           $join_ports = TRUE;
           break;
+        case 'type':
+          $where .= generate_query_values($value, 'A.ip_type');
+          break;
         case 'network':
           if (!is_array($value))
           {
@@ -157,7 +160,7 @@ function print_addresses($vars)
 
   // Override by address type
   //$query = str_replace(array('ip_address', 'ip_network'), array($address_type.'_address', $address_type.'_network'), $query);
-  $query = preg_replace('/ip_(address|network|binary)/', $address_type.'_$1', $query);
+  $query = preg_replace('/ip_(address|network|type|binary)/', $address_type.'_$1', $query);
   //$query_count = str_replace(array('ip_address', 'ip_network'), array($address_type.'_address', $address_type.'_network'), $query_count);
 
   // Query addresses
@@ -185,12 +188,14 @@ function print_addresses($vars)
     if ($list['device']) { $string .= '      <th>Device</th>' . PHP_EOL; }
     $string .= '      <th>Interface</th>' . PHP_EOL;
     $string .= '      <th>Address</th>' . PHP_EOL;
-    $string .= '      <th>Description</th>' . PHP_EOL;
+    $string .= '      <th>Type</th>' . PHP_EOL;
+    $string .= '      <th>[VRF] Description</th>' . PHP_EOL;
     $string .= '    </tr>' . PHP_EOL;
     $string .= '  </thead>' . PHP_EOL;
   }
   $string .= '  <tbody>' . PHP_EOL;
 
+  $vrf_cache = [];
   foreach ($ip_array as $entry)
   {
     $address_show = TRUE;
@@ -219,7 +224,8 @@ function print_addresses($vars)
         {
           $port_error = generate_port_link($port, '<span class="label label-important">Errors</span>', 'port_errors');
         }
-        $entity_link = generate_port_link($port, $port['port_label_short']) . ' ' . $port_error;
+        // for port_label_short - generate_port_link($link_if, NULL, NULL, TRUE, TRUE)
+        $entity_link = generate_port_link_short($port) . ' ' . $port_error;
         $entry['ifAlias'] = $port['ifAlias'];
       }
       else if ($vlan = dbFetchRow('SELECT * FROM `vlans` WHERE `device_id` = ? AND `ifIndex` = ?', array($entry['device_id'], $entry['ifIndex'])))
@@ -230,6 +236,20 @@ function print_addresses($vars)
       } else {
         $entity_link = 'ifIndex ' . $entry['ifIndex'];
       }
+
+      // Query VRFs
+      if ($entry['vrf_id'])
+      {
+        if (isset($vrf_cache[$entry['vrf_id']]))
+        {
+          $vrf_name = $vrf_cache[$entry['vrf_id']];
+        } else {
+          $vrf_name = dbFetchCell("SELECT `vrf_name` FROM `vrfs` WHERE `vrf_id` = ?", [ $entry['vrf_id'] ]);
+          $vrf_cache[$entry['vrf_id']] = $vrf_name;
+        }
+        $entry['ifAlias'] = '<span class="label label-default">'.$vrf_name.'</span>' . $entry['ifAlias'];
+      }
+      
       $device_link = generate_device_link($entry);
       $string .= '  <tr>' . PHP_EOL;
       if ($list['device'])
@@ -239,6 +259,9 @@ function print_addresses($vars)
       $string .= '    <td class="entity">' . $entity_link . '</td>' . PHP_EOL;
       if ($address_type === 'ipv6') { $entry[$address_type.'_address'] = Net_IPv6::compress($entry[$address_type.'_address']); }
       $string .= '    <td>' . generate_popup_link('ip', $entry[$address_type.'_address'] . '/' . $length) . '</td>' . PHP_EOL;
+      $type = strlen($entry[$address_type.'_type']) ? $entry[$address_type.'_type'] : get_ip_type($entry[$address_type.'_address'] . '/' . $length);
+      $type_class = $GLOBALS['config']['ip_types'][$type]['label-class'];
+      $string .= '    <td><span class="label label-'.$type_class.'">' . $type . '</span></td>' . PHP_EOL;
       $string .= '    <td>' . $entry['ifAlias'] . '</td>' . PHP_EOL;
       $string .= '  </tr>' . PHP_EOL;
 

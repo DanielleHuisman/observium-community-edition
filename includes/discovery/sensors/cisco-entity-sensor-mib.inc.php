@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -74,10 +73,11 @@ if ($GLOBALS['snmp_status'])
     'rpm'         => 'fanspeed',
     'cmm'         => 'airflow',
     'truthvalue'  => 'state',
-    'specialEnum' => 'counter',
+    //'specialEnum' => 'gauge', // This sensors seems as useless
     'dBm'         => 'dbm'
   );
 
+  $i = [];
   foreach ($entity_array as $index => $entry)
   {
     if (is_numeric($index) && isset($c_entitysensor[$entry['entSensorType']]) &&
@@ -156,8 +156,17 @@ if ($GLOBALS['snmp_status'])
 
       // Returning blatantly broken value. IGNORE.
       if ($value == "-32768" || $value == "-127") { $ok = FALSE; }
-      // Invalid description. Lots of these on Nexus
-      if ($descr == "") { $ok = FALSE; }
+      // Empty description. Lots of these on Nexus and Cisco APIC
+      elseif (empty($descr))
+      {
+        $i[$type]++;
+        $descr = 'Sensor ' . $i[$type];
+        //$ok = FALSE;
+      }
+
+      print_debug_vars($descr);
+      print_debug_vars($scale);
+      print_debug_vars($entry);
 
       // Now try to search port bounded with sensor by ENTITY-MIB
       if ($ok && in_array($type, array('temperature', 'voltage', 'current', 'dbm', 'power')))
@@ -181,7 +190,8 @@ if ($GLOBALS['snmp_status'])
       {
         $precision = $entry['entSensorPrecision'];
         // See: https://jira.observium.org/browse/OBS-3026
-        if ($device['os'] == 'iosxe' && version_compare($device['version'], '16', '>=') && $precision > 0)
+        // Note, issue not actual on firmware less than 16.11, not sure if fixed on more newer firmwares
+        if ($device['os'] == 'iosxe' && version_compare($device['version'], '16.11', '>=') && $precision > 0)
         {
           // I not sure that this fully correct, but for issue case - works
           $precision -= 1;
@@ -349,6 +359,59 @@ if ($GLOBALS['snmp_status'])
           $limits['limit_low_warn'] = $limits['limit_low_major'];
         }
         unset($limits['limit_high_major'], $limits['limit_low_major']);
+
+        // This port sensors really always return 0, see:
+        // https://jira.observium.org/browse/OBS-3335
+        /*
+          entPhysicalDescr.2134256 = Voltage Sensor
+          entPhysicalVendorType.2134256 = cevSensorNCS4KVol
+          entPhysicalContainedIn.2134256 = 2134017
+          entPhysicalClass.2134256 = sensor
+          entPhysicalParentRelPos.2134256 = 4
+          entPhysicalName.2134256 = GigabitEthernet0/0/0/1-3.3 V
+          entPhysicalHardwareRev.2134256 =
+          entPhysicalFirmwareRev.2134256 =
+          entPhysicalSoftwareRev.2134256 =
+          entPhysicalSerialNum.2134256 =
+          entPhysicalMfgName.2134256 =
+          entPhysicalModelName.2134256 = N/A
+          entPhysicalAlias.2134256 =
+          entPhysicalAssetID.2134256 =
+          entPhysicalIsFRU.2134256 = false
+
+          entSensorType.2134256 = voltsDC
+          entSensorScale.2134256 = milli
+          entSensorPrecision.2134256 = 4
+          entSensorValue.2134256 = 0
+          entSensorStatus.2134256 = ok
+          entSensorValueTimeStamp.2134256 = 0:0:00:00.00
+          entSensorValueUpdateRate.2134256 = 10
+          entSensorMeasuredEntity.2134256 = 2134017
+          entSensorThresholdSeverity.2134256.1 = minor
+          entSensorThresholdSeverity.2134256.2 = minor
+          entSensorThresholdSeverity.2134256.3 = major
+          entSensorThresholdSeverity.2134256.4 = major
+          entSensorThresholdSeverity.2134256.5 = critical
+          entSensorThresholdSeverity.2134256.6 = critical
+          entSensorThresholdRelation.2134256.1 = lessOrEqual
+          entSensorThresholdRelation.2134256.2 = greaterOrEqual
+          entSensorThresholdRelation.2134256.3 = lessOrEqual
+          entSensorThresholdRelation.2134256.4 = greaterOrEqual
+          entSensorThresholdRelation.2134256.5 = lessOrEqual
+          entSensorThresholdRelation.2134256.6 = greaterOrEqual
+          entSensorThresholdValue.2134256.1 = 0
+          entSensorThresholdValue.2134256.2 = 0
+          entSensorThresholdValue.2134256.3 = 0
+          entSensorThresholdValue.2134256.4 = 0
+          entSensorThresholdValue.2134256.5 = 0
+          entSensorThresholdValue.2134256.6 = 0
+         */
+        if ($options['measured_class'] == 'port' && $value == 0 &&
+            $limits['limit_high'] == 0 && $limits['limit_high_warn'] == 0 &&
+            $limits['limit_low'] == 0 && $limits['limit_low_warn'] == 0)
+        {
+          $ok = FALSE;
+        }
 
         // Some Cisco sensors have all limits as same value (f.u. cisco), than leave only one limit
         if ((float_cmp($limits['limit_high'],      $limits['limit_low'])       === 0) &&

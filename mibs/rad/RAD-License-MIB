@@ -1,0 +1,237 @@
+RAD-License-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       DateAndTime     FROM  SNMPv2-TC
+       agnt     FROM  RAD-SMI-MIB
+       fileSystemPath, fileSystemObjType, alarmEventLogSourceName, 
+       fileSystemObjName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB
+       sysName     FROM  SNMPv2-MIB; 
+
+
+
+    agnLicense MODULE-IDENTITY
+        LAST-UPDATED "201602041803Z"  -- February 04, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "License MIB."
+    ::= { agnt 73 }
+
+
+licenseNotifications   OBJECT IDENTIFIER ::= { agnLicense 0 }
+licenseConfig          OBJECT IDENTIFIER ::= { agnLicense 1 }
+
+--
+-- License Table --
+--
+
+licenseTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF LicenseEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "A table of license properties."
+   ::= { licenseConfig 1 }
+
+licenseEntry OBJECT-TYPE
+   SYNTAX      LicenseEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "Entries appear in this table for each license.
+       "
+   INDEX       { fileSystemPath, fileSystemObjType, IMPLIED fileSystemObjName }
+   ::= { licenseTable 1 }
+
+LicenseEntry ::= SEQUENCE {
+    licenseId                    Unsigned32 
+ }
+
+licenseId       OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+        "This is a unique number that identifies the license.
+        0xffffffff is reserved for the simple, hardcoded, license, should the device have one."
+   ::= { licenseEntry 1 }
+
+--
+-- License Feature Table
+--
+
+licenseFeatureTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF LicenseFeatureEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "A table of license features. This table contains all the features
+        in the device.
+       "
+   ::= { licenseConfig 2 }
+
+licenseFeatureEntry OBJECT-TYPE
+   SYNTAX      LicenseFeatureEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "Entries appear in this table for each license-Id licensed feature.
+       Only one active License ID exists.
+       "
+   INDEX  { licenseId, licenseFeatureId }
+   ::= { licenseFeatureTable 1 }
+
+LicenseFeatureEntry ::= SEQUENCE {
+    licenseFeatureId                      Unsigned32,
+    licenseFeatureName                    SnmpAdminString,
+    licenseFeatureStatus                  INTEGER,
+    licenseFeatureMaxAvailableQuantity    Unsigned32,
+    licenseFeatureAllowedQuantity         Unsigned32,
+    licenseFeatureQuantityInUse           Unsigned32,
+    licenseFeatureExpiration              Unsigned32,
+    licenseFeatureActivationCmd           INTEGER 
+ }
+
+licenseFeatureId    OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "This is a feature identifier comprised of 10 digits containing the main feature
+        and sub feature."
+   ::= { licenseFeatureEntry 1 }
+
+licenseFeatureName      OBJECT-TYPE
+   SYNTAX      SnmpAdminString  (SIZE (1..32))
+   MAX-ACCESS  read-only
+   STATUS      current
+   DESCRIPTION
+      "ASCII string specifying the feature name."
+   ::= { licenseFeatureEntry 2 }
+
+licenseFeatureStatus  OBJECT-TYPE
+    SYNTAX  INTEGER {
+      inactive          (1),
+      perpetual         (2),
+      perpeutalAll      (3),
+      temporary         (4),
+      temporaryAll      (5),
+      expired           (6)
+      }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+       "This variable denotes the status of the current feature.
+        inactive        - current feature has no license or it is disabled.
+        perpetual    - feature license will not expire.
+        perpetualAll    - feature license will not expire, new features will be also perpetual.
+        temporary    - feature license is temporary.
+        temporaryAll - temporary license for all features.
+                                    This value is sent in the license expiration traps:
+                                    systemLicenseExpired and  systemLicenseAboutToExpire.
+         expired             - license of the current feature has expired.
+       "
+     ::= { licenseFeatureEntry 3 }
+
+licenseFeatureMaxAvailableQuantity  OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "This is the maximum number of feature entities that the device contains.
+        For unlimited quantity, the agent will return 0xffffffff (4294967295).
+       "
+   ::= { licenseFeatureEntry 4 }
+
+licenseFeatureAllowedQuantity   OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "This is the number of licensed entities that the user installed/paid for.
+        For unlimited quantity, the agent will return 0xffffffff (4294967295).
+       "
+   ::= { licenseFeatureEntry 5 }
+
+licenseFeatureQuantityInUse OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "The number of used licensed entities.
+       "
+   ::= { licenseFeatureEntry 6 }
+
+licenseFeatureExpiration      OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+       "This is the number of seconds remaining until the license expires.
+        A value of 0 shows that the license is expired.
+        A perpetual license will have a value of: 'FFFFFFFF' hex.
+       "
+   ::= { licenseFeatureEntry 7 }
+
+licenseFeatureActivationCmd     OBJECT-TYPE
+    SYNTAX      INTEGER {
+        activate   (1),
+        deactivate (2)
+        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This object is used to activate or deactivate a license feature.
+             It may only be set if licenseId is 0xffffffff (hardcoded license).
+             activate   - Activate the license feature.
+             deactivate - Deactivate the license feature."
+    DEFVAL      { deactivate }
+    ::= { licenseFeatureEntry 8 }
+
+systemLicenseEnabled NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, licenseFeatureName } 
+      STATUS  current
+      DESCRIPTION
+      "This trap is sent when a license is enabled."
+     ::= { licenseNotifications 8 }
+
+systemLicenseDisabled NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, licenseFeatureName } 
+      STATUS  current
+      DESCRIPTION
+      "This trap is sent when a license is disabled."
+      ::= { licenseNotifications 9 }
+
+END
+

@@ -25,6 +25,11 @@
 //  $form_items['devices'][$device_id] = $hostname;
 //}
 
+foreach (dbFetchColumn('SELECT DISTINCT `ipv4_type` FROM `ipv4_addresses` WHERE `device_id` = ?', [ $device['device_id'] ]) as $type)
+{
+  $form_items['types'][$type] = [ 'name' => $config['ip_types'][$type]['name'], 'subtext' => $config['ip_types'][$type]['subtext'] ];
+}
+
 $form = array('type'  => 'rows',
               'space' => '5px',
               'submit_by_key' => TRUE);
@@ -41,6 +46,13 @@ $form['row'][0]['interface']  = array(
                                 'grid'        => 3,
                                 'value'       => $vars['interface'],
                                 'values'      => array('' => 'All Interfaces', 'Lo' => 'Loopbacks', 'Vlan' => 'Vlans'));
+$form['row'][0]['type']  = array(
+                                'type'        => 'multiselect',
+                                'name'        => 'IP Type',
+                                'width'       => '100%',
+                                'grid'        => 2,
+                                'value'       => $vars['type'],
+                                'values'      => $form_items['types']);
 $form['row'][0]['network'] = array(
                                 'type'        => 'text',
                                 'name'        => 'IP Network',
@@ -54,13 +66,13 @@ $form['row'][0]['address']  = array(
                                 'type'        => 'text',
                                 'name'        => 'IP Address',
                                 'width'       => '100%',
-                                'grid'        => 4,
+                                'grid'        => 3,
                                 'placeholder' => TRUE,
                                 'value'       => escape_html($vars['address']));
 // search button
 $form['row'][0]['search']   = array(
                                 'type'        => 'submit',
-                                'grid'        => 2,
+                                'grid'        => 1,
                                 //'name'        => 'Search',
                                 //'icon'        => 'icon-search',
                                 'value'       => 'ipv4',

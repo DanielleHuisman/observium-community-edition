@@ -20,8 +20,8 @@
 // BBU temperature. WTF @ (Normal) string, LSI.
 // LSI-MegaRAID-SAS-MIB::temperature.0 = STRING: "35 (Normal)"
 
-echo('physicalDriveTable ');
-$cache['megaraid']['pd'] = snmpwalk_cache_multi_oid($device, 'physicalDriveTable', array(), 'LSI-MegaRAID-SAS-MIB');
+//echo('physicalDriveTable ');
+//$cache['megaraid']['pd'] = snmpwalk_cache_multi_oid($device, 'physicalDriveTable', array(), 'LSI-MegaRAID-SAS-MIB');
 
 echo('enclosureTable ');
 $cache['megaraid']['encl'] = snmpwalk_cache_multi_oid($device, 'enclosureTable', array(), 'LSI-MegaRAID-SAS-MIB');
@@ -70,12 +70,13 @@ foreach ($cache['megaraid']['pd'] as $index => $pd)
   $encl  = trim(trim($cache['megaraid']['enclosure'][$pd['enclIndex']]['vendorID'], '.') . ' ' . trim($cache['megaraid']['enclosure'][$pd['enclIndex']]['productID'], '.'));
   if ($encl == '') { $encl = 'Enclosure'; } // Static string if no enclosure vendor/product ID
   $descr = $encl . ' (' . $pd['enclIndex'] . ') Slot ' . $pd['slotNumber'] . ': ' . $pd['pdVendorID'] . ' ' . $pd['pdProductID'];
+
   $value = $pd['pdTemperature'];
   $oid   = ".1.3.6.1.4.1.3582.4.1.4.2.1.2.1.36.$index";
 
   if ($value != '')
   {
-    discover_sensor('temperature', $device, $oid, "pdTemperature.$index", 'lsi-megaraid-sas-mib', $descr, 1, $value);
+    //discover_sensor('temperature', $device, $oid, "pdTemperature.$index", 'lsi-megaraid-sas-mib', $descr, 1, $value);
   }
 
   $value = $pd['pdState'];
@@ -83,7 +84,7 @@ foreach ($cache['megaraid']['pd'] as $index => $pd)
 
   if ($value !== '')
   {
-    discover_status($device, $oid, "pdState.$index", 'lsi-megaraid-sas-pd-state', $descr,  $value);
+    //discover_status($device, $oid, "pdState.$index", 'lsi-megaraid-sas-pd-state', $descr,  $value);
   }
 }
 

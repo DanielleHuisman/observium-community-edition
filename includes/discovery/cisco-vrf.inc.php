@@ -11,9 +11,12 @@
  *
  */
 
+//FIXME. Need complete rewrite. I'm added this to next todo (mike)
+
 if ($config['enable_vrfs'])
 {
-  if ($device['os_group'] == "cisco" || $device['os'] == "junos" || $device['os'] == "ironware" || $device['os'] == "zxr10")
+  //if ($device['os_group'] == "cisco" || $device['os'] == "junos" || $device['os'] == "ironware" || $device['os'] == "zxr10")
+  if (is_device_mib($device, 'MPLS-L3VPN-STD-MIB') || is_device_mib($device, 'MPLS-VPN-MIB'))
   {
     unset($vrf_count);
 

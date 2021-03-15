@@ -1,0 +1,4911 @@
+RAD-Clock-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       ifIndex, ifAlias     FROM  IF-MIB
+       InetAddressType, InetAddress     FROM  INET-ADDRESS-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Integer32, Counter32, Gauge32, 
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE, OBJECT-IDENTITY, Counter64     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, RowStatus, DateAndTime, 
+       MacAddress, TruthValue     FROM  SNMPv2-TC
+       agnt     FROM  RAD-SMI-MIB
+       sysName     FROM  SNMPv2-MIB
+       systemsEvents, alarmEventLogSourceName, alarmEventAttrName, 
+       alarmEventAttrDescription, systemPort, alarmEventConfigSeverity, 
+       alarmEventLogAlarmOrEventId, alarmEventLogDescription, alarmEventLogSeverity, 
+       alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB
+       peerAddress     FROM  RAD-Pw-MIB
+       VlanIdOrAnyOrNone     FROM  Q-BRIDGE-MIB; 
+
+
+    agnClockSource MODULE-IDENTITY
+        LAST-UPDATED "201609181940Z"  -- September 18, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Clock MIB."
+    ::= { agnt 52 }
+
+
+clockEvents  OBJECT IDENTIFIER ::= {agnClockSource 0 }
+
+SyncRate             ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TEXTUAL CONVENTION defines the sync packet rate."
+    SYNTAX  INTEGER
+    {
+        r16pps            (1),
+        r32pps            (2),
+        r64pps            (3),
+        r128pps           (4)
+    }
+
+AnnounceRate             ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TEXTUAL CONVENTION defines the announce packet rate."
+    SYNTAX  INTEGER
+    {
+        r125msec         (1),
+        r250msec         (2),
+        r500msec         (3),
+        r1sec            (4),
+        r2sec            (5),
+        r4sec            (6),
+        r8sec            (7),
+        r16sec           (8)
+    }
+
+
+ClockQlList             ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TEXTUAL CONVENTION defines the quality Level.
+    The QL divided to 3 types:
+     Type 1 -
+     Type 2 -
+     Type 3 - "
+    SYNTAX  INTEGER
+    {
+       type1Prc         (1),
+       type1SsuA        (2),
+       type1SsuB        (3),
+       type1Sec         (4),
+       type1Dnu         (5),
+       type1SsmBased    (6),
+
+-- Remaining values until 20 are reserved for type 1.
+
+       type2Prs            (21),
+       type2Stu            (22),
+       type2St2            (23),
+       type2Tnc            (24),
+       type2St3e           (25),
+       type2St3            (26),
+       type2Smc            (27),
+       type2St4            (28),
+       type2Dus            (29),
+       type2SsmBased       (30),
+       type2Prov           (31),
+
+-- Remaining values until 40 are reserved for type 2.
+
+       type3Unk            (41),
+       type3Sec            (42),
+       type3Dnu            (43),
+       type3SsmBased       (44),
+
+-- Remaining values until 60 are reserved for type 3.
+       notApplicable       (255)
+    }
+
+
+agnClkSrcPortTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF AgnClkSrcPortEntry
+      MAX-ACCESS not-accessible
+      STATUS  current
+      DESCRIPTION
+      "Pool of Ports for the Master/Fallback Clock Source
+       and of Recovered/Distributed Clock IDs.
+       For devices with more than one configuration:
+       Set operation is valid only to the TmpCnfg entry."
+       ::= { agnClockSource 1}
+
+agnClkSrcPortEntry OBJECT-TYPE
+      SYNTAX AgnClkSrcPortEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION  "An entry in the table."
+      INDEX {agnClkSrcPortCnfgIdx, agnClkSrcPortSrcIdx, agnClkSrcPortIdx}
+      ::= { agnClkSrcPortTable 1}
+
+AgnClkSrcPortEntry ::= SEQUENCE {
+    agnClkSrcPortCnfgIdx      Integer32,
+    agnClkSrcPortSrcIdx       INTEGER,
+    agnClkSrcPortIdx          Integer32,
+    agnClkSrcPort             Integer32,
+    agnClkSrcPortRowStatus    RowStatus,
+    agnClkSrcPortAdminStatus  INTEGER,
+    agnClkSrcPortType         INTEGER,
+    agnClkSrcPortQuality      INTEGER,
+    agnClkSrcPortNetType      INTEGER,
+    agnClkSrcPortState        INTEGER,
+    agnClkSrcPortSrcType      INTEGER,
+    agnClkSrcPortTimeState    INTEGER,
+    agnClkSrcPortDescr        SnmpAdminString,
+    agnClkSrcPortMode         INTEGER 
+ }
+
+agnClkSrcPortCnfgIdx OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "This object indicates the Idx of the Cnfg being
+       accessed ; Idx of 255 relates to the TmpCnfg.
+       For product supporting a single configuration, the value will be 1."
+      ::= { agnClkSrcPortEntry 1}
+
+agnClkSrcPortSrcIdx OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+            master            (1),
+            fallback          (2),
+            recovered         (3), -- PTP1588 Slave
+            distributed       (4), -- PTP1588 Master
+            g82751Recovered   (5),
+            g82751Distributed (6),
+            g82752Recovered   (7),
+            g82752Distributed (8)
+      }
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+      "Clock Source Index.
+        master      - refers to Master clock
+        fallback    - refers to Fallback clock
+        recovered   - refers to Recovered PTP1588 clock
+        distributed - refers to Distributed PTP1588 clock
+        g82751Recovered - refers to Recovered G.8275.1 clock
+        g82751Distributed - refers to Recovered G.8275.1 clock
+        g82752Recovered - refers to Recovered G.8275.2 clock
+        g82752Distributed - refers to Recovered G.8275.2 clock."
+      ::= { agnClkSrcPortEntry 2}
+
+agnClkSrcPortIdx OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "This object indicates the running Idx of the Port/Recovered/Distributed ID that is
+       to be used as Clock Source, for each agnClkSrcPortSrcIdx instance."
+      ::= { agnClkSrcPortEntry 3}
+
+agnClkSrcPort OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates the Port/Interface/Recovered ID # that is
+       to be used as Clock Source.
+
+       In case of agnClkSrcPortSrcIdx = recovered(3):
+       - When agnClkSrcPortType = adaptive(2)   - it indicates the PW number.
+       - When agnClkSrcPortType = ieee1588v2(3) - it indicates the Peer ID.
+
+       When agnClkSrcPortSrcIdx = master(1) or fallback(2),
+       this list may include both External Ports and Recovered IDs (mixed).
+       Therefore, in order to know which type of instance is indicated,
+       agnClkSrcPortSrcType will be used:
+       - When agnClkSrcPortSrcType = rxClock(3)     - this object indicates a Port index.
+       - When agnClkSrcPortSrcType = recovered(12)  - this object indicates a Recovered ID.
+       The value of 255 mean not-applicable. "
+      ::= { agnClkSrcPortEntry 4}
+
+agnClkSrcPortRowStatus OBJECT-TYPE
+      SYNTAX  RowStatus
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object enables Creation/ Deletion of rows in the table."
+      ::= { agnClkSrcPortEntry 5}
+
+agnClkSrcPortAdminStatus OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        notApplicable   (1),
+        down            (2),
+        up              (3)
+      }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Recovered/Distributed Clock Administrative Status."
+      ::= { agnClkSrcPortEntry 6 }
+
+agnClkSrcPortType OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        notApplicable       (1),
+        adaptive            (2),
+        ieee1588v2          (3),
+        commonClock         (4),
+        g82751              (5),
+        g82752              (6)
+      }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object is relevant only in case of Recovered/Distributed Clock.
+       It indicates the Clock Type.
+
+       In case of value = ieee1588v2, it represents 1588v2 clocks as follows:
+       - If agnClkSrcPortSrcIdx =  recovered(3)         -> clock is 1588v2 Slave
+       - If agnClkSrcPortSrcIdx =  distributed(4)       -> clock is 1588v2 Master
+       - If agnClkSrcPortSrcIdx =  g82751Recovered(5)   -> clock is G.8275.1 Slave
+       - If agnClkSrcPortSrcIdx =  g82751Distributed(6) -> clock is G.8275.1 Master
+       - If agnClkSrcPortSrcIdx =  g82752Recovered(7)   -> clock is G.8275.2 Slave
+       - If agnClkSrcPortSrcIdx =  g82752Distributed(8) -> clock is G.8275.2 Master."
+
+      ::= { agnClkSrcPortEntry 7 }
+
+agnClkSrcPortQuality OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        notApplicable       (1),
+        stratum1            (2),
+        stratum2            (3),
+        stratum3            (4),
+        stratum3e           (5),
+        stratum4            (6)
+      }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Clock Source Quality."
+      ::= { agnClkSrcPortEntry 8 }
+
+agnClkSrcPortNetType OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        notApplicable       (1),
+        typeA               (2),
+        typeB               (3),
+        typeC               (4),
+        typeD               (5),
+        typeE               (6),
+        typeF               (7)
+      }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object is relevant only in case of Recovered Clock.
+       It indicates the Clock Network Type, i.e.
+       the PSN network characteristics and behavior."
+      ::= { agnClkSrcPortEntry 9 }
+
+agnClkSrcPortState OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        freeRun                 (1),
+        frequencyAcquisition    (2),    -- Synclock 3 state
+        rapidPhaseLock          (3),    -- Synclock 3 state
+        finePhaseLock           (4),    -- Synclock 3 state
+        holdover                (5),    -- FREQ HOLDOVER
+        notApplicable           (6),
+        locking                 (7),    -- Synclock 4 state
+        idle                    (8),
+        frequencyLock           (9),     -- Synclock 4 state
+        holdoverPackets         (10),
+        acquiringPackets        (11),
+        lockPackets             (12),
+        holdoverPhyPackets      (13),
+        acquiringPhyPackets     (14),
+        lockPhyClock            (15)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Frequency Clock State.
+
+       freeRun(1) -
+       Clock recovery is not locked to any clock.
+
+       frequencyAcquisition(2) -
+       Adaptive clock recovery is learning the frequency.
+
+       rapidPhaseLock(3) -
+       Clock recovery is in training process till it reaches fine phase lock.
+
+       finePhaseLock(4) -
+       Clock is locked and clock recovery is qualified and stable.
+
+       holdover(5) -
+       Clock recovery is in holdover mode.
+
+       notApplicable(6) -
+       Clock recovery is not applicable
+
+       locking(7) -
+       Clock recovery is in locking mode."
+      ::= { agnClkSrcPortEntry 10 }
+
+agnClkSrcPortSrcType OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        notApplicable  (1),
+        rxClock   (3),
+        recovered(12)
+      }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Src Type of each entry in the list of source
+       instances, when agnClkSrcPortSrcIdx=master(1)or fallback(2).
+       According to this type, agnClkSrcPort gets the relevant meaning (Port index
+       or Recovered ID)."
+      ::= { agnClkSrcPortEntry 11 }
+
+agnClkSrcPortTimeState OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        freeRun         (1),
+        acquisition     (2),
+        holdover        (3),
+        notApplicable   (4),
+        lock            (5)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Time Clock State.
+
+       freeRun(1) - Clock recovery is not locked to any clock.
+
+       acquisition(2) - Adaptive clock recovery is learning the time.
+
+       holdover(3) -  Clock recovery is in holdover mode.
+
+       notApplicable(4) - Clock recovery is not applicable
+
+       lock(5) - Clock recovery is in locking mode."
+      ::= { agnClkSrcPortEntry 12 }
+
+agnClkSrcPortDescr      OBJECT-TYPE
+      SYNTAX  SnmpAdminString
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "By default, agent will set the value of this object as follows:
+      If  agnClkSrcPortSrcIdx value is equal to
+      distributed (4) ->  PTP (1588) master name
+       If  agnClkSrcPortSrcIdx value is equal to
+       recovered (3)  ->  PTP (1588) slave name
+       If  agnClkSrcPortSrcIdx value is equal to
+       g82751Distributed (6) ->  G.8275.1 master name
+       If  agnClkSrcPortSrcIdx value is equal to
+       g82751Recovered (5)  ->  G.8275.1 slave name
+       If  agnClkSrcPortSrcIdx value is equal to
+       g82752Distributed (8) ->  G.8275.2 master name
+       If  agnClkSrcPortSrcIdx value is equal to
+       g82752Recovered (7)  ->  G.8275.2 slave name"
+      ::= { agnClkSrcPortEntry 13 }
+
+agnClkSrcPortMode OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        notApplicable  (1),
+        ordinaryClock  (2),
+        boundaryClock  (3)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Clock Mode when Clock type is G.8275.1
+      (meaning agnClkSrcPortSrcIdx=(5) or (6), and  agnClkSrcPortType=5
+       notApplicable(1) - means agnClkSrcPortSrcIdx is not equal to 5 or 6.
+       ordinaryClock(2) - means Clock entity actual Role is Master or Slave.
+       boundaryClock(3) - meams Clock entity actual Role is Boundary Clock."
+      ::= { agnClkSrcPortEntry 14 }
+
+
+-- agn Current Clock Table
+
+agnCurrClkTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF AgnCurrClkEntry
+      MAX-ACCESS not-accessible
+      STATUS  current
+      DESCRIPTION
+      "Current Clock Source."
+       ::= { agnClockSource 2}
+
+agnCurrClkEntry OBJECT-TYPE
+      SYNTAX AgnCurrClkEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION  "An entry in the table."
+      INDEX {agnCurrClkObjIdx}
+      ::= { agnCurrClkTable 1}
+
+AgnCurrClkEntry ::= SEQUENCE {
+    agnCurrClkObjIdx          Integer32,
+    agnCurrClkMode            INTEGER,
+    agnCurrClkSrc             INTEGER,
+    agnCurrClkPort            Integer32,
+    agnCurrClkHoldover        INTEGER,
+    agnCurrClkSsmBased        INTEGER,
+    agnCurrClkState           INTEGER,
+    agnCurrClkQualification   INTEGER 
+ }
+
+agnCurrClkObjIdx OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "This MIB object identifies the object for which the Clock Source
+       is used (System, Other System, Card)."
+      ::= { agnCurrClkEntry 1}
+
+agnCurrClkMode OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+      master    (1),
+      fallback  (2),
+      internal  (3)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "Current Clock Source Mode.
+       master   - refers Master clock
+       fallback - refers Fallback clock
+       internal - only when both Master and Fallback Sources failed "
+      ::= { agnCurrClkEntry 2}
+
+agnCurrClkSrc OBJECT-TYPE
+      SYNTAX INTEGER
+      {
+      none            (1),
+      internal        (2),
+      rxClk           (3),
+      station         (4),  -- station A (for GMUX2000)
+      lbt             (5),
+      ntr             (6),
+      adaptive        (7),
+      stationB        (8),
+      automatic      (9),
+      system         (10),
+      sSubsystem     (11),
+      recovered      (12),
+      notApplicable (255)
+       }
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+      "This object indicates the Current Clock Source."
+      ::= { agnCurrClkEntry 3}
+
+agnCurrClkPort OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+      "This object indicates the Port/Interface/Recovered ID that is
+       Currently used as Clock Source.
+       - When agnCurrClkSrc=rxClock(3), this object indicates a Port index.
+       - When agnCurrClkSrc=recovered(12), this object indicates a Recovered ID."
+      ::= { agnCurrClkEntry 4}
+
+agnCurrClkHoldover OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+      notApplicable(1),
+      no  (2),
+      yes (3)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "Current Clock Holdover State.
+       As a last resort, in the absence of higher quality timing:
+       - a SONET/SDH object can enter 'holdover' state, until higher quality
+         external timing becomes available again. In this state (value=yes)
+         the SONET/SDH object uses its own timing circuits for clock of the
+         SONET/SDH signal.
+       - for other objects, the 'holdover'=yes state means that the object uses
+         last available clock (stored by the object) for a pre-defined time,
+         until another clock source is used."
+      ::= { agnCurrClkEntry 5}
+
+agnCurrClkSsmBased    OBJECT-TYPE
+      SYNTAX  INTEGER
+       {
+       notApplicable (1),
+       no            (2),
+       yes           (3)
+       }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This parameter indicates whether clock source
+       is selected based on receive clock quality.
+       Clock quality is indicated in S1 byte inside SONET/SDH overhead,
+       (encoded as SSM - Synchronization Status Messaging)."
+      ::= { agnCurrClkEntry 6}
+
+agnCurrClkState OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        freeRun                 (1),
+        rapidPhaseLock          (2),
+        finePhaseLock           (3),
+        holdover                (4),
+        frequencyAcquisition    (5)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Current Clock State.
+
+       freeRun(1) -
+       Current clock state machine is not locked
+       and run from the internal oscillator.
+
+       rapidPhaseLock(2) -
+       Current clock state machine is locked.
+
+       finePhaseLock(3) -
+       Current clock state machine is in pre-locking.
+
+       holdover(4) -
+       Current clock state machine is in holdover mode
+       (due to loss of event).
+
+       frequencyAcquisition(5) -
+       Adaptive clock recovery is learning the frequency."
+      ::= { agnCurrClkEntry 7 }
+
+agnCurrClkQualification OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+        notApplicable   (1),
+        disqualified    (2),
+        qualified       (3)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the Current Clock Qualification
+       and defines whether the PLL can locked according to the stratum definitions."
+      ::= { agnCurrClkEntry 8 }
+
+
+agnClockMonitoring  OBJECT IDENTIFIER ::= { agnClockSource 3 }
+
+-- agn Clock Current Table
+
+agnClkCurrentTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnClkCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Clock Current table."
+    ::= { agnClockMonitoring 1 }
+
+agnClkCurrentEntry OBJECT-TYPE
+    SYNTAX      AgnClkCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the Clock Current table."
+    INDEX       { agnClkCurrentIndex }
+    ::= { agnClkCurrentTable 1 }
+
+AgnClkCurrentEntry ::= SEQUENCE {
+    agnClkCurrentIndex                      Unsigned32,
+    agnClkCurrentRxPackets                  Gauge32,
+    agnClkCurrentLostPackets                Gauge32,
+    agnClkCurrentOutOfOrderPackets          Gauge32,
+    agnClkCurrentBufferUnderflow            Gauge32 
+ }
+
+agnClkCurrentIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An Index that is uniquely represents the Clock."
+    ::= { agnClkCurrentEntry 1 }
+
+agnClkCurrentRxPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Packets,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { agnClkCurrentEntry 2 }
+
+agnClkCurrentLostPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Lost Packets,
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { agnClkCurrentEntry 3 }
+
+agnClkCurrentOutOfOrderPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times Out-of-Order Packets
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { agnClkCurrentEntry 4 }
+
+agnClkCurrentBufferUnderflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times Underflow event
+         encountered by a Bridge Port in the current 15 minute interval."
+    ::= { agnClkCurrentEntry 5 }
+
+-- agn Clock Interval Table
+
+agnClkIntervalTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnClkIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Clock Interval table."
+    ::= { agnClockMonitoring 2 }
+
+agnClkIntervalEntry OBJECT-TYPE
+    SYNTAX      AgnClkIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the Clock Interval table."
+    INDEX       { agnClkIntervalIndex, agnClkIntervalNumber }
+    ::= { agnClkIntervalTable 1 }
+
+AgnClkIntervalEntry ::= SEQUENCE {
+    agnClkIntervalIndex                     Unsigned32,
+    agnClkIntervalNumber                    Unsigned32,
+    agnClkIntervalRxPackets                 Gauge32,
+    agnClkIntervalLostPackets               Gauge32,
+    agnClkIntervalOutOfOrderPackets         Gauge32,
+    agnClkIntervalBufferUnderflow           Gauge32 
+ }
+
+agnClkIntervalIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An Index that is uniquely represents the Clock."
+    ::= { agnClkIntervalEntry 1 }
+
+agnClkIntervalNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A number between 1 and 96,
+     where 1 is the most recently completed 15 minute interval
+     and 96 is the least recently completed 15 minutes interval
+     (assuming that all 96 intervals exist)."
+    ::= { agnClkIntervalEntry 2 }
+
+agnClkIntervalRxPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Packets,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { agnClkIntervalEntry 3 }
+
+agnClkIntervalLostPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Lost Packets,
+         encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { agnClkIntervalEntry 4 }
+
+agnClkIntervalOutOfOrderPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times Out-of-Order Packets
+         are detected, encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { agnClkIntervalEntry 5 }
+
+agnClkIntervalBufferUnderflow OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of times Underflow event
+         is detected, encountered by a Bridge Port in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { agnClkIntervalEntry 6 }
+
+
+-- PTP (Precision Time Protocol, IEEE-1588v2)
+
+agnPtpClk       OBJECT IDENTIFIER ::= { agnClockSource 4 }
+
+
+-- PTP Clock Table
+
+agnPtpClkTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The PTP (Precision Time Protocol, IEEE-1588v2) Clock table.
+
+         Entries are created/deleted to/from this table upon a set of
+         agnClkSrcPortRowStatus (from agnClkSrcPortTable) and only when
+         agnClkSrcPortType = ieee1588v2(3) or g82751(5) or g82752(6)."
+    ::= { agnPtpClk 1 }
+
+agnPtpClkEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the PTP Clock table."
+    INDEX       { agnPtpClkType, agnPtpClkId }
+    ::= { agnPtpClkTable 1 }
+
+AgnPtpClkEntry ::= SEQUENCE {
+    agnPtpClkType                           INTEGER,
+    agnPtpClkId                             Unsigned32,
+    agnPtpClkSrcPrtClkId                    OCTET STRING,
+    agnPtpClkSrcPrtNumber                   OCTET STRING,
+    agnPtpClkSyncRate                       INTEGER,
+    agnPtpClkQualityLogVar                  Unsigned32,
+    agnPtpClkAddrType                       InetAddressType,
+    agnPtpClkMcastAddr                      InetAddress,
+    agnPtpClkTos                            Unsigned32,
+    agnPtpClkPbit                           Unsigned32,
+    agnPtpClkNumOfIntervals                 Unsigned32,
+    agnPtpClkCurr15TimeElapsed              Unsigned32,
+    agnPtpClkCurr15TxSyncPackets            Gauge32,
+    agnPtpClkCurr15RxSyncPackets            Gauge32,
+    agnPtpClkCurr15RxFollowupPackets        Gauge32,
+    agnPtpClkState                          INTEGER,
+    agnPtpClkIndicatedQl                    ClockQlList,
+    agnPtpClkClockIdentity                  Unsigned32,
+    agnPtpClkRecoveryMode                   INTEGER,
+    agnPtpClkWtr                            Unsigned32,
+    agnPtpClkDomain                         Unsigned32,
+    agnPtpClkIpAddress                      InetAddress,
+    agnPtpClkActiveMaster                   Unsigned32,
+    agnPtpClkRecoveryModeSelect             INTEGER,
+    agnPtpClkPortMaxSlaves                  Unsigned32,
+    agnPtpClkPortTxClockDomain              Unsigned32,
+    agnPtpClkMasterStatus                   BITS,
+    agnPtpClkIpAddressType                  InetAddressType,
+    agnPtpClkNetMetricsClearCounters        INTEGER,
+    agnPtpClkIdentity                       SnmpAdminString,
+    agnPtpClkAsymmetryCorrection            Integer32,
+    agnPtpClkJointFrequencyTime             INTEGER,
+    agnPtpClkProfileType                    INTEGER,
+    agnPtpClkPrtPriority2                   Unsigned32 
+ }
+
+agnPtpClkType OBJECT-TYPE
+    SYNTAX      INTEGER {
+        ieee1588Slave   (3),
+        ieee1588Master  (4),
+        g82751Slave     (5),
+        g82751Master    (6),
+        g82752Slave     (7),
+        g82752Master    (8)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object uniquely represents the PTP Clock Type(PTP1588 or,
+         G.8275.1, or G.8275.2, Master or Slave, same as agnClkSrcPortSrcIdx
+         (from agnClkSrcPortTable)."
+    ::= { agnPtpClkEntry 1 }
+
+agnPtpClkId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object uniquely represents the PTP Clock ID,
+         same as agnClkSrcPortIdx (from agnClkSrcPortTable)."
+    ::= { agnPtpClkEntry 2 }
+
+agnPtpClkSrcPrtClkId OBJECT-TYPE
+    SYNTAX      OCTET STRING ( SIZE(8) )
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Source Port Clock ID,
+         within the Source Port Identity."
+    ::= { agnPtpClkEntry 3 }
+
+agnPtpClkSrcPrtNumber OBJECT-TYPE
+    SYNTAX      OCTET STRING ( SIZE(2) )
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Source Port Number,
+         within the Source Port Identity."
+    ::= { agnPtpClkEntry 4 }
+
+agnPtpClkSyncRate OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable       (1),
+        r32pps              (2),
+        r64pps              (3),
+        r128pps             (4),
+        r16pps              (5)
+    }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Sync Rate of the packet,
+         which is transmitted from the master clock towards the slave clock."
+    ::= { agnPtpClkEntry 5 }
+
+agnPtpClkQualityLogVar OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the stability of the master clock."
+    ::= { agnPtpClkEntry 6 }
+
+agnPtpClkAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Type of the Address, used by this PTP clock."
+    ::= { agnPtpClkEntry 7 }
+
+agnPtpClkMcastAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Multicast Address, according to agnPtpClkAddrType."
+    ::= { agnPtpClkEntry 8 }
+
+agnPtpClkTos OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the TOS value (range is 0..255) or the DSCP value
+         (range is 0..64) of the PTP frame.
+        255 = not applicable "
+    DEFVAL { 0 }
+    ::= { agnPtpClkEntry 9 }
+
+agnPtpClkPbit OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Priority bit value (range is 0..7)
+         of the PTP frame."
+    DEFVAL { 0 }
+    ::= { agnPtpClkEntry 10 }
+
+agnPtpClkNumOfIntervals OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of previous 15-minutes intervals for which data was collected."
+    ::= { agnPtpClkEntry 11 }
+
+agnPtpClkCurr15TimeElapsed OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the number of seconds that have elapsed
+         since the beginning of the current error-measurement period
+         (range is 0..899)."
+    ::= { agnPtpClkEntry 12 }
+
+agnPtpClkCurr15TxSyncPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Sync Packets,
+         encountered by this PTP clock in the current 15 minute interval."
+    ::= { agnPtpClkEntry 13 }
+
+agnPtpClkCurr15RxSyncPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Sync Packets,
+         encountered by this PTP clock in the current 15 minute interval."
+    ::= { agnPtpClkEntry 14 }
+
+agnPtpClkCurr15RxFollowupPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Followup Packets,
+         encountered by this PTP clock in the current 15 minute interval."
+    ::= { agnPtpClkEntry 15 }
+
+agnPtpClkState OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable  (1),
+        failure     (2),
+        ok          (3),
+        lld         (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the PTP clock state.
+        Failuer - The clock state is - Failuer
+        OK      - The clock state is - OK
+        Lld     - Lower Layer Down"
+    ::= { agnPtpClkEntry 16 }
+
+agnPtpClkIndicatedQl                OBJECT-TYPE
+    SYNTAX      ClockQlList
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This object indicates the PTP clock QL that transmit to the CSM."
+    ::= { agnPtpClkEntry 17 }
+
+agnPtpClkClockIdentity      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS    read-write
+    STATUS        deprecated
+    DESCRIPTION
+        "The identity of the clock."
+    ::= { agnPtpClkEntry 18 }
+
+agnPtpClkRecoveryMode           OBJECT-TYPE
+    SYNTAX    INTEGER
+    {
+     notApplicable  (1),
+     nonRevertive (2),
+     revertive    (3)
+    }
+    MAX-ACCESS read-write
+    STATUS       current
+    DESCRIPTION
+    "This object defines the revertive mode."
+    ::= { agnPtpClkEntry 19 }
+
+agnPtpClkWtr                    OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+     "Wait to Restore (WTR) time in sec."
+    ::= { agnPtpClkEntry 20 }
+
+agnPtpClkDomain                    OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-write
+     STATUS  current
+     DESCRIPTION
+     "For PTP Slave - The domain number in the send header message,
+     use to verify that the domain number in the receive message is the same,
+     otherwise the package will be discard.
+     For PTP Master - The domain that Master clock is set according to the CSM."
+    ::= { agnPtpClkEntry 21 }
+
+agnPtpClkIpAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The IP Address of the Slave, used in NE with more then one Slaves."
+    ::= { agnPtpClkEntry 22 }
+
+agnPtpClkActiveMaster       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This object indicates the current active master per slave(recovered)."
+    ::= { agnPtpClkEntry 23 }
+
+agnPtpClkRecoveryModeSelect       OBJECT-TYPE
+    SYNTAX    INTEGER
+    {
+     frequency          (1),
+     timeFrequency      (2),
+     time               (3)
+    }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object enables to combine between the 1588 and the syncE clock recovery.
+        The actual frequency used from clock selector output to 1588 does not
+        need to be configured.
+        Default: timeFrequency"
+    ::= { agnPtpClkEntry 24 }
+
+agnPtpClkPortMaxSlaves       OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object sets the maximum number of registered slaves per Master."
+    ::= { agnPtpClkEntry 25 }
+
+agnPtpClkPortTxClockDomain       OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object set the community domain."
+    ::= { agnPtpClkEntry 26 }
+
+agnPtpClkMasterStatus       OBJECT-TYPE
+     SYNTAX   BITS
+     {
+       ok                 (0),
+       todFailure         (1),
+       lppsFailure        (2)
+     }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "This object indicates the Master Status."
+    ::= { agnPtpClkEntry 27 }
+
+agnPtpClkIpAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Type of the Address for agnPtpClkIpAddress."
+    ::= { agnPtpClkEntry 28 }
+
+agnPtpClkNetMetricsClearCounters      OBJECT-TYPE
+      SYNTAX  INTEGER
+       {
+       off            (1),
+       masterToSlave  (2),
+       slaveToMaster  (3),
+       all            (4)
+       }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+        "Setting this object to masterToSlave(2) or slaveToMaster(3), will enforce a clear
+      operation for agnPtpClkNetMetricsCurrentTable (Master to Slave or Slave to Master) Counters. Upon completion,
+      the value will automatically change to off."
+      ::= { agnPtpClkEntry 29}
+
+agnPtpClkIdentity      OBJECT-TYPE
+    SYNTAX        SnmpAdminString
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+        "The identity of the clock."
+    ::= { agnPtpClkEntry 30 }
+
+agnPtpClkAsymmetryCorrection        OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-write
+    STATUS        deprecated
+    DESCRIPTION
+        "The object use to compensate between TX and RX packet delay."
+    ::= { agnPtpClkEntry 31 }
+
+agnPtpClkJointFrequencyTime        OBJECT-TYPE
+    SYNTAX        INTEGER
+       {
+       enable        (1),
+       disable       (2),
+       notApplicable (3)
+       }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "The object set the 1PPS algorithm to:
+         enable - recovered frequency and time
+         disable - recovered time only."
+    ::= { agnPtpClkEntry 32 }
+
+agnPtpClkProfileType      OBJECT-TYPE
+      SYNTAX  INTEGER
+       {
+       notApplicable      (1),
+       telecomEndToEnd    (2),
+       telecomPeerToPeer  (3)
+       }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+        "The object set the profile type."
+      ::= { agnPtpClkEntry 33}
+      
+agnPtpClkPrtPriority2   OBJECT-TYPE
+        SYNTAX          Unsigned32 (0..255)
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+        "This object is relevant when agnPtpClkType=g82751Master(6).
+        It is used in the execution of the best master clock algorithm. 
+        Lower values take precedence. It provides finer grained ordering 
+        among otherwise equivalent clocks."
+        DEFVAL {128}
+      ::= { agnPtpClkEntry 34}      
+   
+
+-- PTP Master Clock Stream Table
+
+agnPtpClkMasterStreamTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkMasterStreamEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The PTP Master Clock Stream table."
+    ::= { agnPtpClk 2 }
+
+agnPtpClkMasterStreamEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkMasterStreamEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the PTP Master Clock Stream table."
+    INDEX       { agnPtpClkMasterStreamClockId, agnPtpClkMasterStreamId }
+    ::= { agnPtpClkMasterStreamTable 1 }
+
+AgnPtpClkMasterStreamEntry ::= SEQUENCE {
+    agnPtpClkMasterStreamClockId                Unsigned32,
+    agnPtpClkMasterStreamId                     Unsigned32,
+    agnPtpClkMasterStreamRowStatus              RowStatus,
+    agnPtpClkMasterStreamAdminStatus            INTEGER,
+    agnPtpClkMasterStreamName                   SnmpAdminString,
+    agnPtpClkMasterStreamPeerId                 Unsigned32,
+    agnPtpClkMasterStreamNumOfIntervals         Unsigned32,
+    agnPtpClkMasterStreamCurr15TimeElapsed      Unsigned32,
+    agnPtpClkMasterStreamCurr15TxSyncPackets    Gauge32 
+ }
+
+agnPtpClkMasterStreamClockId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object uniquely represents the PTP Master Clock ID,
+         same as agnPtpClkId when agnPtpClkType = ieee1588Master(4)."
+    ::= { agnPtpClkMasterStreamEntry 1 }
+
+agnPtpClkMasterStreamId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This object uniquely represents the Stream ID of the PTP master clock."
+    ::= { agnPtpClkMasterStreamEntry 2 }
+
+agnPtpClkMasterStreamRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object enables the user to create/delete entries (streams) in this table."
+    ::= { agnPtpClkMasterStreamEntry 3 }
+
+agnPtpClkMasterStreamAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        down    (2),
+        up      (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Administrative Status of the stream."
+    ::= { agnPtpClkMasterStreamEntry 4 }
+
+agnPtpClkMasterStreamName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Name of the stream."
+    ::= { agnPtpClkMasterStreamEntry 5 }
+
+agnPtpClkMasterStreamPeerId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Peer ID of the stream."
+    ::= { agnPtpClkMasterStreamEntry 6 }
+
+agnPtpClkMasterStreamNumOfIntervals OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of previous 15-minutes intervals for which data was collected."
+    ::= { agnPtpClkMasterStreamEntry 7 }
+
+agnPtpClkMasterStreamCurr15TimeElapsed OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the number of seconds that have elapsed
+         since the beginning of the current error-measurement period
+         (range is 0..899)."
+    ::= { agnPtpClkMasterStreamEntry 8 }
+
+agnPtpClkMasterStreamCurr15TxSyncPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Sync Packets,
+         encountered by this stream in the current 15 minute interval."
+    ::= { agnPtpClkMasterStreamEntry 9 }
+
+
+-- PTP Master Clock Stream Statistics
+
+agnPtpClkMasterStreamIntTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkMasterStreamIntEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The PTP Master Clock Stream Intervals Statistics table."
+    ::= { agnPtpClk 4 }
+
+agnPtpClkMasterStreamIntEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkMasterStreamIntEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the PTP Master Clock Interval table."
+    INDEX       { agnPtpClkMasterStreamClockId,
+                  agnPtpClkMasterStreamId,
+                  agnPtpClkMasterStreamIntNumber }
+    ::= { agnPtpClkMasterStreamIntTable 1 }
+
+AgnPtpClkMasterStreamIntEntry ::= SEQUENCE {
+    agnPtpClkMasterStreamIntNumber              Unsigned32,
+    agnPtpClkMasterStreamIntTxSyncPackets       Gauge32 
+ }
+
+agnPtpClkMasterStreamIntNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A number between 1 and 96,
+         where 1 is the most recently completed 15 minute interval
+         and 96 is the least recently completed 15 minutes interval
+         (assuming that all 96 intervals exist)."
+    ::= { agnPtpClkMasterStreamIntEntry 1 }
+
+agnPtpClkMasterStreamIntTxSyncPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Sync Packets,
+         encountered by this stream in one of the previous 96,
+         individual 15 minute, intervals."
+    ::= { agnPtpClkMasterStreamIntEntry 2 }
+
+
+-- PTP Clock Statistics
+
+agnPtpClkIntervalTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The PTP Clock 15 minutes Intervals table."
+    ::= { agnPtpClk 3 }
+
+agnPtpClkIntervalEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the PTP Clock 15 minutes Interval table."
+    INDEX       { agnPtpClkType, agnPtpClkId, agnPtpClkIntNumber }
+    ::= { agnPtpClkIntervalTable 1 }
+
+AgnPtpClkIntervalEntry ::= SEQUENCE {
+    agnPtpClkIntNumber                  Unsigned32,
+    agnPtpClkIntTxSyncPackets           Gauge32,
+    agnPtpClkIntRxSyncPackets           Gauge32,
+    agnPtpClkIntRxFollowupPackets       Gauge32 
+ }
+
+agnPtpClkIntNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A number between 1 and 96,
+        where 1 is the most recently completed 15 minute interval
+        and 96 is the least recently completed 15 minutes interval
+        (assuming that all 96 intervals exist)."
+    ::= { agnPtpClkIntervalEntry 1 }
+
+agnPtpClkIntTxSyncPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Transmitted Sync Packets,
+        encountered by a PTP Clock in one of the previous 96,
+        individual 15 minute, intervals."
+    ::= { agnPtpClkIntervalEntry 2 }
+
+agnPtpClkIntRxSyncPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Sync Packets,
+        encountered by a PTP Clock in one of the previous 96,
+        individual 15 minute, intervals."
+    ::= { agnPtpClkIntervalEntry 3 }
+
+agnPtpClkIntRxFollowupPackets OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated with the number of Received Followup Packets,
+        encountered by a PTP Clock in one of the previous 96,
+        individual 15 minute, intervals."
+    ::= { agnPtpClkIntervalEntry 4 }
+
+
+-- agnPtpClkCounterTable
+
+agnPtpClkCounterTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkCounterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table contains countars for PTP (1588) ."
+    ::= { agnPtpClk 5 }
+
+agnPtpClkCounterEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkCounterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the PTP Clock."
+    INDEX       { agnPtpClkType, agnPtpClkId }
+    ::= { agnPtpClkCounterTable 1 }
+
+AgnPtpClkCounterEntry ::= SEQUENCE {
+    agnPtpClearCounters                 INTEGER,
+    agnPtpUnicastAnnounceReq            Counter32,
+    agnPtpUnicastAnnounceAccept         Counter32,
+    agnPtpUnicastAnnounceReject         Counter32,
+    agnPtpUnicastAnnounceTimeOut        Counter32,
+    agnPtpUnicastSyncReq                Counter32,
+    agnPtpUnicastSyncAccept             Counter32,
+    agnPtpUnicastSyncReject             Counter32,
+    agnPtpUnicastSyncTimeOutAccept      Counter32,
+    agnPtpNoSyncTotalElapsedTime        Counter32,
+    agnPtpNoSyncElapsedTime             Gauge32,
+    agnPtpNoAnnounceTotalElapsedTime    Counter32,
+    agnPtpNoAnnounceElapsedTime         Gauge32,
+    agnPtpRxSyncPackets                 Counter32,
+    agnPtpRxUnicastSyncMisOrdered       Counter32,
+    agnPtpRxSyncLost                    Counter32,
+    agnPtpTxPackets                     Counter64,
+    agnPtpTxSyncPackets                 Counter64,
+    agnPtpTXFollowUpPackets             Counter64,
+    agnPtpTXDelayResponsePackets        Counter64,
+    agnPtpTXAnnouncePackets             Counter64,
+    agnPtpTXSignalingPackets            Counter64,
+    agnPtpRxPackets                     Counter64,
+    agnPtpRXSignalingPackets            Counter64,
+    agnPtpRXDelayRequest                Counter64,
+    agnPtpDiscardedSignalingPackets     Counter64,
+    agnPtpRXAnnouncePackets             Counter64 
+ }
+
+agnPtpClearCounters OBJECT-TYPE
+    SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will enforce a clear statistics
+      counters. The command will clear statistics from all
+      agnPtpClkCounterTable.
+      Upon completion, the value will automatically change to off(2).
+      Default=off(2)."
+      ::= { agnPtpClkCounterEntry 1 }
+
+agnPtpUnicastAnnounceReq OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message type requests that were sent from slave to master."
+    ::= { agnPtpClkCounterEntry 2 }
+
+agnPtpUnicastAnnounceAccept OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message type accepts that were sent from master to slave."
+    ::= { agnPtpClkCounterEntry 3 }
+
+agnPtpUnicastAnnounceReject OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message type rejects that were sent from master to slave.
+    The durationField shall be equal to zero."
+    ::= { agnPtpClkCounterEntry 4 }
+
+agnPtpUnicastAnnounceTimeOut OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message types that were received
+    after timeout (60 Sec) from the master."
+    ::= { agnPtpClkCounterEntry 5 }
+
+agnPtpUnicastSyncReq OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type requests that were sent from slave to master."
+    ::= { agnPtpClkCounterEntry 6 }
+
+agnPtpUnicastSyncAccept OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type accepts that were sent from master to slave."
+    ::= { agnPtpClkCounterEntry 7 }
+
+agnPtpUnicastSyncReject OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type rejects that were sent from master to slave."
+    ::= { agnPtpClkCounterEntry 8 }
+
+agnPtpUnicastSyncTimeOutAccept OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message types that were received
+    after timeout (60 Sec) from the master."
+    ::= { agnPtpClkCounterEntry 9 }
+
+agnPtpNoSyncTotalElapsedTime OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The accumulated seconds of agnPtpNoUnicastSyncElapsedTime
+    object. This counter defines the cumulated elapsed time (in seconds) that the slave
+    did not receive Sync Message types from the master."
+    ::= { agnPtpClkCounterEntry 10 }
+
+agnPtpNoSyncElapsedTime OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of seconds that the slave did not receive Sync Message
+    from the master from the last Sync Message."
+    ::= { agnPtpClkCounterEntry 11 }
+
+agnPtpNoAnnounceTotalElapsedTime OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The accumulated seconds of agnPtpNoUnicastAnnounceElapsedTime
+    object. This counter defines the cumulated elapsed time (in seconds) that the slave
+    did not receive Announce Message types from the master."
+    ::= { agnPtpClkCounterEntry 12 }
+
+agnPtpNoAnnounceElapsedTime OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds that the slave did not receive Announce Message
+    from the master from the last Announce Message."
+    ::= { agnPtpClkCounterEntry 13 }
+
+agnPtpRxSyncPackets OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type that were received by the slave."
+    ::= { agnPtpClkCounterEntry 14 }
+
+agnPtpRxUnicastSyncMisOrdered OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Messages that were mis-ordered.
+     e.g. Sync Message 5 was received before Sync Message 4."
+    ::= { agnPtpClkCounterEntry 15 }
+
+agnPtpRxSyncLost OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of lost unicast Sync Messages from master to slave."
+    ::= { agnPtpClkCounterEntry 16 }
+
+agnPtpTxPackets       OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of all packet transmitted by the 1588 master (to all slaves)."
+    ::= { agnPtpClkCounterEntry 17 }
+
+agnPtpTxSyncPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only SYNC packets transmitted by master (to all slaves)."
+    ::= { agnPtpClkCounterEntry 18 }
+
+agnPtpTXFollowUpPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only FOLLOW UP packets transmitted by master (to all slaves)."
+    ::= { agnPtpClkCounterEntry 19 }
+
+agnPtpTXDelayResponsePackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only DELAY RESPONSE packets transmitted by master (to all slaves)."
+    ::= { agnPtpClkCounterEntry 20 }
+
+agnPtpTXAnnouncePackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only ANNOUNCE packets transmitted by master (to all slaves)."
+    ::= { agnPtpClkCounterEntry 21 }
+
+agnPtpTXSignalingPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only FOLLOW UP packets transmitted by master (to all slaves)."
+    ::= { agnPtpClkCounterEntry 22 }
+
+agnPtpRxPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of all classified 1588 master received packets
+    (Delay request and signaling packets from all slaves)."
+    ::= { agnPtpClkCounterEntry 23 }
+
+agnPtpRXSignalingPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only Signaling packets received by master (from all slaves)."
+    ::= { agnPtpClkCounterEntry 24 }
+
+agnPtpRXDelayRequest OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only DELAY REQUEST packets received by master (from all slaves)."
+    ::= { agnPtpClkCounterEntry 25 }
+
+agnPtpDiscardedSignalingPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The Counts only the SIGNALING packets that discarded by the master (from all slaves)."
+    ::= { agnPtpClkCounterEntry 26 }
+
+agnPtpRXAnnouncePackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of only ANNOUNCE packets received by master (from all slaves)."
+    ::= { agnPtpClkCounterEntry 27 }
+
+
+-- PTP Multi Master Table
+
+agnPtpMultiMasterTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF AgnPtpMultiMasterEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The table contains configuration and status for PTP Recovered (Slave)
+         Masters.
+         The table contains 2 indexes, first index is indicate the
+         Recovered (Slave) ID from agnPtpClkTable, seconds index see agnPtpMultiMasterId."
+    ::= { agnPtpClk 6 }
+
+agnPtpMultiMasterEntry OBJECT-TYPE
+    SYNTAX        AgnPtpMultiMasterEntry
+    MAX-ACCESS  not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the Table."
+    INDEX        { agnPtpClkId, agnPtpMultiMasterId }
+    ::= { agnPtpMultiMasterTable 1 }
+
+AgnPtpMultiMasterEntry ::= SEQUENCE {
+    agnPtpMultiMasterId                           Unsigned32,
+    agnPtpMultiMasterRowStatus                    RowStatus,
+    agnPtpMultiMasterClockId                      OCTET STRING,
+    agnPtpMultiMasterPortNumber                   OCTET STRING,
+    agnPtpMultiMasterNumber                       OCTET STRING,
+    agnPtpMultiMasterPriority                     Unsigned32,
+    agnPtpMultiMasterNetType                      INTEGER,
+    agnPtpMultiMasterPeer                         Unsigned32,
+    agnPtpMultiMasterSyncRate                     SyncRate,
+    agnPtpMultiMasterMinExpectedSyncRate          SyncRate,
+    agnPtpMultiMasterSyncGrantPeriod              Unsigned32,
+    agnPtpMultiMasterAnnounceRate                 AnnounceRate,
+    agnPtpMultiMasterMinExpectedAnnounceRate      AnnounceRate,
+    agnPtpMultiMasterAnnounceGrantPeriod          Unsigned32,
+    agnPtpMultiMasterQl                           ClockQlList,
+    agnPtpMultiMasterEnable                       INTEGER,
+    agnPtpMultiMasterReceivedQl                   ClockQlList,
+    agnPtpMultiMasterGrantedSyncRate              SyncRate,
+    agnPtpMultiMasterGrantedSyncPeriod            Unsigned32,
+    agnPtpMultiMasterGrantedAnnounceRate          AnnounceRate,
+    agnPtpMultiMasterGrantedAnnouncePeriod        Unsigned32,
+    agnPtpMultiMasterPtsfStatus                   INTEGER,
+    agnPtpMultiMasterDelayRespondRate             SyncRate,
+    agnPtpMultiMasterMinExpectedDelayRespondRate  SyncRate,
+    agnPtpMultiMasterDelayRespondGrantPeriod      Unsigned32,
+    agnPtpMultiMasterDelayRespondGrantedRate      Unsigned32,
+    agnPtpMultiMasterGrantedDelayRespPeriod       Unsigned32,
+    agnPtpMultiMasterAsymmetryCorrection          Integer32 
+ }
+
+agnPtpMultiMasterId                 OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "This index indicate the master number."
+    ::= { agnPtpMultiMasterEntry 1 }
+
+agnPtpMultiMasterRowStatus          OBJECT-TYPE
+    SYNTAX        RowStatus
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "This object enables the user to create/delete entries in this table."
+    ::= { agnPtpMultiMasterEntry 2 }
+
+agnPtpMultiMasterClockId            OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "This object uniquely represents the PTP Master Clock ID
+        Default: clock-id = 0xFFFFFFFFFFFFFFFF."
+    ::= { agnPtpMultiMasterEntry 3 }
+
+agnPtpMultiMasterPortNumber         OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "This object uniquely represents the PTP Master Port Number
+        Default: port-number = 0xFFFF."
+    ::= { agnPtpMultiMasterEntry 4 }
+
+agnPtpMultiMasterNumber             OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+      "This object indicates the Master Clock Identity, the value of this object
+      is a combination of agnPtpMultiMasterClockId and agnPtpMultiMasterPortNumber"
+    ::= { agnPtpMultiMasterEntry 5 }
+
+agnPtpMultiMasterPriority           OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "The priority of the master clock.
+         This parameter is used to in case that the masters have the same QL."
+    ::= { agnPtpMultiMasterEntry 6 }
+
+agnPtpMultiMasterNetType            OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    auto          (1),
+    dsl           (2)
+    }
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "The Network Type indicates the PSN network characteristics and behavior."
+    ::= { agnPtpMultiMasterEntry 7 }
+
+agnPtpMultiMasterPeer               OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "This object represents the Peer Index (from peerTable)."
+    ::= { agnPtpMultiMasterEntry 8 }
+
+agnPtpMultiMasterSyncRate           OBJECT-TYPE
+    SYNTAX        SyncRate
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "The sync message rate that the slave request from the master."
+    ::= { agnPtpMultiMasterEntry 9 }
+
+agnPtpMultiMasterMinExpectedSyncRate   OBJECT-TYPE
+    SYNTAX        SyncRate
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "The minimum sync message rate that the slave can request from the master."
+    ::= { agnPtpMultiMasterEntry 10 }
+
+agnPtpMultiMasterSyncGrantPeriod    OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "The period of time (in seconds) that the slave ask from the master to send
+    the sync message.
+    0 = disable."
+    ::= { agnPtpMultiMasterEntry 11 }
+
+agnPtpMultiMasterAnnounceRate       OBJECT-TYPE
+    SYNTAX        AnnounceRate
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "The announce message rate that the slave request from the master."
+    ::= { agnPtpMultiMasterEntry 12 }
+
+agnPtpMultiMasterMinExpectedAnnounceRate   OBJECT-TYPE
+    SYNTAX        AnnounceRate
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+        "The minimum announce message rate that the slave can request from the master."
+    ::= { agnPtpMultiMasterEntry 13 }
+
+agnPtpMultiMasterAnnounceGrantPeriod   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "The period of time (in seconds) that the slave ask from the master to send
+    the announce message.
+    0 = disable."
+    ::= { agnPtpMultiMasterEntry 14 }
+
+agnPtpMultiMasterQl      OBJECT-TYPE
+     SYNTAX      ClockQlList
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+    "The actual QL of csmDomainCurrentSourceId dependent on
+     csmDomainSynchNetType."
+    ::= { agnPtpMultiMasterEntry 15 }
+
+agnPtpMultiMasterEnable             OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    no    (2),
+    yes    (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enable/disable the Master source."
+    ::= { agnPtpMultiMasterEntry 16 }
+
+agnPtpMultiMasterReceivedQl         OBJECT-TYPE
+    SYNTAX        ClockQlList
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The QL that was received from the master."
+    ::= { agnPtpMultiMasterEntry 17 }
+
+agnPtpMultiMasterGrantedSyncRate    OBJECT-TYPE
+    SYNTAX      SyncRate
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Sync Rate that was granted from the master."
+    ::= { agnPtpMultiMasterEntry 18 }
+
+agnPtpMultiMasterGrantedSyncPeriod   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Sync Period that was granted from the master."
+    ::= { agnPtpMultiMasterEntry 19 }
+
+agnPtpMultiMasterGrantedAnnounceRate   OBJECT-TYPE
+    SYNTAX      AnnounceRate
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Announce Rate that was granted from the master."
+    ::= { agnPtpMultiMasterEntry 20 }
+
+agnPtpMultiMasterGrantedAnnouncePeriod   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Announce Period that was granted from the master."
+    ::= { agnPtpMultiMasterEntry 21 }
+
+agnPtpMultiMasterPtsfStatus       OBJECT-TYPE
+    SYNTAX INTEGER
+    {
+    active       (2),
+    notActive    (3)
+    }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "This object indicates the status of the master clock.
+    PSTF - Packet Timing Signal Fail."
+    ::= { agnPtpMultiMasterEntry 22 }
+
+agnPtpMultiMasterDelayRespondRate        OBJECT-TYPE
+    SYNTAX   SyncRate
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+    "This object set the delay-respond message rate that the slave request from the master.
+    The delay-respond rate mast be equal or lower that the sync rate.
+    Default: 128pps."
+    ::= { agnPtpMultiMasterEntry 23 }
+
+agnPtpMultiMasterMinExpectedDelayRespondRate   OBJECT-TYPE
+    SYNTAX        SyncRate
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "The minimum Delay Respond message rate that the slave can request from the master.
+    The minimum-expected must be lower or equal to the  request-rate.
+    Default: 128pps."
+    ::= { agnPtpMultiMasterEntry 24 }
+
+agnPtpMultiMasterDelayRespondGrantPeriod    OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "The period of time (in seconds) that the slave ask from the master to send
+    the delay-respond message.
+    Default: 300 (sec)."
+    ::= { agnPtpMultiMasterEntry 25 }
+
+agnPtpMultiMasterDelayRespondGrantedRate   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Sync Period that was granted from the master."
+    ::= { agnPtpMultiMasterEntry 26 }
+
+
+agnPtpMultiMasterGrantedDelayRespPeriod    OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+    "The period of time (in seconds) that the slave ask from the master to send
+    the delay-respond message."
+    ::= { agnPtpMultiMasterEntry 27 }
+
+agnPtpMultiMasterAsymmetryCorrection        OBJECT-TYPE
+    SYNTAX        Integer32
+    MAX-ACCESS    read-create
+    STATUS        current
+    DESCRIPTION
+    "The object use to compensate between TX and RX packet delay."
+    ::= { agnPtpMultiMasterEntry 28 }
+
+
+-- agn Ptp Multi Master Counter Table
+
+agnPtpMultiMasterCounterTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF AgnPtpMultiMasterCounterEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The table contains countars for PTP (1588) ."
+    ::= { agnPtpClk 7 }
+
+agnPtpMultiMasterCounterEntry OBJECT-TYPE
+    SYNTAX        AgnPtpMultiMasterCounterEntry
+    MAX-ACCESS  not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the PTP Clock."
+    INDEX        { agnPtpClkId, agnPtpMultiMasterId }
+    ::= { agnPtpMultiMasterCounterTable 1 }
+
+AgnPtpMultiMasterCounterEntry ::= SEQUENCE {
+    agnPtpMultiMasterClearCounters                 INTEGER,
+    agnPtpMultiMasterUnicastAnnounceReq            Counter32,
+    agnPtpMultiMasterUnicastAnnounceAccept         Counter32,
+    agnPtpMultiMasterUnicastAnnounceReject         Counter32,
+    agnPtpMultiMasterUnicastAnnounceTimeOut        Counter32,
+    agnPtpMultiMasterUnicastSyncReq                Counter32,
+    agnPtpMultiMasterUnicastSyncAccept             Counter32,
+    agnPtpMultiMasterUnicastSyncReject             Counter32,
+    agnPtpMultiMasterUnicastSyncTimeOutAccept      Counter32,
+    agnPtpMultiMasterNoSyncTotalElapsedTime        Counter32,
+    agnPtpMultiMasterNoSyncElapsedTime             Gauge32,
+    agnPtpMultiMasterNoAnnounceTotalElapsedTime    Counter32,
+    agnPtpMultiMasterNoAnnounceElapsedTime         Gauge32,
+    agnPtpMultiMasterRxSyncPackets                 Counter32,
+    agnPtpMultiMasterRxUnicastSyncMisOrdered       Counter32,
+    agnPtpMultiMasterRxSyncLost                    Counter32,
+    agnPtpMultiMasterClearMeasuredCounters         INTEGER,
+    agnPtpMultiMasterMeasuredSyncRate              Gauge32,
+    agnPtpMultiMasterMeasuredMaxSyncRate           Gauge32,
+    agnPtpMultiMasterMeasuredMinSyncRate           Gauge32,
+    agnPtpMultiMasterUnicastDelayRespondReq        Counter32,
+    agnPtpMultiMasterUnicastDelayRespondAccept     Counter32,
+    agnPtpMultiMasterUnicastDelayRespondReject     Counter32,
+    agnPtpMultiMasterUnicastDelayRespondTimeOut    Counter32,
+    agnPtpMultiMasterNoDelayRespondTotalElapsedTime    Counter32,
+    agnPtpMultiMasterNoDelayRespondElapsedTime     Gauge32,
+    agnPtpMultiMasterRxDelayRespondPackets         Counter32,
+    agnPtpMultiMasterEstimatedFreqErr              Gauge32,
+    agnPtpMultiMasterEstimatedTimeErr              Gauge32,
+    agnPtpMultiMasterMeasuredDelayRespondRate      Gauge32,
+    agnPtpMultiMasterMeasuredMaxDelayRespondRate   Gauge32,
+    agnPtpMultiMasterMeasuredMinDelayRespondRate   Gauge32,
+    agnPtpMultiMasterDescr                         SnmpAdminString,
+    agnPtpMultiMasterTxDelayRequestPackets         Counter32 
+ }
+
+agnPtpMultiMasterClearCounters OBJECT-TYPE
+    SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will enforce a clear statistics
+      Counters.Upon completion, the value will automatically chagne to off(2).
+      Default=off(2)."
+      ::= { agnPtpMultiMasterCounterEntry 1 }
+
+agnPtpMultiMasterUnicastAnnounceReq OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message type requests that were sent from
+    slave to master."
+    ::= { agnPtpMultiMasterCounterEntry 2 }
+
+agnPtpMultiMasterUnicastAnnounceAccept OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message type accepts that were sent from
+    master to slave."
+    ::= { agnPtpMultiMasterCounterEntry 3 }
+
+agnPtpMultiMasterUnicastAnnounceReject OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message type rejects that were sent from
+    master to slave. The durationField shall be equal to zero."
+    ::= { agnPtpMultiMasterCounterEntry 4 }
+
+agnPtpMultiMasterUnicastAnnounceTimeOut OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Announce Message types that were received
+    after timeout (60 Sec) from the master."
+    ::= { agnPtpMultiMasterCounterEntry 5 }
+
+agnPtpMultiMasterUnicastSyncReq OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type requests that were sent from
+    slave to master."
+    ::= { agnPtpMultiMasterCounterEntry 6 }
+
+agnPtpMultiMasterUnicastSyncAccept OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type accepts that were sent from
+    master to slave."
+    ::= { agnPtpMultiMasterCounterEntry 7 }
+
+agnPtpMultiMasterUnicastSyncReject OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type rejects that were sent from master to slave."
+    ::= { agnPtpMultiMasterCounterEntry 8 }
+
+agnPtpMultiMasterUnicastSyncTimeOutAccept OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message types that were received
+    after timeout (60 Sec) from the master."
+    ::= { agnPtpMultiMasterCounterEntry 9 }
+
+agnPtpMultiMasterNoSyncTotalElapsedTime   OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The accumulated seconds of agnPtpMultiMasterNoUnicastSyncElapsedTime
+    object. This counter defines the cumulated elapsed time (in seconds) that
+    the slave did not receive Sync Message types from the master."
+    ::= { agnPtpMultiMasterCounterEntry 10 }
+
+agnPtpMultiMasterNoSyncElapsedTime        OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of seconds that the slave did not receive Sync Message
+    from the master from the last Sync Message."
+    ::= { agnPtpMultiMasterCounterEntry 11 }
+
+agnPtpMultiMasterNoAnnounceTotalElapsedTime OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The accumulated seconds of agnPtpMultiMasterNoAnnounceElapsedTime
+    object. This counter defines the cumulated elapsed time (in seconds) that the slave
+    did not receive Announce Message types from the master."
+    ::= { agnPtpMultiMasterCounterEntry 12 }
+
+agnPtpMultiMasterNoAnnounceElapsedTime OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds that the slave did not receive Announce Message
+    from the master from the last Announce Message."
+    ::= { agnPtpMultiMasterCounterEntry 13 }
+
+agnPtpMultiMasterRxSyncPackets OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Message type that were received by the slave."
+    ::= { agnPtpMultiMasterCounterEntry 14 }
+
+agnPtpMultiMasterRxUnicastSyncMisOrdered OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Sync Messages that were mis-ordered.
+     e.g. Sync Message 5 was received before Sync Message 4."
+    ::= { agnPtpMultiMasterCounterEntry 15 }
+
+agnPtpMultiMasterRxSyncLost OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of lost unicast Sync Messages from master to slave."
+    ::= { agnPtpMultiMasterCounterEntry 16 }
+
+agnPtpMultiMasterClearMeasuredCounters OBJECT-TYPE
+    SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will enforce a clear Sync statistics Counters.
+      Upon completion, the value will automatically chagne to off(2).
+      Default=off(2)."
+      ::= { agnPtpMultiMasterCounterEntry 17 }
+
+agnPtpMultiMasterMeasuredSyncRate   OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The actual sync rate message that receive from the 1588 master."
+    ::= { agnPtpMultiMasterCounterEntry 18 }
+
+agnPtpMultiMasterMeasuredMaxSyncRate    OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The highest value that was measured in agnPtpMultiMasterMeasuredSyncRate."
+    ::= { agnPtpMultiMasterCounterEntry 19 }
+
+agnPtpMultiMasterMeasuredMinSyncRate    OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The lowest value that was measured in agnPtpMultiMasterMeasuredSyncRate."
+    ::= { agnPtpMultiMasterCounterEntry 20 }
+
+agnPtpMultiMasterUnicastDelayRespondReq OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Respond Message type requests that were sent from
+    slave to master."
+    ::= { agnPtpMultiMasterCounterEntry 21 }
+
+agnPtpMultiMasterUnicastDelayRespondAccept OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Respond Message type accepts, that were sent from
+    master to slave."
+    ::= { agnPtpMultiMasterCounterEntry 22 }
+
+agnPtpMultiMasterUnicastDelayRespondReject OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Respond Message type rejects that were sent from
+    master to slave. The duration Field shall be equal to zero."
+    ::= { agnPtpMultiMasterCounterEntry 23 }
+
+agnPtpMultiMasterUnicastDelayRespondTimeOut OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Respond Message types that were received
+    after timeout (60 Sec) from the master."
+    ::= { agnPtpMultiMasterCounterEntry 24 }
+
+agnPtpMultiMasterNoDelayRespondTotalElapsedTime OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The accumulated seconds of agnPtpMultiMasterNoDelayRespondElapsedTime
+    object. This counter defines the cumulated elapsed time (in seconds) that the slave
+    did not receive Delay Respond Message types from the master."
+    ::= { agnPtpMultiMasterCounterEntry 25 }
+
+agnPtpMultiMasterNoDelayRespondElapsedTime OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds that the slave did not receive Delay Respond Message
+    from the master from the last Delay Respond Message."
+    ::= { agnPtpMultiMasterCounterEntry 26 }
+
+agnPtpMultiMasterRxDelayRespondPackets OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Respond Message type that were received by the slave."
+    ::= { agnPtpMultiMasterCounterEntry 27 }
+
+agnPtpMultiMasterEstimatedFreqErr OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Respond Message type that were received by the slave."
+    ::= { agnPtpMultiMasterCounterEntry 28 }
+
+agnPtpMultiMasterEstimatedTimeErr OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Respond Message type that were received by the slave."
+    ::= { agnPtpMultiMasterCounterEntry 29 }
+
+agnPtpMultiMasterMeasuredDelayRespondRate   OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The actual Delay Respond rate message that receive from the 1588 master."
+    ::= { agnPtpMultiMasterCounterEntry 30 }
+
+agnPtpMultiMasterMeasuredMaxDelayRespondRate    OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The highest value that was measured in agnPtpMultiMasterMeasuredDelayRespondRate."
+    ::= { agnPtpMultiMasterCounterEntry 31 }
+
+agnPtpMultiMasterMeasuredMinDelayRespondRate    OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The lowest value that was measured in agnPtpMultiMasterMeasuredDelayRespondRate."
+    ::= { agnPtpMultiMasterCounterEntry 32 }
+
+agnPtpMultiMasterDescr            OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "."
+    ::= { agnPtpMultiMasterCounterEntry 33 }
+
+agnPtpMultiMasterTxDelayRequestPackets OBJECT-TYPE
+    SYNTAX       Counter32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of unicast Delay Request Message type that were sent by the slave."
+    ::= { agnPtpMultiMasterCounterEntry 34 }
+
+
+--   agn Ptp Clk Slave Table
+agnPtpClkSlaveTable OBJECT-TYPE
+    SYNTAX        SEQUENCE OF AgnPtpClkSlaveEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION
+        "The table contains statuses and countars of the 1588 slave that registered on
+           a 1588 master."
+    ::= { agnPtpClk 8 }
+
+agnPtpClkSlaveEntry OBJECT-TYPE
+    SYNTAX        AgnPtpClkSlaveEntry
+    MAX-ACCESS  not-accessible
+    STATUS        current
+    DESCRIPTION
+        "An entry in the PTP Clock."
+    INDEX        { agnPtpClkId, agnPtpClkSlaveIpAddressType,
+                   agnPtpClkSlaveIpAddress }
+    ::= { agnPtpClkSlaveTable 1 }
+
+AgnPtpClkSlaveEntry ::= SEQUENCE {
+    agnPtpClkSlaveIpAddressType                 InetAddressType,
+    agnPtpClkSlaveIpAddress                     InetAddress,
+    agnPtpClkSlaveNumberClearCounters           INTEGER,
+    agnPtpClkSlaveTxSyncPackets                 Counter64,
+    agnPtpClkSlaveTXFollowUpPackets             Counter64,
+    agnPtpClkSlaveTXDelayResponsePackets        Counter64,
+    agnPtpClkSlaveTXAnnouncePackets             Counter64,
+    agnPtpClkSlaveTXSignalingPackets            Counter64,
+    agnPtpClkSlaveRXSignalingPackets            Counter64,
+    agnPtpClkSlaveRXDelayRequest                Counter64,
+    agnPtpClkSlaveDiscardedSignalingPackets     Counter64,
+    agnPtpClkSlaveValidity                      INTEGER,
+    agnPtpClkSlaveOperationalMode               INTEGER,
+    agnPtpClkSlaveClockIdentity                 SnmpAdminString,
+    agnPtpClkSlaveAnnounceRate                  INTEGER,
+    agnPtpClkSlaveAnnouncePeriod                Unsigned32,
+    agnPtpClkSlaveDelayRespondRate              INTEGER,
+    agnPtpClkSlaveDelayRespondPeriod            Unsigned32 
+ }
+
+agnPtpClkSlaveIpAddressType  OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+    "Type of the IP Address designated by deviceAccessIpAddress"
+    ::= { agnPtpClkSlaveEntry 1 }
+
+agnPtpClkSlaveIpAddress  OBJECT-TYPE
+    SYNTAX       InetAddress
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+    "The IP number of slave."
+    ::= { agnPtpClkSlaveEntry 2 }
+
+agnPtpClkSlaveNumberClearCounters OBJECT-TYPE
+    SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object reset all the Master and the Slave counters.
+      Setting this object to on, will enforce a clear statistics
+      Counters.Upon completion, the value will automatically chagne to off(2).
+      Default=off(2)."
+    ::= { agnPtpClkSlaveEntry 3 }
+
+agnPtpClkSlaveTxSyncPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of Sync packets transmitted by master."
+    ::= { agnPtpClkSlaveEntry 4 }
+
+agnPtpClkSlaveTXFollowUpPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of delay response packets transmitted by master."
+    ::= { agnPtpClkSlaveEntry 5 }
+
+agnPtpClkSlaveTXDelayResponsePackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of delay response packets transmitted by master ."
+    ::= { agnPtpClkSlaveEntry 6 }
+agnPtpClkSlaveTXAnnouncePackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of announce packets transmitted by master."
+    ::= { agnPtpClkSlaveEntry 7 }
+
+agnPtpClkSlaveTXSignalingPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of signaling packets transmitted by master ."
+    ::= { agnPtpClkSlaveEntry 8 }
+
+agnPtpClkSlaveRXSignalingPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of signaling packets received by master ."
+    ::= { agnPtpClkSlaveEntry 9 }
+
+agnPtpClkSlaveRXDelayRequest OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of delay request packets received by master ."
+    ::= { agnPtpClkSlaveEntry 10 }
+
+agnPtpClkSlaveDiscardedSignalingPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The number of signaling packets that discarded by the SW."
+    ::= { agnPtpClkSlaveEntry 11 }
+
+agnPtpClkSlaveValidity OBJECT-TYPE
+    SYNTAX      INTEGER
+      {
+      off(2),
+      on (3)
+      }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the validity of the slave."
+    ::= { agnPtpClkSlaveEntry 12 }
+
+agnPtpClkSlaveOperationalMode    OBJECT-TYPE
+    SYNTAX      INTEGER
+      {
+      frequency(2),
+      frequencyAndTime (3)
+      }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "In this SYNC mode, the delay response and announce
+    messages will be transmitted by the master to the salve."
+    ::= { agnPtpClkSlaveEntry 13 }
+
+agnPtpClkSlaveClockIdentity    OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The 1588 PTP slave unique identifier."
+    ::= { agnPtpClkSlaveEntry 14 }
+
+agnPtpClkSlaveAnnounceRate    OBJECT-TYPE
+    SYNTAX      INTEGER
+      {
+      r1     (1),
+      r2     (2),
+      r4     (3),
+      r8     (4),
+      r16    (5),
+      r125m  (6),
+      r250m  (7),
+      r500m  (8)
+      }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The announce Interval is the rate (packets per second) of
+    the Announce packets transmitted by the master to the slave"
+    ::= { agnPtpClkSlaveEntry 15 }
+
+agnPtpClkSlaveAnnouncePeriod    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds for which the Announce messages shall be transmitted "
+    ::= { agnPtpClkSlaveEntry 16 }
+
+agnPtpClkSlaveDelayRespondRate    OBJECT-TYPE
+    SYNTAX      INTEGER
+      {
+      r1      (1),
+      r2      (2),
+      r4      (3),
+      r8      (4),
+      r16     (5),
+      r125m   (6),
+      r250m   (7),
+      r500m   (8),
+      r16pps  (9),
+      r32pps  (10),
+      r64pps  (11),
+      r128pps (12)
+      }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The Delay Response Interval is the rate (packets per second) of the
+    Delay Response packets transmitted by the master to the slave."
+    ::= { agnPtpClkSlaveEntry 17 }
+
+agnPtpClkSlaveDelayRespondPeriod    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds for the Delay Response messages shall be transmitted"
+    ::= { agnPtpClkSlaveEntry 18 }
+
+
+
+csm     OBJECT IDENTIFIER ::= { agnClockSource 5 }
+
+-- csm Domain Table
+
+csmDomainTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF CsmDomainEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Clock Selection Module (CSM) Table."
+    ::= { csm 1 }
+
+csmDomainEntry OBJECT-TYPE
+    SYNTAX  CsmDomainEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  { csmDomainIdx }
+    ::= { csmDomainTable 1 }
+
+CsmDomainEntry ::= SEQUENCE {
+    csmDomainIdx                        Unsigned32,
+    csmDomainRowStatus                  RowStatus,
+    csmDomainMode                       INTEGER,
+    csmDomainQlMode                     INTEGER,
+    csmDomainSynchNetType               INTEGER,
+    csmDomainQlMinimum                  INTEGER,
+    csmDomainExternalCmd                INTEGER,
+    csmDomainExtCmdParam                Unsigned32,
+    csmDomainClearStatCounters          INTEGER,
+    csmDomainSysSourceId                Unsigned32,
+    csmDomainCurrentSourceQl            INTEGER,
+    csmDomainStationOutSourceId         Unsigned32,
+    csmDomainSysSourceState             INTEGER,
+    csmDomainStationOutSourceState      INTEGER,
+    csmDomainForceSwitchState           INTEGER,
+    csmDomainManualSwitchState          INTEGER,
+    csmDomainForceT4AsT0                INTEGER,
+    csmDomainMaxFrequencyDeviation      Unsigned32,
+    csmDomainDescr                      SnmpAdminString,
+    csmDomainLastSystemSrcClkSwitchReason   INTEGER,
+    csmDomainLastStationSrcClkSwitchReason INTEGER 
+ }
+
+
+csmDomainIdx OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This is the unique Clock Selection Module Domain index."
+    ::= { csmDomainEntry 1 }
+
+csmDomainRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of entries
+     in the csmDomainTable."
+    ::= { csmDomainEntry 2 }
+
+csmDomainMode     OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       auto                (2),
+       freeRun             (3),
+       forceT0Holdover     (4)
+      }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This object determines Clock Selection operational mode.
+      auto = CSM automatically selects the Clock Source.
+      In this mode, CSM can be configured to work in the csmDomainQlMode
+      Enabled or Disabled.
+      freeRun = the Internal Clock is used. In this mode,
+      configuration parameters are applicable, but selected clock is not
+      distributed.
+      forceT0Holdover = When in automatic clock selection mode, if the clock
+      source is due to undergo maintenance users may want to force T0 to
+      holdover mode, in order to avoid entering free-running mode
+      Default=auto(2)."
+    ::= { csmDomainEntry 3 }
+
+csmDomainQlMode OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       disable   (2),
+       enable    (3)
+    }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This object determines the QL (quality) mode.
+
+      enable = clock selection is done according to quality of the clock sources.
+      For clock sources having same quality, priority determines selection.
+
+      disable = clock selection is done according to the Priority
+      of the clock sources. For clock sources having same priority,
+      the first clock source will be selected.
+      Default= disable(2)."
+    ::= { csmDomainEntry 4 }
+
+csmDomainSynchNetType     OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       type1  (1),
+       type2  (2),
+       type3  (3)
+    }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This object determines the network synchronization type  applicable to
+      geographic area.
+      Each type has possible quality levels (csmDomainCurrentSourceQl).
+      Upon changing a type value, Agent will delete all the clock sources
+      parameters, i.e all the entries in csmSourceTable.
+      Therefore, this table should be configured prior to the csmSourceTable."
+    ::= { csmDomainEntry 5 }
+
+csmDomainQlMinimum    OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       type1Prc         (1),
+       type1SsuA        (2),
+       type1SsuB        (3),
+       type1Sec         (4),
+       type1Dnu         (5),
+       type1SsmBased    (6),
+
+-- Remaining values until 20 are reserved for type 1.
+
+       type2Prs         (21),
+       type2Stu         (22),
+       type2St2         (23),
+       type2Tnc         (24),
+       type2St3e        (25),
+       type2St3         (26),
+       type2Smc         (27),
+       type2St4         (28),
+       type2Dus         (29),
+       type2SsmBased    (30),
+       type2Prov        (31),
+
+
+-- Remaining values until 40 are reserved for type 2.
+
+       type3Unk         (41),
+       type3Sec         (42),
+       type3Dnu         (43),
+       type3SsmBased    (44)
+
+-- Remaining values until 60 are reserved for type 2.
+
+    }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This object determines the minimum Quality Level(QL) of the clock
+      which is sent out via station clock connector.
+      QL value is Set according to the defined type in csmDomainSynchNetType.
+      Applicable only when device contains station clock connector."
+    ::= { csmDomainEntry 6 }
+
+csmDomainExternalCmd OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       off       (2),
+       forced    (3),
+       manual    (4),
+       clear     (5)
+    }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "An external command .
+      forced - It will override the currently clock source.
+      csmDomainExtCmdParam determines the desired clock source.
+      This clock source will be selected.
+      This override is applicable until device reset or 'clear' value is Set.
+
+      manual - It will override the Priority.
+      csmDomainExtCmdParam determines the desired clock source.
+      This clock source should be selectable.
+      CSM might not perform the override action, for example when the quality
+      of csmDomainExtCmdParam is lower than the quality of csmDomainSysSourceId.
+      This override is applicable until device reset or 'clear' value is Set.
+
+      clear - clears the Forced or Manual  modes and causes the
+      Clock Selection Logic to perform the automatic Clock Selection.
+
+      After Setting each of the values above, Agent will turn the value
+      automatically to off(2).
+      Default=off (2)."
+    ::= { csmDomainEntry 7 }
+
+csmDomainExtCmdParam OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "This object determines the required clock source number when
+     csmDomainExternalCmd is set to forced(3) or manual(4).
+     When 'forced' value is Set, CSM will switch the clock source
+     to csmDomainExtCmdParam always.
+     When 'manual' value is Set, CSM may not switch the clock source
+     to csmDomainExtCmdParam, for example when its QL is lower than the
+     current one (csmDomainSysSourceId).
+     Default=1."
+    ::= { csmDomainEntry 8 }
+
+csmDomainClearStatCounters  OBJECT-TYPE
+      SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will enforce a clear operation of CSM
+      statistics Counters. The command will clear statistics from all
+      sources in csmSourceTable.
+      Upon completion, the value will automatically change to off(2).
+      Default=off(2)."
+     ::= { csmDomainEntry 9}
+
+csmDomainSysSourceId OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "System Clock Source ID.
+      0 = Source Clock is internal.
+      Max value is Max number of existing Clock sources.
+      For standard projects Max number of clock sources is 8,
+      and for non standard projects it is project dependent."
+    ::= { csmDomainEntry 10 }
+
+csmDomainCurrentSourceQl      OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       type1Prc         (1),
+       type1SsuA        (2),
+       type1SsuB        (3),
+       type1Sec         (4),
+       type1Dnu         (5),
+       type1SsmBased    (6),
+
+-- Remaining values until 20 are reserved for type 1.
+
+       type2Prs         (21),
+       type2Stu         (22),
+       type2St2         (23),
+       type2Tnc         (24),
+       type2St3e        (25),
+       type2St3         (26),
+       type2Smc         (27),
+       type2St4         (28),
+       type2Dus         (29),
+       type2SsmBased    (30),
+       type2Prov        (31),
+
+-- Remaining values until 40 are reserved for type 2.
+
+       type3Unk         (41),
+       type3Sec         (42),
+       type3Dnu         (43),
+       type3SsmBased    (44)
+
+-- Remaining values until 60 are reserved for type 3.
+
+    }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+    "The actual QL of csmDomainCurrentSourceId dependent on
+     csmDomainSynchNetType."
+    ::= { csmDomainEntry 11 }
+
+csmDomainStationOutSourceId  OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "The Clock Source ID, which is sent out via station clock connector.
+      When equals 0, clock Source is internal.
+      Applicable only when device contains station clock connector."
+    ::= { csmDomainEntry 12 }
+
+csmDomainSysSourceState   OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       freeRun  (1),
+       holdover (2),
+       locked   (3)
+      }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "The system selected clock source state.
+      freeRun - internal clock is in use.
+      holdover - incoming reference is in signal fail state (SSF = true).
+      locked - incoming reference is not in the signal fail state
+      (SSF = false) and quality level of the incoming reference is
+       better than Internal Clock."
+        ::= { csmDomainEntry 13 }
+
+csmDomainStationOutSourceState    OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       unlocked(2),
+       locked  (3)
+
+      }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+      "The state of the Clock Source, which is sent out via station
+      clock connector.
+      locked - incoming reference to station clock is not in the signal
+      fail state (SSF = false) and the quality level of the incoming reference
+      is better than Internal Clock.
+      unlocked - incoming reference to station clock goes into the signal
+      fail state.
+      Applicable only when device contains station clock connector."
+    ::= { csmDomainEntry 14 }
+
+csmDomainForceSwitchState     OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       active  (2),
+       inActive  (3)
+      }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+      "The state of the Force Switch.
+       active - The Force Switch action is active
+       inActive - The Force Switch action is not active."
+    ::= { csmDomainEntry 15 }
+
+
+csmDomainManualSwitchState    OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       active  (2),
+       inActive  (3)
+      }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+      "The state of the Manual Switch.
+       active - The Manual Switch action is active
+       inActive - The Manual Switch action is not active."
+    ::= { csmDomainEntry 16 }
+
+csmDomainForceT4AsT0      OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+       off (2),
+       on  (3)
+      }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+      "Ensure that t0 and t4 are derived from the same source (in case t4 is
+      not driven from external source while t0 is)."
+    ::= { csmDomainEntry 17 }
+
+csmDomainMaxFrequencyDeviation    OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+      "This is the frequency deviation threshold. If the actual input clock
+      frequency deviation exceeds this threshold,  the given synchronization
+      source is disqualified and the synchronization signal fail (SSF) is
+      generated by the SEC device.
+      The value in hundreds of ppm in range 381-6096.
+      the value configured is effective for all HW inputs.
+      Default value = 1524."
+    ::= { csmDomainEntry 18 }
+
+csmDomainDescr          OBJECT-TYPE
+     SYNTAX      SnmpAdminString
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+      "The description of the domain"
+    ::= { csmDomainEntry 19 }
+
+
+csmDomainLastSystemSrcClkSwitchReason   OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+        other(1),
+        manualSwitchCommand(2),
+        forceSwitchCommand(3),
+        invalidClock(4),
+        betterClockAvailability(5),
+        notApplicable(255)
+      }
+     MAX-ACCESS  read-only
+     STATUS  current
+        DESCRIPTION
+        "Reason of the last system source clock switch.
+            (1)  Other
+            (2)  Manual Switch Command
+            (3) Force Switch Command
+            (4) Invalid Clock
+            (5)  Better  Clock Availability
+            (255) Not Applicable
+        "
+        ::= { csmDomainEntry 20 }
+
+
+csmDomainLastStationSrcClkSwitchReason   OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+    other(1),
+    manualSwitchCommand(2),
+    forceSwitchCommand(3),
+    invalidClock(4),
+    betterClockAvailability(5),
+    notApplicable(255)
+    }
+     MAX-ACCESS  read-only
+     STATUS  current
+    DESCRIPTION
+        "Reason of the last station source clock switch.
+            (1)  Other
+            (2)  Manual Switch Command
+            (3) Force Switch Command
+            (4) Invalid Clock
+            (5)  Better  Clock Availability
+            (255) Not Applicable
+        "
+        ::= { csmDomainEntry 21 }
+
+-- CSM Source Table
+
+csmSourceTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF CsmSourceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "CSM Clock Sources Table."
+    ::= { csm 2 }
+
+csmSourceEntry OBJECT-TYPE
+    SYNTAX  CsmSourceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  {csmSourceDomainIdx, csmSourceIdx }
+    ::= { csmSourceTable 1 }
+
+CsmSourceEntry ::= SEQUENCE {
+    csmSourceDomainIdx                  Unsigned32,
+    csmSourceIdx                        Unsigned32,
+    csmSourceRowStatus                  RowStatus,
+    csmSourceType                       INTEGER,
+    csmSourceID                         Unsigned32,
+    csmSourceQL                         INTEGER,
+    csmSourcePriority                   Unsigned32,
+    csmSourceHoldoffTimer               Unsigned32,
+    csmSourceWtrTimer                   Unsigned32,
+    csmSourceWtrClear                   INTEGER,
+    csmSourceStatus                     INTEGER,
+    csmSourceTxQL                       INTEGER,
+    csmSourceRxQL                       INTEGER,
+    csmSourceEsmcState                  INTEGER,
+    csmSourceEsmcTxInfoFrames           Counter32,
+    csmSourceEsmcRxInfoFrames           Counter32,
+    csmSourceEsmcFailures               Counter32,
+    csmkSourceEsmcTxEventFrames         Counter32,
+    csmSourceEsmcRxEventFrames          Counter32,
+    csmSourceWTRState                   Unsigned32 
+ }
+
+
+csmSourceDomainIdx OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This is the unique CSM Domain index
+     that the current clock source is referenced to."
+    ::= { csmSourceEntry 1 }
+
+csmSourceIdx OBJECT-TYPE
+     SYNTAX  Unsigned32 (1..4294967295)
+     MAX-ACCESS  not-accessible
+     STATUS  current
+     DESCRIPTION
+     "CSM Source running index.
+      For standard projects Max number of clock sources is 8,
+      and for non standard projects it is project dependent."
+    ::= { csmSourceEntry 2 }
+
+csmSourceRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of entries
+     in the csmSourceTable.
+     It will not be possible to add entries with csmSourceDomainIdx
+     that doesn't exist in csmDomainTable. "
+    ::= { csmSourceEntry 3 }
+
+csmSourceType     OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+      rxPort        (1),
+      station       (2),
+      recovered     (3),
+      adaptive      (4),
+      domain        (5),
+      internalGps   (6)
+     }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "Source type."
+    ::= { csmSourceEntry 4 }
+
+csmSourceID OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "ID of the clock source.
+     ID depends on type as follows:
+     rxPort - ifIndex of the interface configured for the csmSourceIdx.
+     station - Station ID.
+     recovered - Recovered ID (agnClkSrcPortIdx when
+                 agnClkSrcPortSrcIdx=recovered(3)).
+     adaptive - Distributed ID (agnClkSrcPortIdx when
+                agnClkSrcPortSrcIdx=distributed(4)).
+     domain - Domain ID (a domain defined by csmDomainIdx in csmDomainTable)."
+    ::= { csmSourceEntry 5 }
+
+csmSourceQL   OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       type1Prc         (1),
+       type1SsuA        (2),
+       type1SsuB        (3),
+       type1Sec         (4),
+       type1Dnu         (5),
+       type1SsmBased    (6),
+
+-- Remaining values until 20 are reserved for type 1.
+
+       type2Prs         (21),
+       type2Stu         (22),
+       type2St2         (23),
+       type2Tnc         (24),
+       type2St3e        (25),
+       type2St3         (26),
+       type2Smc         (27),
+       type2St4         (28),
+       type2Dus         (29),
+       type2SsmBased    (30),
+       type2Prov        (31),
+
+-- Remaining values until 40 are reserved for type 2.
+
+       type3Unk         (41),
+       type3Sec         (42),
+       type3Dnu         (43),
+       type3SsmBased    (44)
+
+-- Remaining values until 60 are reserved for type 2.
+
+    }
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The configured quality level of csmSourceIdx.
+      Default= ssmBased (type1SsmBased(6)/type2SsmBased(30)/type3SsmBased(43))
+      according to the type (csmDomainSynchNetType from csmDomainTable)
+      of the domain that this clock source belongs to."
+    ::= { csmSourceEntry 6 }
+
+csmSourcePriority OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "The configured priority. Priority will be used for source selection
+      when the Quality Levels of the clock sources cannot be used (for example
+      when Quality Level of some clock sources are equal or when
+      csmDomainQlMode = disable (2)).The priority value can be from 1 to K,
+      where K is maximum number of clock sources for the system. The priority
+      value 0 means priority disable. The Clock Source having priority disable
+      value is not taken to the selection process"
+    ::= { csmSourceEntry 7 }
+
+csmSourceHoldoffTimer   OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "Holdoff Timer in msec.
+      When Holdoff Timer>0, and the current clock source fails (SSF),
+      timer is started and doesn't trigger the CSM immediately to switch to
+      another clock source.
+      In this case, when Holdoff Timer expired (or 0 initially),
+      the CSM will switch the clock source immediately.
+      Valid values are: 300..1800.
+      Default= 300."
+    ::= {csmSourceEntry 8 }
+
+csmSourceWtrTimer  OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-create
+     STATUS  current
+     DESCRIPTION
+     "Wait to Restore (WTR) time in msec.
+      After failed clock source recovers, in order to prevent frequent
+      clock source switchings of the CSM due to intermittent defects,
+      a period of time will pass before
+      CSM will return to the recovered source. This period of time
+      is the WTR time.
+      Valid values are: 0..720,000 msec.
+      Default=300,000 msec (=5 minutes)."
+    ::= { csmSourceEntry 9 }
+
+csmSourceWtrClear  OBJECT-TYPE
+      SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will clear WTR, causing immediate
+      return to recovered source.
+      Upon completion, the value will automatically change to off(2).
+      Default=off(2).
+      After operation is performed, value of csmSourceWtrTimer
+      will be the configured value(not 0)."
+      ::= { csmSourceEntry 10}
+
+csmSourceStatus       OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       ok             (1),
+       physicalFail   (2),
+       monitoringFail (3),
+       esmcFail       (4)
+      }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "Clock Source Status.
+      physicalFail(2)- Physical interface failure.
+      monitoringFail(3)- Clock Selection HW failure (SSF = true).
+      esmcFail(4)- Fail report received via ESMC protocol."
+    ::= { csmSourceEntry 11 }
+
+csmSourceTxQL     OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       type1Prc         (1),
+       type1SsuA        (2),
+       type1SsuB        (3),
+       type1Sec         (4),
+       type1Dnu         (5),
+       type1SsmBased    (6),
+
+-- Remaining values until 20 are reserved for type 1.
+
+       type2Prs         (21),
+       type2Stu         (22),
+       type2St2         (23),
+       type2Tnc         (24),
+       type2St3e        (25),
+       type2St3         (26),
+       type2Smc         (27),
+       type2St4         (28),
+       type2Dus         (29),
+       type2SsmBased    (30),
+       type2Prov        (31),
+
+-- Remaining values until 40 are reserved for type 2.
+
+       type3Unk         (41),
+       type3Sec         (42),
+       type3Dnu         (43),
+       type3SsmBased    (44)
+
+-- Remaining values until 60 are reserved for type 2.
+
+    }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "The reported Quality Level(QL)from Clock Selection Module(CSM)
+     to Clock Source."
+    ::= { csmSourceEntry 12 }
+
+
+csmSourceRxQL     OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       type1Prc         (1),
+       type1SsuA        (2),
+       type1SsuB        (3),
+       type1Sec         (4),
+       type1Dnu         (5),
+       type1SsmBased    (6),
+
+-- Remaining values until 20 are reserved for type 1.
+
+       type2Prs         (21),
+       type2Stu         (22),
+       type2St2         (23),
+       type2Tnc         (24),
+       type2St3e        (25),
+       type2St3         (26),
+       type2Smc         (27),
+       type2St4         (28),
+       type2Dus         (29),
+       type2SsmBased    (30),
+       type2Prov        (31),
+
+-- Remaining values until 40 are reserved for type 2.
+
+       type3Unk         (41),
+       type3Sec         (42),
+       type3Dnu         (43),
+       type3SsmBased    (44)
+
+-- Remaining values until 60 are reserved for type 2.
+
+    }
+
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+      "The reported Quality Level(QL)Clock Source to Clock Selection Module."
+    ::= { csmSourceEntry 13 }
+
+
+csmSourceEsmcState    OBJECT-TYPE
+     SYNTAX  INTEGER
+    {
+       unlock (2),
+       lock(3)
+
+             }
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "ESMC Protocol state.
+      unlock - Messages are not received as expected.
+      lock- OK.
+      Applicable only for Ethernet interfaces."
+    ::= { csmSourceEntry 14 }
+
+csmSourceEsmcTxInfoFrames OBJECT-TYPE
+     SYNTAX  Counter32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "Number of informational ESMC messages sent from Clock Selection
+      Module(CSM) to Clock Source.
+      Applicable only for Ethernet interfaces."
+    ::= { csmSourceEntry 15 }
+
+csmSourceEsmcRxInfoFrames OBJECT-TYPE
+     SYNTAX  Counter32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "Number of informational ESMC messages received by Clock
+      Selection Module(CSM) .
+      Applicable only for Ethernet interfaces."
+    ::= { csmSourceEntry 16 }
+
+csmSourceEsmcFailures OBJECT-TYPE
+     SYNTAX  Counter32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "Number of times that ESMC messages were not received as expected.
+      Applicable only for Ethernet interfaces."
+    ::= { csmSourceEntry 17 }
+
+csmkSourceEsmcTxEventFrames OBJECT-TYPE
+     SYNTAX  Counter32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "Number of ESMC messages that report status change of the clock source
+      (csmSourceStatus) that were sent from Clock Selection Module(CSM)
+      to Clock Source.
+      Applicable only for Ethernet interfaces."
+     ::= { csmSourceEntry 18 }
+
+csmSourceEsmcRxEventFrames OBJECT-TYPE
+     SYNTAX  Counter32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "Number of ESMC messages that report status change of the clock source
+      (csmSourceStatus) that were received by Clock Selection Module(CSM).
+      Applicable only for Ethernet interfaces."
+    ::= { csmSourceEntry 19 }
+
+csmSourceWTRState OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+     "Wait to restore state.
+      Use the number (2) to indicate 'running' state,
+      Use the number (3) to indicate 'inactive' state,
+      All other numbers can be use to indicate the current WTR time."
+    ::= { csmSourceEntry 20 }
+
+
+
+
+
+--***********************
+--Clock Port Definitions
+--***********************
+
+agnClockPorts   OBJECT IDENTIFIER ::= { agnClockSource 6 }
+
+agnClkstationClkCableMode OBJECT-TYPE
+    SYNTAX  INTEGER {
+        normal        (2),
+        yCable        (3)
+        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This configuration parameter indicates whether both Station
+            clocks are designated to get their clocks from the same
+            source (Y-Cable) or each one gets its clock independently."
+    ::= { agnClockPorts 1 }
+
+agnClkTodBaudrate       OBJECT-TYPE
+    SYNTAX    INTEGER
+    {
+     r2400bps        (1),
+     r4800bps        (2),
+     r9600bps        (3),
+     r14400bps       (4),
+     r19200bps       (5),
+     r38400bps       (6),
+     r57600bps       (7),
+     r115200bps      (8)
+    }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+        "This object  TBD .
+        Default: 4800pbs "
+    ::= { agnClockPorts 2 }
+
+
+agnPtpClkNetMetricsCurrentTable     OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkNetMetricsCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Clock network metrics current statistics table."
+    ::= { agnPtpClk 9 }
+
+agnPtpClkNetMetricsCurrentEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkNetMetricsCurrentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the table."
+    INDEX   { agnPtpClkNetMetricsCurrentSlaveIndex, agnPtpClkNetMetricsCurrentDirection ,
+              agnPtpClkNetMetricsCurrentId  }
+    ::= { agnPtpClkNetMetricsCurrentTable 1 }
+
+AgnPtpClkNetMetricsCurrentEntry ::= SEQUENCE {
+    agnPtpClkNetMetricsCurrentSlaveIndex       Unsigned32,
+    agnPtpClkNetMetricsCurrentDirection        INTEGER,
+    agnPtpClkNetMetricsCurrentId               Unsigned32,
+    agnPtpClkNetMetricsCurrentTau              Unsigned32,
+    agnPtpClkNetMetricsCurrentTdev             Gauge32,
+    agnPtpClkNetMetricsCurrentMinTdev          Gauge32,
+    agnPtpClkNetMetricsCurrentElapsedTime      Gauge32 
+ }
+
+agnPtpClkNetMetricsCurrentSlaveIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An Index that is uniquely represents the Clock entity.
+         The index shall be equal to agnPtpClkId."
+    ::= { agnPtpClkNetMetricsCurrentEntry 1 }
+
+agnPtpClkNetMetricsCurrentDirection OBJECT-TYPE
+SYNTAX  INTEGER
+     {
+        masterToSlave  (1),
+        slaveToMaster  (2)
+     }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the direction of the statistics."
+    ::= { agnPtpClkNetMetricsCurrentEntry 2 }
+
+agnPtpClkNetMetricsCurrentId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the metrics ID."
+    ::= { agnPtpClkNetMetricsCurrentEntry 3 }
+
+agnPtpClkNetMetricsCurrentTau    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the measuring window time of the
+        statistics, ( The time is sec )."
+    ::= { agnPtpClkNetMetricsCurrentEntry 4 }
+
+agnPtpClkNetMetricsCurrentTdev           OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A Time Deviation metric based on Allan Variance. Measures standard
+        deviation of a packet network frequency instability (caused by PDV)
+        over a specific observation period Tau."
+    ::= { agnPtpClkNetMetricsCurrentEntry 5 }
+
+agnPtpClkNetMetricsCurrentMinTdev           OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A minimum Time Deviation metric based on Allan variance. Measures
+        frequency instability standard deviation of the early arriving packets
+        only (with minimum network delay) over a specific observation period Tau."
+    ::= { agnPtpClkNetMetricsCurrentEntry 6 }
+
+agnPtpClkNetMetricsCurrentElapsedTime    OBJECT-TYPE
+      SYNTAX      Gauge32
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "The number of seconds that the statistics were accumulated from the last statistic reset."
+      ::= {agnPtpClkNetMetricsCurrentEntry 7}
+
+
+agnPtpClkNetMetricsIntervalTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkNetMetricsIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Clock Net Metrics Interval table
+        The duration of each interval is 1 hour."
+    ::= { agnPtpClk 10 }
+
+agnPtpClkNetMetricsIntervalEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkNetMetricsIntervalEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the Clock Interval statistic table."
+    INDEX       { agnPtpClkNetMetricsIntervalSlaveIndex, agnPtpClkNetMetricsIntervalDirection ,
+              agnPtpClkNetMetricsIntervalId , agnPtpClkNetMetricsIntervalNumber  }
+    ::= { agnPtpClkNetMetricsIntervalTable 1 }
+
+AgnPtpClkNetMetricsIntervalEntry ::= SEQUENCE {
+    agnPtpClkNetMetricsIntervalSlaveIndex       Unsigned32,
+    agnPtpClkNetMetricsIntervalDirection        INTEGER,
+    agnPtpClkNetMetricsIntervalId               Unsigned32,
+    agnPtpClkNetMetricsIntervalNumber           Unsigned32,
+    agnPtpClkNetMetricsIntervalTau              Unsigned32,
+    agnPtpClkNetMetricsIntervalTdev             Gauge32,
+    agnPtpClkNetMetricsIntervalMinTdev          Gauge32,
+    agnPtpClkNetMetricsIntervalElapsedTime      Gauge32 
+ }
+agnPtpClkNetMetricsIntervalSlaveIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An Index that is uniquely represents the Clock entity.
+         The index shall be equal to agnPtpClkId."
+    ::= { agnPtpClkNetMetricsIntervalEntry 1 }
+
+agnPtpClkNetMetricsIntervalDirection OBJECT-TYPE
+    SYNTAX      INTEGER
+     {
+        masterToSlave  (1),
+        slaveToMaster  (2)
+     }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the direction of the statistics"
+    ::= { agnPtpClkNetMetricsIntervalEntry 2 }
+
+agnPtpClkNetMetricsIntervalId       OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the metrics ID."
+    ::= { agnPtpClkNetMetricsIntervalEntry 3 }
+
+agnPtpClkNetMetricsIntervalNumber OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..24)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The Interval Number. This number is between 1 and x, where 1 is the
+         most recently completed interval and x is the least recently
+         completed interval."
+    ::= { agnPtpClkNetMetricsIntervalEntry 4 }
+
+agnPtpClkNetMetricsIntervalTau   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the measuring window time of the
+        statistics ( The time is sec )."
+    ::= { agnPtpClkNetMetricsIntervalEntry 5 }
+
+agnPtpClkNetMetricsIntervalTdev      OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A Time Deviation metric based on Allan Variance. Measures standard
+        deviation of a packet network frequency instability (caused by PDV)
+        over a specific observation period Tau."
+    ::= { agnPtpClkNetMetricsIntervalEntry 6 }
+
+agnPtpClkNetMetricsIntervalMinTdev       OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A minimum Time Deviation metric based on Allan variance. Measures
+        frequency instability standard deviation of the early arriving packets
+        only (with minimum network delay) over a specific observation period Tau."
+    ::= { agnPtpClkNetMetricsIntervalEntry 7 }
+
+agnPtpClkNetMetricsIntervalElapsedTime       OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of seconds that have elapsed since the beginning
+        of the interval."
+    ::= { agnPtpClkNetMetricsIntervalEntry 8 }
+
+
+agnPtpClkNetMetricsIntervalMasterTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkNetMetricsIntervalMasterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table includes the master ID that was active during the interval."
+    ::= { agnPtpClk 11 }
+
+agnPtpClkNetMetricsIntervalMasterEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkNetMetricsIntervalMasterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the Clock Interval table."
+    INDEX       { agnPtpClkNetMetricsIntervalSlaveIndex, agnPtpClkNetMetricsIntervalNumber }
+    ::= { agnPtpClkNetMetricsIntervalMasterTable 1 }
+
+AgnPtpClkNetMetricsIntervalMasterEntry ::= SEQUENCE {
+    agnPtpClkNetMetricsIntervalMasterId         Unsigned32,
+    agnPtpClkNetMetricsIntervalSamplingTime     DateAndTime 
+ }
+agnPtpClkNetMetricsIntervalMasterId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Master ID that was active during the interval."
+    ::= { agnPtpClkNetMetricsIntervalMasterEntry 1 }
+
+agnPtpClkNetMetricsIntervalSamplingTime  OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The date and time of the sampling that occurs during the interval."
+    ::= { agnPtpClkNetMetricsIntervalMasterEntry 2 }
+
+-- agnPtpClkPrtTable
+
+agnPtpClkPrtTable OBJECT-TYPE
+      SYNTAX SEQUENCE OF AgnPtpClkPrtEntry
+      MAX-ACCESS not-accessible
+      STATUS  current
+      DESCRIPTION
+      "G.8275.1 Port Table."
+       ::= { agnPtpClk 12 }
+
+agnPtpClkPrtEntry OBJECT-TYPE
+      SYNTAX AgnPtpClkPrtEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION  "An entry in the table."
+      INDEX {agnPtpClkPrtIdx}
+      ::= { agnPtpClkPrtTable 1}
+
+AgnPtpClkPrtEntry ::= SEQUENCE {
+    agnPtpClkPrtIdx                   Integer32,
+    agnPtpClkPrtSviId                 Integer32,
+    agnPtpClkPrtLowerLayerId          Integer32,
+    agnPtpClkPrtLocalPriority         Integer32,
+    agnPtpClkPrtAsymmetry             Integer32,
+    agnPtpClkPrtProvisionedState      INTEGER,
+    agnPtpClkPrtActualState           INTEGER,
+    agnPtpClkPrtMacAddress            MacAddress,
+    agnPtpClkPrtClkClass              INTEGER,
+    agnPtpClkPrtClkAccuracy           INTEGER,
+    agnPtpClkPrtClkOffsetScaledLogVar INTEGER,
+    agnPtpClkPrtClkIdentity           OCTET STRING,
+    agnPtpClkPrtAnnounceRate          INTEGER,
+    agnPtpClkPrtSyncRate              INTEGER,
+    agnPtpClkPrtDelayRate             INTEGER,
+    agnPtpClkPrtRowStatus             RowStatus,
+    agnPtpClkPrtRxSourcePortId        SnmpAdminString,
+    agnPtpClkPrtGrandMasterIdentity   OCTET STRING,
+    agnPtpClkPrtFrequencyTraceableFlag INTEGER 
+ }
+
+agnPtpClkPrtIdx OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "This object indicates the Idx of the ptp-port."
+      ::= { agnPtpClkPrtEntry 1}
+
+agnPtpClkPrtSviId OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates the Svi Id to which the ptp-port
+      is associated to."
+      ::= { agnPtpClkPrtEntry 2}
+
+agnPtpClkPrtLowerLayerId OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates the IfIndex of the entity to which the
+      SVI associated to."
+      ::= { agnPtpClkPrtEntry 3}
+
+agnPtpClkPrtLocalPriority OBJECT-TYPE
+      SYNTAX Integer32 (1..255)
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates local priority of the ptp-port
+      default value is 128."
+      ::= { agnPtpClkPrtEntry 4}
+
+agnPtpClkPrtAsymmetry OBJECT-TYPE
+      SYNTAX Integer32 (-134217727..134217727)
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates clock signal Assymetry, in nano-seconds
+      default value is 0."
+      ::= { agnPtpClkPrtEntry 5}
+
+agnPtpClkPrtProvisionedState OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+            master        (1),
+            slave         (2),
+            auto          (3),
+            autoNotSlave  (4)
+      }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the ptp-port configured state."
+      ::= { agnPtpClkPrtEntry 6}
+
+
+agnPtpClkPrtActualState OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+            master        (1),
+            slave         (2),
+            auto          (3),
+            autoNotSlave  (4),
+            passive       (5)
+      }
+      MAX-ACCESS  read-only
+      STATUS  current
+      DESCRIPTION
+      "This object indicates the ptp-port actual state."
+      ::= { agnPtpClkPrtEntry 7}
+
+agnPtpClkPrtMacAddress OBJECT-TYPE
+      SYNTAX  MacAddress
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates the ptp-port MAC Address."
+      DEFVAL      { '0180C200000E'H }
+      ::= { agnPtpClkPrtEntry 8}
+
+agnPtpClkPrtClkClass OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+            tgmPrtcLocked                             (6),
+            tgmHoldoverWithinSpec                     (7),
+            tbcHoldoverWithinSpec                     (135),
+            tgmHoldoverOutOfSpecTraceableToCategory1  (140),
+            tbcHoldoverOutOfSpecPrior201407           (145),
+            tgmHoldoverOutOfSpecTraceableToCategory2  (150),
+            tgmHoldoverOutOfSpecTraceableToCategory3  (160),
+            tbcHoldoverOutOfSpec                      (165),
+            tgmTbcNoTimeReference                     (248)
+      }
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates Clock Class.
+      In case the ptp-port actual state is 'Master'- this object will indicate
+      transmitted Clock Class.
+      In case the ptp-port actual state is 'Slave'- this object will indicate
+      received Clock Class.   "
+      ::= { agnPtpClkPrtEntry 9}
+
+agnPtpClkPrtClkAccuracy OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+            r0x21  (1),
+            r0xFe  (2)
+      }
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates Clock Accuarcy.
+      In case the ptp-port actual state is 'Master'- this object will indicate
+      transmitted Clock Accuracy.
+      In case the ptp-port actual state is 'Slave'- this object will indicate
+      received Clock Accuracy"
+      ::= { agnPtpClkPrtEntry 10}
+
+agnPtpClkPrtClkOffsetScaledLogVar OBJECT-TYPE
+      SYNTAX  INTEGER
+      {
+            r0x4E5D  (1),
+            r0xFFFF     (2)
+      }
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates Clock Offset Scaled Variance.
+      In case the ptp-port actual state is 'Master'- this object will indicate
+      transmitted Clock offset scaled variance.
+      In case the ptp-port actual state is 'Slave'- this object will indicate
+      received Clock offset scaled variance."
+      ::= { agnPtpClkPrtEntry 11}
+
+
+agnPtpClkPrtClkIdentity OBJECT-TYPE
+      SYNTAX  OCTET STRING
+      MAX-ACCESS read-create
+      STATUS current
+      DESCRIPTION
+      "This object indicates Clock Identity.
+      In case the ptp-port actual state is 'Master'- this object will indicate
+      transmitted Clock Identity.
+      In case the ptp-port actual state is 'Slave'- this object will indicate
+      transmitted Clock Identity.
+      For MiCLK it contains the clock identity of the G.8275.1 Slave."
+      ::= { agnPtpClkPrtEntry 12}
+
+agnPtpClkPrtAnnounceRate OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable   (1),
+        r32pps          (2),
+        r64pps          (3),
+        r128pps         (4),
+        r16pps          (5),
+        r8pps           (6)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Announce Rate of the packets,
+         which are transmitted or received through this port."
+    ::= { agnPtpClkPrtEntry 13 }
+
+agnPtpClkPrtSyncRate OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable   (1),
+        r32pps          (2),
+        r64pps          (3),
+        r128pps         (4),
+        r16pps          (5),
+        r8pps           (6)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Sync Rate of the packets,
+         which are transmitted or received through this port."
+    ::= { agnPtpClkPrtEntry 14 }
+
+agnPtpClkPrtDelayRate OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable   (1),
+        r32pps          (2),
+        r64pps          (3),
+        r128pps         (4),
+        r16pps          (5),
+        r8pps           (6)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object indicates the Delay Rate of the packets,
+         which are transmitted or received through this port."
+    ::= { agnPtpClkPrtEntry 15 }
+
+agnPtpClkPrtRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of entries
+     in the agnPtpClkPrtTable."
+    ::= { agnPtpClkPrtEntry 16 }
+
+agnPtpClkPrtRxSourcePortId OBJECT-TYPE
+      SYNTAX  SnmpAdminString
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+      "This object is relevant for ptp-Port associated to Slave entity only.
+      This object indicates received source port identity, as it is received
+      in 1588 messages."
+      ::= { agnPtpClkPrtEntry 17}
+
+agnPtpClkPrtGrandMasterIdentity OBJECT-TYPE
+      SYNTAX  OCTET STRING
+      MAX-ACCESS read-only
+      STATUS current
+      DESCRIPTION
+      "This object is relevant for ptp-Port associated to Slave entity only.
+      This object indicates received source port identity, as it is received
+      in 1588 announce messages only."
+      ::= { agnPtpClkPrtEntry 18}
+
+agnPtpClkPrtFrequencyTraceableFlag OBJECT-TYPE
+    SYNTAX      INTEGER {
+        notApplicable   (1),
+        traceable       (2),
+        notTraceable    (3)
+
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The frequencyTraceable flag may be traceable or notTraceable,
+         depending on the availability of a PRC-tracable physical
+         layer frequency input signal."
+    ::= { agnPtpClkPrtEntry 19 }
+
+
+
+-- agnPtpClkPrtCounterTable
+
+agnPtpClkPrtCounterTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AgnPtpClkPrtCounterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table contains counters for Hop by Hop Cloclc Ports
+        (G.8275.1) ."
+    ::= { agnPtpClk 13 }
+
+agnPtpClkPrtCounterEntry OBJECT-TYPE
+    SYNTAX      AgnPtpClkPrtCounterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the Table."
+    INDEX       { agnPtpClkPrtCounterIdx }
+    ::= { agnPtpClkPrtCounterTable 1 }
+
+AgnPtpClkPrtCounterEntry ::= SEQUENCE {
+    agnPtpClkPrtCounterIdx                      Integer32,
+    agnPtpClkPrtCounterClearCounters            INTEGER,
+    agnPtpClkPrtCounterTxAnnouncePackets        Counter64,
+    agnPtpClkPrtCounterRxAnnouncePackets        Counter64,
+    agnPtpClkPrtCounterTxSyncPackets            Counter64,
+    agnPtpClkPrtCounterRxSyncPackets            Counter64,
+    agnPtpClkPrtCounterTxDelayReqPackets        Counter64,
+    agnPtpClkPrtCounterTxDelayResPackets        Counter64,
+    agnPtpClkPrtCounterRxDelayReqPackets        Counter64,
+    agnPtpClkPrtCounterRxDelayResPackets        Counter64 
+ }
+
+agnPtpClkPrtCounterIdx OBJECT-TYPE
+      SYNTAX Integer32 (1..2147483647)
+      MAX-ACCESS not-accessible
+      STATUS current
+      DESCRIPTION
+      "This object indicates the Idx of the ptp-port."
+      ::= { agnPtpClkPrtCounterEntry 1}
+
+agnPtpClkPrtCounterClearCounters OBJECT-TYPE
+    SYNTAX  INTEGER
+       {
+       off(2),
+       on (3)
+       }
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "Setting this object to on, will enforce a clear statistics
+      counters. The command will clear statistics from all
+      agnPtpClkPrtCounterTable.
+      Upon completion, the value will automatically change to off(2).
+      Default=off(2)."
+      ::= { agnPtpClkPrtCounterEntry 2 }
+
+agnPtpClkPrtCounterTxAnnouncePackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Announce packets transmitted by the port."
+    ::= { agnPtpClkPrtCounterEntry 3 }
+
+agnPtpClkPrtCounterRxAnnouncePackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Announce packets received by the port."
+    ::= { agnPtpClkPrtCounterEntry 4 }
+
+agnPtpClkPrtCounterTxSyncPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Sync packets transmitted by the port."
+    ::= { agnPtpClkPrtCounterEntry 5 }
+
+agnPtpClkPrtCounterRxSyncPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Sync packets received by the port."
+    ::= { agnPtpClkPrtCounterEntry 6 }
+
+agnPtpClkPrtCounterTxDelayReqPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Delay Request packets transmitted by the port."
+    ::= { agnPtpClkPrtCounterEntry 7 }
+
+agnPtpClkPrtCounterTxDelayResPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Delay Response packets transmitted by the port."
+    ::= { agnPtpClkPrtCounterEntry 8 }
+
+agnPtpClkPrtCounterRxDelayReqPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Delay Request packets received by the port."
+    ::= { agnPtpClkPrtCounterEntry 9 }
+
+agnPtpClkPrtCounterRxDelayResPackets OBJECT-TYPE
+    SYNTAX       Counter64
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+    "The sum of Delay Response packets received by the port."
+    ::= { agnPtpClkPrtCounterEntry 10 }
+
+
+-- Clock Traps
+
+agnClkSrcStateChangeTrap  NOTIFICATION-TYPE
+	OBJECTS { agnClkSrcPortState } 
+     STATUS current
+     DESCRIPTION
+     "The trap is sent upon change in Recovery Clock State."
+     ::= { systemsEvents 28 }
+
+agnCurrClkStateChangeTrap NOTIFICATION-TYPE
+	OBJECTS { agnCurrClkState } 
+     STATUS current
+     DESCRIPTION
+     "The trap is sent upon change in the state of the current (active) clock,
+      when it is a Recovery Clock."
+     ::= { systemsEvents 30 }
+
+agnClkSrcFrequencyAlarmTrap  NOTIFICATION-TYPE
+     STATUS current
+     DESCRIPTION
+     "The trap is sent upon Recovered Clock Frequency alarm."
+     ::= { systemsEvents 31 }
+
+
+-----------------------------------
+-- Clock Common Trap Definitions
+-----------------------------------
+
+clockDomainSystemClockUnlock     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     csmDomainDescr, csmDomainSysSourceState } 
+    STATUS      current
+    DESCRIPTION
+    "Domain system clock state changed to one of: freerun, holdover or locked."
+     ::= { clockEvents 1 }
+
+clockDomainStationClockQlLow        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     csmDomainDescr, csmDomainStationOutSourceId, csmDomainQlMode, 
+     csmDomainQlMinimum, csmDomainCurrentSourceQl } 
+    STATUS      current
+    DESCRIPTION
+    "Domain clock quality level below minimum."
+     ::= { clockEvents 3 }
+
+
+sourceClockFailure              NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     csmDomainDescr, csmSourceStatus } 
+    STATUS      current
+    DESCRIPTION
+    "Source Clock Failure."
+     ::= { clockEvents 4 }
+
+stationClockLos                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias } 
+    STATUS      current
+    DESCRIPTION
+    "Loss of signal (LOS)."
+     ::= { clockEvents 7 }
+
+clockDomainStationClockUnlock     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     csmDomainDescr, csmDomainStationOutSourceState } 
+    STATUS      current
+    DESCRIPTION
+    "Domain station clock state changed to unlocked."
+     ::= { clockEvents 8 }
+
+     --reserved      ::= { clockEvents 9 }
+
+
+ptpRecoveredNoPtpMaster          NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates No PTP Master "
+     ::= { clockEvents 10}
+
+
+ptpRecoveredInvalidFreqAccuracy        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates Unacceptable Frequency Accuracy "
+     ::= { clockEvents 11}
+
+ptpRecoveredInvalidTimeAccuracy             NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates  Unacceptable Time Accuracy  "
+     ::= { clockEvents 12}
+
+ptpRecoveredDisqualifiedMaster               NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnPtpClkIndicatedQl } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates Master Disqualification   "
+     ::= { clockEvents 13}
+
+ ptpRecoveredMasterSyncFail                   NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnPtpMultiMasterDescr } 
+      STATUS            current
+      DESCRIPTION
+      "This Notification indicates Master Sync Failure "
+     ::= { clockEvents 14}
+
+ ptpRecoveredMasterAnnounceFail                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnPtpMultiMasterDescr } 
+                STATUS            current
+      DESCRIPTION
+      " This Notification indicates Master Announce Failure"
+     ::= { clockEvents 15}
+
+ ptpRecoveredMasterDelayRespFail           NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnPtpMultiMasterDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates Master Delay Response Failure "
+     ::= { clockEvents 16}
+
+ptpRecoveredPtpStateChange      NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnClkSrcPortState } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that there was a change in the 1588 state machine."
+     ::= { clockEvents 17}
+
+ptpRecoveredSevereFreqCondition  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that network conditions might cause frequency recovery degradation."
+     ::= { clockEvents 18}
+
+ptpRecoveredSevereTimeCondition     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that network conditions might cause time recovery degradation."
+     ::= { clockEvents 19}
+
+ptpRecoveredMasterSwitchover     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnPtpClkActiveMaster } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that a switchover to another PTP master occured."
+     ::= { clockEvents 20}
+
+ptpRecoveredMasterUnicastNegFail     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnPtpMultiMasterDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates unicast negotiation failure"
+     ::= { clockEvents 21}
+
+clockDomainSystemSrcClockChange  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias, csmSourceQL, csmDomainLastSystemSrcClkSwitchReason } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that a switchover(change of reference clock) occurred."
+     ::= { clockEvents 22}
+
+clockDomainStationSrcClockChange        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias, csmSourceQL, csmDomainLastStationSrcClkSwitchReason } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that the domain station source clock changed."
+     ::= { clockEvents 23}
+
+ptpMasterUnavailableTod    NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates unavailable time of day (TOD)."
+     ::= { clockEvents 24}
+
+ptpMasterUnavailable1pps      NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates unavailable 1pps."
+     ::= { clockEvents 25}
+
+ptpMasterSlavesLimitReached      NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnPtpClkPortMaxSlaves } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that slaves limit was reached."
+     ::= { clockEvents 26}
+
+ptpMasterGrantedServiceAborted        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that the granted service was aborted."
+     ::= { clockEvents 27}
+
+ptpMasterSlaveRequestDenied         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that slave request was denied."
+     ::= { clockEvents 28}
+
+ptpRecoveredSevereTimeConditionO     NOTIFICATION-TYPE
+	OBJECTS { agnClkSrcPortDescr } 
+      STATUS            deprecated
+      DESCRIPTION
+      " This Notification indicates that network conditions might cause time recovery degradation.
+      The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 29}
+
+ptpRecoveredMasterSwitchoverO     NOTIFICATION-TYPE
+	OBJECTS { agnClkSrcPortDescr, agnPtpClkActiveMaster } 
+      STATUS            deprecated
+      DESCRIPTION
+      " This Notification indicates that a switchover to another PTP master occured.
+      The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 30}
+
+ptpRecoveredMasterUnicastNegFailO     NOTIFICATION-TYPE
+	OBJECTS { agnPtpMultiMasterDescr } 
+      STATUS            deprecated
+      DESCRIPTION
+      " This Notification indicates unicast negotiation failure.
+      The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 31}
+
+ptpRecoveredNoPtpMasterO          NOTIFICATION-TYPE
+	OBJECTS { agnClkSrcPortDescr } 
+      STATUS            deprecated
+      DESCRIPTION
+      " This Notification indicates No PTP Master.
+      The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 32}
+
+ptpRecoveredInvalidTimeAccuracyO             NOTIFICATION-TYPE
+	OBJECTS { agnClkSrcPortDescr } 
+      STATUS            deprecated
+      DESCRIPTION
+      " This Notification indicates  Unacceptable Time Accuracy.
+      The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 33}
+
+ptpRecoveredMasterSyncFailO                   NOTIFICATION-TYPE
+	OBJECTS { agnPtpMultiMasterDescr } 
+      STATUS            deprecated
+      DESCRIPTION
+      "This Notification indicates Master Sync Failure.
+        The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 34}
+
+ ptpRecoveredMasterAnnounceFailO                NOTIFICATION-TYPE
+	OBJECTS { agnPtpMultiMasterDescr } 
+                STATUS            deprecated
+      DESCRIPTION
+      " This Notification indicates Master Announce Failure.
+        The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 35}
+
+ ptpRecoveredMasterDelayRespFailO           NOTIFICATION-TYPE
+	OBJECTS { agnPtpMultiMasterDescr } 
+      STATUS            deprecated
+      DESCRIPTION
+      " This Notification indicates Master Delay Response Failure.
+        The 'O' at the end of the trap name mean 'Old'."
+     ::= { clockEvents 36}
+
+systemSourceClockFailure                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, ifAlias } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates Source clock failure."
+      ::= { clockEvents 37 }
+
+g82751MasterTxClkClassChange                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnPtpClkPrtClkClass, agnPtpClkPrtFrequencyTraceableFlag } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 master clock Tx class change."
+      ::= { clockEvents 38 }
+
+g82751RecoveredFreqStateChange                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnClkSrcPortState } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) clock frequency state change."
+      ::= { clockEvents 39 }
+
+g82751RecoveredTimeStateChange                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnClkSrcPortTimeState } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) clock time state change."
+      ::= { clockEvents 40 }
+
+g82751RecoveredRxClkClsChange                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnPtpClkPrtClkClass, agnPtpClkPrtFrequencyTraceableFlag } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) Rx clock class change."
+      ::= { clockEvents 41 }
+
+g82751RecoveredSlavePortChange                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnClkSrcPort } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) slave port change."
+      ::= { clockEvents 42 }
+
+
+g82751RecoveredGMChange                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnPtpClkPrtGrandMasterIdentity } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) grand master change."
+      ::= { clockEvents 43 }
+
+g82751RecoveredNoMaster                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates there is no Master clock for
+       G.8275.1 recovered (slave) entity."
+      ::= { clockEvents 44 }
+
+g82751RecoveredFreqOutOfSpec                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) entity
+      receives clock signal with frequency accuracy out of
+      specification."
+      ::= { clockEvents 45 }
+
+g82751RecoveredTimeOutOfSpec                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) entity
+      receives clock signal with bad time accuracy."
+      ::= { clockEvents 46 }
+
+g82751RecoveredDisqualMaster                       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnPtpClkPrtClkClass, agnPtpClkPrtFrequencyTraceableFlag } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) entity
+      has no qualified Master."
+      ::= { clockEvents 47 }
+
+g82751RecoveredSyncFail                            NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) entity
+      sync rate failure."
+      ::= { clockEvents 48 }
+
+g82751RecoveredAnnounceFail                        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) entity
+      announce rate failure."
+      ::= { clockEvents 49 }
+
+g82751RecoveredDelayRespFail                        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates G.8275.1 recovered (slave) entity
+      delay response rate failure."
+      ::= { clockEvents 50 }
+
+ptpRecoveredTimeStateChange      NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     agnClkSrcPortDescr, agnClkSrcPortTimeState } 
+      STATUS            current
+      DESCRIPTION
+      " This Notification indicates that there was a change in the 1588 time
+        state machine."
+     ::= { clockEvents 51}
+
+-- GNSS
+
+GnssMode             ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TEXTUAL CONVENTION defines the GNSS mode."
+    SYNTAX  INTEGER
+   {
+   notApplicable (1),
+   gps      (2),
+   glonass  (3),
+   galileo  (4),
+   beidou   (5)
+   }
+
+
+gnssPort    OBJECT IDENTIFIER ::= { systemPort 9 }
+
+gnssEvents  OBJECT IDENTIFIER ::= { gnssPort 0 } -- Node for Notifications
+
+gnssConfigTable OBJECT-TYPE
+   SYNTAX      SEQUENCE OF GnssConfigEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "A table of GNSS configuration entries."
+   ::= { gnssPort 1 }
+
+gnssConfigEntry OBJECT-TYPE
+   SYNTAX      GnssConfigEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "GNSS configuration entry."
+   INDEX  { ifIndex }
+   ::= { gnssConfigTable 1 }
+
+GnssConfigEntry ::= SEQUENCE {
+    gnssConfigAntennaDelay       Unsigned32,
+    gnssConfigElevationMaskMin  Unsigned32,
+    gnssConfigModePrimary       GnssMode,
+    gnssConfigModeSecondary     GnssMode,
+    gnssConfigPosition          INTEGER,
+    gnssConfigLatitude          SnmpAdminString,
+    gnssConfigLongitude         SnmpAdminString,
+    gnssConfigHeight            Integer32 
+ }
+
+gnssConfigAntennaDelay   OBJECT-TYPE
+   SYNTAX         Unsigned32 (0..999999)
+   UNITS         "nanoseconds"
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Configure antenna cable delay"
+   ::= { gnssConfigEntry 1 }
+
+gnssConfigElevationMaskMin   OBJECT-TYPE
+   SYNTAX         Unsigned32 (5..45)
+   UNITS          "degrees"
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Minimum elevation angle."
+   ::= { gnssConfigEntry 2 }
+
+gnssConfigModePrimary   OBJECT-TYPE
+   SYNTAX         GnssMode
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "GNSS selected as primary.
+       The value notApplicable (1) is not allowed."
+   ::= { gnssConfigEntry 3 }
+
+gnssConfigModeSecondary   OBJECT-TYPE
+   SYNTAX         GnssMode
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "GNSS selected as secondary, if primary is not available."
+   ::= { gnssConfigEntry 4 }
+
+gnssConfigPosition   OBJECT-TYPE
+   SYNTAX         INTEGER
+   {
+        auto        (1),
+        manual      (2)
+   }
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Positioning mode"
+   ::= { gnssConfigEntry 5 }
+
+gnssConfigLatitude   OBJECT-TYPE
+   SYNTAX         SnmpAdminString
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Applicable only when gnssConfigPosition = manual.
+      "
+   ::= { gnssConfigEntry 6 }
+
+gnssConfigLongitude   OBJECT-TYPE
+   SYNTAX         SnmpAdminString
+   MAX-ACCESS     read-write
+   STATUS         current
+   DESCRIPTION
+      "Applicable only when gnssConfigPosition = manual.
+      "
+   ::= { gnssConfigEntry 7 }
+
+gnssConfigHeight   OBJECT-TYPE
+    SYNTAX         Integer32
+    UNITS "millimeters"
+    MAX-ACCESS     read-write
+    STATUS         current
+    DESCRIPTION
+      "Applicable only when gnssConfigPosition = manual.
+      "
+   ::= { gnssConfigEntry  8 }
+
+
+--   gnssStatusTable
+
+gnssStatusTable     OBJECT-TYPE
+   SYNTAX      SEQUENCE OF GnssStatusEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "A table of GNSS status entries."
+   ::= { gnssPort 2 }
+
+gnssStatusEntry OBJECT-TYPE
+   SYNTAX      GnssStatusEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "Position data and status"
+   INDEX  { ifIndex }
+   ::= { gnssStatusTable 1 }
+
+GnssStatusEntry ::= SEQUENCE {
+    gnssStatusMode                  GnssMode,
+    gnssStatusTracking              INTEGER,
+    gnssStatusLatitude              SnmpAdminString,
+    gnssStatusLongitude             SnmpAdminString,
+    gnssStatusHeight                 Integer32,
+    gnssStatusHardwareFailReason    BITS 
+ }
+
+gnssStatusMode   OBJECT-TYPE
+   SYNTAX         GnssMode
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "Actual GNSS used"
+   ::= { gnssStatusEntry 1 }
+
+gnssStatusTracking   OBJECT-TYPE
+   SYNTAX         INTEGER
+   {
+   notTracking         (1),
+   trackingSatellites  (2),
+   gpsLocked           (3),
+   todLocked           (4)
+   }
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "GNSS tracking status:
+       notTracking        (1): Not tracking satellite.
+       trackingSatellites (2): Tracking satellite.
+       gpsLocked          (3): GNSS locked.
+       todLocked          (4): TOD locked to the reference."
+   ::= { gnssStatusEntry 2 }
+
+gnssStatusLatitude   OBJECT-TYPE
+   SYNTAX         SnmpAdminString
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "Latitude coordinates, formatted ndd:mm:ss.sss or sdd:mm:ss.sss
+       (n=north / s=south, dd=degrees, mm=minutes, ss=seconds)"
+   ::= { gnssStatusEntry 3 }
+
+gnssStatusLongitude   OBJECT-TYPE
+   SYNTAX         SnmpAdminString
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "Longitude coordinates, formatted eddd:mm:ss.sss or wddd:mm:ss.sss
+      (e=east/ w=west, dd=degrees, mm=minutes, ss=seconds)    "
+   ::= { gnssStatusEntry 4 }
+
+gnssStatusHeight   OBJECT-TYPE
+   SYNTAX         Integer32
+   UNITS "millimeters"
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "Altitude in millimmeters"
+   ::= { gnssStatusEntry 5 }
+
+
+gnssStatusHardwareFailReason       OBJECT-TYPE
+   SYNTAX         BITS
+   {
+        voltageOra  (0),    -- antenna voltage out of range
+        currentOra  (1),    -- antenna current out of range
+        shortCircuit(2),    -- antenna short circuit
+        openCircuit (3),    -- antenna open circuit
+        signalLow   (4),    -- antenna signal low
+        noAntennaPower (5), -- no antenna power
+        other(6),           -- unknown or unspecified failure reason
+        noResponseFromModule (7) -- hardware failure, no response from module
+   }
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      " Each bit represent poissible GNSS port hardware failure reason.
+        when no failure, the value will be 0."
+   ::= { gnssStatusEntry 6 }
+
+gnssSatelliteTable   OBJECT-TYPE
+   SYNTAX      SEQUENCE OF GnssSatelliteEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "A table of GNSS satellites status entries."
+   ::= { gnssPort 3}
+
+gnssSatelliteEntry OBJECT-TYPE
+   SYNTAX      GnssSatelliteEntry
+   MAX-ACCESS  not-accessible
+   STATUS      current
+   DESCRIPTION
+       "GNSS satellites status entry.
+       "
+   INDEX  { ifIndex, gnssSatelliteIndex }
+   ::= { gnssSatelliteTable 1 }
+
+GnssSatelliteEntry ::= SEQUENCE {
+    gnssSatelliteIndex          Unsigned32,
+    gnssSatelliteNumber         Unsigned32,
+    gnssSatelliteSnr            Integer32,
+    gnssSatelliteHealthy        INTEGER,
+    gnssSatelliteAzimuth        Integer32,
+    gnssSatelliteElevation      Integer32 
+ }
+
+gnssSatelliteIndex   OBJECT-TYPE
+   SYNTAX         Unsigned32
+   MAX-ACCESS     not-accessible
+   STATUS         current
+   DESCRIPTION
+      "running index of the satellite table.
+      "
+   ::= { gnssSatelliteEntry 1 }
+
+gnssSatelliteNumber   OBJECT-TYPE
+   SYNTAX         Unsigned32
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "Satelite number.
+      "
+   ::= { gnssSatelliteEntry 2 }
+
+gnssSatelliteSnr   OBJECT-TYPE
+   SYNTAX         Integer32
+   UNITS "db"
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+    "Satellite Signal to Noise Ratio"
+   ::= { gnssSatelliteEntry 3 }
+
+gnssSatelliteHealthy   OBJECT-TYPE
+   SYNTAX         INTEGER
+   {
+   no  (1),
+   yes (2)
+   }
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "Satellite health status.
+      "
+   ::= { gnssSatelliteEntry 4 }
+
+gnssSatelliteAzimuth   OBJECT-TYPE
+   SYNTAX         Integer32
+   UNITS          "Degrees"
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      "Azimuth to satellite "
+   ::= { gnssSatelliteEntry 5 }
+
+gnssSatelliteElevation   OBJECT-TYPE
+   SYNTAX         Integer32
+   UNITS          "Degrees"
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION
+      " Satellite elevation angle "
+   ::= { gnssSatelliteEntry 6 }
+
+
+
+gnssNotLocked         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias, gnssStatusTracking } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates GNSS state change."
+      ::= { gnssEvents  1 }
+
+gnssHardwareFailure                  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias, gnssStatusHardwareFailReason } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates Hardware Failure and its reason."
+      ::= { gnssEvents  2 }
+
+
+END

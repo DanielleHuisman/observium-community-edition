@@ -9,7 +9,7 @@ IMPORTS
 	;
 
 device MODULE-IDENTITY --Category
-	LAST-UPDATED "201505221059Z"
+	LAST-UPDATED "201802121619Z"
 	ORGANIZATION "MICROSENS GmbH & Co. KG"
 	CONTACT-INFO
 		"Kueferstrasse 16
@@ -20,7 +20,7 @@ device MODULE-IDENTITY --Category
 	DESCRIPTION
 		"Microsens private MIB for Generation 6 Ethernet Switches"
 
-	REVISION "201505221059Z"
+	REVISION "201802121619Z"
 	DESCRIPTION
 		"File creation"
 	::= { g6 1 }
@@ -108,6 +108,8 @@ cableTestConfigEntry	OBJECT-TYPE
 	cableTestConfigPortIndex INTEGER,
 	cableTestConfigEnableAutoCableTest INTEGER ,
 	cableTestConfigEventGeneration INTEGER ,
+	cableTestConfigReflectionThreshold Integer32 ,
+	cableTestConfigReflectionHysteresis Integer32 ,
 	cableTestConfigStartTestNow DisplayString
 	}
 
@@ -132,7 +134,7 @@ cableTestConfigEventGeneration OBJECT-TYPE   -- event_generation
 		{
 		disabled (0),
 		anyChange (1),
-		cableUnplugged (2)
+		connectionsOnly (2)
 		}
 	MAX-ACCESS read-write
 	STATUS current
@@ -140,13 +142,29 @@ cableTestConfigEventGeneration OBJECT-TYPE   -- event_generation
 	"When the cable termination status changes an event can be raised."
 	::= { cableTestConfigEntry 3 }
 
+cableTestConfigReflectionThreshold OBJECT-TYPE   -- reflection_threshold
+	SYNTAX Integer32 (0..65535)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+	"Select a value up to 508 which is used to decide between a connected cable and a remotely disconnected cable. With actively terminated data ports, the detection is difficult and precise setup is required. Please refer to cable_test_status.reflection_value for further details."
+	::= { cableTestConfigEntry 4 }
+
+cableTestConfigReflectionHysteresis OBJECT-TYPE   -- reflection_hysteresis
+	SYNTAX Integer32 (0..65535)
+	MAX-ACCESS read-write
+	STATUS current
+	DESCRIPTION
+	"Choose value to prevent oscillation when reflection value is slightly shifting."
+	::= { cableTestConfigEntry 5 }
+
 cableTestConfigStartTestNow OBJECT-TYPE   -- start_test_now
 	SYNTAX DisplayString
 	MAX-ACCESS read-write
 	STATUS current
 	DESCRIPTION
 	"May be used to manually start a cable test. ATTENTION: If the port is in link up status it will be forced to link down first. This will disrupt the current data traffic. Therefore, type start_test_now = CONFIRM."
-	::= { cableTestConfigEntry 4 }
+	::= { cableTestConfigEntry 6 }
 
 
 -- ********************* End of cableTestConfigTable ***********************
@@ -460,7 +478,7 @@ moduleInfoUnitType OBJECT-TYPE   -- unit_type
 		{
 		notPresent (0),
 		baseUnit (1),
-		extension (2)
+		expansion (2)
 		}
 	MAX-ACCESS read-only
 	STATUS current
@@ -563,7 +581,8 @@ slotInfoBoardType OBJECT-TYPE   -- board_type
 		power (2),
 		cpu (3),
 		port (4),
-		io (5)
+		io (5),
+		ms10gPort (6)
 		}
 	MAX-ACCESS read-only
 	STATUS current
@@ -1179,6 +1198,7 @@ cableTestStatusEntry	OBJECT-TYPE
 	cableTestStatusPair2DistanceToFault Integer32 ,
 	cableTestStatusPair3State INTEGER ,
 	cableTestStatusPair3DistanceToFault Integer32 ,
+	cableTestStatusReflectionValue Integer32 ,
 	cableTestStatusCableStatus INTEGER 
 	}
 
@@ -1205,7 +1225,9 @@ cableTestStatusPair0State OBJECT-TYPE   -- pair_0_state
 		pairOk (1),
 		pairOpen (2),
 		samePairShort (3),
-		crossPairShort (4)
+		crossPairShort (4),
+		terminationLow (5),
+		terminationHigh (6)
 		}
 	MAX-ACCESS read-only
 	STATUS current
@@ -1228,7 +1250,9 @@ cableTestStatusPair1State OBJECT-TYPE   -- pair_1_state
 		pairOk (1),
 		pairOpen (2),
 		samePairShort (3),
-		crossPairShort (4)
+		crossPairShort (4),
+		terminationLow (5),
+		terminationHigh (6)
 		}
 	MAX-ACCESS read-only
 	STATUS current
@@ -1251,7 +1275,9 @@ cableTestStatusPair2State OBJECT-TYPE   -- pair_2_state
 		pairOk (1),
 		pairOpen (2),
 		samePairShort (3),
-		crossPairShort (4)
+		crossPairShort (4),
+		terminationLow (5),
+		terminationHigh (6)
 		}
 	MAX-ACCESS read-only
 	STATUS current
@@ -1274,7 +1300,9 @@ cableTestStatusPair3State OBJECT-TYPE   -- pair_3_state
 		pairOk (1),
 		pairOpen (2),
 		samePairShort (3),
-		crossPairShort (4)
+		crossPairShort (4),
+		terminationLow (5),
+		terminationHigh (6)
 		}
 	MAX-ACCESS read-only
 	STATUS current
@@ -1290,18 +1318,30 @@ cableTestStatusPair3DistanceToFault OBJECT-TYPE   -- pair_3_distance_to_fault
 	"Distance to fault on wire pair 3 in centimeters. Indicates 0 when no fault is detected or the function is unused."
 	::= { cableTestStatusEntry 10 }
 
+cableTestStatusReflectionValue OBJECT-TYPE   -- reflection_value
+	SYNTAX Integer32 (0..65535)
+	MAX-ACCESS read-only
+	STATUS current
+	DESCRIPTION
+	"A unitless value that indicates a measure of reflection level. For difficult to detect actively terminated devices perform a measurement with remotely plugged-in and then unplugged cable. Note the reflection values an choose a value in the middle as reflection_threshold configuration value."
+	::= { cableTestStatusEntry 11 }
+
 cableTestStatusCableStatus OBJECT-TYPE   -- cable_status
 	SYNTAX INTEGER 
 		{
 		notAvailable (0),
-		pluggedIn (1),
-		open (2)
+		noCable (1),
+		pluggedInLocally (2),
+		pluggedInRemotely (3),
+		terminatedCable (4),
+		terminationTooLow (5),
+		defective (6)
 		}
 	MAX-ACCESS read-only
 	STATUS current
 	DESCRIPTION
-	""
-	::= { cableTestStatusEntry 11 }
+	"Indicates the concluded status summary."
+	::= { cableTestStatusEntry 12 }
 
 
 -- ********************* End of cableTestStatusTable ***********************
@@ -1386,7 +1426,7 @@ tcamStatusTable	OBJECT-TYPE
 	MAX-ACCESS not-accessible
 	STATUS current
 	DESCRIPTION
-		"This section is only used for devices which offer external signal inputs and outputs."
+		"The TCAM is a programmable wire speed packet filter. The filter is controlled by the system automatically. This table indicates which filters have been set."
 	::= { hardware 116 }
 
 tcamStatusEntry	OBJECT-TYPE

@@ -15,6 +15,7 @@
 namespace Ramsey\Uuid;
 
 use Ramsey\Uuid\Converter\NumberConverterInterface;
+use Ramsey\Uuid\Exception\InvalidUuidStringException;
 use Ramsey\Uuid\Provider\NodeProviderInterface;
 use Ramsey\Uuid\Generator\RandomGeneratorInterface;
 use Ramsey\Uuid\Generator\TimeGeneratorInterface;
@@ -180,17 +181,26 @@ class UuidFactory implements UuidFactoryInterface
         $this->uuidBuilder = $builder;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function fromBytes($bytes)
     {
         return $this->codec->decodeBytes($bytes);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function fromString($uuid)
     {
         $uuid = strtolower($uuid);
         return $this->codec->decode($uuid);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function fromInteger($integer)
     {
         $hex = $this->numberConverter->toHex($integer);
@@ -199,6 +209,9 @@ class UuidFactory implements UuidFactoryInterface
         return $this->fromString($hex);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function uuid1($node = null, $clockSeq = null)
     {
         $bytes = $this->timeGenerator->generate($node, $clockSeq);
@@ -207,11 +220,17 @@ class UuidFactory implements UuidFactoryInterface
         return $this->uuidFromHashedName($hex, 1);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function uuid3($ns, $name)
     {
         return $this->uuidFromNsAndName($ns, $name, 3, 'md5');
     }
 
+    /**
+     * @inheritdoc
+     */
     public function uuid4()
     {
         $bytes = $this->randomGenerator->generate(16);
@@ -224,6 +243,9 @@ class UuidFactory implements UuidFactoryInterface
         return $this->uuidFromHashedName($hex, 4);
     }
 
+    /**
+     * @inheritdoc
+     */
     public function uuid5($ns, $name)
     {
         return $this->uuidFromNsAndName($ns, $name, 5, 'sha1');
@@ -253,6 +275,7 @@ class UuidFactory implements UuidFactoryInterface
      * @param string $hashFunction The hash function to use when hashing together
      *     the namespace and name
      * @return UuidInterface
+     * @throws InvalidUuidStringException
      */
     protected function uuidFromNsAndName($ns, $name, $version, $hashFunction)
     {
@@ -278,14 +301,14 @@ class UuidFactory implements UuidFactoryInterface
         $timeHi = BinaryUtils::applyVersion(substr($hash, 12, 4), $version);
         $clockSeqHi = BinaryUtils::applyVariant(hexdec(substr($hash, 16, 2)));
 
-        $fields = array(
+        $fields = [
             'time_low' => substr($hash, 0, 8),
             'time_mid' => substr($hash, 8, 4),
             'time_hi_and_version' => str_pad(dechex($timeHi), 4, '0', STR_PAD_LEFT),
             'clock_seq_hi_and_reserved' => str_pad(dechex($clockSeqHi), 2, '0', STR_PAD_LEFT),
             'clock_seq_low' => substr($hash, 18, 2),
             'node' => substr($hash, 20, 12),
-        );
+        ];
 
         return $this->uuid($fields);
     }

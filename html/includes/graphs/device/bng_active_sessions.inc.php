@@ -13,11 +13,11 @@
 
 $scale_min = "0";
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "bng-active-sessions.rrd");
 
-$rrd_options .= " DEF:value=".$rrd_filename.":value:AVERAGE";
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
+
+$rrd_options .= " DEF:value=".$rrd_filename_escape.":value:AVERAGE";
 $rrd_options .= " 'COMMENT:Sessions   Current  Minimum  Maximum  Average\\l'";
 $rrd_options .= " AREA:value#EEEEEE:'Subscribers   '";
 $rrd_options .= " LINE1.25:value#36393D:";

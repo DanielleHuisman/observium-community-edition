@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage search
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -40,10 +39,10 @@ if (count($results))
 
     $status_search_results[] = array('url' => generate_device_url($result, array('tab' => 'entphysical')),
       'name' => $name, 'colour' => $tab_colour,
-      'icon' => '<i class="'.$config['icon']['inventory'].'"></i>',
+      'icon' => $config['icon']['inventory'],
       'data' => array(
         escape_html($result['hostname']),
-        highlight_search(escape_html($model) . ' | SN: ' . escape_html($result['entPhysicalSerialNum']))
+        html_highlight(escape_html($model) . ' | SN: ' . escape_html($result['entPhysicalSerialNum']), $queryString)
         )
     );
 

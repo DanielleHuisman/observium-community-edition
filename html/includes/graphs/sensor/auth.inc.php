@@ -13,7 +13,8 @@
 
 if (is_numeric($vars['id']))
 {
-  $sensor = dbFetchRow("SELECT * FROM `sensors` WHERE `sensor_id` = ?", array($vars['id']));
+  //$sensor = dbFetchRow("SELECT * FROM `sensors` WHERE `sensor_id` = ?", array($vars['id']));
+  $sensor = get_entity_by_id_cache('sensor', $vars['id']);
 
   if (is_numeric($sensor['device_id']) && ($auth || is_entity_permitted($sensor['sensor_id'], 'sensor') || device_permitted($sensor['device_id'])))
   {

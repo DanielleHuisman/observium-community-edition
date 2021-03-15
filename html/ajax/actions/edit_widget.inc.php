@@ -1,5 +1,8 @@
 <?php
 
+if ($readonly = $_SESSION['userlevel'] < 7) {  } else { // Currently edit allowed only for Admins
+
+
     $widget = dbFetchRow("SELECT * FROM `dash_widgets` WHERE widget_id = ?", array($vars['widget_id']));
 
     $widget['widget_config'] = json_decode($widget['widget_config'], TRUE);
@@ -37,3 +40,4 @@
 
     }
 
+}

@@ -1,0 +1,1520 @@
+RAD-ACL-MIB DEFINITIONS ::= BEGIN
+
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       Integer32, Gauge32, Unsigned32, 
+       OBJECT-TYPE, MODULE-IDENTITY, NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       sysName     FROM  SNMPv2-MIB
+       TEXTUAL-CONVENTION, RowStatus, RowPointer     FROM  SNMPv2-TC
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       InetAddressType, InetAddress, InetPortNumber, 
+       InetAddressPrefixLength     FROM  INET-ADDRESS-MIB
+       radSecurity     FROM  RAD-SMI-MIB
+       systemsEvents, alarmEventLogSourceName, alarmEventLogAlarmOrEventId, 
+       alarmEventLogDescription, alarmEventLogSeverity, alarmEventLogDateAndTime, 
+       alarmEventReason     FROM  RAD-GEN-MIB; 
+
+radAclMIB    MODULE-IDENTITY
+        LAST-UPDATED "201605191805Z"  -- May 19, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "ACL MIB."
+    ::= {radSecurity 2 }
+
+
+--
+-- TEXTUAL-CONVENTIONs
+--
+--
+
+AceMarkingType  ::=  TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Specifies the Marking Type: DSCP, IP Precedence, or Pbit."
+    SYNTAX      BITS
+    {
+    dscp         (0),
+    ipPrecedence (1),
+    pBit         (2)
+    }
+
+DscpMark    ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Specifies the DSCP value."
+    SYNTAX      Unsigned32 (0..63)
+
+IpPrecedenceMark    ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Specifies the IP precedence value ."
+    SYNTAX      Unsigned32 (0..7)
+
+PbitMark    ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Specifies the VLAN P-Bit value."
+    SYNTAX      Unsigned32 (0..7)
+
+UdpTcpPortOp    ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+    "Indicates how a packet's destination TCP/UDP port number is
+    to be compared.
+
+    'noOperator(1)', which is the default value, means that no
+    comparison is to be made with the destination TCP/UDP port
+    number.
+
+    lt(2) means less than.
+    gt(3) means greater than.
+    eq(4) means equal.
+    neq(5) means not equal.
+
+    range(6) means that it compares the port value between two
+    numbers, so this operator needs 2 operands. One operand is the
+    starting port number of the range, and the other operand is the ending port number
+    of the range"
+    SYNTAX INTEGER {
+        noOperator  (1),
+        lt          (2),
+        gt          (3),
+        eq          (4),
+        neq         (5),
+        range       (6)
+        }
+
+
+--Configuration Tables
+
+aclConf   OBJECT IDENTIFIER ::= { radAclMIB 1 }
+
+aclMainTable OBJECT-TYPE
+       SYNTAX  SEQUENCE OF AclMainEntry
+       MAX-ACCESS  not-accessible
+       STATUS  current
+       DESCRIPTION
+        "ACL Configuration Table."
+       ::= { aclConf 1 }
+
+aclMainEntry OBJECT-TYPE
+       SYNTAX AclMainEntry
+       MAX-ACCESS not-accessible
+       STATUS current
+       DESCRIPTION
+          "An entry in the ACL main table"
+       INDEX   { aclName }
+       ::= { aclMainTable 1 }
+
+AclMainEntry ::= SEQUENCE {
+    aclName                 SnmpAdminString (SIZE (1..252)),
+    aclNumberOfAce          Unsigned32,
+    aclLastSeqeunceNumber   Unsigned32,
+    aclResequenceCmd        Unsigned32,
+    aclType                 INTEGER,
+    aclIllegalEntityTypes   BITS,
+    aclRowStatus            RowStatus 
+ }
+
+aclName OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Access Control List (ACL) name"
+    ::= { aclMainEntry 1 }
+
+aclNumberOfAce OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of Access Control Entries in this ACL"
+    ::= { aclMainEntry 2 }
+
+aclLastSeqeunceNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sequence Number of the last ACE in this ACL. "
+    ::= { aclMainEntry 3 }
+
+aclResequenceCmd OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Resequence Command, specifying step between ACE sequence numbers.
+         For example, when resequence command with value of 100 is given,
+         new sequence number will be  100 200 300 400 etc.
+         Default Value - 10. Possible Set values - 1....10000.
+
+         Upon resequence action completion,  Agent will reset this object value
+         to '0'- to indicate the resequence action is finished,
+         and to  allow the user to set the same (or other) value (e.g. 10) again.
+         The value 0 can only be set by agent."
+    ::= { aclMainEntry 4 }
+
+aclType OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    ipv4 (1),
+    ipv6 (2)
+    }
+    MAX-ACCESS read-create
+    STATUS      current
+    DESCRIPTION
+        "ACL type. For IP ACLs, all ACEs of same ACL will have same InetAddressType value"
+    DEFVAL  { ipv4}
+    ::= { aclMainEntry 5 }
+
+aclIllegalEntityTypes     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    management      (0),
+    routerInterface (1)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is a bitmap of entity types.
+         If a bit representing certain entity type is '1',
+         ACL cannot be bound to that entity type.
+         e.g. if bit (0) is '1', ACL  cannot be bound to management entity."
+    ::= { aclMainEntry 6 }
+
+aclRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Create/Destroy ACLs.
+         When removing ACL which has associated ACE entries,
+         all associated entries  (in aclAceTable and in all auxiliary (per protocol) tables)
+         MUST  be removed before destroying ACL entry"
+    ::= { aclMainEntry 7}
+
+
+aclAceTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclAceEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+        "Access Control Entry  (ACE) Table "
+       ::= { aclConf 2 }
+
+aclAceEntry OBJECT-TYPE
+       SYNTAX       AclAceEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "ACE entry -  general ACE parameters , and pointer to Auxillary table."
+       INDEX   {aclAceIdx  }
+       ::= { aclAceTable 1 }
+
+AclAceEntry ::= SEQUENCE {
+    aclAceIdx                   Unsigned32,
+    aclAceSequenceNumber        Unsigned32,
+    aclAceType                  INTEGER,
+    aclAcePointer               RowPointer,
+    aclAcelog                   INTEGER,
+    aclAceIllegalEntityTypes    BITS,
+    aclAceAclName               SnmpAdminString (SIZE (1..252)),
+    aclAceRowStatus             RowStatus 
+ }
+
+aclAceIdx               OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS          not-accessible
+    STATUS              current
+    DESCRIPTION
+        "ACE running Index . "
+    ::= { aclAceEntry 1 }
+
+aclAceSequenceNumber    OBJECT-TYPE
+    SYNTAX              Unsigned32
+    MAX-ACCESS          read-create
+    STATUS              current
+    DESCRIPTION
+        "ACE Sequence Number "
+    ::= { aclAceEntry 2 }
+
+aclAceType OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    remark  (1),
+    deny    (2),
+    permit  (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object specify ACE type:
+         Remark, Deny or Permit.
+         Remark type ACE  must include pointer (aclAcePointer) to aclAceRemarkTable
+         Permit or Deny type ACE must include pointer to one of the other
+         auxilliary tables (aclAceIP Table, aclAceICMPTable, aclAceTCPTable or aclAceUDPTable)."
+    ::= { aclAceEntry 3 }
+
+aclAcePointer OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Pointer to entry in one of the auxilary tables:
+         aclAceRemarkTable, aclAceIP Table, aclAceICMPTable ,
+         aclAceTCPTable, aclAceUDPTable.
+         When an entry is created in this table,
+         Agent must create associated entry in one of the  auxilary accroding to this pointer "
+    ::= { aclAceEntry 4 }
+
+aclAcelog OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable   (1), --for ACE type = remark
+    disable         (2),
+    enable          (3)
+    }
+    MAX-ACCESS read-create
+    STATUS      current
+    DESCRIPTION
+        "Enable or disable log of current ACE"
+    ::= { aclAceEntry 5 }
+
+
+aclAceIllegalEntityTypes     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    management      (0),
+    routerInterface (1)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This object is a bitmap of entity types.
+         If a bit representing certain entity type is '1', ACL containing
+         current ACE cannot be bound to that entity type.
+         e.g. if bit (0) is '1', ACL containing current ACE cannot be
+         bound to a management entity."
+    ::= { aclAceEntry 6 }
+
+aclAceAclName       OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The name of the ACL to which this ACE belongs. ACL Name MUST exists
+         in aclMainTable.
+         Upon deletion of an ACL, all entries with deleted ACL Name
+         must be deleted."
+    ::= { aclAceEntry 7 }
+
+aclAceRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Create or Destroy ACE "
+    ::= { aclAceEntry 8 }
+
+
+aclAceRemarkTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclAceRemarkEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+        "ACE remark   Table.
+         This table containing all remarks (free text which may describe ACEs) for all ACLs"
+       ::= { aclConf 3 }
+
+aclAceRemarkEntry OBJECT-TYPE
+       SYNTAX       AclAceRemarkEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "ACE remarks "
+       INDEX   { aclAceIdx }
+       ::= { aclAceRemarkTable 1 }
+
+AclAceRemarkEntry ::= SEQUENCE {
+    aclAceRemark    SnmpAdminString (SIZE (1..252)) 
+ }
+
+aclAceRemark        OBJECT-TYPE
+    SYNTAX          SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Free text describing following ACEs"
+    ::= {  aclAceRemarkEntry 1 }
+
+
+aclAceIPTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclAceIPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+        "ACE IP   Table."
+       ::= { aclConf 4 }
+
+aclAceIPEntry OBJECT-TYPE
+       SYNTAX       AclAceIPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "IP match criteria"
+       INDEX   { aclAceIdx }
+       ::= { aclAceIPTable 1 }
+
+AclAceIPEntry ::= SEQUENCE {
+    aclAceIPSrcAddressType              InetAddressType,
+    aclAceIPSrcAddress                  InetAddress,
+    aclAceIPSrcAddressPrefixLength      InetAddressPrefixLength,
+    aclAceIPDstAddressType              InetAddressType,
+    aclAceIPDstAddress                  InetAddress,
+    aclAceIPDstAddressPrefixLength      InetAddressPrefixLength,
+    aclAceIPMarkingType                 AceMarkingType,
+    aclAceIPDscp                        DscpMark,
+    aclAceIPIpPrecedence                IpPrecedenceMark,
+    aclAceIPProtocolNumber              Unsigned32,
+    aclAceIPSetMarkingType              AceMarkingType,
+    aclAceIPSetDscp                     DscpMark,
+    aclAceIPSetIpPrecedence             IpPrecedenceMark,
+    aclAceIPSetPbit                     PbitMark 
+ }
+
+aclAceIPSrcAddressType      OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Type of Internet address of aclAceIPSrcAddress
+         Only ipV4 and ipv6 are supported."
+    ::= {  aclAceIPEntry 1 }
+
+aclAceIPSrcAddress      OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP address to match against the packet's source  IP address.
+         The type of this address is determined by the value of the
+         aclAceIPSrcAddressType object."
+    ::= {  aclAceIPEntry 2 }
+
+aclAceIPSrcAddressPrefixLength  OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in  aclAceIPSrcAddress"
+    ::= {  aclAceIPEntry 3 }
+
+aclAceIPDstAddressType      OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Type of Internet address of aclAceIPDstAddress .
+         Only ipV4 and ipv6 are supported."
+    ::= {  aclAceIPEntry 4 }
+
+aclAceIPDstAddress      OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP address to match against the packet's destination  IP address.
+         The type of this address is determined by the value of the
+         aclAceIPDstAddressType object."
+    ::= {  aclAceIPEntry 5 }
+
+aclAceIPDstAddressPrefixLength  OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in aclAceIPDstAddress"
+    ::= {  aclAceIPEntry 6 }
+
+aclAceIPMarkingType OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Specifies the marking type to be matched."
+    ::= {  aclAceIPEntry 7 }
+
+aclAceIPDscp    OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The DSCP value to match against the packet's DSCP field"
+    ::= {  aclAceIPEntry 8 }
+
+aclAceIPIpPrecedence    OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP Precendece value to match against the packet's IP Precendece field"
+    ::= {  aclAceIPEntry 9 }
+
+aclAceIPProtocolNumber  OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "IP protocol numbers used in the Protocol field of the IPv4 header and the Next Header field of IPv6 header."
+    ::= {  aclAceIPEntry 10 }
+
+aclAceIPSetMarkingType  OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This object is used only for ACE type 'permit'.
+         It indicates which priority parameter should be set in matched packet. "
+    ::= {  aclAceIPEntry 11 }
+
+aclAceIPSetDscp OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "DSCP value to set in matched packet"
+    ::= {  aclAceIPEntry  12 }
+
+aclAceIPSetIpPrecedence OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "IP Precedence value to set in matched packet"
+    ::= {  aclAceIPEntry 13}
+
+aclAceIPSetPbit OBJECT-TYPE
+    SYNTAX          PbitMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Pbit (layer two priority) to set in matched packet"
+    ::= {  aclAceIPEntry 14 }
+
+aclAceICMPTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclAceICMPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "ACE ICMP   Table."
+       ::= { aclConf 5 }
+
+aclAceICMPEntry OBJECT-TYPE
+       SYNTAX       AclAceICMPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "ICMP entry"
+       INDEX   { aclAceIdx }
+       ::= { aclAceICMPTable 1 }
+
+AclAceICMPEntry ::= SEQUENCE {
+    aclAceICMPSrcAddressType            InetAddressType,
+    aclAceICMPSrcAddress                InetAddress,
+    aclAceICMPSrcAddressPrefixLength    InetAddressPrefixLength,
+    aclAceICMPDstAddressType            InetAddressType,
+    aclAceICMPDstAddress                InetAddress,
+    aclAceICMPDstAddressPrefixLength    InetAddressPrefixLength,
+    aclAceICMPMarkingType               AceMarkingType,
+    aclAceICMPDscp                      DscpMark,
+    aclAceICMPIpPrecedence              IpPrecedenceMark,
+    aclAceICMPType                      Unsigned32,
+    aclAceICMPCode                      Unsigned32,
+    aclAceICMPSetMarkingType            AceMarkingType,
+    aclAceICMPSetDscp                   DscpMark,
+    aclAceICMPSetIpPrecedence           IpPrecedenceMark,
+    aclAceICMPSetPbit                   PbitMark 
+ }
+            
+aclAceICMPSrcAddressType        OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Type of Internet address of aclAceICMPSrcAddress
+         Only ipV4 and ipv6 are supported."
+    ::= {  aclAceICMPEntry 1 }
+
+aclAceICMPSrcAddress        OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP address to match against the packet's source  IP address.
+         The type of this address is determined by the value of the
+         aclAceICMPSrcAddressType object."
+    ::= {  aclAceICMPEntry 2 }
+
+aclAceICMPSrcAddressPrefixLength    OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in aclAceICMPSrcAddress The length of the CIDR Prefix carried in SrcAddressPrefixLength"
+    ::= {  aclAceICMPEntry 3 }
+
+aclAceICMPDstAddressType        OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Type of Internet address of aclAceICMPDstAddressType .
+         Only ipV4 and ipv6 are supported."
+    ::= {  aclAceICMPEntry 4 }
+
+    aclAceICMPDstAddress        OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP address to match against the packet's destination  IP address.
+         The type of this address is determined by the value of the
+         aclAceICMPDstAddress object."
+    ::= {  aclAceICMPEntry 5 }
+
+aclAceICMPDstAddressPrefixLength    OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in DstAddressPrefixLength"
+    ::= {  aclAceICMPEntry 6 }
+
+aclAceICMPMarkingType   OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Specifies the marking type to be matched"
+    ::= {  aclAceICMPEntry 7 }
+
+aclAceICMPDscp  OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The DSCP value to match against the packet's DSCP field"
+    ::= {  aclAceICMPEntry 8 }
+
+aclAceICMPIpPrecedence  OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP Precendece value to match against the packet's IP Precendece field"
+    ::= {  aclAceICMPEntry 9 }
+
+aclAceICMPType  OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "ICMP message Type"
+    ::= {  aclAceICMPEntry  10 }
+
+aclAceICMPCode  OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "ICMP message Code"
+    ::= {  aclAceICMPEntry  11 }
+
+aclAceICMPSetMarkingType    OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This object is used only for ACE type 'permit'.
+         It indicates which priority parameter should be set in matched packet. "
+    ::= {  aclAceICMPEntry 12}
+
+aclAceICMPSetDscp   OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "DSCP value to set in matched packet"
+    ::= {  aclAceICMPEntry  13 }
+
+aclAceICMPSetIpPrecedence   OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "IP Precedence value to set in matched packet"
+    ::= {  aclAceICMPEntry 14 }
+
+aclAceICMPSetPbit   OBJECT-TYPE
+    SYNTAX          PbitMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Pbit (layer two priority) to set in matched packet"
+    ::= {  aclAceICMPEntry 15 }
+
+-- TCP Table
+
+aclAceTCPTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclAceTCPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "ACE TCP  Table."
+       ::= { aclConf 6 }
+
+aclAceTCPEntry OBJECT-TYPE
+       SYNTAX       AclAceTCPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "ACE TCP entry"
+       INDEX   { aclAceIdx }
+       ::= { aclAceTCPTable 1 }
+
+AclAceTCPEntry ::= SEQUENCE {
+    aclAceTCPSrcAddressType             InetAddressType,
+    aclAceTCPSrcAddress                 InetAddress,
+    aclAceTCPSrcAddressPrefixLength     InetAddressPrefixLength,
+    aclAceTCPDstAddressType             InetAddressType,
+    aclAceTCPDstAddress                 InetAddress,
+    aclAceTCPDstAddressPrefixLength     InetAddressPrefixLength,
+    aclAceTCPMarkingType                AceMarkingType,
+    aclAceTCPDscp                       DscpMark,
+    aclAceTCPIpPrecedence               IpPrecedenceMark,
+    aclAceTCPSrcPortOp                  UdpTcpPortOp,
+    aclAceTCPSrcPort                    InetPortNumber,
+    aclAceTCPSrcPortRange               InetPortNumber,
+    aclAceTCPDstPortOp                  UdpTcpPortOp,
+    aclAceTCPDstPort                    InetPortNumber,
+    aclAceTCPDstPortRange               InetPortNumber,
+    aclAceTCPSetMarkingType             AceMarkingType,
+    aclAceTCPSetDscp                    DscpMark,
+    aclAceTCPSetIpPrecedence            IpPrecedenceMark,
+    aclAceTCPSetPbit                    PbitMark 
+ }
+aclAceTCPSrcAddressType         OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Type of Internet address of aclAceTCPSrcAddress
+         Only ipV4 and ipv6 are supported."
+    ::= {  aclAceTCPEntry 1}
+
+aclAceTCPSrcAddress         OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP address to match against the packet's source  IP address.
+         The type of this address is determined by the value of the
+         aclAceTCPSrcAddressType object."
+    ::= {  aclAceTCPEntry 2}
+
+aclAceTCPSrcAddressPrefixLength OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in aclAceTCPSrcAddress"
+    ::= {  aclAceTCPEntry 3}
+
+aclAceTCPDstAddressType         OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Type of Internet address of aclAceTCPDstAddress .
+         Only ipV4 and ipv6 are supported."
+    ::= {  aclAceTCPEntry 4 }
+
+aclAceTCPDstAddress         OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP address to match against the packet's destination  IP address.
+         The type of this address is determined by the value of the
+         aclAceTCPDstAddressType object."
+    ::= {  aclAceTCPEntry 5 }
+
+aclAceTCPDstAddressPrefixLength OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in aclAceTCPDstAddress"
+    ::= {  aclAceTCPEntry 6 }
+
+aclAceTCPMarkingType    OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Specifies the marking type to be matched."
+    ::= {  aclAceTCPEntry 7 }
+
+aclAceTCPDscp   OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The DSCP value to match against the packet's DSCP field"
+    ::= {  aclAceTCPEntry 8 }
+
+aclAceTCPIpPrecedence   OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP Precendece value to match against the packet's IP Precendece field"
+    ::= {  aclAceTCPEntry 9 }
+
+aclAceTCPSrcPortOp  OBJECT-TYPE
+    SYNTAX          UdpTcpPortOp
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Indicates how a packet's Source TCP port number is
+         to be compared with aclAceTCPSrcPort and aclAceTCPSrcPortRange"
+    ::= {  aclAceTCPEntry 10 }
+
+aclAceTCPSrcPort     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The TCP port number  to be matched against the packets TCP source port."
+    ::= { aclAceTCPEntry 11 }
+
+aclAceTCPSrcPortRange     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The source port number of the  TCP  protocol.
+         If the aclAceTCPSrcPortOp object in the same row is range(6),
+         this object will be the ending port number of the port range.
+         This object cannot be configured if
+         aclAceTCPSrcPortOp in the same row is not range(6)"
+    ::= { aclAceTCPEntry 12 }
+
+aclAceTCPDstPortOp  OBJECT-TYPE
+    SYNTAX          UdpTcpPortOp
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Indicates how a packet's destination TCP port number is
+         to be compared with aclAceTCPDstPort and aclAceTCPDstPortRange"
+    ::= {  aclAceTCPEntry 13 }
+
+aclAceTCPDstPort     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The TCP port number to be matched against the packets TCP destination port"
+    ::= { aclAceTCPEntry 14 }
+
+    aclAceTCPDstPortRange     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The destination port number of the  TCP  protocol.
+         If the aclAceTCPDstPortOp object in the same row is range(6),
+         this object will be the ending port number of the port range.
+         This object cannot be configured if
+         aclAceTCPDstPortOp in the same row is not range(6)"
+    ::= { aclAceTCPEntry 15 }
+
+aclAceTCPSetMarkingType OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This object is used only for ACE type 'permit'.
+         It indicates which priority parameter should be set in matched packet. "
+    ::= {  aclAceTCPEntry 16 }
+
+aclAceTCPSetDscp    OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "DSCP value to set in matched packet"
+    ::= {  aclAceTCPEntry  17 }
+
+aclAceTCPSetIpPrecedence    OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "IP Precedence value to set in matched packet"
+    ::= {  aclAceTCPEntry 18 }
+
+aclAceTCPSetPbit    OBJECT-TYPE
+    SYNTAX          PbitMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Pbit (layer two priority) to set in matched packet"
+    ::= {  aclAceTCPEntry 19 }
+
+--   UDP  table
+
+aclAceUDPTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclAceUDPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "ACE UDP   Table."
+       ::= { aclConf 7 }
+
+aclAceUDPEntry OBJECT-TYPE
+       SYNTAX       AclAceUDPEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "ACE UDP entry"
+       INDEX   { aclAceIdx }
+       ::= { aclAceUDPTable 1 }
+
+AclAceUDPEntry ::= SEQUENCE {
+    aclAceUDPSrcAddressType             InetAddressType,
+    aclAceUDPSrcAddress                 InetAddress,
+    aclAceUDPSrcAddressPrefixLength     InetAddressPrefixLength,
+    aclAceUDPDstAddressType             InetAddressType,
+    aclAceUDPDstAddress                 InetAddress,
+    aclAceUDPDstAddressPrefixLength     InetAddressPrefixLength,
+    aclAceUDPMarkingType                AceMarkingType,
+    aclAceUDPDscp                       DscpMark,
+    aclAceUDPIpPrecedence               IpPrecedenceMark,
+    aclAceUDPSrcPortOp                  UdpTcpPortOp,
+    aclAceUDPSrcPort                    InetPortNumber,
+    aclAceUDPSrcPortRange               InetPortNumber,
+    aclAceUDPDstPortOp                  UdpTcpPortOp,
+    aclAceUDPDstPort                    InetPortNumber,
+    aclAceUDPDstPortRange               InetPortNumber,
+    aclAceUDPSetMarkingType             AceMarkingType,
+    aclAceUDPSetDscp                    DscpMark,
+    aclAceUDPSetIpPrecedence            IpPrecedenceMark,
+    aclAceUDPSetPbit                    PbitMark 
+ }
+
+aclAceUDPSrcAddressType         OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "IP  Source Address"
+    ::= {  aclAceUDPEntry 1 }
+
+    aclAceUDPSrcAddress         OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "IP  Source Address"
+    ::= {  aclAceUDPEntry 2 }
+
+aclAceUDPSrcAddressPrefixLength OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in SrcAddressPrefixLength"
+    ::= {  aclAceUDPEntry 3 }
+
+aclAceUDPDstAddressType         OBJECT-TYPE
+    SYNTAX          InetAddressType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "X3 Description for DstAddress"
+    ::= {  aclAceUDPEntry 4 }
+
+aclAceUDPDstAddress         OBJECT-TYPE
+    SYNTAX          InetAddress
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "X3 Description for DstAddress"
+    ::= {  aclAceUDPEntry 5 }
+
+aclAceUDPDstAddressPrefixLength OBJECT-TYPE
+    SYNTAX          InetAddressPrefixLength
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The length of the CIDR Prefix carried in aclAceUDPDstAddress"
+    ::= {  aclAceUDPEntry 6 }
+
+aclAceUDPMarkingType    OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Specifies the marking type to be matched"
+    ::= {  aclAceUDPEntry 7 }
+
+aclAceUDPDscp   OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The DSCP value to match against the packet's DSCP field"
+    ::= {  aclAceUDPEntry 8 }
+
+aclAceUDPIpPrecedence   OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The IP Precendece value to match against the packet's IP Precendece field"
+    ::= {  aclAceUDPEntry 9 }
+
+aclAceUDPSrcPortOp  OBJECT-TYPE
+    SYNTAX          UdpTcpPortOp
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Indicates how a packet's source UDP port number is
+         to be compared with aclAceUDPSrcPort and aclAceUDPSrcPortRange"
+    ::= {  aclAceUDPEntry 10 }
+
+aclAceUDPSrcPort     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The UDP port number  to be matched against the packets UDP source port."
+    ::= { aclAceUDPEntry 11 }
+
+aclAceUDPSrcPortRange     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The source port number of the  UDP protocol.
+         If the aclAceUDPSrcPortOp object in the same row is range(6),
+         this object will be the ending port number of the port range.
+         This object cannot be configured if
+         aclAceUDPSrcPortOp in the same row is not range(6)"
+    ::= { aclAceUDPEntry 12 }
+
+aclAceUDPDstPortOp  OBJECT-TYPE
+    SYNTAX          UdpTcpPortOp
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Indicates how a packet's destination UDP port number is
+         to be compared with aclAceUDPDstPort and aclAceUDPDstPortRange"
+    ::= {  aclAceUDPEntry 13 }
+
+aclAceUDPDstPort     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The UDP port number  to be matched against the packets UDP destination port number"
+    ::= { aclAceUDPEntry 14 }
+
+aclAceUDPDstPortRange     OBJECT-TYPE
+    SYNTAX          InetPortNumber
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The destination port number of the  TCP  protocol.
+         If the aclAceUDPDstPortOp object in the same row is range(6),
+         this object will be the ending port number of the port range.
+         This object cannot be configured if
+         aclAceUDPDstPortOp in the same row is not range(6)"
+    ::= { aclAceUDPEntry 15 }
+
+aclAceUDPSetMarkingType OBJECT-TYPE
+    SYNTAX          AceMarkingType
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This object is used only for ACE type 'permit'.
+         It indicates which priority parameter should be set in matched packet. "
+    ::= {  aclAceUDPEntry 16 }
+
+aclAceUDPSetDscp    OBJECT-TYPE
+    SYNTAX          DscpMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "DSCP value to set in matched packet"
+    ::= {  aclAceUDPEntry  17 }
+
+aclAceUDPSetIpPrecedence    OBJECT-TYPE
+    SYNTAX          IpPrecedenceMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "IP Precedence value to set in matched packet"
+    ::= {  aclAceUDPEntry 18 }
+
+aclAceUDPSetPbit    OBJECT-TYPE
+    SYNTAX          PbitMark
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Pbit (layer two priority) to set in matched packet"
+    ::= {  aclAceUDPEntry 19 }
+
+    
+aclBindTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclBindEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "ACL Bind to Entitity Table."
+       ::= { aclConf 8 }
+
+aclBindEntry OBJECT-TYPE
+       SYNTAX       AclBindEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "Entry defines ACL bind to entity"
+       INDEX   {aclBindEntityType, aclBindEntityIndex, aclBindDirection, aclBindAclType }
+       ::= { aclBindTable 1 }
+
+AclBindEntry ::= SEQUENCE {
+    aclBindEntityType           INTEGER,
+    aclBindEntityIndex          Integer32,
+    aclBindDirection            INTEGER,
+    aclBindAclType              INTEGER,
+    aclBindAclName              SnmpAdminString (SIZE (1..252)),
+    aclBindTimeElapsed          Gauge32,
+    aclBindClearStatisticsCmd   INTEGER,
+    aclBindRowStatus            RowStatus 
+ }
+
+ aclBindEntityType     OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+    routerInterface (1),
+    management      (2)
+    }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This ocject defines whether ACL is bound to Router Interface
+         or to Management entity."
+    ::= { aclBindEntry 1 }
+
+ aclBindEntityIndex     OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Entity Index"
+    ::= { aclBindEntry 2 }
+
+ aclBindDirection     OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+    inbound     (2),
+    outbound    (3)
+    }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "This object indicates the direction on which the access list works,
+         which may be either inbound (for traffic entering the entity)
+         or outbound (for traffic transmitted out of the entity)."
+    ::= { aclBindEntry 3 }
+
+aclBindAclType      OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+    ipv4    (1),
+    ipv6    (2)
+    }
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "ACL type. For IP ACLs, all ACEs of same ACL will have same InetAddressType value"
+    DEFVAL  { ipv4}
+    ::= { aclBindEntry 4 }
+
+aclBindAclName      OBJECT-TYPE
+    SYNTAX          SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "This object indicates the name of ACL binded to this entity."
+    ::= { aclBindEntry 5 }
+
+aclBindTimeElapsed     OBJECT-TYPE
+    SYNTAX          Gauge32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "The number of seconds that have elapsed since
+         the beginning of the current measurement period."
+    ::= { aclBindEntry 6 }
+
+aclBindClearStatisticsCmd     OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+    off (1),
+    on  (2)
+    }
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Clear statistics command. All Matches counters (of all ACEs)
+         of ACL bound to entity are cleared."
+    ::= { aclBindEntry 7}
+
+aclBindRowStatus     OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "Create or delete ACL bind to entity"
+    ::= { aclBindEntry 8}
+
+-- Scalars collection
+
+aclHandleTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclHandleEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "Dummy table, includes single row of ACL handling parameters"
+       ::= { aclConf 10 }
+
+aclHandleEntry OBJECT-TYPE
+       SYNTAX       AclHandleEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "ACL handling parameters"
+       INDEX   { aclHandleIndex }
+       ::= { aclHandleTable 1 }
+
+AclHandleEntry ::= SEQUENCE {
+    aclHandleIndex      Unsigned32,
+    aclLoggingIntervel  Unsigned32 
+ }
+
+ aclHandleIndex     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Dummy index = 1"
+    ::= { aclHandleEntry 1 }
+
+aclLoggingIntervel     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Logging interval in seconds.
+         The default value is 300 seconds = 5 minutes"
+    ::= { aclHandleEntry 2 }
+
+aclInvAceTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclInvAceEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+        "Inverse table for Access Control Entry  (ACE) Table.
+         This table is used for displaying ACEs ordered according their sequence number. "
+       ::= { aclConf 11 }
+
+aclInvAceEntry OBJECT-TYPE
+       SYNTAX       AclInvAceEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+          "ACE Table inverse entry -  general ACE parameters , indexed by ACL Nam and Sequence Number,
+           used for display sorted according to sequence number purpose."
+       INDEX   { aclName ,  aclAceSequenceNumber }
+       ::= { aclInvAceTable 1 }
+
+AclInvAceEntry ::= SEQUENCE {
+    aclInvAceIdx        Unsigned32,
+    aclInvAceType       INTEGER,
+    aclInvAcePointer    RowPointer,
+    aclInvAcelog        INTEGER 
+ }
+
+aclInvAceIdx        OBJECT-TYPE
+    SYNTAX          Unsigned32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "ACE running Index . "
+    ::= { aclInvAceEntry 1 }
+
+aclInvAceType OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+    remark  (1),
+    deny    (2),
+    permit  (3)
+    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "This object specify ACE type:
+         Remark, Deny or Permit.
+         Remark type ACE  must include pointer (aclAcePointer) to aclAceRemarkTable
+         Permit or Deny type ACE must include pointer to one of the other
+         auxilliary tables (aclAceIP Table, aclAceICMPTable, aclAceTCPTable or aclAceUDPTable)."
+    ::= { aclInvAceEntry 2 }
+
+aclInvAcePointer OBJECT-TYPE
+    SYNTAX          RowPointer
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Pointer to entry in one of the auxilary tables:
+         aclAceRemarkTable, aclAceIP Table, aclAceICMPTable ,
+         aclAceTCPTable, aclAceUDPTable. "
+    ::= { aclInvAceEntry 3 }
+
+aclInvAcelog OBJECT-TYPE
+    SYNTAX          INTEGER
+    {
+    notApplicable   (1), --for ACE type = remark
+    disable         (2),
+    enable          (3)
+    }
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION
+        "Enable or disable log of current ACE"
+    ::= { aclInvAceEntry 4 }
+
+
+--Statistics Tables
+
+aclStats   OBJECT IDENTIFIER ::= { radAclMIB 2 }
+
+aclAceStatsTable OBJECT-TYPE
+       SYNTAX       SEQUENCE OF AclAceStatsEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "Statistics table"
+       ::= { aclStats 1 }
+
+aclAceStatsEntry OBJECT-TYPE
+       SYNTAX       AclAceStatsEntry
+       MAX-ACCESS   not-accessible
+       STATUS       current
+       DESCRIPTION
+            "Statistics entry"
+       INDEX   { aclBindEntityType, aclBindEntityIndex, aclBindDirection, aclType, aclAceIdx  }
+       ::= { aclAceStatsTable 1 }
+
+AclAceStatsEntry ::= SEQUENCE {
+    aclAceStatsMatches   Gauge32,
+    aclAceStatsClearCmd  INTEGER 
+ }
+
+ aclAceStatsMatches     OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Counts the number of packets that matched the
+         statement indicated by aclAceIdx,
+         of the ACL of type  indicated by aclType,
+         which is bounded to the entity indicated by aclBindEntityType
+         &  aclBindEntityIndex "
+    ::= { aclAceStatsEntry 1 }
+
+aclAceStatsClearCmd         OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    off (1),
+    on  (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Clear statistics command. ACE Matches counter (aclAceStatsMatches)
+         is cleared."
+    ::= { aclAceStatsEntry 2}
+
+
+aclAceLogTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AclAceLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "ACL log table.
+         This table has limited number of rows, hence,
+         is implemented as a cyclic table."
+    ::= { aclStats 2 }
+
+aclAceLogEntry  OBJECT-TYPE
+    SYNTAX      AclAceLogEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each entry contains information on one ACE match."
+    INDEX  { aclAceLogIndex }
+    ::= { aclAceLogTable 1 }
+
+AclAceLogEntry ::= SEQUENCE {
+    aclAceLogIndex          Unsigned32,
+    aclAceLogIPAddressType  InetAddressType,
+    aclAceLogIPSrcAddress   InetAddress,
+    aclAceLogIPDstAddress   InetAddress,
+    aclAceLogProtocol       INTEGER,
+    aclAceLogSrcPort        Unsigned32,
+    aclAceLogDstPort        Unsigned32,
+    aclAceLogIpProtocol     Unsigned32 
+ }
+
+aclAceLogIndex  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Running index "
+    ::= { aclAceLogEntry 1 }
+
+aclAceLogIPAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Type of Internet address of source and destination fields
+         of the matched packet. (aclAceLogIPSrcAddress and aclAceLogIPDstAddress).
+         Only ipV4 and ipv6 are supported"
+    ::= { aclAceLogEntry 2 }
+
+
+aclAceLogIPSrcAddress  OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Source IP address of the matched packet.
+         If the IP address is unknown then  the value of this object
+         will be empty"
+    ::= { aclAceLogEntry 3 }
+
+
+aclAceLogIPDstAddress  OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Dest IP address of the the matched packet.
+         If the IP address is unknown then  the value of this object
+         will be empty"
+    ::= { aclAceLogEntry 4 }
+
+aclAceLogProtocol OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                ip      (1),
+                icmp    (2),
+                udp     (3),
+                tcp     (4),
+                unknown (255)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Matched packet protocol  - IP, ICMP, UDP or TCP.
+         If the protocol is unknown then  the value of this object
+         will be unknown(255)."
+    ::= { aclAceLogEntry 5 }
+
+aclAceLogSrcPort OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Matched packet source TCP/UDP port number.
+         If the port is unknown or aclAceLogProtocol <> (tcp or udp) then
+         the value of this object will be 0xFFFFFFFF"
+    ::= { aclAceLogEntry 6}
+
+aclAceLogDstPort OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Matched packet destination TCP/UDP port number.
+         If the port is unknown or aclAceLogProtocol <>  (tcp or udp)  then
+         the value of this object will be 0xFFFFFFFF"
+    ::= { aclAceLogEntry 7}
+
+aclAceLogIpProtocol OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "IP protocol number.
+         If the protocol is unknown or  aclAceLogProtocol <> ip
+         then the value of this object will be 0xFFFFFFFF"
+    ::= { aclAceLogEntry 8 }
+
+
+
+systemAclLogging  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, aclBindAclName, aclAceSequenceNumber, 
+     aclAceType, aclAceStatsMatches, aclAceLogIPSrcAddress, 
+     aclAceLogIPDstAddress, aclAceLogProtocol, aclAceLogSrcPort, 
+     aclAceLogDstPort, aclAceLogIpProtocol } 
+    STATUS current
+    DESCRIPTION
+        "This trap is sent whenever a packet matches ACL entry for which logging
+         is enabled.     The ACL logging event is rate limited."
+    ::= { systemsEvents 89 }
+
+END

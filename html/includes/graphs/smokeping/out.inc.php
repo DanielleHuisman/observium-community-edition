@@ -56,19 +56,24 @@ if (isset($config['smokeping']['master_hostname']))
 foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($config['smokeping']['dir'])) as $filename_dir)
 {
     if (($device['hostname'] == $master_hostname) && strstr($filename_dir, $target.".rrd"))
-        $filename = $filename_dir;
-    elseif(strstr($filename_dir, $target."~".$device['hostname'].".rrd"))
-        $filename = $filename_dir;
+    {
+      $filename = $filename_dir;
+    }
+    elseif (strstr($filename_dir, $target."~".$device['hostname'].".rrd"))
+    {
+      $filename = $filename_dir;
+    }
 }
 
 if (!isset($config['graph_colours'][$colourset][$iter])) { $iter = 0; }
 $colour = $config['graph_colours'][$colourset][$iter];
 $iter++;
 
-$descr = rrdtool_escape($source,$descr_len);
+$descr = rrdtool_escape($source, $descr_len);
+$filename_escape = rrdtool_escape($filename);
 
-$rrd_options .= " DEF:median$i=".$filename.":median:AVERAGE ";
-$rrd_options .= " DEF:loss$i=".$filename.":loss:AVERAGE";
+$rrd_options .= " DEF:median$i=".$filename_escape.":median:AVERAGE ";
+$rrd_options .= " DEF:loss$i=".$filename_escape.":loss:AVERAGE";
 $rrd_options .= " CDEF:ploss$i=loss$i,$pings,/,100,*";
 $rrd_options .= " CDEF:dm$i=median$i";
 #  $rrd_options .= " CDEF:dm$i=median$i,0,".$max->{$start}.",LIMIT";
@@ -76,7 +81,7 @@ $rrd_options .= " CDEF:dm$i=median$i";
 // start emulate Smokeping::calc_stddev
 foreach (range(1, $pings) as $p)
 {
-  $rrd_options .= " DEF:pin".$i."p".$p."=".$filename.":ping".$p.":AVERAGE";
+  $rrd_options .= " DEF:pin".$i."p".$p."=".$filename_escape.":ping".$p.":AVERAGE";
   $rrd_options .= " CDEF:p".$i."p".$p."=pin".$i."p".$p.",UN,0,pin".$i."p".$p.",IF";
 }
 

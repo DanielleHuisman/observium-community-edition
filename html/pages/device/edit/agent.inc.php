@@ -68,7 +68,7 @@ $device = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", array($dev
                                       'name'        => 'Agent Port',
                                       'width'       => '250px',
                                       'readonly'    => $readonly,
-                                      'value'       => escape_html(get_dev_attrib($device, 'agent_port')));
+                                      'value'       => get_dev_attrib($device, 'agent_port'));
       $form['row'][2]['submit']    = array(
                                       'type'        => 'submit',
                                       'name'        => 'Save Changes',

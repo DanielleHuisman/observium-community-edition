@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- * @package        observium
- * @subpackage     webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -71,33 +70,63 @@ $menu_start = utime();
 
 
                    // Show Groups
-                   if (OBSERVIUM_EDITION != 'community')
+                   if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5)
                    {
-                      if ($_SESSION['userlevel'] >= 5)
-                      {
-                         $group_menu        = array();
-                         $entity_group_menu = array();
+                     $group_menu        = array();
+                     $entity_group_menu = array();
 
-                         $group_menu[] = array('url' => generate_url(array('page' => 'group_add')), 'title' => 'Create New Group', 'icon' => $config['icon']['plus']);
-                         $group_menu[] = array('divider' => TRUE);
+                     $group_menu[] = array('url' => generate_url(array('page' => 'group_add')), 'title' => 'Create New Group', 'icon' => $config['icon']['plus']);
 
-                         $group_count = 0;
+                     $group_count = 0;
+                     $group_menu_simple = [];
+                     $group_menu_nested = [ [ 'divider' => TRUE ] ];
 
-                         foreach (get_type_groups() as $group)
+                     $groups_by_type = get_groups_by_type();
+                     $groups_by_type_count = count($groups_by_type);
+
+                     foreach ($groups_by_type as $type => $groups)
+                     {
+                         $group_menu_entries = [
+                           'url' => generate_url(array('page' => 'groups', 'entity_type' => $type)),
+                           'title' => $config['entities'][$type]['names'],
+                           'icon' => $config['entities'][$type]['icon'],
+                           'count' => count($groups)
+                         ];
+                         $group_count += count($groups);
+
+                         foreach ($groups as $group)
                          {
-                            $group['member_count'] = dbFetchCell("SELECT COUNT(*) FROM `group_table` WHERE `group_id` = ?", array($group['group_id']));
-                            $entity_type           = $config['entities'][$group['entity_type']];
+                           $group['member_count'] = dbFetchCell("SELECT COUNT(*) FROM `group_table` WHERE `group_id` = ?", array($group['group_id']));
+                           $entity_type           = $config['entities'][$group['entity_type']];
 
-                            $group_menu[] = array('url' => generate_url(array('page' => 'group', 'group_id' => $group['group_id'])), 'title' => escape_html($group['group_name']), 'icon' => $config['entities'][$group['entity_type']]['icon'], 'count' => $group['member_count']);
+                           $group_menu_entries['entries'][] = array('url' => generate_url(array('page' => 'group', 'group_id' => $group['group_id'])), 'title' => escape_html($group['group_name']), 'icon' => $config['entities'][$group['entity_type']]['icon'], 'count' => $group['member_count']);
 
-                            $group_count++;
-
-                            $entity_group_menu[$group['entity_type']][] = array('url' => generate_url(array('page' => 'group', 'group_id' => $group['group_id'])), 'title' => escape_html($group['group_name']), 'icon' => $config['entities'][$group['entity_type']]['icon'], 'count' => $group['member_count']);
+                           $entity_group_menu[$group['entity_type']][] = array('url' => generate_url(array('page' => 'group', 'group_id' => $group['group_id'])), 'title' => escape_html($group['group_name']), 'icon' => $config['entities'][$group['entity_type']]['icon'], 'count' => $group['member_count']);
                          }
 
-                         $navbar['observium']['entries'][] = array('title' => 'Groups', 'url' => generate_url(array('page' => 'groups')), 'icon' => $config['icon']['group'], 'count' => $group_count, 'entries' => $group_menu);
-                         $navbar['observium']['entries'][] = array('divider' => TRUE);
-                      }
+                         // Nested
+                         $group_menu_nested[] = $group_menu_entries;
+                         // Simple
+                         $group_menu_simple[] = [ 'divider' => TRUE ];
+                         if ($groups_by_type_count > 3 && count($groups) > 7)
+                         {
+                           // Force nested for single group type
+                           $group_menu_simple[] = $group_menu_entries;
+                         } else {
+                           $group_menu_simple = array_merge($group_menu_simple, $group_menu_entries['entries']);
+                         }
+                     }
+
+                     if ($groups_by_type_count > 2 && $group_count > 30)
+                     {
+                       $navbar['observium']['entries'][] = [ 'title' => 'Groups', 'url' => generate_url(array('page' => 'groups')), 'icon' => $config['icon']['group'], 'count' => $group_count, 'entries' => array_merge($group_menu, $group_menu_nested) ];
+                     } else {
+                       $navbar['observium']['entries'][] = [ 'title' => 'Groups', 'url' => generate_url(array('page' => 'groups')), 'icon' => $config['icon']['group'], 'count' => $group_count, 'entries' => array_merge($group_menu, $group_menu_simple) ];
+                     }
+                     //$navbar['observium']['entries'][] = [ 'title' => 'Groups', 'url' => generate_url(array('page' => 'groups')), 'icon' => $config['icon']['group'], 'count' => $group_count, 'entries' => $group_menu];
+                     $navbar['observium']['entries'][] = array('divider' => TRUE);
+
+                     unset($group_menu, $group_menu_simple, $group_menu_nested, $group_menu_entries, $groups_by_type);
                    }
 
                    $navbar['observium']['entries'][] = array('title' => 'Alerts', 'url' => generate_url(array('page' => 'alerts')), 'icon' => $config['icon']['alert']);
@@ -121,7 +150,7 @@ $menu_start = utime();
 
                    $navbar['observium']['entries'][] = array('title' => 'Alert Logs', 'url' => generate_url(array('page' => 'alert_log')), 'icon' => $config['icon']['alert-log']);
 
-                   if (OBSERVIUM_EDITION != 'community')
+                   if (OBSERVIUM_EDITION !== 'community')
                    {
                       $navbar['observium']['entries'][] = array('title' => 'Scheduled Maintenance', 'url' => generate_url(array('page' => 'alert_maintenance')), 'icon' => $config['icon']['scheduled-maintenance'], 'userlevel' => 7);
                    }
@@ -132,7 +161,7 @@ $menu_start = utime();
                    {
                       $navbar['observium']['entries'][] = array('title' => 'Syslog', 'url' => generate_url(array('page' => 'syslog')), 'icon' => $config['icon']['syslog']);
 
-                      if (OBSERVIUM_EDITION != 'community')
+                      if (OBSERVIUM_EDITION !== 'community')
                       {
                          $navbar['observium']['entries'][] = array('title' => 'Syslog Alerts', 'url' => generate_url(array('page' => 'syslog_alerts')), 'icon' => $config['icon']['syslog-alerts']);
                          $navbar['observium']['entries'][] = array('title' => 'Syslog Rules', 'url' => generate_url(array('page' => 'syslog_rules')), 'icon' => $config['icon']['syslog-rules'], 'userlevel' => 7);
@@ -159,9 +188,9 @@ $menu_start = utime();
                       $navbar['observium']['entries'][] = array('divider' => TRUE);
                    }
 
-                   if (OBSERVIUM_EDITION != 'community' && $_SESSION['userlevel'] >= 5)
+                   if (OBSERVIUM_EDITION !== 'community' && $_SESSION['userlevel'] >= 5)
                    {
-                      // `m OIDs
+                      // Custom OIDs
 
                       $oids = dbFetchRows("SELECT `oids`.*, COUNT(*) AS `count` FROM `oids` JOIN `oids_entries` ON `oids`.`oid_id` = `oids_entries`.`oid_id` WHERE 1 GROUP BY `oids`.`oid_id`");
 
@@ -173,6 +202,9 @@ $menu_start = utime();
                       }
 
                       $navbar['observium']['entries'][] = array('title' => 'Custom OIDs', 'url' => generate_url(array('page' => 'customoids')), 'count' => $oid_count, 'icon' => $config['icon']['customoid'], 'entries' => $oids_menu);
+                      //$navbar['observium']['entries'][] = array('divider' => TRUE);
+
+                      $navbar['observium']['entries'][] = array('title' => 'Probes', 'url' => generate_url(array('page' => 'probes')), 'icon' => $config['icon']['status']);
                       $navbar['observium']['entries'][] = array('divider' => TRUE);
 
                    }
@@ -590,11 +622,19 @@ $menu_start = utime();
 
                       if (count($entity_group_menu['bgp_peer']) || count($entity_group_menu['bgp_peer_af']))
                       {
-			 if (count($entity_group_menu['bgp_peer']))
-                            $navbar['routing']['entries'][] = array('title' => 'BGP Peer Groups', 'url' => generate_url(array('page' => 'groups', 'entity_type' => 'bgp_peer')), 'icon' => $config['icon']['group'], 'count' => count($entity_group_menu['bgp_peer']), 'entries' => array_merge($entity_group_menu['bgp_peer']));
-			 if (count($entity_group_menu['bgp_peer_af']))
-                            $navbar['routing']['entries'][] = array('title' => 'BGP Peer (AFI/SAFI) Groups', 'url' => generate_url(array('page' => 'groups', 'entity_type' => 'bgp_peer_af')), 'icon' => $config['icon']['group'], 'count' => count($entity_group_menu['bgp_peer_af']), 'entries' => array_merge($entity_group_menu['bgp_peer_af']));
-                         $separator = 1;
+                          if (count($entity_group_menu['bgp_peer']))
+                          {
+                            $navbar['routing']['entries'][] = [ 'title'   => 'BGP Peer Groups', 'url' => generate_url([ 'page' => 'groups', 'entity_type' => 'bgp_peer' ]),
+                                                                'icon'    => $config['icon']['group'], 'count' => count($entity_group_menu['bgp_peer']),
+                                                                'entries' => array_merge($entity_group_menu['bgp_peer']) ];
+                          }
+                          if (count($entity_group_menu['bgp_peer_af']))
+                          {
+                            $navbar['routing']['entries'][] = [ 'title'   => 'BGP Peer (AFI/SAFI) Groups', 'url' => generate_url([ 'page' => 'groups', 'entity_type' => 'bgp_peer_af' ]),
+                                                                'icon'    => $config['icon']['group'], 'count' => count($entity_group_menu['bgp_peer_af']),
+                                                                'entries' => array_merge($entity_group_menu['bgp_peer_af']) ];
+                          }
+                        $separator = 1;
                       }
 
                       if ($cache['routing']['vrf']['count'])
@@ -654,8 +694,8 @@ $menu_start = utime();
                          }
 
                          $navbar['routing']['entries'][] = array('url' => generate_url(array('page' => 'routing', 'protocol' => 'bgp', 'type' => 'all', 'graph' => 'NULL')), 'icon' => $config['icon']['bgp'], 'title' => 'BGP All Sessions', 'count' => $cache['routing']['bgp']['count']);
-                         $navbar['routing']['entries'][] = array('url' => generate_url(array('page' => 'routing', 'protocol' => 'bgp', 'type' => 'external', 'graph' => 'NULL')), 'icon' => $config['icon']['bgp-external'], 'title' => 'BGP External', count => $cache['routing']['bgp']['external']);
-                         $navbar['routing']['entries'][] = array('url' => generate_url(array('page' => 'routing', 'protocol' => 'bgp', 'type' => 'internal', 'graph' => 'NULL')), 'icon' => $config['icon']['bgp-internal'], 'title' => 'BGP Internal', count => $cache['routing']['bgp']['internal']);
+                         $navbar['routing']['entries'][] = array('url' => generate_url(array('page' => 'routing', 'protocol' => 'bgp', 'type' => 'external', 'graph' => 'NULL')), 'icon' => $config['icon']['bgp-external'], 'title' => 'BGP External', 'count' => $cache['routing']['bgp']['external']);
+                         $navbar['routing']['entries'][] = array('url' => generate_url(array('page' => 'routing', 'protocol' => 'bgp', 'type' => 'internal', 'graph' => 'NULL')), 'icon' => $config['icon']['bgp-internal'], 'title' => 'BGP Internal', 'count' => $cache['routing']['bgp']['internal']);
                       }
 
                       // Do Alerts at the bottom
@@ -669,7 +709,7 @@ $menu_start = utime();
                    // Custom navbar entries.
                    if (is_file("includes/navbar-custom.inc.php"))
                    {
-                      include("includes/navbar-custom.inc.php");
+                      include_once("includes/navbar-custom.inc.php");
                    }
 
 
@@ -696,7 +736,8 @@ $menu_start = utime();
 
                       foreach ($dropdown['entries'] as $entry)
                       {
-                         if (count($entry['entries'])) {
+                         if (isset($entry['entries']) && count($entry['entries']))
+                         {
                             navbar_submenu($entry);
                          } else {
                             navbar_entry($entry);
@@ -746,11 +787,13 @@ $(function() {
                    $ua = array('browser' => detect_browser_type());
                    if ($_SESSION['touch'] == "yes")
                    {
-                      $ua['url'] = generate_url($vars, array('touch' => 'no'));
+                      //$ua['url'] = generate_url($vars, array('touch' => 'no'));
+                      $ua['attribs']['onclick'] = "ajax_action('touch_off');";
                    }
                    else
                    {
-                      $ua['url'] = generate_url($vars, array('touch' => 'yes'));
+                      //$ua['url'] = generate_url($vars, array('touch' => 'yes'));
+                      $ua['attribs']['onclick'] = "ajax_action('touch_on');";
                    }
 
                    if ($vars['touch'] == 'yes')
@@ -791,7 +834,9 @@ $(function() {
                       }
                    }
 
-                   echo('<li>' . generate_tooltip_link($ua['url'], ' <i class="' . $ua['icon'] . '"></i>', $ua['content']) . '</li>');
+                   $ua['url'] = "#";
+
+                   echo '<li>' . generate_tooltip_link($ua['url'], ' <i class="' . $ua['icon'] . '"></i>', $ua['content'], NULL, $ua['attribs']) . '</li>';
 
                    ?>
                     <li class="dropdown">
@@ -823,31 +868,65 @@ $(function() {
                            echo('</li>');
                            echo('<li class="divider"></li>');
 
-                           if ($_SESSION['big_graphs'] == 1)
+                           echo('<li class="dropdown-submenu">');
+                           echo('  <a href="#"><i class="' . $config['icon']['users'] . '"></i> Personalisation</a>');
+                           echo('  <ul class="dropdown-menu">');
+
+                           // This definition not exist in community edition
+                           if (OBSERVIUM_EDITION !== 'community')
                            {
-                              echo('<li><a href="' . generate_url($vars, array('big_graphs' => 'no')) . '" title="Switch to normal graphs"><i class="' . $config['icon']['graphs-small'] . '" style="font-size: 16px; color: #555;"></i> Normal Graphs</a></li>');
+                              foreach($config['themes'] as $theme_name => $theme_data)
+                              {
+                                 if ($_SESSION['theme'] != $theme_name)
+                                 {
+                                    echo('<li><a href="#" onclick="ajax_action(\'theme\', \''.$theme_name.'\');" title="Switch to '.$theme_data['name'].'"><i class="'.$theme_data['icon'].'" style="font-size: 16px; color: #555;"></i> '.$theme_data['name'].'</a></li>');
+                                 }
+                              }
+
+                              echo('    <li class="divider"></li>');
+                           }
+
+                           if ($_SESSION['big_graphs'])
+                           {
+                               echo('<li><a href="#" onclick="ajax_action(\'small_graphs\');" title="Switch to normal graphs"><i class="' . $config['icon']['graphs-small'] . '" style="font-size: 16px; color: #555;"></i> Normal Graphs</a></li>');
                            }
                            else
                            {
-                              echo('<li><a href="' . generate_url($vars, array('big_graphs' => 'yes')) . '" title="Switch to larger graphs"><i class="' . $config['icon']['graphs-large'] . '" style="font-size: 16px; color: #555;"></i> Large Graphs</a></li>');
+                               echo('<li><a href="#" onclick="ajax_action(\'big_graphs\');" title="Switch to larger graphs"><i class="' . $config['icon']['graphs-large'] . '" style="font-size: 16px; color: #555;"></i> Large Graphs</a></li>');
                            }
+
+                           echo('  </ul>');
+                           echo('</li>');
+
+                           ?>
+                            <li><a href="<?php echo(generate_url(array('page' => 'preferences'))); ?>"
+                                   title="My Profile"><?php echo get_icon('user-self'); ?> My
+                                    Profile</a></li>
+                           <?php
 
                            if ($_SESSION['userlevel'] >= 10)
                            {
                               echo('<li class="divider"></li>');
                               echo('<li class="dropdown-submenu">');
-                              echo('  <a tabindex="-1" href="' . generate_url(array('page' => 'adduser')) . '"><i class="' . $config['icon']['users'] . '"></i> Users</a>');
+                              echo('  <a tabindex="-1" href="' . generate_url(array('page' => 'user_add')) . '"><i class="' . $config['icon']['users'] . '"></i> Users & Groups</a>');
                               echo('  <ul class="dropdown-menu">');
                               if (auth_usermanagement())
                               {
-                                 echo('    <li><a href="' . generate_url(array('page' => 'adduser')) . '"><i class="' . $config['icon']['user-add'] . '"></i> Add User</a></li>');
+                                 echo('    <li><a href="' . generate_url(array('page' => 'user_add')) . '"><i class="' . $config['icon']['user-add'] . '"></i> Add User</a></li>');
                               }
-                              echo('    <li><a href="' . generate_url(array('page' => 'edituser')) . '"><i class="' . $config['icon']['user-edit'] . '"></i> Edit User</a></li>');
-                              if (auth_usermanagement())
-                              {
-                                 echo('    <li><a href="' . generate_url(array('page' => 'edituser')) . '"><i class="' . $config['icon']['user-delete'] . '"></i> Remove User</a></li>');
-                              }
-                              echo('    <li><a href="' . generate_url(array('page' => 'authlog')) . '"><i class="' . $config['icon']['user-log'] . '"></i> Authentication Log</a></li>');
+                              echo('    <li><a href="' . generate_url(array('page' => 'user_edit')) . '"><i class="' . $config['icon']['user-edit'] . '"></i> Edit User</a></li>');
+                              //if (auth_usermanagement())
+                              //{
+                              //   echo('    <li><a href="' . generate_url(array('page' => 'user_edit')) . '"><i class="' . $config['icon']['user-delete'] . '"></i> Remove User</a></li>');
+                              //}
+
+                             echo('<li class="divider"></li>');
+
+                             echo('    <li><a href="' . generate_url(array('page' => 'roles')) . '"><i class="' . $config['icon']['users'] . '"></i> Roles</a></li>');
+
+                             echo('<li class="divider"></li>');
+
+                             echo('    <li><a href="' . generate_url(array('page' => 'authlog')) . '"><i class="' . $config['icon']['user-log'] . '"></i> Authentication Log</a></li>');
                               echo('  </ul>');
                               echo('</li>');
 
@@ -860,14 +939,8 @@ $(function() {
                               echo('  </ul>');
                               echo('</li>');
                            }
-                           ?>
-                            <li class="divider"></li>
-                            <li><a href="<?php echo(generate_url(array('page' => 'preferences'))); ?>"
-                                   title="My Profile"><i class="<?php echo $config['icon']['user-self']; ?>"></i> My
-                                    Profile</a></li>
-                            <li class="divider"></li>
 
-                           <?php
+                           echo('<li class="divider"></li>');
 
                            navbar_entry(array('title' => 'Polling Information', 'url' => generate_url(array('page' => 'pollerlog')), 'icon' => $config['icon']['pollerlog']));
                            if ($_SESSION['userlevel'] >= 7)
@@ -887,7 +960,7 @@ $(function() {
                            }
                            ?>
                             <li class="divider"></li>
-                            <li><a href="<?php echo OBSERVIUM_URL; ?>/docs" title="Help"><i
+                            <li><a href="<?php echo OBSERVIUM_DOCS_URL; ?>/" title="Help" target="_blank"><i
                                             class="<?php echo $config['icon']['help']; ?>"></i> Help</a></li>
                             <li><?php echo(generate_link('<i class="' . $config['icon']['info'] . '"></i> About ' . OBSERVIUM_PRODUCT, array('page' => 'about'), array(), FALSE)); ?></li>
                         </ul>
@@ -971,3 +1044,7 @@ $(function() {
     ?>
 
 </script>
+
+<?php
+
+//EOF

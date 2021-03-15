@@ -23,9 +23,9 @@ if (!isset($percentile)) { $length += "2"; }
 if (!isset($out_text)) { $out_text = "Out"; }
 if (!isset($in_text)) { $in_text = "In"; }
 
-$unit_text = str_pad(truncate($unit_text,$length),$length);
-$in_text   = str_pad(truncate($in_text,$length),$length);
-$out_text  = str_pad(truncate($out_text,$length),$length);
+$unit_text = str_pad(truncate($unit_text, $length), $length);
+$in_text   = str_pad(truncate($in_text,   $length), $length);
+$out_text  = str_pad(truncate($out_text,  $length), $length);
 
 // Alternative style
 if ($graph_style == 'mrtg')
@@ -52,10 +52,10 @@ if (isset($defs))
 {
   $rrd_options .= $defs;
 } else {
-  $rrd_options .= " DEF:".$out."=".$rrd_filename.":".$ds_out.":AVERAGE";
-  $rrd_options .= " DEF:".$in."=".$rrd_filename.":".$ds_in.":AVERAGE";
-  $rrd_options .= " DEF:".$out."_max=".$rrd_filename.":".$ds_out.":MAX";
-  $rrd_options .= " DEF:".$in."_max=".$rrd_filename.":".$ds_in.":MAX";
+  $rrd_options .= " DEF:".$out."=".$rrd_filename_escape.":".$ds_out.":AVERAGE";
+  $rrd_options .= " DEF:".$in."=".$rrd_filename_escape.":".$ds_in.":AVERAGE";
+  $rrd_options .= " DEF:".$out."_max=".$rrd_filename_escape.":".$ds_out.":MAX";
+  $rrd_options .= " DEF:".$in."_max=".$rrd_filename_escape.":".$ds_in.":MAX";
 }
 
 $rrd_options .= " CDEF:dout_max=out_max,".$out_scale.",*";
@@ -87,10 +87,10 @@ if ($graph_max)
 
 if ($vars['previous'] == "yes")
 {
-  $rrd_options .= " DEF:".$out."X=".$rrd_filename.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
-  $rrd_options .= " DEF:".$in."X=".$rrd_filename.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
-  $rrd_options .= " DEF:".$out."_maxX=".$rrd_filename.":".$ds_out.":MAX:start=".$prev_from.":end=".$from;
-  $rrd_options .= " DEF:".$in."_maxX=".$rrd_filename.":".$ds_in.":MAX:start=".$prev_from.":end=".$from;
+  $rrd_options .= " DEF:".$out."X=".$rrd_filename_escape.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
+  $rrd_options .= " DEF:".$in."X=".$rrd_filename_escape.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
+  $rrd_options .= " DEF:".$out."_maxX=".$rrd_filename_escape.":".$ds_out.":MAX:start=".$prev_from.":end=".$from;
+  $rrd_options .= " DEF:".$in."_maxX=".$rrd_filename_escape.":".$ds_in.":MAX:start=".$prev_from.":end=".$from;
   $rrd_options .= " SHIFT:".$out."X:$period";
   $rrd_options .= " SHIFT:".$in."X:$period";
   $rrd_options .= " SHIFT:".$out."_maxX:$period";
@@ -174,8 +174,8 @@ if ($vars['previous'] == "yes")
     $rrd_options .= " AREA:dout".$format."X#99444466:";
   }
 } else {
-  $rrd_options .= " AREA:wrongin#FFF2F2";
-  $rrd_options .= " AREA:wrongout#FFF2F2";
+    $rrd_options .= " AREA:wrongin".$nan_colour;
+    $rrd_options .= " AREA:wrongout".$nan_colour;
 }
 
 $rrd_options .= " HRULE:0#999999";

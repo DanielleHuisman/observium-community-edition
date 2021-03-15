@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,39 +6,42 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-// We are interrested in equallogic group members (devices), not in the group
-// find group member id.
-
-// eqlMemberName.1.443914937 = hostname-1
-// eqlMemberName.1.1664046123 = hostname-2
-$eqlgrpmembers = snmpwalk_cache_multi_oid($device, 'eqlMemberName', array(), 'EQLMEMBER-MIB');
-
-foreach ($eqlgrpmembers as $index => $entry)
+// Do not poll member id on every poll, use discovery since this id required in discovery stage!
+if (!is_numeric($attribs['eqlgrpmemid']))
 {
-  // Find member id and name in results
-  if (!empty($entry['eqlMemberName']) && strtolower($entry['eqlMemberName']) == strtolower($poll_device['sysName']))
+  // eqlMemberName.1.443914937 = hostname-1
+  // eqlMemberName.1.1664046123 = hostname-2
+  $eqlgrpmembers = snmpwalk_cache_multi_oid($device, 'eqlMemberName', [], 'EQLMEMBER-MIB');
+
+  foreach ($eqlgrpmembers as $index => $entry)
   {
-    list(,$eqlgrpmemid) = explode('.', $index);
-    break;
+    // Find member id and name in results
+    if (!empty($entry['eqlMemberName']) && strtolower($entry['eqlMemberName']) == strtolower($poll_device['sysName']))
+    {
+      list(, $eqlgrpmemid) = explode('.', $index);
+      break;
+    }
   }
-}
 
-if (!isset($eqlgrpmemid))
-{
-  // Fall-back to old method.
-  $eqlgrpmemid = snmp_get($device, 'eqliscsiLocalMemberId.0', '-OQv', 'EQLVOLUME-MIB');
-}
+  if (!isset($eqlgrpmemid))
+  {
+    // Fall-back to old method.
+    $eqlgrpmemid = snmp_get_oid($device, 'eqliscsiLocalMemberId.0', 'EQLVOLUME-MIB');
+  }
 
-if (is_numeric($eqlgrpmemid) && $eqlgrpmemid != $attribs['eqlgrpmemid'])
-{
-  // Store member id when detected
-  set_dev_attrib($device, 'eqlgrpmemid', $eqlgrpmemid);
-  $attribs['eqlgrpmemid'] = $eqlgrpmemid;
-  print_debug("\neqlgrpmemid: $eqlgrpmemid");
+  if (is_numeric($eqlgrpmemid) && $eqlgrpmemid != $attribs['eqlgrpmemid'])
+  {
+    // Store member id when detected
+    set_dev_attrib($device, 'eqlgrpmemid', $eqlgrpmemid);
+    $attribs['eqlgrpmemid'] = $eqlgrpmemid;
+    print_debug("\neqlgrpmemid: $eqlgrpmemid");
+  }
+} else {
+  $eqlgrpmemid = $attribs['eqlgrpmemid'];
 }
 
 // EQLMEMBER-MIB::eqlMemberProductFamily.1.$eqlgrpmemid = STRING: PS6500
@@ -49,15 +51,15 @@ if (is_numeric($eqlgrpmemid) && $eqlgrpmemid != $attribs['eqlgrpmemid'])
 // EQLMEMBER-MIB::eqlMemberSerialNumber.1.$eqlgrpmemid = STRING: XXXNNNNNNNXNNNN
 // EQLMEMBER-MIB::eqlMemberServiceTag.1.$eqlgrpmemid = STRING: XXXXXXX
 
-$hardware = 'Dell EqualLogic '.snmp_get($device, 'eqlMemberProductFamily.1.'.$eqlgrpmemid, '-OQv', 'EQLMEMBER-MIB');
+$hardware = 'EqualLogic '.snmp_get_oid($device, 'eqlMemberProductFamily.1.'.$eqlgrpmemid, 'EQLMEMBER-MIB');
 
-$serial = snmp_get($device, 'eqlMemberSerialNumber.1.'.$eqlgrpmemid, '-OQv', 'EQLMEMBER-MIB');
-$serial .= ' ['.snmp_get($device, 'eqlMemberServiceTag.1.'.$eqlgrpmemid, '-OQv', 'EQLMEMBER-MIB').']';
+$serial = snmp_get_oid($device, 'eqlMemberSerialNumber.1.'.$eqlgrpmemid, 'EQLMEMBER-MIB');
+$serial .= ' ['.snmp_get_oid($device, 'eqlMemberServiceTag.1.'.$eqlgrpmemid, 'EQLMEMBER-MIB').']';
 
-$eqlmajor = snmp_get($device, 'eqlMemberControllerMajorVersion.1.'.$eqlgrpmemid, '-OQv', 'EQLMEMBER-MIB');
-$eqlminor = snmp_get($device, 'eqlMemberControllerMinorVersion.1.'.$eqlgrpmemid, '-OQv', 'EQLMEMBER-MIB');
-$eqlmaint = snmp_get($device, 'eqlMemberControllerMaintenanceVersion.1.'.$eqlgrpmemid, '-OQv', 'EQLMEMBER-MIB');
-$version = sprintf('V%d.%d.%d',$eqlmajor, $eqlminor, $eqlmaint);
+$eqlmajor = snmp_get_oid($device, 'eqlMemberControllerMajorVersion.1.'.$eqlgrpmemid, 'EQLMEMBER-MIB');
+$eqlminor = snmp_get_oid($device, 'eqlMemberControllerMinorVersion.1.'.$eqlgrpmemid, 'EQLMEMBER-MIB');
+$eqlmaint = snmp_get_oid($device, 'eqlMemberControllerMaintenanceVersion.1.'.$eqlgrpmemid, 'EQLMEMBER-MIB');
+$version  = sprintf('%d.%d.%d', $eqlmajor, $eqlminor, $eqlmaint);
 
 unset($eqlgrpmemid, $eqlgrpmembers, $eqlgrpmem, $eqlmajor, $eqlminor, $eqlmaint, $index);
 

@@ -92,6 +92,10 @@ if ($ports_modules[$port_module])
   foreach($oids as $oid)
   {
     $ipIfStats = snmpwalk_cache_twopart_oid($device, $oid, $ipIfStats, "IP-MIB", NULL, OBS_SNMP_ALL_TABLE);
+    if ($oid == 'ipIfStatsHCInOctets' && !snmp_status())
+    {
+      break;
+    }
   }
 
   foreach ($ipIfStats as $af => $af_ports)
@@ -104,7 +108,7 @@ if ($ports_modules[$port_module])
 
   //print_r($port_stats);
 
-  $process_port_functions[$port_module] = $GLOBALS['snmp_status'];
+  $process_port_functions[$port_module] = snmp_status();
 }
 
 

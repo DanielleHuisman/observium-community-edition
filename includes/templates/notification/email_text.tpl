@@ -5,7 +5,7 @@
  *
  * @package    observium
  * @subpackage templates
- * @copyright  (C) 2006-2015 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 /**
@@ -32,7 +32,7 @@ Duration:    {{DURATION}}
 ------------------------------------
 
 ------------------------------------
-Device:      {{DEVICE_HOSTNAME}}
+Device:      {{DEVICE_HOSTNAME}}{{#DEVICE_DESCRIPTION}} ({{DEVICE_DESCRIPTION}}){{/DEVICE_DESCRIPTION}}
 Hardware:    {{DEVICE_HARDWARE}}
 OS:          {{DEVICE_OS}}
 Location:    {{DEVICE_LOCATION}}

@@ -1,0 +1,2526 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-DHCP-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxActivationState,
+        MxIpHostName,
+        MxIpAddress,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpSubnetMask,
+        MxDigitMap
+    FROM MX-TC
+        MxUInt64,
+        MxFloat32,
+        MxIpHostNamePort,
+        MxIpAddr,
+        MxIpAddrPort,
+        MxIpAddrMask,
+        MxUri,
+        MxUrl
+    FROM MX-TC2
+        mediatrixServices
+    FROM MX-SMI2;
+
+dhcpMIB MODULE-IDENTITY
+ LAST-UPDATED   "1910210000Z"
+ ORGANIZATION " Mediatrix Telecom, Inc. "
+ CONTACT-INFO " Mediatrix Telecom, Inc.
+                4229, Garlock Street
+                Sherbrooke (Quebec)
+                Canada
+                Phone: (819) 829-8749
+                "
+ DESCRIPTION  " Dynamic Host Configuration Protocol Server
+
+                The Dynamic Host Configuration Protocol (DHCP) service manages
+                a DHCP server on each network interface.
+                "
+ ::= { mediatrixServices 1900 }
+
+dhcpMIBObjects OBJECT IDENTIFIER ::= { dhcpMIB 1 }
+
+-- *****************************************************************************
+
+-- Table:Subnets
+
+-- *****************************************************************************
+
+subnetsTable OBJECT-TYPE
+ SYNTAX        SEQUENCE OF SubnetsEntry
+ MAX-ACCESS    not-accessible
+ STATUS        current
+ DESCRIPTION " Subnets
+
+               This table configures the subnets of the DHCP server. The
+               NetworkInterfaceName parameter must match a network interface
+               that is Up and the EnableSubnet parameter must be set to
+               'Enable' to properly activate the DHCP server on that interface.
+
+               The Dhcp.AddSubnet command may be used to add a new subnet to
+               the SubnetsTable and to all subnet-specific configuration
+               tables.
+
+               "
+ ::= { dhcpMIBObjects 100 }
+ subnetsEntry OBJECT-TYPE
+  SYNTAX        SubnetsEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " A row in table Subnets. "
+  INDEX         {
+                  subnetsNetworkInterfaceName
+                }
+
+  ::= { subnetsTable 1 }
+
+ SubnetsEntry ::= SEQUENCE
+ {
+   subnetsNetworkInterfaceName            OCTET STRING,
+   subnetsEnableSubnet                    MxEnableState,
+   subnetsStartAddress                    MxIpAddr,
+   subnetsEndAddress                      MxIpAddr,
+   subnetsAutomaticConfigurationInterface OCTET STRING,
+   subnetsConfigStatus                    INTEGER,
+   subnetsDelete                          INTEGER
+ }
+
+ -- Index:Network Interface
+
+ subnetsNetworkInterfaceName OBJECT-TYPE
+  SYNTAX        OCTET STRING
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Network Interface
+
+                Network interface on which the DHCP server is active. That
+                interface must be up for the DHCP server to become active.
+                "
+  ::= { subnetsEntry 100 }
+
+ -- Columnar:Enable
+
+ subnetsEnableSubnet OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Enable
+
+                Enables the subnet configuration. Activates the DHCP server on
+                the subnet when enabled.
+                "
+  DEFVAL        { disable }
+  ::= { subnetsEntry 200 }
+
+ -- Columnar:Start Address
+
+ subnetsStartAddress OBJECT-TYPE
+  SYNTAX        MxIpAddr
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Start Address
+
+                Start address of the subnet range. It MUST be within the
+                network interface's subnet.
+                "
+  DEFVAL        { "" }
+  ::= { subnetsEntry 300 }
+
+ -- Columnar:End Address
+
+ subnetsEndAddress OBJECT-TYPE
+  SYNTAX        MxIpAddr
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " End Address
+
+                End address of the subnet range. It MUST be within the network
+                interface's subnet and higher than or equal to the StartAddress
+                value.
+
+                "
+  DEFVAL        { "" }
+  ::= { subnetsEntry 400 }
+
+ -- Columnar:Configuration Interface
+
+ subnetsAutomaticConfigurationInterface OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..50) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Configuration Interface
+
+                The network interface that provides the automatic configuration
+                (E.g.: DNS servers, NTP server, etc.) to this subnet.
+                "
+  DEFVAL        { "" }
+  ::= { subnetsEntry 450 }
+
+ -- Columnar:Status
+
+ subnetsConfigStatus OBJECT-TYPE
+  SYNTAX        INTEGER { disabled(100) , invalidConfig(200) , ok(300) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Status
+
+                Subnet configuration status.
+
+                  * Disabled: The EnableSubnet parameter is disabled or the
+                    NetworkInterfaceName parameter does not match a network
+                    interface that is Up.
+                  * InvalidConfig: The start or end address range is out of the
+                    network interface's subnet, or both parameters are
+                    incompatible.
+                  * Ok: The EnableSubnet parameter is enabled and the subnet
+                    configuration is valid.
+
+                "
+  ::= { subnetsEntry 500 }
+
+ -- Row command:Delete
+
+ subnetsDelete OBJECT-TYPE
+  SYNTAX        INTEGER { noOp(0), delete(10) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Delete
+
+                Deletes a row from the table.
+                "
+  DEFVAL        { noOp }
+  ::= { subnetsEntry 600 }
+
+-- End of table:Subnets
+
+-- ****************************************************************************
+
+-- Group:Domain Name
+
+-- ****************************************************************************
+
+domainNameGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 200 }
+ -- Scalar:Configuration Source
+
+ defaultDomainNameConfigSource OBJECT-TYPE
+  SYNTAX        INTEGER { hostConfiguration(200) , static(400) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Configuration Source
+
+                Default configuration source of all subnets.
+
+                  * HostConfiguration: The domain name is the one used by the
+                    unit.
+                  * Static: The domain name is specified in the
+                    DefaultStaticDomainName parameter.
+
+                "
+  DEFVAL        { hostConfiguration }
+  ::= { domainNameGroup 100 }
+
+ -- Scalar:Static Domain Name
+
+ defaultStaticDomainName OBJECT-TYPE
+  SYNTAX        MxIpHostName
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Static Domain Name
+
+                Default static domain name for all subnets.
+                "
+  DEFVAL        { "" }
+  ::= { domainNameGroup 200 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Subnet Domain Names
+
+ -- ***************************************************************************
+ 
+ specificDomainNamesTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SpecificDomainNamesEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Subnet Domain Names
+
+                This table specifies subnet-specific domain names
+                configurations. All subnets use the default configuration
+                unless the SpecificDomainNames.EnableConfig parameter is set
+                to 'Enable'.
+
+                The Dhcp.AddSubnet command may be used to add a new subnet to
+                the SubnetsTable and to all subnet-specific configuration
+                tables.
+
+                "
+  ::= { domainNameGroup 300 }
+  specificDomainNamesEntry OBJECT-TYPE
+   SYNTAX        SpecificDomainNamesEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Subnet Domain Names. "
+   INDEX         {
+                   specificDomainNamesSubnetName
+                 }
+
+   ::= { specificDomainNamesTable 1 }
+
+  SpecificDomainNamesEntry ::= SEQUENCE
+  {
+    specificDomainNamesSubnetName   OCTET STRING,
+    specificDomainNamesEnableConfig MxEnableState,
+    specificDomainNamesEnableOption MxEnableState,
+    specificDomainNamesConfigSource INTEGER,
+    specificDomainNamesStaticName   MxIpHostName
+  }
+
+  -- Index:Subnet Name
+
+  specificDomainNamesSubnetName OBJECT-TYPE
+   SYNTAX          OCTET STRING
+   MAX-ACCESS      read-only
+   STATUS          current
+   DESCRIPTION   " Subnet Name
+
+                   Name of the subnet.
+                   "
+   ::= { specificDomainNamesEntry 100 }
+
+  -- Columnar:Enable
+
+  specificDomainNamesEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable
+
+                 Defines the domain name configuration to use for this
+                 specific subnet.
+
+                   * Disable: The subnet uses the default configuration as
+                     defined in the DefaultDomainNameConfigSource and
+                     DefaultStaticDomainName parameters.
+                   * Enable: The subnet uses the specific configuration as
+                     defined in the SpecificDomainNames.ConfigSource and
+                     SpecificDomainNames.StaticName parameters.
+
+                 The configuration is only valid when the
+                 SpecificDomainNames.EnableOption parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { specificDomainNamesEntry 200 }
+
+  -- Columnar:Enable Option
+
+  specificDomainNamesEnableOption OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Option
+
+                 Enables the domain name (option 15).
+                 "
+   DEFVAL        { disable }
+   ::= { specificDomainNamesEntry 300 }
+
+  -- Columnar:Configuration Source
+
+  specificDomainNamesConfigSource OBJECT-TYPE
+   SYNTAX        INTEGER { hostConfiguration(200) , static(400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Configuration Source
+
+                 Subnet's domain name specific configuration source.
+
+                   * HostConfiguration: The domain name is obtained from the
+                     host configuration.
+                   * Static: The domain name is specified in the StaticName
+                     parameter.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultDomainNameConfigSource parameter when the
+                 SpecificDomainNames.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { static }
+   ::= { specificDomainNamesEntry 400 }
+
+  -- Columnar:Static Domain Name
+
+  specificDomainNamesStaticName OBJECT-TYPE
+   SYNTAX        MxIpHostName
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static Domain Name
+
+                 Static Domain Name Configuration. The
+                 SpecificDomainNames.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticDomainName parameter when the
+                 SpecificDomainNames.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificDomainNamesEntry 500 }
+
+ -- End of table:Subnet Domain Names
+
+ -- ******************************************************************
+ 
+ -- Table:Domain Names Information
+
+ -- ******************************************************************
+ 
+ domainNamesInfoTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF DomainNamesInfoEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Domain Names Information
+
+                This table contains the active subnets' domain names.
+                "
+  ::= { domainNameGroup 400 }
+  domainNamesInfoEntry OBJECT-TYPE
+   SYNTAX        DomainNamesInfoEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Domain Names Information. "
+   INDEX         {
+                   domainNamesInfoSubnetName
+                 }
+
+   ::= { domainNamesInfoTable 1 }
+
+  DomainNamesInfoEntry ::= SEQUENCE
+  {
+    domainNamesInfoSubnetName OCTET STRING,
+    domainNamesInfoDomainName OCTET STRING
+  }
+
+  -- Index:Subnet Name
+
+  domainNamesInfoSubnetName OBJECT-TYPE
+   SYNTAX         OCTET STRING
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION  " Subnet Name
+
+                  Name of the subnet.
+                  "
+   ::= { domainNamesInfoEntry 100 }
+
+  -- Columnar:Domain Name
+
+  domainNamesInfoDomainName OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Domain Name
+
+                 Indicates the subnet's current domain name.
+                 "
+   ::= { domainNamesInfoEntry 200 }
+
+ -- End of table:Domain Names Information
+
+-- End of group:Domain Name
+
+-- ****************************************************************************
+
+-- Group:Lease Time Configuration
+
+-- ****************************************************************************
+
+leaseTimeGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 300 }
+ -- Scalar:Lease Time
+
+ defaultLeaseTime OBJECT-TYPE
+  SYNTAX        Unsigned32
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Lease Time
+
+                Specifies the lease time (in seconds) default setting for all
+                subnets.
+                "
+  DEFVAL        { 86400 }
+  ::= { leaseTimeGroup 100 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Subnet Lease Times
+
+ -- ***************************************************************************
+ 
+ specificLeaseTimesTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SpecificLeaseTimesEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Subnet Lease Times
+
+                This table specifies subnet-specific lease times
+                configurations. All subnets use the default configuration
+                unless the SpecificLeaseTimes.EnableConfig parameter is set to
+                'Enable'.
+
+                The Dhcp.AddSubnet command may be used to add a new subnet to
+                the SubnetsTable and to all subnet-specific configuration
+                tables.
+
+                "
+  ::= { leaseTimeGroup 200 }
+  specificLeaseTimesEntry OBJECT-TYPE
+   SYNTAX        SpecificLeaseTimesEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Subnet Lease Times. "
+   INDEX         {
+                   specificLeaseTimesSubnetName
+                 }
+
+   ::= { specificLeaseTimesTable 1 }
+
+  SpecificLeaseTimesEntry ::= SEQUENCE
+  {
+    specificLeaseTimesSubnetName   OCTET STRING,
+    specificLeaseTimesEnableConfig MxEnableState,
+    specificLeaseTimesLeaseTime    Unsigned32
+  }
+
+  -- Index:Subnet Name
+
+  specificLeaseTimesSubnetName OBJECT-TYPE
+   SYNTAX          OCTET STRING
+   MAX-ACCESS      read-only
+   STATUS          current
+   DESCRIPTION   " Subnet Name
+
+                   Name of the subnet.
+                   "
+   ::= { specificLeaseTimesEntry 100 }
+
+  -- Columnar:Enable
+
+  specificLeaseTimesEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable
+
+                 Defines the lease time configuration to use for this specific
+                 subnet.
+
+                   * Disable: The subnet uses the default configuration as
+                     defined in the DefaultLeaseTime parameter.
+                   * Enable: The subnet uses the specific configuration as
+                     defined in the SpecificLeaseTimes.LeaseTime parameter.
+
+                 "
+   DEFVAL        { disable }
+   ::= { specificLeaseTimesEntry 200 }
+
+  -- Columnar:Lease Time
+
+  specificLeaseTimesLeaseTime OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Lease Time
+
+                 Specifies the subnet's specific lease time in seconds.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultLeaseTime parameter when the
+                 SpecificLeaseTimes.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { 86400 }
+   ::= { specificLeaseTimesEntry 300 }
+
+ -- End of table:Subnet Lease Times
+
+ -- ***************************************************************************
+ 
+ -- Table:Lease Times
+
+ -- ***************************************************************************
+ 
+ leaseTimesInfoTable OBJECT-TYPE
+  SYNTAX         SEQUENCE OF LeaseTimesInfoEntry
+  MAX-ACCESS     not-accessible
+  STATUS         current
+  DESCRIPTION  " Lease Times
+
+                 This table contains the active subnets' lease times.
+                 "
+  ::= { leaseTimeGroup 300 }
+  leaseTimesInfoEntry OBJECT-TYPE
+   SYNTAX        LeaseTimesInfoEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Lease Times. "
+   INDEX         {
+                   leaseTimesInfoSubnetName
+                 }
+
+   ::= { leaseTimesInfoTable 1 }
+
+  LeaseTimesInfoEntry ::= SEQUENCE
+  {
+    leaseTimesInfoSubnetName OCTET STRING,
+    leaseTimesInfoDefault    Unsigned32
+  }
+
+  -- Index:Subnet Name
+
+  leaseTimesInfoSubnetName OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Subnet Name
+
+                 Name of the subnet.
+                 "
+   ::= { leaseTimesInfoEntry 100 }
+
+  -- Columnar:Lease Time
+
+  leaseTimesInfoDefault OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Lease Time
+
+                 Indicates the subnet's current default lease time in seconds.
+                 "
+   ::= { leaseTimesInfoEntry 200 }
+
+ -- End of table:Lease Times
+
+-- End of group:Lease Time Configuration
+
+-- ****************************************************************************
+
+-- Group:Default Router
+
+-- ****************************************************************************
+
+defaultRouterGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 400 }
+ -- ***************************************************************************
+ 
+ -- Table:Subnet Default Routers
+
+ -- ***************************************************************************
+ 
+ specificDefaultRoutersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SpecificDefaultRoutersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Subnet Default Routers
+
+                This table specifies subnet-specific default routers
+                configurations.
+
+                The Dhcp.AddSubnet command may be used to add a new subnet to
+                the SubnetsTable and to all subnet-specific configuration
+                tables.
+
+                "
+  ::= { defaultRouterGroup 100 }
+  specificDefaultRoutersEntry OBJECT-TYPE
+   SYNTAX        SpecificDefaultRoutersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Subnet Default Routers. "
+   INDEX         {
+                   specificDefaultRoutersSubnetName
+                 }
+
+   ::= { specificDefaultRoutersTable 1 }
+
+  SpecificDefaultRoutersEntry ::= SEQUENCE
+  {
+    specificDefaultRoutersSubnetName   OCTET STRING,
+    specificDefaultRoutersEnableOption MxEnableState,
+    specificDefaultRoutersConfigSource INTEGER,
+    specificDefaultRoutersStaticRouter MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  specificDefaultRoutersSubnetName OBJECT-TYPE
+   SYNTAX            OCTET STRING
+   MAX-ACCESS        read-only
+   STATUS            current
+   DESCRIPTION     " Subnet Name
+
+                     Name of the subnet.
+                     "
+   ::= { specificDefaultRoutersEntry 100 }
+
+  -- Columnar:Enable Option
+
+  specificDefaultRoutersEnableOption OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Option
+
+                 Enables the default router (option 3).
+                 "
+   DEFVAL        { enable }
+   ::= { specificDefaultRoutersEntry 200 }
+
+  -- Columnar:Configuration Source
+
+  specificDefaultRoutersConfigSource OBJECT-TYPE
+   SYNTAX        INTEGER { hostInterface(100) , static(400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Configuration Source
+
+                 The subnet's specific router configuration source.
+
+                   * HostInterface: The default router is the host address
+                     within the client's subnet.
+                   * Static: The default router is specified in the
+                     SpecificDefaultRouters.StaticRouter parameter.
+
+                 "
+   DEFVAL        { hostInterface }
+   ::= { specificDefaultRoutersEntry 300 }
+
+  -- Columnar:Static Default Router
+
+  specificDefaultRoutersStaticRouter OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static Default Router
+
+                 Specifies the subnet's default router. The
+                 SpecificDefaultRouters.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificDefaultRoutersEntry 400 }
+
+ -- End of table:Subnet Default Routers
+
+ -- *********************************************************************
+ 
+ -- Table:Default Routers
+
+ -- *********************************************************************
+ 
+ defaultRoutersInfoTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF DefaultRoutersInfoEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Default Routers
+
+                This table contains the active subnets' default routers.
+                "
+  ::= { defaultRouterGroup 200 }
+  defaultRoutersInfoEntry OBJECT-TYPE
+   SYNTAX        DefaultRoutersInfoEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Default Routers. "
+   INDEX         {
+                   defaultRoutersInfoSubnetName
+                 }
+
+   ::= { defaultRoutersInfoTable 1 }
+
+  DefaultRoutersInfoEntry ::= SEQUENCE
+  {
+    defaultRoutersInfoSubnetName    OCTET STRING,
+    defaultRoutersInfoDefaultRouter MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  defaultRoutersInfoSubnetName OBJECT-TYPE
+   SYNTAX          OCTET STRING
+   MAX-ACCESS      read-only
+   STATUS          current
+   DESCRIPTION   " Subnet Name
+
+                   Name of the subnet.
+                   "
+   ::= { defaultRoutersInfoEntry 100 }
+
+  -- Columnar:Default Router
+
+  defaultRoutersInfoDefaultRouter OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Default Router
+
+                 Indicates the subnet's current default router.
+                 "
+   ::= { defaultRoutersInfoEntry 200 }
+
+ -- End of table:Default Routers
+
+-- End of group:Default Router
+
+-- ****************************************************************************
+
+-- Group:DNS Servers
+
+-- ****************************************************************************
+
+dnsServersGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 500 }
+ -- Scalar:Configuration Source
+
+ defaultDnsServersConfigSource OBJECT-TYPE
+  SYNTAX        INTEGER { hostConfiguration(200) , automatic(300) , static
+                (400) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Configuration Source
+
+                Default configuration source for the DNS servers of all
+                subnets.
+
+                  * HostConfiguration: The DNS servers are obtained from the
+                    host configuration.
+                  * Automatic: The DNS servers are automatically obtained from
+                    the network configured in the
+                    Subnets.AutomaticConfigurationInterface parameter of this
+                    subnet.
+                  * Static: The DNS servers are specified in the
+                    DefaultStaticDnsServers table.
+
+                "
+  DEFVAL        { hostConfiguration }
+  ::= { dnsServersGroup 100 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Static DNS Servers
+
+ -- ***************************************************************************
+ 
+ defaultStaticDnsServersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF DefaultStaticDnsServersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Static DNS Servers
+
+                This table contains the list of default static DNS servers for
+                all subnets. The DNS servers are sorted by priority. These DNS
+                servers are used as the current DNS servers when the Default
+                DnsServersConfigSource parameter is set to 'Static'.
+
+                "
+  ::= { dnsServersGroup 200 }
+  defaultStaticDnsServersEntry OBJECT-TYPE
+   SYNTAX        DefaultStaticDnsServersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Static DNS Servers. "
+   INDEX         {
+                   defaultStaticDnsServersPriority
+                 }
+
+   ::= { defaultStaticDnsServersTable 1 }
+
+  DefaultStaticDnsServersEntry ::= SEQUENCE
+  {
+    defaultStaticDnsServersPriority  Unsigned32,
+    defaultStaticDnsServersIpAddress MxIpAddr
+  }
+
+  -- Index:Priority
+
+  defaultStaticDnsServersPriority OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 1..4 )
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Priority
+
+                 Priority number of this static DNS server. The lower the
+                 number is, the higher the priority is.
+                 "
+   ::= { defaultStaticDnsServersEntry 100 }
+
+  -- Columnar:IP Address
+
+  defaultStaticDnsServersIpAddress OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " IP Address
+
+                 Static DNS server's IP address.
+                 "
+   ::= { defaultStaticDnsServersEntry 200 }
+
+ -- End of table:Static DNS Servers
+
+ -- ***************************************************************************
+ 
+ -- Table:Subnet DNS Servers
+
+ -- ***************************************************************************
+ 
+ specificDnsServersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SpecificDnsServersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Subnet DNS Servers
+
+                This table specifies subnet-specific DNS servers
+                configurations. All subnets use the default configuration
+                unless the SpecificDnsServers.EnableConfig parameter is set to
+                'Enable'.
+
+                The Dhcp.AddSubnet command may be used to add a new subnet to
+                the SubnetsTable and to all subnet-specific configuration
+                tables.
+
+                "
+  ::= { dnsServersGroup 300 }
+  specificDnsServersEntry OBJECT-TYPE
+   SYNTAX        SpecificDnsServersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Subnet DNS Servers. "
+   INDEX         {
+                   specificDnsServersSubnetName
+                 }
+
+   ::= { specificDnsServersTable 1 }
+
+  SpecificDnsServersEntry ::= SEQUENCE
+  {
+    specificDnsServersSubnetName   OCTET STRING,
+    specificDnsServersEnableConfig MxEnableState,
+    specificDnsServersEnableOption MxEnableState,
+    specificDnsServersConfigSource INTEGER,
+    specificDnsServersStaticDns1   MxIpAddr,
+    specificDnsServersStaticDns2   MxIpAddr,
+    specificDnsServersStaticDns3   MxIpAddr,
+    specificDnsServersStaticDns4   MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  specificDnsServersSubnetName OBJECT-TYPE
+   SYNTAX          OCTET STRING
+   MAX-ACCESS      read-only
+   STATUS          current
+   DESCRIPTION   " Subnet Name
+
+                   Name of the subnet.
+                   "
+   ::= { specificDnsServersEntry 100 }
+
+  -- Columnar:Enable
+
+  specificDnsServersEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable
+
+                 Defines the DNS servers configuration to use for this
+                 specific subnet.
+
+                   * Disable: The subnet uses the default configuration as
+                     defined in the DefaultDnsServersConfigSource and
+                     DefaultStaticDnsServers.IpAddress parameters.
+                   * Enable: The subnet uses the specific configuration as
+                     defined in the following parameters:
+                     SpecificDnsServers.ConfigSource,
+                     SpecificDnsServers.StaticDns1,
+                     SpecificDnsServers.StaticDns2,
+                     SpecificDnsServers.StaticDns3, and
+                     SpecificDnsServers.StaticDns4.
+
+                 The configuration is only valid when the
+                 SpecificDnsServers.EnableOption parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { specificDnsServersEntry 200 }
+
+  -- Columnar:Enable Option
+
+  specificDnsServersEnableOption OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Option
+
+                 Enables the DNS servers (option 6).
+                 "
+   DEFVAL        { enable }
+   ::= { specificDnsServersEntry 300 }
+
+  -- Columnar:Configuration Source
+
+  specificDnsServersConfigSource OBJECT-TYPE
+   SYNTAX        INTEGER { hostConfiguration(200) , automatic(300) , static
+                 (400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Configuration Source
+
+                 DNS servers specific configuration source for the subnet.
+
+                   * HostConfiguration: The DNS servers are obtained from the
+                     host configuration.
+                   * Automatic: The DNS servers are automatically obtained
+                     from the network configured in the
+                     Subnets.AutomaticConfigurationInterface parameter of this
+                     subnet.
+                   * Static: The DNS servers are specified in the StaticDns
+                     parameters of this table.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultDnsServersConfigSource parameter when the
+                 SpecificDnsServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { static }
+   ::= { specificDnsServersEntry 400 }
+
+  -- Columnar:Static DNS 1
+
+  specificDnsServersStaticDns1 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static DNS 1
+
+                 IP address of the first DNS server of the subnet. The
+                 SpecificDnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticDnsServers.IpAddress parameter when the
+                 SpecificDnsServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificDnsServersEntry 500 }
+
+  -- Columnar:Static DNS 2
+
+  specificDnsServersStaticDns2 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static DNS 2
+
+                 IP address of the second DNS server of the subnet. The
+                 SpecificDnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticDnsServers.IpAddress parameter when the
+                 SpecificDnsServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificDnsServersEntry 600 }
+
+  -- Columnar:Static DNS 3
+
+  specificDnsServersStaticDns3 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static DNS 3
+
+                 IP address of the third DNS server of the subnet. The
+                 SpecificDnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticDnsServers.IpAddress parameter when the
+                 SpecificDnsServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificDnsServersEntry 700 }
+
+  -- Columnar:Static DNS 4
+
+  specificDnsServersStaticDns4 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static DNS 4
+
+                 IP address of the fourth DNS server of the subnet. The
+                 SpecificDnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticDnsServers.IpAddress parameter when the
+                 SpecificDnsServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificDnsServersEntry 800 }
+
+ -- End of table:Subnet DNS Servers
+
+ -- *****************************************************************
+ 
+ -- Table:DNS Servers
+
+ -- *****************************************************************
+ 
+ dnsServersInfoTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF DnsServersInfoEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " DNS Servers
+
+                This table contains the active subnets' DNS servers.
+                "
+  ::= { dnsServersGroup 400 }
+  dnsServersInfoEntry OBJECT-TYPE
+   SYNTAX        DnsServersInfoEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table DNS Servers. "
+   INDEX         {
+                   dnsServersInfoSubnetName
+                 }
+
+   ::= { dnsServersInfoTable 1 }
+
+  DnsServersInfoEntry ::= SEQUENCE
+  {
+    dnsServersInfoSubnetName OCTET STRING,
+    dnsServersInfoDns1       MxIpAddr,
+    dnsServersInfoDns2       MxIpAddr,
+    dnsServersInfoDns3       MxIpAddr,
+    dnsServersInfoDns4       MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  dnsServersInfoSubnetName OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Subnet Name
+
+                 Name of the subnet.
+                 "
+   ::= { dnsServersInfoEntry 100 }
+
+  -- Columnar:DNS 1
+
+  dnsServersInfoDns1 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " DNS 1
+
+                 Indicates the subnets' first DNS server.
+                 "
+   ::= { dnsServersInfoEntry 200 }
+
+  -- Columnar:DNS 2
+
+  dnsServersInfoDns2 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " DNS 2
+
+                 Indicates the subnets' second DNS server.
+                 "
+   ::= { dnsServersInfoEntry 300 }
+
+  -- Columnar:DNS 3
+
+  dnsServersInfoDns3 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " DNS 3
+
+                 Indicates the subnets' third DNS server.
+                 "
+   ::= { dnsServersInfoEntry 400 }
+
+  -- Columnar:DNS 4
+
+  dnsServersInfoDns4 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " DNS 4
+
+                 Indicates the subnets' fourth DNS server.
+                 "
+   ::= { dnsServersInfoEntry 500 }
+
+ -- End of table:DNS Servers
+
+-- End of group:DNS Servers
+
+-- ****************************************************************************
+
+-- Group:NTP Servers
+
+-- ****************************************************************************
+
+ntpServersGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 600 }
+ -- Scalar:Configuration Source
+
+ defaultNtpServersConfigSource OBJECT-TYPE
+  SYNTAX        INTEGER { hostConfiguration(200) , automatic(300) , static
+                (400) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Configuration Source
+
+                Default configuration source for the NTP servers of all
+                subnets.
+
+                  * HostConfiguration: The NTP servers are obtained from the
+                    host configuration.
+                  * Automatic: The NTP servers are automatically obtained from
+                    the network configured in the
+                    Subnets.AutomaticConfigurationInterface parameter of this
+                    subnet.
+                  * Static: The NTP servers are specified in the
+                    DefaultStaticNtpServers table.
+
+                "
+  DEFVAL        { hostConfiguration }
+  ::= { ntpServersGroup 100 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Static NTP Servers
+
+ -- ***************************************************************************
+ 
+ defaultStaticNtpServersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF DefaultStaticNtpServersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Static NTP Servers
+
+                This table contains the list of default static NTP servers for
+                all subnets. The NTP servers are sorted by priority. These NTP
+                servers are used as the current NTP servers when the
+                DefaultNtpServersConfigSource parameter is set to 'Static'.
+
+                "
+  ::= { ntpServersGroup 200 }
+  defaultStaticNtpServersEntry OBJECT-TYPE
+   SYNTAX        DefaultStaticNtpServersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Static NTP Servers. "
+   INDEX         {
+                   defaultStaticNtpServersPriority
+                 }
+
+   ::= { defaultStaticNtpServersTable 1 }
+
+  DefaultStaticNtpServersEntry ::= SEQUENCE
+  {
+    defaultStaticNtpServersPriority  Unsigned32,
+    defaultStaticNtpServersIpAddress MxIpAddr
+  }
+
+  -- Index:Priority
+
+  defaultStaticNtpServersPriority OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 1..4 )
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Priority
+
+                 Priority number of this static NTP server. The lower the
+                 number is, the higher the priority is.
+                 "
+   ::= { defaultStaticNtpServersEntry 100 }
+
+  -- Columnar:IP Address
+
+  defaultStaticNtpServersIpAddress OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " IP Address
+
+                 NTP server's static IP address.
+                 "
+   ::= { defaultStaticNtpServersEntry 200 }
+
+ -- End of table:Static NTP Servers
+
+ -- ***************************************************************************
+ 
+ -- Table:Subnet NTP Servers
+
+ -- ***************************************************************************
+ 
+ specificNtpServersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SpecificNtpServersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Subnet NTP Servers
+
+                This table specifies subnet-specific NTP servers
+                configurations. All subnets use the default configuration
+                unless the SpecificNtpServers.EnableConfig parameter is set to
+                'Enable'.
+
+                The Dhcp.AddSubnet command may be used to add a new subnet to
+                the SubnetsTable and to all subnet-specific configuration
+                tables.
+
+                "
+  ::= { ntpServersGroup 300 }
+  specificNtpServersEntry OBJECT-TYPE
+   SYNTAX        SpecificNtpServersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Subnet NTP Servers. "
+   INDEX         {
+                   specificNtpServersSubnetName
+                 }
+
+   ::= { specificNtpServersTable 1 }
+
+  SpecificNtpServersEntry ::= SEQUENCE
+  {
+    specificNtpServersSubnetName   OCTET STRING,
+    specificNtpServersEnableConfig MxEnableState,
+    specificNtpServersEnableOption MxEnableState,
+    specificNtpServersConfigSource INTEGER,
+    specificNtpServersStaticNtp1   MxIpAddr,
+    specificNtpServersStaticNtp2   MxIpAddr,
+    specificNtpServersStaticNtp3   MxIpAddr,
+    specificNtpServersStaticNtp4   MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  specificNtpServersSubnetName OBJECT-TYPE
+   SYNTAX          OCTET STRING
+   MAX-ACCESS      read-only
+   STATUS          current
+   DESCRIPTION   " Subnet Name
+
+                   Name of the subnet.
+                   "
+   ::= { specificNtpServersEntry 100 }
+
+  -- Columnar:Enable
+
+  specificNtpServersEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable
+
+                 Defines the NTP servers configuration to use for this
+                 specific subnet.
+
+                   * Disable: The subnet uses the default configuration as
+                     defined in the DefaultNtpServersConfigSource and
+                     DefaultStaticNtpServers.IpAddress parameters.
+                   * Enable: The subnet uses the specific configuration as
+                     defined in the following parameters:
+                     SpecificNtpServers.ConfigSource,
+                     SpecificNtpServers.StaticNtp1,
+                     SpecificNtpServers.StaticNtp2,
+                     SpecificNtpServers.StaticNtp3, and
+                     SpecificNtpServers.StaticNtp4.
+
+                 The configuration is only valid when the
+                 SpecificNtpServers.EnableOption parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { specificNtpServersEntry 200 }
+
+  -- Columnar:Enable Option
+
+  specificNtpServersEnableOption OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Option
+
+                 Enables the NTP servers (option 42).
+                 "
+   DEFVAL        { disable }
+   ::= { specificNtpServersEntry 300 }
+
+  -- Columnar:Configuration Source
+
+  specificNtpServersConfigSource OBJECT-TYPE
+   SYNTAX        INTEGER { hostConfiguration(200) , automatic(300) , static
+                 (400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Configuration Source
+
+                 NTP servers specific configuration source for the subnet.
+
+                   * HostConfiguration: The NTP servers are obtained from the
+                     host configuration.
+                   * Automatic: The NTP servers are automatically obtained
+                     from the network configured in the
+                     Subnets.AutomaticConfigurationInterface parameter of this
+                     subnet.
+                   * Static: The NTP servers are specified in the StaticNtp
+                     parameters of this table.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultNtpServersConfigSource parameter when the
+                 SpecificNtpServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { hostConfiguration }
+   ::= { specificNtpServersEntry 400 }
+
+  -- Columnar:Static NTP 1
+
+  specificNtpServersStaticNtp1 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NTP 1
+
+                 IP address of the first NTP server of the subnet. The
+                 SpecificNtpServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNtpServers.IpAddress parameter when the
+                 SpecificNtpServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNtpServersEntry 500 }
+
+  -- Columnar:Static NTP 2
+
+  specificNtpServersStaticNtp2 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NTP 2
+
+                 IP address of the second NTP server of the subnet. The
+                 SpecificNtpServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNtpServers.IpAddress parameter when the
+                 SpecificNtpServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNtpServersEntry 600 }
+
+  -- Columnar:Static NTP 3
+
+  specificNtpServersStaticNtp3 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NTP 3
+
+                 IP address of the third NTP server of the subnet. The
+                 SpecificNtpServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNtpServers.IpAddress parameter when the
+                 SpecificNtpServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNtpServersEntry 700 }
+
+  -- Columnar:Static NTP 4
+
+  specificNtpServersStaticNtp4 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NTP 4
+
+                 IP address of the fourth NTP server of the subnet. The
+                 SpecificNtpServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNtpServers.IpAddress parameter when the
+                 SpecificNtpServers.EnableConfig parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNtpServersEntry 800 }
+
+ -- End of table:Subnet NTP Servers
+
+ -- ******************************************************************
+ 
+ -- Table:NTP Servers
+
+ -- ******************************************************************
+ 
+ ntpServersInfoTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF NtpServersInfoEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " NTP Servers
+
+                This table contains the active subnets's NTP servers.
+                "
+  ::= { ntpServersGroup 400 }
+  ntpServersInfoEntry OBJECT-TYPE
+   SYNTAX        NtpServersInfoEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table NTP Servers. "
+   INDEX         {
+                   ntpServersInfoSubnetName
+                 }
+
+   ::= { ntpServersInfoTable 1 }
+
+  NtpServersInfoEntry ::= SEQUENCE
+  {
+    ntpServersInfoSubnetName OCTET STRING,
+    ntpServersInfoNtp1       MxIpAddr,
+    ntpServersInfoNtp2       MxIpAddr,
+    ntpServersInfoNtp3       MxIpAddr,
+    ntpServersInfoNtp4       MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  ntpServersInfoSubnetName OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Subnet Name
+
+                 Name of the subnet.
+                 "
+   ::= { ntpServersInfoEntry 100 }
+
+  -- Columnar:NTP 1
+
+  ntpServersInfoNtp1 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NTP 1
+
+                 Indicates the subnets' first NTP server.
+                 "
+   ::= { ntpServersInfoEntry 200 }
+
+  -- Columnar:NTP 2
+
+  ntpServersInfoNtp2 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NTP 2
+
+                 Indicates the subnets' second NTP server.
+                 "
+   ::= { ntpServersInfoEntry 300 }
+
+  -- Columnar:NTP 3
+
+  ntpServersInfoNtp3 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NTP 3
+
+                 Indicates the subnets' third NTP server.
+                 "
+   ::= { ntpServersInfoEntry 400 }
+
+  -- Columnar:NTP 4
+
+  ntpServersInfoNtp4 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NTP 4
+
+                 Indicates the subnets' fourth NTP server.
+                 "
+   ::= { ntpServersInfoEntry 500 }
+
+ -- End of table:NTP Servers
+
+-- End of group:NTP Servers
+
+-- ****************************************************************************
+
+-- Group:NBNS Servers
+
+-- ****************************************************************************
+
+nbnsServersGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 700 }
+ -- ***************************************************************************
+ 
+ -- Table:Static NBNS Servers
+
+ -- ***************************************************************************
+ 
+ defaultStaticNbnsServersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF DefaultStaticNbnsServersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Static NBNS Servers
+
+                This table contains the list of default static NBNS servers
+                for all subnets. The NBNS servers are sorted by priority.
+                "
+  ::= { nbnsServersGroup 100 }
+  defaultStaticNbnsServersEntry OBJECT-TYPE
+   SYNTAX        DefaultStaticNbnsServersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Static NBNS Servers. "
+   INDEX         {
+                   defaultStaticNbnsServersPriority
+                 }
+
+   ::= { defaultStaticNbnsServersTable 1 }
+
+  DefaultStaticNbnsServersEntry ::= SEQUENCE
+  {
+    defaultStaticNbnsServersPriority  Unsigned32,
+    defaultStaticNbnsServersIpAddress MxIpAddr
+  }
+
+  -- Index:Priority
+
+  defaultStaticNbnsServersPriority OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 1..4 )
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Priority
+
+                 Priority number of this static NBNS server. The lower the
+                 number is, the higher the priority is.
+                 "
+   ::= { defaultStaticNbnsServersEntry 100 }
+
+  -- Columnar:IP Address
+
+  defaultStaticNbnsServersIpAddress OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " IP Address
+
+                 NBNS server's static IP address.
+                 "
+   ::= { defaultStaticNbnsServersEntry 200 }
+
+ -- End of table:Static NBNS Servers
+
+ -- ***************************************************************************
+ 
+ -- Table:Subnet NBNS Servers
+
+ -- ***************************************************************************
+ 
+ specificNbnsServersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SpecificNbnsServersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Subnet NBNS Servers
+
+                This table specifies subnet-specific NBNS servers
+                configurations. All subnets use the default configuration
+                unless the SpecificNbnsServers.EnableConfig parameter is set
+                to 'Enable'.
+
+                The Dhcp.AddSubnet command may be used to add a new subnet to
+                the SubnetsTable and to all subnet-specific configuration
+                tables.
+
+                "
+  ::= { nbnsServersGroup 200 }
+  specificNbnsServersEntry OBJECT-TYPE
+   SYNTAX        SpecificNbnsServersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Subnet NBNS Servers. "
+   INDEX         {
+                   specificNbnsServersSubnetName
+                 }
+
+   ::= { specificNbnsServersTable 1 }
+
+  SpecificNbnsServersEntry ::= SEQUENCE
+  {
+    specificNbnsServersSubnetName   OCTET STRING,
+    specificNbnsServersEnableConfig MxEnableState,
+    specificNbnsServersEnableOption MxEnableState,
+    specificNbnsServersStaticNbns1  MxIpAddr,
+    specificNbnsServersStaticNbns2  MxIpAddr,
+    specificNbnsServersStaticNbns3  MxIpAddr,
+    specificNbnsServersStaticNbns4  MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  specificNbnsServersSubnetName OBJECT-TYPE
+   SYNTAX          OCTET STRING
+   MAX-ACCESS      read-only
+   STATUS          current
+   DESCRIPTION   " Subnet Name
+
+                   Name of the subnet.
+                   "
+   ::= { specificNbnsServersEntry 100 }
+
+  -- Columnar:Enable
+
+  specificNbnsServersEnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable
+
+                 Defines the NBNS servers configuration to use for this
+                 specific subnet.
+
+                   * Disable: The subnet uses the default configuration as
+                     defined in the DefaultStaticNbnsServers.IpAddress
+                     parameter.
+                   * Enable: The subnet uses the specific configuration as
+                     defined in the following parameters:
+                     SpecificNbnsServers.StaticNbns1,
+                     SpecificNbnsServers.StaticNbns2,
+                     SpecificNbnsServers.StaticNbns3, and
+                     SpecificNbnsServers.StaticNbns4.
+
+                 The configuration is only valid when the
+                 SpecificNbnsServers.EnableOption parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { specificNbnsServersEntry 200 }
+
+  -- Columnar:Enable Option
+
+  specificNbnsServersEnableOption OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Option
+
+                 Enables the NBNS servers (option 44).
+                 "
+   DEFVAL        { disable }
+   ::= { specificNbnsServersEntry 300 }
+
+  -- Columnar:Static NBNS 1
+
+  specificNbnsServersStaticNbns1 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NBNS 1
+
+                 IP address of the first NBNS server of the subnet. The
+                 SpecificNbnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNbnsServers.IpAddress parameter when the
+                 SpecificNbnsServers.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNbnsServersEntry 400 }
+
+  -- Columnar:Static NBNS 2
+
+  specificNbnsServersStaticNbns2 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NBNS 2
+
+                 IP address of the second NBNS server of the subnet. The
+                 SpecificNbnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNbnsServers.IpAddress parameter when the
+                 SpecificNbnsServers.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNbnsServersEntry 500 }
+
+  -- Columnar:Static NBNS 3
+
+  specificNbnsServersStaticNbns3 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NBNS 3
+
+                 IP address of the third NBNS server of the subnet. The
+                 SpecificNbnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNbnsServers.IpAddress parameter when the
+                 SpecificNbnsServers.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNbnsServersEntry 600 }
+
+  -- Columnar:Static NBNS 4
+
+  specificNbnsServersStaticNbns4 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Static NBNS 4
+
+                 IP address of the fourth NBNS server of the subnet. The
+                 SpecificNbnsServers.ConfigSource parameter must be set to
+                 'Static' for this value to be applied.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticNbnsServers.IpAddress parameter when the
+                 SpecificNbnsServers.EnableConfig parameter is set to
+                 'Enable'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { specificNbnsServersEntry 700 }
+
+ -- End of table:Subnet NBNS Servers
+
+ -- ******************************************************************
+ 
+ -- Table:NBNS Servers
+
+ -- ******************************************************************
+ 
+ nbnsServersInfoTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF NbnsServersInfoEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " NBNS Servers
+
+                This table contains the active subnets' NBNS servers.
+                "
+  ::= { nbnsServersGroup 300 }
+  nbnsServersInfoEntry OBJECT-TYPE
+   SYNTAX        NbnsServersInfoEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table NBNS Servers. "
+   INDEX         {
+                   nbnsServersInfoSubnetName
+                 }
+
+   ::= { nbnsServersInfoTable 1 }
+
+  NbnsServersInfoEntry ::= SEQUENCE
+  {
+    nbnsServersInfoSubnetName OCTET STRING,
+    nbnsServersInfoNbns1      MxIpAddr,
+    nbnsServersInfoNbns2      MxIpAddr,
+    nbnsServersInfoNbns3      MxIpAddr,
+    nbnsServersInfoNbns4      MxIpAddr
+  }
+
+  -- Index:Subnet Name
+
+  nbnsServersInfoSubnetName OBJECT-TYPE
+   SYNTAX         OCTET STRING
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION  " Subnet Name
+
+                  Name of the subnet.
+                  "
+   ::= { nbnsServersInfoEntry 100 }
+
+  -- Columnar:NBNS 1
+
+  nbnsServersInfoNbns1 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NBNS 1
+
+                 Indicates the subnets' first NBNS server.
+                 "
+   ::= { nbnsServersInfoEntry 200 }
+
+  -- Columnar:NBNS 2
+
+  nbnsServersInfoNbns2 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NBNS 2
+
+                 Indicates the subnets' second NBNS server.
+                 "
+   ::= { nbnsServersInfoEntry 300 }
+
+  -- Columnar:NBNS 3
+
+  nbnsServersInfoNbns3 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NBNS 3
+
+                 Indicates the subnets' third NBNS server.
+                 "
+   ::= { nbnsServersInfoEntry 400 }
+
+  -- Columnar:NBNS 4
+
+  nbnsServersInfoNbns4 OBJECT-TYPE
+   SYNTAX        MxIpAddr
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " NBNS 4
+
+                 Indicates the subnets' fourth NBNS server.
+                 "
+   ::= { nbnsServersInfoEntry 500 }
+
+ -- End of table:NBNS Servers
+
+-- End of group:NBNS Servers
+
+-- *****************************************************************************
+
+-- Table:Static Leases
+
+-- *****************************************************************************
+
+staticLeasesTable OBJECT-TYPE
+ SYNTAX        SEQUENCE OF StaticLeasesEntry
+ MAX-ACCESS    not-accessible
+ STATUS        current
+ DESCRIPTION " Static Leases
+
+               This table specifies IP addresses that are reserved for specific
+               hosts.
+               "
+ ::= { dhcpMIBObjects 800 }
+ staticLeasesEntry OBJECT-TYPE
+  SYNTAX        StaticLeasesEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " A row in table Static Leases. "
+  INDEX         {
+                  staticLeasesMacAddress
+                }
+
+  ::= { staticLeasesTable 1 }
+
+ StaticLeasesEntry ::= SEQUENCE
+ {
+   staticLeasesMacAddress OCTET STRING,
+   staticLeasesIpAddress  MxIpAddr,
+   staticLeasesDelete     INTEGER
+ }
+
+ -- Index:MAC Address
+
+ staticLeasesMacAddress OBJECT-TYPE
+  SYNTAX        OCTET STRING
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " MAC Address
+
+                MAC address of the host.
+                "
+  ::= { staticLeasesEntry 100 }
+
+ -- Columnar:IP Address
+
+ staticLeasesIpAddress OBJECT-TYPE
+  SYNTAX        MxIpAddr
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " IP Address
+
+                The reserved IP address of the host.
+                "
+  DEFVAL        { "" }
+  ::= { staticLeasesEntry 200 }
+
+ -- Row command:Delete
+
+ staticLeasesDelete OBJECT-TYPE
+  SYNTAX        INTEGER { noOp(0), delete(10) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Delete
+
+                Deletes a static lease from the table.
+                "
+  DEFVAL        { noOp }
+  ::= { staticLeasesEntry 300 }
+
+-- End of table:Static Leases
+
+-- ***************************************************************************
+
+-- Table:Assigned Leases
+
+-- ***************************************************************************
+
+assignedLeasesInfoTable OBJECT-TYPE
+ SYNTAX        SEQUENCE OF AssignedLeasesInfoEntry
+ MAX-ACCESS    not-accessible
+ STATUS        current
+ DESCRIPTION " Assigned Leases
+
+               This table lists the IP addresses that are currently assigned.
+               "
+ ::= { dhcpMIBObjects 900 }
+ assignedLeasesInfoEntry OBJECT-TYPE
+  SYNTAX        AssignedLeasesInfoEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " A row in table Assigned Leases. "
+  INDEX         {
+                  assignedLeasesInfoIpAddress
+                }
+
+  ::= { assignedLeasesInfoTable 1 }
+
+ AssignedLeasesInfoEntry ::= SEQUENCE
+ {
+   assignedLeasesInfoIpAddress     MxIpAddr,
+   assignedLeasesInfoMacAddress    OCTET STRING,
+   assignedLeasesInfoSubnetName    OCTET STRING,
+   assignedLeasesInfoLeaseTimeLeft Unsigned32
+ }
+
+ -- Index:IP Address
+
+ assignedLeasesInfoIpAddress OBJECT-TYPE
+  SYNTAX        MxIpAddr
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " IP Address
+
+                IP Address of the host.
+                "
+  ::= { assignedLeasesInfoEntry 100 }
+
+ -- Columnar:MAC Address
+
+ assignedLeasesInfoMacAddress OBJECT-TYPE
+  SYNTAX        OCTET STRING
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " MAC Address
+
+                MAC address of the host.
+                "
+  ::= { assignedLeasesInfoEntry 200 }
+
+ -- Columnar:Subnet Name
+
+ assignedLeasesInfoSubnetName OBJECT-TYPE
+  SYNTAX        OCTET STRING
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Subnet Name
+
+                Indicates on which subnet the host is located.
+                "
+  ::= { assignedLeasesInfoEntry 300 }
+
+ -- Columnar:Lease Time Left
+
+ assignedLeasesInfoLeaseTimeLeft OBJECT-TYPE
+  SYNTAX        Unsigned32
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Lease Time Left
+
+                Indicates the lease time left in seconds.
+                "
+  ::= { assignedLeasesInfoEntry 400 }
+
+-- End of table:Assigned Leases
+
+-- ****************************************************************************
+
+-- Group:Provisioning
+
+-- ****************************************************************************
+
+provisioningGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 1000 }
+ -- Scalar:DefaultStaticOption66
+
+ defaultStaticOption66 OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..120) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " DefaultStaticOption66
+
+                Specifies the static value of Option 66 for all subnets.
+
+                When the parameter is empty, the option is not sent.
+
+                NOTE: Some characters are not allowed: Comma, Double quotes,
+                Space or Pound.
+
+                "
+  DEFVAL        { "" }
+  ::= { provisioningGroup 100 }
+
+ -- Scalar:DefaultStaticOption67
+
+ defaultStaticOption67 OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..120) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " DefaultStaticOption67
+
+                Specifies the static value of Option 67 for all subnets.
+
+                When the parameter is empty, the option is not sent.
+
+                NOTE: Some characters are not allowed: Comma, Double quotes,
+                Space or Pound.
+
+                "
+  DEFVAL        { "" }
+  ::= { provisioningGroup 200 }
+
+ -- ***************************************************************************
+ 
+ -- Table:Specific Option 66
+
+ -- ***************************************************************************
+ 
+ specificOption66Table OBJECT-TYPE
+  SYNTAX           SEQUENCE OF SpecificOption66Entry
+  MAX-ACCESS       not-accessible
+  STATUS           current
+  DESCRIPTION    " Specific Option 66
+
+                   This table contains the Option 66 for each subnet.
+                   "
+  ::= { provisioningGroup 1000 }
+  specificOption66Entry OBJECT-TYPE
+   SYNTAX        SpecificOption66Entry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Specific Option 66. "
+   INDEX         {
+                   specificOption66SubnetName
+                 }
+
+   ::= { specificOption66Table 1 }
+
+  SpecificOption66Entry ::= SEQUENCE
+  {
+    specificOption66SubnetName   OCTET STRING,
+    specificOption66EnableConfig MxEnableState,
+    specificOption66EnableOption MxEnableState,
+    specificOption66Value        OCTET STRING
+  }
+
+  -- Index:Subnet Name
+
+  specificOption66SubnetName OBJECT-TYPE
+   SYNTAX         OCTET STRING
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION  " Subnet Name
+
+                  Name of the subnet.
+                  "
+   ::= { specificOption66Entry 100 }
+
+  -- Columnar:Enable
+
+  specificOption66EnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable
+
+                 Defines the Option 66 configuration to use for this specific
+                 subnet.
+
+                   * Disable: The subnet uses the default configuration as
+                     defined in the DefaultStaticOption66 parameter.
+                   * Enable: The subnet uses the specific configuration as
+                     defined in the SpecificOption66.Value parameter.
+
+                 The configuration is only valid when the
+                 SpecificOption66.EnableOption parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { specificOption66Entry 200 }
+
+  -- Columnar:Enable Option
+
+  specificOption66EnableOption OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Option
+
+                 Enables the option 66 on this subnet.
+                 "
+   DEFVAL        { disable }
+   ::= { specificOption66Entry 300 }
+
+  -- Columnar:Value
+
+  specificOption66Value OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..120) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Value
+
+                 Subnet's Option 66 specific value.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticOption66 parameter when the
+                 SpecificOption66.EnableConfig parameter is set to 'Enable'.
+
+                 When the parameter is empty, the option is not sent.
+
+                 NOTE: Some characters are not allowed: Comma, Double quotes,
+                 Space or Pound.
+
+                 "
+   ::= { specificOption66Entry 400 }
+
+ -- End of table:Specific Option 66
+
+ -- ***************************************************************************
+ 
+ -- Table:Specific Option 67
+
+ -- ***************************************************************************
+ 
+ specificOption67Table OBJECT-TYPE
+  SYNTAX        SEQUENCE OF SpecificOption67Entry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Specific Option 67
+
+                This table contains the Option 67 for each subnet. When empty,
+                option 67 is not sent.
+                "
+  ::= { provisioningGroup 1100 }
+  specificOption67Entry OBJECT-TYPE
+   SYNTAX        SpecificOption67Entry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Specific Option 67. "
+   INDEX         {
+                   specificOption67SubnetName
+                 }
+
+   ::= { specificOption67Table 1 }
+
+  SpecificOption67Entry ::= SEQUENCE
+  {
+    specificOption67SubnetName   OCTET STRING,
+    specificOption67EnableConfig MxEnableState,
+    specificOption67EnableOption MxEnableState,
+    specificOption67Value        OCTET STRING
+  }
+
+  -- Index:Subnet Name
+
+  specificOption67SubnetName OBJECT-TYPE
+   SYNTAX         OCTET STRING
+   MAX-ACCESS     read-only
+   STATUS         current
+   DESCRIPTION  " Subnet Name
+
+                  Name of the subnet.
+                  "
+   ::= { specificOption67Entry 100 }
+
+  -- Columnar:Enable
+
+  specificOption67EnableConfig OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable
+
+                 Defines the Option 67 configuration to use for this specific
+                 subnet.
+
+                   * Disable: The subnet uses the default configuration as
+                     defined in the DefaultStaticOption67 parameter.
+                   * Enable: The subnet uses the specific configuration as
+                     defined in the SpecificOption67.Value parameter.
+
+                 The configuration is only valid when the
+                 SpecificOption67.EnableOption parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { disable }
+   ::= { specificOption67Entry 200 }
+
+  -- Columnar:Enable Option
+
+  specificOption67EnableOption OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Enable Option
+
+                 Enables the option 67 on this subnet.
+                 "
+   DEFVAL        { disable }
+   ::= { specificOption67Entry 300 }
+
+  -- Columnar:Value
+
+  specificOption67Value OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..120) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Value
+
+                 Subnet's Option 67 specific value.
+
+                 This configuration overrides the default configuration set in
+                 the DefaultStaticOption67 parameter when the
+                 SpecificOption67.EnableConfig parameter is set to 'Enable'.
+
+                 When the parameter is empty, the option is not sent.
+
+                 NOTE: Some characters are not allowed: Comma, Double quotes,
+                 Space or Pound.
+
+                 "
+   ::= { specificOption67Entry 400 }
+
+ -- End of table:Specific Option 67
+
+-- End of group:Provisioning
+
+-- ***********************************************************************
+
+-- Group:Statistics
+
+-- ***********************************************************************
+
+statisticsGroup OBJECT IDENTIFIER
+        ::= { dhcpMIBObjects 10000 }
+        -- ***************************************************************
+        
+        -- Table:Statistics
+
+        -- ***************************************************************
+        
+        subnetsStatsTable OBJECT-TYPE
+         SYNTAX        SEQUENCE OF SubnetsStatsEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION " Statistics
+
+                       This table contains the statistics for each
+                       subnet.
+                       "
+         ::= { statisticsGroup 100 }
+         subnetsStatsEntry OBJECT-TYPE
+          SYNTAX        SubnetsStatsEntry
+          MAX-ACCESS    not-accessible
+          STATUS        current
+          DESCRIPTION " A row in table Statistics. "
+          INDEX         {
+                          subnetsStatsSubnetName
+                        }
+
+          ::= { subnetsStatsTable 1 }
+
+         SubnetsStatsEntry ::= SEQUENCE
+         {
+           subnetsStatsSubnetName     OCTET STRING,
+           subnetsStatsNumberOfLeases Unsigned32
+         }
+
+         -- Index:Subnet Name
+
+         subnetsStatsSubnetName OBJECT-TYPE
+          SYNTAX        OCTET STRING
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION " Subnet Name
+
+                        Name of the subnet.
+                        "
+          ::= { subnetsStatsEntry 100 }
+
+         -- Columnar:Number of Leases
+
+         subnetsStatsNumberOfLeases OBJECT-TYPE
+          SYNTAX        Unsigned32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION " Number of Leases
+
+                        Number of currently assigned leases.
+                        "
+          ::= { subnetsStatsEntry 200 }
+
+        -- End of table:Statistics
+
+-- End of group:Statistics
+
+-- ****************************************************************************
+
+-- Group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+notificationsGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 60010 }
+ -- Scalar:Minimal Severity of Notification
+
+ minSeverity OBJECT-TYPE
+  SYNTAX        INTEGER { disable(0) , debug(100) , info(200) , warning(300) ,
+                error(400) , critical (500) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Minimal Severity of Notification
+
+                Sets the minimal severity to issue a notification message
+                incoming from this service.
+
+                  * Disable: No notification is issued.
+                  * Debug: All notification messages are issued.
+                  * Info: Notification messages with a 'Informational' and
+                    higher severity are issued.
+                  * Warning: Notification messages with a 'Warning' and higher
+                    severity are issued.
+                  * Error: Notification messages with an 'Error' and higher
+                    severity are issued.
+                  * Critical: Notification messages with a 'Critical' severity
+                    are issued.
+
+                "
+  DEFVAL        { warning }
+  ::= { notificationsGroup 100 }
+
+-- End of group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+-- Group:Configuration Settings
+
+-- ****************************************************************************
+
+configurationGroup OBJECT IDENTIFIER
+ ::= { dhcpMIBObjects 60020 }
+ -- Scalar:Need Restart
+
+ needRestartInfo OBJECT-TYPE
+  SYNTAX        INTEGER { no(0) , yes(100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Need Restart
+
+                Indicates if the service needs to be restarted for the
+                configuration to fully take effect.
+
+                  * Yes: Service needs to be restarted.
+                  * No: Service does not need to be restarted.
+
+                Services can be restarted by using the
+                Scm.ServiceCommands.Restart command.
+
+                "
+  ::= { configurationGroup 100 }
+
+-- End of group:Configuration Settings
+
+END

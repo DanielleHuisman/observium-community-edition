@@ -1,0 +1,1244 @@
+-- *****************************************************************
+-- MY-RSTP-MIB.mib:  My RSTP MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+MY-RSTP-MSTP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32,
+        IpAddress
+                FROM SNMPv2-SMI
+        VlanId
+                FROM Q-BRIDGE-MIB
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        IfIndex,ConfigStatus
+                FROM MY-TC        
+        dot1dBridge, dot1dStp, dot1dStpPortEntry,BridgeId 
+                FROM BRIDGE-MIB
+        EnabledStatus
+                FROM P-BRIDGE-MIB
+        myMgmt
+                FROM MY-SMI;
+
+myStpMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "This module defines my stp mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 16}
+
+myStpMIBObjects OBJECT IDENTIFIER ::=  { myStpMIB 1 }
+myRstpMIBObjects OBJECT IDENTIFIER ::= { myStpMIB 2 }
+myMstpMIBObjects OBJECT IDENTIFIER ::= { myStpMIB 3 }
+
+-- -------------------------------------------------------------
+-- extend of stp
+-- -------------------------------------------------------------
+mySysStpStatus OBJECT-TYPE
+        SYNTAX EnabledStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This object allow of enabling or disabling the Spanning
+            Tree Protocol in the system, this will avoid the circle
+            exist in the net environment, then avoid the broad cast
+            storm. and when set its value to enable(1) will cause a
+            short time that the station can not connect the agent,
+            waitting for the topology become stable."
+        DEFVAL { disabled }
+        ::= { myStpMIBObjects 1 }
+    
+mySysStpReset OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "This object allow of resetting all Spanning Tree Protocol
+            parameter reset to default settings. set its value to any
+            but 0, will cause agent reset the parameters, set it to 0
+            will cause no action. this operation may cause some interval
+            the station can not connect the agent depending on the
+            parameters previous set."
+        ::= { myStpMIBObjects 2 }
+
+myStpExtPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyStpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains port-specific Spanning Tree
+         extend information."
+    ::= { myStpMIBObjects 3 }
+
+myStpExtPortEntry OBJECT-TYPE
+    SYNTAX      MyStpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of Spanning Tree extend information maintained by
+         each port."
+    INDEX    { myStpPortIfIndex }
+    ::= { myStpExtPortTable 1 }
+
+MyStpExtPortEntry ::=
+    SEQUENCE {
+        myStpPortIfIndex
+            IfIndex,
+        myStpPortAdminPathCost
+            Integer32,
+        myStpPortOperPathCost
+            Integer32,
+        myStpPortRole
+            INTEGER
+--        myStpPortIfRunSTP
+--            TruthValue    
+    }
+myStpPortIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "include only physical port and trunk port "
+        ::= { myStpExtPortEntry 1 }
+            
+myStpPortAdminPathCost OBJECT-TYPE
+        SYNTAX  INTEGER (0..200000000)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION
+              "The contribution of this port to the path cost of
+              paths towards the spanning tree root which include
+              this port.  802.1D-1990 recommends that the
+              default value of this parameter be in inverse
+              proportion to the speed of the attached LAN.
+              Setting this value to 0 indicates that port's real
+              path cost will be automaticly assigned by system
+              according to duplex and speed of the port.Setting 
+              this value to other value and system will assigned this 
+              value to the port."
+        DEFVAL{0}
+        ::= { myStpExtPortEntry  2 }
+
+myStpPortOperPathCost OBJECT-TYPE
+        SYNTAX  INTEGER (1..200000000)
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              " Actual oper value of port cost."
+        ::= { myStpExtPortEntry  3 }
+
+myStpPortRole OBJECT-TYPE
+        SYNTAX  INTEGER {
+               disabledPort(1),
+               alternatePort(2),
+               backupPort(3),
+               rootPort(4),
+               designatedPort(5),
+               masterPort(6)
+        }
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+              " Actual role of port in stp."
+        ::= { myStpExtPortEntry  4 }
+
+--myStpPortIfRunSTP OBJECT-TYPE
+--        SYNTAX TruthValue
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--            "When the value is true the port will take part in the spanning tree algorithm,
+--             that is, if the topology of a port is changed will this be sensed by the algorithm
+--             or not."
+--        ::= { myStpExtPortEntry 5 }
+
+-- -------------------------------------------------------------
+-- RSTP / CIST ieee 802.1s-d14-1 12.8.1
+-- -------------------------------------------------------------
+-- Addition to the dot1dStp group
+myStpVersion OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    stpCompatible(0),
+                    rstp(2),
+                    mstp(3)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The version of Spanning Tree Protocol the bridge is
+         currently running.  The value 'stpCompatible(0)'
+         indicates the Spanning Tree Protocol specified in
+         IEEE 802.1D , 'rstp(2)' indicates the Rapid Spanning
+         Tree Protocol specified in IEEE 802.1w mstp(3) indicates 
+         the Multiple spanning tree protocol specified in 
+         IEEE 802.1s.  New value may be defined as future versions 
+         of the protocol become available."
+    REFERENCE
+        "IEEE 802.1w clause 14.8.1, 17.12, 17.16.1"
+    DEFVAL      { mstp }
+    ::= { myRstpMIBObjects 1 }
+
+myStpTxHoldCount OBJECT-TYPE
+    SYNTAX      Integer32 (1..10)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value used by the Port Transmit state machine to limit
+         the maximum transmission rate."
+    REFERENCE
+        "IEEE 802.1w clause 17.16.6"
+    DEFVAL      { 3 }
+    ::= { myRstpMIBObjects 2 }
+
+myStpPathCostDefault OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    stp8021d1998(1),
+                    stp8021t2001(2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The version of the Spanning Tree default Path Costs that
+         are to be used by this Bridge.  A value of 8021d1998(1)
+         uses the 16-bit default Path Costs from IEEE Std. 802.1D-1998.
+         A value of stp8021t2001(2) uses the 32-bit default Path
+         Costs from IEEE Std. 802.1t."
+    REFERENCE
+        "IEEE 802.1D & 802.1t Table 8-5"
+    ::= { myRstpMIBObjects 3 }
+
+myRstpExtPortTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyRstpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains port-specific Rapid Spanning Tree
+         information."
+    ::= { myRstpMIBObjects 4 }
+
+myRstpExtPortEntry OBJECT-TYPE
+    SYNTAX      MyRstpExtPortEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A list of Rapid Spanning Tree information maintained by
+         each port."
+    INDEX    { myRstpExtPortIfIndex }
+    ::= { myRstpExtPortTable 1 }
+
+MyRstpExtPortEntry ::=
+    SEQUENCE {
+        myRstpExtPortIfIndex    
+            IfIndex,
+        myStpPortProtocolMigration
+            TruthValue,
+        myStpPortAdminEdgePort
+            TruthValue,
+        myStpPortOperEdgePort
+            TruthValue,
+        myStpPortAdminPointToPoint
+            INTEGER,
+        myStpPortOperPointToPoint
+            TruthValue,
+	myStpPortBpduGuard
+	    EnabledStatus,
+	myStpPortBpduFilter	    
+	    EnabledStatus		    
+    }
+myRstpExtPortIfIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "include only physical port and trunk port "
+        ::= { myRstpExtPortEntry 1 }
+        
+myStpPortProtocolMigration OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "When operating in RSTP (version 2) mode, writing TRUE(1)
+         to this object forces this port to transmit RSTP BPDUs.
+         Any other operation on this object has no effect and
+         it always returns FALSE(2) when read."
+    REFERENCE
+        "IEEE 802.1w clause 14.8.2.4, 17.18.10, 17.26"
+    ::= { myRstpExtPortEntry 2 }
+
+myStpPortAdminEdgePort OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative value of the Edge Port parameter.  A
+         value of TRUE(1) indicates that this port should be
+         assumed as an edge-port and a value of FALSE(2) indicates
+         that this port should be assumed as a non-edge-port."
+    REFERENCE
+        "IEEE 802.1t clause 14.8.2, 18.3.3"
+    ::= { myRstpExtPortEntry 3 }
+
+myStpPortOperEdgePort OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational value of the Edge Port parameter.  The
+         object is initialized to the value of
+         myStpPortAdminEdgePort and is set FALSE on reception of
+         a BPDU."
+    REFERENCE
+        "IEEE 802.1t clause 14.8.2, 18.3.4"
+    ::= { myRstpExtPortEntry 4 }
+
+myStpPortAdminPointToPoint OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    forceTrue(0),
+                    forceFalse(1),
+                    auto(2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative point-to-point status of the LAN segment
+         attached to this port.  A value of forceTrue(0) indicates that
+         this port should always be treated as if it is connected to
+         a point-to-point link.  A value of forceFalse(1) indicates
+         that this port should be treated as having a shared media
+         connection.  A value of auto(2) indicates that this port is
+         considered to have a point-to-point link if it is an Aggregator
+         and all of its members are aggregatable, or if the MAC entity
+         is configured for full duplex operation, either through
+         auto-negotiation or by management means."
+   REFERENCE
+       "IEEE 802.1w clause 6.4.3, 6.5, 14.8.2"
+   ::= { myRstpExtPortEntry 5 }
+
+myStpPortOperPointToPoint OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational point-to-point status of the LAN segment
+         attached to this port.  It indicates whether a port is
+         considered to have a point-to-point connection or not.
+         The value is determined by management or by auto-detection,
+         as described in the myStpPortAdminPointToPoint object."
+    REFERENCE
+        "IEEE 802.1w clause 6.4.3, 6.5, 14.8.2"
+    ::= { myRstpExtPortEntry 6 }
+    
+myStpPortBpduGuard  OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "
+         The BPDU guard feature provides a secure response to invalid configurations because
+         you must manually put the port back in service. Use the BPDU guard feature in a 
+         service-provider network to  prevent an access port from participating in the 
+         spanning tree.
+                 
+         When the port receives a BPDU, it is put in the error-disabled state if you enable
+         BPDU guard feature of this port.
+        "
+   ::= { myRstpExtPortEntry 7 }
+   
+myStpPortBpduFilter  OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "It will prevent the port from sending or receiving BPDUs if you enable
+         BPDU filter feature of this port. "
+   ::= { myRstpExtPortEntry 8 }   
+
+myStpBpduGuard OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If you enable Global BPDU guard feature ,ports which is EdgePort will
+         is put in the error-disabled state When thest ports receives a BPDU."
+    ::= { myRstpMIBObjects 5 }
+    
+myStpBpduFilter OBJECT-TYPE
+    SYNTAX      EnabledStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "If you enable Global BPDU filter feature ,ports which is EdgePort will
+        be prevented the port from sending or receiving BPDUs."
+    ::= { myRstpMIBObjects 6 }    
+ 
+--MSTP addition
+myStpCistRegionRoot OBJECT-TYPE
+    SYNTAX  BridgeId
+    MAX-ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "The Bridge Identifier of the current CIST Regional Root."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.1.3"        
+    ::= { myRstpMIBObjects 7 }
+
+myStpCistPathCost OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "The CIST path cost from the transmitting Bridge to the CIST Regional Root.."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.1.3"        
+    ::= { myRstpMIBObjects 8 }
+    
+    
+--myStpPortCistTable OBJECT-TYPE
+--      SYNTAX      SEQUENCE OF MyStpPortCistEntry
+--      MAX-ACCESS  not-accessible
+--      STATUS      current
+--      DESCRIPTION
+--        "A table containing the spanning tree port path cost
+--        configuration when stpxSpanningTreePathCostMode is
+--        long(2),
+
+--        If the value of stpxSpanningTreePathCostMode is short(1),
+--        this table is not instantiated."
+--    ::= { myRstpMIBObjects 9 }
+
+--myStpPortCistEntry OBJECT-TYPE
+--    SYNTAX      MyStpPortCistEntry
+--    MAX-ACCESS  not-accessible
+--    STATUS      current
+--    DESCRIPTION
+--        "A conceptual row containing the spanning tree port path cost
+--         configuration."
+--     AUGMENTS   { myRstpExtPortEntry }
+--    ::= { myStpPortCistTable 1 }
+
+--MyStpPortCistEntry ::= SEQUENCE {
+--        myStpPortCistRegionRoot BridgeId,
+--        myStpPortCistPathCost Counter32
+--        myStpPortHelloTime Integer32
+--}
+
+--myStpPortCistRegionRoot OBJECT-TYPE
+--    SYNTAX      BridgeId
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--         "The Bridge Identifier of the current CIST Regional Root."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.1.3"           
+--    ::= { myStpPortCistEntry 1}   
+
+
+--myStpPortCistPathCost OBJECT-TYPE
+--    SYNTAX      Counter32
+--    MAX-ACCESS  read-only
+--    STATUS      current
+--    DESCRIPTION
+--         "The CIST path cost from the transmitting Bridge to the CIST Regional Root."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.1.3"           
+--    ::= { myStpPortCistEntry 2}   
+
+
+--myStpPortHelloTime OBJECT-TYPE
+--    SYNTAX      Integer32
+--    MAX-ACCESS  read-write
+--    STATUS      current
+--    DESCRIPTION
+--         "The administrative value of Hello Time for the Port."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.1.3"           
+--    ::= { myStpPortCistEntry 3}   
+
+-- -------------------------------------------------------------
+-- MSTP / MSTI 802.1s-d14-1 12.8.1
+-- -------------------------------------------------------------
+myStpMstiMaxInstanceNumber  OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The maximum MST (Multiple Spanning Tree) instance id, 
+       that are supported by the device for the MST Protocol." 
+    ::= { myMstpMIBObjects 1}
+
+myStpMstiRegionName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE(0..32))  
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The operational MST region name."  
+    ::= { myMstpMIBObjects 2}
+
+myStpMstiRegionRevision OBJECT-TYPE
+    SYNTAX      Integer32 (0..65535) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The operational MST region version."  
+    ::= { myMstpMIBObjects 3 } 
+
+myStpMstiMaxHopNumber OBJECT-TYPE
+    SYNTAX      Integer32 (1..40) 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "The operational MST region max hop number."  
+    DEFVAL { 20 }       
+    ::= { myMstpMIBObjects 4 } 
+
+
+myStpMstiInstanceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyStpMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains MST instance information with 
+       one entry for each MST instance numbered from 0 
+       to myStpxMSTMaxInstanceNumber." 
+    ::= {myMstpMIBObjects 5 }
+
+myStpMstiInstanceEntry OBJECT-TYPE
+    SYNTAX      MyStpMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "A conceptual row containing the MST instance 
+       information."
+    INDEX  { myStpMstiInstanceIndex }
+    ::= { myStpMstiInstanceTable 1 }
+
+MyStpMstiInstanceEntry ::= SEQUENCE {
+    myStpMstiInstanceIndex Integer32,
+    myStpMstiInstanceVlansAddMapped OCTET STRING,
+    myStpMstiInstanceVlansDeleteMapped OCTET STRING,
+    myStpMstiInstanceVlansGetMapped OCTET STRING,
+    myStpMstiInstanceRemainingHopCount Integer32,
+    myStpMstiPriority Integer32,
+--    myStpMstiBridgeId Integer32,
+    myStpMstiTimeSinceTopologyChange TimeTicks,
+    myStpMstiTopChanges Integer32,
+--    myStpMstiTopChanged TruthValue,
+    myStpMstiDesignatedRoot BridgeId,
+    myStpMstiRootCost Integer32,
+    myStpMstiRootPort Integer32,
+    myStpMstiInstanceEntryStatus ConfigStatus
+
+}
+
+myStpMstiInstanceIndex OBJECT-TYPE
+    SYNTAX      Integer32 (1..64) 
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "An integer that uniquely identifies an MST instance 
+       from 0 to the object value of myStpMstiMaxInstanceNumber."  
+    ::= {myStpMstiInstanceEntry 1 }
+
+myStpMstiInstanceVlansAddMapped OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (512))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= {myStpMstiInstanceEntry 2 }
+
+myStpMstiInstanceVlansDeleteMapped OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (512))
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= {myStpMstiInstanceEntry 3 }
+    
+myStpMstiInstanceVlansGetMapped OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (512))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= {myStpMstiInstanceEntry 4 }
+
+myStpMstiInstanceRemainingHopCount OBJECT-TYPE
+    SYNTAX     Integer32 (0..40)
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The remaining hop count for this MST instance."
+    ::= {myStpMstiInstanceEntry 5 }
+    
+myStpMstiPriority  OBJECT-TYPE
+    SYNTAX     Integer32 (0..65535)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The Bridge priority for the spanning tree instance identified
+	by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    DEFVAL { 32768 }	
+    ::= {myStpMstiInstanceEntry 6 }  
+    
+--myStpMstiBridgeId  OBJECT-TYPE
+--    SYNTAX     BridgeId
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "The Bridge Identifier for the spanning tree instance identified
+--	by the MSTID."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+--    ::= {myStpMstiInstanceEntry 5 }      
+    
+myStpMstiTimeSinceTopologyChange  OBJECT-TYPE
+    SYNTAX     TimeTicks
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Ccount in (in hundredths of a second) of the time elapsed since tcWhile (13.21) was last
+         non-zero for any Port for the given MSTI."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {myStpMstiInstanceEntry 7 }          
+    
+myStpMstiTopChanges  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Count of the times tcWhile (13.21) has been non-zero for any Port for the
+	given MSTI since the Bridge was powered on or initialized."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {myStpMstiInstanceEntry 8 }          
+
+--myStpMstiTopChanged  OBJECT-TYPE
+--    SYNTAX     TruthValue
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "True if tcWhile is non-zero for any Port for the given MST."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+--    ::= {myStpMstiInstanceEntry 8 }          
+ 
+myStpMstiDesignatedRoot  OBJECT-TYPE
+    SYNTAX     BridgeId
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Bridge Identifier of the Root Bridge for the spanning tree instance
+	identified by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {myStpMstiInstanceEntry 9 }         
+    
+myStpMstiRootCost  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The path cost from the transmitting Bridge to the Root Bridge for the
+	spanning tree instance identified by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {myStpMstiInstanceEntry 10 }         
+    
+myStpMstiRootPort  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Root Port for the spanning tree instance identified by the MSTID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.1.2.3."
+    	
+    ::= {myStpMstiInstanceEntry 11 }         
+
+myStpMstiInstanceEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set this object to valid will creat a entry,
+             and set its value to invalid will delete this entry."
+    ::= { myStpMstiInstanceEntry 12 }
+        
+myStpPortMstiInstanceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MyStpPortMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "This table contains MST instance information with 
+       one entry for each MST instance numbered from 0 
+       to myStpxMSTMaxInstanceNumber." 
+    ::= {myMstpMIBObjects 6 }
+
+myStpPortMstiInstanceEntry OBJECT-TYPE
+    SYNTAX      MyStpPortMstiInstanceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "A conceptual row containing pthe MST instance 
+       information of a bridge port."
+    INDEX  { myStpMstiInstanceIndex, myStpPortMstiIndex}
+    ::= { myStpPortMstiInstanceTable 1 }
+
+MyStpPortMstiInstanceEntry ::= SEQUENCE {
+    myStpPortMstiIndex Integer32,
+--    myStpPortMstiUpTime TimeTicks,
+    myStpPortMstiState INTEGER,
+--    myStpPortMstiEnable INTEGER,
+--    myStpPortMstiPortId OCTET STRING,
+    myStpPortMstiAdminPathCost Integer32,
+    myStpPortMstiOperPathCost Integer32,
+    myStpPortMstiPriority Integer32,
+    myStpPortMstiDesignatedRoot BridgeId,
+    myStpPortMstiDesignatedCost Integer32,
+    myStpPortMstiDesignatedBridge BridgeId,
+    myStpPortMstiDesignatedPort OCTET STRING,
+    myStpPortMstiPortRole INTEGER,
+    myStpPortMstiPortForwardTransitions Integer32
+    
+}
+
+myStpPortMstiIndex OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+       "The value of dot1dBasePort (i.e. dot1dBridge.1.4)
+                 for the bridge port."  
+    REFERENCE
+               "dot1dBasePort is defined in RFC1493."
+                 
+    ::= {myStpPortMstiInstanceEntry 1 }
+
+--myStpPortMstiUpTime  OBJECT-TYPE
+--    SYNTAX     TimeTicks
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "Count in seconds of the time elapsed since the Port was last reset or initialized."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+--    ::= {myStpPortMstiInstanceEntry 2 }           
+
+myStpPortMstiState  OBJECT-TYPE
+     SYNTAX      INTEGER {
+   	        	disabled(1),
+        	        blocking(2),
+                        listening(3),
+                        learning(4),
+                        forwarding(5),
+                        broken(6),
+                        discard(7)
+                    }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The current state of the Port."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {myStpPortMstiInstanceEntry 2 }        
+
+--myStpPortMstiEnable  OBJECT-TYPE
+--     SYNTAX      INTEGER {
+--   	        	enabled(1),
+--        	        disabled(2)
+--                    }
+--    MAX-ACCESS read-write
+--    STATUS     current
+--    DESCRIPTION
+--        "The enabled/disabled status of the port."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+--    ::= {myStpPortMstiInstanceEntry 3 }        
+
+--myStpPortMstiPortId  OBJECT-TYPE
+--    SYNTAX     OCTET STRING (SIZE (2))
+--    MAX-ACCESS read-only
+--    STATUS     current
+--    DESCRIPTION
+--        "The Port Identifier of the port on the Designated
+--        Bridge for this port's segment."
+--    REFERENCE
+--        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+--    ::= {myStpPortMstiInstanceEntry 4 }       
+
+myStpPortMstiAdminPathCost  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+              "The contribution of this port to the path cost of
+              paths towards the spanning tree root which include
+              this port.  802.1D-1990 recommends that the
+              default value of this parameter be in inverse
+              proportion to the speed of the attached LAN.
+              Setting this value to 0 indicates that port's real
+              path cost will be automaticly assigned by system
+              according to duplex and speed of the port.Setting 
+              this value to other value and system will assigned this 
+              value to the port."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {myStpPortMstiInstanceEntry 3 }      
+
+myStpPortMstiOperPathCost  OBJECT-TYPE
+    SYNTAX     Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        " Actual oper value of port cost of msti."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {myStpPortMstiInstanceEntry 4 }      
+
+myStpPortMstiPriority  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The value of the priority field which is contained in
+        the first (in network byte order) octet of the (2 octet
+        long) Port ID."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    DEFVAL { 128 }    	
+    ::= {myStpPortMstiInstanceEntry 5 }      
+
+myStpPortMstiDesignatedRoot  OBJECT-TYPE
+    SYNTAX     BridgeId
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The unique Bridge Identifier of the Bridge
+        recorded as the Root."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {myStpPortMstiInstanceEntry 6 }      
+
+myStpPortMstiDesignatedCost  OBJECT-TYPE
+    SYNTAX     Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The path cost of the Designated Port of the segment
+        connected to this port."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {myStpPortMstiInstanceEntry 7 }        
+
+myStpPortMstiDesignatedBridge  OBJECT-TYPE
+    SYNTAX     BridgeId
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Bridge Identifier of the bridge which this
+        port considers to be the Designated Bridge for
+        this port's segment."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {myStpPortMstiInstanceEntry 8 }    
+
+myStpPortMstiDesignatedPort  OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE (2))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The Port Identifier of the port on the Designated
+         Bridge for this port's segment."
+    REFERENCE
+        "IEEE 802.1s-d14-1: Section 12.8.2.2.3."
+    	
+    ::= {myStpPortMstiInstanceEntry 9 }    
+
+myStpPortMstiPortRole  OBJECT-TYPE
+    SYNTAX  INTEGER {
+               disabledPort(1),
+               alternatePort(2),
+               backupPort(3),
+               rootPort(4),
+               designatedPort(5),
+               masterPort(6)
+        }
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        " Actual role of port in msti."
+    ::= {myStpPortMstiInstanceEntry 10 }    
+    
+myStpPortMstiPortForwardTransitions  OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The number of times this port has transitioned
+         from the Learning state to the Forwarding state in msti."
+    ::= {myStpPortMstiInstanceEntry 11 }    
+
+    
+    
+myStpMstiReset  OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+            "This object allow of resetting  MST configuration
+            parameter reset to default settings. set its value to any
+            but 0, will cause agent reset the parameters, set it to 0
+            will cause no action. this operation may cause some interval
+            the station can not connect the agent depending on the
+            parameters previous set."
+    ::= { myMstpMIBObjects 7}
+    
+myStpCistVlansAddMapped OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= { myMstpMIBObjects 8 }
+
+myStpCistVlansGetMapped OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+       "A string of octets containing one bit per VLAN. The
+       first octet corresponds to VLANs with VlanIndex values
+       of 0 through 7; the second octet to VLANs 8 through
+       15; etc.  The most significant bit of each octet
+       corresponds to the lowest value VlanIndex in that octet.
+
+       For each VLAN, if it is mapped to this MST instance, 
+       then the bit corresponding to that VLAN is set to '1'."
+    ::= { myMstpMIBObjects 9 }
+    
+
+myStpCistRemainingHopCount OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "The remaining hop count for CIST."
+    ::= { myMstpMIBObjects 10 }
+
+
+-- -------------------------------------------------------------
+-- rstpMIB - Conformance Information
+-- -------------------------------------------------------------
+
+
+stpExternConformance OBJECT IDENTIFIER ::= { myStpMIB 4 }
+
+stpExternGroups OBJECT IDENTIFIER ::= { stpExternConformance 1 }
+
+-- stpExternCompliances OBJECT IDENTIFIER ::= { stpExternConformance 2 }
+
+-- -------------------------------------------------------------
+-- Units of conformance
+-- -------------------------------------------------------------
+
+stpExternGroup OBJECT-GROUP
+    OBJECTS {
+        mySysStpStatus,
+        mySysStpReset,
+        myStpPortIfIndex,
+        myStpPortAdminPathCost,
+        myStpPortOperPathCost,
+        myStpPortRole
+--        myStpPortIfRunSTP
+    }
+    STATUS      current
+    DESCRIPTION
+        "Spanning Tree extern information for the bridge."
+    ::= { stpExternGroups 1 }
+
+-- -------------------------------------------------------------
+-- Compliance statements
+-- -------------------------------------------------------------
+--stpExternCompliance MODULE-COMPLIANCE
+--    STATUS      current
+--    DESCRIPTION
+--        "The compliance statement for device support of bridging
+--         services."
+--         
+--    MODULE
+--        MANDATORY-GROUPS {
+--            stpExternGroup
+--            }
+--        OBJECT           dot1dStpPortPathCost
+--        MIN-ACCESS       read-only
+--        DESCRIPTION     "Write access is not required."
+--        
+--        OBJECT           dot1dStpPortEnable
+--        MIN-ACCESS       read-only
+--        DESCRIPTION     "Write access is not required."
+--          
+--        OBJECT           dot1dStpHoldTime
+--        MIN-ACCESS       not-accessible
+--        DESCRIPTION     "Access is not required."  
+--            
+--        OBJECT           dot1dStpPortState
+--        SYNTAX           INTEGER {
+--                          disabled(1),
+--                          blocking(2),
+--                          listening(3),
+--                          learning(4),
+--                          forwarding(5),
+--                          broken(6),
+--                          discard(7)
+--                      }
+--        DESCRIPTION     "Add a new syntax."
+--            
+--    ::= { stpExternCompliances 1 }
+
+
+
+
+-- -------------------------------------------------------------
+-- rstpMIB - Conformance Information
+-- -------------------------------------------------------------
+
+rstpConformance OBJECT IDENTIFIER ::= { myStpMIB 5 }
+
+rstpGroups OBJECT IDENTIFIER ::= { rstpConformance 1 }
+
+rstpCompliances OBJECT IDENTIFIER ::= { rstpConformance 2 }
+
+-- -------------------------------------------------------------
+-- Units of conformance
+-- -------------------------------------------------------------
+
+rstpBridgeGroup OBJECT-GROUP
+    OBJECTS {
+        myStpVersion,
+        myStpTxHoldCount,
+        myStpBpduGuard,
+        myStpBpduFilter
+    }
+    STATUS      current
+    DESCRIPTION
+        "Rapid Spanning Tree information for the bridge."
+    ::= { rstpGroups 1 }
+
+rstpDefaultPathCostGroup OBJECT-GROUP
+    OBJECTS {
+        myStpPathCostDefault
+
+    }
+    STATUS      current
+    DESCRIPTION
+        "Default Spanning Tree path cost information."
+    ::= { rstpGroups 2 }
+
+rstpPortGroup OBJECT-GROUP
+    OBJECTS {
+        myRstpExtPortIfIndex,
+        myStpPortProtocolMigration,
+        myStpPortAdminEdgePort,
+        myStpPortOperEdgePort,
+        myStpPortAdminPointToPoint,
+        myStpPortOperPointToPoint,
+        myStpPortBpduGuard,
+        myStpPortBpduFilter,
+--        myStpPortCistRegionRoot,
+--        myStpPortCistPathCost,
+--        myStpPortHelloTime,
+        myStpCistRegionRoot,
+        myStpCistPathCost
+        
+    }
+    STATUS      current
+    DESCRIPTION
+        "Rapid Spanning Tree information for individual ports."
+    ::= { rstpGroups 3 }
+
+-- -------------------------------------------------------------
+-- Compliance statements
+-- -------------------------------------------------------------
+
+rstpCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for device support of bridging
+         services."
+
+    MODULE
+        MANDATORY-GROUPS {
+            rstpBridgeGroup,
+            rstpDefaultPathCostGroup,
+            rstpPortGroup
+        }
+
+        GROUP rstpDefaultPathCostGroup
+            DESCRIPTION
+                "Support for this group is mandatory only if
+                 both 16-bit and 32-bit Path Costs are supported."
+    ::= { rstpCompliances 1 }
+    
+
+-- -------------------------------------------------------------
+-- mstpMIB - Conformance Information
+-- -------------------------------------------------------------
+
+mstpConformance OBJECT IDENTIFIER ::= { myStpMIB 6 }
+
+mstpGroups OBJECT IDENTIFIER ::= { mstpConformance 1 }
+
+mstpCompliances OBJECT IDENTIFIER ::= { mstpConformance 2 }
+
+-- -------------------------------------------------------------
+-- Units of conformance
+-- -------------------------------------------------------------
+
+mstpBridgeRegionGroup OBJECT-GROUP
+    OBJECTS {
+    	myStpMstiMaxInstanceNumber,
+    	myStpMstiRegionName,
+    	myStpMstiRegionRevision,
+    	myStpMstiMaxHopNumber
+    	
+    }
+    STATUS      current
+    DESCRIPTION
+        "Msti information for the bridge."
+    ::= { mstpGroups 1 }
+
+mstpMstiBridgeGroup OBJECT-GROUP
+    OBJECTS {
+	myStpMstiInstanceIndex,
+    myStpMstiInstanceVlansAddMapped,
+    myStpMstiInstanceVlansDeleteMapped,
+    myStpMstiInstanceVlansGetMapped,
+    	myStpMstiInstanceRemainingHopCount,
+    	myStpMstiPriority,
+--    	myStpMstiBridgeId,
+    	myStpMstiTimeSinceTopologyChange,
+    	myStpMstiTopChanges,
+--    	myStpMstiTopChanged,
+    	myStpMstiDesignatedRoot,
+    	myStpMstiRootCost,
+    	myStpMstiRootPort,
+	myStpMstiInstanceEntryStatus    	
+    }
+    STATUS      current
+    DESCRIPTION
+        "Default Spanning Tree path cost information."
+    ::= { mstpGroups 2 }
+
+mstpMstiPortGroup OBJECT-GROUP
+    OBJECTS {
+    	myStpPortMstiIndex,
+--    	myStpPortMstiUpTime,
+    	myStpPortMstiState,
+--    	myStpPortMstiEnable,
+--    	myStpPortMstiPortId,
+    	myStpPortMstiAdminPathCost,
+    	myStpPortMstiOperPathCost,
+    	myStpPortMstiPriority,
+    	myStpPortMstiDesignatedRoot,
+    	myStpPortMstiDesignatedCost,
+    	myStpPortMstiDesignatedBridge,
+    	myStpPortMstiDesignatedPort,
+    	myStpPortMstiPortRole,
+	myStpPortMstiPortForwardTransitions    	
+    }
+    STATUS      current
+    DESCRIPTION
+        "Rapid Spanning Tree information for individual ports."
+    ::= { mstpGroups 3 }
+
+-- -------------------------------------------------------------
+-- Compliance statements
+-- -------------------------------------------------------------
+
+mstpCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for device support of bridging
+         services."
+
+    MODULE
+        MANDATORY-GROUPS {
+            mstpBridgeRegionGroup,
+            mstpMstiBridgeGroup,
+            mstpMstiPortGroup
+        }
+
+    ::= { mstpCompliances 1 }
+END

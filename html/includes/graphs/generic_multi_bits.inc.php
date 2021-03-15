@@ -30,18 +30,26 @@ $i = 0;
 $rrd_multi = array();
 foreach ($rrd_filenames as $key => $rrd_filename)
 {
-  if ($rrd_inverted[$key]) { $in = 'out'; $out = 'in'; } else { $in = 'in'; $out = 'out'; }
+  if ($rrd_inverted[$key])
+  {
+    $in = 'out';
+    $out = 'in';
+  } else {
+    $in = 'in';
+    $out = 'out';
+  }
+  $rrd_filename_escape = rrdtool_escape($rrd_filename);
 
-  $rrd_options .= " DEF:".$in."octets" . $i . "=".$rrd_filename.":".$ds_in.":AVERAGE";
-  $rrd_options .= " DEF:".$out."octets" . $i . "=".$rrd_filename.":".$ds_out.":AVERAGE";
+  $rrd_options .= " DEF:".$in."octets" . $i . "=".$rrd_filename_escape.":".$ds_in.":AVERAGE";
+  $rrd_options .= " DEF:".$out."octets" . $i . "=".$rrd_filename_escape.":".$ds_out.":AVERAGE";
 
   $rrd_multi['in_thing'][]  = "inoctets" .  $i;
   $rrd_multi['out_thing'][] = "outoctets" . $i;
 
   if ($vars['previous'])
   {
-    $rrd_options .= " DEF:".$in."octets" . $i . "X=".$rrd_filename.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
-    $rrd_options .= " DEF:".$out."octets" . $i . "X=".$rrd_filename.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:".$in."octets" . $i . "X=".$rrd_filename_escape.":".$ds_in.":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:".$out."octets" . $i . "X=".$rrd_filename_escape.":".$ds_out.":AVERAGE:start=".$prev_from.":end=".$from;
     $rrd_options .= " SHIFT:".$in."octets" . $i . "X:$period";
     $rrd_options .= " SHIFT:".$out."octets" . $i . "X:$period";
 

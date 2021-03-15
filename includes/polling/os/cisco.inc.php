@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -43,7 +42,7 @@ if (is_device_mib($device, 'CISCO-CONFIG-MAN-MIB'))
 
 $sysDescr = preg_replace('/\s+/', ' ', $poll_device['sysDescr']); // Replace all spaces and newline to single space
 // Generic IOS/IOS-XE/IES/IOS-XR sysDescr
-if (preg_match('/^Cisco IOS Software(?: \[\S+?\])?, .+? Software \((?:[^\-]+-([\w\d]+)-\w|\w+_IOSXE)\),.+?Version ([^,\s]+)/', $sysDescr, $matches))
+if (preg_match('/^Cisco IOS Software(?: \[\S+?\])?, .+? Software \((?:[^\-]+-(\w+)-\w|\w+_IOSXE)\),.+?Version ([^,\s]+)/', $sysDescr, $matches))
 {
   //Cisco IOS Software, Catalyst 4500 L3 Switch Software (cat4500e-ENTSERVICESK9-M), Version 15.2(1)E3, RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2014 by Cisco Systems, Inc. Compiled Mon 05-May-14 07:56 b
   //Cisco IOS Software, IOS-XE Software (PPC_LINUX_IOSD-IPBASEK9-M), Version 15.2(2)S, RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2012 by Cisco Systems, Inc. Compiled Mon 26-Mar-12 15:23 by mcpre
@@ -53,7 +52,7 @@ if (preg_match('/^Cisco IOS Software(?: \[\S+?\])?, .+? Software \((?:[^\-]+-([\
   $features = $matches[1];
   $version  = $matches[2];
 }
-elseif (preg_match('/^Cisco Internetwork Operating System Software IOS \(tm\) [^ ]+ Software \([^\-]+-([\w\d]+)-\w\),.+?Version ([^, ]+)/', $sysDescr, $matches))
+elseif (preg_match('/^Cisco Internetwork Operating System Software IOS \(tm\) [^ ]+ Software \([^\-]+-(\w+)-\w\),.+?Version ([^, ]+)/', $sysDescr, $matches))
 {
   //Cisco Internetwork Operating System Software IOS (tm) 7200 Software (UBR7200-IK8SU2-M), Version 12.3(17b)BC8, RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2007 by cisco Systems, Inc. Compiled Fri 29-Ju
   //Cisco Internetwork Operating System Software IOS (tm) C1700 Software (C1700-Y-M), Version 12.2(4)YA2, EARLY DEPLOYMENT RELEASE SOFTWARE (fc1) Synched to technology version 12.2(5.4)T TAC Support: http://www.cisco.com/tac Copyright (c) 1986-2002 by ci
@@ -83,7 +82,7 @@ elseif (preg_match('/^Cisco NX-OS(?:\(tm\))? (?<hw1>\S+?), Software \((?<hw2>.+?
   list(, $features) = explode('-', $matches['hw2'], 2);
   $version  = $matches['version'];
 }
-elseif (preg_match('/Software \(\w+-(?<features>[\w\d]+)-\w\),.+?Version (?<version>[^, ]+),(?:[\w ]+)? RELEASE SOFTWARE/', $sysDescr, $matches))
+elseif (preg_match('/Software \(\w+-(?<features>\w+)-\w\),.+?Version (?<version>[^, ]+),(?:[\w ]+)? RELEASE SOFTWARE/', $sysDescr, $matches))
 {
   //C800 Software (C800-UNIVERSALK9-M), Version 15.2(2)T2, RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Compiled Thu 02-Aug-12 02:09 by prod_rel_team
   //Cisco IOS Software, Catalyst 4500 L3 Switch Software (cat4500e-ENTSERVICESK9-M), Version 15.2(1)E3, RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2014 by Cisco Systems, Inc. Compiled Mon 05-May-14 07:56 b
@@ -111,21 +110,21 @@ elseif (preg_match('/Software, Version (?<version>\d[\d\.\(\)]+)/', $sysDescr, $
 // All other Cisco devices
 if (is_array($entPhysical))
 {
-  if ($config['discovery_modules']['inventory'])
+  if (is_module_enabled($device, 'inventory', 'discovery'))
   {
-    if ($entPhysical['entPhysicalClass'] == 'stack')
+    if ($entPhysical['entPhysicalClass'] === 'stack')
     {
       // If it's stacked device try get chassis instead
-      $chassis = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `entPhysicalContainedIn` = ?', array($device['device_id'], 'chassis', '1'));
+      $chassis = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `entPhysicalContainedIn` = ? AND `deleted` IS NULL', array($device['device_id'], 'chassis', '1'));
       if ($chassis['entPhysicalModelName'])
       {
         $entPhysical = $chassis;
       }
     }
-    elseif (empty($entPhysical['entPhysicalModelName']) || $entPhysical['entPhysicalModelName'] == 'MIDPLANE')
+    elseif (empty($entPhysical['entPhysicalModelName']) || $entPhysical['entPhysicalModelName'] === 'MIDPLANE')
     {
       // F.u. Cisco.. for some platforms (4948/4900M) they store correct model and version not in chassis
-      $hw_module = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `entPhysicalContainedIn` = ?', array($device['device_id'], 'module', '2'));
+      $hw_module = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `entPhysicalContainedIn` = ? AND `deleted` IS NULL', array($device['device_id'], 'module', '2'));
       if ($hw_module['entPhysicalModelName'])
       {
         $entPhysical = $hw_module;
@@ -134,10 +133,10 @@ if (is_array($entPhysical))
     elseif (empty($entPhysical['entPhysicalSoftwareRev']))
     {
       // 720X, try again get correct serial/version
-      $hw_module = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalSerialNum` != ?', array($device['device_id'], 'module', '1', ''));
+      $hw_module = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `entPhysicalContainedIn` = ? AND `entPhysicalSerialNum` != ? AND `deleted` IS NULL', array($device['device_id'], 'module', '1', ''));
       if ($hw_module['entPhysicalSoftwareRev'])
       {
-        if ($device['os'] == 'iosxe')
+        if ($device['os'] === 'iosxe')
         {
           // For IOS-XE fix only version
           $entPhysical['entPhysicalSoftwareRev'] = $hw_module['entPhysicalSoftwareRev'];
@@ -148,9 +147,9 @@ if (is_array($entPhysical))
     }
   }
 
-  if ($entPhysical['entPhysicalContainedIn'] === '0' || $entPhysical['entPhysicalContainedIn'] === '1' || $entPhysical['entPhysicalContainedIn'] === '2')
+  if (in_array($entPhysical['entPhysicalContainedIn'], [ '0', '1', '2' ]) || $entPhysical['entPhysicalClass'] === 'chassis')
   {
-    if ((empty($version) || $device['os'] == 'iosxe') && !empty($entPhysical['entPhysicalSoftwareRev']))
+    if ((empty($version) || $device['os'] === 'iosxe') && !empty($entPhysical['entPhysicalSoftwareRev']))
     {
       $version = $entPhysical['entPhysicalSoftwareRev'];
     }
@@ -206,9 +205,10 @@ if ($hardware)
 }
 
 // Additional checks for IOS devices
-if ($device['os'] == 'ios')
+if ($device['os'] === 'ios' &&
+    (str_iexists($hardware, 'AIRAP') || str_starts($hardware, 'AIR-')))
 {
-  if (stristr($hardware, 'AIRAP') || substr($hardware,0,4) == 'AIR-') { $ios_type = 'wireless'; }
+  $ios_type = 'wireless';
 }
 
 // Set type to a predefined type for the OS if it's not already set

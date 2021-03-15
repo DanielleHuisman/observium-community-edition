@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -16,7 +15,7 @@ $skip_status = dbExist('status', '`device_id` = ? AND `status_type` = ? AND `sta
 
 // Walk CISCO-ENTITY-FRU-CONTROL-MIB oids
 $entity_array = array();
-$oids = array('cefcFRUPowerStatusEntry', 'cefcFanTrayStatusEntry', 'cefcFanEntry');
+$oids = array('cefcFRUPowerStatusEntry', 'cefcFanTrayStatusEntry', 'cefcFanEntry', 'cefcModuleEntry');
 foreach ($oids as $oid)
 {
   $entity_array = snmpwalk_cache_multi_oid($device, $oid, $entity_array, 'CISCO-ENTITY-FRU-CONTROL-MIB');
@@ -127,6 +126,8 @@ if (count($entity_array))
     $descr = $entry['entPhysicalDescr'];
 
     // Power Supplies
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcFRUPowerAdminStatus.470 = INTEGER: on(1)
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcFRUPowerOperStatus.470 = INTEGER: on(2)
     if (!$skip_status && $entry['entPhysicalClass'] == 'powerSupply' && $entry['cefcFRUPowerAdminStatus'] != 'off')
     {
       $oid_name = 'cefcFRUPowerOperStatus';
@@ -137,7 +138,15 @@ if (count($entity_array))
       discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'powersupply'));
     }
 
+    // A negative value expresses current used by the FRU.
+    // A positive value expresses current supplied by the FRU.
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcFRUCurrent.470 = INTEGER: 2810
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcFRUActualInputCurrent.470 = INTEGER: 45558
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcFRUActualOutputCurrent.470 = INTEGER: 61000
+
     // Fans
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcFanTrayOperStatus.534 = INTEGER: up(2)
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcFanTrayDirection.534 = INTEGER: backToFront(3)
     if (!$skip_status && $entry['entPhysicalClass'] == 'fan')
     {
       $oid_name = 'cefcFanTrayOperStatus';
@@ -164,6 +173,24 @@ if (count($entity_array))
       $oid_num  = '.1.3.6.1.4.1.9.9.117.1.4.2.1.1.'.$index;
       $value    = $entry[$oid_name];
       discover_sensor_ng($device, 'fanspeed', $mib, $oid_name, $oid_num, $index, NULL, $descr, 1, $value, $options);
+    }
+
+    // Modules
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcModuleAdminStatus.22 = INTEGER: enabled(1)
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcModuleOperStatus.22 = INTEGER: ok(2)
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcModuleResetReason.22 = INTEGER: unknown(1)
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcModuleStatusLastChangeTime.22 = Timeticks: (0) 0:00:00.00
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcModuleLastClearConfigTime.22 = Timeticks: (158892673) 18 days, 9:22:06.73
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcModuleResetReasonDescription.22 = STRING:
+    // CISCO-ENTITY-FRU-CONTROL-MIB::cefcModuleUpTime.22 = Gauge32: 1988824
+    if (isset($entry['cefcModuleOperStatus']) && $entry['cefcModuleAdminStatus'] == 'enabled')
+    {
+      $oid_name = 'cefcModuleOperStatus';
+      $oid_num  = '.1.3.6.1.4.1.9.9.117.1.2.1.1.2.'.$index;
+      $type     = 'cefcModuleOperStatus';
+      $value    = $entry[$oid_name];
+
+      discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => $entry['entPhysicalClass']));
     }
   }
 }

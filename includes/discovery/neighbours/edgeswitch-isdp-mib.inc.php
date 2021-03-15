@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,65 +6,24 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-$isdp_array = snmpwalk_cache_twopart_oid($device, "agentIsdpCache", array(), "EdgeSwitch-ISDP-MIB");
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheAddress.25.1 = STRING: "119.59.109.140"
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheLocalIntf.25.1 = STRING: "0/25"
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheVersion.25.1 = STRING: "Cisco IOS Software, C3560E Software (C3560E-UNIVERSALK9-M), Version 15.0(2)SE11, RELEASE SOFTWARE (fc3)
+// Technical Support: http://www.cisco.com/techsupport
+// Copyright (c) 1986-2017 by Cisco Systems, Inc.
+// Compiled Sat 19-Aug-17 09:04 by prod_rel_team"
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheDeviceId.25.1 = STRING: "Cisco3560E-10G-Rack207.metrabyte.net"
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheDevicePort.25.1 = STRING: "GigabitEthernet0/32"
+// EdgeSwitch-ISDP-MIB::agentIsdpCachePlatform.25.1 = STRING: "cisco WS-C3560E-48TD"
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheCapabilities.25.1 = STRING: "Switch IGMP "
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheLastChange.25.1 = Timeticks: (1581770900) 183 days, 1:48:29.00
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheProtocolVersion.25.1 = STRING: "2"
+// EdgeSwitch-ISDP-MIB::agentIsdpCacheHoldtime.25.1 = INTEGER: 120 seconds
 
-// FIXME, make this code generic for all *-ISDP-MIB
-if ($isdp_array)
-{
-  foreach ($isdp_array as $ifIndex => $port_neighbours)
-  {
-    $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?", array($device['device_id'], $ifIndex));
-
-    foreach ($port_neighbours as $entry_id => $isdp_entry)
-    {
-      list($isdp_entry['agentIsdpCacheDeviceId']) = explode('(', $isdp_entry['agentIsdpCacheDeviceId']); // Fix for Nexus ISDP neighbors: <hostname>(serial number)
-
-      $remote_device_id = FALSE;
-      if (is_valid_hostname($isdp_entry['agentIsdpCacheDeviceId']))
-      {
-        if (isset($GLOBALS['cache']['discovery-protocols'][$isdp_entry['agentIsdpCacheDeviceId']]))
-        {
-          // This hostname already checked, skip discover
-          $remote_device_id = $GLOBALS['cache']['discovery-protocols'][$isdp_entry['agentIsdpCacheDeviceId']];
-        } else {
-          $remote_device_id = dbFetchCell("SELECT `device_id` FROM `devices` WHERE `sysName` = ? OR `hostname` = ?", array($isdp_entry['agentIsdpCacheDeviceId'], $isdp_entry['agentIsdpCacheDeviceId']));
-
-          // FIXME do LLDP-code-style hostname overwrite here as well? (see below)
-          if (!$remote_device_id && is_valid_hostname($isdp_entry['agentIsdpCacheDeviceId']) && !is_bad_xdp($isdp_entry['agentIsdpCacheDeviceId'], $isdp_entry['agentIsdpCachePlatform']))
-          {
-            // For now it's a Cisco so CDP discovery is ok
-            $remote_device_id = discover_new_device($isdp_entry['agentIsdpCacheDeviceId'], 'xdp', 'ISDP', $device, $port);
-          }
-
-          // Cache remote device ID for other protocols
-          $GLOBALS['cache']['discovery-protocols'][$isdp_entry['agentIsdpCacheDeviceId']] = $remote_device_id;
-        }
-
-        if ($remote_device_id)
-        {
-          $if = $isdp_entry['agentIsdpCacheDevicePort'];
-          $remote_port_id = dbFetchCell("SELECT `port_id` FROM `ports` WHERE (`ifDescr` = ? OR `ifName` = ?) AND `device_id` = ?", array($if, $if, $remote_device_id));
-        } else {
-          $remote_port_id = NULL;
-        }
-
-        if (!is_bad_xdp($isdp_entry['agentIsdpCacheDeviceId']) && $port['port_id'] && $isdp_entry['agentIsdpCacheDeviceId'] && $isdp_entry['agentIsdpCacheDevicePort'])
-        {
-          $remote_address = $isdp_entry['agentIsdpCacheAddress'];
-          if (!get_ip_version($remote_address)) { $remote_address = NULL; }
-
-          discover_link($port, 'isdp', $remote_port_id, $isdp_entry['agentIsdpCacheDeviceId'], $isdp_entry['agentIsdpCacheDevicePort'], $isdp_entry['agentIsdpCachePlatform'], $isdp_entry['agentIsdpCacheVersion'], $remote_address);
-        }
-      } else {
-        echo("X");
-      }
-    }
-  }
-}
+include("isdp-mib.inc.php");
 
 // EOF

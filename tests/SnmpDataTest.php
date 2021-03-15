@@ -1,6 +1,6 @@
 <?php
 
-//define('OBS_DEBUG', 1);
+//define('OBS_DEBUG', 2);
 define('OBS_QUIET', TRUE); // Disable any additional output from tests
 ini_set('opcache.enable', 0);
 
@@ -75,9 +75,16 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       $this->markTestSkipped('SNMPsimd unavailable or daemon not started, test skipped.');
     }
 
-    // Just get first snmp request, for alive snmpsimd
-    $device = build_initial_device_array($snmpsimd_ip, 'ios-1', 'v2c', $snmpsimd_port, 'udp');
-    snmp_get_oid($device, '.1.3.6.1.2.1.1.2.0');
+    if (!defined('OBS_TEST_SNMP'))
+    {
+      // Just get first snmp request, for alive snmpsimd
+      $device = build_initial_device_array($snmpsimd_ip, 'ios-1', 'v2c', $snmpsimd_port, 'udp');
+      snmp_get_oid($device, '.1.3.6.1.2.1.1.2.0');
+      define('OBS_TEST_SNMP', snmp_status());
+    } else {
+      $device = build_initial_device_array($snmpsimd_ip, 'ios-1', 'v2c', $snmpsimd_port, 'udp');
+      snmp_get_oid($device, '.1.3.6.1.2.1.1.2.0');
+    }
   }
 
   /**
@@ -92,6 +99,9 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
     $device['snmp_timeout'] = 2;
     $device['snmp_retries'] = 1;
     //var_dump($device);
+
+    // Clear cache before get_device_os()
+    unset($GLOBALS['cache_snmp']);
     $this->assertSame($os, get_device_os($device));
   }
 
@@ -107,7 +117,7 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
       {
         if (filetype($snmpsimd_data . '/' . $file) == 'file' && preg_match('/^(?<community>(?<os>[\S]+?)(?:\-\d+)?)\.snmprec$/', $file, $matches))
         {
-          //if (!str_starts($matches['os'], 'eltex')) { continue; }
+          //if (!str_starts($matches['os'], 'zyxel')) { continue; }
           $results[] = array($matches['os'], $matches['community']);
         }
       }
@@ -140,6 +150,9 @@ class IncludesSnmpTest extends \PHPUnit\Framework\TestCase
     if (preg_match('/^(?<community>(?<os>[\S]+?)(?:\-\d+)?)$/', $community, $matches))
     {
       $os = $matches['os'];
+
+      // Clear cache before get_device_os()
+      unset($GLOBALS['cache_snmp']);
       $this->assertSame($os, get_device_os($device));
     }
   }

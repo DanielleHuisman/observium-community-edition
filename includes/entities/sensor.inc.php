@@ -6,8 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
- *
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -19,13 +18,13 @@ function discover_sensor_definition($device, $mib, $entry)
   echo($entry['oid']. ' [');
 
   // Check that types listed in skip_if_valid_exist have already been found
-  if (discovery_check_if_type_exist($GLOBALS['valid'], $entry, 'sensor')) { echo '!]'; return; }
+  if (discovery_check_if_type_exist($entry, 'sensor')) { echo '!]'; return; }
 
   // Check array requirements list
   if (discovery_check_requires_pre($device, $entry, 'sensor')) { echo '!]'; return; }
 
   // Fetch table or Oids
-  $table_oids = array('oid', 'oid_descr', 'oid_scale', 'oid_unit', 'oid_class',
+  $table_oids = array('oid', 'oid_descr', 'oid_scale', 'oid_precision', 'oid_unit', 'oid_class',
                       'oid_limit_low', 'oid_limit_low_warn', 'oid_limit_high_warn', 'oid_limit_high',
                       'oid_limit_nominal', 'oid_limit_delta_warn', 'oid_limit_delta', 'oid_limit_scale',
                       'oid_extra', 'oid_entPhysicalIndex');
@@ -41,9 +40,11 @@ function discover_sensor_definition($device, $mib, $entry)
 
   $entry['type'] = $mib . '-' . $entry['oid'];
 
-  if (!isset($entry['scale'])) { $options['scale'] = 1; } else { $options['scale'] = $entry['scale']; }
-  if (!isset($entry['scale'])) { $scale            = 1; } else { $scale            = $entry['scale']; }
-
+  // Just append mib name to definition entry, for simple pass to external functions
+  if (empty($entry['mib']))
+  {
+    $entry['mib'] = $mib;
+  }
 
   $counters = array(); // Reset per-class counters for each MIB
 
@@ -73,7 +74,7 @@ function discover_sensor_definition($device, $mib, $entry)
       }
     }
 
-    $dot_index = '.' . $index;
+    $dot_index = strlen($index) ? '.' . $index : '';
     $oid_num   = $entry['oid_num'] . $dot_index;
 
     // echo PHP_EOL; print_vars($entry); echo PHP_EOL; print_vars($sensor); echo PHP_EOL; print_vars($descr); echo PHP_EOL;
@@ -85,12 +86,60 @@ function discover_sensor_definition($device, $mib, $entry)
 
     $sensor['class'] = nicecase($class);  // Class in descr
     $sensor['index'] = $index;            // Index in descr
+    foreach (explode('.', $index) as $k => $i)
+    {
+      $sensor['index'.$k] = $i;           // Index parts
+    }
     $sensor['i']     = $counters[$class]; // i++ counter in descr (per sensor class)
+
+    // Rule-based entity linking (associate before discovery_check_requires()).
+    if ($measured = entity_measured_match_definition($device, $entry, $sensor, 'sensor'))
+    {
+      $options = array_merge($options, $measured);
+      $sensor  = array_merge($sensor, $measured); // append to $sensor for %descr% tags, ie %port_label%
+    }
+    // End rule-based entity linking
+    elseif (isset($entry['entPhysicalIndex']))
+    {
+      // Just set physical index
+      $options['entPhysicalIndex'] = array_tag_replace($sensor, $entry['entPhysicalIndex']);
+    }
 
     // Check array requirements list
     if (discovery_check_requires($device, $entry, $sensor, 'sensor')) { continue; }
 
-    $value = snmp_fix_numeric($sensor[$entry['oid']]);
+    // Scale
+    $scale = entity_scale_definition($device, $entry, $sensor);
+
+    // Limits
+    $options = array_merge($options, entity_limits_definition($device, $entry, $sensor, $scale));
+
+    // Unit
+    if (isset($entry['unit']))
+    {
+      // Static unit definition
+      $options['sensor_unit'] = $entry['unit'];
+    }
+    if (isset($entry['oid_unit']))
+    {
+      if (isset($sensor[$entry['oid_unit']]))
+      {
+        // Unit in same table
+        $unit = $sensor[$entry['oid_unit']];
+      }
+      elseif (str_exists($entry['oid_unit'], '.'))
+      {
+        // Unit is outside from table with single index, see VERTIV-V5-MIB
+        $unit = snmp_cache_oid($device, $entry['oid_unit'], $mib);
+      }
+      // Translate unit from specific Oid
+      if (isset($entry['map_unit'][$unit]))
+      {
+        $options['sensor_unit'] = $entry['map_unit'][$unit];
+      }
+    }
+
+    $value = snmp_fix_numeric($sensor[$entry['oid']], $options['sensor_unit']);
     if (!is_numeric($value))
     {
       print_debug("Excluded by current value ($value) is not numeric.");
@@ -114,117 +163,6 @@ function discover_sensor_definition($device, $mib, $entry)
       continue;
     }
 
-    // Check limits oids if set
-    foreach (array('limit_low', 'limit_low_warn', 'limit_high_warn', 'limit_high') as $limit)
-    {
-      $oid_limit = 'oid_'   . $limit;
-      if (isset($entry[$oid_limit]))
-      {
-        if (isset($sensor[$entry[$oid_limit]])) { $options[$limit] = $sensor[$entry[$oid_limit]]; } // Named oid, exist in table
-        else                                    { $options[$limit] = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-        $options[$limit] = snmp_fix_numeric($options[$limit]);
-        // Scale limit
-        if (isset($entry['limit_scale']) && is_numeric($entry['limit_scale']) && $entry['limit_scale'] != 0)
-        {
-          $options[$limit] *= $entry['limit_scale'];
-        }
-      }
-      elseif (isset($entry[$limit]) && is_numeric($entry[$limit]))
-      {
-        $options[$limit] = $entry[$limit]; // Limit from definition
-      }
-    }
-
-    // Limits based on nominal +- delta oids (see TPT-HEALTH-MIB)
-    if (isset($entry['oid_limit_nominal']) && (isset($entry['oid_limit_delta']) || isset($entry['oid_limit_delta_warn'])))
-    {
-      $oid_limit = 'oid_limit_nominal';
-      if (isset($sensor[$entry[$oid_limit]])) { $limit_nominal = $sensor[$entry[$oid_limit]]; } // Named oid, exist in table
-      else                                    { $limit_nominal = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-
-      if (is_numeric($limit_nominal) && isset($entry['oid_limit_delta_warn']))
-      {
-        $oid_limit = 'oid_limit_delta_warn';
-        if (isset($sensor[$entry[$oid_limit]])) { $limit_delta_warn = $sensor[$entry[$oid_limit]]; } // Named oid, exist in table
-        else                                    { $limit_delta_warn = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-        $options['limit_low_warn']  = $limit_nominal - $limit_delta_warn; //$entry['limit_scale'];
-        $options['limit_high_warn'] = $limit_nominal + $limit_delta_warn; //$entry['limit_scale'];
-        if (isset($entry['limit_scale']) && is_numeric($entry['limit_scale']) && $entry['limit_scale'] != 0)
-        {
-          $options['limit_low_warn']  *= $entry['limit_scale'];
-          $options['limit_high_warn'] *= $entry['limit_scale'];
-        }
-      }
-      if (is_numeric($limit_nominal) && isset($entry['oid_limit_delta']))
-      {
-        $oid_limit = 'oid_limit_delta';
-        if (isset($sensor[$entry[$oid_limit]])) { $limit_delta = $sensor[$entry[$oid_limit]]; } // Named oid, exist in table
-        else                                    { $limit_delta = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-        $options['limit_low']  = $limit_nominal - $limit_delta;
-        $options['limit_high'] = $limit_nominal + $limit_delta;
-        if (isset($entry['limit_scale']) && is_numeric($entry['limit_scale']) && $entry['limit_scale'] != 0)
-        {
-          $options['limit_low']  *= $entry['limit_scale'];
-          $options['limit_high'] *= $entry['limit_scale'];
-        }
-      }
-    }
-    // One last step for convert limit unit, when value and limits use different units
-    if (isset($entry['limit_unit']))
-    {
-      foreach (array('limit_low', 'limit_low_warn', 'limit_high_warn', 'limit_high') as $limit)
-      {
-        if (isset($options[$limit]))
-        {
-          $options[$limit] = value_to_si($options[$limit], $entry['limit_unit'], $entry['class']);
-        }
-      }
-    }
-
-    // Allow disable auto limits by definitions
-    if (isset($entry['limit_auto']))
-    {
-      $options['limit_auto'] = $entry['limit_auto'];
-    }
-
-    // Unit
-    if (isset($entry['unit']))
-    {
-      // Static unit definition
-      $options['sensor_unit'] = $entry['unit'];
-    }
-    if (isset($entry['oid_unit']))
-    {
-      if (isset($sensor[$entry['oid_unit']]))
-      {
-        // Unit in same table
-        $unit = $sensor[$entry['oid_unit']];
-      }
-      elseif (str_contains($entry['oid_unit'], '.'))
-      {
-        // Unit is outside from table with single index, see VERTIV-V5-MIB
-        $unit = snmp_cache_oid($device, $entry['oid_unit'], $mib);
-      }
-      // Translate unit from specific Oid
-      if (isset($entry['map_unit'][$unit]))
-      {
-        $options['sensor_unit'] = $entry['map_unit'][$unit];
-      }
-    }
-
-    // Rule-based entity linking.
-    if ($measured = entity_measured_match_definition($device, $entry, $sensor, 'sensor'))
-    {
-      $options = array_merge($options, $measured);
-      $sensor  = array_merge($sensor, $measured); // append to $sensor for %descr% tags, ie %port_label%
-    }
-    // End rule-based entity linking
-    elseif (isset($entry['entPhysicalIndex']))
-    {
-      // Just set physical index
-      $options['entPhysicalIndex'] = array_tag_replace($sensor, $entry['entPhysicalIndex']);
-    }
-
     // Generate Description
     $descr = entity_descr_definition('sensor', $entry, $sensor, $sensors_count);
 
@@ -238,6 +176,7 @@ function discover_sensor_definition($device, $mib, $entry)
       $options['rename_rrd_full'] = $entry['rename_rrd_full'];
     }
 
+    print_debug_vars($options);
     discover_sensor_ng($device, $class, $mib, $entry['oid'], $oid_num, $index, $entry['type'], $descr, $scale, $value, $options);
   }
 
@@ -300,9 +239,9 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
     print_debug("Redirecting call to discover_counter().");
     return discover_counter($device, $class, $mib, $object, $oid, $index, $sensor_descr, $scale, $value, $options);
   }
-  elseif ($class == 'power' && $options['measured_class'] == 'port' &&            // Power sensor with measured port entity
+  elseif ($class == 'power' && $options['measured_class'] == 'port' &&      // Power sensor with measured port entity
     $config['sensors']['port']['power_to_dbm'] &&                           // Convert option set to TRUE
-    $options['sensor_unit'] != 'W' && !str_icontains($sensor_descr, 'PoE')) // Not forced W unit, not PoE
+    $options['sensor_unit'] != 'W' && !str_iexists($sensor_descr, 'PoE')) // Not forced W unit, not PoE
   {
     // DOM Power sensors convert to dBm
     print_debug("DOM power sensor forced to dBm sensor.");
@@ -311,7 +250,15 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
   }
 
   // Init main
-  $param_main = array('oid' => 'sensor_oid', 'sensor_descr' => 'sensor_descr', 'scale' => 'sensor_multiplier', 'sensor_deleted' => 'sensor_deleted', 'mib' => 'sensor_mib', 'object' => 'sensor_object');
+  $param_main = [
+    'oid' => 'sensor_oid',
+    'type' => 'sensor_type', // anyway compare type on update, while db query is case insensitive
+    'sensor_descr' => 'sensor_descr',
+    'scale' => 'sensor_multiplier',
+    'sensor_deleted' => 'sensor_deleted',
+    'mib' => 'sensor_mib',
+    'object' => 'sensor_object'
+  ];
 
   // Init numeric values
   if (!is_numeric($scale) || $scale == 0) { $scale = 1; }
@@ -321,13 +268,19 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
   {
     $type = $mib . '-' . $object;
   }
+  // Another hack for FIBERSTORE-MIB/FS-SWITCH-MIB multi lane DOM sensors
+  // Append unit as sensor type part
+  if (isset($options['sensor_unit']) && str_starts($options['sensor_unit'], 'split'))
+  {
+    $type .= '-' . $options['sensor_unit'];
+  }
 
   // Skip discovery sensor if value not numeric or null (default)
   if (strlen($value))
   {
     // Some retarded devices report data with spaces and commas
     // STRING: "  20,4"
-    $value = snmp_fix_numeric($value);
+    $value = snmp_fix_numeric($value, $options['sensor_unit']);
   }
 
   if (is_numeric($value))
@@ -494,7 +447,7 @@ function discover_sensor_ng($device, $class, $mib, $object, $oid, $index, $type,
       {
         echo("L");
         print_debug($debug_msg);
-        log_event('Sensor updated (limits): '.implode(', ', $update_msg), $device, 'sensor', $sensor_entry['sensor_id']);
+        if($config['sensors_limits_events']) { log_event('Sensor updated (limits): '.implode(', ', $update_msg), $device, 'sensor', $sensor_entry['sensor_id']); }
         $updated = dbUpdate($update, 'sensors', '`sensor_id` = ?', array($sensor_entry['sensor_id']));
       }
     }
@@ -739,27 +692,29 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
       print_debug_vars($sensor_db, 1);
     }
 
-    if ($sensor_db['poller_type'] == "snmp")
+    if ($sensor_db['poller_type'] === "snmp")
     {
       $sensor_db['sensor_oid'] = '.' . ltrim($sensor_db['sensor_oid'], '.'); // Fix first dot in oid for caching
 
       // Why all temperature?
-      if ($class == "temperature")
+      if ($class === "temperature")
       {
         for ($i = 0; $i < 5; $i++) // Try 5 times to get a valid temp reading
         {
           // Take value from $oid_cache if we have it, else snmp_get it
           if (isset($oid_cache[$sensor_db['sensor_oid']]))
           {
-            $oid_cache[$sensor_db['sensor_oid']] = snmp_fix_numeric($oid_cache[$sensor_db['sensor_oid']]);
+            $oid_cache_tmp = $oid_cache[$sensor_db['sensor_oid']]; // keep original value, while cache entry can reused
+            $oid_cache[$sensor_db['sensor_oid']] = snmp_fix_numeric($oid_cache[$sensor_db['sensor_oid']], $sensor_db['sensor_unit']);
           }
           if (is_numeric($oid_cache[$sensor_db['sensor_oid']]))
           {
             print_debug("value taken from oid_cache");
             $sensor_poll['sensor_value'] = $oid_cache[$sensor_db['sensor_oid']];
+            $oid_cache[$sensor_db['sensor_oid']] = $oid_cache_tmp; // restore original cached value
           } else {
             $sensor_poll['sensor_value'] = snmp_get_oid($device, $sensor_db['sensor_oid'], 'SNMPv2-MIB');
-            $sensor_poll['sensor_value'] = snmp_fix_numeric($sensor_poll['sensor_value']);
+            $sensor_poll['sensor_value'] = snmp_fix_numeric($sensor_poll['sensor_value'], $sensor_db['sensor_unit']);
           }
 
           if (is_numeric($sensor_poll['sensor_value']) && $sensor_poll['sensor_value'] != 9999)
@@ -773,40 +728,32 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
         {
           $sensor_poll['sensor_value'] = "U";
         }
-      }
-      elseif ($class == "runtime")
-      {
-        if (isset($oid_cache[$sensor_db['sensor_oid']]))
-        {
-          print_debug("value taken from oid_cache");
-          $sensor_poll['sensor_value'] = $oid_cache[$sensor_db['sensor_oid']];
-        } else {
-          $sensor_poll['sensor_value'] = snmp_get_oid($device, $sensor_db['sensor_oid'], 'SNMPv2-MIB');
-        }
-        if (strpos($sensor_poll['sensor_value'], ':') !== FALSE)
-        {
-          // Use timetick conversion only when snmpdata is formatted as timetick 0:0:21:00.00
-          $sensor_poll['sensor_value'] = timeticks_to_sec($sensor_poll['sensor_value']);
-        } else {
-          $sensor_poll['sensor_value'] = snmp_fix_numeric($sensor_poll['sensor_value']);
-        }
       } else {
+        // Compat with runtime sensors without set unit
+        // Use timetick conversion only when snmpdata is formatted as timetick 0:0:21:00.00
+        if ($class === "runtime" && empty($sensor_db['sensor_unit']) && str_exists($sensor_poll['sensor_value'], ':'))
+        {
+          $sensor_db['sensor_unit'] = 'timeticks';
+        }
+
         // Take value from $oid_cache if we have it, else snmp_get it
         if (isset($oid_cache[$sensor_db['sensor_oid']]))
         {
-          $oid_cache[$sensor_db['sensor_oid']] = snmp_fix_numeric($oid_cache[$sensor_db['sensor_oid']]);
+          $oid_cache_tmp = $oid_cache[$sensor_db['sensor_oid']]; // keep original value, while cache entry can reused
+          $oid_cache[$sensor_db['sensor_oid']] = snmp_fix_numeric($oid_cache[$sensor_db['sensor_oid']], $sensor_db['sensor_unit']);
         }
         if (is_numeric($oid_cache[$sensor_db['sensor_oid']]))
         {
           print_debug("value taken from oid_cache");
           $sensor_poll['sensor_value'] = $oid_cache[$sensor_db['sensor_oid']];
+          $oid_cache[$sensor_db['sensor_oid']] = $oid_cache_tmp; // restore original cached value
         } else {
           $sensor_poll['sensor_value'] = snmp_get_oid($device, $sensor_db['sensor_oid'], 'SNMPv2-MIB');
-          $sensor_poll['sensor_value'] = snmp_fix_numeric($sensor_poll['sensor_value']);
+          $sensor_poll['sensor_value'] = snmp_fix_numeric($sensor_poll['sensor_value'], $sensor_db['sensor_unit']);
         }
       }
     }
-    elseif ($sensor_db['poller_type'] == "agent")
+    elseif ($sensor_db['poller_type'] === "agent")
     {
       if (isset($agent_sensors))
       {
@@ -816,7 +763,7 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
         continue;
       }
     }
-    elseif ($sensor_db['poller_type'] == "ipmi")
+    elseif ($sensor_db['poller_type'] === "ipmi")
     {
       if (isset($ipmi_sensors))
       {
@@ -838,6 +785,12 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
     if ($sensor_poll['sensor_value'] == -32768)
     {
       print_debug("Invalid (-32768) ");
+      $sensor_poll['sensor_value'] = 0;
+    }
+    elseif ($sensor_db['sensor_unit'] === 'W' && $sensor_poll['sensor_value'] < 0)
+    {
+      // See: https://jira.observium.org/browse/OBS-3200
+      // -9999 is exclude for Extreme devices, which report incorrect RX power when no power received
       $sensor_poll['sensor_value'] = 0;
     }
 
@@ -883,11 +836,26 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
       $sensor_poll['sensor_event'] = check_thresholds($sensor_db['sensor_limit_low'],  $sensor_db['sensor_limit_low_warn'],
                                                       $sensor_db['sensor_limit_warn'], $sensor_db['sensor_limit'],
                                                       $sensor_poll['sensor_value']);
-      if ($sensor_poll['sensor_event'] == 'alert')
+      if ($sensor_poll['sensor_event'] === 'alert')
       {
         $sensor_poll['sensor_status'] = 'Sensor critical thresholds exceeded.';
+
+        // Force ignore state if measured entity is in Shutdown state
+        $measured_class = $sensor_db['measured_class'];
+        if (is_numeric($sensor_db['measured_entity']) &&
+            isset($config['sensors'][$measured_class]['ignore_shutdown']) && $config['sensors'][$measured_class]['ignore_shutdown'])
+        {
+          $measured_entity = get_entity_by_id_cache($measured_class, $sensor_db['measured_entity']);
+          print_debug_vars($measured_entity);
+          // Currently only for ports
+          if (isset($measured_entity['ifAdminStatus']) && $measured_entity['ifAdminStatus'] === 'down')
+          {
+            $sensor_poll['sensor_event']  = 'ignore';
+            $sensor_poll['sensor_status'] = 'Sensor critical thresholds exceeded, but ignored.';
+          }
+        }
       }
-      elseif ($sensor_poll['sensor_event'] == 'warning')
+      elseif ($sensor_poll['sensor_event'] === 'warning')
       {
         $sensor_poll['sensor_status'] = 'Sensor warning thresholds exceeded.';
       } else {
@@ -895,7 +863,7 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
       }
 
       // Reset Alert if sensor ignored
-      if ($sensor_poll['sensor_event'] != 'ok' && $sensor_db['sensor_ignore'])
+      if ($sensor_poll['sensor_event'] !== 'ok' && $sensor_db['sensor_ignore'])
       {
         $sensor_poll['sensor_event'] = 'ignore';
         $sensor_poll['sensor_status'] = 'Sensor thresholds exceeded, but ignored.';
@@ -913,7 +881,7 @@ function poll_sensor($device, $class, $unit, &$oid_cache)
       // Sensor event changed, log and set sensor_last_change
       $sensor_poll['sensor_last_change'] = $sensor_polled_time;
 
-      if ($sensor_db['sensor_event'] == 'ignore')
+      if ($sensor_db['sensor_event'] === 'ignore')
       {
         print_message("[%ySensor Ignored%n]", 'color');
       }
@@ -1014,7 +982,8 @@ function parse_ipmitool_sensor($device, $results, $source = 'ipmi')
     $index++;
 
     # BB +1.1V IOH     | 1.089      | Volts      | ok    | na        | 1.027     | 1.054     | 1.146     | 1.177     | na
-    list($desc,$current,$unit,$state,$low_nonrecoverable,$limit_low,$limit_low_warn,$limit_high_warn,$limit_high,$high_nonrecoverable) = explode('|',$row);
+    # Fan5             | 0.000      | RPM        | nr    | 200.000   | 300.000   | 400.000   | na        | na        | na
+    list($desc, $current, $unit, $state, $low_nonrecoverable, $limit_low, $limit_low_warn, $limit_high_warn, $limit_high, $high_nonrecoverable) = explode('|', $row);
 
     // Trim values
     $current = trim($current);
@@ -1023,12 +992,71 @@ function parse_ipmitool_sensor($device, $results, $source = 'ipmi')
     $desc    = trim($desc);
     if ($current != "na" && $state != "nr")
     {
-      if (isset($config['ipmi_unit'][$unit]))
+      if ($unit == 'discrete')
       {
+        // Statuses
+        if (!$config['ipmi_unit']['discrete'])
+        {
+          print_debug("Discrete statuses disabled.");
+          continue;
+        }
+        print_warning("Discrete statuses support is very unstable!");
+
+        $options = [];
+        $ipmi_state = hexdec($state) + 0;
+        print_debug("Descr: $desc, Current: $current, State: $state ($ipmi_state), Unit: $unit");
+
+        // 0 - fail, 1 - ok
+        switch ($current)
+        {
+          // Intrusion        | 0x0        | discrete   | 0x0100| na        | na        | na        | na        | na        | na
+          // Power Supply     | 0x0        | discrete   | 0x0000| na        | na        | na        | na        | na        | na
+          // PS1 Status       | 0x1        | discrete   | 0x0100| na        | na        | na        | na        | na        | na
+          // PS2 Status       | 0x1        | discrete   | 0x0100| na        | na        | na        | na        | na        | na
+
+          case '0x0':
+            $state = in_array($state, [ '0x0000', '0x01ff' ]) ? 1 : 0;
+            break;
+          case '0x1':
+            $state = in_array($state, [ '0x0000', '0x01ff' ]) ? 0 : 1;
+            break;
+        }
+
+        if (str_istarts($desc, [ 'chassis', 'intrusion' ]))
+        {
+          // Chassis
+          $options = array('entPhysicalClass' => 'chassis');
+          //$state = ($state === '0x0000') ? 1 : 0;
+        }
+        elseif (str_istarts($desc, [ 'ps', 'power supply' ]))
+        {
+          // Power Supply
+          $options = array('entPhysicalClass' => 'powersupply');
+          //$state = in_array($state, [ '0x0000', '0x01ff' ]) ? 1 : 0;
+        } else {
+          // All others
+          $options = array('entPhysicalClass' => 'other');
+          //$state = ($state === '0x0000') ? 1 : 0;
+        }
+
+        $state_type = $source == 'ipmi' ? 'ipmi-state' : 'unix-agent-state';
+        discover_status($device, '', $index, $state_type, $desc, $state, $options, $source);
+        $ipmi_sensors['state'][$state_type][$index] = ['description' => $desc, 'current' => $state, 'index' => $index];
+      }
+      elseif (isset($config['ipmi_unit'][$unit]))
+      {
+        print_debug("Descr: $desc, Current: $current, State: $state, Unit: $unit");
         // Numeric sensors
         $class = $config['ipmi_unit'][$unit];
+        if ($class == 'capacity')
+        {
+          if (str_istarts($desc, [ 'fan' ]))
+          {
+            $class = 'load';
+          }
+        }
         $options = [];
-        foreach (['limit_high', 'limit_low', 'limit_high_warn', 'limit_low_warn'] as $limit)
+        foreach ([ 'limit_high', 'limit_low', 'limit_high_warn', 'limit_low_warn' ] as $limit)
         {
           $limit_value = trim($$limit);
           if (is_numeric($limit_value))
@@ -1036,42 +1064,10 @@ function parse_ipmitool_sensor($device, $results, $source = 'ipmi')
             $options[$limit] = $limit_value;
           }
         }
-        if ($unit == 'CFM')
-        {
-          // Convert imperial airflow value to CMM
-          //$options['sensor_unit'] = $unit;
-        }
+
         discover_sensor($class, $device, '', $index, $source, $desc, 1, $current, $options, $source);
 
         $ipmi_sensors[$class][$source][$index] = ['description' => $desc, 'current' => $current, 'index' => $index, 'unit' => $unit];
-      }
-      elseif ($unit == 'discrete')
-      {
-        // Statuses
-        # Intrusion        | 0x0        | discrete   | 0x0100| na        | na        | na        | na        | na        | na
-        # Power Supply     | 0x0        | discrete   | 0x0000| na        | na        | na        | na        | na        | na
-        $options = [];
-        $ipmi_state = hexdec($state) + 0;
-
-        if (str_istarts($desc, ['chassis', 'intrusion']))
-        {
-          // Chassis
-          $options = array('entPhysicalClass' => 'chassis');
-          $state = ($ipmi_state === 0x0000) ? 1 : 0;
-        }
-        elseif (str_istarts($desc, ['ps', 'power supply']))
-        {
-          // Power Supply
-          $options = array('entPhysicalClass' => 'powersupply');
-          $state = in_array($ipmi_state, [0x0100, 0x01ff]) ? 1 : 0;
-        } else {
-          // All others
-          $options = array('entPhysicalClass' => 'other');
-          $state = ($ipmi_state === 0x0000) ? 1 : 0;
-        }
-
-        discover_status($device, '', $index, 'unix-agent-state', $desc, $state, $options, $source);
-        $ipmi_sensors['state']['unix-agent-state'][$index] = ['description' => $desc, 'current' => $state, 'index' => $index];
       }
     }
   }
@@ -1086,15 +1082,20 @@ function get_sensor_rrd($device, $sensor)
   global $config;
 
   # For IPMI/agent, sensors tend to change order, and there is no index, so we prefer to use the description as key here.
-  if ($config['os'][$device['os']]['sensor_descr'] || ($sensor['poller_type'] != "snmp" && $sensor['poller_type'] != ''))
+  if ((isset($config['os'][$device['os']]['sensor_descr']) && $config['os'][$device['os']]['sensor_descr']) ||                     // per os definition
+      (isset($config['mibs'][$sensor['sensor_mib']]['sensor_descr']) && $config['mibs'][$sensor['sensor_mib']]['sensor_descr']) || // per mib definition
+      ($sensor['poller_type'] != "snmp" && $sensor['poller_type'] != ''))
   {
-    $rrd_file = "sensor-".$sensor['sensor_class']."-".$sensor['sensor_type']."-".$sensor['sensor_descr'] . ".rrd";
+    $index = $sensor['sensor_descr'];
   } else {
-    // note, in discover_sensor_ng() sensor_type == %mib%-%object%
-    $rrd_file = "sensor-".$sensor['sensor_class']."-".$sensor['sensor_type']."-".$sensor['sensor_index'] . ".rrd";
+    $index = $sensor['sensor_index'];
   }
 
-  return($rrd_file);
+  // note, in discover_sensor_ng() sensor_type == %mib%-%object%
+  $rrd_file = "sensor-" . $sensor['sensor_class'] . "-" . $sensor['sensor_type'] . "-" . $index . ".rrd";
+
+
+  return $rrd_file;
 }
 
 // DOCME needs phpdoc block

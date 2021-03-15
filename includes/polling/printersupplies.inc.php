@@ -54,7 +54,7 @@ foreach ($supply_data as $supply)
         $level = 0;   // Unknown
         break;
       case '-3':
-        $level = 1;   // This is wrong SuppliesLevel (1%), but better than nothing
+        $level = 80;   // This is wrong SuppliesLevel (1%), but better than nothing
         break;
     }
   }

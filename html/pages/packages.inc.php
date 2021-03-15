@@ -117,7 +117,7 @@ foreach (dbFetchRows("SELECT * FROM `packages` WHERE 1 $where GROUP BY `name`", 
     if (empty($vars['name']))
     {
       #if ($first) { $first = false; $middot = ""; } else { $middot = "&nbsp;&nbsp;&middot;&nbsp;&nbsp;"; }
-      $vers[] = generate_tooltip_link('', $version . $dbuild, implode($hosts, '<br />'));
+      $vers[] = generate_tooltip_link('', $version . $dbuild, implode('<br />', $hosts));
     }
     unset($hosts);
   }
@@ -127,7 +127,7 @@ foreach (dbFetchRows("SELECT * FROM `packages` WHERE 1 $where GROUP BY `name`", 
     echo '</tbody>';
     echo '</table>';
   } else {
-    echo implode($vers, ' - ');
+    echo implode(' - ', $vers);
   }
 
   unset($vers);

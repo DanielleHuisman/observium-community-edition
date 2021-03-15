@@ -81,7 +81,7 @@ if ($if_list)
     echo('</td>');
 
     echo('   <td style="width: 150px;" class="strong">' . generate_device_link($port) . '</td>
-             <td style="width: 150px;" class="strong">' . generate_port_link($port, short_ifname($port['ifDescr'])) . '</td>
+             <td style="width: 150px;" class="strong">' . generate_port_link_short($port) . '</td>
              <td style="width: 75px;">'.$port['port_descr_speed'].'</td>
              <td style="width: 150px;">'.$port['port_descr_circuit'].'</td>
              <td>'.$port['port_descr_notes'].'</td>');

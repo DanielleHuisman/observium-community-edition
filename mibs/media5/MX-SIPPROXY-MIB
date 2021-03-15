@@ -1,0 +1,1476 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-SIPPROXY-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxActivationState,
+        MxIpHostName,
+        MxIpAddress,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpSubnetMask,
+        MxDigitMap
+    FROM MX-TC
+        MxUInt64,
+        MxFloat32,
+        MxIpHostNamePort,
+        MxIpAddr,
+        MxIpAddrPort,
+        MxIpAddrMask,
+        MxUri,
+        MxUrl
+    FROM MX-TC2
+        mediatrixServices
+    FROM MX-SMI2;
+
+sipProxyMIB MODULE-IDENTITY
+ LAST-UPDATED   "1910210000Z"
+ ORGANIZATION " Mediatrix Telecom, Inc. "
+ CONTACT-INFO " Mediatrix Telecom, Inc.
+                4229, Garlock Street
+                Sherbrooke (Quebec)
+                Canada
+                Phone: (819) 829-8749
+                "
+ DESCRIPTION  " SIP Proxy
+
+                The SIP Proxy (SipProxy) service is used to add local
+                survivability for local endpoints and SIP phones.
+                "
+ ::= { mediatrixServices 4600 }
+
+sipProxyMIBObjects OBJECT IDENTIFIER ::= { sipProxyMIB 1 }
+
+-- ****************************************************************************
+
+-- Group:Status Group
+
+-- ****************************************************************************
+
+statusGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 100 }
+ -- Scalar:MonitoringState
+
+ monitoringState OBJECT-TYPE
+  SYNTAX        INTEGER { destinationIsUp(100) , destinationIsDown(200) ,
+                inactive(300) , unknown(400) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " MonitoringState
+
+                Indicates the current monitoring status. A SIP server is
+                monitored to determine if it is usable. Monitoring is
+                performed through the SIP OPTIONS method.
+
+                  * DestinationIsUp: The destination SIP server correctly
+                    responds and is considered to be alive.
+                  * DestinationIsDown: The destination SIP server fails to
+                    correctly respond. The destination SIP server is
+                    considered to be down.
+                  * Inactive: The monitoring is not in use.
+                  * Unknown: The initial response to monitoring has not yet
+                    been received. This is the initial state when monitoring
+                    is used.
+
+                "
+  ::= { statusGroup 100 }
+
+ -- Scalar:ProxyStatus
+
+ proxyStatus OBJECT-TYPE
+  SYNTAX        INTEGER { starting(100) , running(200) ,
+                runningInSurvivability(300) , stopping(400) ,
+                errorPortAlreadyInUse(500) ,
+                errorWaitingForTimeSynchronization(600) , errorInternal(700) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " ProxyStatus
+
+                The SipProxy service current status.
+
+                  * Starting: The SIP proxy is starting: it cannot listen for
+                    incoming SIP traffic or send SIP traffic.
+                  * Running: The SIP proxy acts in transparent mode: it does
+                    not respond to REGISTER requests and it transparently
+                    forwards SIP messages to their normal routes. Registration
+                    Throttling can be activated in that state.
+                  * RunningInSurvivability: The SIP proxy acts in
+                    survivability mode: it responds to REGISTER requests and
+                    it routes SIP messages.
+                  * Stopping: The SIP proxy is stopping: it cannot listen for
+                    incoming SIP traffic or send SIP traffic.
+                  * ErrorPortAlreadyInUse: The SIP proxy cannot open its IP
+                    port because the port is already used by a SIP gateway.
+                  * ErrorWaitingForTimeSynchronization: The SIP proxy is
+                    started but it cannot open the SIP TLS port because the
+                    real-time clock is not synchronised. This generally occurs
+                    when the SNTP server is not set or is unreachable.
+                  * ErrorInternal: The SIP proxy cannot start because of an
+                    internal error. Refer to the release notes or contact a
+                    technical support specialist.
+
+                "
+  ::= { statusGroup 200 }
+
+ -- Scalar:Number of Active Calls
+
+ nbActiveCalls OBJECT-TYPE
+  SYNTAX        Unsigned32
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Number of Active Calls
+
+                The number of active calls currently handled by the SIP proxy.
+
+                The maximum number of active calls is platform-dependent.
+
+                "
+  ::= { statusGroup 250 }
+
+ -- ***************************************************************************
+ 
+ -- Table:TLS Persistent Connection Status
+
+ -- ***************************************************************************
+ 
+ tlsPersistentConnectionStatusTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF TlsPersistentConnectionStatusEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " TLS Persistent Connection Status
+
+                This table holds the status of the TLS persistent connections.
+                "
+  ::= { statusGroup 300 }
+  tlsPersistentConnectionStatusEntry OBJECT-TYPE
+   SYNTAX        TlsPersistentConnectionStatusEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table TLS Persistent Connection Status. "
+   INDEX         {
+                   tlsPersistentConnectionStatusId
+                 }
+
+   ::= { tlsPersistentConnectionStatusTable 1 }
+
+  TlsPersistentConnectionStatusEntry ::= SEQUENCE
+  {
+    tlsPersistentConnectionStatusId               Unsigned32,
+    tlsPersistentConnectionStatusLocalPort        MxAdvancedIpPort,
+    tlsPersistentConnectionStatusRemoteHost       OCTET STRING,
+    tlsPersistentConnectionStatusRemoteHostIpAddr OCTET STRING,
+    tlsPersistentConnectionStatusState            INTEGER
+  }
+
+  -- Index:Index
+
+  tlsPersistentConnectionStatusId OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Index
+
+                 Unique identifier of the row.
+                 "
+   ::= { tlsPersistentConnectionStatusEntry 100 }
+
+  -- Columnar:Local Port
+
+  tlsPersistentConnectionStatusLocalPort OBJECT-TYPE
+   SYNTAX        MxAdvancedIpPort
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Local Port
+
+                 Local port used by the TLS persistent connection.
+                 "
+   ::= { tlsPersistentConnectionStatusEntry 300 }
+
+  -- Columnar:Remote Host
+
+  tlsPersistentConnectionStatusRemoteHost OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Remote Host
+
+                 The remote host used to establish the TLS persistent
+                 connection. The remote host can be a host name or an IP
+                 address of the proxy, outbound proxy, or registrar.
+                 "
+   ::= { tlsPersistentConnectionStatusEntry 400 }
+
+  -- Columnar:Remote Host Ip Address
+
+  tlsPersistentConnectionStatusRemoteHostIpAddr OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Remote Host Ip Address
+
+                 The resolved IP address of the remote host used to establish
+                 the TLS persistent connection.
+                 "
+   ::= { tlsPersistentConnectionStatusEntry 450 }
+
+  -- Columnar:State
+
+  tlsPersistentConnectionStatusState OBJECT-TYPE
+   SYNTAX        INTEGER { up(100) , down(200) , waitingShutdown(300) ,
+                 waitingUp(400) }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " State
+
+                 The current state of the TLS persistent connection.
+
+                   * Up: The TLS connection is established and ready to be
+                     used.
+                   * Down: The TLS connection is not established.
+                   * WaitingShutdown: The TLS connection is established but in
+                     a graceful shutdown.
+                   * WaitingUp: The TLS connection is established but not yet
+                     ready to be used.
+
+                 "
+   ::= { tlsPersistentConnectionStatusEntry 500 }
+
+ -- End of table:TLS Persistent Connection Status
+
+-- End of group:Status Group
+
+-- ****************************************************************************
+
+-- Group:Proxy Group
+
+-- ****************************************************************************
+
+proxyGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 200 }
+ -- Scalar:Survivability Mode
+
+ survivabilityMode OBJECT-TYPE
+  SYNTAX        INTEGER { automatic(100) , alwaysOn(200) , disabled(300) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Survivability Mode
+
+                Survivability mode executed by the SIP proxy.
+
+                  * Automatic: The SIP proxy applies the normal survivability
+                    strategy, i.e. it uses monitoring to determine if the SIP
+                    server is up or down.
+                  * AlwaysOn: The SIP proxy always acts as if the SIP server
+                    is down. Useful for debugging.
+                  * Disabled: The SIP proxy always acts as if the SIP server
+                    is up. Useful for debugging.
+
+                Note that this parameter does not affect whether monitoring is
+                performed or not.
+
+                "
+  DEFVAL        { automatic }
+  ::= { proxyGroup 100 }
+
+ -- Scalar:Configuration Modified Status
+
+ configModifiedStatus OBJECT-TYPE
+  SYNTAX        INTEGER { yes(100) , no(200) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Configuration Modified Status
+
+                Indicates that some configuration changes need the
+                ApplyConfiguration command to be executed in order to take
+                effect or to be validated. Restarting the service will also
+                apply these changes.
+
+                  * Yes: The configuration has been modified but has not been
+                    applied.
+                  * No: The configuration has not been modified.
+
+                Use the ApplyConfiguration command to apply the configuration.
+
+                "
+  ::= { proxyGroup 300 }
+
+ -- Scalar:Configuration Applied Status
+
+ configAppliedStatus OBJECT-TYPE
+  SYNTAX        INTEGER { yes(100) , no(200) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Configuration Applied Status
+
+                Indicates that the configuration changes were applied or not.
+
+                  * Yes: Configuration changes were applied successfully.
+                  * No: Configuration changes not applied because of errors.
+
+                "
+  ::= { proxyGroup 400 }
+
+-- End of group:Proxy Group
+
+-- ****************************************************************************
+
+-- Group:Network Group
+
+-- ****************************************************************************
+
+networkGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 300 }
+ -- Scalar:Network Interface
+
+ networkInterface OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(1..50) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Network Interface
+
+                The network on which the SIP proxy listens for incoming SIP
+                traffic and sends SIP traffic.
+                "
+  DEFVAL        { "Uplink" }
+  ::= { networkGroup 100 }
+
+ -- Scalar:SIP Port
+
+ port OBJECT-TYPE
+  SYNTAX        MxAdvancedIpPort
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " SIP Port
+
+                Port on which the SIP proxy listens for incoming unsecure SIP
+                traffic.
+
+                This is used only when UDP and/or TCP transports are enabled.
+
+                If set to 0, the unit uses the default SIP port.
+
+                "
+  DEFVAL        { 0 }
+  ::= { networkGroup 200 }
+
+ -- Scalar:SIP Secure Port
+
+ securePort OBJECT-TYPE
+  SYNTAX        MxAdvancedIpPort
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " SIP Secure Port
+
+                Port on which the SIP proxy listens for incoming secure SIP
+                traffic.
+
+                This is used only when the TLS transport is enabled.
+
+                If set to 0, the unit uses the default SIP secure port.
+
+                "
+  DEFVAL        { 0 }
+  ::= { networkGroup 300 }
+
+-- End of group:Network Group
+
+-- ****************************************************************************
+
+-- Group:Register Group
+
+-- ****************************************************************************
+
+registerGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 400 }
+ -- Scalar:Register Contact Override
+
+ contactOverrideEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Register Contact Override
+
+                Defines if the SIP proxy should modify the Contact header of
+                REGISTER requests.
+
+                  * Disabled: Act as a transparent proxy. Generally not
+                    recommended in TLS.
+                  * Enabled: Modify the Contact header of REGISTER requests
+                    with the IP address and port of the proxy, so inbound
+                    requests are routed back to the proxy. Also adds an alias
+                    in the Contact URI for tracking purposes.
+
+                "
+  DEFVAL        { enable }
+  ::= { registerGroup 50 }
+
+ -- Scalar:Endpoint Survivability Expiration
+
+ endpointSurvivabilityExpiration OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 10..86400 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Endpoint Survivability Expiration
+
+                Configures the maximum registration expiration delay, i.e. the
+                EXPIRES value returned by the SIP proxy registrar in the 200
+                OK responses.
+
+                This value is expressed in seconds (s).
+
+                This parameter applies only when the survivability mode is
+                active, when the SIP proxy's internal registrar replies to the
+                REGISTER requests.
+
+                  * If the value included in the REGISTER is lower or equal to
+                    the value of this parameter, the value included in the
+                    REGISTER is used.
+                  * Otherwise, the value defined by the
+                    EndpointSurvivabilityExpiration parameter is used.
+
+                Note: Using expiration values smaller than 32 seconds may
+                cause conflicts with the SIP retransmission timeouts. It is
+                not recommended to use expiration values smaller than 32
+                seconds unless the network environment requires very few
+                retransmissions or the retransmission timeouts of the devices
+                are set to short values.
+
+                "
+  DEFVAL        { 90 }
+  ::= { registerGroup 100 }
+
+ -- Scalar:Relayed Throttling Expiration
+
+ relayedThrottlingExpiration OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..0 | 10..86400 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Relayed Throttling Expiration
+
+                Configures the expiration value in the REGISTERs relayed to
+                the external registrar when Registration Throttling is used.
+
+                This value is expressed in seconds (s).
+
+                A value of 0 has the effect proposing no expiration value to
+                the registrar during Registration Throttling. Any expiration
+                value present in the REGISTER is removed before relaying it to
+                the registrar.
+
+                The value of the RelayedThrottlingExpiration should be at
+                least twice the value of the EndpointThrottlingExpiration
+                parameter otherwise Registration Throttling is ineffective.
+
+                The expiration value returned by the registrar in the 200 OK
+                response always has precedence over the expiration value that
+                we propose in the REGISTER requests sent to the registrar
+
+                Note: Using expiration values smaller than 32 seconds may
+                cause conflicts with the SIP retransmission timeouts. It is
+                not recommended to use expiration values smaller than 32
+                seconds unless the network environment requires very few
+                retransmissions or the retransmission timeouts of the devices
+                are set to short values.
+
+                "
+  DEFVAL        { 0 }
+  ::= { registerGroup 200 }
+
+ -- Scalar:Endpoint Throttling Expiration
+
+ endpointThrottlingExpiration OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..0 | 10..3600 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Endpoint Throttling Expiration
+
+                Configures the maximum registration expiration on the endpoint
+                side when Registration Throttling is used.
+
+                This value is expressed in seconds (s).
+
+                A value of 0 disables Registration Throttling.
+
+                The value of the RelayedThrottlingExpiration should be at
+                least twice the value of the EndpointThrottlingExpiration
+                parameter otherwise Registration Throttling is ineffective.
+
+                This parameter applies only when the Registration Throttling
+                replies to REGISTER requests.
+
+                  * If the expiration value included in the REGISTER is lower
+                    or equal to the value of this parameter, the value
+                    included in the REGISTER is used.
+                  * Otherwise, the value defined by the
+                    EndpointThrottlingExpiration parameter is used.
+                  * The expiration value returned by the registrar in the 200
+                    OK has no impact on the expiration used on the endpoint
+                    side.
+
+                Note: Using expiration values smaller than 32 seconds may
+                cause conflicts with the SIP retransmission timeouts. It is
+                not recommended to use expiration values smaller than 32
+                seconds unless the network environment requires very few
+                retransmissions or the retransmission timeouts of the devices
+                are set to short values.
+
+                "
+  DEFVAL        { 120 }
+  ::= { registerGroup 300 }
+
+ -- ***************************************************************************
+ 
+ -- Group:Registration Cache Group
+
+ -- ***************************************************************************
+ 
+ registrationCacheGroup OBJECT IDENTIFIER
+  ::= { registerGroup 400 }
+  -- Scalar:Registration Cache Search Name
+
+  registrationCacheSearchName OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Registration Cache Search Name
+
+                 The name pattern to search in Aor and Contact from the
+                 registration database used to populate the
+                 RegistrationCacheSearchResult table when using the
+                 SearchRegistration command.
+                 "
+   ::= { registrationCacheGroup 100 }
+
+  -- Scalar:Registration Cache Search Sort
+
+  registrationCacheSearchSort OBJECT-TYPE
+   SYNTAX        INTEGER { aor(100) , contact(200) , receivedTime(300) ,
+                 endpointExpiration(400) , registrarExpiration(500) , unsorted
+                 (1000) }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Registration Cache Search Sort
+
+                 The sort order applied to RegistrationCacheSearchResult table
+                 when using the SearchRegistration command.
+
+                   * Aor: Address of record in the REGISTER.
+                   * Contact: Contact in the REGISTER.
+                   * ReceivedTime: Time at which the registration was received.
+                   * EndpointExpiration: Time at which the endpoint-side
+                     registration expires.
+                   * RegistrarExpiration: Time at which the registrar-side
+                     registration expires.
+                   * Unsorted: Internal cache order.
+
+                 "
+   DEFVAL        { receivedTime }
+   ::= { registrationCacheGroup 200 }
+
+  -- ***************************************************************************
+  
+  -- Table:Registration Cache Search Result
+
+  -- ***************************************************************************
+  
+  registrationCacheSearchResultTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF RegistrationCacheSearchResultEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " Registration Cache Search Result
+
+                 This table contains the registration cache entries filtered by
+                 the SearchRegistrationCache command.
+                 "
+   ::= { registrationCacheGroup 300 }
+   registrationCacheSearchResultEntry OBJECT-TYPE
+    SYNTAX        RegistrationCacheSearchResultEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Registration Cache Search Result. "
+    INDEX         {
+                    registrationCacheSearchResultId
+                  }
+
+    ::= { registrationCacheSearchResultTable 1 }
+
+   RegistrationCacheSearchResultEntry ::= SEQUENCE
+   {
+     registrationCacheSearchResultId                  Unsigned32,
+     registrationCacheSearchResultAor                 OCTET STRING,
+     registrationCacheSearchResultContact             OCTET STRING,
+     registrationCacheSearchResultReceivedTime        OCTET STRING,
+     registrationCacheSearchResultEndpointExpiration  OCTET STRING,
+     registrationCacheSearchResultRegistrarExpiration OCTET STRING,
+     registrationCacheSearchResultRegisteredTo        INTEGER
+   }
+
+   -- Index:Id
+
+   registrationCacheSearchResultId OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Id
+
+                  Unique numerical identifier for a registration search result.
+                  "
+    ::= { registrationCacheSearchResultEntry 100 }
+
+   -- Columnar:Address of Record
+
+   registrationCacheSearchResultAor OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Address of Record
+
+                  The Address of Record, in URI format, present in the
+                  REGISTER.
+
+                  For example: sip:alice@example.com
+
+                  This value is taken from the REGISTER.
+
+                  "
+    ::= { registrationCacheSearchResultEntry 200 }
+
+   -- Columnar:
+
+   registrationCacheSearchResultContact OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION "
+
+                  The Contact, in URI format, present in the REGISTER.
+
+                  For example: sip:5551212@192.168.11.23:5060
+
+                  This value is taken from the REGISTER.
+
+                  "
+    ::= { registrationCacheSearchResultEntry 300 }
+
+   -- Columnar:Received Time
+
+   registrationCacheSearchResultReceivedTime OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Received Time
+
+                  Time at which the registration was received. Expressed as the
+                  local time computed from the Time Zone defined in the
+                  Hoc.StaticTimeZone parameter.
+
+                  Format is DD/MM/YYYY hh:mm:ss
+
+                  "
+    ::= { registrationCacheSearchResultEntry 400 }
+
+   -- Columnar:Endpoint Expiration
+
+   registrationCacheSearchResultEndpointExpiration OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Endpoint Expiration
+
+                  Time at which the registration expires on the endpoint side.
+                  Expressed as a local time computed from the Time Zone defined
+                  in the Hoc.StaticTimeZone parameter.
+
+                  Format is DD/MM/YYYY hh:mm:ss
+
+                  The expiration time of the endpoint side can differ from the
+                  expiration time of the registrar side. This happens:
+
+                    * if Registration Throttling is enabled and the expiration
+                      delay is shorter on the endpoint side, or
+                    * if the system is in survivability.
+
+                  "
+    ::= { registrationCacheSearchResultEntry 500 }
+
+   -- Columnar:RegistrarEndpoint Expiration
+
+   registrationCacheSearchResultRegistrarExpiration OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " RegistrarEndpoint Expiration
+
+                  Time at which the registration expires on the registrar side.
+                  Expressed as a local time computed from the Time Zone defined
+                  in the Hoc.StaticTimeZone parameter.
+
+                  Format is DD/MM/YYYY hh:mm:ss
+
+                  The expiration time of the endpoint side can differ from the
+                  expiration time of the registrar side. This happens:
+
+                    * if Registration Throttling is enabled, where the
+                      expiration delay is shorter on the endpoint side, or
+                    * if the system is in survivability.
+
+                  When the SipProxy service state switches to
+                  RunningInSurvivability, all the registrations on the
+                  registrar side are overridden at the time the switch
+                  occurred. This ensures that endpoint registrations are
+                  quickly refreshed on the registrar side after the system
+                  exits from survivability mode.
+
+                  "
+    ::= { registrationCacheSearchResultEntry 550 }
+
+   -- Columnar:Registered To
+
+   registrationCacheSearchResultRegisteredTo OBJECT-TYPE
+    SYNTAX        INTEGER { normal(100) , local(200) }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Registered To
+
+                  Registrar that handled the registration.
+
+                    * Normal: The registration was forwarded to the normal
+                      registrar.
+                    * Local: The registration was handled by the local
+                      registrar.
+
+                  "
+    ::= { registrationCacheSearchResultEntry 600 }
+
+  -- End of table:Registration Cache Search Result
+
+  -- Scalar:Total Registration Cache Count
+
+  totalRegistrationCacheCount OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Total Registration Cache Count
+
+                 The total number of registrations cached by the SipProxy
+                 service. This number also includes the registrations in
+                 progress but not yet completed.
+                 "
+   ::= { registrationCacheGroup 400 }
+
+ -- End of group:Registration Cache Group
+
+-- End of group:Register Group
+
+-- ****************************************************************************
+
+-- Group:Monitoring Group
+
+-- ****************************************************************************
+
+monitoringGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 500 }
+ -- Scalar:Monitoring Interval
+
+ monitoringInterval OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..3600 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Monitoring Interval
+
+                Interval at which monitoring requests are sent to verify the
+                SIP server status.
+
+                This value is expressed in seconds (s).
+
+                SIP OPTIONS are sent periodically to the monitored SIP server.
+
+                The SIP server is considered unreachable if one of these
+                conditions occurs:
+
+                  * No response is received after the retransmission timer
+                    expires (configurable via the
+                    InteropRequestTransactionTimeout parameter).
+                  * The response code received is listed in the
+                    KeepAliveOptionErrorCodes parameter.
+
+                When the SIP server is considered unreachable, the
+                survivability mode enters its active state. Monitoring is
+                still performed when the SIP server is unreachable and as soon
+                as it becomes reachable again, the survivability mode becomes
+                inactive.
+
+                Setting this parameter to 0 disables the monitoring.
+
+                "
+  DEFVAL        { 30 }
+  ::= { monitoringGroup 100 }
+
+ -- Scalar:Monitoring Toggle Delay
+
+ monitoringToggleDelay OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..3600 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Monitoring Toggle Delay
+
+                Delay before reporting a status change of the monitored
+                destination.
+
+                This value is expressed in seconds (s).
+
+                Monitoring must succeed or fail for at least this duration to
+                conclude that the state of monitoring has changed (toggled).
+
+                Delay measurement is reset each time the result of a
+                monitoring attempt is obtained that reconfirms the current
+                state of monitoring.
+
+                "
+  DEFVAL        { 0 }
+  ::= { monitoringGroup 200 }
+
+ -- Scalar:Monitoring Destination
+
+ monitoringDestination OBJECT-TYPE
+  SYNTAX        MxIpHostNamePort
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Monitoring Destination
+
+                Destination target. FQDN and port for a specific SIP proxy.
+                "
+  DEFVAL        { "" }
+  ::= { monitoringGroup 300 }
+
+ -- Scalar:KeepAlive Option Error Codes
+
+ keepAliveOptionErrorCodes OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..255) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " KeepAlive Option Error Codes
+
+                Comma-separated list of response codes indicating that the SIP
+                server is down, when monitoring is performed through SIP
+                OPTIONS.
+                "
+  DEFVAL        { "" }
+  ::= { monitoringGroup 400 }
+
+-- End of group:Monitoring Group
+
+-- ****************************************************************************
+
+-- Group:Option Group
+
+-- ****************************************************************************
+
+optionGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 600 }
+ -- Scalar:SIP OPTIONS Method Support
+
+ sipOptionsMethodSupport OBJECT-TYPE
+  SYNTAX        INTEGER { default(100) , acceptAll(200) , rejectAll(300) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " SIP OPTIONS Method Support
+
+                Determines the behaviour of the SIP proxy when answering a SIP
+                OPTIONS request.
+
+                  * Default: The SIP proxy responds with a 200 OK only if the
+                    SIP proxy is the destination of the OPTIONS request
+                    regardless of the other content. If the SIP proxy is not
+                    the destination, the OPTIONS request is forwarded.
+                  * AcceptAll: The SIP proxy accepts all OPTIONS requests and
+                    responds with a 200 OK, regardless of the content and
+                    destination.
+                  * RejectAll: The SIP proxy rejects all OPTIONS requests and
+                    responds with an error 405 Method Not Allowed.
+
+                "
+  DEFVAL        { default }
+  ::= { optionGroup 100 }
+
+-- End of group:Option Group
+
+-- ****************************************************************************
+
+-- Group:Routing Group
+
+-- ****************************************************************************
+
+routingGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 700 }
+ -- ***************************************************************************
+ 
+ -- Table:Route
+
+ -- ***************************************************************************
+ 
+ routeTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF RouteEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " Route
+
+                This table contains the routes that can be applied by the SIP
+                proxy. Each table entry is a route. When a SIP request must be
+                routed, the table is searched in decreasing priority order to
+                find the first matching route. A route is selected when the
+                criteria defined by CriteriaType and CriteriaExpression
+                parameters matches.
+
+                "
+  ::= { routingGroup 100 }
+  routeEntry OBJECT-TYPE
+   SYNTAX        RouteEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table Route. "
+   INDEX         {
+                   routeId
+                 }
+
+   ::= { routeTable 1 }
+
+  RouteEntry ::= SEQUENCE
+  {
+    routeId                               Unsigned32,
+    routePriority                         Unsigned32,
+    routeCriteriaType                     INTEGER,
+    routeCriteriaExpression               OCTET STRING,
+    routeTargetType                       INTEGER,
+    routeTargetUserTransformationName     OCTET STRING,
+    routeRegisteredUserTransformationName OCTET STRING,
+    routeHardcodedHostPort                MxIpHostNamePort,
+    routeConfigStatus                     INTEGER,
+    routeDelete                           INTEGER
+  }
+
+  -- Index:Id
+
+  routeId OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Id
+
+                 Unique numerical identifier for a routing rule.
+                 "
+   ::= { routeEntry 100 }
+
+  -- Columnar:Priority
+
+  routePriority OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Priority
+
+                 Priority used to determine search order in the table when
+                 routing is executed.
+                 "
+   DEFVAL        { 1 }
+   ::= { routeEntry 200 }
+
+  -- Columnar:Configuration Status
+
+  routeConfigStatus OBJECT-TYPE
+   SYNTAX        INTEGER { valid(100) , priorityDuplicate(200) ,
+                 missingHardcodedHostport(300) ,
+                 inexistentTargetUserTransformation(400) ,
+                 inexistentRegisteredUserTransformation(500) , invalid(600) }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Configuration Status
+
+                 Indicates if the configuration of this row is valid.
+
+                   * Valid: The current content of the row is valid.
+                   * PriorityDuplicate: Two or more entries have the same
+                     priority.
+                   * MissingHardcodedHostport: The TargetType parameter is set
+                     to 'HardcodedHost' but the HardcodedHostPort parameter is
+                     not configured.
+                   * InexistentTargetUserTransformation: The
+                     TargetUserTransformationName parameter refers to an
+                     inexistent transformation.
+                   * InexistentRegisteredUserTransformation: The
+                     RegisteredUserTransformationName parameter refers to an
+                     inexistent transformation.
+                   * Invalid: The current content of the row is invalid.
+
+                 "
+   ::= { routeEntry 2000 }
+
+  -- Row command:Delete
+
+  routeDelete OBJECT-TYPE
+   SYNTAX        INTEGER { noOp(0), delete(10) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Delete
+
+                 Deletes this row.
+                 "
+   DEFVAL        { noOp }
+   ::= { routeEntry 2100 }
+
+  -- Columnar:Criteria Type
+
+  routeCriteriaType OBJECT-TYPE
+   SYNTAX        INTEGER { toUri(100) , toUser(200) , toHost(300) , contactUri
+                 (400) , contactUser(500) , contactHost(600) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Criteria Type
+
+                 Type of criteria used to match the routing rule against the
+                 SIP message.
+
+                   * ToUri: The full URI of the TO header.
+                   * ToUser: The user part of the URI in the TO header.
+                   * ToHost: The host part of the URI in the TO header.
+                   * ContactUri: The full URI of the CONTACT header.
+                   * ContactUser: The user part of the URI in the CONTACT
+                     header.
+                   * ContactHost: The host part of the URI in the CONTACT
+                     header.
+
+                 "
+   DEFVAL        { toUser }
+   ::= { routeEntry 300 }
+
+  -- Columnar:Expression Criteria
+
+  routeCriteriaExpression OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..255) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Expression Criteria
+
+                 Regular expression compared with the value of the Criteria
+                 Type found in the SIP message. If it matches, the route
+                 defined by this table entry is used.
+
+                 The regular expression is implicitly searched from the
+                 beginning of the searched string. The regular expression must
+                 not contain the begin string character (^).
+
+                 The special syntax %gateway=gw_name% can be used to refer to
+                 an internal gateway. The gw_name refers to the gateway name
+                 as it appears in the SipEp.Gateway.Name parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { routeEntry 400 }
+
+  -- Columnar:Target Type
+
+  routeTargetType OBJECT-TYPE
+   SYNTAX        INTEGER { registeredAor(100) , registeredAorUser(200) ,
+                 hardcodedHost(300) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Target Type
+
+                 Type of target used by the route.
+
+                   * RegisteredAor: Routing is based on the registration
+                     database. Entries with an AOR matching the Request-URI
+                     (R-URI) of the SIP request are looked up in the database.
+                     Matching is based on the full AOR.
+                   * RegisteredAorUser: Routing is based on the registration
+                     database. Entries with an AOR matching the R-URI of the
+                     SIP request are looked up in the database. Matching is
+                     based on the user portion of the AOR.
+                   * HardcodedHost: The SIP request is routed to the host
+                     defined by the HardcodedHostPort parameter. The use of a
+                     specific phone number can also be forced by using the
+                     transformation specified by the
+                     Route.TargetUserTransformationName parameter. When this
+                     option is selected, the
+                     Route.RegisteredUserTransformationName parameter is not
+                     used.
+
+                 "
+   DEFVAL        { registeredAorUser }
+   ::= { routeEntry 500 }
+
+  -- Columnar:Target User Transformation Name
+
+  routeTargetUserTransformationName OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..255) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Target User Transformation Name
+
+                 Name of the transformation in the UserTransformations table.
+                 This transformation is applied to the user part of the target
+                 Request-URI (R-URI) in the SIP request. This transformation
+                 allows modifying the user part of the R-URI in a SIP request
+                 forwarded by the router. This parameter can be used to modify
+                 a phone number: add/remove a regional code, add a prefix, add
+                 a suffix, ...
+
+                 "
+   DEFVAL        { "" }
+   ::= { routeEntry 600 }
+
+  -- Columnar:Registered User Transformation Name
+
+  routeRegisteredUserTransformationName OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..255) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Registered User Transformation Name
+
+                 Name of a transformation in the UserTransformations table.
+                 This transformation is used during the registration database
+                 lookup, to normalise the database entries before checking for
+                 matches. The transformation is applied to the user part of
+                 the RegistrationStatus.Aor parameter. Only a copy of the
+                 parameter is modified: this transformation does not modify
+                 the content of the RegistrationStatus table.
+
+                 This parameter is ignored when the Route.TargetType parameter
+                 is set to 'HardcodedHost'.
+
+                 "
+   DEFVAL        { "" }
+   ::= { routeEntry 700 }
+
+  -- Columnar:Hardcoded Host and Port
+
+  routeHardcodedHostPort OBJECT-TYPE
+   SYNTAX        MxIpHostNamePort
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Hardcoded Host and Port
+
+                 Hardcoded host that can be used as a target in routes. The
+                 host can be expressed as an IP address or a domain name. The
+                 port is optional. A port value of 0 is interpreted as the
+                 default port.
+
+                 The special %gateway=gw_name% syntax can be used to refer to
+                 an internal gateway. The gw_name refers to the gateway name
+                 as it appears in the SipEp.Gateway.Name parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { routeEntry 800 }
+
+ -- End of table:Route
+
+ -- ***************************************************************************
+ 
+ -- Table:User Transformations table
+
+ -- ***************************************************************************
+ 
+ userTransformationsTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF UserTransformationsEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " User Transformations table
+
+                This table contains the transformations to be applied to a
+                user portion of a URI. The name and the criteria must match to
+                have the transformation applied. There can be multiple entries
+                with the same name. The entries are checked in decreasing
+                priority order and the first entry with matching name and
+                criteria is applied. If no matching entry is found, no
+                transformation is applied and the user stays unmodified.
+                "
+  ::= { routingGroup 300 }
+  userTransformationsEntry OBJECT-TYPE
+   SYNTAX        UserTransformationsEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table User Transformations table. "
+   INDEX         {
+                   userTransformationsId
+                 }
+
+   ::= { userTransformationsTable 1 }
+
+  UserTransformationsEntry ::= SEQUENCE
+  {
+    userTransformationsId           Unsigned32,
+    userTransformationsPriority     Unsigned32,
+    userTransformationsName         OCTET STRING,
+    userTransformationsCriteria     OCTET STRING,
+    userTransformationsPattern      OCTET STRING,
+    userTransformationsConfigStatus INTEGER,
+    userTransformationsDelete       INTEGER
+  }
+
+  -- Index:Id
+
+  userTransformationsId OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Id
+
+                 Unique numerical identifier.
+                 "
+   ::= { userTransformationsEntry 100 }
+
+  -- Columnar:Priority
+
+  userTransformationsPriority OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Priority
+
+                 Priority used to determine search order in the table when
+                 routing is executed. Search order is from lower to higher
+                 priority values.
+
+                 Entries with the same name must have different prioriry
+                 values.
+
+                 "
+   DEFVAL        { 1 }
+   ::= { userTransformationsEntry 200 }
+
+  -- Columnar:Configuration Status
+
+  userTransformationsConfigStatus OBJECT-TYPE
+   SYNTAX        INTEGER { valid(100) , priorityDuplicate(200) , missingName
+                 (300) , invalid(400) }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Configuration Status
+
+                 Indicates if the configuration of this row is valid.
+
+                   * Valid: The current content of the row is valid.
+                   * PriorityDuplicate: Two or more entries with the same name
+                     have the same priority.
+                   * MissingName: The entry must have a name.
+                   * Invalid: The current content of the row is invalid.
+
+                 "
+   ::= { userTransformationsEntry 2000 }
+
+  -- Row command:Delete
+
+  userTransformationsDelete OBJECT-TYPE
+   SYNTAX        INTEGER { noOp(0), delete(10) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Delete
+
+                 Deletes this row.
+                 "
+   DEFVAL        { noOp }
+   ::= { userTransformationsEntry 2100 }
+
+  -- Columnar:Transformation name
+
+  userTransformationsName OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..50) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Transformation name
+
+                 The name of the transformation. There can be several
+                 transformations of the same name. Must match values of
+                 RegisteredUserTransformationName or UserTransformationName
+                 parameters.
+
+                 "
+   DEFVAL        { "" }
+   ::= { userTransformationsEntry 300 }
+
+  -- Columnar:Transformation Criteria
+
+  userTransformationsCriteria OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..250) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Transformation Criteria
+
+                 The criteria to be used in the transformation. If the
+                 criteria does not match, the search in the table continues.
+                 The criteria is a regular expression used for two things:
+
+                   * Matching: If the expression matches, this transformation
+                     is used. If it does not, the search continues for entries
+                     with the same name in the table.
+                   * Creating groups to be used as backreferences in the
+                     pattern expression.
+
+                 The regular expression is implicitly searched from the
+                 beginning of the searched string: the begin string character
+                 (^) must not be used in the regular expression.
+
+                 "
+   DEFVAL        { "" }
+   ::= { userTransformationsEntry 400 }
+
+  -- Columnar:Transformation Pattern
+
+  userTransformationsPattern OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..250) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Transformation Pattern
+
+                 Pattern expression that creates the transformed value. Can
+                 use backreferences to the groups created in the criteria.
+                 "
+   DEFVAL        { "" }
+   ::= { userTransformationsEntry 500 }
+
+ -- End of table:User Transformations table
+
+-- End of group:Routing Group
+
+-- ****************************************************************************
+
+-- Group:Interop Group
+
+-- ****************************************************************************
+
+interopGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 800 }
+ -- Scalar:Request Transaction Timeout
+
+ interopRequestTransactionTimeout OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 1..32 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Request Transaction Timeout
+
+                The transaction timeout for SIP requests. Corresponds to
+                timers B and F in RFC 3261.
+
+                This value applies to:
+
+                  * all requests (INVITE as well as non-INVITE) relayed by the
+                    SipProxy service, and
+                  * the monitoring requests initiated by the SipProxy itself.
+
+                Setting this parameter to a relatively small value is useful
+                in cases where the SipProxy handles a request with an FQDN
+                that resolves to several targets. It gives time to try several
+                targets when the first target(s) do not respond.
+
+                Example: if this parameter is set to 5 seconds and the SIP
+                client that sent a request through the SipProxy has a
+                transaction timeout of 32 seconds, the SipProxy is able to try
+                about 6 targets before the transaction timer of the SIP client
+                expires.
+
+                This parameter is ignored if it has a value larger than the
+                value of the SipEp.InteropTransmissionTimeout parameter.
+
+                This value is expressed in seconds (s).
+
+                "
+  DEFVAL        { 32 }
+  ::= { interopGroup 100 }
+
+-- End of group:Interop Group
+
+-- ****************************************************************************
+
+-- Group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+notificationsGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 60010 }
+ -- Scalar:Minimal Severity of Notification
+
+ minSeverity OBJECT-TYPE
+  SYNTAX        INTEGER { disable(0) , debug(100) , info(200) , warning(300) ,
+                error(400) , critical (500) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Minimal Severity of Notification
+
+                Sets the minimal severity to issue a notification message
+                incoming from this service.
+
+                  * Disable: No notification is issued.
+                  * Debug: All notification messages are issued.
+                  * Info: Notification messages with a 'Informational' and
+                    higher severity are issued.
+                  * Warning: Notification messages with a 'Warning' and higher
+                    severity are issued.
+                  * Error: Notification messages with an 'Error' and higher
+                    severity are issued.
+                  * Critical: Notification messages with a 'Critical' severity
+                    are issued.
+
+                "
+  DEFVAL        { warning }
+  ::= { notificationsGroup 100 }
+
+-- End of group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+-- Group:Configuration Settings
+
+-- ****************************************************************************
+
+configurationGroup OBJECT IDENTIFIER
+ ::= { sipProxyMIBObjects 60020 }
+ -- Scalar:Need Restart
+
+ needRestartInfo OBJECT-TYPE
+  SYNTAX        INTEGER { no(0) , yes(100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Need Restart
+
+                Indicates if the service needs to be restarted for the
+                configuration to fully take effect.
+
+                  * Yes: Service needs to be restarted.
+                  * No: Service does not need to be restarted.
+
+                Services can be restarted by using the
+                Scm.ServiceCommands.Restart command.
+
+                "
+  ::= { configurationGroup 100 }
+
+-- End of group:Configuration Settings
+
+END

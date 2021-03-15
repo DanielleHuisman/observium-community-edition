@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -20,10 +19,10 @@ foreach (dbFetchRows("SELECT * FROM `sensors` WHERE `sensor_class` = ? AND `sens
 
   if (($auth == TRUE || is_entity_permitted($sensor['sensor_id'], 'sensor')) && is_file($rrd_filename))
   {
-    //if (!str_contains($sensor['sensor_descr'], array('Total', 'Printed'))) { continue; } // FIXME, currently show only Total here
-    //if (!str_icontains($sensor['sensor_type'], 'print')) { continue; }
+    //if (!str_exists($sensor['sensor_descr'], array('Total', 'Printed'))) { continue; } // FIXME, currently show only Total here
+    //if (!str_iexists($sensor['sensor_type'], 'print')) { continue; }
 
-    $descr = rewrite_hrDevice($sensor['sensor_descr']);
+    $descr = rewrite_entity_name($sensor['sensor_descr'], 'sensor');
     $rrd_list[] = array('filename' => $rrd_filename,
                         'descr'    => $descr,
                         'ds'       => "sensor");

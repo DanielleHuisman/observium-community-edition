@@ -1,0 +1,610 @@
+-- ****************************************************************************
+--
+--  This module provides authoritative definitions for Dell Networking OS
+--  Port Security Mib.
+--
+-- ****************************************************************************
+--
+
+DELL-NETWORKING-PORT-SECURITY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, 
+    OBJECT-TYPE, 
+    NOTIFICATION-TYPE,
+    Integer32,
+    Unsigned32                          FROM SNMPv2-SMI
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP                  FROM SNMPv2-CONF
+	InterfaceIndex,
+    ifIndex,
+    ifName                              FROM IF-MIB
+    VlanIndex                           FROM Q-BRIDGE-MIB
+    TruthValue,
+    MacAddress, 
+    RowStatus,
+    TEXTUAL-CONVENTION                  FROM SNMPv2-TC
+    DisplayString		                FROM RFC1213-MIB
+    dellNetMgmt                         FROM DELL-NETWORKING-SMI;
+
+-- ****************************************************************************
+-- *   MODULE IDENTITY
+-- ****************************************************************************
+
+dellNetPortSecurityMib MODULE-IDENTITY
+
+       LAST-UPDATED         "201807160000Z"
+       ORGANIZATION         "Dell Inc"
+       CONTACT-INFO
+                            "http://www.dell.com/support"
+       DESCRIPTION
+                "The Mib module for managing Dell Networking L2 Port Security feature."
+
+       REVISION             "201807160000Z"    -- 16 July, 2018 
+       DESCRIPTION
+                "Initial version of this Mib module."
+     
+       ::= { dellNetMgmt 31 }
+
+dellNetPortSecurityMibObjects     OBJECT IDENTIFIER ::= 
+                                        { dellNetPortSecurityMib 1 }
+
+dellNetPortSecGlobalObjects        OBJECT IDENTIFIER ::= 
+                                    { dellNetPortSecurityMibObjects 1 }
+dellNetPortSecInterfaceObjects     OBJECT IDENTIFIER ::= 
+                                    { dellNetPortSecurityMibObjects 2 }
+dellNetPortSecMacObjects           OBJECT IDENTIFIER ::=
+                                    { dellNetPortSecurityMibObjects 3 }
+
+--
+-- textual conventions
+--
+
+ClearSecureMacAddrType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION  
+                 "This is the type of secure mac addresses
+                 which user is allowed to delete globally or 
+                 per interface.
+                      
+                 none(0) - Setting this value to this object has
+                           no effect.No mac address gets deleted.
+                 dynamic(1) - All secure MAC addresses which are 
+                              learnt on the switch.
+                 sticky(2) -  All secure MAC addresses (sticky MACs) 
+	                          which are learnt and retained across 
+                              reboots."
+
+    SYNTAX INTEGER {
+        none(0), 
+        dynamic(1), 
+        sticky(2) 
+    }
+
+SecureMacViolationType  ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+                 "This is the type of violation staus 
+                 which user is allowed to reset globally or
+                 per interface.
+
+                 none(0) - Setting this value to this object has
+                           no effect.
+                
+                  macLimitViolation(1) - Secure Mac Limit  violation 
+
+                 stmvViolation(2) - Station move violation."
+
+    SYNTAX INTEGER {
+        none(0),
+        macLimitViolation (1),
+        stmvViolation(2)
+    }
+ 
+--
+-- Port Security Global Configuration Objects
+--
+
+dellNetGlobalPortSecurityMode OBJECT-TYPE
+        SYNTAX        INTEGER
+                      {
+                        enable(1),
+						disable(2)
+                      }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object is used to enable or disable 
+                      port security feature globally on the device. 
+                      By default, this is set to enable to support
+                      backward compatibility."
+         DEFVAL       { enable }
+        ::= { dellNetPortSecGlobalObjects 1 }
+
+dellNetGlobalTotalSecureAddress  OBJECT-TYPE
+        SYNTAX        Integer32 (0..2147483647)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The total number of MAC addresses secured
+                      in the device."
+        ::= { dellNetPortSecGlobalObjects 2 }
+
+dellNetGlobalClearSecureMacAddresses OBJECT-TYPE
+        SYNTAX        ClearSecureMacAddrType
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object is used to delete 
+                      secure MAC addresses based on the specified
+                      type."
+          ::= { dellNetPortSecGlobalObjects 3 }
+
+dellNetGlobalResetViolationStatus OBJECT-TYPE
+        SYNTAX        SecureMacViolationType
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object is used to reseet the 
+                       violation status of all violated interfaces
+                       based on the specified type."
+          ::= { dellNetPortSecGlobalObjects 4 }
+
+--
+-- Port Security Interface Configuration Table
+--
+
+dellNetPortSecIfConfigTable OBJECT-TYPE
+        SYNTAX          SEQUENCE OF DellNetPortSecIfConfigEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+                "A table for Port Security configuration entries.  
+                The number of entries is determined by the number of 
+                interfaces in the system that can support the 
+                port security feature." 
+        ::= { dellNetPortSecInterfaceObjects 1 }
+
+dellNetPortSecIfConfigEntry OBJECT-TYPE
+        SYNTAX         DellNetPortSecIfConfigEntry
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     
+                "Entry containing port security information for a 
+                particular interface."
+        INDEX           { ifIndex }
+        ::= { dellNetPortSecIfConfigTable 1 }
+
+DellNetPortSecIfConfigEntry ::=
+        SEQUENCE {
+                dellNetPortSecIfPortSecurityEnable         TruthValue,
+                dellNetPortSecIfPortSecurityStatus         INTEGER,
+                dellNetPortSecIfSecureMacLimit             Integer32,
+                dellNetPortSecIfCurrentMacCount            Integer32,
+                dellNetPortSecIfStationMoveEnable          TruthValue,
+                dellNetPortSecIfSecureMacViolationAction   INTEGER,
+                dellNetPortSecIfStmvViolationAction        INTEGER,
+                dellNetPortSecIfStickyEnable               TruthValue,
+                dellNetPortSecIfClearSecureMacAddresses    ClearSecureMacAddrType,
+				dellNetPortSecIfResetViolationStatus       SecureMacViolationType,
+                dellNetPortSecIfSecureMacAgeEnable          TruthValue
+        }
+
+dellNetPortSecIfPortSecurityEnable OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "This Mib object specifies if the port 
+                         security feature is enaled or not on an interface.  
+                         The value of this object returns 'disable' if
+						 the value of 
+                        dellNetGlobalPortSecurityMode is set to 'disable' or 
+						dellNetPortSecIfSecureMacLimit is not configured."
+        ::= { dellNetPortSecIfConfigEntry 1 }
+
+dellNetPortSecIfPortSecurityStatus OBJECT-TYPE
+        SYNTAX          INTEGER { 
+                        normal(1),
+                        dynMacLimitErrDisable(2),
+                        stationMoveErrDisable(3)
+                        }                   
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "This object represents the port security
+                         status of an interface.
+
+                        normal(1) - This indicates port is operating normally
+                                     without any violation.
+                        dynMacLimitErrDisable(2) - This indicates that the port
+                                     is shutdown due to mac learn
+                                     limit violation when the object 
+                                     dellNetPortSecIfSecureMacViolationAction
+                                     is of type 'shutdown'. 
+                        stationMoveErrDisable(3) - This indicates that the port
+                                     is shutdown due to station move violation 
+                                     when the object
+                                     dellNetPortSecIfStmvViolationAction
+                                     is of type 'shutdownOrig' or 
+                                     'shutdownOffending' or 'shutdownBoth'."
+                                     
+        ::= { dellNetPortSecIfConfigEntry 2 }
+
+dellNetPortSecIfSecureMacLimit OBJECT-TYPE
+        SYNTAX        Integer32 (1..2147483647)
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "The maximum  number (N) of MAC addresses 
+                      to be secured on the interface. The first N MAC
+                      addresses learnit or configured are made secured.
+                      Changing this object value from N to M is not 
+                      allowed if  M is smaller than N, and M is less 
+                      than the value of
+                      dellNetPortSecIfCurrentMacCount
+                      on the interface. One way to change the number in
+                      this case is by deleting sufficient number of 
+                      secure mac addresses present on the interface.
+					  The maximum limit that can be configured is 
+					  1000000."
+
+        ::= { dellNetPortSecIfConfigEntry 3 }
+
+dellNetPortSecIfCurrentMacCount  OBJECT-TYPE
+        SYNTAX        Integer32 (0..2147483647)
+        MAX-ACCESS    read-only
+        STATUS        current
+        DESCRIPTION   "The current number of MAC addresses 
+                      learnt or configured on this interface."
+        ::= { dellNetPortSecIfConfigEntry 4 }
+
+dellNetPortSecIfStationMoveEnable  OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object is used to enable or disable
+                      station movement on the dynamically secured
+                      mac addresses learnt on the interface.
+                      By default, this is set to false."
+        DEFVAL       { false }
+        ::= { dellNetPortSecIfConfigEntry 5 }
+
+dellNetPortSecIfSecureMacViolationAction  OBJECT-TYPE
+        SYNTAX        INTEGER {
+                      none(1),
+                      notify(2),
+                      shutdown(3)
+                      }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Determines the action to be taken when
+                       mac limit violation occurs in the system.
+
+                        none(1) - no action will be taken
+                        notify(2)   - raise syslog to notify about
+                                      port security violation. The log 
+                                      will contain MAC causing violation,
+                                      vlanId and interface index.
+
+                        shutdown(3) - the interface will be shut down."
+        DEFVAL        { none }
+        ::= { dellNetPortSecIfConfigEntry 6 }
+
+dellNetPortSecIfStmvViolationAction  OBJECT-TYPE
+        SYNTAX        INTEGER {
+                      none(1),
+                      notify(2),
+                      shutdownOrigPort(3),
+                      shutDownOffendingPort(4),
+                      shutdownBoth(5)
+                      }
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Determines the action to be taken when
+                       either dynamic or static mac limit
+                       violation occurs in the system. This
+                       is applicable only for dynamically learnt
+                       MAC addresses.
+
+                        none(1)     - no action will be taken.
+                        notify(2)   - raise syslog to notify about
+                                      station movement violation. The log
+                                      will contain MAC causing violation,
+                                      vlanId, old interface index 
+                                       and new interface index.
+
+                        shutdownOrigPort(3) - the old interface on which
+                                              MAC is learnt will be shutdown.
+
+                        shutdownOffendigPort(4) - the new interface causing 
+                                              station move will be shutdown.
+                        
+                        shutdowBoth(5) - both the old and new interfaces
+                                         will be shutdown."
+        DEFVAL        { none }
+        ::= { dellNetPortSecIfConfigEntry 7 }
+
+dellNetPortSecIfStickyEnable  OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "Set to 'true' to enable and 'false' to
+                      disable Sticky port security feature on this
+                      interface.  Enabling this feature allows the 
+                      device to secure learnt MAC addresses on this
+                      interface permanently. In order to remove the
+                      sticky addresses on this interface, user has to 
+                      manually delete the sticky MAC address(es) or
+                      disable the sticky feature itself. Manual deletion
+                      of all addresses can be accomplished by
+                      dellNetPortSecIfClearSecureMacAddresses object.
+                      
+                      At the maximum, only first 1000 macs can be marked 
+                      as sticky."
+       DEFVAL         { false }
+
+        ::= { dellNetPortSecIfConfigEntry 8 }
+
+dellNetPortSecIfClearSecureMacAddresses  OBJECT-TYPE
+        SYNTAX        ClearSecureMacAddrType
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object is used to delete
+                      secure MAC addresses based on the specified
+                      type."
+        DEFVAL        { none } 
+        ::= { dellNetPortSecIfConfigEntry 9 }
+
+dellNetPortSecIfResetViolationStatus OBJECT-TYPE
+        SYNTAX        SecureMacViolationType
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object is used to reset the
+                       violation status of an interface
+                       based on the specified type."
+        DEFVAL        { none }
+          ::= { dellNetPortSecIfConfigEntry 10 }
+
+dellNetPortSecIfSecureMacAgeEnable  OBJECT-TYPE
+        SYNTAX        TruthValue
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION   "This object is used to enable aging of 
+                       the dynamically secured mac addresses learnt 
+                       on the interface. Sticky and static macs will 
+                       never age out.                      
+                      By default, this is set to false."
+        DEFVAL       { false }
+        ::= { dellNetPortSecIfConfigEntry 11 }
+
+
+-- Port Security Static  Mac Address Table. 
+-- This table is used to configure secure  MAC addresses(static)
+-- on an interface.
+
+dellNetPortSecSecureStaticMacAddrTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF DellNetPortSecIfSecureStaticMacAddrEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "A table used to configure 
+                      secure static MAC addresses on an interface."
+       ::= { dellNetPortSecInterfaceObjects 2 }
+
+dellNetPortSecIfSecureStaticMacAddrEntry OBJECT-TYPE
+        SYNTAX        DellNetPortSecIfSecureStaticMacAddrEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current
+        DESCRIPTION   "Entry to configure static MAC address
+                      on a particular interface."
+        INDEX        { 	 dellNetPortSecIfSecureStaticMacAddress,
+						 dellNetPortSecIfSecureStaticMacVlanId,
+	                     dellNetPortSecIfSecureStaticMacIfIndex	}
+        ::= { dellNetPortSecSecureStaticMacAddrTable 1 }
+
+DellNetPortSecIfSecureStaticMacAddrEntry ::=
+        SEQUENCE {
+                dellNetPortSecIfSecureStaticMacAddress       MacAddress,
+                dellNetPortSecIfSecureStaticMacVlanId        VlanIndex,
+				dellNetPortSecIfSecureStaticMacIfIndex       InterfaceIndex,
+				dellNetPortSecIfSecureStaticMacRowStatus     RowStatus
+        }
+
+dellNetPortSecIfSecureStaticMacAddress OBJECT-TYPE
+        SYNTAX          MacAddress
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "This object is used to specify the static MAC
+                        address to be configured on an interface."
+        ::= { dellNetPortSecIfSecureStaticMacAddrEntry 1 }
+
+dellNetPortSecIfSecureStaticMacVlanId    OBJECT-TYPE
+        SYNTAX          VlanIndex
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "This is the vlan on which the
+                         dellNetPortSecIfSecureStaticMacAddress is
+                         to be configured."
+        ::= { dellNetPortSecIfSecureStaticMacAddrEntry 2 }
+
+dellNetPortSecIfSecureStaticMacIfIndex    OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "This is the interface on which the
+                         dellNetSecureStaticMacAddress is
+                         configured."
+        ::= { dellNetPortSecIfSecureStaticMacAddrEntry 3 }
+
+dellNetPortSecIfSecureStaticMacRowStatus  OBJECT-TYPE
+        SYNTAX        RowStatus
+        MAX-ACCESS    read-write
+        STATUS        current
+        DESCRIPTION
+             "This object is a conceptual row entry that allows adding
+              or deleting entries to or from the 
+              dellNetPortSecSecureStaticMacAddrTable.
+
+              1. When creating an entry in this table the 'createAndGo'
+              method is used and the value of this object is set to
+              'active'. Deactivation of an 'active' entry is not
+              allowed.
+
+              2. When deleting an entry in this table 'destroy' method
+              is used."
+        ::= { dellNetPortSecIfSecureStaticMacAddrEntry 4 }
+
+
+-- Port Security Secure MAC Address Table
+
+dellNetPortSecSecureMacAddrTable OBJECT-TYPE
+        SYNTAX        SEQUENCE OF DellNetSecureMacAddrEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current 
+        DESCRIPTION   "A table containing the list of
+                      secure MAC addresses."
+       ::= { dellNetPortSecMacObjects 1 }
+
+dellNetSecureMacAddrEntry OBJECT-TYPE
+        SYNTAX        DellNetSecureMacAddrEntry
+        MAX-ACCESS    not-accessible
+        STATUS        current 
+        DESCRIPTION   "Entry containing secure MAC address 
+                      information for a particular interface.
+                      security feature is disabled."
+        INDEX         { dellNetSecureMacAddress,
+		                dellNetSecureMacVlanId }
+        ::= { dellNetPortSecSecureMacAddrTable 1 }
+
+DellNetSecureMacAddrEntry ::=
+        SEQUENCE {
+                dellNetSecureMacAddress             MacAddress,
+                dellNetSecureMacVlanId              VlanIndex,
+				dellNetSecureMacIfIndex             InterfaceIndex,
+                dellNetSecureMacAddrType            INTEGER
+        }
+
+dellNetSecureMacAddress OBJECT-TYPE
+        SYNTAX          MacAddress
+        MAX-ACCESS      not-accessible
+        STATUS          current
+        DESCRIPTION     "This is a secure MAC
+                        address configured or learnt on an
+                        interface."
+        ::= { dellNetSecureMacAddrEntry 1 }
+
+dellNetSecureMacVlanId    OBJECT-TYPE
+        SYNTAX          VlanIndex 
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "This is the vlan on which the 
+                         dellNetSecureMacAddress is
+                         configured or learnt."
+        ::= { dellNetSecureMacAddrEntry 2 }
+
+dellNetSecureMacIfIndex    OBJECT-TYPE
+        SYNTAX          InterfaceIndex
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "This is the interface on which the
+                         dellNetSecureMacAddress is
+                         configured or learnt."
+        ::= { dellNetSecureMacAddrEntry 3 }
+
+dellNetSecureMacAddrType  OBJECT-TYPE
+        SYNTAX          INTEGER { static(1), dynamic(2), sticky(3) }
+        MAX-ACCESS      read-only
+        STATUS          current
+        DESCRIPTION     "This object indicates if the secure MAC address
+                        is a configured 'static' or learnt 'dynamic' or
+                        learnt and retained across reboots 'sticky'."
+        ::= { dellNetSecureMacAddrEntry 4 }
+
+-- ****************************************************************************
+-- Conformance Information
+-- ****************************************************************************
+
+dellNetPortSecurityMibConformance     OBJECT IDENTIFIER
+       ::= { dellNetPortSecurityMib 2 }
+
+dellNtPortSecurityCompliances     OBJECT IDENTIFIER
+       ::= { dellNetPortSecurityMibConformance 1 }
+
+dellNetPortSecurityGroups          OBJECT IDENTIFIER
+       ::= { dellNetPortSecurityMibConformance 2 }
+
+
+-- ****************************************************************************
+-- * Compliance Statements
+-- ****************************************************************************
+
+dellNetPortSecurityMibConform   MODULE-COMPLIANCE
+       STATUS                   current
+       DESCRIPTION
+              "The compliance statement for the Dell Networking OS Port Security Mib."
+       MODULE
+       MANDATORY-GROUPS {
+                     dellNetPortSecGlobalGroup, 
+                     dellNetPortSecInterfaceGroup,
+                     dellNetPortSecIfSecureStaticMacAddrGroup,
+                     dellNetSecureMacAddrGroup
+              }
+       ::= { dellNtPortSecurityCompliances 1}
+
+
+
+-- ****************************************************************************
+-- Units of Conformance
+-- ****************************************************************************
+
+dellNetPortSecGlobalGroup   OBJECT-GROUP
+        OBJECTS {
+                dellNetGlobalPortSecurityMode,
+                dellNetGlobalTotalSecureAddress,
+                dellNetGlobalClearSecureMacAddresses,
+                dellNetPortSecIfResetViolationStatus 
+               }
+        STATUS current
+        DESCRIPTION
+                "A set of global objects for use with the Port
+                Security feature."
+        ::= { dellNetPortSecurityGroups 1}
+
+dellNetPortSecInterfaceGroup   OBJECT-GROUP
+        OBJECTS {
+                dellNetPortSecIfPortSecurityEnable,  
+                dellNetPortSecIfPortSecurityStatus,
+                dellNetPortSecIfSecureMacLimit,
+                dellNetPortSecIfCurrentMacCount,
+                dellNetPortSecIfStationMoveEnable,
+                dellNetPortSecIfSecureMacViolationAction,
+                dellNetPortSecIfStmvViolationAction,
+                dellNetPortSecIfStickyEnable,
+                dellNetPortSecIfClearSecureMacAddresses,
+                dellNetPortSecIfResetViolationStatus,
+                dellNetPortSecIfSecureMacAgeEnable
+                }
+        STATUS current
+        DESCRIPTION
+                "A set of interface level objects for use with the Port
+                Security feature."
+        ::= { dellNetPortSecurityGroups 2}
+
+dellNetPortSecIfSecureStaticMacAddrGroup   OBJECT-GROUP
+        OBJECTS {
+                 dellNetPortSecIfSecureStaticMacRowStatus                 
+                }
+        STATUS current
+        DESCRIPTION
+                "Static secure MAC addresss
+                 configuration parameters on an interface."
+        ::= { dellNetPortSecurityGroups 3}
+		
+dellNetSecureMacAddrGroup  OBJECT-GROUP
+        OBJECTS {
+                 dellNetSecureMacVlanId,   
+				 dellNetSecureMacIfIndex,		 
+                 dellNetSecureMacAddrType         
+                }
+        STATUS current
+        DESCRIPTION
+                "Static secure MAC addresss
+                 configuration parameters on an interface."
+        ::= { dellNetPortSecurityGroups 4 }
+
+END
+

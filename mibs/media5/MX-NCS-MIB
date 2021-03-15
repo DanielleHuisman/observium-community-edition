@@ -1,0 +1,677 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--
+--             Copyright(c) 2001-2002 Mediatrix Telecom, Inc. 
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc. 
+--
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents. 
+--
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc. 
+--
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes. 
+--
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-NCS-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE
+    FROM SNMPv2-CONF
+        ifIndex
+    FROM RFC1213-MIB
+        MxIpHostName,
+        MxIpConfigSource,
+        MxIpPort,
+        MxIpSelectConfigSource,
+        MxIpDhcpSiteSpecificCode
+    FROM MX-TC
+        ipAddressStatus,
+        ipAddressConfig, 
+        mediatrixIpTelephonySignaling
+    FROM MX-SMI;
+
+ncs OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION "This MIB contains NCS configuration objects."
+    ::= { mediatrixIpTelephonySignaling 10 }
+
+ncsMIB MODULE-IDENTITY
+    LAST-UPDATED "0211180000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc. 
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION "This MIB contains NCS configuration objects."
+
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "0211180000Z"
+    DESCRIPTION "November 18, 2002
+                    Edited many DEFVALs.
+                    - Set the interval of ncsRetransmissionInitialPeriod 
+                    to ncsRetransmissionMaxPeriod since it is forbidden that
+                    the first has more 'range', than the second.
+                    - Set a minimum value of 100 to:
+                        - ncsRetransmissionDisconnectTimeout
+                        - ncsRetransmissionHistoryTimeout
+                        - ncsRetransmissionMaxWaitingDelay
+                        - ncsRetransmissionDisconnectInitialWaitingPeriod
+                        - ncsRetransmissionDisconnectMinWaitingPeriod
+                        - ncsRetransmissionDisconnectMaxWaitingPeriod
+                     since each must be at least equal to minimum internal tick
+                     value.
+                    - Set a minimum value of 1 to:
+                        - ncsRetransmissionSuspicionThreshold
+                        - ncsRetransmissionDisconnectThreshold 
+                    since each must be at least higher than zero.
+                    - Use the same DEFVAL for:
+                        - ncsRetransmissionHistoryTimeout
+                        - ncsRetransmissionDisconnectTimeout
+                    since the second must be at least equal to the second DEFVAL
+                 June 26, 2002
+                    Renamed INTEGER value doNotIncludeNotStarted(0) 
+                                       to excludeNotStarted(0)
+                 March 13, 2002
+                    Added ncsPiggyBackingEnable.
+                 December 04, 2001
+                    Added value range for ncsRetransmissionInitialPeriod.
+                 November 13, 2001
+                    Creation"
+    ::= { ncs 1 }
+
+ncsMIBObjects  OBJECT IDENTIFIER ::= { ncsMIB 1 }
+ncsConformance OBJECT IDENTIFIER ::= { ncsMIB 2 }
+
+    ncsPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "NCS IP port number. This is the UDP port number on
+                     which the gateway is listening for any NCS request."
+        DEFVAL      { 2427 }
+        ::=  {  ncsMIBObjects  1  }
+
+    ncsDefaultDigitMap OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..255))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Default digit map for all the endpoints."
+        DEFVAL      { "x.T" }
+        ::=  {  ncsMIBObjects  2  }
+
+    ncsRestartLevel OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              gateway(0),
+                              group(1),
+                              endpoint(2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Level of restart for initial RSIP."
+        DEFVAL      { gateway }
+        ::=  {  ncsMIBObjects 4  }
+
+    ncsEndpointIdListIncludeNotStarted OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              excludeNotStarted(0),
+                              includeNotStarted(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates if the EndpointIdList returned by a wildcarded 
+                     AUEP will include or not endpoints that are not started."
+        DEFVAL       { excludeNotStarted }
+        ::=  {  ncsMIBObjects  5  }
+
+    ncsPiggyBackingEnable OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             disable(0),
+                             enable(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates if piggy-backing can be used to send several 
+                     NCS messages in the same UDP packet. If enabled, 
+                     piggy-backing can be used. Otherwise, no piggy-backing 
+                     is used."
+        DEFVAL      { enable }
+        ::=  {  ncsMIBObjects  6  }
+
+-- ************************************************************************
+-- EndPoint Id information
+-- ************************************************************************
+
+ncsEndpointId  OBJECT IDENTIFIER ::=  {  ncsMIBObjects  20  }
+
+    ncsEndpointIfTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF NCSEndpointIfEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Table that contains NCS endpoint interface parameters.
+                     This table contains the local endpoint name. The endpoint
+                     name is created as follows: term2/term1@localHostFqdn."
+        ::= { ncsEndpointId  10 }
+
+        ncsEndpointIfEntry OBJECT-TYPE
+            SYNTAX      NCSEndpointIfEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "Table entry of the endpoint interface table."
+            INDEX       {
+                         ifIndex
+                        }
+            ::= { ncsEndpointIfTable 1 }
+
+            NCSEndpointIfEntry ::= SEQUENCE 
+                {
+                    ncsEndpointIdTerm2 OCTET STRING (SIZE (1..255)),
+                    ncsEndpointIdTerm1 OCTET STRING (SIZE (1..255))
+               }    
+
+    ncsEndpointIdTerm1 OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..255))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The right most term of the local endpoint name."
+        ::=  {  ncsEndpointIfEntry  1  }
+        
+        
+    ncsEndpointIdTerm2 OBJECT-TYPE
+        SYNTAX      OCTET STRING (SIZE (1..255))
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Second term from the right of the local endpoint name."
+        DEFVAL      { "aaln" }
+        ::=  {  ncsEndpointIfEntry  2  }
+
+
+-- ************************************************************************
+-- Retransmission information
+-- ************************************************************************
+ncsRetransmission  OBJECT IDENTIFIER ::=  {  ncsMIBObjects  23  }
+
+    ncsRetransmissionAlgorithm OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              static(0),
+                              exponential(1),
+                              exponentialWithJitter(2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Retransmission algorithm used."
+        DEFVAL      { exponentialWithJitter }
+        ::=  {  ncsRetransmission  1  }
+
+    ncsRetransmissionInitialPeriod OBJECT-TYPE
+        SYNTAX      Unsigned32 (200..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Retransmission initial period in ms."
+        DEFVAL      { 200 }
+        ::=  {  ncsRetransmission  2  }
+
+    ncsRetransmissionMaxPeriod OBJECT-TYPE
+        SYNTAX      Unsigned32 (200..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Retransmission maximum period in ms.
+                     Must be greater than or equal to the retransmission
+                     initial period."
+        DEFVAL      { 30000 }
+        ::=  {  ncsRetransmission  3  }
+
+    ncsRetransmissionDisconnectTimeout OBJECT-TYPE
+        SYNTAX      Unsigned32 (100..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Time elapsed (in ms) at which an endpoint will become disconnected."
+        DEFVAL { 20000 }
+        ::=  {  ncsRetransmission  4  }
+
+    ncsRetransmissionSuspicionThreshold OBJECT-TYPE
+        SYNTAX  Unsigned32 (1..4294967295)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION "Number of retransmissions at which an endpoint may
+                     actively query the name server to detect the possible
+                     change of the Call Agent's interfaces."
+        DEFVAL      { 7 }
+        ::=  {  ncsRetransmission  5  }
+
+    ncsRetransmissionSuspicionThresholdDnsQuery OBJECT-TYPE
+        SYNTAX     INTEGER {
+                             noDnsQuery(0),
+                             performDnsQuery(1)
+                           }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates whether a DNS query will be performed or not when the 
+                     number of retransmissions is equal to the suspicion threshold."
+        DEFVAL      { noDnsQuery }
+        ::=  {  ncsRetransmission  6  }
+
+    ncsRetransmissionDisconnectThreshold OBJECT-TYPE
+        SYNTAX  Unsigned32 (1..4294967295)
+        MAX-ACCESS  read-write
+        STATUS  current
+        DESCRIPTION "Number of retransmissions at which an endpoint  
+                     should contact the DNS one more time to see if
+                     any other interfaces have become available. When 
+                     the number of retransmissions is greater than 
+                     this value, the endpoint will become disconnected."
+        DEFVAL       { 7 }
+        ::=  {  ncsRetransmission  7  }
+
+    ncsRetransmissionDisconnectThresholdDnsQuery OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             noDnsQuery(0),
+                             performDnsQuery(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates whether a DNS query will be performed or not when the 
+                     number of retransmissions is equal to the disconnect threshold."
+        DEFVAL { noDnsQuery }
+        ::=  {  ncsRetransmission  8  }
+
+    ncsRetransmissionHistoryTimeout OBJECT-TYPE
+        SYNTAX      Unsigned32 (100..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Number of milliseconds for which reponses to old 
+                     transactions must be kept."
+        DEFVAL      { 20000 }
+        ::=  {  ncsRetransmission  9  }
+
+    ncsRetransmissionMaxWaitingDelay OBJECT-TYPE
+        SYNTAX      Unsigned32 (100..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Maximum waiting delay (in ms) an endpoint can wait 
+                     before sending an RSIP."
+        DEFVAL      { 600000 }
+        ::=  {  ncsRetransmission  10  }
+
+    ncsRetransmissionDisconnectInitialWaitingPeriod OBJECT-TYPE
+        SYNTAX      Unsigned32 (100..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Initial waiting delay (in ms) an endpoint must wait before 
+                     starting the disconnect procedure."
+        DEFVAL      { 15000 }
+        ::=  {  ncsRetransmission  11  }
+
+    ncsRetransmissionDisconnectMinWaitingPeriod OBJECT-TYPE
+        SYNTAX      Unsigned32 (100..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Disconnected minimum waiting delay (in ms) that must 
+                     have elapsed since the gateway became disconnected 
+                     before entering the disconnect procedure."
+        DEFVAL      { 15000 }
+        ::=  {  ncsRetransmission  12  }
+
+    ncsRetransmissionDisconnectMaxWaitingPeriod OBJECT-TYPE
+        SYNTAX      Unsigned32 (100..4294967295)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Disconnected maximum waiting delay (in ms) since the 
+                     gateway became disconnected that an endpoint can wait
+                     before starting the disconnect procedure."
+        DEFVAL      { 600000 }
+        ::=  {  ncsRetransmission  13  }
+
+-- ************************************************************************
+-- Line (L) package
+-- ************************************************************************
+
+ncsLinePackage OBJECT IDENTIFIER ::=  {  ncsMIBObjects  30  }
+
+    ncsLinePackageBzDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Busy tone timeout value in ms."
+        DEFVAL      { 30000 }
+        ::=  {  ncsLinePackage  4 }
+
+    ncsLinePackageDlDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Dial tone timeout value in ms."
+        DEFVAL      { 16000 }
+        ::=  {  ncsLinePackage  8  }
+
+    ncsLinePackageLDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "DTMF long duration timeout value in ms."
+        DEFVAL      { 2000 }
+        ::=  {  ncsLinePackage  12  }
+
+    ncsLinePackageMwiDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Message waiting indicator tone timeout value in ms."
+        DEFVAL      { 16000 }
+        ::=  {  ncsLinePackage  16  }
+
+    ncsLinePackageOtDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Off hook warning tone timeout value in ms."
+        DEFVAL      { 65535000 }
+        ::=  {  ncsLinePackage  20  }
+
+    ncsLinePackageRbkDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Ring back on connection tone timeout value in ms."
+        DEFVAL      { 180000 }
+        ::=  {  ncsLinePackage  24  }
+
+    ncsLinePackageRgDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Ring tone timeout value in ms."
+        DEFVAL      { 180000 }
+        ::=  {  ncsLinePackage  28  }
+
+    ncsLinePackageRoDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Reorder tone timeout value in ms."
+        DEFVAL      { 30000 }
+        ::=  {  ncsLinePackage  32  }
+
+    ncsLinePackageRtDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Ring back tone timeout value in ms."
+        DEFVAL      { 180000 }
+        ::=  {  ncsLinePackage  36  }
+
+    ncsLinePackageSlDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Stutter dial tone timeout value in ms."
+        DEFVAL      { 16000 }
+        ::=  {  ncsLinePackage  40  }
+
+    ncsLinePackageTCriticalDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Interdigit timeout value in ms when a timer is all that 
+                     is required for the digit string to match a pattern in 
+                     the digit map."
+        DEFVAL      { 4000 }
+        ::=  {  ncsLinePackage 44  }
+
+    ncsLinePackageTPartialDuration OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Interdigit timeout value in ms when at least one more
+                     digit is required for the digit string to match any of
+                     the patterns in the digit map."
+        DEFVAL      { 16000 }
+        ::=  {  ncsLinePackage  48  }
+
+-- ************************************************************************
+-- NCS statistics
+-- ************************************************************************
+
+ncsStats OBJECT IDENTIFIER ::= { ncsMIBObjects 50 }
+
+    ncsStatsCurrentNumberOfActiveConnections OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Number of active connections which are currently
+                     conducted by the gateway."
+        ::= { ncsStats 1 }
+        
+ncsStatsCurrentStatistics        OBJECT IDENTIFIER ::= { ncsStats 5 }   
+ncsStatsCumulatedStatistics      OBJECT IDENTIFIER ::= { ncsStats 6 }   
+
+   -- NCS Current Statistics
+                                  
+    ncsStatsCurrentTotalNumberOfConnections OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Total number of connections conducted by the gateway so far
+                     in the current statistics period."
+        ::= { ncsStatsCurrentStatistics 1 }
+
+    ncsStatsCurrentAvgConnectionTime OBJECT-TYPE
+        SYNTAX       Unsigned32
+        MAX-ACCESS   read-only
+        STATUS       current
+        DESCRIPTION "Average connection time (in seconds) so far in the current
+                     statistics period."
+        ::= { ncsStatsCurrentStatistics 2 }
+
+   -- NCS Cumulated Statistics
+     ncsStatsCumulatedTotalNumberOfConnections OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Cumulated number of connections conducted by the gateway."
+        ::= { ncsStatsCumulatedStatistics 1 }
+
+    ncsStatsCumulatedAvgConnectionTime OBJECT-TYPE
+        SYNTAX      Unsigned32
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Cumulated average connection time (in seconds)."
+        ::= { ncsStatsCumulatedStatistics 2 }
+
+    -- ************************************************************************
+    -- CallAgent IP address: Placed in the mediatrixMgmt.ipAddressStatus and
+    --                       in mediatrixConfig.ipAddressConfig.
+    -- ************************************************************************
+
+-- Add the NCS ip addresses specifics parameters
+
+    ipAddressStatusNcsCallAgent OBJECT IDENTIFIER ::= { ipAddressStatus 60 }
+    ipAddressConfigNcsCallAgent OBJECT IDENTIFIER ::= { ipAddressConfig 60 }
+
+-- Add the NCS Call Agent status information
+    ncsCAConfigSource OBJECT-TYPE
+        SYNTAX      MxIpConfigSource
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Indicates the source used for the provisioning of 
+                     the NCS Call Agent MIB objects."
+        DEFVAL { dhcp }
+        ::=  {  ipAddressStatusNcsCallAgent  1  }
+
+    ncsCAHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "NCS Call Agent IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {  ipAddressStatusNcsCallAgent  2  }
+
+    ncsCAPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "NCS Call Agent IP port number."
+        DEFVAL { 2727 }
+        ::=  {  ipAddressStatusNcsCallAgent  3  }
+
+-- Add the NCS Call Agent configuration information
+
+    ncsCASelectConfigSource OBJECT-TYPE
+        SYNTAX      MxIpSelectConfigSource
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates the source to be used for the provisioning of 
+                     the NCS Call Agent MIB objects."
+        DEFVAL      { dhcp }
+        ::=  {  ipAddressConfigNcsCallAgent  1  }
+
+ipAddressConfigNcsCAStatic OBJECT IDENTIFIER  ::=  {  ipAddressConfigNcsCallAgent  6  }
+
+    ncsCAStaticHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static NCS Call Agent IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {  ipAddressConfigNcsCAStatic  1  }
+
+    ncsCAStaticPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static NCS Call Agent IP port number."
+        DEFVAL      { 2727 }
+        ::=  {  ipAddressConfigNcsCAStatic  2  }
+
+ipAddressConfigNcsCADhcp OBJECT IDENTIFIER  ::=  {  ipAddressConfigNcsCallAgent  7  }
+
+    ncsCADhcpSiteSpecificCode OBJECT-TYPE
+        SYNTAX      MxIpDhcpSiteSpecificCode
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "DHCP NCS Call Agent site specific code.
+                     If set to 0, use vendor-specific code #210."
+        DEFVAL      { 0 }
+        ::=  {  ipAddressConfigNcsCADhcp  1  }
+
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    ncsCompliances OBJECT IDENTIFIER ::= { ncsConformance 1 }
+
+    ncsResidentialGatewayBasicComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION "Minimal definitions for the NCS Residential Gateway group."
+        MODULE -- This Module
+            MANDATORY-GROUPS { 
+                                ncsBasicGroupVer1,
+                                ncsLinePkgGroupVer1,
+                                ncsStatsBasicGroupVer1,
+                                ncsCallAgentGroupVer1
+                             }
+        ::= { ncsCompliances 1 }
+
+    -- ************************************************************************
+    -- MIB variable grouping
+    -- ************************************************************************
+    ncsGroups OBJECT IDENTIFIER ::= {ncsConformance 2 }
+
+    ncsBasicGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  ncsPort,
+                  ncsDefaultDigitMap,
+                  ncsRestartLevel,
+                  ncsEndpointIdListIncludeNotStarted,
+                  ncsPiggyBackingEnable,
+                  ncsEndpointIdTerm1,
+                  ncsEndpointIdTerm2,
+                  ncsRetransmissionAlgorithm,
+                  ncsRetransmissionInitialPeriod,
+                  ncsRetransmissionMaxPeriod,
+                  ncsRetransmissionDisconnectTimeout,
+                  ncsRetransmissionSuspicionThreshold,
+                  ncsRetransmissionSuspicionThresholdDnsQuery,
+                  ncsRetransmissionDisconnectThreshold,
+                  ncsRetransmissionDisconnectThresholdDnsQuery,
+                  ncsRetransmissionHistoryTimeout,
+                  ncsRetransmissionMaxWaitingDelay,
+                  ncsRetransmissionDisconnectInitialWaitingPeriod,
+                  ncsRetransmissionDisconnectMinWaitingPeriod,
+                  ncsRetransmissionDisconnectMaxWaitingPeriod
+                }
+        STATUS      current
+        DESCRIPTION "This group holds the objects that define the basic
+                     NCS group."
+        ::= { ncsGroups 1 }
+
+    ncsLinePkgGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  ncsLinePackageBzDuration,
+                  ncsLinePackageDlDuration,
+                  ncsLinePackageLDuration,
+                  ncsLinePackageMwiDuration,
+                  ncsLinePackageOtDuration,
+                  ncsLinePackageRbkDuration,
+                  ncsLinePackageRgDuration,
+                  ncsLinePackageRoDuration,
+                  ncsLinePackageRtDuration,
+                  ncsLinePackageSlDuration,
+                  ncsLinePackageTCriticalDuration,
+                  ncsLinePackageTPartialDuration
+                }
+        STATUS      current
+        DESCRIPTION "This group holds the objects that define the
+                     NCS LINE package."
+        ::= { ncsGroups 4 }
+
+    ncsStatsBasicGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  ncsStatsCurrentNumberOfActiveConnections,
+                  ncsStatsCurrentTotalNumberOfConnections,
+                  ncsStatsCurrentAvgConnectionTime,
+                  ncsStatsCumulatedTotalNumberOfConnections,
+                  ncsStatsCumulatedAvgConnectionTime
+
+                }
+        STATUS current
+        DESCRIPTION "This group holds the objects that define the basic
+                     NCS statistics group."
+        ::= { ncsGroups 5 }
+
+    ncsCallAgentGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  ncsCAConfigSource,
+                  ncsCAHost,
+                  ncsCAPort,
+                  ncsCASelectConfigSource,
+                  ncsCAStaticHost,
+                  ncsCAStaticPort,
+                  ncsCADhcpSiteSpecificCode
+                }
+        STATUS      current
+        DESCRIPTION "This group holds the objects that define the
+                     NCS Call Agent IP address."
+        ::= { ncsGroups 6 }
+
+END

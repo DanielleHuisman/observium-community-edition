@@ -1,0 +1,1596 @@
+LUM-BACKUP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32, IpAddress
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE
+        FROM SNMPv2-CONF
+    RowStatus, DisplayString, TestAndIncr, DateAndTime, TruthValue
+        FROM SNMPv2-TC
+    lumModules, lumBackupMIB
+        FROM LUM-REG
+    CommandString, FaultStatus
+        FROM LUM-TC;
+
+lumBackupMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201712150000Z" -- Dec 15th 2017
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+        "The backup MIB.
+
+        - General
+
+        - Locally stored configuration files
+
+        - Command (only SNMP)
+
+"
+    REVISION
+        "201712150000Z" -- Dec 15th 2017
+    DESCRIPTION
+	"Removed unused command loadConfigFile"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "- Added sftp upload group
+         - Added backup scheme attribute to backupGeneral
+         - Changed ORGANIZATION and CONTACT-INFO"
+    REVISION
+        "201601110000Z" -- Jan 11th 2016
+    DESCRIPTION
+	"Added default operStatus to down."
+    REVISION
+       "200701110000Z" -- January 11th 2007
+    DESCRIPTION
+        "Added minimal compliance and 'upload' to localhost."
+    REVISION
+       "200512050000Z" -- December 5th 2005
+    DESCRIPTION
+        "Added backupUploadUploadNow and backupUploadStatus."
+    REVISION
+        "200412210000Z" -- December 21st 2004
+    DESCRIPTION
+        "Added backup upload."
+    REVISION
+        "200412200000Z" -- December 20th 2004
+    DESCRIPTION
+        "Added primary file name."
+    REVISION
+        "200411090000Z" -- November 9th 2004
+    DESCRIPTION
+        "Added installConfigFile."
+    REVISION
+        "200410280000Z" -- October 28th 2004
+    DESCRIPTION
+        "Added global state and configuration timestamps."
+    REVISION
+        "200409300000Z" -- September 30th 2004
+    DESCRIPTION
+        "Added table size variables in backupGeneral."
+    REVISION
+        "200406170000Z" -- June 16th 2004
+    DESCRIPTION
+        "Added unsaved changes flag in backupGeneral."
+    REVISION
+        "200210290000Z" -- October 29th 2002
+    DESCRIPTION
+        "Command group is now implemented.
+        Added configLastChange in accordance with other MIBs."
+    REVISION
+        "200110300000Z" -- October 30th 2001
+    DESCRIPTION
+        "MIB verson and testAndIncr hidder, not supported yet.
+        Command group hidden, not supported yet.
+        Added lastChangeTime for the whole mib.
+        Updated compliance accordingly"
+    REVISION
+        "200108160000Z" -- August 16th 2001
+    DESCRIPTION
+        "Added backup command group."
+    REVISION
+        "200108010000Z" -- August 1st 2001
+    DESCRIPTION
+        "The initial revision of this module."
+    ::= { lumModules 7 }
+
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and complicance
+-- specifications.
+-- ----------------------------------------------------
+
+lumBackupConfs OBJECT IDENTIFIER ::= { lumBackupMIB 1 }
+lumBackupGroups OBJECT IDENTIFIER ::= { lumBackupConfs 1 }
+lumBackupCompl OBJECT IDENTIFIER ::= { lumBackupConfs 2 }
+lumBackupMinimalGroups OBJECT IDENTIFIER ::= { lumBackupConfs 3 }
+lumBackupMinimalCompl OBJECT IDENTIFIER ::= { lumBackupConfs 4 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the backup MIB
+-- ----------------------------------------------------
+
+lumBackupMIBObjects OBJECT IDENTIFIER ::= { lumBackupMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+backupGeneral OBJECT IDENTIFIER ::= { lumBackupMIBObjects 1 }
+backupFileList OBJECT IDENTIFIER ::= { lumBackupMIBObjects 2 }
+backupCommand OBJECT IDENTIFIER ::= { lumBackupMIBObjects 3 }
+backupPersistentFileList OBJECT IDENTIFIER ::= { lumBackupMIBObjects 4 }
+backupUpload OBJECT IDENTIFIER ::= { lumBackupMIBObjects 5 }
+backupSftpUpload OBJECT IDENTIFIER ::= { lumBackupMIBObjects 6 }
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+-- n/a
+
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+
+backupGeneralTestAndIncr OBJECT-TYPE
+    SYNTAX      TestAndIncr
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Protection against simultaneous access from
+        multiple managers. See SNMPv2-TC.
+
+"
+    ::= { backupGeneral 1 }
+
+backupGeneralMibSpecVersion OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The MIB specification version.
+
+"
+    DEFVAL { "" }
+    ::= { backupGeneral 2 }
+
+backupGeneralMibImplVersion OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The MIB implementation version.
+
+"
+    DEFVAL { "" }
+    ::= { backupGeneral 3 }
+
+backupGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the state of the MIB was last
+        changed.
+"
+    ::= { backupGeneral 4 }
+
+backupGeneralConfigLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the configuration of the MIB
+        was last changed.
+
+"
+    ::= { backupGeneral 5 }
+
+backupGeneralUnsavedChanges OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Set to true(1) if unsaved changes exists.
+
+"
+    ::= { backupGeneral 6 }
+
+backupGeneralFileTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of rows available in the
+        configuration file table.
+
+"
+    ::= { backupGeneral 7 }
+
+backupGeneralPersistentFileTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of rows available in the
+        persistent file list table.
+        configuration file.
+
+"
+    ::= { backupGeneral 8 }
+
+backupGeneralInstallConfigFile OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-write
+    STATUS      deprecated
+    DESCRIPTION
+        "Install a new configuration file.
+
+         The file can either be fetched from a
+         remote server or installed from local
+         directory.
+
+         There are 3 cases:
+
+         1. Remote server. Give server addr and full path
+
+            installConfigFile <ip-addr>/<full path>
+
+            installConfigFile 192.168.10.27/tftp/config.xml
+
+         2. From a local directory
+
+           installConfigFile <full path>
+
+           installConfigFile /root/config.xml
+
+         3. From the local download directory
+            /tftpboot/downloaded
+
+           installConfigFile <file name>
+
+           installConfigFile config.xml
+
+         The file will be installed as an deactivated
+         configuration file, activate manually.
+
+"
+    ::= { backupGeneral 9 }
+
+backupGeneralGlobalStateLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the state of any MIB in the node
+        was last changed.
+
+"
+    ::= { backupGeneral 10 }
+
+backupGeneralGlobalConfigLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the configuration of any MIB in
+        the node was last changed.
+
+"
+    ::= { backupGeneral 11 }
+
+backupGeneralPrimaryFileName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the current primary configuration file.
+
+"
+    ::= { backupGeneral 12 }
+
+backupGeneralWarnForUnsaved OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    disabled (1),
+                    enabled (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable/disable the warning for
+         unsaved changes.
+
+        disabled - warning is disabled.
+
+        enabled - warning is enabled.
+
+"
+    DEFVAL { enabled }
+    ::=  { backupGeneral 13 }
+
+backupGeneralWarnUnsavedDelay OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..60)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies how long time there must be
+         unsaved changes before the warning
+         is issued.
+
+"
+    DEFVAL { 15 }
+    ::=  { backupGeneral 14 }
+
+backupGeneralUnsavedChangesAlarm OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The configuration has not been saved
+         for a specified numer of minutes.
+
+        This function can be disabled, and
+        it is possible to specify the delay
+        how long time there must be unsaved
+        changes, before the warning is issued.
+
+        A(ctivation): When the configuration
+        is changed and not saved for a specified
+        number of minutes.
+
+        D(e-activation): When the configuration is
+        saved, or this alarm function is disabled.
+
+"
+    ::= { backupGeneral 15 }
+
+backupGeneralSavedConfigurationGenerationId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0.. 4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A counter that is incremented each time a backup
+         is saved.
+
+"
+	DEFVAL {0}
+    ::= { backupGeneral 16 }
+
+backupGeneralBackupScheme OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    tftp (1),
+                    sftp (2)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The selected backup transfer initiator.
+
+        TFTP:
+
+        The node element will act as a TFTP client, uploading the
+        compressed backup entity file upon request to a
+        specified TFTP server.
+
+        (S)FTP:
+
+        The node element will act as a SFTP server. It continuously
+        compresses the backup files and makes the resulting backup
+        entity file available for download by a network management
+        system.
+
+        NOTE: If SFTP is not available, the node will act as a FTP
+        server instead.
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { tftp }
+    ::= { backupGeneral 17 }
+
+-- ----------------------------------------------------
+-- Backup file group
+-- ----------------------------------------------------
+
+backupFileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BackupFileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The list of saved configuration files."
+    ::= { backupFileList 1 }
+
+backupFileEntry OBJECT-TYPE
+    SYNTAX      BackupFileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the configuration file list.
+
+"
+    INDEX { backupFileIndex }
+    ::= { backupFileTable 1 }
+
+BackupFileEntry ::=
+    SEQUENCE {
+        backupFileIndex                 Unsigned32,
+        backupFileName                  DisplayString,
+        backupFileDescr                 DisplayString,
+        backupFileLastChangeTime        DateAndTime,
+        backupFileAdminStatus           INTEGER,
+        backupFileOperStatus            INTEGER,
+        backupFileRowStatus             RowStatus,
+        backupFileUrl                   DisplayString }
+
+backupFileIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each
+        configuration file.
+
+"
+    ::= { backupFileEntry 1 }
+
+backupFileName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the configuration file.
+
+"
+    ::= { backupFileEntry 2 }
+
+backupFileDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A user configurable descriptive text of the
+        configuration file.
+
+"
+    DEFVAL { "" }
+    ::= { backupFileEntry 3 }
+
+backupFileLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time the file was last changed.
+
+"
+    ::= { backupFileEntry 4 }
+
+backupFileAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    down (1),
+                    secondary (2),
+                    primary (3) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Indicates which configuration file will be used
+        when loading the configuration.
+
+        down - This configuration will not be loaded.
+
+        secondary - This is the secondary configuration.
+
+        primary - This is the primary configuration.
+
+        Note: There can be only one primary and one
+        secondary configuration file at any given time.
+
+"
+    DEFVAL { primary }
+    ::= { backupFileEntry 5 }
+
+backupFileOperStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    down (1),
+                    running (2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "Indicates which configuration file was most
+       recently loaded.
+
+       down - This configuration is not in use.
+
+       running - This configuration was loaded most recently.
+
+"
+   DEFVAL { down }
+   ::= { backupFileEntry 6 }
+
+backupFileRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Manages creation and deletion of conceptual rows.
+        See also SNMPv2-TC.
+
+        Note: It is only possible to delete files.
+        Creation is not supported.
+
+"
+    ::= { backupFileEntry 7 }
+
+backupFileUrl OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The full path indicating where the file
+        can be found on the network element.
+
+"
+    ::= { backupFileEntry 8 }
+
+
+-- ----------------------------------------------------
+-- Backup command group
+-- ----------------------------------------------------
+
+backupCommandName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The name of the backup to be created.
+
+        If set to the empty string the current
+        configuration file is overwritten.
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { "" }
+    ::= { backupCommand 1 }
+
+backupCommandDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The description for the backup to be created.
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { "" }
+    ::= { backupCommand 2 }
+
+backupCommandAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    down (1),
+                    secondary (2),
+                    primary (3) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The adminStatus for the backup to be created.
+        See also backupFileAdminStatus.
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { primary }
+    ::= { backupCommand 3 }
+
+backupCommandAction OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    idle (1),
+                    saveTofile (2),
+                    busy (3) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Initiates the backup.
+
+        idle - No backup in progress.
+
+        saveTofile - Write backup to local persistent
+        storage.
+
+        busy - Backup function is busy
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { idle }
+    ::= { backupCommand 4 }
+
+backupCommandResult OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    idle (1),
+                    success (2),
+                    failed (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The result of the most recent backup.
+
+"
+    ::= { backupCommand 5 }
+
+
+-- ----------------------------------------------------
+-- Backup upload group
+-- ----------------------------------------------------
+
+backupUploadServerAddr OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The IP address for the backup server.
+        Backups are transferred using TFTP.
+
+        Setting the address to 127.0.0.1 (local host) will
+        only create the file locally; does not attempt to
+        transfer i to the backup server.
+
+        Transfers are disabled if the address is
+        set to 0.0.0.0.
+
+        This attribute can be written via SNMP.
+"
+    ::= { backupUpload 1 }
+
+backupUploadServerPath OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The destination path on the backup server.
+        The configuration package will be written to
+        the following filename.
+
+        <path>/backup_<IP address>.zip
+
+        where path is the destination path
+        and IP address is the numerical IP
+        address with '.'s replaced with '_'s.
+        For example:
+
+        /tftpboot/backup_192_168_10_101.zip
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { "/upload" }
+    ::= { backupUpload 2 }
+
+backupUploadTimeHour OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..23)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The hour during which backups are transferred.
+        The transfer is scheduled at a random time
+        during the hour.
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { 23 }
+    ::= { backupUpload 3 }
+
+backupUploadAction OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    idle (1),
+                    pending (2),
+                    upload (3),
+                    busy (4) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Initiates the backup.
+
+        idle - No backup pending or in progress.
+
+        pending - An upload will be performed
+        at the next time.
+
+        upload - Activate upload immediately.
+
+        busy - Backup function is busy.
+
+        This attribute can be written via SNMP.
+"
+    DEFVAL { idle }
+    ::= { backupUpload 4 }
+
+backupUploadResult OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    idle (1),
+                    success (2),
+                    failed (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The result of the most recent backup upload.
+
+"
+    ::= { backupUpload 5 }
+
+backupUploadLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when a successful upload was last
+        performed.
+
+"
+    ::= { backupUpload 6 }
+
+backupUploadFailure OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The most recent configuration upload failed.
+
+        A(ctivation): When the upload fails.
+
+        D(e-activation): When the upload succeeds
+        or when the upload is disabled
+        (address set to 0.0.0.0).
+
+"
+    ::= { backupUpload 7 }
+
+backupUploadNextTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the next upload attempt will
+        be made.
+
+"
+    ::= { backupUpload 8 }
+
+backupUploadInstallUploadFile OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Installs an upload file. Includes the
+        following files:
+
+        - Configuration file
+
+        - SNMP agent configuration
+
+        - Local user database
+
+         The file can either be fetched from a
+         remote server or installed from local
+         directory.
+
+         There are 3 cases:
+
+         1. Remote server. Give server addr and full path
+
+            installUploadFile <ip-addr>/<full path>
+
+            installUploadFile
+                192.168.10.27/tftp/backup_192_168_10_101.zip
+
+         2. From a local directory
+
+           installUploadFile <full path>
+
+           installUploadFile /root/backup_192_168_10_101.zip
+
+         3. From the local download directory
+            /tftpboot/downloaded
+
+           installUploadFile <file name>
+
+           installUploadFile backup_192_168_10_101.zip
+
+        Note: The configuration file is installed
+        as primary.xml, it will not overwrite an
+        existing file with the same name.
+"
+    ::= { backupUpload 9 }
+
+backupUploadStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    idle (1),
+                    pending (2),
+                    busy (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Upload function status.
+
+        idle - No backup pending or in progress.
+
+        pending - An upload will be performed
+        at the next time.
+
+        busy - The function is busy.
+
+"
+    DEFVAL { idle }
+    ::= { backupUpload 10 }
+
+backupUploadUploadNow OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Triggers an (almost) immediate upload
+        attempt.
+"
+    ::= { backupUpload 11 }
+
+backupUploadLocalFile OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The local file name for the
+        configuration package.
+
+"
+    DEFVAL { "" }
+
+    ::= { backupUpload 12 }
+
+-- ----------------------------------------------------
+-- Backup sftp upload group
+-- ----------------------------------------------------
+
+backupSftpUploadBackupEntityAvailability OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    available (1),
+                    availableOutdated (2),
+                    notAvailable (3)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The availability of the compressed backup entity file.
+
+        available:
+
+        The compressed backup entity file is available and contains the
+        latest changes written to the backup files.
+
+        availableOutdated:
+
+        The compressed backup entity file is available but does not
+        contains the latest changes written to the backup files.
+
+        notAvailable:
+
+        Either there is no compressed backup entity file available
+        or a new backup entity file is currently being compressed.
+
+"
+    DEFVAL { notAvailable }
+    ::= { backupSftpUpload 1 }
+
+backupSftpUploadBackupEntityCompressionTimestamp OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The unix timestamp of the last successful compression of the
+        backup files.
+
+"
+    ::= { backupSftpUpload 2 }
+
+backupSftpUploadBackupEntityCrc OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A 32 bit CRC checksum of the backup entity file.
+
+"
+    ::= { backupSftpUpload 3 }
+
+
+
+backupSftpUploadRestoreEntityAction OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    ready (1),
+                    busy (2),
+                    restoreNow (3)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Initiates the restore of the backup entity file pointed
+        out by the 'Restore entity file path' attribute.
+        Administrator privileges are required to perform a restore
+        procedure.
+
+"
+    DEFVAL { ready }
+    ::= { backupSftpUpload 5 }
+
+backupSftpUploadBackupEntityFilePath OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The absolute path of the backup entity file.
+
+"
+    ::= { backupSftpUpload 6 }
+
+backupSftpUploadRestoreEntityFilePath OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..127))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The absolute path of the restore entity file. This file will be removed
+         when a restore procedure is performed.
+         Administrator privileges are required to modify this path.
+
+"
+    ::= { backupSftpUpload 7 }
+
+backupSftpUploadRestoreEntityRestoreNow OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    normal (1),
+                    restore (2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+       "Restore from backup. Includes the
+        following files:
+
+        - Configuration file
+
+        - SNMP agent configuration
+
+        - Local user database
+
+         The backup file is fetched from the location
+         pointed out by restoreEntityFilePath attribute.
+
+        Note: The configuration file is installed
+        as primary.xml, it will not overwrite an
+        existing file with the same name.
+"
+    ::= { backupSftpUpload 8 }
+
+-- ----------------------------------------------------
+-- Backup persistent files group
+-- ----------------------------------------------------
+
+backupPersistentFileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF BackupPersistentFileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The list of available persistent files."
+    ::= { backupPersistentFileList 1 }
+
+backupPersistentFileEntry OBJECT-TYPE
+    SYNTAX      BackupPersistentFileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the persistent file list.
+
+"
+    INDEX { backupPersistentFileIndex }
+    ::= { backupPersistentFileTable 1 }
+
+BackupPersistentFileEntry ::=
+    SEQUENCE {
+        backupPersistentFileIndex               Unsigned32,
+        backupPersistentFileName                DisplayString,
+        backupPersistentFileDescr               DisplayString }
+
+backupPersistentFileIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each
+        configuration file.
+
+"
+    ::= { backupPersistentFileEntry 1 }
+
+backupPersistentFileName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The file name of the persistent file.
+
+"
+    ::= { backupPersistentFileEntry 2 }
+
+backupPersistentFileDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A user configurable descriptive text of the
+        configuration file.
+
+"
+    ::= { backupPersistentFileEntry 3 }
+
+
+-- ----------------------------------------------------
+-- Notifications
+-- ----------------------------------------------------
+
+-- n/a
+
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+backupGeneralGroup OBJECT-GROUP
+    OBJECTS {
+        backupGeneralTestAndIncr,
+        backupGeneralMibSpecVersion,
+        backupGeneralMibImplVersion }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects."
+    ::= { lumBackupGroups 1 }
+
+backupFileGroup OBJECT-GROUP
+    OBJECTS {
+        backupFileIndex,
+        backupFileName,
+        backupFileDescr,
+        backupFileLastChangeTime,
+        backupFileAdminStatus,
+        backupFileOperStatus,
+        backupFileRowStatus }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup file objects."
+    ::= { lumBackupGroups 2 }
+
+backupCommandGroup OBJECT-GROUP
+    OBJECTS {
+        backupCommandName,
+        backupCommandDescr,
+        backupCommandAdminStatus,
+        backupCommandAction,
+        backupCommandResult }
+    STATUS      current
+    DESCRIPTION
+        "The backup command objects."
+    ::= { lumBackupGroups 3 }
+
+backupGeneralGroupV2 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects v2."
+    ::= { lumBackupGroups 4 }
+
+backupGeneralGroupV3 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects v3."
+    ::= { lumBackupGroups 5 }
+
+backupPersistentFileGroup OBJECT-GROUP
+    OBJECTS {
+        backupPersistentFileIndex,
+        backupPersistentFileName,
+        backupPersistentFileDescr }
+    STATUS      current
+    DESCRIPTION
+        "The backup persistent file objects."
+    ::= { lumBackupGroups 6 }
+
+backupFileGroupV2 OBJECT-GROUP
+    OBJECTS {
+        backupFileIndex,
+        backupFileName,
+        backupFileDescr,
+        backupFileLastChangeTime,
+        backupFileAdminStatus,
+        backupFileOperStatus,
+        backupFileRowStatus,
+        backupFileUrl }
+    STATUS      current
+    DESCRIPTION
+        "The backup file objects v2."
+    ::= { lumBackupGroups 7 }
+
+backupGeneralGroupV4 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime,
+        backupGeneralUnsavedChanges }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects v4."
+    ::= { lumBackupGroups 8 }
+
+backupGeneralGroupV5 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime,
+        backupGeneralUnsavedChanges,
+        backupGeneralFileTableSize,
+        backupGeneralPersistentFileTableSize,
+        backupGeneralInstallConfigFile,
+        backupGeneralGlobalStateLastChangeTime,
+        backupGeneralGlobalConfigLastChangeTime,
+        backupGeneralPrimaryFileName }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects v5."
+    ::= { lumBackupGroups 9 }
+
+backupUploadGroup OBJECT-GROUP
+    OBJECTS {
+        backupUploadServerAddr,
+        backupUploadServerPath,
+        backupUploadTimeHour,
+        backupUploadAction,
+        backupUploadResult,
+        backupUploadLastChangeTime,
+        backupUploadFailure,
+        backupUploadNextTime,
+        backupUploadInstallUploadFile }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup upload objects."
+    ::= { lumBackupGroups 10 }
+
+backupGeneralGroupV6 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime,
+        backupGeneralUnsavedChanges,
+        backupGeneralFileTableSize,
+        backupGeneralPersistentFileTableSize,
+        backupGeneralInstallConfigFile,
+        backupGeneralGlobalStateLastChangeTime,
+        backupGeneralGlobalConfigLastChangeTime,
+        backupGeneralPrimaryFileName,
+        backupGeneralWarnForUnsaved,
+        backupGeneralWarnUnsavedDelay,
+        backupGeneralUnsavedChangesAlarm }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects v6 (5.0)."
+    ::= { lumBackupGroups 11 }
+
+backupUploadGroupV2 OBJECT-GROUP
+    OBJECTS {
+        backupUploadServerAddr,
+        backupUploadServerPath,
+        backupUploadTimeHour,
+        backupUploadAction,
+        backupUploadResult,
+        backupUploadLastChangeTime,
+        backupUploadFailure,
+        backupUploadNextTime,
+        backupUploadInstallUploadFile }
+    STATUS      current
+    DESCRIPTION
+        "The backup upload objects v2 (5.0)."
+    ::= { lumBackupGroups 12 }
+
+backupUploadGroupV3 OBJECT-GROUP
+    OBJECTS {
+        backupUploadServerAddr,
+        backupUploadServerPath,
+        backupUploadTimeHour,
+        backupUploadAction,
+        backupUploadResult,
+        backupUploadLastChangeTime,
+        backupUploadFailure,
+        backupUploadNextTime,
+        backupUploadInstallUploadFile,
+        backupUploadUploadNow,
+        backupUploadStatus,
+        backupUploadLocalFile }
+    STATUS      current
+    DESCRIPTION
+        "The backup upload objects v3 (8.0)."
+    ::= { lumBackupGroups 13 }
+
+backupGeneralGroupV7 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime,
+        backupGeneralUnsavedChanges,
+        backupGeneralFileTableSize,
+        backupGeneralPersistentFileTableSize,
+        backupGeneralInstallConfigFile,
+        backupGeneralGlobalStateLastChangeTime,
+        backupGeneralGlobalConfigLastChangeTime,
+        backupGeneralPrimaryFileName,
+        backupGeneralWarnForUnsaved,
+        backupGeneralWarnUnsavedDelay,
+        backupGeneralUnsavedChangesAlarm,
+        backupGeneralSavedConfigurationGenerationId }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects v7 (12.0)."
+    ::= { lumBackupGroups 14 }
+
+backupGeneralGroupV8 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime,
+        backupGeneralUnsavedChanges,
+        backupGeneralFileTableSize,
+        backupGeneralPersistentFileTableSize,
+        backupGeneralInstallConfigFile,
+        backupGeneralGlobalStateLastChangeTime,
+        backupGeneralGlobalConfigLastChangeTime,
+        backupGeneralPrimaryFileName,
+        backupGeneralWarnForUnsaved,
+        backupGeneralWarnUnsavedDelay,
+        backupGeneralUnsavedChangesAlarm,
+        backupGeneralSavedConfigurationGenerationId,
+        backupGeneralBackupScheme }
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup general objects v8 (29.0)."
+    ::= { lumBackupGroups 15 }
+
+backupSftpUploadGroup OBJECT-GROUP
+    OBJECTS {
+        backupSftpUploadBackupEntityAvailability,
+        backupSftpUploadBackupEntityCompressionTimestamp,
+        backupSftpUploadBackupEntityCrc,
+        backupSftpUploadRestoreEntityAction,
+        backupSftpUploadBackupEntityFilePath,
+        backupSftpUploadRestoreEntityFilePath}
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup sftp upload objects (29.0)"
+    ::= { lumBackupGroups 16 }
+
+backupGeneralGroupV9 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime,
+        backupGeneralUnsavedChanges,
+        backupGeneralFileTableSize,
+        backupGeneralPersistentFileTableSize,
+        backupGeneralGlobalStateLastChangeTime,
+        backupGeneralGlobalConfigLastChangeTime,
+        backupGeneralPrimaryFileName,
+        backupGeneralWarnForUnsaved,
+        backupGeneralWarnUnsavedDelay,
+        backupGeneralUnsavedChangesAlarm,
+        backupGeneralSavedConfigurationGenerationId,
+        backupGeneralBackupScheme }
+    STATUS      current
+    DESCRIPTION
+        "The backup general objects v9 (30.0)."
+    ::= { lumBackupGroups 17 }
+
+backupSftpUploadGroupV2 OBJECT-GROUP
+    OBJECTS {
+        backupSftpUploadBackupEntityAvailability,
+        backupSftpUploadBackupEntityCompressionTimestamp,
+        backupSftpUploadBackupEntityCrc,
+        backupSftpUploadRestoreEntityAction,
+        backupSftpUploadBackupEntityFilePath,
+        backupSftpUploadRestoreEntityFilePath,
+        backupSftpUploadRestoreEntityRestoreNow}
+    STATUS      current
+    DESCRIPTION
+        "The backup sftp upload objects (30.0)"
+    ::= { lumBackupGroups 18 }
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+lumBackupBasicComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v1."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroup,
+            backupFileGroup,
+            backupCommandGroup }
+    ::= { lumBackupCompl 1 }
+
+lumBackupBasicComplV2 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v2."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV2,
+            backupFileGroup }
+    ::= { lumBackupCompl 2 }
+
+lumBackupBasicComplV3 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v3."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV3,
+            backupFileGroup,
+            backupCommandGroup }
+    ::= { lumBackupCompl 3 }
+
+lumBackupBasicComplV4 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v4."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV3,
+            backupFileGroup,
+            backupCommandGroup,
+            backupPersistentFileGroup }
+    ::= { lumBackupCompl 4 }
+
+lumBackupBasicComplV5 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v5."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV3,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup }
+    ::= { lumBackupCompl 5 }
+
+lumBackupBasicComplV6 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v6."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV4,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup }
+    ::= { lumBackupCompl 6 }
+
+lumBackupBasicComplV7 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v7 3.1."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV5,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroup }
+    ::= { lumBackupCompl 7 }
+
+
+lumBackupBasicComplV8 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v8 4.0."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV5,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroup }
+    ::= { lumBackupCompl 8 }
+
+lumBackupBasicComplV9 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v9 5.0."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV6,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroupV2 }
+    ::= { lumBackupCompl 9 }
+
+lumBackupBasicComplV10 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v10 8.0."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV6,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroupV3 }
+    ::= { lumBackupCompl 10 }
+
+lumBackupBasicComplV11 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v11 12.0."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV7,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroupV3 }
+    ::= { lumBackupCompl 11 }
+
+lumBackupBasicComplV12 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v12 29.0."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV8,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroupV3,
+            backupSftpUploadGroup}
+    ::= { lumBackupCompl 12 }
+
+lumBackupBasicComplV13 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v13 30.0."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV9,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroupV3,
+            backupSftpUploadGroupV2}
+    ::= { lumBackupCompl 13 }
+
+
+lumBackupBasicComplV14 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the backup MIB v14 (30.1)."
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralGroupV9,
+            backupFileGroupV2,
+            backupCommandGroup,
+            backupPersistentFileGroup,
+            backupUploadGroupV3,
+            backupSftpUploadGroupV2}
+    ::= { lumBackupCompl 14 }
+
+-- ----------------------------------------------------
+-- Minimal object and event groups
+-- ----------------------------------------------------
+
+backupGeneralMinimalGroupV1 OBJECT-GROUP
+    OBJECTS {
+        backupGeneralLastChangeTime,
+        backupGeneralConfigLastChangeTime,
+        backupGeneralGlobalStateLastChangeTime,
+        backupGeneralGlobalConfigLastChangeTime
+        }
+    STATUS      current
+    DESCRIPTION
+        "The backup general minimal objects v1 (5.0)."
+    ::= { lumBackupMinimalGroups 1 }
+
+backupUploadMinimalGroupV1 OBJECT-GROUP
+    OBJECTS {
+        backupUploadServerAddr,
+        backupUploadTimeHour,
+        backupUploadAction,
+        backupUploadResult,
+        backupUploadLastChangeTime,
+        backupUploadFailure,
+        backupUploadNextTime,
+        backupUploadLocalFile
+        }
+    STATUS      current
+    DESCRIPTION
+        "The backup upload minimal objects v1 (8.0)."
+    ::= { lumBackupMinimalGroups 2 }
+
+backupSftpUploadMinimalGroupV1 OBJECT-GROUP
+    OBJECTS {
+        backupSftpUploadBackupEntityAvailability,
+        backupSftpUploadBackupEntityCompressionTimestamp,
+        backupSftpUploadBackupEntityCrc,
+        backupSftpUploadRestoreEntityAction,
+        backupSftpUploadBackupEntityFilePath,
+        backupSftpUploadRestoreEntityFilePath}
+    STATUS      deprecated
+    DESCRIPTION
+        "The backup upload minimal objects v1 (29.0)."
+    ::= { lumBackupMinimalGroups 3 }
+
+backupSftpUploadMinimalGroupV2 OBJECT-GROUP
+    OBJECTS {
+        backupSftpUploadBackupEntityAvailability,
+        backupSftpUploadBackupEntityCompressionTimestamp,
+        backupSftpUploadBackupEntityCrc,
+        backupSftpUploadRestoreEntityAction,
+        backupSftpUploadBackupEntityFilePath,
+        backupSftpUploadRestoreEntityFilePath,
+        backupSftpUploadRestoreEntityRestoreNow}
+    STATUS      current
+    DESCRIPTION
+        "The backup upload minimal objects v2 (30.0)."
+    ::= { lumBackupMinimalGroups 4 }
+
+
+-- ----------------------------------------------------
+-- Minimal Compliance
+-- ----------------------------------------------------
+
+lumBackupMinimalComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Minimal implementation requirements for the backup MIB v1"
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralMinimalGroupV1,
+            backupUploadMinimalGroupV1}
+    ::= { lumBackupMinimalCompl 1 }
+
+lumBackupMinimalComplV2 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Minimal implementation requirements for the backup MIB v2"
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralMinimalGroupV1,
+            backupUploadMinimalGroupV1,
+            backupSftpUploadMinimalGroupV1}
+    ::= { lumBackupMinimalCompl 2 }
+
+lumBackupMinimalComplV3 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Minimal implementation requirements for the backup MIB v3"
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralMinimalGroupV1,
+            backupUploadMinimalGroupV1,
+            backupSftpUploadMinimalGroupV2}
+    ::= { lumBackupMinimalCompl 3 }
+
+lumBackupMinimalComplV4 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Minimal implementation requirements for the backup MIB v4 (30.1)"
+    MODULE
+        MANDATORY-GROUPS {
+            backupGeneralMinimalGroupV1,
+            backupUploadMinimalGroupV1,
+            backupSftpUploadMinimalGroupV2}
+    ::= { lumBackupMinimalCompl 4 }
+END
+

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -78,7 +77,11 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $mempool)
       // Clean not numeric symbols from snmp output
       foreach (array('perc', 'free', 'used', 'total') as $param)
       {
-        if (isset($mempool[$param])) { $mempool[$param] = snmp_fix_numeric($mempool[$param]); }
+        // Convert strings '3.40 TB' to value
+        // See QNAP NAS-MIB or HIK-DEVICE-MIB
+        $unit = ($param != 'perc' && isset($table_def['unit'])) ? $table_def['unit'] : NULL;
+
+        if (isset($mempool[$param])) { $mempool[$param] = snmp_fix_numeric($mempool[$param], $unit); }
       }
 
       // Merge calculated used/total/free/perc array keys into $mempool variable (with additional options)
@@ -136,6 +139,6 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $mempool)
 $headers = array('%WLabel%n', '%WType%n', '%WIndex%n', '%WTotal%n', '%WUsed%n', '%WFree%n', '%WPerc%n');
 print_cli_table($table_rows, $headers);
 
-unset($cache_mempool, $mempool, $index, $table_row, $table_rows, $table_headers);
+unset($cache_mempool, $mempool, $index, $table_row, $table_rows, $table_headers, $unit);
 
 // EOF

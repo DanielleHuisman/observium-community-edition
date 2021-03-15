@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -24,7 +23,7 @@ $row = 0;
 foreach ($vlans as $vlan)
 {
   $row++;
-  if (is_integer($row/2)) { $row_colour = $list_colour_a; } else { $row_colour = $list_colour_b; }
+  if (is_integer($row/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
   echo('<tr>');
 
   echo('<td style="width: 100px;" class="entity-title"> Vlan ' . $vlan['vlan'] . '</td>');
@@ -51,7 +50,7 @@ foreach ($vlans as $vlan)
   $vsep='';
   foreach ($vlan_ports as $otherport)
   {
-    echo($vsep.generate_port_link($otherport, short_ifname($otherport['ifDescr'])));
+    echo($vsep . generate_port_link_short($otherport));
     if ($otherport['untagged']) { echo("(U)"); }
     $vsep=", ";
   }

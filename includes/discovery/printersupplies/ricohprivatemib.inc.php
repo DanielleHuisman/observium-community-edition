@@ -46,7 +46,7 @@ foreach ($prt_supplies as $index => $entry)
     continue;
   }
 
-  if (str_icontains($entry['ricohEngTonerName'], 'Ink'))
+  if (str_iexists($entry['ricohEngTonerName'], 'Ink'))
   {
     $update_array['type'] = 'ink';
   }

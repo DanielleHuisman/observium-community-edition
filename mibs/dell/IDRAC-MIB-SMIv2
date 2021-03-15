@@ -2,8 +2,8 @@
 --
 -- Title: iDRAC MIB
 --
--- Version: 3.2
--- Date: 19 January 2015
+-- Version: 3.4
+-- Date: 21 August 2018
 --
 -- Description: This MIB defines MIB objects that make iDRAC data available
 -- to SNMP management applications.
@@ -12,7 +12,7 @@
 -- of Managed Information) notations: SMIv1 and SMIv2. This copy of the iDRAC
 -- MIB file is the SMIv2 version of the MIB file.
 --
--- Copyright (c) 2012-2015 Dell Inc.
+-- Copyright (c) 2012-2018 Dell Inc.
 -- All Rights Reserved.
 --
 -- Note: The information and functionality described by this MIB file,
@@ -38,10 +38,13 @@ IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, enterprises
         FROM SNMPv2-SMI
     TEXTUAL-CONVENTION, DisplayString
-        FROM SNMPv2-TC;
+        FROM SNMPv2-TC
+	OBJECT-GROUP,NOTIFICATION-GROUP
+        FROM SNMPv2-CONF;
+
 
 outOfBandGroup MODULE-IDENTITY
-    LAST-UPDATED "201501190000Z" -- 19 January 2015
+    LAST-UPDATED "201808210000Z" -- 21 August 2018
     ORGANIZATION "Dell Inc."
     CONTACT-INFO
         "Visit the Dell Support website at: support.dell.com"
@@ -50,6 +53,13 @@ outOfBandGroup MODULE-IDENTITY
          available to SNMP management applications. It also defines the traps
          that iDRAC supports."
     -- Revision history, in reverse chronological order.
+
+    REVISION "201808210000Z" -- 21 August 2018
+    DESCRIPTION
+        "Version: 3.4
+         * Updated alertStorageSolidstateDrive trap.
+         * Updated alertInternaliDRACMemoryUnresponsive trap.
+		 * Added new memory properties - memoryDeviceTechnology, memoryDeviceVolatileSize, memoryDeviceNonVolatilesSize, memoryDeviceCacheSize & memoryDeviceRemainingRatedWriteEndurance."
 
     REVISION "201501190000Z" -- 19 January 2015
     DESCRIPTION
@@ -189,6 +199,11 @@ physicalDevices                 OBJECT IDENTIFIER ::= { storageManagement 130 }
 logicalDevices                  OBJECT IDENTIFIER ::= { storageManagement 140 }
 -- Storage details end
 
+conformanceGroup                OBJECT IDENTIFIER ::= { outOfBandGroup 6     }
+conformanceMIBCompliances       OBJECT IDENTIFIER ::= { conformanceGroup 1   }
+conformanceMIBGroups            OBJECT IDENTIFIER ::= { conformanceGroup 2   }
+conformanceMIBnotificationGroup OBJECT IDENTIFIER ::= { conformanceGroup 4  }
+
 
 ------------------------------------------------------------------------------
 -- Textual Conventions
@@ -298,7 +313,16 @@ StateCapabilitiesFlags  ::= TEXTUAL-CONVENTION
     enableCapable(2),           -- be disabled (offline) or be enabled (online)
     notReadyCapable(4),         -- not ready
     enableAndNotReadyCapable(6)
+}
 
+SystemLockdownModeEnum  ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "State Capabilities flags."
+    SYNTAX              INTEGER {
+    --disabled(0),                             -  LockdownMode disabled
+    enabled(1),                                  -- LockdownMode enabled
+	unknown(2)                                  -- LockdownMode unknown
 }
 
 --
@@ -396,9 +420,14 @@ RacTypeEnum             ::= TEXTUAL-CONVENTION
     other(1),               -- the RAC type is not one of the following
     unknown(2),             -- the RAC type is unknown
     idrac7monolithic(16),   -- iDRAC7 Monolithic
-    idrac7modular(17),       -- iDRAC7 Modular
+    idrac7modular(17),      -- iDRAC7 Modular
+    idrac7DCS(21),          -- iDRAC7 DCS
     idrac8monolithic(32),   -- iDRAC8 Monolithic
-    idrac8modular(33)       -- iDRAC8 Modular
+    idrac8modular(33),      -- iDRAC8 Modular
+    idrac8DCS(34),         -- iDRAC8 DCS
+    idrac9Monolithic(48),   -- iDRAC9 Monolothic
+    idrac9Modular(49),      -- iDRAC9 Modular
+    idrac9DCS(50)           -- iDRAC9 DCS
 }
 
 SystemFormFactorEnum    ::= TEXTUAL-CONVENTION
@@ -464,6 +493,13 @@ PowerStateStatusEnum    ::= TEXTUAL-CONVENTION
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.1.1.<a>.0
 ------------------------------------------------------------------------------
+racInfoObjGroup OBJECT-GROUP
+    OBJECTS { racName, racShortName, racDescription, racManufacturer, racVersion,
+              racURL, racType, racFirmwareVersion }
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the remote access card."
+    ::= { conformanceMIBGroups 1  }
 
 racName OBJECT-TYPE
     SYNTAX          StringType
@@ -540,6 +576,13 @@ racFirmwareVersion OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.1.2.<a>.0
 ------------------------------------------------------------------------------
 
+chassisInfoObjGroup OBJECT-GROUP
+    OBJECTS { chassisServiceTag, chassisNameModular, chassisModelModular}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Chassis group."
+    ::= { conformanceMIBGroups 2 }
+
 chassisServiceTag OBJECT-TYPE
     SYNTAX          StringType
     MAX-ACCESS      read-only
@@ -572,7 +615,15 @@ chassisModelModular OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.1.3.<a>.0
 ------------------------------------------------------------------------------
-
+systemInfoObjGroup OBJECT-GROUP
+    OBJECTS { systemFQDN, systemServiceTag, systemExpressServiceCode, systemAssetTag, systemBladeSlotNumber, 
+	          systemOSName, systemFormFactor, systemDataCenterName, systemAisleName, systemRackName, 
+			  systemRackSlot, systemModelName, systemSystemID, systemOSVersion, systemRoomName,
+			  systemChassisSystemHeight, systemBladeGeometry, systemNodeID,systemOEMOSVersion}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the System group."
+    ::= { conformanceMIBGroups 3 }
 systemFQDN OBJECT-TYPE
     SYNTAX          StringType
     MAX-ACCESS      read-only
@@ -726,13 +777,32 @@ systemNodeID OBJECT-TYPE
         provides a unique identifier for the system."
     ::= { systemInfoGroup 18 }
 
-
+systemOEMOSVersion OBJECT-TYPE
+    SYNTAX          StringType
+    MAX-ACCESS          read-only
+    STATUS          current
+    DESCRIPTION
+        "This attribute defines the OEM version of the operating system ."
+    ::= { systemInfoGroup 19 }
+systemLockdownMode OBJECT-TYPE
+    SYNTAX          SystemLockdownModeEnum
+    MAX-ACCESS          read-only
+    STATUS          current
+    DESCRIPTION
+        "This attribute defines the system Lockdown mode is enabled or disabled."
+    ::= { systemInfoGroup 20 }
 ------------------------------------------------------------------------------
 -- Status Group
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.2.<a>.0
 ------------------------------------------------------------------------------
-
+statusInfoObjGroup OBJECT-GROUP
+    OBJECTS { globalSystemStatus, systemLCDStatus, globalStorageStatus, systemPowerState, systemPowerUpTime}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the status group."
+    ::= { conformanceMIBGroups 4 }
+	
 globalSystemStatus OBJECT-TYPE
     SYNTAX          ObjectStatusEnum
     MAX-ACCESS      read-only
@@ -791,7 +861,13 @@ systemPowerUpTime OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.3.1.<a>.0
 ------------------------------------------------------------------------------
-
+alertInfoObjGroup OBJECT-GROUP
+    OBJECTS { alertMessageID, alertMessage, alertCurrentStatus, alertSystemServiceTag, alertSystemFQDN, alertFQDD, alertDeviceDisplayName, 
+	          alertMessageArguments, alertChassisServiceTag, alertChassisName, alertRacFQDN}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the alert group."
+    ::= { conformanceMIBGroups 5 }
 alertMessageID OBJECT-TYPE
     SYNTAX          OCTET STRING (SIZE (0..8))
     MAX-ACCESS      read-only
@@ -902,7 +978,13 @@ alertRacFQDN OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.1.<a>.0
 -------------------------------------------------------------------------------
-
+mibVersionInfoObjGroup OBJECT-GROUP
+    OBJECTS { mIBMajorVersionNumber, mIBMinorVersionNumber, mIBMaintenanceVersionNumber}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the mib version group."
+    ::= { conformanceMIBGroups 6 }
+	
 mIBMajorVersionNumber OBJECT-TYPE
     SYNTAX      Unsigned8BitRange
     MAX-ACCESS  read-only
@@ -943,7 +1025,29 @@ mIBMaintenanceVersionNumber OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.200.10.1.<a>.<i1>
 -------------------------------------------------------------------------------
-
+systemStateTableInfoObjGroup OBJECT-GROUP
+    OBJECTS { systemStatechassisIndex, systemStateGlobalSystemStatus, systemStateChassisState, systemStateChassisStatus,
+	          systemStatePowerUnitStateDetails, systemStatePowerUnitStatusRedundancy, systemStatePowerUnitStatusDetails, 
+			  systemStatePowerSupplyStateDetails, systemStatePowerSupplyStatusCombined, systemStatePowerSupplyStatusDetails,
+			  systemStateVoltageStateDetails, systemStateVoltageStatusCombined, systemStateVoltageStatusDetails,
+			  systemStateAmperageStateDetails, systemStateAmperageStatusCombined, systemStateAmperageStatusDetails,
+			  systemStateCoolingUnitStateDetails, systemStateCoolingUnitStatusRedundancy, systemStateCoolingUnitStatusDetails,
+			  systemStateCoolingDeviceStateDetails, systemStateCoolingDeviceStatusCombined, systemStateCoolingDeviceStatusDetails, 
+			  systemStateTemperatureStateDetails, systemStateTemperatureStatusCombined, systemStateTemperatureStatusDetails,
+			  systemStateMemoryDeviceStateDetails, systemStateMemoryDeviceStatusCombined, systemStateMemoryDeviceStatusDetails,
+			  systemStateChassisIntrusionStateDetails, systemStateChassisIntrusionStatusCombined, systemStateChassisIntrusionStatusDetails,
+			  systemStatePowerUnitStatusCombined, systemStatePowerUnitStatusList, systemStateCoolingUnitStatusCombined, 
+			  systemStateCoolingUnitStatusList, systemStateProcessorDeviceStatusCombined, systemStateProcessorDeviceStatusList,
+			  systemStateBatteryStatusCombined, systemStateBatteryStatusList, systemStateSDCardUnitStatusCombined, systemStateSDCardUnitStatusList,
+			  systemStateSDCardDeviceStatusCombined, systemStateSDCardDeviceStatusList, systemStateIDSDMCardUnitStatusCombined,
+			  systemStateIDSDMCardUnitStatusList, systemStateIDSDMCardDeviceStatusCombined, systemStateIDSDMCardDeviceStatusList,
+			  systemStateTemperatureStatisticsStateDetails, systemStateTemperatureStatisticsStatusCombined, systemStateTemperatureStatisticsStatusDetails,systemStateCMCStatus
+			  }
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the System State Table group."
+    ::= { conformanceMIBGroups 7 }
+	
 SystemStateTableEntry                              ::= SEQUENCE {
     systemStatechassisIndex                        ObjectRange,
     systemStateGlobalSystemStatus                  ObjectStatusEnum,
@@ -994,7 +1098,8 @@ SystemStateTableEntry                              ::= SEQUENCE {
     systemStateIDSDMCardDeviceStatusList           OCTET STRING,
     systemStateTemperatureStatisticsStateDetails   OCTET STRING,
     systemStateTemperatureStatisticsStatusCombined ObjectStatusEnum,
-    systemStateTemperatureStatisticsStatusDetails  OCTET STRING
+    systemStateTemperatureStatisticsStatusDetails  OCTET STRING,
+	systemStateCMCStatus       ObjectStatusEnum
 }
 
 systemStateTable                                OBJECT-TYPE
@@ -1567,7 +1672,13 @@ systemStateTemperatureStatisticsStatusDetails   OBJECT-TYPE
         The bytes have the same definition type as ObjectStatusEnum."
     ::= { systemStateTableEntry 64 }
 
-
+systemStateCMCStatus          OBJECT-TYPE
+    SYNTAX      ObjectStatusEnum
+    MAX-ACCESS      read-only
+    STATUS      current
+    DESCRIPTION
+        "0200.0010.0001.0065 This attribute defines the status of CMC."
+    ::= { systemStateTableEntry 65 }
 -------------------------------------------------------------------------------
 -- Chassis Information Group
 --
@@ -1614,7 +1725,12 @@ LogFormatType                                   ::= TEXTUAL-CONVENTION
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.300.<a>.0
 -------------------------------------------------------------------------------
-
+chassisInformationObjGroup OBJECT-GROUP
+    OBJECTS { numEventLogEntries, numLCLogEntries}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the System chassis information group."
+    ::= { conformanceMIBGroups 8 }
 numEventLogEntries                              OBJECT-TYPE
     SYNTAX      Unsigned32BitRange
     MAX-ACCESS  read-only
@@ -1864,6 +1980,48 @@ SystemPropertiesFlags                           ::= TEXTUAL-CONVENTION
     energySmart(1)                              -- Energy Smart system
 }
 
+chassisInformationTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    chassisIndexChassisInformation,
+    chassisStateCapabilities,
+    chassisStateSettings,
+    chassisStatus,
+    chassisparentIndexReference,
+    chassisType,
+    chassisName,
+    chassisManufacturerName,
+    chassisModelTypeName,
+    chassisAssetTagName,
+    chassisServiceTagName,
+    chassisID,
+    chassisIDExtension,
+    chassisSystemClass,
+    chassisSystemName,
+    chassisLEDControlCapabilitiesUnique,
+    chassisLEDControlSettingsUnique,
+    chassisIdentifyFlashControlCapabilities,
+    chassisIdentifyFlashControlSettings,
+    chassisLockPresent,
+    chassishostControlCapabilitiesUnique,
+    chassishostControlSettingsUnique,
+    chassiswatchDogControlCapabilitiesUnique,
+    chassiswatchDogControlSettingsUnique,
+    chassiswatchDogControlExpiryTimeCapabilitiesUnique,
+    chassiswatchDogControlExpiryTime,
+    chassisPowerButtonControlCapabilitiesUnique,
+    chassisPowerButtonControlSettingsUnique,
+    chassisNMIButtonControlCapabilitiesUnique,
+    chassisNMIButtonControlSettingsUnique,
+    chassisSystemProperties,
+    chassisSystemRevisionNumber,
+    chassisSystemRevisionName,
+    chassisExpressServiceCodeName	
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the System chassis information table group."
+    ::= { conformanceMIBGroups 9 }
+	
 ChassisInformationTableEntry                    ::= SEQUENCE {
     chassisIndexChassisInformation              ObjectRange,
     chassisStateCapabilities                    StateCapabilitiesFlags,
@@ -2217,7 +2375,21 @@ chassisExpressServiceCodeName                   OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.300.40.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
-
+eventLogTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    eventLogchassisIndex,
+    eventLogRecordIndex,
+    eventLogStateCapabilitiesUnique,
+    eventLogStateSettingsUnique,
+    eventLogRecord,
+    eventLogFormat,
+    eventLogSeverityStatus,
+    eventLogDateName	
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the event log table group."
+    ::= { conformanceMIBGroups 11 }
 EventLogTableEntry                              ::= SEQUENCE {
     eventLogchassisIndex                        ObjectRange,
     eventLogRecordIndex                         Unsigned32BitRange,
@@ -2323,7 +2495,22 @@ eventLogDateName                                OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.300.50.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
-
+systemBiosTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    systemBIOSchassisIndex,
+    systemBIOSIndex,
+    systemBIOSStateCapabilities,
+    systemBIOSStateSettings,
+    systemBIOSStatus,
+    systemBIOSReleaseDateName,
+    systemBIOSVersionName,
+    systemBIOSManufacturerName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the system Bios table group."
+    ::= { conformanceMIBGroups 12 }
+	
 SystemBIOSTableEntry                            ::= SEQUENCE {
     systemBIOSchassisIndex                      ObjectRange,
     systemBIOSIndex                             ObjectRange,
@@ -2440,9 +2627,28 @@ FirmwareType                                    ::= TEXTUAL-CONVENTION
     unknown(2),                                 -- type is unknown
     lifecycleController(20),                    -- type is Lifecycle Controller
     iDRAC7(21),                                 -- type is Integrated Dell Remote Access Controller 7
-    iDRAC8(22)                                  -- type is Integrated Dell Remote Access Controller 8
+    iDRAC8(22),                                  -- type is Integrated Dell Remote Access Controller 8
+	iDRAC9(23)                                  -- type is Integrated Dell Remote Access Controller 9
 }
 
+firmwareTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    firmwarechassisIndex,
+    firmwareIndex,
+    firmwareStateCapabilities,
+    firmwareStateSettings,
+    firmwareStatus,
+    firmwareSize,
+    firmwareType,
+    firmwareTypeName,
+    firmwareUpdateCapabilities,
+    firmwareVersionName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the firmware table group."
+    ::= { conformanceMIBGroups 13 }
+	
 FirmwareTableEntry                              ::= SEQUENCE {
     firmwarechassisIndex                        ObjectRange,
     firmwareIndex                               ObjectRange,
@@ -2587,6 +2793,22 @@ IntrusionTypeEnum                               ::= TEXTUAL-CONVENTION
     chassisBreachDetectionWhenPowerOFF(2)       -- type is detect intrusion while power off
 }
 
+intrusionTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    intrusionchassisIndex,
+    intrusionIndex,
+    intrusionStateCapabilities,
+    intrusionStateSettings,
+    intrusionStatus,
+    intrusionReading,
+    intrusionType,
+    intrusionLocationName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the intrusion table group."
+    ::= { conformanceMIBGroups 14 }
+
 IntrusionTableEntry                             ::= SEQUENCE {
     intrusionchassisIndex                       ObjectRange,
     intrusionIndex                              ObjectRange,
@@ -2707,6 +2929,26 @@ LcLogCategoryEnum                               ::= TEXTUAL-CONVENTION
     configuration(5),                           -- Configuration category
     workNotes(6)                                -- Work Notes category
 }
+
+lcLogTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    lcLogChassisIndex,
+    lcLogRecordIndex,
+    lcLogSequenceNumber,
+    lcLogCategory,
+    lcLogSeverityStatus,
+    lcLogDateName,
+    lcLogFQDD,
+    lcLogMessageID,
+    lcLogMessage,
+    lcLogDetailedDescription,
+    lcLogRecommededAction,
+    lcLogComment
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the lc log table group."
+    ::= { conformanceMIBGroups 15 }
 
 LcLogTableEntry                                 ::= SEQUENCE {
     lcLogChassisIndex                           ObjectRange,
@@ -2868,6 +3110,22 @@ lcLogComment                                    OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.600.10.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
 
+powerUnitTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    powerUnitchassisIndex,
+    powerUnitIndex,
+    powerUnitStateCapabilities,
+    powerUnitStateSettings,
+    powerUnitRedundancyStatus,
+    powerSupplyCountForRedundancy,
+    powerUnitName,
+    powerUnitStatus
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the power unit table group."
+    ::= { conformanceMIBGroups 16 }
+	
 PowerUnitTableEntry                             ::= SEQUENCE {
     powerUnitchassisIndex                       ObjectRange,
     powerUnitIndex                              ObjectRange,
@@ -3050,6 +3308,30 @@ PowerSupplyConfigurationErrorTypeEnum           ::= TEXTUAL-CONVENTION
     revisionMismatch(2),                        -- error type is Revision mismatch
     processorMissing(3)                         -- error type is Processor missing
 }
+
+powerSupplyTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    powerSupplychassisIndex,
+    powerSupplyIndex,
+    powerSupplyStateCapabilitiesUnique,
+    powerSupplyStateSettingsUnique,
+    powerSupplyStatus,
+    powerSupplyOutputWatts,
+    powerSupplyType,
+    powerSupplyLocationName,
+    powerSupplyMaximumInputVoltage,
+    powerSupplypowerUnitIndexReference,
+    powerSupplySensorState,
+    powerSupplyConfigurationErrorType,
+    powerSupplyPowerMonitorCapable,
+    powerSupplyRatedInputWattage,
+    powerSupplyFQDD,
+    powerSupplyCurrentInputVoltage
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the power supply table group."
+    ::= { conformanceMIBGroups 17 }
 
 PowerSupplyTableEntry                           ::= SEQUENCE {
     powerSupplychassisIndex                     ObjectRange,
@@ -3273,6 +3555,30 @@ VoltageDiscreteReadingEnum                      ::= TEXTUAL-CONVENTION
     voltageIsGood(1),                           -- voltage reading is Good
     voltageIsBad(2)                             -- voltage reading is Bad
 }
+
+voltageProbeTableTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    voltageProbechassisIndex,
+    voltageProbeIndex,
+    voltageProbeStateCapabilities,
+    voltageProbeStateSettings,
+    voltageProbeStatus,
+    voltageProbeReading,
+    voltageProbeType,
+    voltageProbeLocationName,
+    voltageProbeUpperNonRecoverableThreshold,
+    voltageProbeUpperCriticalThreshold,
+    voltageProbeUpperNonCriticalThreshold,
+    voltageProbeLowerNonCriticalThreshold,
+    voltageProbeLowerCriticalThreshold,
+    voltageProbeLowerNonRecoverableThreshold,
+    voltageProbeProbeCapabilities,
+    voltageProbeDiscreteReading
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Voltage Probe Table group."
+    ::= { conformanceMIBGroups 18 }
 
 VoltageProbeTableEntry                          ::= SEQUENCE {
     voltageProbechassisIndex                    ObjectRange,
@@ -3510,6 +3816,30 @@ AmperageDiscreteReadingEnum                     ::= TEXTUAL-CONVENTION
     amperageIsBad(2)                            -- amperage reading is Bad
 }
 
+amperageProbeTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    amperageProbechassisIndex,
+    amperageProbeIndex,
+    amperageProbeStateCapabilities,
+    amperageProbeStateSettings,
+    amperageProbeStatus,
+    amperageProbeReading,
+    amperageProbeType,
+    amperageProbeLocationName,
+    amperageProbeUpperNonRecoverableThreshold,
+    amperageProbeUpperCriticalThreshold,
+    amperageProbeUpperNonCriticalThreshold,
+    amperageProbeLowerNonCriticalThreshold,
+    amperageProbeLowerCriticalThreshold,
+    amperageProbeLowerNonRecoverableThreshold,
+    amperageProbeProbeCapabilities,
+    amperageProbeDiscreteReading
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Amperage Probe Table group."
+    ::= { conformanceMIBGroups 19 }
+
 AmperageProbeTableEntry                         ::= SEQUENCE {
     amperageProbechassisIndex                   ObjectRange,
     amperageProbeIndex                          ObjectRange,
@@ -3733,6 +4063,21 @@ SystemBatteryReadingFlags                       ::= TEXTUAL-CONVENTION
     presenceDetected(4)                         -- battery presence detected
 }
 
+systemBatteryTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    systemBatteryChassisIndex,
+    systemBatteryIndex,
+    systemBatteryStateCapabilities,
+    systemBatteryStateSettings,
+    systemBatteryStatus,
+    systemBatteryReading,
+    systemBatteryLocationName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the System Battery Table group."
+    ::= { conformanceMIBGroups 20 }
+
 SystemBatteryTableEntry                         ::= SEQUENCE {
     systemBatteryChassisIndex                   ObjectRange,
     systemBatteryIndex                          ObjectRange,
@@ -3844,6 +4189,35 @@ PowerCapSettingEnum                             ::= TEXTUAL-CONVENTION
     -- disabled(0),                             -  power cap disabled
     enabled(1)                                  -- power cap enabled
 }
+
+powerUsageTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    powerUsageChassisIndex,
+    powerUsageIndex,
+    powerUsageStateCapabilities,
+    powerUsageStateSettings,
+    powerUsageStatus,
+    powerUsageEntityName,
+    powerUsageCumulativeWattage,
+    powerUsageCumulativeWattageStartDateName,
+    powerUsagePeakWatts,
+    powerUsagePeakWattsStartDateName,
+    powerUsagePeakWattsReadingDateName,
+    powerUsagePeakAmps,
+    powerUsagePeakAmpsStartDateName,
+    powerUsagePeakAmpsReadingDateName,
+    powerUsageIdlePower,
+    powerUsageMaxPotentialPower,
+    powerUsagePowerCapCapabilities,
+    powerUsagePowerCapSetting,
+    powerUsagePowerCapValue,
+    powerUsageInstantaneousHeadroom,
+    powerUsagePeakHeadroom
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Power Usage Table group."
+    ::= { conformanceMIBGroups 21 }
 
 PowerUsageTableEntry                            ::= SEQUENCE {
     powerUsageChassisIndex                      ObjectRange,
@@ -4100,6 +4474,22 @@ powerUsagePeakHeadroom                          OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.700.10.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
 
+coolingUnitTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    coolingUnitchassisIndex,
+    coolingUnitIndex,
+    coolingUnitStateCapabilties,
+    coolingUnitStateSettings,
+    coolingUnitRedundancyStatus,
+    coolingDeviceCountForRedundancy,
+    coolingUnitName,
+    coolingUnitStatus
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Cooling Unit Table group."
+    ::= { conformanceMIBGroups 22 }
+
 CoolingUnitTableEntry                           ::= SEQUENCE {
     coolingUnitchassisIndex                     ObjectRange,
     coolingUnitIndex                            ObjectRange,
@@ -4246,6 +4636,33 @@ CoolingDeviceDiscreteReadingEnum                ::= TEXTUAL-CONVENTION
     coolingDeviceIsGood(1),                     -- cooling device is Good
     coolingDeviceIsBad(2)                       -- cooling device is Bad
 }
+
+coolingDeviceTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    coolingDevicechassisIndex,
+    coolingDeviceIndex,
+    coolingDeviceStateCapabilities,
+    coolingDeviceStateSettings,
+    coolingDeviceStatus,
+    coolingDeviceReading,
+    coolingDeviceType,
+    coolingDeviceLocationName,
+    coolingDeviceUpperNonRecoverableThreshold,
+    coolingDeviceUpperCriticalThreshold,
+    coolingDeviceUpperNonCriticalThreshold,
+    coolingDeviceLowerNonCriticalThreshold,
+    coolingDeviceLowerCriticalThreshold,
+    coolingDeviceLowerNonRecoverableThreshold,
+    coolingDevicecoolingUnitIndexReference,
+    coolingDeviceSubType,
+    coolingDeviceProbeCapabilities,
+    coolingDeviceDiscreteReading,
+    coolingDeviceFQDD
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Cooling Device Table group."
+    ::= { conformanceMIBGroups 23 }
 
 CoolingDeviceTableEntry                         ::= SEQUENCE {
     coolingDevicechassisIndex                   ObjectRange,
@@ -4502,6 +4919,30 @@ TemperatureDiscreteReadingEnum                  ::= TEXTUAL-CONVENTION
     temperatureIsGood(1),                       -- temperature reading is Good
     temperatureIsBad(2)                         -- temperature reading is Bad
 }
+
+temperatureProbeTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    temperatureProbechassisIndex,
+    temperatureProbeIndex,
+    temperatureProbeStateCapabilities,
+    temperatureProbeStateSettings,
+    temperatureProbeStatus,
+    temperatureProbeReading,
+    temperatureProbeType,
+    temperatureProbeLocationName,
+    temperatureProbeUpperNonRecoverableThreshold,
+    temperatureProbeUpperCriticalThreshold,
+    temperatureProbeUpperNonCriticalThreshold,
+    temperatureProbeLowerNonCriticalThreshold,
+    temperatureProbeLowerCriticalThreshold,
+    temperatureProbeLowerNonRecoverableThreshold,
+    temperatureProbeProbeCapabilities,
+    temperatureProbeDiscreteReading
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Temperature Probe Table group."
+    ::= { conformanceMIBGroups 24 }
 
 TemperatureProbeTableEntry                      ::= SEQUENCE {
     temperatureProbechassisIndex                ObjectRange,
@@ -4809,6 +5250,7 @@ ProcessorDeviceFamily                           ::= TEXTUAL-CONVENTION
     deviceFamilyIs68010(99),                    -- family is 68010
     deviceFamilyIs68020(100),                   -- family is 68020
     deviceFamilyIs68030(101),                   -- family is 68030
+    deviceFamilyIsAMDZen(107),                  -- family is AMD Zen Processor Family
     deviceFamilyIsHobbit(112),                  -- family is Hobbit Family
     deviceFamilyIsCrusoeTM5000(120),            -- family is Crusoe TM5000 Family
     deviceFamilyIsCrusoeTM3000(121),            -- family is Crusoe TM3000 Family
@@ -4920,6 +5362,36 @@ ProcessorDeviceStatusState                      ::= TEXTUAL-CONVENTION
     biosDisabled(5),                            -- state is disabled by BIOS (POST error)
     idle(6)                                     -- state is idle
 }
+
+processorDeviceTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    processorDevicechassisIndex,
+    processorDeviceIndex,
+    processorDeviceStateCapabilities,
+    processorDeviceStateSettings,
+    processorDeviceStatus,
+    processorDeviceType,
+    processorDeviceManufacturerName,
+    processorDeviceStatusState,
+    processorDeviceFamily,
+    processorDeviceMaximumSpeed,
+    processorDeviceCurrentSpeed,
+    processorDeviceExternalClockSpeed,
+    processorDeviceVoltage,
+    processorDeviceVersionName,
+    processorDeviceCoreCount,
+    processorDeviceCoreEnabledCount,
+    processorDeviceThreadCount,
+    processorDeviceCharacteristics,
+    processorDeviceExtendedCapabilities,
+    processorDeviceExtendedSettings,
+    processorDeviceBrandName,
+    processorDeviceFQDD
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Processor Device Table group."
+    ::= { conformanceMIBGroups 25 }
 
 ProcessorDeviceTableEntry                       ::= SEQUENCE {
     processorDevicechassisIndex                 ObjectRange,
@@ -5217,6 +5689,21 @@ ProcessorDeviceStatusReadingFlags               ::= TEXTUAL-CONVENTION
     processorThrottled(1024)                    -- Processor Throttled
 }
 
+processorDeviceStatusTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    processorDeviceStatusChassisIndex,
+    processorDeviceStatusIndex,
+    processorDeviceStatusStateCapabilities,
+    processorDeviceStatusStateSettings,
+    processorDeviceStatusStatus,
+    processorDeviceStatusReading,
+    processorDeviceStatusLocationName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Processor Device Status Table group."
+    ::= { conformanceMIBGroups 26 }
+
 ProcessorDeviceStatusTableEntry                 ::= SEQUENCE {
     processorDeviceStatusChassisIndex           ObjectRange,
     processorDeviceStatusIndex                  ObjectRange,
@@ -5315,6 +5802,27 @@ processorDeviceStatusLocationName               OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.1100.50.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
+MemoryTechnologyEnum            ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Memory Technology Enum."
+    SYNTAX                                      INTEGER {
+    other(1),                       -- the memory technology is other than following values
+    unknown(2),                     -- the memory technology is not one of the following:
+    dram(3),                        -- the memory technology is DRAM
+    nvdimmn(4),                    -- the memory technology is NVDIMM-N
+    nvdimmf(5),                    -- the memory technology is NVDIMM-F
+    nvdimmp(6),                    -- the memory technology is NVDIMM-P
+	intelpersistentmemory(7)        -- the memory technology is intelpersistentmemory
+}
+
+MemoryPropertyEnum           ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Memory Property Enum."
+    SYNTAX                                      INTEGER {
+	notApplicable(255)				-- the memory property is NotApplicable for the device.
+}
 
 MemoryDeviceTypeEnum                            ::= TEXTUAL-CONVENTION
     STATUS current
@@ -5346,6 +5854,35 @@ MemoryDeviceTypeEnum                            ::= TEXTUAL-CONVENTION
     deviceTypeIsDDR4(26)                        -- type is DDR4
 }
 
+
+memoryDeviceTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    memoryDevicechassisIndex,
+    memoryDeviceIndex,
+    memoryDeviceStateCapabilities,
+    memoryDeviceStateSettings,
+    memoryDeviceStatus,
+    memoryDeviceType,
+    memoryDeviceLocationName,
+    memoryDeviceBankLocationName,
+    memoryDeviceSize,
+    memoryDeviceSpeed,
+    memoryDeviceManufacturerName,
+    memoryDevicePartNumberName,
+    memoryDeviceSerialNumberName,
+    memoryDeviceFQDD,
+    memoryDeviceCurrentOperatingSpeed,
+    memoryDeviceTechnology,
+    memoryDeviceVolatileSize,
+    memoryDeviceNonVolatilesSize,
+    memoryDeviceCacheSize,
+    memoryDeviceRemainingRatedWriteEndurance	
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Memory Device Table group."
+    ::= { conformanceMIBGroups 27 }
+
 MemoryDeviceTableEntry                          ::= SEQUENCE {
     memoryDevicechassisIndex                    ObjectRange,
     memoryDeviceIndex                           ObjectRange,
@@ -5361,7 +5898,12 @@ MemoryDeviceTableEntry                          ::= SEQUENCE {
     memoryDevicePartNumberName                  String64,
     memoryDeviceSerialNumberName                String64,
     memoryDeviceFQDD                            FQDDString,
-    memoryDeviceCurrentOperatingSpeed           Unsigned32BitRange
+    memoryDeviceCurrentOperatingSpeed           Unsigned32BitRange,
+    memoryDeviceTechnology                      MemoryTechnologyEnum,
+    memoryDeviceVolatileSize					Unsigned32BitRange,
+    memoryDeviceNonVolatilesSize				Unsigned32BitRange,
+    memoryDeviceCacheSize						Unsigned32BitRange,
+    memoryDeviceRemainingRatedWriteEndurance    MemoryPropertyEnum
 }
 
 memoryDeviceTable                               OBJECT-TYPE
@@ -5515,12 +6057,68 @@ memoryDeviceCurrentOperatingSpeed               OBJECT-TYPE
         in megahertz (MHz) of the memory device.  Zero indicates an unknown speed."
     ::= { memoryDeviceTableEntry 27 }
 
+memoryDeviceTechnology               OBJECT-TYPE
+    SYNTAX      MemoryTechnologyEnum
+    MAX-ACCESS      read-only
+    STATUS      current
+    DESCRIPTION
+        "1100.0050.0001.0028 This attribute defines the type or technology of the memory device."
+    ::= { memoryDeviceTableEntry 28 }
+
+memoryDeviceVolatileSize               OBJECT-TYPE
+    SYNTAX      Unsigned32BitRange
+    MAX-ACCESS      read-only
+    STATUS      current
+    DESCRIPTION
+        "1100.0050.0001.0029 This attribute defines the volatile size of the memory device in MBs."
+    ::= { memoryDeviceTableEntry 29 }
+
+memoryDeviceNonVolatilesSize               OBJECT-TYPE
+    SYNTAX      Unsigned32BitRange
+    MAX-ACCESS      read-only
+    STATUS      current
+    DESCRIPTION
+        "1100.0050.0001.0030 This attribute defines the Non Volatile size of the memory device in MBs."
+    ::= { memoryDeviceTableEntry 30 }
+
+memoryDeviceCacheSize               OBJECT-TYPE
+    SYNTAX      Unsigned32BitRange
+    MAX-ACCESS      read-only
+    STATUS      current
+    DESCRIPTION
+        "1100.0050.0001.0031 This attribute defines the Cache size of the memory device in MBs."
+    ::= { memoryDeviceTableEntry 31 }
+	
+memoryDeviceRemainingRatedWriteEndurance               OBJECT-TYPE
+    SYNTAX      MemoryPropertyEnum
+    MAX-ACCESS      read-only
+    STATUS      current
+    DESCRIPTION
+        "1100.0050.0001.0032 This attribute defines the percent of remaining life for the memory device"
+    ::= { memoryDeviceTableEntry 32 }
 
 -------------------------------------------------------------------------------
 -- PCI Device Table
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.1100.80.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
+
+pCIDeviceTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    pCIDevicechassisIndex,
+    pCIDeviceIndex,
+    pCIDeviceStateCapabilities,
+    pCIDeviceStateSettings,
+    pCIDeviceStatus,
+    pCIDeviceDataBusWidth,
+    pCIDeviceManufacturerName,
+    pCIDeviceDescriptionName,
+    pCIDeviceFQDD
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the PCI Device Table group."
+    ::= { conformanceMIBGroups 28 }
 
 PCIDeviceTableEntry                             ::= SEQUENCE {
     pCIDevicechassisIndex                       ObjectRange,
@@ -5712,6 +6310,30 @@ NetworkDeviceCapabilitiesFlags                  ::= TEXTUAL-CONVENTION
     iscsiOffload(4),                            -- device has iSCSI Offload capability
     fcoeOffload(8)                              -- device has FCoE Offload capability
 }
+
+networkDeviceTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    networkDeviceChassisIndex,
+    networkDeviceIndex,
+    networkDeviceStatus,
+    networkDeviceConnectionStatus,
+    networkDeviceProductName,
+    networkDeviceVendorName,
+    networkDeviceCurrentMACAddress,
+    networkDevicePermanentMACAddress,
+    networkDevicePCIBusNumber,
+    networkDevicePCIDeviceNumber,
+    networkDevicePCIFunctionNumber,
+    networkDeviceTOECapabilityFlags,
+    networkDeviceiSCSICapabilityFlags,
+    networkDeviceiSCSIEnabled,
+    networkDeviceCapabilities,
+    networkDeviceFQDD
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Network Device Table group."
+    ::= { conformanceMIBGroups 29 }
 
 NetworkDeviceTableEntry                         ::= SEQUENCE {
     networkDeviceChassisIndex                   ObjectRange,
@@ -6031,6 +6653,23 @@ SystemSlotCategoryEnum                          ::= TEXTUAL-CONVENTION
     systemSlotCategoryIsMotherboard(5)          -- category is Motherboard
 }
 
+systemSlotTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    systemSlotchassisIndex,
+    systemSlotIndex,
+    systemSlotStateCapabilitiesUnique,
+    systemSlotStateSettingsUnique,
+    systemSlotStatus,
+    systemSlotCurrentUsage,
+    systemSlotType,
+    systemSlotSlotExternalSlotName,
+    systemSlotCategory
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the System Slot Table group."
+    ::= { conformanceMIBGroups 30 }
+
 SystemSlotTableEntry                            ::= SEQUENCE {
     systemSlotchassisIndex                      ObjectRange,
     systemSlotIndex                             ObjectRange,
@@ -6153,6 +6792,22 @@ systemSlotCategory                              OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.4.2000.10.1.<a>.<i1>.<i2>
 -------------------------------------------------------------------------------
 
+fruTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    fruChassisIndex,
+    fruIndex,
+    fruInformationStatus,
+    fruManufacturerName,
+    fruSerialNumberName,
+    fruPartNumberName,
+    fruRevisionName,
+    fruFQDD
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Fru Table group."
+    ::= { conformanceMIBGroups 31 }
+
 FruTableEntry                                   ::= SEQUENCE {
     fruChassisIndex                             ObjectRange,
     fruIndex                                    ObjectRange,
@@ -6267,6 +6922,20 @@ fruFQDD                                         OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.15.1.<a>.<i1>
 -------------------------------------------------------------------------------
+
+batteryTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    batteryNumber,
+    batteryState,
+    batteryComponentStatus,
+    batteryPredictedCapacity,
+    batteryFQDD,
+    batteryDisplayName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Battery Table group."
+    ::= { conformanceMIBGroups 32 }
 
 BatteryTableEntry                               ::=SEQUENCE { 
     batteryNumber                               INTEGER,
@@ -6392,6 +7061,49 @@ batteryDisplayName OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.1.1.<a>.<i1>
 -------------------------------------------------------------------------------
+
+controllerTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    controllerNumber,
+    controllerName,
+    controllerRebuildRate,
+    controllerFWVersion,
+    controllerCacheSizeInMB,
+    controllerRollUpStatus,
+    controllerComponentStatus,
+    controllerDriverVersion,
+    controllerPCISlot,
+    controllerReconstructRate,
+    controllerPatrolReadRate,
+    controllerBGIRate,
+    controllerCheckConsistencyRate,
+    controllerPatrolReadMode,
+    controllerPatrolReadState,
+    controllerPersistentHotSpare,
+    controllerSpinDownUnconfiguredDrives,
+    controllerSpinDownHotSpareDrives,
+    controllerSpinDownTimeInterval,
+    controllerPreservedCache,
+    controllerCheckConsistencyMode,
+    controllerCopyBackMode,
+    controllerSecurityStatus,
+    controllerEncryptionKeyPresent,
+    controllerEncryptionCapability,
+    controllerLoadBalanceSetting,    
+    controllerMaxCapSpeed,
+    controllerSASAddress,
+    controllerFQDD,
+    controllerDisplayName,
+    controllerT10PICapability,
+    controllerRAID10UnevenSpansSupported,
+    controllerEnhancedAutoImportForeignConfigMode,  
+    controllerBootModeSupported,
+    controllerBootMode
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Controller Table group."
+    ::= { conformanceMIBGroups 33 }
 
 ControllerTableEntry                            ::=SEQUENCE { 
     controllerNumber                            INTEGER,
@@ -6947,6 +7659,49 @@ controllerBootMode OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.4.1.<a>.<i1>
 -------------------------------------------------------------------------------
+
+physicalDiskTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    physicalDiskNumber,
+    physicalDiskName,
+    physicalDiskManufacturer,    
+    physicalDiskState,
+    physicalDiskProductID,
+    physicalDiskSerialNo,
+    physicalDiskRevision,
+    physicalDiskCapacityInMB,
+    physicalDiskUsedSpaceInMB,
+    physicalDiskFreeSpaceInMB,
+    physicalDiskBusType,
+    physicalDiskSpareState,
+    physicalDiskComponentStatus,    
+    physicalDiskPartNumber,
+    physicalDiskSASAddress,
+    physicalDiskNegotiatedSpeed,
+    physicalDiskCapableSpeed,
+    physicalDiskSmartAlertIndication,
+    physicalDiskManufactureDay,
+    physicalDiskManufactureWeek,
+    physicalDiskManufactureYear,
+    physicalDiskMediaType,
+    physicalDiskPowerState,
+    physicalDiskRemainingRatedWriteEndurance,
+    physicalDiskOperationalState,
+    physicalDiskProgress,
+    physicalDiskSecurityStatus,
+    physicalDiskFormFactor,
+    physicalDiskFQDD,
+    physicalDiskDisplayName,
+    physicalDiskT10PICapability,
+    physicalDiskBlockSizeInBytes,
+    physicalDiskProtocolVersion,
+    physicalDiskPCIeNegotiatedLinkWidth,
+    physicalDiskPCIeCapableLinkWidth
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Physical Disk Table group."
+    ::= { conformanceMIBGroups 34 }
 
 PhysicalDiskTableEntry                          ::=SEQUENCE { 
     physicalDiskNumber                          INTEGER,
@@ -7536,6 +8291,36 @@ physicalDiskPCIeCapableLinkWidth OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.140.1.1.<a>.<i1>
 -------------------------------------------------------------------------------
 
+virtualDiskTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    virtualDiskNumber,
+    virtualDiskName,
+    virtualDiskState,
+    virtualDiskSizeInMB,
+    virtualDiskWritePolicy,
+    virtualDiskReadPolicy,
+    virtualDiskLayout,
+    virtualDiskStripeSize,
+    virtualDiskComponentStatus,        
+    virtualDiskBadBlocksDetected,
+    virtualDiskSecured,
+    virtualDiskIsCacheCade,
+    virtualDiskDiskCachePolicy,
+    virtualDiskOperationalState,
+    virtualDiskProgress,
+    virtualDiskAvailableProtocols,
+    virtualDiskMediaType,
+    virtualDiskRemainingRedundancy,
+    virtualDiskFQDD,
+    virtualDiskDisplayName,
+    virtualDiskT10PIStatus,
+    virtualDiskBlockSizeInBytes
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Virtual Disk Table group."
+    ::= { conformanceMIBGroups 35 }
+	
 VirtualDiskTableEntry                          ::=SEQUENCE { 
     virtualDiskNumber                           INTEGER,
     virtualDiskName                             DisplayString,
@@ -7947,6 +8732,36 @@ virtualDiskBlockSizeInBytes OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.3.1.<a>.<i1>
 -------------------------------------------------------------------------------
 
+enclosureTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    enclosureNumber,
+    enclosureName,
+    enclosureState,
+    enclosureServiceTag,
+    enclosureAssetTag,
+    enclosureConnectedPort,
+    enclosureRollUpStatus,    
+    enclosureComponentStatus, 
+    enclosureFirmwareVersion,
+    enclosureSASAddress,
+    enclosureDriveCount,
+    enclosureTotalSlots,
+    enclosureFanCount,
+    enclosurePSUCount,
+    enclosureEMMCount,
+    enclosureTempProbeCount,
+    enclosureRedundantPath,
+    enclosurePosition,
+    enclosureBackplaneBayID,
+    enclosureFQDD,
+    enclosureDisplayName,
+    enclosureType
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Enclosure Table group."
+    ::= { conformanceMIBGroups 36 }
+	
 EnclosureTableEntry                             ::=SEQUENCE { 
     enclosureNumber                             INTEGER,
     enclosureName                               DisplayString,
@@ -8253,6 +9068,22 @@ enclosureType OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.13.1.<a>.<i1>
 -------------------------------------------------------------------------------
 
+enclosureManagementModuleTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    enclosureManagementModuleNumber,
+    enclosureManagementModuleName,
+    enclosureManagementModuleState,
+    enclosureManagementModulePartNumber,
+    enclosureManagementModuleFWVersion,
+    enclosureManagementModuleComponentStatus, 
+    enclosureManagementModuleFQDD,
+    enclosureManagementModuleDisplayName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Enclosure Management Module Table group."
+    ::= { conformanceMIBGroups 37 }
+
 EnclosureManagementModuleTableEntry             ::=SEQUENCE { 
     enclosureManagementModuleNumber             INTEGER,
     enclosureManagementModuleName               DisplayString,
@@ -8395,6 +9226,21 @@ enclosureManagementModuleDisplayName OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.7.1.<a>.<i1>
 -------------------------------------------------------------------------------
 
+enclosureFanTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    enclosureFanNumber,
+    enclosureFanName,
+    enclosureFanState,
+    enclosureFanSpeed,
+    enclosureFanComponentStatus, 
+    enclosureFanFQDD,
+    enclosureFanDisplayName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Enclosure Fan Table group."
+    ::= { conformanceMIBGroups 38 }
+
 EnclosureFanTableEntry                          ::=SEQUENCE { 
     enclosureFanNumber                          INTEGER,
     enclosureFanName                            DisplayString,
@@ -8532,6 +9378,21 @@ enclosureFanDisplayName OBJECT-TYPE
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.9.1.<a>.<i1>
 -------------------------------------------------------------------------------
 
+enclosurePowerSupplyTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    enclosurePowerSupplyNumber,
+    enclosurePowerSupplyName,
+    enclosurePowerSupplyState,
+    enclosurePowerSupplyPartNumber,
+    enclosurePowerSupplyComponentStatus, 
+    enclosurePowerSupplyFQDD,
+    enclosurePowerSupplyDisplayName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Enclosure Power Supply Table group."
+    ::= { conformanceMIBGroups 39 }
+
 EnclosurePowerSupplyTableEntry                 ::=SEQUENCE { 
     enclosurePowerSupplyNumber                  INTEGER,
     enclosurePowerSupplyName                    DisplayString,
@@ -8663,6 +9524,25 @@ enclosurePowerSupplyDisplayName OBJECT-TYPE
 --
 -- OID Format: 1.3.6.1.4.1.674.10892.5.5.1.20.130.11.1.<a>.<i1>
 -------------------------------------------------------------------------------
+
+enclosureTemperatureProbeTableObjGroup OBJECT-GROUP
+    OBJECTS { 
+    enclosureTemperatureProbeNumber,
+    enclosureTemperatureProbeName,
+    enclosureTemperatureProbeState,
+    enclosureTemperatureProbeMinWarningValue,
+    enclosureTemperatureProbeMinCriticalValue,
+    enclosureTemperatureProbeMaxWarningValue,
+    enclosureTemperatureProbeMaxCriticalValue,
+    enclosureTemperatureProbeCurValue,
+    enclosureTemperatureProbeComponentStatus, 
+    enclosureTemperatureProbeFQDD,
+    enclosureTemperatureProbeDisplayName
+	}
+    STATUS  current
+    DESCRIPTION
+        "A collection of objects providing information about the Enclosure Temperature Probe Table group."
+    ::= { conformanceMIBGroups 40 }
 
 EnclosureTemperatureProbeTableEntry             ::=SEQUENCE { 
     enclosureTemperatureProbeNumber             INTEGER,
@@ -8855,6 +9735,13 @@ enclosureTemperatureProbeDisplayName OBJECT-TYPE
 -- Category: System/1
 -- Subcategory: AMP/16
 ------------------------------------------------------------------------------
+alertnotification NOTIFICATION-GROUP
+    NOTIFICATIONS { alertAmperageProbeNormal, alertAmperageProbeWarning ,alertAmperageProbeFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 1 }
 
 alertAmperageProbeNormal NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -8947,6 +9834,14 @@ alertAmperageProbeFailure NOTIFICATION-TYPE
 -- Subcategory: ASR/23
 ------------------------------------------------------------------------------
 
+alertAutomaticSystemRecoveryTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertAutomaticSystemRecovery }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 2 }
+
 alertAutomaticSystemRecovery NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -8981,6 +9876,14 @@ alertAutomaticSystemRecovery NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: BAT/22
 ------------------------------------------------------------------------------
+
+alertBatteryTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertBatteryNormal,  alertBatteryWarning, alertBatteryFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 3 }
 
 alertBatteryNormal NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -9074,6 +9977,14 @@ alertBatteryFailure NOTIFICATION-TYPE
 -- Subcategory: CBL/43
 ------------------------------------------------------------------------------
 
+cableTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertCableFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 4 }
+
 alertCableFailure NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -9108,6 +10019,14 @@ alertCableFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: CMC/62
 ------------------------------------------------------------------------------
+
+cmcTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertCMCWarning, alertCMCFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 5 }
 
 alertCMCWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -9171,6 +10090,14 @@ alertCMCFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: CPU/24
 ------------------------------------------------------------------------------
+
+processorDeviceStatusTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertProcessorDeviceStatusNormal, alertProcessorDeviceStatusWarning, alertProcessorDeviceStatusFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 6 }
 
 alertProcessorDeviceStatusNormal NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -9263,6 +10190,14 @@ alertProcessorDeviceStatusFailure NOTIFICATION-TYPE
 -- Subcategory: CPUA/51
 ------------------------------------------------------------------------------
 
+processorDeviceAbsentTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertProcessorDeviceAbsent}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 7 }
+
 alertProcessorDeviceAbsent NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -9297,6 +10232,14 @@ alertProcessorDeviceAbsent NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: FAN/13
 ------------------------------------------------------------------------------
+
+fanTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertFanInformation, alertFanWarning, alertFanFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 8 }
 
 alertFanInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -9389,6 +10332,14 @@ alertFanFailure NOTIFICATION-TYPE
 -- Subcategory: FC/61
 ------------------------------------------------------------------------------
 
+fiberChannelTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertFiberChannelInformation, alertFiberChannelWarning, alertFiberChannelFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 9 }
+
 alertFiberChannelInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -9479,6 +10430,14 @@ alertFiberChannelFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: HWC/35
 ------------------------------------------------------------------------------
+
+hardwareConfigurationTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertHardwareConfigurationInformation, alertHardwareConfigurationWarning, alertHardwareConfigurationFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 10 }
 
 alertHardwareConfigurationInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -9571,6 +10530,14 @@ alertHardwareConfigurationFailure NOTIFICATION-TYPE
 -- Subcategory: IOV/63
 ------------------------------------------------------------------------------
 
+ioVirtualizationTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertIOVirtualizationFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 11 }
+
 alertIOVirtualizationFailure NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -9605,6 +10572,14 @@ alertIOVirtualizationFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: LNK/25
 ------------------------------------------------------------------------------
+
+linkStatusTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertLinkStatusInformation, alertLinkStatusWarning, alertLinkStatusFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 12 }
 
 alertLinkStatusInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -9697,6 +10672,14 @@ alertLinkStatusFailure NOTIFICATION-TYPE
 -- Subcategory: MEM/27
 ------------------------------------------------------------------------------
 
+memoryDeviceTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertMemoryDeviceInformation, alertMemoryDeviceWarning, alertMemoryDeviceFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 13 }
+
 alertMemoryDeviceInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -9787,6 +10770,14 @@ alertMemoryDeviceFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: NIC/5
 ------------------------------------------------------------------------------
+
+nicTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertNetworkInformation, alertNetworkWarning, alertNetworkFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 14 }
 
 alertNetworkInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -9879,6 +10870,14 @@ alertNetworkFailure NOTIFICATION-TYPE
 -- Subcategory: OSE/45
 ------------------------------------------------------------------------------
 
+osTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertOSInformation, alertOSFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 15 }
+
 alertOSInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -9943,6 +10942,14 @@ alertOSFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: PCI/46
 ------------------------------------------------------------------------------
+
+pciDeviceTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPCIDeviceInformation, alertPCIDeviceWarning, alertPCIDeviceFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 16 }
 
 alertPCIDeviceInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -10035,6 +11042,14 @@ alertPCIDeviceFailure NOTIFICATION-TYPE
 -- Subcategory: PDR/31
 ------------------------------------------------------------------------------
 
+physicaldiskTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPhysicalDiskInformation, alertPhysicalDiskWarning, alertPhysicalDiskFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 17 }
+
 alertPhysicalDiskInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -10120,11 +11135,62 @@ alertPhysicalDiskFailure NOTIFICATION-TYPE
     ::= { systemAlertTrapGroup 0 2297 }
 
 ------------------------------------------------------------------------------
+-- System Performance Traps
+--
+-- Category: System/1
+-- Subcategory: PFM/75
+------------------------------------------------------------------------------
+
+systemPerformanceTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSystemPerformanceWarning}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 35 }
+
+alertSystemPerformanceWarning NOTIFICATION-TYPE
+    OBJECTS { alertMessageID,
+              alertMessage,
+              alertCurrentStatus,
+              alertSystemServiceTag,
+              alertSystemFQDN,
+              alertFQDD,
+              alertDeviceDisplayName,
+              alertMessageArguments,
+              alertChassisServiceTag,
+              alertChassisName,
+              alertRacFQDN }
+    STATUS current
+    DESCRIPTION
+        "System Performance warning."
+    --#TYPE       "System: Performance Warning"
+    --#SEVERITY   MINOR
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Status Events"
+    --#STATE      DEGRADED
+    --#STATUS     current
+    ::= { systemAlertTrapGroup 0 2650 }
+
+------------------------------------------------------------------------------
 -- BIOS POST Trap
 --
 -- Category: System/1
 -- Subcategory: PST/47
 ------------------------------------------------------------------------------
+
+biosPOSTTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertBiosPostFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 18 }
 
 alertBiosPostFailure NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -10160,6 +11226,14 @@ alertBiosPostFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: PSU/17
 ------------------------------------------------------------------------------
+
+powerSupplyTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPowerSupplyNormal, alertPowerSupplyWarning, alertPowerSupplyFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 19 }
 
 alertPowerSupplyNormal NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -10252,6 +11326,14 @@ alertPowerSupplyFailure NOTIFICATION-TYPE
 -- Subcategory: PSUA/52
 ------------------------------------------------------------------------------
 
+powerSupplyAbsentTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPowerSupplyAbsent}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 20 }
+
 alertPowerSupplyAbsent NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -10286,6 +11368,14 @@ alertPowerSupplyAbsent NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: PWR/28
 ------------------------------------------------------------------------------
+
+powerUsageTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPowerUsageInformation, alertPowerUsageWarning, alertPowerUsageFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 21 }
 
 alertPowerUsageInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -10374,11 +11464,62 @@ alertPowerUsageFailure NOTIFICATION-TYPE
     ::= { systemAlertTrapGroup 0 2273 }
 
 ------------------------------------------------------------------------------
+-- RAC Traps
+--
+-- Category: System/1
+-- Subcategory: RAC/60
+------------------------------------------------------------------------------
+
+racTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertRACInformation}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 34 }
+
+alertRACInformation NOTIFICATION-TYPE
+    OBJECTS { alertMessageID,
+              alertMessage,
+              alertCurrentStatus,
+              alertSystemServiceTag,
+              alertSystemFQDN,
+              alertFQDD,
+              alertDeviceDisplayName,
+              alertMessageArguments,
+              alertChassisServiceTag,
+              alertChassisName,
+              alertRacFQDN }
+    STATUS current
+    DESCRIPTION
+        "RAC information."
+    --#TYPE       "System: RAC Information"
+    --#SEVERITY   INFORMATIONAL
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Status Events"
+    --#STATE      OPERATIONAL
+    --#STATUS     current
+    ::= { systemAlertTrapGroup 0 2531 }
+
+------------------------------------------------------------------------------
 -- Redundancy Traps
 --
 -- Category: System/1
 -- Subcategory: RDU/53
 ------------------------------------------------------------------------------
+
+redundancyTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertRedundancyInformation, alertRedundancyDegraded, alertRedundancyLost}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 22 }
 
 alertRedundancyInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -10471,6 +11612,14 @@ alertRedundancyLost NOTIFICATION-TYPE
 -- Subcategory: RFL/20
 ------------------------------------------------------------------------------
 
+integratedDualSDModuleTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertIntegratedDualSDModuleInformation, alertIntegratedDualSDModuleWarning, alertIntegratedDualSDModuleFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 23 }
+
 alertIntegratedDualSDModuleInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -10562,6 +11711,14 @@ alertIntegratedDualSDModuleFailure NOTIFICATION-TYPE
 -- Subcategory: RFLA/54
 ------------------------------------------------------------------------------
 
+integratedDualSDModuleAbsentTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertIntegratedDualSDModuleAbsent}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 24 }
+
 alertIntegratedDualSDModuleAbsent NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -10597,6 +11754,14 @@ alertIntegratedDualSDModuleAbsent NOTIFICATION-TYPE
 -- Subcategory: RRDU/55
 ------------------------------------------------------------------------------
 
+integratedDualSDModuleRedundancyTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertIntegratedDualSDModuleRedundancyInformation, alertIntegratedDualSDModuleRedundancyDegraded, alertIntegratedDualSDModuleRedundancyLost}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 25 }
+	
 alertIntegratedDualSDModuleRedundancyInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -10687,6 +11852,14 @@ alertIntegratedDualSDModuleRedundancyLost NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: SEC/42
 ------------------------------------------------------------------------------
+
+securityEventTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSecurityInformation, alertSecurityWarning, alertSecurityFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 26 }
 
 alertSecurityInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -10779,6 +11952,14 @@ alertSecurityFailure NOTIFICATION-TYPE
 -- Subcategory: SEL/41
 ------------------------------------------------------------------------------
 
+systemEventLogTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSystemEventLogInformation, alertSystemEventLogWarning, alertSystemEventLogFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 27 }
+
 alertSystemEventLogInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -10870,6 +12051,14 @@ alertSystemEventLogFailure NOTIFICATION-TYPE
 -- Subcategory: SWC/36
 ------------------------------------------------------------------------------
 
+softwareConfigurationTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSoftwareConfigurationInformation, alertSoftwareConfigurationWarning, alertSoftwareConfigurationFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 28 }
+
 alertSoftwareConfigurationInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -10955,11 +12144,63 @@ alertSoftwareConfigurationFailure NOTIFICATION-TYPE
     ::= { systemAlertTrapGroup 0 2337 }
 
 ------------------------------------------------------------------------------
+-- iDRAC Memory Unresponsive Trap
+--
+-- Category: System/1
+-- Subcategory: SYS/48
+------------------------------------------------------------------------------
+
+alertInternaliDRACMemoryUnresponsiveTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertInternaliDRACMemoryUnresponsive }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 65 }
+
+
+alertInternaliDRACMemoryUnresponsive NOTIFICATION-TYPE
+    OBJECTS { alertMessageID,
+              alertMessage,
+              alertCurrentStatus,
+              alertSystemServiceTag,
+              alertSystemFQDN,
+              alertFQDD,
+              alertDeviceDisplayName,
+              alertMessageArguments,
+              alertChassisServiceTag,
+              alertChassisName,
+              alertRacFQDN }
+    STATUS current
+    DESCRIPTION
+        "Unable to communicate with internal iDRAC memory"
+    --#TYPE       "System: Internal iDRAC Memory Unresponsive"
+    --#SEVERITY   CRITICAL
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Error Events"
+    --#STATE      OPERATIONAL
+    --#STATUS     current
+    ::= { systemAlertTrapGroup 0 2433 }
+
+------------------------------------------------------------------------------
 -- Temperature Probe Traps
 --
 -- Category: System/1
 -- Subcategory: TMP/14
 ------------------------------------------------------------------------------
+
+temperatureProbeTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertTemperatureProbeNormal, alertTemperatureProbeWarning, alertTemperatureProbeFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 29 }
 
 alertTemperatureProbeNormal NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -11052,6 +12293,14 @@ alertTemperatureProbeFailure NOTIFICATION-TYPE
 -- Subcategory: TMPS/59
 ------------------------------------------------------------------------------
 
+temperatureStatisticsTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertTemperatureStatisticsWarning, alertTemperatureStatisticsFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 30 }
+
 alertTemperatureStatisticsWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -11116,6 +12365,14 @@ alertTemperatureStatisticsFailure NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: VFL/57
 ------------------------------------------------------------------------------
+
+vFlashMediaDeviceTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertvFlashMediaDeviceInformation, alertvFlashMediaDeviceWarning, alertvFlashMediaDeviceFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 31 }
 
 alertvFlashMediaDeviceInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -11208,6 +12465,14 @@ alertvFlashMediaDeviceFailure NOTIFICATION-TYPE
 -- Subcategory: VFLA/58
 ------------------------------------------------------------------------------
 
+vFlashMediaDeviceAbsentTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertvFlashMediaDeviceAbsent}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 32 }
+
 alertvFlashMediaDeviceAbsent NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -11242,6 +12507,14 @@ alertvFlashMediaDeviceAbsent NOTIFICATION-TYPE
 -- Category: System/1
 -- Subcategory: VLT/15
 ------------------------------------------------------------------------------
+
+voltageProbeTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertVoltageProbeNormal, alertVoltageProbeWarning, alertVoltageProbeFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 33 }
 
 alertVoltageProbeNormal NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -11328,77 +12601,6 @@ alertVoltageProbeFailure NOTIFICATION-TYPE
     ::= { systemAlertTrapGroup 0 2169 }
 
 ------------------------------------------------------------------------------
--- RAC Traps
---
--- Category: System/1
--- Subcategory: RAC/60
-------------------------------------------------------------------------------
-
-alertRACInformation NOTIFICATION-TYPE
-    OBJECTS { alertMessageID,
-              alertMessage,
-              alertCurrentStatus,
-              alertSystemServiceTag,
-              alertSystemFQDN,
-              alertFQDD,
-              alertDeviceDisplayName,
-              alertMessageArguments,
-              alertChassisServiceTag,
-              alertChassisName,
-              alertRacFQDN }
-    STATUS current
-    DESCRIPTION
-        "RAC information."
-    --#TYPE       "System: RAC Information"
-    --#SEVERITY   INFORMATIONAL
-    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
-    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
-    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
-    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
-    --#SUMMARY    "RAC FQDN: %s"
-    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
-    --#CATEGORY   "Status Events"
-    --#STATE      OPERATIONAL
-    --#STATUS     current
-    ::= { systemAlertTrapGroup 0 2531 }
-
-------------------------------------------------------------------------------
--- System Performance Traps
---
--- Category: System/1
--- Subcategory: PFM/75
-------------------------------------------------------------------------------
-
-alertSystemPerformanceWarning NOTIFICATION-TYPE
-    OBJECTS { alertMessageID,
-              alertMessage,
-              alertCurrentStatus,
-              alertSystemServiceTag,
-              alertSystemFQDN,
-              alertFQDD,
-              alertDeviceDisplayName,
-              alertMessageArguments,
-              alertChassisServiceTag,
-              alertChassisName,
-              alertRacFQDN }
-    STATUS current
-    DESCRIPTION
-        "System Performance warning."
-    --#TYPE       "System: Performance Warning"
-    --#SEVERITY   MINOR
-    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
-    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
-    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
-    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
-    --#SUMMARY    "RAC FQDN: %s"
-    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
-    --#CATEGORY   "Status Events"
-    --#STATE      DEGRADED
-    --#STATUS     current
-    ::= { systemAlertTrapGroup 0 2650 }
-
-
-------------------------------------------------------------------------------
 -- Storage Alert Trap Group
 -- Storage Traps
 -- Category: Storage/2
@@ -11412,6 +12614,14 @@ alertSystemPerformanceWarning NOTIFICATION-TYPE
 -- Category: Storage/2
 -- Subcategory: BAT/22
 ------------------------------------------------------------------------------
+
+batteryTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageBatteryInformation, alertStorageBatteryWarning, alertStorageBatteryFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 36 }
 
 alertStorageBatteryInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -11504,6 +12714,14 @@ alertStorageBatteryFailure NOTIFICATION-TYPE
 -- Subcategory: CTL/29
 ------------------------------------------------------------------------------
 
+storageControllerTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageControllerInformation, alertStorageControllerWarning, alertStorageControllerFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 37 }
+
 alertStorageControllerInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -11594,6 +12812,14 @@ alertStorageControllerFailure NOTIFICATION-TYPE
 -- Category: Storage/2
 -- Subcategory: ENC/30
 ------------------------------------------------------------------------------
+
+enclosureTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageEnclosureInformation, alertStorageEnclosureWarning, alertStorageEnclosureFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 38 }
 
 alertStorageEnclosureInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -11686,6 +12912,14 @@ alertStorageEnclosureFailure NOTIFICATION-TYPE
 -- Subcategory: FAN/13
 ------------------------------------------------------------------------------
 
+fanStorageTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageFanInformation, alertStorageFanWarning, alertStorageFanFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 39 }
+
 alertStorageFanInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -11776,6 +13010,14 @@ alertStorageFanFailure NOTIFICATION-TYPE
 -- Category: Storage/2
 -- Subcategory: PDR/31
 ------------------------------------------------------------------------------
+
+physicalDiskTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStoragePhysicalDiskInformation, alertStoragePhysicalDiskWarning, alertStoragePhysicalDiskFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 40 }
 
 alertStoragePhysicalDiskInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -11868,6 +13110,14 @@ alertStoragePhysicalDiskFailure NOTIFICATION-TYPE
 -- Subcategory: PSU/17
 ------------------------------------------------------------------------------
 
+storagePowerSupplyTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStoragePowerSupplyInformation, alertStoragePowerSupplyWarning, alertStoragePowerSupplyFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 41 }
+
 alertStoragePowerSupplyInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -11959,6 +13209,14 @@ alertStoragePowerSupplyFailure NOTIFICATION-TYPE
 -- Subcategory: SEC/42
 ------------------------------------------------------------------------------
 
+alertStorageSecurityTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageSecurityInformation, alertStorageSecurityWarning, alertStorageSecurityFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 42 }
+
 alertStorageSecurityInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -12044,11 +13302,62 @@ alertStorageSecurityFailure NOTIFICATION-TYPE
     ::= { storageAlertTrapGroup 0 4433 }
 
 ------------------------------------------------------------------------------
+-- Solid State Drive
+--
+-- Category: storage/2
+-- Subcategory: SSD/34
+------------------------------------------------------------------------------
+
+storageSolidstateDriveTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageBatteryInformation }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 66 }
+	
+alertStorageSolidstateDrive NOTIFICATION-TYPE
+    OBJECTS { alertMessageID,
+              alertMessage,
+              alertCurrentStatus,
+              alertSystemServiceTag,
+              alertSystemFQDN,
+              alertFQDD,
+              alertDeviceDisplayName,
+              alertMessageArguments,
+              alertChassisServiceTag,
+              alertChassisName,
+              alertRacFQDN }
+    STATUS current
+    DESCRIPTION
+        "SSD is less than the threshold value."
+    --#TYPE       "Storage: SSD Warning"
+    --#SEVERITY   MINOR
+    --#SUMMARY    "Message ID: %s, Device Display Name: %s, Message: %s,"
+    --#SUMMARY    "Device Status: %d, Device FQDD: %s,"
+    --#SUMMARY    "System Service Tag: %s, System Name: %s,"
+    --#SUMMARY    "Chassis Service Tag: %s, Chassis Name: %s,"
+    --#SUMMARY    "RAC FQDN: %s"
+    --#ARGUMENTS  {0, 6, 1, 2, 5, 3, 4, 8, 9, 10}
+    --#CATEGORY   "Error Events"
+    --#STATE      OPERATIONAL
+    --#STATUS     current
+    ::= { storageAlertTrapGroup 0 4370 }
+
+------------------------------------------------------------------------------
 -- Storage Management Status Traps
 --
 -- Category: Storage/2
 -- Subcategory: STOR/10
 ------------------------------------------------------------------------------
+
+alertStorageManagementTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageManagementInformation, alertStorageManagementWarning, alertStorageManagementFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 43 }
 
 alertStorageManagementInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12145,6 +13454,14 @@ alertStorageManagementFailure NOTIFICATION-TYPE
 -- Subcategory: TMP/14
 ------------------------------------------------------------------------------
 
+alertStorageTemperatureProbeTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageTemperatureProbeInformation, alertStorageTemperatureProbeWarning, alertStorageTemperatureProbeFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 44 }
+
 alertStorageTemperatureProbeInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -12235,6 +13552,14 @@ alertStorageTemperatureProbeFailure NOTIFICATION-TYPE
 -- Category: Storage/2
 -- Subcategory: VDR/32
 ------------------------------------------------------------------------------
+
+alertStorageVirtualDiskTrapsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertStorageVirtualDiskInformation, alertStorageVirtualDiskWarning, alertStorageVirtualDiskFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 45 }
 
 alertStorageVirtualDiskInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12336,6 +13661,14 @@ alertStorageVirtualDiskFailure NOTIFICATION-TYPE
 -- Subcategory: RED/8
 ------------------------------------------------------------------------------
 
+alertUpdateJobTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertUpdateJobInformation}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 46 }
+
 alertUpdateJobInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -12370,6 +13703,14 @@ alertUpdateJobInformation NOTIFICATION-TYPE
 -- Category: Updates/3
 -- Subcategory: SWU/21
 ------------------------------------------------------------------------------
+
+alertSoftwareChangeUpdateNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSoftwareChangeUpdateWarning}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 47 }
 
 alertSoftwareChangeUpdateWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12414,6 +13755,14 @@ alertSoftwareChangeUpdateWarning NOTIFICATION-TYPE
 -- Category: Audit/4
 -- Subcategory: CMC/62
 ------------------------------------------------------------------------------
+
+alertCMCAuditNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertCMCAuditInformation, alertCMCAuditWarning, alertCMCAuditFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 48 }
 
 alertCMCAuditInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12506,6 +13855,14 @@ alertCMCAuditFailure NOTIFICATION-TYPE
 -- Subcategory: FSD/50
 ------------------------------------------------------------------------------
 
+alertDebugNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertDebugInformation, alertDebugWarning}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 49 }
+
 alertDebugInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -12569,6 +13926,14 @@ alertDebugWarning NOTIFICATION-TYPE
 -- Subcategory: IPA/38
 ------------------------------------------------------------------------------
 
+alertiDRACIPAddressChangeNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertiDRACIPAddressChange}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 50 }
+
 alertiDRACIPAddressChange NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -12604,6 +13969,14 @@ alertiDRACIPAddressChange NOTIFICATION-TYPE
 -- Category: Audit/4
 -- Subcategory: LIC/40
 ------------------------------------------------------------------------------
+
+alertLicenseNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertLicenseInformation, alertLicenseWarning, alertLicenseFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 51 }
 
 alertLicenseInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12696,6 +14069,14 @@ alertLicenseFailure NOTIFICATION-TYPE
 -- Subcategory: PCI/46
 ------------------------------------------------------------------------------
 
+alertPCIDeviceAuditNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPCIDeviceAuditWarning}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 52 }
+
 alertPCIDeviceAuditWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -12730,6 +14111,14 @@ alertPCIDeviceAuditWarning NOTIFICATION-TYPE
 -- Category: Audit/4
 -- Subcategory: PSU/17
 ------------------------------------------------------------------------------
+
+alertPowerSupplyAuditNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPowerSupplyAuditWarning, alertPowerSupplyAuditFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 53 }
 
 alertPowerSupplyAuditWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12793,6 +14182,14 @@ alertPowerSupplyAuditFailure NOTIFICATION-TYPE
 -- Category: Audit/4
 -- Subcategory: PWR/28
 ------------------------------------------------------------------------------
+
+alertPowerUsageAuditNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPowerUsageAuditInformation, alertPowerUsageAuditWarning, alertPowerUsageAuditFailure}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 54 }
 
 alertPowerUsageAuditInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12885,6 +14282,14 @@ alertPowerUsageAuditFailure NOTIFICATION-TYPE
 -- Subcategory: SYS/48
 ------------------------------------------------------------------------------
 
+alertSystemPowerStateChangeNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSystemPowerStateChangeInformation}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 55 }
+
 alertSystemPowerStateChangeInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -12920,6 +14325,14 @@ alertSystemPowerStateChangeInformation NOTIFICATION-TYPE
 -- Category: Audit/4
 -- Subcategory: USR/37
 ------------------------------------------------------------------------------
+
+alertUserTrackingNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertUserTrackingWarning}
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 56 }
 
 alertUserTrackingWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -12965,6 +14378,14 @@ alertUserTrackingWarning NOTIFICATION-TYPE
 -- Subcategory: DIS/49
 ------------------------------------------------------------------------------
 
+alertAutoDiscoveryNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertAutoDiscoveryInformation }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 57 }
+
 alertAutoDiscoveryInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -13000,6 +14421,13 @@ alertAutoDiscoveryInformation NOTIFICATION-TYPE
 -- Subcategory: IOID/66
 ------------------------------------------------------------------------------
 
+alertNetworkConfigurationNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertNetworkConfigurationInformation, alertNetworkConfigurationWarning }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 58 }
 
 alertNetworkConfigurationInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -13064,6 +14492,14 @@ alertNetworkConfigurationWarning NOTIFICATION-TYPE
 -- Subcategory: IPA/38
 ------------------------------------------------------------------------------
 
+alertIPAddressConfigurationNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertIPAddressConfigurationInformation }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 59 }
+
 alertIPAddressConfigurationInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -13098,6 +14534,14 @@ alertIPAddressConfigurationInformation NOTIFICATION-TYPE
 -- Category: Configuration/5
 -- Subcategory: JCP/3
 ------------------------------------------------------------------------------
+
+alertJobControlConfigurationNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertJobControlConfigurationInformation }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 60 }
 
 alertJobControlConfigurationInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -13134,6 +14578,14 @@ alertJobControlConfigurationInformation NOTIFICATION-TYPE
 -- Subcategory: PCI/46
 ------------------------------------------------------------------------------
 
+alertPCIDeviceConfigurationNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertPCIDeviceConfigurationInformation }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 61}
+
 alertPCIDeviceConfigurationInformation NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -13169,6 +14621,14 @@ alertPCIDeviceConfigurationInformation NOTIFICATION-TYPE
 -- Subcategory: SEC/42
 ------------------------------------------------------------------------------
 
+alertSecurityConfigurationNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSecurityConfigurationWarning }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 62 }
+
 alertSecurityConfigurationWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -13203,6 +14663,14 @@ alertSecurityConfigurationWarning NOTIFICATION-TYPE
 -- Category: Configuration/5
 -- Subcategory: SWC/36
 ------------------------------------------------------------------------------
+
+alertSWCConfigurationNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertSWCConfigurationWarning, alertSWCConfigurationFailure }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 63 }
 
 alertSWCConfigurationWarning NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
@@ -13267,6 +14735,14 @@ alertSWCConfigurationFailure NOTIFICATION-TYPE
 -- Subcategory: TST/19
 ------------------------------------------------------------------------------
 
+alertTestTrapNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS { alertTestTrapEvent }
+    STATUS        current
+    DESCRIPTION
+            "The two notifications which an SNMPv2 entity is required to
+            implement."
+    ::= { conformanceMIBnotificationGroup 64 }
+
 alertTestTrapEvent NOTIFICATION-TYPE
     OBJECTS { alertMessageID,
               alertMessage,
@@ -13295,8 +14771,8 @@ alertTestTrapEvent NOTIFICATION-TYPE
     --#STATUS     current
     ::= { configurationAlertTrapGroup 0 10395 }
 
-END
 
+END
 ------------------------------------------------------------------------------
 -- End MIB
 ------------------------------------------------------------------------------

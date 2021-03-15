@@ -35,10 +35,19 @@ if ($check_ipv6_mib || !count($ip_data[$ip_version])) // Note, $check_ipv6_mib s
     {
       $ip_address = snmp2ipv6($ip_snmp);
 
+      /*
       $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
                                                            'ip'     => $ip_address,
                                                            'prefix' => $entry['ipv6AddrPfxLength'],
                                                            'origin' => $entry['ipv6AddrType']);
+      */
+      $data = [
+        'ifIndex' => $ifIndex,
+        'ip'      => $ip_address,
+        'prefix'  => $entry['ipv6AddrPfxLength'],
+        'origin'  => $entry['ipv6AddrType']
+      ];
+      discover_add_ip_address($device, $mib, $data);
     }
   }
 }

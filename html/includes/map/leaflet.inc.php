@@ -13,6 +13,14 @@
 
 register_html_resource('css', 'leaflet.css');
 register_html_resource('js', 'leaflet.js');
+
+$ua = detect_browser();
+if ($ua['browser'] == 'MSIE' ||
+    ($ua['browser'] == 'Firefox' && version_compare($ua['version'], '61', '<'))) // Also for FF ESR60 and older
+{
+  register_html_resource('js', 'js/compat/bluebird.min.js');
+  register_html_resource('js', 'js/compat/fetch.js');
+}
 register_html_resource('js', 'leaflet-realtime.js');
 register_html_resource('css', 'MarkerCluster.css');
 register_html_resource('css', 'MarkerCluster.Default.css');
@@ -71,8 +79,17 @@ switch ($config['frontpage']['map']['tiles'])
 
   case 'carto-base-dark':
   case 'carto-base-light':
+  case 'carto-base-auto':
   default:
-    $leaflet_variant = ($config['frontpage']['map']['tiles'] == "carto-base-dark" ? "dark_all" : "light_all");
+
+    if($config['frontpage']['map']['tiles'] == "carto-base-dark") {
+        $leaflet_variant = "dark_all";
+    }  elseif ($config['frontpage']['map']['tiles'] == "carto-base-light") {
+        $leaflet_variant = "light_all";
+    } else {
+        $leaflet_variant = ($config['themes'][$_SESSION['theme']]['type'] == 'dark' ? "dark_all" : "light_all");
+    }
+
     $leaflet_url     = is_ssl() ? 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/' . $leaflet_variant . '/{z}/{x}/{y}.png' :
       'http://{s}.basemaps.cartocdn.com/' . $leaflet_variant . '/{z}/{x}/{y}.png';
 
@@ -86,6 +103,7 @@ switch ($config['frontpage']['map']['tiles'])
 }
 
 ?>
+
 
     <script type="text/javascript">
         var icons = {
@@ -224,7 +242,7 @@ switch ($config['frontpage']['map']['tiles'])
            <?php  echo $leaflet_bounds; ?>
             //map.fitBounds(realtime.getBounds(), {maxZoom: 3});
             //console.log('REBOUNDING');
-           };
+           }
         });
 
 

@@ -68,7 +68,7 @@ foreach ($sensors as $name => $sensor)
   {
     $tmp = str_replace(array('_', 'Sys '),
                        array(' ', 'System '), $sensor['description']['cmcIIIVarValueStr']);
-    if (!str_contains($name, $tmp))
+    if (!str_exists($name, $tmp))
     {
       $descr .= ' - ' . $sensor['description']['cmcIIIVarValueStr'];
     }
@@ -110,7 +110,7 @@ foreach ($sensors as $name => $sensor)
     else
     */
     $type = NULL;
-    if (str_contains($unit, 'degree') || str_ends($unit, array('C', 'F')))
+    if (str_exists($unit, 'degree') || str_ends($unit, array( 'C', 'F')))
     {
       $type = "temperature";
       if ($temp_unit == 'fahrenheit')
@@ -124,12 +124,12 @@ foreach ($sensors as $name => $sensor)
     }
     else if ($unit == "%")
     {
-      if (str_icontains($name, 'RPM'))
+      if (str_iexists($name, 'RPM'))
       {
         $type = "load";
       }
     }
-    else if (str_contains($unit, 'l/min'))
+    else if (str_exists($unit, 'l/min'))
     {
       $type = "waterflow";
       $options['sensor_unit'] = 'l/min';

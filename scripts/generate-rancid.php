@@ -1,6 +1,5 @@
 #!/usr/bin/env php
 <?php
-
 /**
  * Observium
  *
@@ -8,15 +7,16 @@
  *
  * @package    observium
  * @subpackage scripts
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 chdir(dirname($argv[0]).'/..');
 $scriptname = basename($argv[0]);
 
-$options = getopt("d");
+$options = getopt("da");
 if (isset($options['d'])) { array_shift($argv); } // for compatibility
+if (isset($options['a'])) { array_shift($argv); } // for compatibility
 
 include_once("includes/sql-config.inc.php");
 
@@ -93,7 +93,15 @@ print_debug($rancid_message);
 
 <?php
 
-foreach (dbFetchRows("SELECT `hostname`, `os`, `disabled`, `status` FROM `devices` ORDER BY `hostname`") as $device)
+$where = '';
+$params = [];
+if (!isset($options['a']))
+{
+  $where = 'WHERE `poller_id` = ?';
+  $params[] = $config['poller_id'];
+}
+
+foreach (dbFetchRows("SELECT `hostname`, `os`, `disabled`, `status` FROM `devices` " . $where . " ORDER BY `hostname`", $params) as $device)
 {
   if ($device['disabled'] || !$device['status'])
   {

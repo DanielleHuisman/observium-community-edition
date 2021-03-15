@@ -59,13 +59,13 @@ foreach ($oids as $index => $entry)
   $descr    = "PowerOn $marker_descr";
   if ($prt_supplies[$index]['prtMarkerSuppliesDescription'])
   {
-    $descr .= ' - ' . snmp_hexstring($prt_supplies[$index]['prtMarkerSuppliesDescription']);
+    $descr .= ' - ' . rewrite_entity_name(snmp_hexstring($prt_supplies[$index]['prtMarkerSuppliesDescription']));
   }
   $oid_name = 'prtMarkerPowerOnCount';
   $oid      = '.1.3.6.1.2.1.43.10.2.1.5.' . $index;
   $value    = $entry[$oid_name];
 
-  discover_counter($device, 'printersupply', $mib, $oid_name, $oid, $index, $descr, 1, $value, $options);
+  discover_counter($device, 'printersupply', $mib, $oid_name, $oid, $index, rewrite_entity_name($descr), 1, $value, $options);
 
   // prtMarkerStatus
   // FIXME, binary statuses currently unsupported

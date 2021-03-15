@@ -1,13 +1,18 @@
-/**
+/*
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
  * @subpackage js
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2015 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
+
+// Workaround jQuery XSS
+jQuery.htmlPrefilter = function( html ) {
+	return html;
+};
 
 function url_from_form(form_id) {
     var url = document.getElementById(form_id).action;
@@ -25,7 +30,13 @@ function url_from_form(form_id) {
                     if (part.selected) {
                         val = part.value.replace(/\//g, '%7F'); // %7F (DEL, delete) - not defined in HTML 4 standard
                         val = val.replace(/,/g, '%1F');         // %1F (US, unit separator) - not defined in HTML 4 standard
-                        multi.push(encodeURIComponent(val));
+                        val = encodeURIComponent(val);
+                        // add quotes for empty or multiword strings
+                        if ((val !== part.value || val === '') && !is_base64(part.value)) {
+                            //console.log(part.value + " != " + val + " : " + atob(val));
+                            val = '"' + val + '"'
+                        }
+                        multi.push(val);
                         //console.log(part.value);
                     }
                 }
@@ -55,6 +66,20 @@ function form_to_path(form_id) {
     window.location.href = url;
 }
 
+function is_base64(value) {
+    try {
+        // Detect if value is base64 encoded string
+        atob(value);
+        return true;
+    } catch(e) {
+        // if you want to be specific and only catch the error which means
+        // the base 64 was invalid, then check for 'e.code === 5'.
+        // (because 'DOMException.INVALID_CHARACTER_ERR === 5')
+
+        return false;
+    }
+}
+
 function submitURL(form_id) {
     url = url_from_form(form_id);
     $(document.getElementById(form_id)).attr('action', url);
@@ -63,6 +88,15 @@ function submitURL(form_id) {
 // toggle attributes readonly,disabled by form id
 function toggleAttrib(attrib, form_id) {
     //console.log('attrib: '+attrib+', id: '+form_id);
+    //console.log(Array.isArray(form_id));
+    if (Array.isArray(form_id))
+    {
+        form_id.forEach(function(entry) {
+            toggleAttrib(attrib, entry);
+            //console.log(entry);
+        });
+        return;
+    }
     var toggle = document.getElementById(form_id); // js object
     var element = $('#' + form_id);                // jQuery object
     //console.log('prop: '+element.prop(attrib));
@@ -73,8 +107,8 @@ function toggleAttrib(attrib, form_id) {
     //console.log(set);
 
     set ? toggle.setAttribute(attrib, 1) : toggle.removeAttribute(attrib);
-    if (element.prop('localName') == 'select') {
-        if (attrib == 'readonly') {
+    if (element.prop('localName') === 'select') {
+        if (attrib === 'readonly') {
             // readonly attr not supported by bootstrap-select
             set ? toggle.setAttribute('disabled', 1) : toggle.removeAttribute('disabled');
         }
@@ -83,24 +117,24 @@ function toggleAttrib(attrib, form_id) {
             element.selectpicker('refresh'); // re-render selectpicker
             //console.log('bootstrap-select');
         }
-        else if (toggle.hasAttribute('data-toggle') && toggle.getAttribute('data-toggle') == 'tagsinput') {
+        else if (toggle.hasAttribute('data-toggle') && toggle.getAttribute('data-toggle') === 'tagsinput') {
             // bootstrap tagsinput
             element.tagsinput('refresh'); // re-render tagsinput
             //console.log('bootstrap-tagsinput');
         }
-    } else if (toggle.hasAttribute('data-toggle') && toggle.getAttribute('data-toggle').substr(0, 6) == 'switch') {
+    } else if (toggle.hasAttribute('data-toggle') && toggle.getAttribute('data-toggle').substr(0, 6) === 'switch') {
         // bootstrap switch
         element.bootstrapSwitch("toggle" + attrib.charAt(0).toUpperCase() + attrib.slice(1));
         //console.log('bootstrap-switch');
-    } else if (toggle.hasAttribute('data-toggle') && toggle.hasAttribute('data-selector') && toggle.getAttribute('data-selector').substr(0, 11) == 'tiny-toggle') {
+    } else if (toggle.hasAttribute('data-toggle') && toggle.hasAttribute('data-selector') && toggle.getAttribute('data-selector').substr(0, 11) === 'tiny-toggle') {
         // tiny toggle
-        if (attrib == 'readonly') {
+        if (attrib === 'readonly') {
           // readonly attr not supported by tiny-toggle
           !set ? toggle.setAttribute(attrib, 1) : toggle.removeAttribute(attrib); // revert
           attrib = 'disabled';
           set = !(toggle.getAttribute('disabled') || element.prop('disabled'));
         }
-        if (attrib == 'disabled') {
+        if (attrib === 'disabled') {
           //console.log('disabled: '+set);
           if (set) {
             toggle.setAttribute('disabled', 1);
@@ -113,7 +147,7 @@ function toggleAttrib(attrib, form_id) {
             element.tinyToggle("toggle");
         }
         //console.log('tiny-toggle: '+attrib);
-    } else if (toggle.hasAttribute('data-toggle') && toggle.hasAttribute('data-selector') && toggle.getAttribute('data-selector') == 'bootstrap-toggle') {
+    } else if (toggle.hasAttribute('data-toggle') && toggle.hasAttribute('data-selector') && toggle.getAttribute('data-selector') === 'bootstrap-toggle') {
         // bootstrap toggle
         element.bootstrapToggle('toggle');
         //console.log('bootstrap-toggle');
@@ -121,7 +155,7 @@ function toggleAttrib(attrib, form_id) {
         set ? $('#' + form_id + '_div').datetimepicker('disable') : $('#' + form_id + '_div').datetimepicker('enable');
         //console.log('bootstrap-datetime');
         //console.log($('#'+form_id+'_div'));
-    } else if (element.prop('type') == 'submit') {
+    } else if (element.prop('type') === 'submit') {
         // submit buttons
         //if (attrib == 'disabled') {
         set ? element.addClass('disabled') : element.removeClass('disabled');
@@ -373,6 +407,36 @@ var toggle_visibility = (function () {
     };
 })();
 
+// Used to set session variables and then reload page.
+function ajax_action (action, value = '')
+{
+
+  var params = {
+     action: action,
+     value: value
+  };
+
+  $.ajax({
+    type: "POST",
+    url: "ajax/actions.php",
+    async: true,
+    cache: false,
+    data: jQuery.param(params),
+    success: function (response) {
+           if (response.status === 'ok') {
+              location.reload(true);
+              //console.log(response);
+          } else {
+              console.log(response);
+           }
+       }
+  });
+
+  event.preventDefault();
+
+  return false;
+
+};
 
 
 delete_ap = function (id) {

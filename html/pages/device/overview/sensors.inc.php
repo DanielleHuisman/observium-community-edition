@@ -46,7 +46,7 @@ if (isset($sensors_db['measured']))
                       );
     echo generate_box_open($box_args);
 
-    echo' <table class="table table-condensed table-striped">';
+    echo ' <table class="table table-condensed table-striped">';
 
     foreach ($measured_entity as $entity_id => $entry)
     {
@@ -59,13 +59,18 @@ if (isset($sensors_db['measured']))
       $rename_from = [];
       if ($measured_class == 'port')
       {
-        $rename_from[] = $entity['port_label'];
-        $rename_from[] = $entity['ifDescr'];
-        $rename_from[] = $entity['port_label_short'];
+        if (is_numeric($entity['port_label']))
+        {
+          $rename_from[] = $entity['port_label'].' ';
+        } else {
+          $rename_from[] = $entity['port_label'];
+          $rename_from[] = $entity['ifDescr'];
+          $rename_from[] = $entity['port_label_short'];
+        }
         if (strlen($entity['port_label_base']) > 4) { $rename_from[] = $entity['port_label_base']; }
         $rename_from = array_unique($rename_from);
       } else {
-          $rename_from[] = entity_rewrite($measured_class, $entity);
+        $rename_from[] = entity_rewrite($measured_class, $entity);
       }
       //r($rename_from);
       //echo('      <tr class="'.$port['row_class'].'">

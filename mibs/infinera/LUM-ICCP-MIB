@@ -1,0 +1,617 @@
+LUM-ICCP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE
+        FROM SNMPv2-CONF
+    TEXTUAL-CONVENTION, MacAddress, DisplayString, DateAndTime
+        FROM SNMPv2-TC
+    lumModules, lumIccpMIB
+        FROM LUM-REG
+    MgmtNameString, FaultStatus, CommandString
+        FROM LUM-TC;
+
+lumIccpMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201709010000Z" -- September 1st 2017
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+        "The MIB module for management of ICCP.
+
+        The tables contained in this MIB are:
+
+        (1) The General group contains some general attributes as time stamps
+            and tables sizes.
+
+        (2) The Node table contains each individual ICCP node.
+            Every board in the physical node that supports ICCP
+            is considered an individual ICCP node.
+
+        (3) The Rg table contains information and configuration for ICCP tunnel,
+            which is a connection between two Label Switch Router, LSRs.
+
+"
+    REVISION
+        "201709010000Z" -- September 1st 2017
+    DESCRIPTION
+        "Changes made for release r30.0:
+         - Added emxp440 board"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "Changes made for release r29.0:
+         - Changed ORGANIZATION and CONTACT-INFO"
+    REVISION
+        "201501140000Z" -- Jan 2015
+    DESCRIPTION
+        "Added emxp240iie board"
+    REVISION
+        "201411050000Z" -- Nov 2014
+    DESCRIPTION
+        "The initial revision of this module."
+    ::= { lumModules 61 }
+
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and compliance
+-- specifications.
+-- ----------------------------------------------------
+
+lumIccpConfs OBJECT IDENTIFIER ::= { lumIccpMIB 1 }
+lumIccpGroups OBJECT IDENTIFIER ::= { lumIccpConfs 1 }
+lumIccpCompl OBJECT IDENTIFIER ::= { lumIccpConfs 2 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the ICCP MIB
+-- ----------------------------------------------------
+
+lumIccpMIBObjects OBJECT IDENTIFIER ::= { lumIccpMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+iccpGeneral OBJECT IDENTIFIER ::= { lumIccpMIBObjects 1 }
+iccpNodeList OBJECT IDENTIFIER ::= { lumIccpMIBObjects 2 }
+iccpRgList OBJECT IDENTIFIER ::= { lumIccpMIBObjects 3 }
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+IccpLabel ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS current
+    DESCRIPTION
+        "ICCP label with actual label range 16-1048575, 0-15 is reserved."
+    SYNTAX Unsigned32 (0..1048575)
+
+IccpIdentifier ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS current
+    DESCRIPTION
+        "ICCP identifier type, 16-bit integer."
+    SYNTAX Unsigned32 (0..65535)
+
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+
+iccpGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the configuration of the MIB was
+        last changed.
+"
+    ::= { iccpGeneral 1 }
+
+iccpGeneralStateLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the state of the MIB was last
+        changed.
+"
+    ::= { iccpGeneral 2 }
+
+iccpGeneralIccpNodeTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "ToDo
+"
+    ::= { iccpGeneral 3 }
+
+iccpGeneralIccpRgTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "ToDo
+"
+    ::= { iccpGeneral 4 }
+
+-- ----------------------------------------------------
+-- Node table
+-- ----------------------------------------------------
+iccpNodeTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF IccpNodeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The ICCP node list. Each individual board that
+         supports ICCP node is considered a ICCP node."
+    ::= { iccpNodeList 1 }
+
+iccpNodeEntry OBJECT-TYPE
+    SYNTAX      IccpNodeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the ICCP node list.
+"
+    INDEX { iccpNodeIndex }
+    ::= { iccpNodeTable 1 }
+
+IccpNodeEntry ::=
+SEQUENCE {
+        iccpNodeIndex                        Unsigned32,
+        iccpNodeName                         MgmtNameString,
+        iccpNodeSystemMacAddress             DisplayString,
+        iccpNodeCreateIccpRg                 CommandString,
+        iccpNodeInternalReference            Unsigned32}
+
+
+
+iccpNodeIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { iccpNodeEntry 1 }
+
+iccpNodeName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the  group, for example
+        ':1:2:lag1:1-2' (:[subrack]:[slot]:[LAG identifier]:[ port])
+
+"
+    ::= { iccpNodeEntry 2 }
+
+iccpNodeSystemMacAddress OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The system mac address.
+
+"
+    DEFVAL { "" }
+    ::= { iccpNodeEntry 3 }
+
+iccpNodeCreateIccpRg OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Create an Inter-Chassis Communication Protocol (ICCP) Redundancy Group (RG).
+
+        Group ID -              The two PE:s that protect the same LAG must have the same Group ID.
+
+        MEP -                   Select the remote UP MEP that has been configured to be used as communication channel for the ICCP and mLACP protocol.
+                                NOTE! Only UP MEPs can be used for this purpose.
+
+        Create MC-LAG -         Whether the MC-LAG should be created is optional in this dialogue. It can be added or removed from the ICCP RG later.
+
+        Node ID -               This MUST be unique in a RG. Be sure to use different values for both PE:s in the RG. The node ID is used in mLACP to ensure
+                                uniqueness of LACP port numbers.
+
+        LAG -                   Select the LAG that should be protected. NOTE! LACP must be enabled on the LAG.
+
+        Administrative
+        system priority -       This is the administrative system priority for this MC-LAG. This will be used in the negotiation with the other PE in the
+                                RG which system parameters to use in LACPDU:s. Both PE:s will automatically agree on the same system priority, system id and key.
+
+        Administrative
+        port priority -         This port priority is used on all ports in the LAG.
+
+"
+    ::= { iccpNodeEntry 4 }
+
+iccpNodeInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 0 }
+    ::= { iccpNodeEntry 5 }
+
+
+-- ----------------------------------------------------
+-- Rg table
+-- ----------------------------------------------------
+
+iccpRgTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF IccpRgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The ICCP RG list."
+    ::= { iccpRgList 1 }
+
+iccpRgEntry OBJECT-TYPE
+    SYNTAX      IccpRgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the ICCP RG list.
+"
+    INDEX { iccpRgIndex }
+    ::= { iccpRgTable 1 }
+
+IccpRgEntry ::=
+SEQUENCE {
+        iccpRgIndex                        Unsigned32,
+        iccpRgName                         MgmtNameString,
+        iccpRgDescr                        DisplayString,
+        iccpRgRedundancyGroupId            Unsigned32,
+        iccpRgRedundancyObjectId           Unsigned32,
+        iccpRgPeerMacAddress               MacAddress,
+        iccpRgPortId                       Unsigned32,
+        iccpRgMepName                      DisplayString,
+	iccpRgMepMaid                      DisplayString,
+        iccpRgMepId                        Unsigned32,
+        iccpRgMegGroupId                   Unsigned32,
+        iccpRgMegLevel                     Unsigned32,
+        iccpRgVlanId                       Unsigned32,
+        iccpRgState                        INTEGER,
+        iccpRgApplicationState             INTEGER,
+        iccpRgInternalReference            Unsigned32,
+        iccpRgApplication                  INTEGER,
+        iccpRgCreateMcLag                  CommandString,
+        iccpRgCommunicationFailure         FaultStatus }
+
+
+iccpRgIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { iccpRgEntry 1 }
+
+iccpRgName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the Redundancy Group, for example
+        'iccpRg:1:2:1' (iccpRg:[subrack]:[slot]:[redundancyGroupId])
+
+"
+    ::= { iccpRgEntry 2 }
+
+iccpRgDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "User configurable label.
+
+"
+    DEFVAL { "" }
+    ::= { iccpRgEntry 3 }
+
+iccpRgRedundancyGroupId OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..8)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The Group ID used by all of its members.
+
+"
+    DEFVAL { 1 }
+    ::= { iccpRgEntry 4 }
+
+iccpRgRedundancyObjectId OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..8)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 1 }
+    ::= { iccpRgEntry 5 }
+
+iccpRgPeerMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "User configurable label.
+
+"
+    ::= { iccpRgEntry 6 }
+
+iccpRgPortId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1023)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 0 }
+    ::= { iccpRgEntry 7 }
+
+ iccpRgMepName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The management name of the mep used for communication.
+"
+    DEFVAL { "" }
+    ::= { iccpRgEntry 8 }
+
+iccpRgMepMaid OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The management name of the mep maid used for communication.
+"
+    DEFVAL { "" }
+    ::= { iccpRgEntry 9 }
+
+iccpRgMepId OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..8191)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 1 }
+    ::= { iccpRgEntry 10 }
+
+
+iccpRgMegGroupId OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..8191)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 1 }
+    ::= { iccpRgEntry 11 }
+
+iccpRgMegLevel OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 0 }
+    ::= { iccpRgEntry 12 }
+
+iccpRgVlanId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4094)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 0 }
+    ::= { iccpRgEntry 13 }
+
+iccpRgState OBJECT-TYPE
+    SYNTAX     INTEGER {
+        nonExistent (1),
+        connecting (2),
+        operational (3),
+        undefined (4)
+    }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "nonExistent - A connect message has not yet been sent to the peer mep.
+         connecting - Periodical connect messages are being sent to the peer mep.
+         operational - A connect message has been received from the peer mep.
+
+"
+    DEFVAL { nonExistent }
+    ::= { iccpRgEntry 14 }
+
+iccpRgApplicationState OBJECT-TYPE
+    SYNTAX     INTEGER {
+        nonExistent (1),
+        reset (2),
+        connectSent (3),
+        connectReceive (4),
+        connecting (5),
+        operational (6),
+        undefined (7)
+    }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "nonExistent - The ICCP RG state is not operational.
+         reset - The ICCP RG state has transitioned to operational.
+         connectSent - An application connect message been sent to the peer mep.
+         connectReceive - An application connect message been received from the peer mep.
+         connecting - An application connect message with the A-bit set has been sent to the peer mep.
+         operational - An application connect message has been received from the peer mep with the A-bit set.
+
+"
+    DEFVAL { nonExistent }
+    ::= { iccpRgEntry 15 }
+
+
+iccpRgInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+
+"
+    DEFVAL { 0 }
+    ::= { iccpRgEntry 16 }
+
+iccpRgApplication OBJECT-TYPE
+    SYNTAX     INTEGER {
+        none (1),
+        mLacp (2),
+        pwRed (3),
+        mLacpAndIccp (4)
+    }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        " ICCP-RG State
+        nonExistent - This state indicates that the Application Connection does not exist since there is no ICCP connection between the PEs.
+        connecting - This state indicates that the local PE has transmitted to its peer an Application Connection message.
+        operational - This state indicates that the Application Connection is operational
+
+"
+    DEFVAL { none }
+    ::= { iccpRgEntry 17 }
+
+iccpRgCreateMcLag OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Create a Multi-Chassis Link Aggregation Group (MC-LAG).
+
+        Node ID -               This MUST be unique in a Redundancy Group (RG). Be sure to use different values for both PE:s in the RG. The node ID is used in mLACP to ensure
+                                uniqueness of LACP port numbers.
+
+        ICCP -                  Select a RG. This must be created beforehand.
+
+        LAG -                   Select the LAG that should be protected. NOTE! LACP must be enabled on the LAG.
+
+        Administrative
+        system priority -       This is the administrative system priority for this MC-LAG. This will be used in the negotiation with the other PE in the
+                                RG which system parameters to use in LACPDU:s. Both PE:s will automatically agree on the same system priority, system id and key.
+
+        Administrative
+        port priority -         This port priority is used on all ports in the LAG.
+
+"
+    ::= { iccpRgEntry 18 }
+
+iccpRgCommunicationFailure OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "alarm - The MEP has either the Remote CCM or RDI CCM alarm set or the ICCP RG state is not operational
+
+        ok - The MEP does not have the Remote CCM or RDI CCM alarm set and the ICCP RG state is operational.
+
+"
+    ::= { iccpRgEntry 19 }
+
+
+
+-- ----------------------------------------------------
+-- Notifications
+-- ----------------------------------------------------
+
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+iccpGeneralGroupV1 OBJECT-GROUP
+    OBJECTS {
+        iccpGeneralLastChangeTime,
+        iccpGeneralStateLastChangeTime,
+        iccpGeneralIccpNodeTableSize}
+    STATUS      current
+    DESCRIPTION
+        "The general objects."
+    ::= { lumIccpGroups 1 }
+
+iccpNodeGroupV1 OBJECT-GROUP
+    OBJECTS {
+        iccpNodeIndex,
+	iccpNodeSystemMacAddress,
+	iccpNodeCreateIccpRg,
+        iccpNodeInternalReference }
+    STATUS      current
+    DESCRIPTION
+        "The ICCP Node objects (R24.0)."
+    ::= { lumIccpGroups 2 }
+
+iccpRgGroupV1 OBJECT-GROUP
+    OBJECTS {
+        iccpRgIndex,
+        iccpRgName,
+        iccpRgDescr,
+        iccpRgRedundancyGroupId,
+        iccpRgRedundancyObjectId,
+        iccpRgPeerMacAddress,
+        iccpRgPortId,
+        iccpRgMepName,
+	iccpRgMepMaid,
+        iccpRgMepId,
+        iccpRgMegGroupId,
+        iccpRgMegLevel,
+        iccpRgVlanId,
+        iccpRgState,
+        iccpRgApplicationState,
+        iccpRgInternalReference,
+        iccpRgApplication,
+        iccpRgCreateMcLag,
+        iccpRgCommunicationFailure }
+    STATUS      current
+    DESCRIPTION
+        "The ICCP Rg objects (R24.0)."
+    ::= { lumIccpGroups 3 }
+
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+lumIccpBasicComplV1 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the ICCP MIB. (R24.0)"
+    MODULE
+        MANDATORY-GROUPS {
+        iccpNodeGroupV1,
+        iccpRgGroupV1 }
+    ::= { lumIccpCompl 1 }
+
+END
+
+

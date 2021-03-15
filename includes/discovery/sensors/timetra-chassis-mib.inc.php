@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,19 +6,16 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 $mib = 'TIMETRA-CHASSIS-MIB';
 
 //TIMETRA-CHASSIS-MIB::tmnxChassisTotalNumber.0 = INTEGER: 1
-$chassis_count = snmp_get($device, "tmnxChassisTotalNumber.0", "-Oqv", $mib);
+$chassis_count = snmp_get_oid($device, "tmnxChassisTotalNumber.0", $mib);
 
-if (!isset($cache_discovery['timetra-chassis-mib']))
-{
-  $cache_discovery['timetra-chassis-mib'] = snmpwalk_cache_twopart_oid($device, 'tmnxHwTable', NULL, $mib);
-}
+$oids = snmp_cache_table($device, 'tmnxHwTable', NULL, 'TIMETRA-CHASSIS-MIB');
 
 //TIMETRA-CHASSIS-MIB::tmnxHwName.1.50331649 = STRING: "chassis"
 //TIMETRA-CHASSIS-MIB::tmnxHwName.1.134217729 = STRING: "Slot 1"
@@ -27,20 +23,20 @@ if (!isset($cache_discovery['timetra-chassis-mib']))
 //TIMETRA-CHASSIS-MIB::tmnxHwTempSensor.1.134217729 = INTEGER: true(1)
 //TIMETRA-CHASSIS-MIB::tmnxHwTemperature.1.50331649 = INTEGER: 37 degrees celsius
 //TIMETRA-CHASSIS-MIB::tmnxHwTemperature.1.134217729 = INTEGER: 37 degrees celsius
-foreach ($cache_discovery['timetra-chassis-mib'] as $chassis => $entries)
+foreach ($oids as $index => $entry)
 {
-  $chassis_name = ($chassis_count > 1 ? ", Chassis $chassis" : "");
-  foreach ($entries as $index => $entry)
-  {
+  list($chassis, $system_index) = explode('.', $index);
+  $chassis_name = $chassis_count > 1 ? ", Chassis $chassis" : "";
+
     if ($entry['tmnxHwTempSensor'] == 'true' && $entry['tmnxHwTemperature'] != '-1')
     {
       $descr   = rewrite_entity_name($entry['tmnxHwName']).$chassis_name;
-      $oid     = ".1.3.6.1.4.1.6527.3.1.2.2.1.8.1.18.$chassis.$index";
+      $oid     = ".1.3.6.1.4.1.6527.3.1.2.2.1.8.1.18.$index";
       $options = array('limit_high' => $entry['tmnxHwTempThreshold']);
 
-      discover_sensor('temperature', $device, $oid, "$chassis.$index", 'timetra-chassis-temp', $descr, 1, $entry['tmnxHwTemperature'], $options);
+      discover_sensor('temperature', $device, $oid, $index, 'timetra-chassis-temp', $descr, 1, $entry['tmnxHwTemperature'], $options);
     }
-  }
+
 }
 
 $timetra_entity = array(
@@ -92,8 +88,8 @@ $timetra_entity = array(
 //TIMETRA-CHASSIS-MIB::tmnxChassisFanSpeed.1.1 = INTEGER: halfSpeed(2)
 $cache_discovery['timetra-chassis-state'] = snmpwalk_cache_twopart_oid($device, 'tmnxChassisPowerSupplyEntry', array(), $mib);
 $cache_discovery['timetra-chassis-state'] = snmpwalk_cache_twopart_oid($device, 'tmnxChassisFanEntry', $cache_discovery['timetra-chassis-state'], $mib);
+print_debug_vars($cache_discovery['timetra-chassis-state']);
 
-if (OBS_DEBUG > 1 && count($cache_discovery['timetra-chassis-state'])) { print_vars($cache_discovery['timetra-chassis-state']); }
 foreach ($cache_discovery['timetra-chassis-state'] as $chassis => $entries)
 {
   $chassis_name = ($chassis_count > 1 ? ", Chassis $chassis" : "");

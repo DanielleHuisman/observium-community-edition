@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -29,7 +27,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
       $entry['found'] = FALSE;
 
       // Check duplicate processors by $valid['processor'] array
-      if (discovery_check_if_type_exist($GLOBALS['valid'], $entry, 'processor')) { continue 2; }
+      if (discovery_check_if_type_exist($entry, 'processor')) { continue 2; }
 
       // Precision (scale)
       $precision = 1;

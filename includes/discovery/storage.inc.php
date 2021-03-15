@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -31,6 +30,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
          $total = NULL;
          $free  = NULL;
          $perc  = NULL;
+         $options = [];
          if (isset($entry['scale']) && is_numeric($entry['scale']) && $entry['scale'])
          {
             $scale = $entry['scale'];
@@ -42,6 +42,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
             // Table Discovery //
             /////////////////////
 
+            /* FIXME. Partially changed, need rewrite to common style
             // If the type is table, walk the table!
             if ($entry['type'] == "table")
             {
@@ -50,7 +51,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
             else
             {
                // Type is not table, so we have to walk each OID individually
-               foreach (array('oid_used', 'oid_total', 'oid_free', 'oid_perc', 'oid_descr') as $oid)
+               foreach (array('oid_total', 'oid_total', 'oid_free', 'oid_perc', 'oid_descr') as $oid)
                {
                   if (isset($entry[$oid]))
                   {
@@ -73,6 +74,13 @@ foreach (get_device_mibs_permitted($device) as $mib)
             {
                $storage_array = snmpwalk_cache_oid($device, $oid, $storage_array, $mib);
             }
+            */
+            $table_oids = [ 'oid_total', 'oid_used', 'oid_free', 'oid_perc', 'oid_descr',
+                            'oid_scale', 'oid_unit', 'oid_extra',
+                            //'oid_limit_low', 'oid_limit_low_warn', 'oid_limit_high_warn', 'oid_limit_high',
+                            //'oid_limit_nominal', 'oid_limit_delta_warn', 'oid_limit_delta', 'oid_limit_scale'
+            ];
+            $storage_array = discover_fetch_oids($device, $mib, $entry, $table_oids);
 
             // FIXME - generify description generation code and just pass it template and OID array.
 
@@ -87,14 +95,18 @@ foreach (get_device_mibs_permitted($device) as $mib)
                $storage_entry['index'] = $index;
                $descr = entity_descr_definition('storage', $entry, $storage_entry, $storage_count);
 
+               // Convert strings '3.40 TB' to value
+               // See QNAP NAS-MIB or HIK-DEVICE-MIB
+               $unit = isset($entry['unit']) ? $entry['unit'] : NULL;
+
                // Fetch used, total, free and percentage values, if OIDs are defined for them
                if ($entry['oid_used'] != '')
                {
-                  $used = snmp_fix_numeric($storage_entry[$entry['oid_used']]);
+                  $used = snmp_fix_numeric($storage_entry[$entry['oid_used']], $unit);
                }
                if ($entry['oid_free'] != '')
                {
-                  $free = snmp_fix_numeric($storage_entry[$entry['oid_free']]);
+                  $free = snmp_fix_numeric($storage_entry[$entry['oid_free']], $unit);
                }
                if ($entry['oid_perc'] != '')
                {
@@ -108,7 +120,7 @@ foreach (get_device_mibs_permitted($device) as $mib)
                }
                elseif ($entry['oid_total'] != '')
                {
-                  $total = snmp_fix_numeric($storage_entry[$entry['oid_total']]);
+                  $total = snmp_fix_numeric($storage_entry[$entry['oid_total']], $unit);
                }
 
                // Extrapolate all values from the ones we have.

@@ -46,11 +46,21 @@ if (!count($ip_data[$ip_version]))
     $tmp_prefix = explode('.', $entry['cIpAddressPrefix']);
     $entry['cIpAddressPrefix'] = end($tmp_prefix);
 
+    /*
     $ip_data[$ip_version][$ifIndex][$ip_address] = array('ifIndex' => $ifIndex,
                                                          'ip'     => $ip_address,
                                                          'prefix' => $entry['cIpAddressPrefix'],
                                                          'type'   => $entry['cIpAddressType'],
                                                          'origin' => $entry['cIpAddressOrigin']);
+    */
+    $data = [
+      'ifIndex' => $ifIndex,
+      'ip'      => $ip_address,
+      'prefix'  => $entry['cIpAddressPrefix'],
+      'type'    => $entry['cIpAddressType'],
+      'origin'  => $entry['cIpAddressOrigin']
+    ];
+    discover_add_ip_address($device, $mib, $data);
   }
 }
 

@@ -71,8 +71,30 @@ if ($graph_style == 'mrtg')
   $out_scale = -1;
 }
 
-if ($rrd_filename) { $rrd_filename_out = $rrd_filename; $rrd_filename_in = $rrd_filename; }
-if ($inverse) { $in = 'out'; $out = 'in'; } else { $in = 'in'; $out = 'out'; }
+if ($rrd_filename)
+{
+  $rrd_filename_out = $rrd_filename_escape;
+  $rrd_filename_in = $rrd_filename_escape;
+} else {
+  // When IPv6 host is used, need escaping for filename path
+  if (isset($rrd_filename_in))
+  {
+    $rrd_filename_in = rrdtool_escape($rrd_filename_in);
+  }
+  if (isset($rrd_filename_out))
+  {
+    $rrd_filename_out = rrdtool_escape($rrd_filename_out);
+  }
+}
+
+if ($inverse)
+{
+  $in = 'out';
+  $out = 'in';
+} else {
+  $in = 'in';
+  $out = 'out';
+}
 
 if ($multiplier)
 {
@@ -222,8 +244,8 @@ if ($vars['previous'] == "yes")
   $rrd_options .= " LINE1.25:in".$format."X#009900:'Prev In \\n'";
   $rrd_options .= " LINE1.25:dout".$format."X#000099:'Prev Out'";
 } else {
-  $rrd_options .= " AREA:wrongin#FFF2F2";
-  $rrd_options .= " AREA:wrongout#FFF2F2";
+  $rrd_options .= " AREA:wrongin".$nan_colour;
+  $rrd_options .= " AREA:wrongout".$nan_colour;
 }
 
 if ($vars['trend'])

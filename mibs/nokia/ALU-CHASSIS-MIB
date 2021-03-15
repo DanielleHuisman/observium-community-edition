@@ -1,0 +1,3686 @@
+ALU-CHASSIS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, 
+        NOTIFICATION-TYPE, Unsigned32,
+        Integer32, Gauge32, Counter64,
+        IpAddress                               FROM SNMPv2-SMI
+
+        MODULE-COMPLIANCE, OBJECT-GROUP, 
+        NOTIFICATION-GROUP                      FROM SNMPv2-CONF
+
+        TEXTUAL-CONVENTION, DisplayString,
+        TruthValue, MacAddress, RowStatus       FROM SNMPv2-TC
+
+        TPortSchedulerPIR,
+        TQueueMode,
+        TmnxActionType, TNamedItemOrEmpty,
+        TPolicyID, TNamedItem,
+        TmnxPortID, TmnxEnabledDisabled         FROM TIMETRA-TC-MIB
+        
+        TmnxDeviceState, TmnxHwIndex,
+        tmnxChassisIndex, tmnxHwID, 
+        tmnxChassisNotifyHwIndex,
+        tmnxHwIndex, tmnxHwClass, 
+        TmnxPortAdminStatus, tmnxCpmCardEntry,
+        TmnxSETSRefQualified, TmnxSETSRefAlarm,
+        tmnxSyncIfTimingEntry,
+        tSyncIfTimingAdmEntry,
+        tmnxMDAEntry,
+        tmnxSyncIfTimingNotifyAlarm,
+        tmnxCardSlotNum,
+        TmnxSSMQualityLevel,
+        tmnxSyncIfTimingRef1InUse, 
+        tmnxSyncIfTimingRef2InUse,
+        TmnxRefInState,
+        tmnxMDASlotNum,
+        tmnxChassisNotifyChassisId              FROM TIMETRA-CHASSIS-MIB
+      
+        aluSARMIBModules, aluSARObjs,
+        aluSARNotifyPrefix, aluSARConfs         FROM ALU-SAR-GLOBAL-MIB
+        
+        AluSecQueueId                           FROM ALU-QOS-MIB
+        ;
+        
+aluChassisMIBModule MODULE-IDENTITY
+        LAST-UPDATED    "0801010000Z"
+        ORGANIZATION    "Nokia"
+        CONTACT-INFO    
+            "Nokia 7x50 Support
+             Web: http://www.nokia.com/comps/pages/carrier_support.jhtml"
+        DESCRIPTION
+        "This document is the SNMP MIB module to manage and provision the 
+        hardware components of the Nokia 7705 device.
+        
+        Copyright 2003-2015 Nokia.  All rights reserved.
+        Reproduction of this document is authorized on the condition that
+        the foregoing copyright notice is included.
+
+        This SNMP MIB module (Specification) embodies Nokia's
+        proprietary intellectual property.  Nokia retains 
+        all title and ownership in the Specification, including any 
+        revisions.
+
+        Nokia grants all interested parties a non-exclusive 
+        license to use and distribute an unmodified copy of this 
+        Specification in connection with management of Nokia 
+        products, and without fee, provided this copyright notice and 
+        license appear on all copies.
+
+        This Specification is supplied 'as is', and Nokia 
+        makes no warranty, either express or implied, as to the use, 
+        operation, condition, or performance of the Specification."
+
+--
+--  Revision History
+--
+        REVISION        "0809170000Z" -- 17 Sept 2008 00:00
+        DESCRIPTION     
+            "Rev 2.0.1 17 Sept 2008 00:00 
+             2.0 release of the ALU-CHASSIS-MIB.
+             - fixed aluExtIfSyncIfTimingExtensionTable definition"
+
+        REVISION        "0801240000Z"
+        DESCRIPTION     "Rev 1.0                24 Jan 2008 00:00 
+                         1.0 release of the ALU-CHASSIS-MIB."
+    ::= { aluSARMIBModules 1 }
+
+
+--  sub-tree for managed objects, and for each functional area
+aluHwObjs                OBJECT IDENTIFIER ::= { aluSARObjs 2 }
+        aluChassisObjs         OBJECT IDENTIFIER ::= { aluHwObjs 1 }
+--      aluSlotObjs            OBJECT IDENTIFIER ::= { aluHwObjs 2 }
+        aluCardObjs            OBJECT IDENTIFIER ::= { aluHwObjs 3 }
+--      aluPortObjs            OBJECT IDENTIFIER ::= { aluHwObjs 4 }
+--      aluPppObjs             OBJECT IDENTIFIER ::= { aluHwObjs 5 }
+aluChassisNotificationObjects  OBJECT IDENTIFIER ::= { aluHwObjs 6 }
+-- aluPortNotificationObjects     OBJECT IDENTIFIER ::= { aluHwObjs 7 }
+-- aluSystemNotificationObjs      OBJECT IDENTIFIER ::= { aluHwObjs 8 }
+-- aluPortStatsObjs               OBJECT IDENTIFIER ::= { aluHwObjs 12 }
+
+aluHwNotification                  OBJECT IDENTIFIER ::= { aluSARNotifyPrefix 2 }
+        aluChassisNotifyPrefix      OBJECT IDENTIFIER ::= { aluHwNotification 1} 
+               aluChassisNotification      OBJECT IDENTIFIER ::= { aluChassisNotifyPrefix 0 } 
+    
+aluHwConformance           OBJECT IDENTIFIER ::= { aluSARConfs 2 }
+    aluChassisConformance      OBJECT IDENTIFIER ::= { aluHwConformance 1 }
+--    aluFabricStatsConformance  OBJECT IDENTIFIER ::= { aluHwConformance 2 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      ALU-CHASSIS-MIB textual conventions
+--
+
+
+--
+--      AluFamType
+--
+AluFamType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The AluFamType data type is bit-mask field that describes
+         the values used to identify the kind of Fan Alarm 
+         module (FAM) installed on the chassis.  A AluFamType bit
+         value specifies the index value for the entry in the
+         aluFamTable used to identify a specific type of FAM
+         manufactured by Nokia.  When multiple bits are set, it can
+         be used to identify a set or list of FAM types used in the
+         aluFamTable to indicate supported FAMs within a specific
+         chassis slot.  Some example FAM types are:
+
+                    unknown            -- unknown/uninstalled
+                    fan-v1             -- Fan Alarm Module version 1
+                    fan-v2             -- Fan Alarm Module version 2
+                    
+        "
+    SYNTAX      Unsigned32
+
+--
+--      AluExtAlarmState
+--
+AluExtAlarmState ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The AluExtAlarmState data type is an enumerated integer that 
+         describes the values used to identify states of inputs from the
+         External Alarms Interface on Nokia platforms."
+    SYNTAX  INTEGER {
+                extAlarmStateUnknown       (1),
+                extAlarmNotEquipped        (2),
+                extAlarmOk                 (3),
+                extAlarmDetected           (4)
+            }
+
+--
+--      AluExtAlarmEvent
+--
+AluExtAlarmEvent ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The AluExtAlarmEvent data type is an enumerated integer that 
+         describes the logging event of an external alarm state when it is detected
+         on the External Alarms Interface on Nokia platforms. This event is
+         based on the event-control configuration in the logger."
+    SYNTAX  INTEGER {
+                extAlarmSuppressed           (1),
+                extAlarmCritical           (2),
+                extAlarmMajor              (3),
+                extAlarmMinor              (4),
+                extAlarmWarning            (5),
+                extAlarmIndeterminate      (6)
+            }
+            
+--
+--      AluPlatformHwClass
+--
+AluPlatformHwClass ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "AluPlatformHwClass is an enumerated integer that identifies the general
+         hardware type of a platform-specific component on Nokia 
+         7705 SAR series devices in the tmnxHwTable."
+    SYNTAX  INTEGER {
+                notApplicable (0),
+                fam           (1),
+                extAlarmInput (2)
+            }   
+            
+--
+--      AluHwBgDiagsState
+--
+AluHwBgDiagsState ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "AluHwBgDiagsState is an enumerated integer that identifies the state
+         of background diagnostics running on hardware components installed 
+         in Nokia series devices in the tmnxHwTable.
+           (0) notApplicable - Hardware component does not have any 
+                               background diagnostics.
+           (1) unknown       - State of background diagnostics can not be 
+                               determined.
+           (2) ok            - Background diagnostics are running on this
+                               component and no fault is being detected.
+           (3) faultDetected - Background diagnostics have detected a fault
+                               on this component. The value of 
+                               'aluExtHwBgDiagsFaultReason' indicates the
+                               type of fault detected.
+           (4) criticalFaultDetected - Background diagnostics have detected a
+                               critical fault on this component. The value of 
+                               'aluExtHwBgDiagsFaultReason' indicates the
+                               type of fault detected."
+    SYNTAX  INTEGER {
+                notApplicable          (0),
+                unknown                (1),
+                ok                     (2),
+                faultDetected          (3),
+                criticalFaultDetected  (4)
+            }   
+
+--
+--      aluSETSRefSource
+--
+AluSETSRefSource ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The AluSETSRefSource is an extension of the TmnxSETSRefSource data type
+         and it is an enumerated integer that describes the values used to identify
+         the Synchronous Equipment Timing Subsystem (SETS) timing reference source.
+
+         All 7705 chassis's support the following SETS timing references:
+         'reference1 (1)', 'reference2 (2)' and 'noReference (7)'.
+
+         The SAR8, SAR-M, SAR-ME, SAR-A and SAR-AE support the 'external (5)'
+         SETS timing reference and the SAR18 supports' 'bits (3),' and 'bits2 (4)'
+         timing references."
+    SYNTAX  INTEGER {
+--                  otherCPM    (0),
+                  reference1  (1),
+                  reference2  (2),
+                  bits        (3),
+                  bits2       (4),
+                  external    (5),
+--                  ptp         (6),
+                  noReference (7)
+            }
+
+
+--
+--      AluExternalIfType
+--
+AluExternalIfType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The AluExternalIfType data type is an enumerated integer that describes
+         the values used to identify the interface type of the external timing
+         interface."
+    SYNTAX  INTEGER {
+                two-mhz-square (1),
+                five-mhz-sine (2),
+                ten-mhz-sine (3)
+            }
+
+--
+--      AluExternalInputImpedanceType
+--
+AluExternalInputImpedanceType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The AluExternalInputImpedanceType data type is an enumerated integer
+         that describes the values used to identify the impedance value of the
+         external input timing interface."
+    SYNTAX  INTEGER {
+                high-impedance (0),
+                seventyfive-ohm (1),
+                fifty-ohm (2)
+            }
+
+--
+--      AluSyncIfTimingIeee1588PtpType
+--
+AluSyncIfTimingIeee1588PtpType ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The AluSyncIfTimingIeee1588PtpType data type is an enumerated integer
+         that describes the values used to identify the IEEE PTP device type.
+         The types are described in IEEE 1588 PTP section 7.6.1 PTP device type"
+    SYNTAX  INTEGER {
+                unknown (0),
+                boundary (1),
+                ordinary (2),
+                end-to-end-transparent (3),
+                peer-to-peer-transparent (4),
+                management-node (5)
+            }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      ALU-CHASSIS-MIB at a glance
+-- 
+--  timetra (enterprises 6527)
+--    tmnxBasedProducts (6)
+--        aluServiceAggrRouters (1)
+--        aluSARObjects (2)
+--           aluSARMIB (1)
+--                aluSARConfs (1)
+--                aluSARObjs (2)
+--                      aluHwObjs     (aluSARObjs 2)
+--                aluSARNotifyPrefix (3)
+--
+--      
+--  aluChassisObjs     (aluHwObjs 1)
+--        aluFamTable (1)
+--        aluExtAlarmTable (2)
+--        aluExtTmnxHwEntryTable (3)
+--        aluExtTmnxMDATable (4)
+--        aluFabricDeviceStatsTable(5)
+--        aluSourceMDAStatsTable(6)
+--        aluDestMDAStatsTable(7)
+--
+--  aluChassisNotificationObjects (6)
+--
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      The ALU Chassis Group
+--
+
+--
+--  Nokia 7705 SAR series Fabric Alarm Module (FAM) Table
+--
+
+aluFamTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluFamEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION   
+        "This table contains information about FAM."
+    ::= { aluChassisObjs 1 }
+
+aluFamEntry OBJECT-TYPE
+    SYNTAX      AluFamEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION   
+        "Contains information regarding a FAM."
+    INDEX       { tmnxChassisIndex, aluFamIndex }
+    ::= { aluFamTable 1 }
+
+AluFamEntry ::=
+     SEQUENCE {
+        aluFamIndex            Unsigned32,
+        aluFamOperStatus       TmnxDeviceState,
+        aluFamHwIndex          TmnxHwIndex,
+        aluFamEquippedType     AluFamType
+    }
+
+aluFamIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..1)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The unique value which identifies a specific FAM instance in the
+         chassis."
+    ::= { aluFamEntry 1 }
+
+aluFamOperStatus OBJECT-TYPE
+    SYNTAX      TmnxDeviceState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION   
+        "Current status of the FAM."
+    ::= { aluFamEntry 2 }
+
+aluFamHwIndex     OBJECT-TYPE
+    SYNTAX      TmnxHwIndex
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+        "The value of aluFamHwIndex is the index into the tmnxHwTable 
+         for the row entry that represents the hardware component information 
+         for this FAM."
+    ::= { aluFamEntry 3 }
+
+aluFamEquippedType        OBJECT-TYPE
+    SYNTAX      AluFamType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "A bit-mask that identifies the FAM type that is physically
+         inserted into this chassis.  There will not be more than one
+         bit set at a time in aluFamEquippedType."
+    ::= { aluFamEntry 4 }
+
+
+--
+--  External Alarm Inputs (from External Alarms Panel) Definition Table
+--
+aluChassisExtAlarmTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluChassisExtAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION   
+        "This table contains information about External Alarms State."
+    ::= { aluChassisObjs 2 }
+
+aluChassisExtAlarmEntry OBJECT-TYPE
+    SYNTAX      AluChassisExtAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION   
+        "Contains information regarding an external Alarm input."
+    INDEX       { tmnxChassisIndex, aluChassisExtAlarmIndex }
+    ::= { aluChassisExtAlarmTable 1 }
+
+AluChassisExtAlarmEntry ::=
+     SEQUENCE {
+        aluChassisExtAlarmIndex       Unsigned32,
+        aluChassisExtAlarmState       AluExtAlarmState,
+        aluChassisExtAlarmEvent       AluExtAlarmEvent,
+        aluChassisExtAlarmPin         Unsigned32
+    }
+
+aluChassisExtAlarmIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The unique value which identifies a specific External Alarm 
+         instance in the chassis."
+    ::= { aluChassisExtAlarmEntry 1 }
+
+aluChassisExtAlarmState OBJECT-TYPE
+    SYNTAX      AluExtAlarmState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION   
+        "Current state of the external alarm panel input."
+    ::= { aluChassisExtAlarmEntry 2 }
+
+aluChassisExtAlarmEvent OBJECT-TYPE
+    SYNTAX      AluExtAlarmEvent
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION   
+        "The logging event of an external alarm input when it is detected."
+    ::= { aluChassisExtAlarmEntry 3 }
+
+aluChassisExtAlarmPin OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..15)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION   
+        "The mapping of an external alarm input to its corresponding
+         pin on the External Alarms Interface."
+    ::= { aluChassisExtAlarmEntry 4 }    
+
+--
+--  Nokia 7705 SAR series Hardware Component Extensions
+--        
+aluExtTmnxHwTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF AluExtTmnxHwEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluExtTmnxHwTable contains the Nokia 7705 SAR specific
+         extensions for the tmnxHwTable which has an entry for each managed 
+         hardware component in the system's chassis."
+    ::= { aluChassisObjs 3 }
+
+aluExtTmnxHwEntry       OBJECT-TYPE
+    SYNTAX      AluExtTmnxHwEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents an Nokia manufactured 
+         hardware component.  Entries cannot be created and deleted via 
+         SNMP SET operations.  Entries are created and deleted 
+         automatically when entries are created or deleted in the
+         tmnxHwTable."
+    INDEX   { tmnxChassisIndex, tmnxHwIndex }
+    ::= { aluExtTmnxHwTable 1 }
+
+AluExtTmnxHwEntry ::=
+    SEQUENCE {
+        aluExtPlatformHwClass              AluPlatformHwClass,
+        aluExtHwBgDiagsState               AluHwBgDiagsState,
+        aluExtHwBgDiagsFaultReason         DisplayString,
+        aluExtHwMfgVariant                 DisplayString
+    }
+
+aluExtPlatformHwClass     OBJECT-TYPE
+    SYNTAX      AluPlatformHwClass
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluExtPlatformHwClass indicates the general hardware 
+         type of this component when the tmnxHwClass is set to 'other (1)'
+         on Nokia 7705 series devices.
+         
+         All general hardware types that are unique to Nokia 7705 
+         SAR series devices have a tmnxHwClass of 'other (1)' and 
+         aluExtPlatformHwClass is used to indicate the specific general
+         hardware class."
+    ::= { aluExtTmnxHwEntry 1 }
+
+aluExtHwBgDiagsState OBJECT-TYPE
+    SYNTAX      AluHwBgDiagsState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION   
+        "Current state of all background diagnostics running on this hardware
+         component on Nokia series devices."
+    DEFVAL  { unknown }
+    ::= { aluExtTmnxHwEntry 2 }
+
+aluExtHwBgDiagsFaultReason OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluExtHwBgDiagsFaultReason indicates the background diagnostic 
+         fault on a hardware component that has 'faultDetected' as 
+         indicated in 'aluExtHwBgDiagsState'."
+    ::= { aluExtTmnxHwEntry 3 }
+
+aluExtHwMfgVariant OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluExtHwMfgVariant contains manufacturing variations of a hardware
+         component that are not visible to software."
+    ::= { aluExtTmnxHwEntry 4 }
+
+--
+--  Nokia 7705 SAR series MDA Component Extensions
+--
+
+aluExtTmnxMDATable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluExtTmnxMDAEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION   
+        "This table contains information about Extension entries to tmnxMDATable in the TIMETRA-CHASSIS-MIB"
+    ::= { aluChassisObjs 4 }
+  
+aluExtTmnxMDAEntry OBJECT-TYPE
+    SYNTAX      AluExtTmnxMDAEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the aluExtTmnxMDATable contains information
+        specific to Nokia 7705 system."
+    AUGMENTS  { tmnxMDAEntry }
+    ::= {  aluExtTmnxMDATable 1 }
+    
+AluExtTmnxMDAEntry ::=
+        SEQUENCE {
+            aluExtTmnxMDANetworkIngFabricPolicy   TPolicyID,
+            aluExtTmnxMDAAccessIngFabricPolicy    TPolicyID,
+            aluExtTmnxMDAFabricStatsEnabled       TruthValue,
+            aluExtTmnxMDAVoiceCompandingLaw       INTEGER,
+            aluExtTmnxMDAVoiceSignalingType       INTEGER,
+            aluExtTmnxMDANumOfDigitalAlarmInputs  INTEGER,
+            aluExtTmnxMDANumOfAnalogAlarmInputs   INTEGER,
+            aluExtTmnxMDANumOfDigitalOutputRelays INTEGER,
+            aluExtTmnxMDACapabilityMode           INTEGER,
+            aluExtTmnxMDANetworkRingQueuePolicy   TNamedItemOrEmpty,
+            aluExtTmnxMDANetworkRingQosPolicy     TPolicyID,
+            aluExtTmnxMDAPwrEthPsPowerMode                  INTEGER,                 
+            aluExtTmnxMDAPwrEthPsPowerSupplyStatus          INTEGER,
+            aluExtTmnxMDAPwrEthPsExternalPowerSupplyStatus  INTEGER,
+            aluExtTmnxMDATuAisEnabled           TruthValue,
+            aluExtTmnxMDANetworkIngSecQueuePolicy TPolicyID,
+            aluExtTmnxMDAAccessIngSecQueuePolicy  TPolicyID,
+            aluExtTmnxMDASptSecAggRate            TPortSchedulerPIR,
+            aluExtTmnxMDAAccessIngShaperPolicy    TNamedItemOrEmpty,
+            aluExtTmnxMDAVcbApplication           INTEGER
+        }
+   
+aluExtTmnxMDANetworkIngFabricPolicy      OBJECT-TYPE
+    SYNTAX      TPolicyID (0..256)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the network ingress fabric-profile policy being used for this object."
+    DEFVAL { 1 }
+    ::= { aluExtTmnxMDAEntry 1 }
+    
+aluExtTmnxMDAAccessIngFabricPolicy      OBJECT-TYPE
+    SYNTAX      TPolicyID (0..256)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the access ingress fabric-profile policy being used for this object."
+    DEFVAL { 1 }
+    ::= { aluExtTmnxMDAEntry 2 }
+       
+aluExtTmnxMDAFabricStatsEnabled      OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specified whether the fabric stats counter is enabled for this MDA.
+         Nokia SAR-8 and allow aluExtTmnxMDAFabricStatsEnabled being TRUE
+         on only one MDA at a time.
+         
+         Nokia SAR-M does not allow aluExtTmnxMDAFabricStatsEnabled to be TRUE."
+    DEFVAL { false }
+    ::= { aluExtTmnxMDAEntry 3 }
+       
+aluExtTmnxMDAVoiceCompandingLaw OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    notApplicable (0),
+                    aLaw          (1),
+                    muLaw         (2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDAVoiceCompandingLaw is applicable only when the 'isVoice'
+         bit in tmnxMDACapabilities is set.
+
+         This object is 'notApplicable' for SCADA MDAs, such
+         as the ISC, whose aluExtTmnxMDACapabilityMode is 'modeA' (ie. MDDB).
+
+         aluExtTmnxMDAVoiceCompandingLaw configures all interfaces of a
+         voice MDA for A-Law or Mu-Law companding.
+
+         To change aluExtTmnxMDAVoiceCompandingLaw, all voice ports must be
+         shutdown and channels must not exist.
+
+         Changing aluExtTmnxMDAVoiceCompandingLaw results in defaulting of
+         aluExtTmnxMDAVoiceSignalingType, aluVoicePortTable objects and
+         signaling-related aluScadaVcbTable objects.
+        "
+    DEFVAL  { muLaw }
+    ::= { aluExtTmnxMDAEntry 4 }
+
+aluExtTmnxMDAVoiceSignalingType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    notApplicable (0),
+                    typeI         (1),
+                    typeII        (2),
+                    typeIII       (3),
+                    typeIV        (4),
+                    typeV         (5)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDAVoiceSignalingType is applicable only when the 'isVoice'
+         bit in tmnxMDACapabilities is set.
+
+         This object is valid for the Voice E&M MDA only.
+
+         aluExtTmnxMDAVoiceSignalingType configures all interfaces of a
+         voice MDA for specific signaling. It specifies how the signaling leads
+         operate to establish a call.
+
+         Default values depend on aluExtTmnxMDAVoiceCompandingLaw :
+         For muLaw    - typeI
+         For aLaw     - typeV
+
+         'typeIII' and 'typeIV' are not supported.
+
+         To change aluExtTmnxMDAVoiceSignalingType, all ports must be shutdown.
+        "
+    ::= { aluExtTmnxMDAEntry 5 }
+
+aluExtTmnxMDANumOfDigitalAlarmInputs OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDANumOfDigitalAlarmInputs indicates the number of
+        discrete digital alarm inputs equipped on this MDA."
+    ::= { aluExtTmnxMDAEntry 6 }
+
+aluExtTmnxMDANumOfAnalogAlarmInputs OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDANumOfAnalogAlarmInputs indicates the number of
+        analog alarm inputs equipped on this MDA."
+    ::= { aluExtTmnxMDAEntry 7 }
+
+aluExtTmnxMDANumOfDigitalOutputRelays OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDANumOfDigitalOutputRelays indicates the number of
+        discrete digital output relays equipped on this MDA."
+    ::= { aluExtTmnxMDAEntry 8 }
+
+aluExtTmnxMDACapabilityMode OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    modeA         (1),
+                    modeB         (2),
+                    modeC         (3)
+                }
+
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDACapabilityMode represents set of mda capabilities,
+         the mode is general for all MDAs, however the same mode for different mda type
+         may have different capabilities, tmnxMDACapabilities object will reflect the 
+         setting"
+    DEFVAL { modeA }
+    ::= { aluExtTmnxMDAEntry 9 }
+
+aluExtTmnxMDANetworkRingQueuePolicy OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the network queue policy being used for this object to 
+        define the queueing structure of the Ring for this MDA.
+        
+        An 'inconsistentValue' error is returned if this object is set
+        to a value which does not have a corresponding entry in 
+        TIMETRA-QOS-MIB::tNetworkQueuePolicyTable.
+        
+        When the value of tmnxMDAAssignedType specifies a 
+        non-ring MDA Type, an 'inconsistentValue' error
+        is returned if this object is set to any non-empty string."
+
+    DEFVAL { "" }
+    ::= { aluExtTmnxMDAEntry 10 }
+    
+aluExtTmnxMDANetworkRingQosPolicy  OBJECT-TYPE
+    SYNTAX      TPolicyID (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluExtTmnxMDANetworkRingQosPolicy is only applicable 
+        to an MDA that supports Ring configuration, where it must associates 
+        a pre-existing network-policy-id corresponding to an entry in
+        TIMETRA-QOS-MIB::tNetworkPolicyTable.
+        
+        On MDAs that don't support Ring configuration, aluExtTmnxMDANetworkRingQosPolicy
+        is defaulted to 0, and cannot be modified.
+        
+        If aluExtTmnxMDANetworkRingQosPolicy is non-zero, only information about
+        dot1p map within the network policy is applied to the ring of this MDA."
+
+    DEFVAL { 0 }
+    ::= { aluExtTmnxMDAEntry 11 }
+    
+aluExtTmnxMDAPwrEthPsPowerMode OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                    none         (0),
+                    internal     (1),
+                    external     (2)
+                }
+
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDAPwrEthPsPowerMode represents the Power Supply location for a MDA
+        with power ethernet ports."
+    DEFVAL { internal }
+    ::= { aluExtTmnxMDAEntry 12 }    
+
+aluExtTmnxMDAPwrEthPsPowerSupplyStatus OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                   none        (0),
+                   bad         (1), 
+                   good        (2)
+                }
+
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION   
+        "Current status of the power ethernet Power Supply."
+    ::= { aluExtTmnxMDAEntry  13 }
+    
+aluExtTmnxMDAPwrEthPsExternalPowerSupplyStatus OBJECT-TYPE
+    SYNTAX      INTEGER
+                {
+                   absent   (0),
+                   present  (1) 
+                }
+
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION   
+        "Current status of the power ethernet External Power Supply connection"
+    ::= { aluExtTmnxMDAEntry  14 }
+
+aluExtTmnxMDATuAisEnabled          OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable TU-AIS propagation for inter-op with SDH SNCP for this MDA."
+    DEFVAL { false }
+    ::= { aluExtTmnxMDAEntry 15 }
+
+aluExtTmnxMDANetworkIngSecQueuePolicy      OBJECT-TYPE
+    SYNTAX      TPolicyID
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the network ingress security-queue policy being used for this object."
+    DEFVAL { 1 }
+    ::= { aluExtTmnxMDAEntry 16 }
+    
+aluExtTmnxMDAAccessIngSecQueuePolicy      OBJECT-TYPE
+    SYNTAX      TPolicyID
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the access ingress security-queue policy being used for this object."
+    DEFVAL { 1 }
+    ::= { aluExtTmnxMDAEntry 17 }
+   
+aluExtTmnxMDASptSecAggRate      OBJECT-TYPE
+    SYNTAX      TPortSchedulerPIR
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the aggregate rate limit of all security self processed traffic for this object.
+        The value '-1' means that there is no limit."
+    DEFVAL { 50000  }
+    ::= { aluExtTmnxMDAEntry 18 }
+    
+aluExtTmnxMDAAccessIngShaperPolicy      OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluExtTmnxMDAAccessIngShaperPolicy specifies the access ingress shaper policy to
+        use for shaper of all unshaped SAPs on this MDA.
+        
+        If the MDA can support shaper, the default of aluExtTmnxMDAAccessIngShaperPolicy
+        is set to shaper policy 'default'.  Otherwise, this object is set to empty string
+        when the MDA cannot support shaper."
+        
+    DEFVAL { ''H }
+    ::= { aluExtTmnxMDAEntry 19 }
+    
+aluExtTmnxMDAVcbApplication      OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    notApplicable (0),
+                    broadcast (1),
+                    teleprotection (2),
+                    vcb (3),
+                    vcbBranchInitiate (4)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluExtTmnxMDAVcbApplication specifies the
+         application for the Voice Conference Bridge (VCB).
+
+         aluExtTmnxMDAVcbApplication is applicable only for SCADA MDAs, such
+         as the ISC, whose aluExtTmnxMDACapabilityMode is 'modeC' (ie. VCB).
+
+         To change aluExtTmnxMDAVcbApplication, scada branches must not exist.
+
+         Changing aluExtTmnxMDAVcbApplication results in defaulting of
+         aluScadaVcbTable objects."
+    DEFVAL { vcb }
+    ::= { aluExtTmnxMDAEntry 20 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--  Nokia 7705 SAR series System Synchronization Extensions
+--
+
+aluSyncObjs             OBJECT IDENTIFIER ::= { aluSARObjs 4 }
+aluSyncExtensionObjs   OBJECT IDENTIFIER ::= { aluSyncObjs 1 }
+
+aluSetsMIBConformance   OBJECT IDENTIFIER ::= { aluSARConfs 4 }
+
+aluSetsNotifyPrefix    OBJECT IDENTIFIER ::= { aluSARNotifyPrefix 4 } 
+  
+--
+--  Operational System Synchronization Extensions Tables
+--
+
+aluExtIfSyncIfTimingExtensionTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF AluExtIfSyncIfTimingExtensionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the aluExtIfSyncIfTimingExtensionTable contains information
+        concerning the operations values of the external timing interfaces 
+        applicable to the tmnxSyncIfTimingTable in the TIMETRA-CHASSIS-MIB."
+    ::= { aluSyncExtensionObjs 1 }
+    
+aluExtIfSyncIfTimingExtensionEntry OBJECT-TYPE
+    SYNTAX        AluExtIfSyncIfTimingExtensionEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION 
+        "An entry in the aluExtIfSyncIfTimingExtensionEntry contains information
+        concerning external timing interfaces applicable to an 
+        TmnxSyncIfTimingEntry in the TIMETRA-CHASSIS-MIB.
+            
+        When a tmnxCpmCardEntry is created, a tmnxSyncIfTimingEntry and
+        a tmnxCpmCardEntry is created."
+    AUGMENTS  { tmnxCpmCardEntry }
+    ::= { aluExtIfSyncIfTimingExtensionTable 1 }
+    
+AluExtIfSyncIfTimingExtensionEntry ::=
+    SEQUENCE {
+        aluSyncIfTimingExternInIfType           AluExternalIfType,
+        aluSyncIfTimingExternInImpedType        AluExternalInputImpedanceType,
+        aluSyncIfTimingExternOutIfType          AluExternalIfType,
+        aluSyncIfTimingExternInIfAdminStatus    TmnxPortAdminStatus,
+        aluSyncIfTimingExternInIfInUse          TruthValue,
+        aluSyncIfTimingExternInIfQualified      TmnxSETSRefQualified,
+        aluSyncIfTimingExternInIfAlarm          TmnxSETSRefAlarm,
+        aluSyncIfTimingRef1Ieee1588PtpSrc       TNamedItemOrEmpty,
+        aluSyncIfTimingRef2Ieee1588PtpSrc       TNamedItemOrEmpty,
+        aluSyncIfTimingIeee1588PtpType          AluSyncIfTimingIeee1588PtpType,
+        aluSyncIfTimingExternInCfgQltyLevel     TmnxSSMQualityLevel,
+        aluSyncIfTimingExternInState            TmnxRefInState,
+        aluSyncIfTimingRef1SrcPtpClock          Unsigned32,
+        aluSyncIfTimingRef2SrcPtpClock          Unsigned32
+    }
+    
+aluSyncIfTimingExternInIfType      OBJECT-TYPE
+    SYNTAX      AluExternalIfType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingExternInIfType indicates the 
+        operational interface type of the external input timing interface."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 1 }
+
+    aluSyncIfTimingExternInImpedType      OBJECT-TYPE
+    SYNTAX      AluExternalInputImpedanceType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingExternInImpedType indicates the 
+        operation input impedance value of the input timing interface."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 2 }
+
+aluSyncIfTimingExternOutIfType      OBJECT-TYPE
+    SYNTAX      AluExternalIfType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingExternOutIfType indicates the 
+        operational interface type of the external output timing interface."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 3 }
+
+aluSyncIfTimingExternInIfAdminStatus      OBJECT-TYPE
+    SYNTAX      TmnxPortAdminStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingExternInIfAdminStatus indicates current
+        administrative status of the external input timing reference."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 4 }
+
+aluSyncIfTimingExternInIfInUse      OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingExternInIfInUse indicates whether the external
+        input timing reference is presently being used by the synchronous timing
+        subsystem."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 5 }
+
+aluSyncIfTimingExternInIfQualified      OBJECT-TYPE
+    SYNTAX      TmnxSETSRefQualified
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingExternInIfQualified indicates whether the 
+        external input timing reference is qualified for use by the 
+        synchronous timing subsystem.  If aluSyncIfTimingExternInIfQualified is
+        'not-qualified', then the object aluSyncIfTimingExternInIfAlarm gives
+        the reason for disqualification."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 6 }
+
+aluSyncIfTimingExternInIfAlarm      OBJECT-TYPE
+    SYNTAX      TmnxSETSRefAlarm
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingExternInIfAlarm indicates the alarms on the
+        external input timing reference.  If any of the bits is set to '1', 
+        then the external input timing reference is disqualified by the timing
+        subsystem and the value of aluSyncIfTimingExternInIfQualified is set to 
+        'not-qualified'."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 7 }
+
+aluSyncIfTimingRef1Ieee1588PtpSrc      OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      obsolete
+    DESCRIPTION
+        "The value of aluSyncIfTimingRef1Ieee1588PtpSrc indicates the source ip
+        interface of the first timing reference.
+        
+        An empty value indicates that there is no source router ip interface for
+        this reference."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 8 }
+
+aluSyncIfTimingRef2Ieee1588PtpSrc      OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      obsolete
+    DESCRIPTION
+        "The value of aluSyncIfTimingRef2Ieee1588PtpSrc indicates the source ip
+        interface of the first timing reference.
+        
+        An empty value indicates that there is no source router ip interface for
+        this reference."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 9 }
+        
+aluSyncIfTimingIeee1588PtpType OBJECT-TYPE
+    SYNTAX      AluSyncIfTimingIeee1588PtpType
+    MAX-ACCESS  read-only
+    STATUS      obsolete
+    DESCRIPTION
+        "The IEEE 1588 PTP device type."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 10 }
+
+aluSyncIfTimingExternInCfgQltyLevel OBJECT-TYPE
+    SYNTAX      TmnxSSMQualityLevel
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmExternInCfgQltyLevel indicates the configured
+         Quality Level of the external reference port."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 11 }
+
+aluSyncIfTimingExternInState        OBJECT-TYPE
+    SYNTAX      TmnxRefInState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of tmnxSyncIfTimingRef1State indicates the operational state
+         of the external input timing port."
+    ::= { aluExtIfSyncIfTimingExtensionEntry 12 }
+
+aluSyncIfTimingRef1SrcPtpClock      OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..32)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingRef1SrcPtpClock indicates the 
+         IEEE 1588 PTP clock that is the ref1 timing reference.
+
+         A value of 32 corresponds to the PTP clock on the CSM,
+         which is configured with the tmnxPtpClockConfig objects."
+    DEFVAL { 0 }
+    ::= { aluExtIfSyncIfTimingExtensionEntry 13 }
+
+aluSyncIfTimingRef2SrcPtpClock      OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..32)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingRef2SrcPtpClock indicates the 
+         IEEE 1588 PTP clock that is the ref2 timing reference.
+
+         A value of 32 corresponds to the PTP clock on the CSM,
+         which is configured with the tmnxPtpClockConfig objects."
+
+    DEFVAL { 0 }
+    ::= { aluExtIfSyncIfTimingExtensionEntry 14 }
+        
+--
+--  Administrative System Synchronization Extension Tables
+--
+
+aluExtIfSyncIfTimingAdmExtensionTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF AluExtIfSyncIfTimingAdmExtensionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Edit session values for the external timing interfaces which are extensions
+        of the tSyncIfTimingAdmTable in the TIMETRA-CHASSIS-MIB."
+    ::= { aluSyncExtensionObjs 2 }
+
+aluExtIfSyncIfTimingAdmExtensionEntry    OBJECT-TYPE
+    SYNTAX      AluExtIfSyncIfTimingAdmExtensionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        " The entries in the aluExtIfSyncIfTimingAdmExtensionTable. 
+        The 7705 system supports 3 timing references (reference1, reference2
+        and an external timing interface).  If the value of the reference source
+        port is a valid Port ID then the reference is a source port."
+    AUGMENTS  { tSyncIfTimingAdmEntry }      
+    ::= { aluExtIfSyncIfTimingAdmExtensionTable 1 }
+
+AluExtIfSyncIfTimingAdmExtensionEntry ::=
+    SEQUENCE {
+        aluSyncIfTimingAdmExternInIfType        AluExternalIfType,
+        aluSyncIfTimingAdmExternInImpedType     AluExternalInputImpedanceType,
+        aluSyncIfTimingAdmExternOutIfType       AluExternalIfType,
+        aluSyncIfTimingAdmExternInIfAdminStatus TmnxPortAdminStatus,
+        aluSyncIfTimingAdmRef1Ieee1588PtpSrc    TNamedItemOrEmpty,
+        aluSyncIfTimingAdmRef2Ieee1588PtpSrc    TNamedItemOrEmpty,
+        aluSyncIfTimingAdmExternInCfgQltyLevel  TmnxSSMQualityLevel,
+        aluSyncIfTimingAdmRef1SrcPtpClock       Unsigned32,
+        aluSyncIfTimingAdmRef2SrcPtpClock       Unsigned32,
+        aluSyncIfTimingAdmChangedMask           BITS
+    }
+
+aluSyncIfTimingAdmExternInIfType      OBJECT-TYPE
+    SYNTAX      AluExternalIfType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmExternInIfType specifies the interface type
+        of the external input timing reference."
+    DEFVAL { two-mhz-square }
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 1 }
+
+aluSyncIfTimingAdmExternInImpedType      OBJECT-TYPE
+    SYNTAX      AluExternalInputImpedanceType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmExternInImpedType specifies the input
+        impedance value of the external input timing interface."
+    DEFVAL { fifty-ohm }
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 2 }
+
+aluSyncIfTimingAdmExternOutIfType      OBJECT-TYPE
+    SYNTAX      AluExternalIfType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmExternOutIfType specifies the interface type
+        of the external output timing reference."
+    DEFVAL { two-mhz-square }
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 3 }
+
+aluSyncIfTimingAdmExternInIfAdminStatus      OBJECT-TYPE
+    SYNTAX      TmnxPortAdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmExternInIfAdminStatus specifies the desired 
+        administrative status of the external input timing reference."
+    DEFVAL { outOfService }
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 4 }
+
+aluSyncIfTimingAdmRef1Ieee1588PtpSrc      OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      obsolete
+    DESCRIPTION
+        "The value of aluSyncIfTimingRef1Ieee1588PtpSrc indicates the source ip
+        interface of the first timing reference.
+        
+        An empty value indicates that there is no source router ip interface for
+        this reference.
+
+        The aluSyncIfTimingAdmRef1Ieee1588PtpSrc cannot be set if 
+        tSyncIfTimingAdmRef1SrcPort is set to a valid (ie not '1e000000'H)
+        TmnxPortID.
+        
+        The aluSyncIfTimingAdmRef1Ieee1588PtpSrc cannot be set to the system IP
+        interface name or to service IP interface name."
+    DEFVAL { ''H } 
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 5 }
+
+aluSyncIfTimingAdmRef2Ieee1588PtpSrc OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      obsolete
+    DESCRIPTION
+        "The value of aluSyncIfTimingRef2Ieee1588PtpSrc indicates the source ip
+        interface of the second timing reference.
+        
+        An empty value indicates that there is no source router ip interface for
+        this reference.
+            
+        The aluSyncIfTimingAdmRef2Ieee1588PtpSrc cannot be set if 
+        tSyncIfTimingAdmRef2SrcPort is set to a valid (ie not '1e000000'H)
+        TmnxPortID.
+        
+        The aluSyncIfTimingAdmRef2Ieee1588PtpSrc cannot be set to the system IP
+        interface name or to service IP interface name."
+    DEFVAL { ''H } 
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 6 }
+
+aluSyncIfTimingAdmExternInCfgQltyLevel OBJECT-TYPE
+    SYNTAX      TmnxSSMQualityLevel
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmExternInCfgQltyLevel indicates the administrative
+         Quality Level of the external reference port. A value of 'unknown (0)' sets 
+         aluSyncIfTimingAdmExternInCfgQltyLevel to the default."
+    DEFVAL { stu }
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 7 }
+
+aluSyncIfTimingAdmRef1SrcPtpClock      OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..32)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmRef1SrcPtpClock specifies the administrative 
+         value of the IEEE 1588 PTP clock that is the source of timing for the ref1
+         timing reference."
+    DEFVAL { 0 }
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 8 }
+
+aluSyncIfTimingAdmRef2SrcPtpClock      OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..32)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmRef2SrcPtpClock specifies the administrative 
+         value of the IEEE 1588 PTP clock that is the source of timing for the ref2
+         timing reference."
+    DEFVAL { 0 }
+    ::= { aluExtIfSyncIfTimingAdmExtensionEntry 9 }
+
+aluSyncIfTimingAdmChangedMask      OBJECT-TYPE
+    SYNTAX      BITS {
+                    aluSyncIfTimingAdmExternInIfType        (0),
+                    aluSyncIfTimingAdmExternInImpedType     (1),
+                    aluSyncIfTimingAdmExternOutIfType       (2),
+                    aluSyncIfTimingAdmExternInIfAdminStatus (3),
+                    aluSyncIfTimingAdmRef1Ieee1588PtpSrc    (4),
+                    aluSyncIfTimingAdmRef2Ieee1588PtpSrc    (5),
+                    aluSyncIfTimingAdmExternInCfgQltyLevel  (6),
+                    aluSyncIfTimingAdmRef1SrcPtpClock       (7),
+                    aluSyncIfTimingAdmRef2SrcPtpClock       (8),
+                    aluSyncIfTimingAdmChangedMask           (9)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSyncIfTimingAdmChangedMask indicates a bitmask of
+         which synchronous interface timing objects have been set, but not
+         committed.
+
+         The agent sets these bits when an object in
+         aluExtIfSyncIfTimingAdmExtensionEntry is set. All bits are cleared
+         when tmnxChassisAdminControlApply is set to 'initialize (2)' or
+         'commit (3)'.
+
+         Bits 'tSyncIfTimingAdmChangedMask(9)' are not valid."
+     ::= { aluExtIfSyncIfTimingAdmExtensionEntry 10 }
+        
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--  Nokia 7705 SAR series CSM Card Extensions
+--
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluExtTmnxCpmCardTable    OBJECT-TYPE
+    SYNTAX  SEQUENCE OF AluExtTmnxCpmCardEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluExtTmnxCpmCardTable has an entry for each CPM card or module in 
+         each chassis in the TMNX system."
+    ::= { aluCardObjs 4 }
+
+aluExtTmnxCpmCardEntry       OBJECT-TYPE
+    SYNTAX      AluExtTmnxCpmCardEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents a CPM card or module in a chassis in the 
+         system.  Entries cannot be created and deleted via SNMP SET 
+         operations.  Each entry provides extended functionality on the
+         Nokia 7705 series devices."
+    AUGMENTS   { tmnxCpmCardEntry }
+    ::= { aluExtTmnxCpmCardTable 1 }
+
+AluExtTmnxCpmCardEntry ::=
+    SEQUENCE {
+        aluExtCpmCardUpgrade              TmnxActionType
+    }
+
+aluExtCpmCardUpgrade      OBJECT-TYPE
+    SYNTAX      TmnxActionType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Setting aluExtCpmCardUpgrade to 'doAction' causes an upgrade 
+         of all firmware and a reboot of the the CPM card.  
+         
+         CAUTION: This upgrade and reboot may take several minutes to 
+         complete.  The card MUST NOT be reset or powered down during 
+         this process as it may cause the card to be rendered
+         inoperable.
+
+         Note that the reboot action is likely to occur before the SNMP
+         SET response can be transmitted."
+    DEFVAL { notApplicable }
+    ::= { aluExtTmnxCpmCardEntry 1 }
+
+--
+--  Fabric Stats Table
+--
+
+aluFabricDeviceStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluFabricDeviceStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION   
+        "This table contains statistics collected from Fabric Device of the Nokia 7705 system"
+    ::= { aluChassisObjs 5 }
+    
+aluFabricDeviceStatsEntry OBJECT-TYPE
+    SYNTAX      AluFabricDeviceStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the aluFabricDeviceStatsTable contains stats collected from fabric device itself, either
+        traffic to a specific fabric port designated to an MDA, or global total traffic egress from the fabric device.
+        aluFabricDeviceStatsIndex indicates the MDA number for the fabric port stats or 0 for global stats.
+        
+        Fabric Stats are not available on Nokia SAR-M platform, therefore all objects of aluFabricDeviceStatsEntry
+        are set to 0."
+        
+    INDEX   { aluFabricDeviceStatsIndex }
+    ::= {  aluFabricDeviceStatsTable 1 }
+    
+AluFabricDeviceStatsEntry ::=
+    SEQUENCE {
+        aluFabricDeviceStatsIndex      Unsigned32,
+        aluFabricDeviceStatsFwdPkts    Counter64,   
+        aluFabricDeviceStatsDroPkts    Counter64,
+        aluFabricDeviceStatsFwdOcts    Counter64,
+        aluFabricDeviceStatsUcastFwdPkts    Counter64,
+        aluFabricDeviceStatsMcastFwdPkts    Counter64,
+        aluFabricDeviceStatsDroOcts            Counter64,
+        aluFabricDeviceStatsMdaDroEvents    Counter64 
+        }
+              
+aluFabricDeviceStatsIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluFabricDeviceStatsIndex serves as the index that uniquely identify the fabric device
+        counter.
+        
+        R2.x and R3.x of Nokia 7705 support two entries of fabric device counters as followed:
+
+        1)  Entry with aluFabricDeviceStatsIndex = 0 is a global device counter which counts all egress
+        traffic from the fabric.  This is the sum of all fabric port traffic, including ports to all
+        MDAs and ports to any other intalled cards such as inactive CSM.
+        
+        2)  Entry with aluFabricDeviceStatsIndex = 1 is a fabric port counter which counts all egress
+        traffic toward the MDA that has aluExtTmnxMDAFabricStatsEnabled being TRUE in AluExtTmnxMDAEntry.
+
+        Starting with R4.0, Nokia 7705 system supports multiple fabric port counters. One entry
+        for each MDA, plus one entry for the global counters.  aluFabricDeviceStatsIndex is numbered
+        as followed:
+        
+        -  Entry with aluFabricDeviceStatsIndex = 0 is a global device counter which counts all egress
+        traffic from the fabric.  This is the sum of all fabric port traffic, including ports to all
+        MDAs and ports to any other intalled cards such as inactive CSM.
+        
+        -  Otherwise aluFabricDeviceStatsIndex > 0 indicates the MDA slot number tmnxMDASlotNum.
+        These entries contain fabric port counters of egress traffic from the fabric device to the
+        MDA with slot number specified by aluFabricDeviceStatsIndex.  aluExtTmnxMDAFabricStatsEnabled must
+        be TRUE on the MDA for the stats to be valid.  If aluExtTmnxMDAFabricStatsEnabled is FALSE,
+        all stats in the entry are set to 0. 
+        
+        Starting with release 7.0 Nokia 7705 uses entry with aluFabricDeviceStatsIndex = 0xff = 255 to 
+        contain counts of all firewall security traffic egress from the fabric."
+ 
+    ::= { aluFabricDeviceStatsEntry 1 }
+
+aluFabricDeviceStatsFwdPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluFabricDeviceStatsFwdPkts indicates the number of fowarded packets from the fabric to 
+         the indexed MDA.  If the entry is a global counter then aluFabricDeviceStatsFwdPkts indicates
+         the total of all fowarded packets from the fabric."
+    ::= { aluFabricDeviceStatsEntry 2 }
+
+aluFabricDeviceStatsDroPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluFabricDeviceStatsDroPkts indicates the number of dropped packets from the fabric to 
+         the indexed MDA.  If the entry is a global counter then aluFabricDeviceStatsDroPkts indicates
+         the total of all dropped packets at the fabric."
+    ::= { aluFabricDeviceStatsEntry 3 }
+
+aluFabricDeviceStatsFwdOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION           
+         "aluFabricDeviceStatsFwdOcts indicates the number of forwarded octets from the fabric to
+         the indexed MDA.  If the entry is a global counter then aluFabricDeviceStatsFwdOcts indicates the 
+         total octets forwarded by the fabric.
+        
+         aluFabricDeviceStatsFwdOcts is not available for global counter entry on SAR-8 system, and
+         it is set to 0 in these cases."
+         
+    ::= { aluFabricDeviceStatsEntry 4 }
+
+aluFabricDeviceStatsUcastFwdPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluFabricDeviceStatsUcastFwdPkts indicates the number of fowarded unicast packets from the fabric 
+         to the indexed MDA.  If the entry is a global counter then aluFabricDeviceStatsUcastFwdPkts indicates 
+         the total of all fowarded unicast packets from the fabric."
+    ::= { aluFabricDeviceStatsEntry 5 }
+    
+aluFabricDeviceStatsMcastFwdPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluFabricDeviceStatsMcastFwdPkts indicates the number of fowarded multicast packets 
+        (multipoint/broadcast/unknown traffic) from the fabric to the indexed MDA.  If the entry is
+        a global counter then aluFabricDeviceStatsMcastFwdPkts indicates the total of all 
+        fowarded multicast packets from the fabric to all MDAs."
+    ::= { aluFabricDeviceStatsEntry 6 }
+
+aluFabricDeviceStatsDroOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluFabricDeviceStatsDroOcts indicates the number of octets from dropped packets from the fabric to
+         the indexed MDA.  If the entry is a global counter then aluFabricDeviceStatsDroOcts indicates the
+         total octets of all dropped packets at the fabric.
+        
+         aluFabricDeviceStatsDroOcts is not available on SAR-8 system, and is set to 0 in these cases."
+
+    ::= { aluFabricDeviceStatsEntry 7 }
+
+aluFabricDeviceStatsMdaDroEvents OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "The total number of events in which packets were dropped by the probe in the MDA
+         due to lack of resources to process them.  Note that this number is not necessarily
+         the number of packets dropped; it is just the number of times this condition has
+         been detected."
+
+    ::= { aluFabricDeviceStatsEntry 8 }
+
+-- ------------------------------
+--  aluSourceMDAStatsTable
+-- ------------------------------
+aluSourceMDAStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluSourceMDAStatsEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains statistics collected from a specific MDA as a source MDA, to provide
+        traffic heading toward each and every MDA in the Nokia 7705 system."
+    ::= { aluChassisObjs 6 }
+    
+aluSourceMDAStatsEntry OBJECT-TYPE
+    SYNTAX      AluSourceMDAStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the aluSourceMDAStatsTable contains ingress traffic stats from this MDA
+        of mda-id being aluSourceMDASrcMdaId to be sent toward the Fabric Device which is to
+        be forwarded toward MDA with mda-id being aluSourceMDADestMdaId.  
+        
+        A special case of aluSourceMDADestMdaId being 0 indicates the entry describes multipoint
+        traffic stats being sent, from MDA with aluSourceMDASrcMdaId, toward the Fabric Device.
+        
+        The Nokia 7705 SAR-M & SAR-ME devices cannot differentiate which source MDA
+        the traffic stats come from.  Therefore these devices provide the aggregated traffic
+        from all the source MDA's in the system, to a particular MDA of aluSourceMDADestMdaId.
+        Thus, any entries with a different, but valid aluSourceMDASrcMdaId, that have the
+        same aluSourceMDADestMdaId would provide the same stats."
+ 
+    INDEX   { aluSourceMDASrcMdaId, aluSourceMDADestMdaId }
+    ::= {  aluSourceMDAStatsTable 1 }
+    
+AluSourceMDAStatsEntry ::=
+    SEQUENCE {
+        aluSourceMDASrcMdaId                     Unsigned32,
+        aluSourceMDADestMdaId                    Unsigned32,
+        aluSourceMDAStatsFwdInProfPkts           Counter64,
+        aluSourceMDAStatsFwdOutProfPkts          Counter64,
+        aluSourceMDAStatsFwdInProfOcts           Counter64,
+        aluSourceMDAStatsFwdOutProfOcts          Counter64,
+        aluSourceMDAStatsDroInProfPkts            Counter64,
+        aluSourceMDAStatsDroOutProfPkts          Counter64,
+        aluSourceMDAStatsDroInProfOcts            Counter64,
+        aluSourceMDAStatsDroOutProfOcts         Counter64,
+        aluSourceMDAStatsAccessFwdInProfPkts    Counter64,
+        aluSourceMDAStatsAccessFwdOutProfPkts   Counter64,
+        aluSourceMDAStatsAccessFwdInProfOcts    Counter64,
+        aluSourceMDAStatsAccessFwdOutProfOcts   Counter64,
+        aluSourceMDAStatsAccessDroPkts          Counter64,
+        aluSourceMDAStatsAccessDroOcts          Counter64   
+        }
+  
+aluSourceMDASrcMdaId OBJECT-TYPE
+    SYNTAX      Unsigned32 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDASrcMdaId serves as the index that uniquely identifies the originating MDA for this stats entry."
+    ::= { aluSourceMDAStatsEntry 1 }
+
+aluSourceMDADestMdaId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDADestMdaId serves as the index that uniquely identifies the destination MDA for this stats entry.
+        aluSourceMDADestMdaId being 0 indicates multipoint traffic stats, otherwise it's unicast traffic."
+    ::= { aluSourceMDAStatsEntry 2 }
+
+aluSourceMDAStatsFwdInProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsFwdInProfPkts is the number of in-profile network ingress packets sent from 
+        MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 3 }
+
+aluSourceMDAStatsFwdOutProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsFwdOutProfPkts is the number of out-profile network ingress packets sent from 
+        MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 4 }
+
+aluSourceMDAStatsFwdInProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsFwdInProfOcts is the number of in-profile network ingress octets sent from
+        MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 5 }
+
+aluSourceMDAStatsFwdOutProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsFwdOutProfOcts is the number of out-profile network ingress octets sent from
+        MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 6 }
+
+aluSourceMDAStatsDroInProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsDroInProfPkts is the number of in-profile network ingress packets, 
+         heading toward MDA with mda-id being aluSourceMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluSourceMDASrcMdaId."
+    ::= { aluSourceMDAStatsEntry 7 }
+
+aluSourceMDAStatsDroOutProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsDroOutProfPkts is the number of out-profile network ingress packets,
+         heading toward MDA with mda-id being aluSourceMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluSourceMDASrcMdaId."
+    ::= { aluSourceMDAStatsEntry 8 }
+
+aluSourceMDAStatsDroInProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsDroInProfOcts is the number of in-profile network ingress octets,
+         heading toward MDA with mda-id being aluSourceMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluSourceMDASrcMdaId."
+    ::= { aluSourceMDAStatsEntry 9 }
+
+aluSourceMDAStatsDroOutProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsDroOutProfOcts is the number of out-profile network ingress octets,
+         heading toward MDA with mda-id being aluSourceMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluSourceMDASrcMdaId."
+    ::= { aluSourceMDAStatsEntry 10 }
+
+aluSourceMDAStatsAccessFwdInProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsAccessFwdInProfPkts is the number of in-profile access ingress packets sent
+        from MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 11 }
+
+aluSourceMDAStatsAccessFwdOutProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsAccessFwdOutProfPkts is the number out-profile access ingress packets sent
+        from MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 12 }
+
+aluSourceMDAStatsAccessFwdInProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsAccessFwdInProfOcts is the number of in-profile access ingress octets sent
+        from MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 13 }
+
+aluSourceMDAStatsAccessFwdOutProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsAccessFwdOutProfOcts is the number of out-profile access ingress octets sent
+        from MDA with mda-id being aluSourceMDASrcMdaId to MDA with mda-id being aluSourceMDADestMdaId."
+    ::= { aluSourceMDAStatsEntry 14 }
+
+aluSourceMDAStatsAccessDroPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsAccessDroPkts is the number of botb in-profile and out-profile access ingress
+        packets heading toward MDA with mda-id being aluSourceMDADestMdaId, but they were dropped at source
+        MDA with mda-id being aluSourceMDASrcMdaId."
+    ::= { aluSourceMDAStatsEntry 15 }
+
+aluSourceMDAStatsAccessDroOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSourceMDAStatsAccessDroOcts is the number of both in-profile and out-profile access ingress
+        octets heading toward MDA with mda-id being aluSourceMDADestMdaId, but they were dropped at source
+        MDA with mda-id being aluSourceMDASrcMdaId."
+    ::= { aluSourceMDAStatsEntry 16 }
+    
+-- ------------------------------
+--  aluDestMDAStatsTable
+-- ------------------------------
+ 
+aluDestMDAStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluDestMDAStatsEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains statistics collected from each and every MDA of the Nokia 7705 system, 
+        to provide traffic heading toward a specific Destination MDA."
+    ::= { aluChassisObjs 7 }
+    
+aluDestMDAStatsEntry OBJECT-TYPE
+    SYNTAX      AluDestMDAStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "An entry in the aluDestMDAStatsTable contains ingress traffic stats from MDA of 
+          mda-id being aluDestMDASrcMdaId that was sent toward the Fabric that is then to be 
+          forwarded to MDA of mda-id being aluDestMDADestMdaId.
+          
+          The Nokia 7705 SAR-M & SAR-ME devices cannot differentiate which source MDA
+          the traffic stats come from.  Therefore these devices provide the aggregated traffic
+          from all the source MDA's in the system, to a particular MDA of aluDestMDADestMdaId.
+          Thus, an entry with any valid aluDestMDASrcMdaId provides the same stats regardless of
+          the specified aluDestMDADestMdaId (provided that the specified aluDestMDADestMdaId is valid)."
+ 
+    INDEX   { aluDestMDADestMdaId, aluDestMDASrcMdaId }
+    ::= {  aluDestMDAStatsTable 1 }
+
+
+AluDestMDAStatsEntry ::=
+    SEQUENCE {
+        aluDestMDADestMdaId                   Unsigned32,
+        aluDestMDASrcMdaId                    Unsigned32,
+        aluDestMDAStatsFwdInProfPkts          Counter64,
+        aluDestMDAStatsFwdOutProfPkts         Counter64,
+        aluDestMDAStatsFwdInProfOcts          Counter64,
+        aluDestMDAStatsFwdOutProfOcts         Counter64,
+        aluDestMDAStatsDroInProfPkts          Counter64,
+        aluDestMDAStatsDroOutProfPkts         Counter64,
+        aluDestMDAStatsDroInProfOcts          Counter64,
+        aluDestMDAStatsDroOutProfOcts         Counter64,       
+        aluDestMDAStatsAccessFwdInProfPkts    Counter64,
+        aluDestMDAStatsAccessFwdOutProfPkts   Counter64,
+        aluDestMDAStatsAccessFwdInProfOcts    Counter64,
+        aluDestMDAStatsAccessFwdOutProfOcts   Counter64,
+        aluDestMDAStatsAccessDroPkts          Counter64,
+        aluDestMDAStatsAccessDroOcts          Counter64      
+        }   
+  
+aluDestMDADestMdaId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDADestMdaId serves as the index that uniquely identify the destination MDA for
+        this stats entry."
+    ::= { aluDestMDAStatsEntry 1 }
+
+aluDestMDASrcMdaId   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDASrcMdaId serves as the index that uniquely identify the originating MDA for 
+        this stats entry."
+    ::= { aluDestMDAStatsEntry 2 }
+    
+aluDestMDAStatsFwdInProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsFwdInProfPkts is the number of in-profile network ingress packets sent from
+        MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 3 }
+
+aluDestMDAStatsFwdOutProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsFwdOutProfPkts is the number of out-profile network ingress packets sent from
+        MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 4 }
+
+aluDestMDAStatsFwdInProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsFwdInProfOcts is the number of in-profile network ingress octets sent from
+        MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 5 }
+
+aluDestMDAStatsFwdOutProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsFwdOutProfOcts is the number of out-profile ingress octets sent from
+        MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 6 }
+
+aluDestMDAStatsDroInProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsDroInProfPkts is the number of in-profile network ingress packets,
+         heading toward MDA with mda-id being aluDestMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluDestMDASrcMdaId."
+    ::= { aluDestMDAStatsEntry 7 }
+
+aluDestMDAStatsDroOutProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsDroOutProfPkts  is the number of out-profile network ingress packets,
+         heading toward MDA with mda-id being aluDestMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluDestMDASrcMdaId."
+    ::= { aluDestMDAStatsEntry 8 }
+
+aluDestMDAStatsDroInProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsDroInProfOcts is the number of in-profile network ingress octets,
+         heading toward MDA with mda-id being aluDestMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluDestMDASrcMdaId."
+    ::= { aluDestMDAStatsEntry 9 }
+
+aluDestMDAStatsDroOutProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsDroOutProfOcts  is the number of out-profile network ingress octets,
+         heading toward MDA with mda-id being aluDestMDADestMdaId, but they were dropped at
+         the source MDA with mda-id aluDestMDASrcMdaId."
+    ::= { aluDestMDAStatsEntry 10 }
+
+aluDestMDAStatsAccessFwdInProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsAccessFwdInProfPkts  is the number of in-profile access ingress packets sent
+        from MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 11 }
+
+aluDestMDAStatsAccessFwdOutProfPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsAccessFwdOutProfPkts is the number of out-profile access ingress packets sent
+        from MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 12 }
+
+aluDestMDAStatsAccessFwdInProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsAccessFwdInProfOcts is the number of in-profile access ingress octets sent
+        from MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 13 }
+
+aluDestMDAStatsAccessFwdOutProfOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsAccessFwdOutProfOcts is the number of out-profile access ingress octets sent
+        from MDA with mda-id being aluDestMDASrcMdaId to MDA with mda-id being aluDestMDADestMdaId."
+    ::= { aluDestMDAStatsEntry 14 }
+
+aluDestMDAStatsAccessDroPkts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsAccessDroPkts is the number of both in-profile and out-profile
+        access ingress packets heading toward MDA with mda-id being aluDestMDADestMdaId, 
+        but they were dropped at source MDA with mda-id being aluDestMDASrcMdaId."
+    ::= { aluDestMDAStatsEntry 15 }
+
+aluDestMDAStatsAccessDroOcts OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDestMDAStatsAccessDroOcts is the number of both in-profile and out-profile
+        access ingress octets heading toward MDA with mda-id being aluDestMDADestMdaId, 
+        but they were dropped at source MDA with mda-id being aluDestMDASrcMdaId."
+    ::= { aluDestMDAStatsEntry 16 }
+
+-- ------------------------------------
+-- MDA MAC FDB Management Table
+-- ------------------------------------
+aluMdaMacFdbMgmtTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluMdaMacFdbMgmtEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "A table that contains MDA FDB management information."
+    ::= { aluChassisObjs 8 }
+
+aluMdaMacFdbMgmtEntry OBJECT-TYPE
+    SYNTAX          AluMdaMacFdbMgmtEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Information to manage a specific MDA FDB."
+    INDEX           { tmnxChassisIndex, tmnxCardSlotNum, tmnxMDASlotNum }
+    ::= { aluMdaMacFdbMgmtTable 1 }
+
+AluMdaMacFdbMgmtEntry ::=
+    SEQUENCE {
+        aluMdaMacFdbMacLearning                TmnxEnabledDisabled,
+        aluMdaMacFdbMacAgeing                  TmnxEnabledDisabled,
+        aluMdaMacFdbFlushTable                 TmnxActionType,
+        aluMdaMacFdbFlushPortID                TmnxPortID,
+        aluMdaMacFdbFlushMac                   MacAddress,
+        aluMdaMacFdbRemoteAgeTime              Integer32,
+        aluMdaMacFdbTableSize                  Integer32,
+        aluMdaMacFdbNumEntries                 Integer32,
+        aluMdaMacFdbNumStaticEntries           Integer32,
+        aluMdaMacFdbDiscardUnknownSource       TmnxEnabledDisabled,
+        aluMdaMacFdbMacPinningValue1           TmnxEnabledDisabled,
+        aluMdaMacFdbMacPinningValue2           TmnxEnabledDisabled,
+        aluMdaMacFdbHighWaterMark              Integer32
+    }
+
+aluMdaMacFdbMacLearning    OBJECT-TYPE
+    SYNTAX          TmnxEnabledDisabled
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbMacLearning specifies
+                     whether the MAC learning process is enabled."
+    DEFVAL          { enabled }
+    ::= { aluMdaMacFdbMgmtEntry 1 }
+    
+aluMdaMacFdbMacAgeing    OBJECT-TYPE
+    SYNTAX          TmnxEnabledDisabled
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbMacAgeing specifies whether
+                     the MAC aging process is enabled."
+    DEFVAL          { enabled }
+    ::= { aluMdaMacFdbMgmtEntry 2 }
+    
+aluMdaMacFdbFlushTable    OBJECT-TYPE
+    SYNTAX          TmnxActionType
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "Setting aluMdaMacFdbFlushTable to 'doAction' specifies
+                     that the dynamic FDB entries be flushed."
+    DEFVAL          { notApplicable }
+    ::= { aluMdaMacFdbMgmtEntry 3 }
+    
+aluMdaMacFdbFlushPortID    OBJECT-TYPE
+    SYNTAX          TmnxPortID
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbFlushPortID specifies
+                     that the dynamic FDB entries with this port be flushed."
+    ::= { aluMdaMacFdbMgmtEntry 4 }
+    
+aluMdaMacFdbFlushMac    OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbFlushMac specifies the
+                     MAC address of the dynamic entry to be flushed."
+    ::= { aluMdaMacFdbMgmtEntry 5 }
+    
+aluMdaMacFdbRemoteAgeTime  OBJECT-TYPE
+    SYNTAX          Integer32 (60..86400)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbRemoteAgeTime specifies
+                     the number of seconds used to age out learned FDB entries."
+    DEFVAL          { 900 }
+    ::= { aluMdaMacFdbMgmtEntry 6 }
+
+aluMdaMacFdbTableSize OBJECT-TYPE
+    SYNTAX          Integer32 (4..512)
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbTableSize specifies the
+                     number of entries in the FDB."
+    DEFVAL          { 512 }
+    ::= { aluMdaMacFdbMgmtEntry 7 }
+
+aluMdaMacFdbNumEntries OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbNumEntries indicates the
+                     current number of entries in the FDB."
+    ::= { aluMdaMacFdbMgmtEntry 8 }
+
+aluMdaMacFdbNumStaticEntries OBJECT-TYPE
+    SYNTAX          Integer32
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbNumStaticEntries
+                     indicates the current number of static entries in the FDB."
+    ::= { aluMdaMacFdbMgmtEntry 9 }
+    
+aluMdaMacFdbDiscardUnknownSource OBJECT-TYPE
+    SYNTAX          TmnxEnabledDisabled
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "By setting aluMdaMacFdbDiscardUnknownSource to enabled, packets 
+                     with unknown source MAC will be dropped."
+    DEFVAL          { disabled }
+    ::= { aluMdaMacFdbMgmtEntry 10 }
+
+
+aluMdaMacFdbMacPinningValue1    OBJECT-TYPE
+    SYNTAX          TmnxEnabledDisabled
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbMacPinningValue1 and
+                     aluMdaMacFdbMacPinningValue1 together  specifies
+                     that the dynamic FDB entries with this port has mac-pinning
+                     feature enabled or not."
+    DEFVAL          { disabled } 
+    ::= { aluMdaMacFdbMgmtEntry 11 }
+
+aluMdaMacFdbMacPinningValue2    OBJECT-TYPE
+    SYNTAX          TmnxEnabledDisabled
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbMacPinningValue2 and
+                     aluMdaMacFdbMacPinningValue2 together  specifies
+                     that the dynamic FDB entries with this port has mac-pinning
+                     feature enabled or not."
+    DEFVAL          { disabled }
+    ::= { aluMdaMacFdbMgmtEntry 12 }
+
+aluMdaMacFdbHighWaterMark OBJECT-TYPE
+    SYNTAX          Integer32 (0..100)
+    MAX-ACCESS      read-write 
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbHighWaterMark specifies
+                     the percentage value of the entries in the FDB."
+    DEFVAL          { 95 }
+    ::= { aluMdaMacFdbMgmtEntry 13 } 
+    
+-- ------------------------------------
+-- MDA MAC FDB Table
+-- ------------------------------------
+aluMdaMacFdbTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluMdaMacFdbEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "A table that contains MDA MAC FDB information."
+    ::= { aluChassisObjs 9 }
+
+aluMdaMacFdbEntry OBJECT-TYPE
+    SYNTAX          AluMdaMacFdbEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     "Information about a specific MDA FDB entry."
+    INDEX           { tmnxChassisIndex, tmnxCardSlotNum, tmnxMDASlotNum, aluMdaMacFdbMacAddr }
+    ::= { aluMdaMacFdbTable 1 }
+
+AluMdaMacFdbEntry ::=
+    SEQUENCE {
+        aluMdaMacFdbMacAddr             MacAddress,
+        aluMdaMacFdbRowStatus           RowStatus,
+        aluMdaMacFdbType                INTEGER,
+        aluMdaMacFdbPortID              TmnxPortID
+    }
+
+aluMdaMacFdbMacAddr    OBJECT-TYPE
+    SYNTAX          MacAddress
+    MAX-ACCESS      read-only
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbMacAddr specifies the
+                     48-bit IEEE 802.3 MAC address."
+    ::= { aluMdaMacFdbEntry 1 }
+    
+aluMdaMacFdbRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION     "The value of the object aluMdaMacFdbRowStatus specifies the
+                     status of this row. The only values supported during a set
+                     operation are 'createAndGo' and 'destroy'.
+                     
+                     The aluMdaMacFdbRowStatus operations only apply to 'static' 
+                     Fdb Type entries."
+    ::= { aluMdaMacFdbEntry 2 }
+
+aluMdaMacFdbType OBJECT-TYPE
+    SYNTAX          INTEGER {
+                        static  (1),
+                        learned (2),
+                        host    (3)
+                    }
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION     " The value of the object aluMdaMacFdbType specifies:
+                     - 'static':  Static FDB entries created via management
+                     - 'learned': dynamic entries created via the learning
+                                  process
+                     - 'host':    entry added by the system for a static
+                                  configured host
+                     "            
+    ::= { aluMdaMacFdbEntry 3 }
+
+aluMdaMacFdbPortID    OBJECT-TYPE
+    SYNTAX          TmnxPortID
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION
+        "The aluMdaMacFdbPortID variable contains the port identifier
+         associated with the MAC address."
+    ::= { aluMdaMacFdbEntry 4 }
+    
+-- ------------------------------
+--  aluSecQueueStatsTable
+-- ------------------------------
+
+AluSecType ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        ""
+         
+    SYNTAX       INTEGER {
+                      notUsed(0),
+                      ipsec-decrypt(1),
+                      ipsec-encrypt(2),
+                      firewall-network-ingress(3),
+                      firewall-access-ingress(4)
+                 }
+aluSecQueueStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluSecQueueStatsEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains statistics collected from security queues of a specific MDA in the Nokia 7705 system."
+    ::= { aluChassisObjs 10 }
+    
+aluSecQueueStatsEntry OBJECT-TYPE
+    SYNTAX      AluSecQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry contains security statistics for an MDA. "
+    INDEX           { tmnxChassisIndex, tmnxCardSlotNum, tmnxMDASlotNum, aluSecQueueId, aluSecType }
+    ::= {  aluSecQueueStatsTable 1 }
+    
+AluSecQueueStatsEntry ::=
+    SEQUENCE {  
+        aluSecQueueId                       AluSecQueueId,
+        aluSecQueueMode                  TQueueMode,
+        aluSecQueueFwdHiPrioPkts           Counter64,
+        aluSecQueueFwdLowPrioPkts        Counter64,
+        aluSecQueueFwdHiPrioBytes           Counter64,
+        aluSecQueueFwdLowPrioBytes        Counter64,
+        aluSecQueueDroHiPrioPkts            Counter64,
+        aluSecQueueDroLowPrioPkts         Counter64,
+        aluSecQueueDroHiPrioBytes           Counter64,
+        aluSecQueueDroLowPrioBytes         Counter64,
+        aluSecQueueFwdInProfPkts           Counter64,
+        aluSecQueueFwdOutProfPkts        Counter64,
+        aluSecQueueFwdInProfBytes           Counter64,
+        aluSecQueueFwdOutProfBytes        Counter64,
+        aluSecQueueDroInProfPkts            Counter64,
+        aluSecQueueDroOutProfPkts         Counter64,
+        aluSecQueueDroInProfBytes            Counter64,
+        aluSecQueueDroOutProfBytes         Counter64,
+        aluSecType                          AluSecType
+    }
+    
+aluSecQueueId                OBJECT-TYPE
+    SYNTAX      AluSecQueueId
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Uniquely identify a particular security queue for the MDA.  
+        aluSecQueueId = 1 is best effort queue, 
+        aluSecQueueId = 2 is expedited queue "
+    ::= { aluSecQueueStatsEntry 1 }
+    
+aluSecQueueMode              OBJECT-TYPE
+    SYNTAX      TQueueMode
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates if this queue is in priority or profile mode."
+    ::= { aluSecQueueStatsEntry 2 }
+
+aluSecQueueFwdHiPrioPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSecQueueFwdHiPrioPkts is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of high priority security packets forwarded from this queue.."
+    ::= { aluSecQueueStatsEntry 3 }
+
+aluSecQueueFwdLowPrioPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueFwdLowPrioPkts is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of low priority security packets forwarded from this queue."
+    ::= { aluSecQueueStatsEntry 4 }
+     
+aluSecQueueFwdHiPrioBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueFwdHiPrioBytes is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of high priority security bytes forwarded from this queue."
+    ::= { aluSecQueueStatsEntry 5 }
+    
+aluSecQueueFwdLowPrioBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueFwdLowPrioBytes is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of high priority security bytes forwarded from this queue."
+    ::= { aluSecQueueStatsEntry 6 } 
+    
+aluSecQueueDroHiPrioPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueDroHiPrioPkts is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of high priority security packets dropped from this queue."
+    ::= { aluSecQueueStatsEntry 7 }
+
+aluSecQueueDroLowPrioPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueDroLowPrioPkts is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of low priority security packets dropped from this queue."
+    ::= { aluSecQueueStatsEntry 8 }
+     
+aluSecQueueDroHiPrioBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueDroLowPrioPkts is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of high priority security bytes dropped from this queue."
+    ::= { aluSecQueueStatsEntry 9 }
+    
+aluSecQueueDroLowPrioBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueDroLowPrioBytes is only applicable and valid if aluSecQueueMode is priority.
+         It indicates the number of low priority security bytes dropped from this queue."
+    ::= { aluSecQueueStatsEntry 10 }  
+        
+aluSecQueueFwdInProfPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSecQueueFwdInProfPkts is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of in-profile security packets forwarded from this queue."
+    ::= { aluSecQueueStatsEntry 11 }
+
+aluSecQueueFwdOutProfPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueFwdOutProfPkts is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of out-profile security packets forwarded from this queue."
+    ::= { aluSecQueueStatsEntry 12 }
+     
+aluSecQueueFwdInProfBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueFwdInProfBytes is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of in-profile security bytes forwarded from this queue."
+    ::= { aluSecQueueStatsEntry 13 }
+    
+aluSecQueueFwdOutProfBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueFwdOutProfBytes is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of out-profile security bytes forwarded from this queue."
+    ::= { aluSecQueueStatsEntry 14 } 
+    
+aluSecQueueDroInProfPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueDroInProfPkts is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of in-profile security packets dropped from this queue."
+    ::= { aluSecQueueStatsEntry 15 }
+
+aluSecQueueDroOutProfPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluSecQueueDroInProfPkts is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of out-profile security packets dropped from this queue."
+    ::= { aluSecQueueStatsEntry 16 }
+     
+aluSecQueueDroInProfBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueDroInProfBytes is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of in-profile security bytes dropped from this queue."
+    ::= { aluSecQueueStatsEntry  17 }
+    
+aluSecQueueDroOutProfBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluSecQueueDroOutProfBytes is only applicable and valid if aluSecQueueMode is profile.
+         It indicates the number of out-profile security bytes dropped from this queue."
+    ::= { aluSecQueueStatsEntry 18 } 
+
+aluSecType      OBJECT-TYPE
+    SYNTAX      AluSecType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluSecType is an additional index to identify the type of security traffic of the queue."
+    ::= { aluSecQueueStatsEntry 19 }
+
+-- ------------------------------
+--  aluIPsecCtrlQueueStatsTable
+-- ------------------------------
+aluIPsecCtrlQueueStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluIPsecCtrlQueueStatsEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains statistics collected from IPsec encryption Control Queues of a specific MDA in the Nokia 7705 system."
+    ::= { aluChassisObjs 11 }
+    
+aluIPsecCtrlQueueStatsEntry OBJECT-TYPE
+    SYNTAX      AluIPsecCtrlQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "Each row entry contains statistics collected from IPsec encryption Control Queue for a specific MDA. "
+    INDEX           { tmnxChassisIndex, tmnxCardSlotNum, tmnxMDASlotNum }
+    ::= {  aluIPsecCtrlQueueStatsTable 1 }
+    
+AluIPsecCtrlQueueStatsEntry ::=
+    SEQUENCE {  
+        aluIPsecCtrlQueueFwdPkts         Counter64,
+        aluIPsecCtrlQueueFwdBytes         Counter64,
+        aluIPsecCtrlQueueDroPkts           Counter64,
+        aluIPsecCtrlQueueDroBytes           Counter64
+    }
+    
+aluIPsecCtrlQueueFwdPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluIPsecCtrlQueueFwdPkts indicates the number of packets forwarded from this control queue."
+    ::= { aluIPsecCtrlQueueStatsEntry 1 } 
+
+aluIPsecCtrlQueueFwdBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluIPsecCtrlQueueFwdBytes indicates the number of bytes forwarded from this control queue."
+    ::= { aluIPsecCtrlQueueStatsEntry 2} 
+    
+aluIPsecCtrlQueueDroPkts           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluIPsecCtrlQueueDroPkts indicates the number of packets dropped from this control queue."
+    ::= { aluIPsecCtrlQueueStatsEntry 3 } 
+   
+aluIPsecCtrlQueueDroBytes           OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluIPsecCtrlQueueDroBytes indicates the number of bytes dropped from this control queue."
+    ::= { aluIPsecCtrlQueueStatsEntry 4 } 
+    
+    
+-- ------------------------------
+--  aluPwrEthSystemPowerInfoTable
+-- ------------------------------
+aluPwrEthSystemPowerInfoTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluPwrEthSystemPowerInfoEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains system level power ethernet power information for the Nokia 
+         7705 system."
+    ::= { aluChassisObjs 12 }
+    
+aluPwrEthSystemPowerInfoEntry OBJECT-TYPE
+    SYNTAX      AluPwrEthSystemPowerInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "Each row entry contains power ethernet power information for a chassis. "
+    INDEX           { tmnxChassisIndex }
+    ::= {  aluPwrEthSystemPowerInfoTable 1 }
+    
+AluPwrEthSystemPowerInfoEntry ::=
+    SEQUENCE {  
+        aluPwrEthSystemMaxPowerBudget       Unsigned32,
+        aluPwrEthSystemPowerCommitted       Unsigned32,
+        aluPwrEthSystemPowerAvailable       Unsigned32,
+        aluPwrEthSystemPowerInUse           Unsigned32
+    }
+    
+aluPwrEthSystemMaxPowerBudget           OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "Milliwatts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPwrEthSystemMaxPowerBudget indicates the maximum power budgeted for power ethernet ports."
+    ::= { aluPwrEthSystemPowerInfoEntry 1 } 
+
+aluPwrEthSystemPowerCommitted           OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "Milliwatts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluPwrEthSystemPowerCommitted indicates the power committed for power ethernet ports."
+    ::= { aluPwrEthSystemPowerInfoEntry 2} 
+    
+aluPwrEthSystemPowerAvailable           OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "Milliwatts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluPwrEthSystemPowerAvailable indicates the power available for power ethernet ports."
+    ::= { aluPwrEthSystemPowerInfoEntry 3 } 
+   
+aluPwrEthSystemPowerInUse           OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "Milliwatts"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluPwrEthSystemPowerAvailable indicates the power in use by power ethernet ports."
+    ::= { aluPwrEthSystemPowerInfoEntry 4 } 
+    
+-- ------------------------------
+--  aluChassisPowerFeedInfoTable
+-- ------------------------------
+aluChassisPowerFeedInfoTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluChassisPowerFeedInfoEntry 
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains system level power feed information for the Nokia 
+         7705 system."
+    ::= { aluChassisObjs 13 }
+    
+aluChassisPowerFeedInfoEntry OBJECT-TYPE
+    SYNTAX      AluChassisPowerFeedInfoEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+         "Each row entry contains power feed information for a chassis. "
+    INDEX           { tmnxChassisIndex, aluChassisPowerSupplyId }
+    ::= {  aluChassisPowerFeedInfoTable 1 }
+    
+AluChassisPowerFeedInfoEntry ::=
+    SEQUENCE {  
+        aluChassisPowerSupplyId             Unsigned32,
+        aluChassisPowerFeedMonitoring       TmnxEnabledDisabled
+    }
+    
+aluChassisPowerSupplyId OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..3)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The unique identifier index for a power supply in the chassis."
+    ::= { aluChassisPowerFeedInfoEntry 1 }
+    
+aluChassisPowerFeedMonitoring OBJECT-TYPE
+    SYNTAX      TmnxEnabledDisabled
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluChassisPowerFeedMonitoring indicates if a chassis power feed failure is 
+         monitored."
+    DEFVAL      { enabled }
+    ::= { aluChassisPowerFeedInfoEntry 2 } 
+
+--
+--  aluChassisSystemIdTable
+--
+
+aluChassisSystemIdTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluChassisSystemIdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION   
+        "This table contains chassis system ID information"
+    ::= { aluChassisObjs 14 }
+  
+aluChassisSystemIdEntry OBJECT-TYPE
+    SYNTAX      AluChassisSystemIdEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the aluChassisSystemIdTable contains information
+        specific to Nokia 7705 system."
+    INDEX           { tmnxChassisIndex }
+    ::= {  aluChassisSystemIdTable 1 }
+    
+AluChassisSystemIdEntry ::=
+        SEQUENCE {
+            aluChassisSysId   IpAddress
+        }
+   
+aluChassisSysId  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A 32-bit integer (in IPv4 address format) uniquely identifying the 7705 system."
+    DEFVAL      { 0 }
+    ::= { aluChassisSystemIdEntry 1 }
+
+-- ------------------------------
+--  aluMirrorQueueStatsTable
+-- ------------------------------
+
+aluMirrorQueueStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluMirrorQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains statistics collected from queues for mirror traffic of a specific MDA in
+         the Nokia 7705 system."
+    ::= { aluChassisObjs 15 }
+
+aluMirrorQueueStatsEntry OBJECT-TYPE
+    SYNTAX      AluMirrorQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry contains mirror queue statistics for an MDA."
+    INDEX { tmnxChassisIndex, tmnxCardSlotNum, tmnxMDASlotNum, aluMirrorQueueId }
+    ::= {  aluMirrorQueueStatsTable 1 }
+
+AluMirrorQueueStatsEntry ::=
+    SEQUENCE {
+        aluMirrorQueueId                    INTEGER,
+        aluMirrorQueueFwdInProfPkts         Counter64,
+        aluMirrorQueueFwdOutProfPkts        Counter64,
+        aluMirrorQueueFwdInProfBytes        Counter64,
+        aluMirrorQueueFwdOutProfBytes       Counter64,
+        aluMirrorQueueDroInProfPkts         Counter64,
+        aluMirrorQueueDroOutProfPkts        Counter64,
+        aluMirrorQueueDroInProfBytes        Counter64,
+        aluMirrorQueueDroOutProfBytes       Counter64
+    }
+
+aluMirrorQueueId                    OBJECT-TYPE
+    SYNTAX INTEGER (1..8)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluMirrorQueueId uniquely identifies a particular mirror queue for the MDA."
+    ::= { aluMirrorQueueStatsEntry 1 }
+
+aluMirrorQueueFwdInProfPkts         OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluMirrorQueueFwdInProfPkts indicates the number of in-profile packets forwarded from this queue."
+    ::= { aluMirrorQueueStatsEntry 2 }
+
+aluMirrorQueueFwdOutProfPkts        OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluMirrorQueueFwdOutProfPkts indicates the number of out-profile packets forwarded from this queue."
+    ::= { aluMirrorQueueStatsEntry 3 }
+
+aluMirrorQueueFwdInProfBytes        OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluMirrorQueueFwdInProfBytes indicates the number of in-profile bytes forwarded from this queue."
+    ::= { aluMirrorQueueStatsEntry 4 }
+
+aluMirrorQueueFwdOutProfBytes       OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluMirrorQueueFwdOutProfBytes indicates the number of out-profile bytes forwarded from this queue."
+    ::= { aluMirrorQueueStatsEntry 5 }
+
+aluMirrorQueueDroInProfPkts         OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluMirrorQueueDroInProfPkts indicates the number of in-profile packets dropped from this queue."
+    ::= { aluMirrorQueueStatsEntry 6 }
+
+aluMirrorQueueDroOutProfPkts        OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluMirrorQueueDroInProfPkts indicates the number of out-profile packets dropped from this queue."
+    ::= { aluMirrorQueueStatsEntry 7 }
+
+aluMirrorQueueDroInProfBytes        OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluMirrorQueueDroInProfBytes indicates the number of in-profile bytes dropped from this queue."
+    ::= { aluMirrorQueueStatsEntry  8 }
+
+aluMirrorQueueDroOutProfBytes       OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluMirrorQueueDroOutProfBytes indicates the number of out-profile bytes dropped from this queue."
+    ::= { aluMirrorQueueStatsEntry 9 }
+
+-- ------------------------------
+--  aluIpTransportQueueStatsTable
+-- ------------------------------
+
+aluIpTransportQueueStatsTable    OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluIpTransportQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains statistics collected from the IP Transport queues
+         of a specific MDA in the Nokia 7705 system. But note that in the Nokia
+         7705 SAR-H and SAR-Hc systems, there is internally only a single
+         instance of IP Transport queues which each MDA shares."
+    ::= { aluChassisObjs 16 }
+
+aluIpTransportQueueStatsEntry    OBJECT-TYPE
+    SYNTAX      AluIpTransportQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry contains IP Transport queue statistics."
+    INDEX       { tmnxChassisIndex, tmnxCardSlotNum, tmnxMDASlotNum,
+                  aluIpTransportQueueId }
+    ::= { aluIpTransportQueueStatsTable 1 }
+
+AluIpTransportQueueStatsEntry ::=
+    SEQUENCE {  
+        aluIpTransportQueueId            INTEGER,
+        aluIpTransportQueueFwdPkts       Counter64,
+        aluIpTransportQueueFwdBytes      Counter64,
+        aluIpTransportQueueDroPkts       Counter64,
+        aluIpTransportQueueDroBytes      Counter64
+    }
+
+aluIpTransportQueueId            OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    networkIngress (1),
+                    accessIngress (2),
+                    serialAccessIngress (3)
+                }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluIpTransportQueueId uniquely identifies a particular IP Transport
+         queue for the MDA."
+    ::= { aluIpTransportQueueStatsEntry 1 }
+
+aluIpTransportQueueFwdPkts       OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluIpTransportQueueFwdPkts indicates the
+         number of packets forwarded from this IP Transport queue."
+    ::= { aluIpTransportQueueStatsEntry 2 }
+
+aluIpTransportQueueFwdBytes      OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluIpTransportQueueFwdBytes indicates the
+         number of bytes forwarded from this IP Transport queue."
+    ::= { aluIpTransportQueueStatsEntry 3 }
+
+aluIpTransportQueueDroPkts       OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluIpTransportQueueDroPkts indicates the
+         number of packets dropped from this IP Transport queue."
+    ::= { aluIpTransportQueueStatsEntry 4 }
+
+aluIpTransportQueueDroBytes      OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluIpTransportQueueDroBytes indicates the
+         number of bytes dropped from this IP Transport queue."
+    ::= { aluIpTransportQueueStatsEntry 5 }
+
+aluCflowdQueueStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluCflowdQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains statistics collected from queues for Cflowd traffic of a specific MDA in
+         the Nokia 7705 system."
+    ::= { aluChassisObjs 17 }
+
+aluCflowdQueueStatsEntry OBJECT-TYPE
+    SYNTAX      AluCflowdQueueStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry contains Cflowd queue statistics for an MDA."
+    INDEX { tmnxChassisIndex, tmnxCardSlotNum, tmnxMDASlotNum }
+    ::= {  aluCflowdQueueStatsTable 1 }
+
+AluCflowdQueueStatsEntry ::=
+    SEQUENCE {
+        aluCflowdQueueForwardPackets Counter64,
+        aluCflowdQueueForwardBytes   Counter64,
+        aluCflowdQueueDropPackets    Counter64,
+        aluCflowdQueueDropBytes      Counter64
+    }
+
+aluCflowdQueueForwardPackets OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluCflowdQueueForwardPackets indicates the number of packets forwarded from this queue."
+    ::= { aluCflowdQueueStatsEntry 1 }
+
+aluCflowdQueueForwardBytes OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluCflowdQueueForwardBytes indicates the number of bytes forwarded from this queue."
+    ::= { aluCflowdQueueStatsEntry 2 }
+
+aluCflowdQueueDropPackets OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "aluCflowdQueueDropPackets indicates the number of packets dropped from this queue."
+    ::= { aluCflowdQueueStatsEntry 3 }
+
+aluCflowdQueueDropBytes OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluCflowdQueueDropBytes indicates the number of bytes dropped from this queue."
+    ::= { aluCflowdQueueStatsEntry 4 }
+
+ --%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ --
+ --     Notification Definition section
+ --
+ --                     Notification Objects
+ --
+ 
+aluChassisNotifyMdaRuntimeStatusContext OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "aluChassisNotifyMdaRuntimeStatusContext contains the
+         context information for a recent MDA runtime status event."
+    ::= { aluChassisNotificationObjects 1 }
+
+aluEqExtAlarmDetected   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass,
+        aluChassisExtAlarmState,
+        aluChassisExtAlarmEvent,
+        aluChassisExtAlarmPin
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluEqExtAlarmDetected notification is generated when an alarm condition
+         from the external alarm interface is detected." 
+    ::= { aluChassisNotification 1 }
+
+
+aluEqExtAlarmCleared   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass,
+        aluChassisExtAlarmState,
+        aluChassisExtAlarmEvent,
+        aluChassisExtAlarmPin
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluEqExtAlarmCleared notification is generated when an alarm condition
+         from the external alarm interface is cleared." 
+    ::= { aluChassisNotification 2 }
+
+aluEqBgDiagsFault  NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass,
+        aluExtHwBgDiagsState,
+        aluExtHwBgDiagsFaultReason
+    }
+    STATUS  current
+    DESCRIPTION
+        "The 'aluEqBgDiagsFault' is generated when a background diagnostic running
+         on a hardware component has detected a fault.
+         aluExtHwBgDiagsFaultReason indicates the fault detected."
+    ::= { aluChassisNotification 3 }
+
+aluEqSyncIfTimingExternAlarm   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass,
+        tmnxSyncIfTimingNotifyAlarm
+    }
+    STATUS current
+    DESCRIPTION
+        "Generated when an alarm condition on the external input
+         timing reference is detected."
+    ::= { aluChassisNotification 4 }
+
+aluEqSyncIfTimingExternAlarmClear   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass,
+        tmnxSyncIfTimingNotifyAlarm
+    }
+    STATUS current
+    DESCRIPTION
+        "Generated when an alarm condition on the External input 
+         timing reference is cleared."
+    ::= { aluChassisNotification 5 }
+
+aluEqFanMinorFailure   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when a minor fan failure has been detected by
+         the system. On the device a single fan failure is 
+         considered a minor failure as the device can operate 
+         normally in this condition."
+    ::= { aluChassisNotification 6 }
+
+aluEqFIBOutOfSynch   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass
+    }
+    STATUS current
+    DESCRIPTION
+        "Generated when the FIB has been detected to be out of
+        synch on the specified equipment"
+    ::= { aluChassisNotification 7 }
+
+aluEqFIBOutOfSynchClr   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass
+    }
+    STATUS current
+    DESCRIPTION
+        "Generated when the FIB is back in synch on the specified 
+        equipment."
+    ::= { aluChassisNotification 8 }
+
+aluEqMdaRuntimeStatus NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass,
+        aluChassisNotifyMdaRuntimeStatusContext
+    }
+    STATUS current
+    DESCRIPTION
+        "Generated when the MDA has experienced a runtime status event
+         worthy of reporting (eg. MIPS CPER has occurred)."
+    ::= { aluChassisNotification 9 }
+
+aluSyncIfTimingRefSwitch      NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxSyncIfTimingRef1InUse,
+        tmnxSyncIfTimingRef2InUse,
+        aluSyncIfTimingExternInIfInUse
+    }
+    STATUS      current
+    DESCRIPTION
+        "Generated when there is a change of which timing reference
+         is providing timing for the system."
+    ::= { aluChassisNotification 10 }
+
+aluChassisConsoleAccessed      NOTIFICATION-TYPE
+    STATUS      current
+    DESCRIPTION
+        "Generated when there a user attempts to access CLI via the console port."
+    ::= { aluChassisNotification 11 }
+
+aluChassisMgmtPortAccessed      NOTIFICATION-TYPE
+    STATUS      current
+    DESCRIPTION
+        "Generated when there a user attempts to access CLI via the local management 
+         ethernet port or in-band management."
+    ::= { aluChassisNotification 12 }
+
+aluEqMdaCriticalRuntimeError NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass,
+        aluChassisNotifyMdaRuntimeStatusContext
+    }
+    STATUS current
+    DESCRIPTION
+        "Generated when the MDA has experienced a critical runtime Error 
+         (eg. FATAL FIB Error)."
+    ::= { aluChassisNotification 13 }
+
+aluSyncIfTimingRef1Ref2Switch      NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxSyncIfTimingRef1InUse,
+        tmnxSyncIfTimingRef2InUse
+    }
+    STATUS      current
+    DESCRIPTION
+        "Generated when there is a change of which timing reference
+         is providing timing for the system."
+    ::= { aluChassisNotification 14 }
+
+aluPwrEthPowerSupplyStatus   NOTIFICATION-TYPE
+    OBJECTS {
+        aluExtTmnxMDAPwrEthPsPowerMode,
+        aluExtTmnxMDAPwrEthPsPowerSupplyStatus
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluPwrEthPowerSupplyStatus notification is generated when Poe
+        power supply state changes"
+    ::= { aluChassisNotification 15 }
+
+aluPwrEthExternPsStatus   NOTIFICATION-TYPE
+    OBJECTS { 
+        aluExtTmnxMDAPwrEthPsExternalPowerSupplyStatus 
+    } 
+    STATUS  current 
+    DESCRIPTION 
+        "The aluPwrEthExternPsStatus notification is 
+        generated when Poe external power supply presence changes" 
+    ::= { aluChassisNotification 16 }    
+    
+aluInvalidDcPowerInput   NOTIFICATION-TYPE
+    OBJECTS {
+        tmnxChassisNotifyHwIndex,
+        tmnxHwID,
+        tmnxHwClass
+    }
+    STATUS  current 
+    DESCRIPTION 
+        "The aluInvalidDcPowerInput notification is 
+        generated when a 7705 SAR-H chassis has both
+        AC and DC power inputs" 
+    ::= { aluChassisNotification 17 }
+    
+aluChassisSystemId   NOTIFICATION-TYPE
+    OBJECTS { 
+        aluChassisSysId 
+    } 
+    STATUS  current 
+    DESCRIPTION 
+        "The aluChassisSystemId notification is 
+        generated when the chassis system ID is configured" 
+    ::= { aluChassisNotification 19 } 
+    
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      TMNX-HW-MIB Object Groups
+--
+
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      The compliance specifications.
+--
+
+aluChassisCompliances  OBJECT IDENTIFIER ::= { aluChassisConformance 1 }
+aluChassisGroups       OBJECT IDENTIFIER ::= { aluChassisConformance 2 }
+--aluFabricStatsCompliances OBJECT IDENTIFIER ::= { aluFabricStatsConformance 1}
+--aluFabricStatsGroups      OBJECT IDENTIFIER ::= { aluFabricStatsConformance 2}
+
+-- compliance statements
+
+aluChassisV1v0Compliance  MODULE-COMPLIANCE
+    STATUS  obsolete
+    DESCRIPTION
+            "The compliance statement for management of chassis features
+             in the ALU-CHASSIS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluFamGroup,
+            aluExtAlarmsGroup,
+            aluExtAlarmNotificationGroup,
+            aluPlatformHwClassGroup,
+            aluHwBgDiagsGroup,
+            aluHwBgDiagsNotificationGroup,
+            aluExternalTimingGroup,
+            aluExternalTimingNotificationGroup,
+            aluExtCpmCardGroup,
+            aluFabricDeviceStatsGroup,
+            aluSourceMDAStatsGroup,
+            aluDestMDAStatsGroup  
+        }
+    ::= { aluChassisCompliances 1 }
+
+aluChassisV4v0Compliance  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for management of chassis features
+             in the ALU-CHASSIS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluFamGroup,
+            aluExtAlarmsGroup,
+            aluExtAlarmNotificationGroup,
+            aluPlatformHwClassGroup,
+            aluHwBgDiagsGroup,
+            aluHwBgDiagsNotificationGroup,
+            aluExternalTimingGroup,
+            aluExternalTimingNotificationGroup,
+            aluExtCpmCardGroup,
+            aluSourceMDAStatsGroup,
+            aluDestMDAStatsGroup,
+            aluEqFIBSynchGroup,
+            aluEqFanMinorFailGroup,
+            aluEqMdaRuntimeNotificationGroup,
+            aluSyncIfTimingNotifV3v0Group,
+            aluFabricDeviceStatsV4v0Group  
+        }
+    ::= { aluChassisCompliances 2 }
+    
+aluChassisV6v1Compliance  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for management of chassis features
+             in the ALU-CHASSIS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluFamGroup,
+            aluExtAlarmsGroup,
+            aluExtAlarmNotificationGroup,
+            aluPlatformHwClassGroup,
+            aluHwBgDiagsGroup,
+            aluHwBgDiagsNotificationGroup,
+            aluExternalTimingGroup,
+            aluExternalTimingNotificationGroup,
+            aluExtCpmCardGroup,
+            aluSourceMDAStatsGroup,
+            aluDestMDAStatsGroup,
+            aluEqFIBSynchGroup,
+            aluEqFanMinorFailGroup,
+            aluEqMdaRuntimeNotificationGroup,
+            aluSyncIfTimingNotifV3v0Group,
+            aluFabricDeviceStatsV4v0Group,
+            aluChassisSecurityGroup,
+            aluRingMdaV6v0Group,
+            aluPwrEthPowerSupplyGroup,
+            aluPwrEthSystemPowerV6v1Group,
+            aluPwrEthPowerSupplyV6v1Group,
+            aluSyncV6v0Group,
+            aluSecurityStatsV6v1Group
+        }
+    ::= { aluChassisCompliances 3 }
+
+aluChassisV7v0Compliance  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for management of chassis features
+             in the ALU-CHASSIS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluExtMDAV7v0Group
+        }
+    ::= { aluChassisCompliances 4 }
+
+aluChassisV8v0Compliance  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for management of chassis features
+             in the ALU-CHASSIS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS {
+            aluStatsV8v0Group,
+            aluExtMDAV8v0Group
+        }
+    ::= { aluChassisCompliances 5 }
+
+aluChassisV9v0Compliance  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+        "The compliance statement for management of chassis features on 7705
+         series systems in the TIMETRA-CHASSIS-MIB release 9.0. The
+         corresponding base module compliance statement is
+         aluChassisV8v0Compliance."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluSyncIfTimingV9v0Group
+        }
+    ::= { aluChassisCompliances 6 }
+    
+-- units of conformance
+
+
+aluFamGroup  OBJECT-GROUP
+    OBJECTS {   aluFamOperStatus,
+                aluFamHwIndex,
+                aluFamEquippedType
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of the Fan Alarm
+         Module hardware specific to the Nokia 7705 SAR 
+         series systems."
+    ::= { aluChassisGroups 1 }
+
+aluExtAlarmsGroup  OBJECT-GROUP
+    OBJECTS {   aluChassisExtAlarmState,
+                aluChassisExtAlarmEvent,
+                aluChassisExtAlarmPin                
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of external alarm
+         hardware specific to the Nokia 7705 SAR series 
+         systems."
+    ::= { aluChassisGroups 2 }
+    
+aluExtAlarmNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   { aluEqExtAlarmDetected,
+                      aluEqExtAlarmCleared
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of inputs from
+         the External Alarms Interface on Nokia series systems."
+    ::= { aluChassisGroups 3 }
+
+aluPlatformHwClassGroup OBJECT-GROUP
+    OBJECTS         { aluExtPlatformHwClass
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of objects supporting the management of hardware classes
+         unique to different platforms on Nokia series systems."
+    ::= { aluChassisGroups 4 }
+
+aluHwBgDiagsGroup  OBJECT-GROUP
+    OBJECTS {   aluExtHwBgDiagsState,
+                aluExtHwBgDiagsFaultReason           
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of background 
+         diagnostics running on hardware components of Nokia 
+         series systems."
+    ::= { aluChassisGroups 5 }
+    
+aluHwBgDiagsNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   { aluEqBgDiagsFault
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of 
+         background diagnostics on Nokia series systems."
+    ::= { aluChassisGroups 6 }
+
+aluExternalTimingGroup  OBJECT-GROUP
+    OBJECTS { aluSyncIfTimingExternInIfType,
+              aluSyncIfTimingExternInImpedType,
+              aluSyncIfTimingExternOutIfType,
+              aluSyncIfTimingExternInIfAdminStatus,
+              aluSyncIfTimingExternInIfInUse,
+              aluSyncIfTimingExternInIfQualified,
+              aluSyncIfTimingExternInIfAlarm,
+              aluSyncIfTimingAdmExternInIfType,
+              aluSyncIfTimingAdmExternInImpedType,
+              aluSyncIfTimingAdmExternOutIfType,
+              aluSyncIfTimingAdmExternInIfAdminStatus
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of 'Synchronous Equipment
+         Timing' (SETS) when the references are external timing interfaces for 
+         release 1.0 on Nokia 7705 SAR SR systems."
+    ::= { aluChassisGroups 7 }
+
+aluExternalTimingNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   { 
+                      aluEqSyncIfTimingExternAlarm,
+                      aluEqSyncIfTimingExternAlarmClear
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of the external
+        input timing reference on the Nokia 7705 SAR SR systems."
+    ::= { aluChassisGroups 8 }
+
+aluExtCpmCardGroup  OBJECT-GROUP
+    OBJECTS {   aluExtCpmCardUpgrade
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of extended
+         functionality of CPM Cards on Nokia series systems."
+    ::= { aluChassisGroups 9 }
+
+aluEqFanMinorFailGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   { 
+                      aluEqFanMinorFailure
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of fans
+        on the Nokia 7705 SAR."
+    ::= { aluChassisGroups 10 }
+
+aluExtMDAGroup  OBJECT-GROUP
+    OBJECTS {   aluExtTmnxMDANetworkIngFabricPolicy,
+                aluExtTmnxMDAAccessIngFabricPolicy,
+                aluExtTmnxMDAFabricStatsEnabled,
+                aluExtTmnxMDAVoiceCompandingLaw,
+                aluExtTmnxMDAVoiceSignalingType
+    }
+    STATUS     obsolete 
+    DESCRIPTION
+        "The group of objects supporting management of extended
+         functionality of MDA on Nokia 7705 SAR."
+    ::= { aluChassisGroups 11 }
+
+aluFabricDeviceStatsGroup  OBJECT-GROUP
+    OBJECTS { aluFabricDeviceStatsFwdPkts,
+              aluFabricDeviceStatsDroPkts,
+              aluFabricDeviceStatsFwdOcts
+    }
+    STATUS      obsolete
+    DESCRIPTION
+        "The group of objects supporting stats collected from fabric device of Nokia 7705 SAR."
+    ::= { aluChassisGroups 12 }
+
+aluSourceMDAStatsGroup  OBJECT-GROUP
+    OBJECTS { aluSourceMDAStatsFwdInProfPkts,
+              aluSourceMDAStatsFwdOutProfPkts,
+              aluSourceMDAStatsFwdInProfOcts,
+              aluSourceMDAStatsFwdOutProfOcts,
+              aluSourceMDAStatsDroInProfPkts,
+              aluSourceMDAStatsDroOutProfPkts,
+              aluSourceMDAStatsDroInProfOcts,
+              aluSourceMDAStatsDroOutProfOcts,              
+              aluSourceMDAStatsAccessFwdInProfPkts,
+              aluSourceMDAStatsAccessFwdOutProfPkts,
+              aluSourceMDAStatsAccessFwdInProfOcts,
+              aluSourceMDAStatsAccessFwdOutProfOcts,
+              aluSourceMDAStatsAccessDroPkts,
+              aluSourceMDAStatsAccessDroOcts
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting ingress stats collected from a specific Source MDA
+        heading toward each of the MDA in Nokia 7705 SAR."
+    ::= { aluChassisGroups 13 }
+    
+aluDestMDAStatsGroup  OBJECT-GROUP
+    OBJECTS { aluDestMDAStatsFwdInProfPkts,
+              aluDestMDAStatsFwdOutProfPkts,
+              aluDestMDAStatsFwdInProfOcts,
+              aluDestMDAStatsFwdOutProfOcts,
+              aluDestMDAStatsDroInProfPkts,
+              aluDestMDAStatsDroOutProfPkts,
+              aluDestMDAStatsDroInProfOcts,
+              aluDestMDAStatsDroOutProfOcts,
+              aluDestMDAStatsAccessFwdInProfPkts,
+              aluDestMDAStatsAccessFwdOutProfPkts,
+              aluDestMDAStatsAccessFwdInProfOcts,
+              aluDestMDAStatsAccessFwdOutProfOcts,
+              aluDestMDAStatsAccessDroPkts,
+              aluDestMDAStatsAccessDroOcts
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting ingress stats collected from each of the Source MDA's in 
+        Nokia 7705 SAR heading toward a specific Destination MDA."
+    ::= { aluChassisGroups 14 }
+
+aluEqFIBSynchGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   { 
+                      aluEqFIBOutOfSynch,
+                      aluEqFIBOutOfSynchClr
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of the FIB
+        on the Nokia 7705 SAR."
+    ::= { aluChassisGroups 15 }
+
+alu1588PtpTimingGroup  OBJECT-GROUP
+    OBJECTS { aluSyncIfTimingIeee1588PtpType,
+              aluSyncIfTimingRef1Ieee1588PtpSrc,
+              aluSyncIfTimingRef2Ieee1588PtpSrc,
+              aluSyncIfTimingAdmRef1Ieee1588PtpSrc,
+              aluSyncIfTimingAdmRef2Ieee1588PtpSrc
+            }
+    STATUS      obsolete
+    DESCRIPTION
+        "The group of objects supporting management of 'Synchronous Equipment
+         Timing' (SETS) references which are timed from IP Interfaces via
+         1588 PTP."
+    ::= { aluChassisGroups 16}
+
+aluEqMdaRuntimeNotifyObjsGroup   OBJECT-GROUP
+    OBJECTS {   aluChassisNotifyMdaRuntimeStatusContext
+            }
+    STATUS        current
+    DESCRIPTION
+        "The group of objects supporting chassis hardware notifications 
+         on the Nokia 7705 SAR."
+    ::= { aluChassisGroups 17 }
+
+aluEqMdaRuntimeNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   { 
+                      aluEqMdaRuntimeStatus,
+                      aluEqMdaCriticalRuntimeError
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of chassis
+         hardware on the Nokia 7705 SAR."
+    ::= { aluChassisGroups 18 }
+
+aluQLRefSelectionGroup  OBJECT-GROUP
+    OBJECTS { aluSyncIfTimingAdmExternInCfgQltyLevel,
+              aluSyncIfTimingExternInCfgQltyLevel,
+              aluSyncIfTimingExternInState
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of 'Synchronous Equipment
+         Timing' (SETS) references switching based on quality level."
+    ::= { aluChassisGroups 19}
+
+aluSyncIfTimingNotifV3v0Group   NOTIFICATION-GROUP
+    NOTIFICATIONS {
+               aluSyncIfTimingRefSwitch
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects added in 3.0 release to support Sync-If-Timing
+         notifications."
+    ::= { aluChassisGroups  20 }
+
+aluMDAAlarmGroup   OBJECT-GROUP
+    OBJECTS {
+               aluExtTmnxMDANumOfDigitalAlarmInputs,
+               aluExtTmnxMDANumOfAnalogAlarmInputs,
+               aluExtTmnxMDANumOfDigitalOutputRelays
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting the management of Auxiliary Alarm I/O 
+        on MDAs."
+    ::= { aluChassisGroups  21 }
+
+aluFabricDeviceStatsV4v0Group  OBJECT-GROUP
+    OBJECTS { aluFabricDeviceStatsFwdPkts,   
+              aluFabricDeviceStatsDroPkts,
+              aluFabricDeviceStatsFwdOcts,
+              aluFabricDeviceStatsUcastFwdPkts,
+              aluFabricDeviceStatsMcastFwdPkts,
+              aluFabricDeviceStatsDroOcts
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting stats collected from fabric device of Nokia 7705 SAR."
+    ::= { aluChassisGroups 22 }
+
+alu1588PtpTimingV4v0Group  OBJECT-GROUP
+    OBJECTS { aluSyncIfTimingRef1SrcPtpClock,
+              aluSyncIfTimingRef2SrcPtpClock,
+              aluSyncIfTimingAdmRef1SrcPtpClock,
+              aluSyncIfTimingAdmRef2SrcPtpClock
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of 'Synchronous Equipment
+         Timing' (SETS) references which are timed from IP Interfaces via
+         IEEE 1588 PTP."
+    ::= { aluChassisGroups 23}
+
+alu1588PtpTimingObsoleteGroup  OBJECT-GROUP
+    OBJECTS { aluSyncIfTimingIeee1588PtpType,
+              aluSyncIfTimingRef1Ieee1588PtpSrc,
+              aluSyncIfTimingRef2Ieee1588PtpSrc,
+              aluSyncIfTimingAdmRef1Ieee1588PtpSrc,
+              aluSyncIfTimingAdmRef2Ieee1588PtpSrc
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of obsolete objects supporting management of 'Synchronous 
+         Equipment Timing' (SETS) references which are timed from IP Interfaces
+         via 1588 PTP."
+    ::= { aluChassisGroups 24}
+
+aluExtMDAV5v0Group  OBJECT-GROUP
+    OBJECTS {   aluExtTmnxMDANetworkIngFabricPolicy,
+                aluExtTmnxMDAAccessIngFabricPolicy,
+                aluExtTmnxMDAFabricStatsEnabled,
+                aluExtTmnxMDAVoiceCompandingLaw,
+                aluExtTmnxMDAVoiceSignalingType,
+                aluExtTmnxMDACapabilityMode
+            }
+    STATUS     obsolete  
+    DESCRIPTION
+        "The group of objects supporting management of extended
+         functionality of MDA on Nokia 7705 SAR."
+    ::= { aluChassisGroups 25 }
+
+aluMDAEventStatsGroup  OBJECT-GROUP
+    OBJECTS {    
+            aluFabricDeviceStatsMdaDroEvents
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting background events in the MDA's in Nokia 7705 SAR"
+    ::= { aluChassisGroups 26 }
+
+aluExtHwMfgVariantGroup  OBJECT-GROUP
+    OBJECTS {    
+            aluExtHwMfgVariant
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects indicating variants in hardware manufacturing in Nokia 7705 SAR"
+    ::= { aluChassisGroups 27 }
+
+aluChassisSecurityGroup  NOTIFICATION-GROUP
+    NOTIFICATIONS {    
+            aluChassisConsoleAccessed,
+            aluChassisMgmtPortAccessed
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of security notifications for local port access on Nokia 7705 SAR"
+    ::= { aluChassisGroups 28 }
+    
+aluExtMDAV6v0Group  OBJECT-GROUP
+    OBJECTS {   aluExtTmnxMDANetworkIngFabricPolicy,
+                aluExtTmnxMDAAccessIngFabricPolicy,
+                aluExtTmnxMDAFabricStatsEnabled,
+                aluExtTmnxMDAVoiceCompandingLaw,
+                aluExtTmnxMDAVoiceSignalingType,
+                aluExtTmnxMDACapabilityMode,
+                aluExtTmnxMDANetworkRingQueuePolicy,
+                aluExtTmnxMDANetworkRingQosPolicy
+            }
+    STATUS     current  
+    DESCRIPTION
+        "The group of objects supporting management of extended
+         functionality of MDA on Nokia 7705 SAR."
+    ::= { aluChassisGroups 29 }
+    
+aluRingMdaV6v0Group  OBJECT-GROUP
+    OBJECTS {   
+                aluMdaMacFdbMacLearning,
+                aluMdaMacFdbMacAgeing,
+                aluMdaMacFdbFlushTable,
+                aluMdaMacFdbFlushPortID,
+                aluMdaMacFdbFlushMac,
+                aluMdaMacFdbRemoteAgeTime,
+                aluMdaMacFdbTableSize,
+                aluMdaMacFdbNumEntries,
+                aluMdaMacFdbNumStaticEntries,
+                aluMdaMacFdbDiscardUnknownSource,
+                aluMdaMacFdbMacPinningValue1,
+                aluMdaMacFdbMacPinningValue2,
+                aluMdaMacFdbHighWaterMark,
+                aluMdaMacFdbMacAddr,
+                aluMdaMacFdbRowStatus,
+                aluMdaMacFdbType,
+                aluMdaMacFdbPortID
+            }
+    STATUS     current  
+    DESCRIPTION
+        "The group of objects supporting management of the
+         ring MDA on Nokia 7705 SAR."
+    ::= { aluChassisGroups 30 }
+
+aluSyncV6v0Group  NOTIFICATION-GROUP
+    NOTIFICATIONS {    
+            aluSyncIfTimingRef1Ref2Switch
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications added in release 6.0, to support management of
+         'Synchronous Equipment Timing' (SETS) on Nokia 7705 SAR."
+    ::= { aluChassisGroups 31 }
+
+aluPwrEthPowerSupplyGroup  OBJECT-GROUP
+    OBJECTS {
+            aluExtTmnxMDAPwrEthPsPowerMode,                 
+            aluExtTmnxMDAPwrEthPsPowerSupplyStatus,
+            aluExtTmnxMDAPwrEthPsExternalPowerSupplyStatus
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects indicating power ethernet Power Supply configuration 
+        and Status for the 7705 SAR-H"
+    ::= { aluChassisGroups 32 }
+    
+aluSecurityStatsV6v1Group OBJECT-GROUP
+    OBJECTS {
+        aluSecQueueMode,
+        aluSecQueueFwdHiPrioPkts,
+        aluSecQueueFwdLowPrioPkts,
+        aluSecQueueFwdHiPrioBytes,
+        aluSecQueueFwdLowPrioBytes,
+        aluSecQueueDroHiPrioPkts,
+        aluSecQueueDroLowPrioPkts,
+        aluSecQueueDroHiPrioBytes,
+        aluSecQueueDroLowPrioBytes,
+        aluSecQueueFwdInProfPkts,
+        aluSecQueueFwdOutProfPkts,
+        aluSecQueueFwdInProfBytes,
+        aluSecQueueFwdOutProfBytes,
+        aluSecQueueDroInProfPkts ,
+        aluSecQueueDroOutProfPkts,
+        aluSecQueueDroInProfBytes ,
+        aluSecQueueDroOutProfBytes,
+        aluIPsecCtrlQueueFwdPkts,
+        aluIPsecCtrlQueueFwdBytes,
+        aluIPsecCtrlQueueDroPkts,
+        aluIPsecCtrlQueueDroBytes
+    }
+    STATUS   current
+        DESCRIPTION
+        "The group of objects indicating statistic values from security queues supported on Nokia 7705 SAR."
+    ::= { aluChassisGroups 33 }
+    
+aluPwrEthSystemPowerV6v1Group OBJECT-GROUP
+    OBJECTS {
+        aluPwrEthSystemMaxPowerBudget,
+        aluPwrEthSystemPowerCommitted,
+        aluPwrEthSystemPowerAvailable,
+        aluPwrEthSystemPowerInUse
+    }
+    STATUS   current
+        DESCRIPTION
+        "The group of objects indicating power ethernet system power information for Nokia 
+         7705 SAR."
+    ::= { aluChassisGroups 34 }
+    
+aluPwrEthPowerSupplyV6v1Group  NOTIFICATION-GROUP
+    NOTIFICATIONS {    
+            aluPwrEthPowerSupplyStatus,
+            aluPwrEthExternPsStatus,
+            aluInvalidDcPowerInput
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications added in release 6.0, to support management of
+         'Synchronous Equipment Timing' (SETS) on Nokia 7705 SAR."
+    ::= { aluChassisGroups 35 }
+
+aluChassisPowerFeedGroup OBJECT-GROUP
+    OBJECTS {
+        aluChassisPowerFeedMonitoring
+    }
+    STATUS   current
+        DESCRIPTION
+        "The group of objects indicating power feed information for Nokia 
+         7705 SAR."
+    ::= { aluChassisGroups 36 }
+
+aluExtMDAV7v0Group OBJECT-GROUP
+    OBJECTS {
+                aluExtTmnxMDANetworkIngSecQueuePolicy,
+                aluExtTmnxMDAAccessIngSecQueuePolicy,
+                aluExtTmnxMDASptSecAggRate,
+                aluExtTmnxMDATuAisEnabled,
+                aluExtTmnxMDAAccessIngShaperPolicy
+            }
+    STATUS     current  
+    DESCRIPTION
+        "The group of objects added in release 7.0, to support management of extended
+         functionality of MDA on Nokia 7705 SAR."
+    ::= { aluChassisGroups 37 }
+
+aluChassisSysIdGroup OBJECT-GROUP
+    OBJECTS {
+        aluChassisSysId
+    }
+    STATUS   current
+        DESCRIPTION
+        "The group of objects added in release 7.0, to support management of extended
+         functionality of chassis on Nokia 7705 SAR."
+    ::= { aluChassisGroups 38 }
+
+aluStatsV8v0Group OBJECT-GROUP
+    OBJECTS {
+            aluMirrorQueueFwdInProfPkts,
+            aluMirrorQueueFwdOutProfPkts,
+            aluMirrorQueueFwdInProfBytes,
+            aluMirrorQueueFwdOutProfBytes,
+            aluMirrorQueueDroInProfPkts,
+            aluMirrorQueueDroOutProfPkts,
+            aluMirrorQueueDroInProfBytes,
+            aluMirrorQueueDroOutProfBytes
+    }
+    STATUS   current
+        DESCRIPTION
+        "The group of objects related to statistics supported on Nokia 7705 SAR."
+    ::= { aluChassisGroups 39 }
+
+aluIpTransportQueueStatsGroup    OBJECT-GROUP
+    OBJECTS {
+        aluIpTransportQueueFwdPkts,
+        aluIpTransportQueueFwdBytes,
+        aluIpTransportQueueDroPkts,
+        aluIpTransportQueueDroBytes
+    }
+    STATUS   current
+        DESCRIPTION
+        "The group of objects indicating statistic values from IP Transport
+         queues supported on Nokia 7705 SAR."
+    ::= { aluChassisGroups 40 }
+    
+aluExtMDAV8v0Group               OBJECT-GROUP
+    OBJECTS {
+                aluExtTmnxMDAVcbApplication
+            }
+    STATUS     current  
+    DESCRIPTION
+        "The group of objects added in release 8.0, to support management of extended
+         functionality of MDA on Nokia 7705 SAR."
+    ::= { aluChassisGroups 41 }
+
+aluSyncIfTimingV9v0Group  OBJECT-GROUP
+    OBJECTS {
+                aluSyncIfTimingAdmChangedMask
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of 'Synchronous Equipment
+         Timing' (SETS) added in Release 9.0 to support management of extended
+         functionality on Nokia 7705 SAR."
+    ::= { aluChassisGroups 42}
+
+END

@@ -11,15 +11,17 @@
  *
  */
 
-$defs  = ' DEF:in_octets='.$rrd_filename.':INOCTETS:AVERAGE';
-$defs .= ' DEF:out_octets='.$rrd_filename.':OUTOCTETS:AVERAGE';
-$defs .= ' DEF:in_upkts='.$rrd_filename.':INUCASTPKTS:AVERAGE';
-$defs .= ' DEF:out_upkts='.$rrd_filename.':OUTUCASTPKTS:AVERAGE';
+$rrd_filename_escape = rrdtool_escape($rrd_filename);
 
-$defs .= ' DEF:in_bpkts='.$rrd_filename.':INBROADCASTPKTS:AVERAGE';
-$defs .= ' DEF:out_bpkts='.$rrd_filename.':OUTBROADCASTPKTS:AVERAGE';
-$defs .= ' DEF:in_mpkts='.$rrd_filename.':INMULTICASTPKTS:AVERAGE';
-$defs .= ' DEF:out_mpkts='.$rrd_filename.':OUTMULTICASTPKTS:AVERAGE';
+$defs  = ' DEF:in_octets='.$rrd_filename_escape.':INOCTETS:AVERAGE';
+$defs .= ' DEF:out_octets='.$rrd_filename_escape.':OUTOCTETS:AVERAGE';
+$defs .= ' DEF:in_upkts='.$rrd_filename_escape.':INUCASTPKTS:AVERAGE';
+$defs .= ' DEF:out_upkts='.$rrd_filename_escape.':OUTUCASTPKTS:AVERAGE';
+
+$defs .= ' DEF:in_bpkts='.$rrd_filename_escape.':INBROADCASTPKTS:AVERAGE';
+$defs .= ' DEF:out_bpkts='.$rrd_filename_escape.':OUTBROADCASTPKTS:AVERAGE';
+$defs .= ' DEF:in_mpkts='.$rrd_filename_escape.':INMULTICASTPKTS:AVERAGE';
+$defs .= ' DEF:out_mpkts='.$rrd_filename_escape.':OUTMULTICASTPKTS:AVERAGE';
 
 #$defs .= ' CDEF:in_bits=in_octets,8,*';
 #$defs .= ' CDEF:out_bits=out_octets,8,*';

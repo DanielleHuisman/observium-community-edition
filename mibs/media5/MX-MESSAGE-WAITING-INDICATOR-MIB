@@ -1,0 +1,253 @@
+-- **SDOC***********************************************************************
+-- *****************************************************************************
+--
+--      Copyright(c) 2003 Mediatrix Telecom, Inc.
+--      Copyright(c) 2007 Media5 Corporation. ("Media5")
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Media5.
+--
+--   Media5 reserves all rights to this document as well as to the Intellectual
+--   Property of the document and the technology and know-how that it includes
+--   and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in
+--   any form whatsoever without written prior approval by Media5.
+--
+--   Media5 reserves the right to revise this publication and make changes at
+--   any time and without the obligation to notify any person and/or entity of
+--   such revisions and/or changes.
+--
+-- *****************************************************************************
+-- **EDOC***********************************************************************
+
+MX-MESSAGE-WAITING-INDICATOR-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        ifIndex
+    FROM RFC1213-MIB
+        MxEnableState,
+        MxDigitMap,
+        MxSignalingAddress
+    FROM MX-TC
+        mediatrixConfig
+    FROM MX-SMI;
+
+messageWaitingIndicatorMIB MODULE-IDENTITY
+    LAST-UPDATED "201008040000Z"
+    ORGANIZATION "Mediatrix Telecom"
+    CONTACT-INFO "Mediatrix Telecom
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION  "This MIB is used to configure the message waiting indicator service."
+
+
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "201008040000Z"
+    DESCRIPTION "Added mwiConfigVoltageEnable variable."
+    REVISION    "0308290000Z"
+    DESCRIPTION "August 29, 2003
+                    Updated mwiExpirationTime range
+                 March 11, 2003
+                    Creation."
+    ::= { mediatrixConfig 100 }
+
+mwiMIBObjects OBJECT IDENTIFIER ::= { messageWaitingIndicatorMIB 1 }
+mwiConformance OBJECT IDENTIFIER ::= { messageWaitingIndicatorMIB 10 }
+
+    -- ************************************************************************
+    -- MWI Unit-wide config parameters
+    -- ************************************************************************
+    mwiFetchDigitMap OBJECT-TYPE
+        SYNTAX  MxDigitMap
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Digit map that the user will dial to trigger a message fetch operation.
+                     Typically this will initiate a call to the voice-messaging system.
+
+                     See mwiConfigFetchAddress."
+        DEFVAL      { "" }
+        ::= { mwiMIBObjects 10 }
+
+    mwiExpirationTime OBJECT-TYPE
+        SYNTAX  Unsigned32 (180..604800)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "For signaling protocols that allow dynamic subscription to a messaging service,
+                     this value indicates the duration of such a subscription.
+
+                     This value is expressed in seconds (s)."
+        DEFVAL      { 3600 }
+        ::= { mwiMIBObjects 20 }
+
+
+    mwiSubscriptionCmdRefresh OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             noOp(0),
+                             refresh(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Command to refresh the subscriptions.
+
+                     noOp    : No operation.
+
+                     refresh : Refresh message waiting subscriptions. All enabled endpoints
+                               unsubscribe themselves from the service and re-subscribe using the
+                               current provisioning."
+        DEFVAL      { noOp }
+        ::=  { mwiMIBObjects 30 }
+
+    -- ************************************************************************
+    -- MWI Config table
+    -- ************************************************************************
+    mwiIfConfigurationTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF MwiIfConfigurationEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of the configurable items relative to the message
+                     waiting indicator, indexed by the interface number."
+        ::= { mwiMIBObjects 40 }
+
+        mwiIfConfigurationEntry OBJECT-TYPE
+            SYNTAX      MwiIfConfigurationEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the mwiIfConfigurationTable table.
+                         It contains the configuration of the mwi service for this interface."
+            INDEX       {
+                            ifIndex
+                        }
+            ::= { mwiIfConfigurationTable 1 }
+
+            MwiIfConfigurationEntry ::= SEQUENCE
+            {
+                mwiConfigActivation                 MxEnableState,
+                mwiConfigUserSubscriptionAddress    MxSignalingAddress,
+                mwiConfigFetchAddress               MxSignalingAddress
+            }
+
+            mwiConfigActivation OBJECT-TYPE
+                SYNTAX  MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enable/Disable the message waiting service.
+
+                             This service, used in conjunction with a voice-messaging system, will enable the
+                             user to be notified when new messages are awaiting attention on the messaging
+                             server. The user will be alerted by the blinking of the LED on the phone, and a
+                             different dial tone when picking up the handset (called the message waiting tone).
+
+                             This variable's semantics are different depending on protocol
+                             and/or hardware platforms.
+                             Please refer to the documentation for more details."
+                DEFVAL      { disable }
+                ::= { mwiIfConfigurationEntry 5 }
+
+            mwiConfigUserSubscriptionAddress OBJECT-TYPE
+                SYNTAX  MxSignalingAddress
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Typically, the unit will need to subscribe to a notification mechanism that will
+                             notify it when new messages are available. This field contains the
+                             address of that entity.
+
+                             This variable's semantics are different depending on protocol
+                             and/or hardware platforms.
+                             Please refer to the documentation for more details."
+                DEFVAL      { "" }
+                ::= { mwiIfConfigurationEntry 10 }
+
+            mwiConfigFetchAddress OBJECT-TYPE
+                SYNTAX  MxSignalingAddress
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "The fetch operation typically consists in the user initiating a call to the
+                             voice-messaging system, then using an auto-attendant to get the messages.
+
+                             This field contains the destination to use in creating the call when the
+                             mwiFetchDigitMap is matched.
+
+                             This variable's semantics are different depending on protocol
+                             and/or hardware platforms.
+                             Please refer to the documentation for more details.
+
+                             Also see mwiFetchDigitMap."
+                DEFVAL      { "" }
+                ::= { mwiIfConfigurationEntry 15 }
+
+           mwiConfigVoltageEnable OBJECT-TYPE
+                SYNTAX  MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enable/Disable the voltage message waiting indicator.
+
+                             When new messages are awaiting attention on the messaging
+                             server, the unit uses the line voltage to power the LED on the
+                             telephone in addition to the default method.
+
+                             This variable is effective only if the endpoint is configured
+                             to use the visual message waiting indicator (mwiConfigActivation).
+
+                             This variable's semantics are different depending on protocol
+                             and/or hardware platforms.
+                             Please refer to the documentation for more details."
+                DEFVAL      { disable }
+                ::= { mwiIfConfigurationEntry 20 }
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    mwiCompliances OBJECT IDENTIFIER ::= { mwiConformance 1 }
+
+    mwiComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "List of groups required to support the message waiting indicator service."
+        MODULE  -- This Module
+            MANDATORY-GROUPS {
+                                mwiIfConfigVer1,
+                                mwiConfigVer1
+                             }
+        ::= { mwiCompliances 1 }
+
+    -- ************************************************************************
+    --  MIB variable grouping
+    -- ************************************************************************
+    mwiGroups OBJECT IDENTIFIER ::= { mwiConformance 5 }
+
+    mwiIfConfigVer1 OBJECT-GROUP
+        OBJECTS {
+                    mwiConfigActivation,
+                    mwiConfigUserSubscriptionAddress,
+                    mwiConfigFetchAddress
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of the mwi service per port."
+        ::= { mwiGroups 3 }
+
+    mwiConfigVer1 OBJECT-GROUP
+        OBJECTS {
+                    mwiFetchDigitMap,
+                    mwiExpirationTime
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of the mwi service for the unit."
+        ::= { mwiGroups 6 }
+END

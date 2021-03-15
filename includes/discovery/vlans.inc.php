@@ -60,10 +60,10 @@ foreach ($discovery_vlans as $domain_index => $vlans)
       {
         if ($vlans_db[$domain_index][$vlan_id][$param] != $vlan[$param])
         {
-          if ($param == 'ifIndex' && (is_null($vlan[$param]) || $vlan[$param] === ''))
+          if ($param === 'ifIndex' && (is_null($vlan[$param]) || $vlan[$param] === ''))
           {
             // Empty string stored as 0, prevent
-            $vlan_update[$param] = ['NULL'];
+            $vlan_update[$param] = [ 'NULL' ];
           } else {
             $vlan_update[$param] = $vlan[$param];
           }

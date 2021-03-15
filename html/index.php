@@ -51,6 +51,7 @@ ob_start('html_callback');
     <base href="<?php echo(escape_html($config['base_url'])); ?>"/>
     <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+
     <!-- ##META_CACHE## -->
     <!-- ##CSS_CACHE## -->
     <!-- ##STYLE_CACHE## -->
@@ -59,14 +60,6 @@ ob_start('html_callback');
     <!--[if lt IE 9]>
     <script src="js/html5shiv.min.js"></script><![endif]-->
   <?php
-
-  register_html_resource('css', 'observium.css');
-  //register_html_resource('css', 'jquery.qtip.min.css');
-  register_html_resource('css', 'sprite.css');
-
-  register_html_resource('js', 'jquery.min.js');
-  // register_html_resource('js', 'jquery-ui.min.js'); // FIXME. We don't use JQueryUI or am I wrong? (mike)
-  register_html_resource('js', 'bootstrap.min.js');
 
   $runtime_start = utime();
 
@@ -79,6 +72,29 @@ ob_start('html_callback');
   unset($vars);
 
   include($config['html_dir'] . "/includes/authenticate.inc.php");
+
+
+  if (!isset($_SESSION['theme']) || !isset($config['themes'][$_SESSION['theme']]))
+  {
+    $_SESSION['theme'] = "light";
+  }
+  $_SESSION['mode'] = $config['themes'][$_SESSION['theme']]['type'];
+
+  if (isset($config['themes'][$_SESSION['theme']]['css']))
+  {
+    register_html_resource('css', $config['themes'][$_SESSION['theme']]['css']);
+  } else {
+    // Fallback in community edition
+    register_html_resource('css', 'observium.css');
+  }
+
+  //register_html_resource('css', 'jquery.qtip.min.css');
+  register_html_resource('css', 'sprite.css');
+
+  register_html_resource('js', 'jquery.min.js');
+  // register_html_resource('js', 'jquery-ui.min.js'); // FIXME. We don't use JQueryUI or am I wrong? (mike)
+  register_html_resource('js', 'bootstrap.min.js');
+
 
   ?>
     <title>##TITLE##</title>
@@ -97,7 +113,7 @@ ob_start('html_callback');
 
     $vars = get_vars(); // Parse vars from GET/POST/URI
 
-    if ($vars['export'] == 'yes') // This is for display XML on export pages
+    if ($vars['export'] === 'yes') // This is for display XML on export pages
     {
       // Code prettify (but it's still horrible)
       register_html_resource('js', 'google-code-prettify.js');
@@ -174,7 +190,7 @@ if ($_SESSION['authenticated'])
   if ($config['web_mouseover'] && $allow_mobile)
   {
     register_html_resource('js', 'jquery.qtip.min.js');
-    register_html_resource('css', 'jquery.qtip.min.css');
+    //register_html_resource('css', 'jquery.qtip.min.css');
 
     register_html_resource('script', 'jQuery(function ($) { entity_popups(); popups_from_data(); });');
     // All of this do same
@@ -374,7 +390,7 @@ if ($vars['bare'] != 'yes')
                                     // Numeric severity to string
                                     $notification['severity'] = $config['syslog']['priorities'][$notification['severity']]['label-class'];
                                   }
-                                  echo('<div width="100%" class="callout callout-' . $notification['severity'] . '">');
+                                  echo('<div width="100%" class="alert alert-' . $notification['severity'] . '">');
                                   $notification_title = '';
                                   if (isset($notification['unixtime']))
                                   {

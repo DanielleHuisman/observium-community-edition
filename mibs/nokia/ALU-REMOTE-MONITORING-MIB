@@ -1,0 +1,967 @@
+ALU-REMOTE-MONITORING-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, 
+        NOTIFICATION-TYPE, Counter64, 
+        Unsigned32, Integer32
+                                                FROM SNMPv2-SMI
+
+        MODULE-COMPLIANCE, OBJECT-GROUP, 
+        NOTIFICATION-GROUP                      FROM SNMPv2-CONF
+
+        TEXTUAL-CONVENTION, TimeStamp,
+        TruthValue, RowStatus , DisplayString   FROM SNMPv2-TC
+        
+        TItemLongDescription, 
+        TNamedItemOrEmpty                       FROM TIMETRA-TC-MIB
+                
+		tmnxChassisIndex                        FROM TIMETRA-CHASSIS-MIB
+		
+        aluSARMIBModules, aluSARObjs,
+        aluSARConfs, aluSARNotifyPrefix         FROM ALU-SAR-GLOBAL-MIB
+        ;
+
+
+aluRMMIBModule MODULE-IDENTITY
+        LAST-UPDATED    "0809100000Z"
+        ORGANIZATION    "Nokia"
+        CONTACT-INFO    
+            "Nokia 7x50 Support
+             Web: http://www.nokia.com/comps/pages/carrier_support.jhtml"
+        DESCRIPTION
+        "This document is the SNMP MIB module to manage and provision the 
+        microwave components on the Nokia 7xxx device.
+        
+        Copyright 2010-2014 Nokia.  All rights reserved.
+        Reproduction of this document is authorized on the condition that
+        the foregoing copyright notice is included.
+
+        This SNMP MIB module (Specification) embodies Nokia's
+        proprietary intellectual property.  Nokia retains 
+        all title and ownership in the Specification, including any 
+        revisions.
+
+        Nokia grants all interested parties a non-exclusive 
+        license to use and distribute an unmodified copy of this 
+        Specification in connection with management of Nokia 
+        products, and without fee, provided this copyright notice and 
+        license appear on all copies.
+
+        This Specification is supplied 'as is', and Nokia 
+        makes no warranty, either express or implied, as to the use, 
+        operation, condition, or performance of the Specification."
+
+--
+--  Revision History
+--
+        REVISION        "0801090000Z"
+        DESCRIPTION     "Rev 1.0                12 Nov 2009 00:00 
+                         1.0 release of the ALU-REMOTE-MONITORING-MIB."
+
+        REVISION        "2101110000Z"
+        DESCRIPTION     "Rev 2.0                21 Jan 2011 00:00 
+                         2.0 release of the ALU-REMOTE-MONITORING-MIB."
+ 
+        REVISION        "2101210000Z"
+        DESCRIPTION     "Rev 3.0                21 Jan 2011 00:00 
+                         3.0 release of the ALU-REMOTE-MONITORING-MIB."
+                         
+        ::= { aluSARMIBModules 11 }
+
+
+aluRMObjPrefix               OBJECT IDENTIFIER ::= { aluSARObjs 11 }
+  aluRMObjs                    OBJECT IDENTIFIER ::= { aluRMObjPrefix 1 }       
+  aluRMNotifyObjs              OBJECT IDENTIFIER ::= { aluRMObjPrefix 2 }       
+
+aluRMMIBConformance          OBJECT IDENTIFIER ::= { aluSARConfs 11 }
+aluRMConformance             OBJECT IDENTIFIER ::= { aluRMMIBConformance 11 }
+
+aluRMNotifyPrefix OBJECT IDENTIFIER ::= { aluSARNotifyPrefix 7 } 
+  aluRMNotification OBJECT IDENTIFIER ::= { aluRMNotifyPrefix 0 } 
+
+--
+--      ALU-REMOTE-MONITORING-MIB at a glance
+-- 
+--  timetra (enterprises 6527)
+--    timetraBasedProducts (6)
+--		aluServiceAggrRouters (1)
+--        aluSARObjects (2)
+--        	aluSARMIB (1)
+--                aluSARConfs (1)
+--                aluSARObjs (2)
+--                      aluRMObjs (aluSARObjs 11)
+--                aluSARNotifyPrefix (3)
+--
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      ALU-REMOTE-MONITORING-MIB textual conventions
+--
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      AluRMAlias
+--
+AluRMAlias ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Unique alias name of a remote site alarm object.
+        
+         Note, use only NVT ASCII displayable characters
+         here, no control characters, no UTF-8, etc."
+    SYNTAX DisplayString (SIZE(0..15))
+        
+--
+--     AluRMExtAlarmID
+--
+AluRMExtAlarmID ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "An AluRMExtAlarmID is a unique 32 bit number that represents a
+        physical alarm-connector equipped on an auxiliary alarm module.  
+        This connector can be used for monitoring and management of remote 
+        site and devices.
+        
+        Encoded into the AluRMExtAlarmID is the type of connector, whether
+        this connector is for input or output, its location and number.
+                
+        Chassis Alarm-Connectors (FAN) are encoded as:
+            0001:Zero(4):Zero(4):Type(4):Zero(3):I/O(1):Alarm(12)
+        
+        Auxilary Alarm-Connectors are encoded as:
+            0001:Slot(4):MDA(4):Type(4):Zero(3):I/O(1):Alarm(12)
+        
+        Auxilary Alarms (Ports, etc..) are encoded as:
+            0001:Slot(4):MDA(4):Type(4):Zero(3):I/O(1):Alarm(12)
+
+        Invalid External-Alarm Id is encoded as:
+            0000:Zero(8):1111:Zero(16)
+            
+        where I/O = input (0) and output (1)
+              Type = digital (0), analog (1) and port (2)
+        "
+    SYNTAX  Unsigned32
+
+--
+--      AluRMAdminStatus
+--
+AluRMAdminStatus ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The administrative status of monitoring."
+    SYNTAX  INTEGER {
+                unknown    (0),
+                disabled   (1),
+                enabled    (2)
+            }
+            
+--
+--      AluRMOperStatus
+--
+AluRMOperStatus ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The operational status of monitoring.
+            unknown       - the current status is not known
+            ghost         - associated hardware is not present 
+                            or offline
+            not-monitored - monitoring is disabled
+            ok            - alarm state is ok 
+            active        - alarm detected"
+    SYNTAX  INTEGER {
+                unknown         (0),
+                ghost           (1),
+                not-monitored   (2),
+                ok              (3),
+                active          (4)
+            }
+
+--
+-- External Alarm Triggers 
+--
+aluRMTriggerTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluRMTriggerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluRMTriggerTable has an entry for each provisioned 
+         external alarm input in the system that that may be 
+         used to monitor remote-site equipment."
+    ::= { aluRMObjs 1 }
+aluRMTriggerEntry       OBJECT-TYPE
+    SYNTAX      AluRMTriggerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents a external alarm trigger.
+        
+        Rows are created and destroyed based on the provisioned hardware
+        in the system that is equipped with input alarm-connectors."
+    INDEX       { tmnxChassisIndex, aluRMTriggerID }
+    ::= { aluRMTriggerTable 1 }
+
+AluRMTriggerEntry ::=
+    SEQUENCE {
+        aluRMTriggerID                  AluRMExtAlarmID,
+        aluRMTriggerName                TNamedItemOrEmpty,
+        aluRMTriggerAdminStatus         AluRMAdminStatus,
+        aluRMTriggerOperStatus          AluRMOperStatus,
+        aluRMTriggerDescription         TItemLongDescription,
+        aluRMTriggerDetectDebounce      Unsigned32,
+        aluRMTriggerClearDebounce       Unsigned32,
+        aluRMTriggerAnalogVoltage       Integer32,
+        aluRMTriggerDigitalState        INTEGER,
+        aluRMTriggerAlias               AluRMAlias,
+        aluRMTriggerDigitalNorm         INTEGER,
+        aluRMTriggerRowStatus           RowStatus        
+   }
+
+aluRMTriggerID    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerID identifies the Remote Site Monitoring trigger. The value of
+         this object is calculated using the TiMOS encoding scheme described
+         in AluRMExtAlarmID."
+    ::= { aluRMTriggerEntry 1 }
+
+aluRMTriggerName OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The textual name of the trigger.  The value of this
+         object should be the name of the trigger as assigned by
+         the local device and should be suitable for use in commands
+         entered at the device's `console'."
+    ::= { aluRMTriggerEntry 2 }
+
+aluRMTriggerAdminStatus    OBJECT-TYPE
+    SYNTAX      AluRMAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerAdminStatus specifies whether monitoring is enabled or
+        disabled on this trigger."
+    DEFVAL      { enabled }
+    ::= { aluRMTriggerEntry 3 }
+
+aluRMTriggerOperStatus    OBJECT-TYPE
+    SYNTAX      AluRMOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerOperStatus indicates the current operational alarm status of
+        the trigger."
+    ::= { aluRMTriggerEntry 4 }
+
+aluRMTriggerDescription    OBJECT-TYPE
+    SYNTAX      TItemLongDescription
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A textual string containing user supplied information about the
+         trigger."
+    DEFVAL { ''H }
+    ::= { aluRMTriggerEntry 5 }
+
+aluRMTriggerDetectDebounce    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..60)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerDetectDebounce specifies the amount of time to debounce
+         the reporting of the triggers.  This guards against excessive 
+         reporting of trigger transitions."
+    DEFVAL      { 2 }
+    ::= { aluRMTriggerEntry 6 }
+
+aluRMTriggerClearDebounce    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..60)
+    UNITS       "seconds"
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerClearDebounce specifies the amount of time to debounce
+         the reporting of the triggers.  This guards against excessive 
+         reporting of trigger transitions."
+    DEFVAL      { 2 }
+    ::= { aluRMTriggerEntry 7 }
+
+aluRMTriggerAnalogVoltage    OBJECT-TYPE
+    SYNTAX      Integer32 
+    UNITS       "millivoltage"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerAnalogVoltage indicates the current voltage on analog
+        triggers."
+    ::= { aluRMTriggerEntry 8 }
+
+aluRMTriggerDigitalState    OBJECT-TYPE
+    SYNTAX      INTEGER {
+    				unknown        (0),
+    				closed         (1),
+    				open           (2)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerDigitalState indicates the current contact state on 
+        digital triggers."
+    ::= { aluRMTriggerEntry 9 }
+    
+aluRMTriggerAlias OBJECT-TYPE
+    SYNTAX      AluRMAlias
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerAlias is a unique name that identifies the trigger."
+    ::= { aluRMTriggerEntry 10 }
+
+aluRMTriggerDigitalNorm    OBJECT-TYPE
+    SYNTAX      INTEGER {
+    				unknown         (0),
+    				normally-closed (1),
+    				normally-open   (2)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMTriggerDigitalNorm indicates the normal contact state of 
+        digital triggers."
+    ::= { aluRMTriggerEntry 11 }
+
+aluRMTriggerRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-write
+    STATUS          current
+    DESCRIPTION     "aluRMTriggerRowStatus specifies the status of this row.
+
+                     Only auxilary alarm triggers (Ports.. etc) can be created
+                     and destroyed."
+
+    ::= { aluRMTriggerEntry 12 }
+
+--
+-- Remote-Monitoring Relays 
+--
+aluRMRelayTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluRMRelayEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluRMRelayTable has an entry for each provisioned 
+         output relay connector in the system that that may be 
+         used to control remote-site equipment."
+    ::= { aluRMObjs 2 }
+aluRMRelayEntry       OBJECT-TYPE
+    SYNTAX      AluRMRelayEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents a remote-monitoring output
+        relay.
+        
+        Rows are created and destroyed based on the provisioned hardware
+        in the system that is equipped with relay-connectors."
+    INDEX       { tmnxChassisIndex, aluRMRelayID }
+    ::= { aluRMRelayTable 1 }
+
+AluRMRelayEntry ::=
+    SEQUENCE {
+        aluRMRelayID                    AluRMExtAlarmID,
+        aluRMRelayName                  TNamedItemOrEmpty,
+        aluRMRelayMode                  INTEGER,
+        aluRMRelayAdminStatus           AluRMAdminStatus,
+        aluRMRelayOperStatus            AluRMOperStatus,
+        aluRMRelayDescription           TItemLongDescription,
+        aluRMRelayAlias                 AluRMAlias
+   }
+
+aluRMRelayID    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluRMRelayID identifies an output relay. The value of
+         this object is calculated using the TiMOS encoding scheme described
+         in AluRMExtAlarmID."
+    ::= { aluRMRelayEntry 1 }
+
+aluRMRelayName OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The textual name of the relay.  The value of this
+         object should be the name of the relay as assigned by
+         the local device and should be suitable for use in commands
+         entered at the device's `console'."
+    ::= { aluRMRelayEntry 2 }
+
+aluRMRelayMode    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    continuous (1),
+                    triggered  (2)
+                 }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMRelayMode specifies the mode that the relay will operate in.
+        When a relay is in 'continuous' mode it will be always active when 
+        it is not administratively disabled using aluRMTriggerAdminStatus.
+        When a relay is in 'triggered' mode it will only become active 
+        when triggered by a remote-monitoring alarm condition."
+    DEFVAL      { continuous }
+    ::= { aluRMRelayEntry 3 }
+
+aluRMRelayAdminStatus    OBJECT-TYPE
+    SYNTAX      AluRMAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMRelayAdminStatus specifies the administrative status of this
+        relay."
+    DEFVAL      { enabled }
+    ::= { aluRMRelayEntry 4 }
+
+aluRMRelayOperStatus    OBJECT-TYPE
+    SYNTAX      AluRMOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluRMRelayOperStatus indicates the current operational alarm status of
+        the relay."
+    ::= { aluRMRelayEntry 5 }
+
+aluRMRelayDescription    OBJECT-TYPE
+    SYNTAX      TItemLongDescription
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "A textual string containing user supplied information about the
+         relay."
+    DEFVAL { ''H }
+    ::= { aluRMRelayEntry 6 }
+    
+aluRMRelayAlias OBJECT-TYPE
+    SYNTAX      AluRMAlias
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "aluRMRelayAlias is a unique name that identifies the relay."
+    ::= { aluRMRelayEntry 7 }
+
+--
+-- Remote Site Monitoring Alarms 
+--
+aluRMAlarmTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluRMAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluRMAlarmTable contains information about each Alarm condition
+        being monitored by Remote Site Monitoring."
+    ::= { aluRMObjs 3 }
+aluRMAlarmEntry       OBJECT-TYPE
+    SYNTAX      AluRMAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry represents a Remote Site Monitoring Alarm."
+    INDEX       { tmnxChassisIndex, aluRMAlarmID }
+    ::= { aluRMAlarmTable 1 }
+
+AluRMAlarmEntry ::=
+    SEQUENCE {
+        aluRMAlarmID                    Unsigned32,
+        aluRMAlarmRowStatus             RowStatus,
+        aluRMAlarmAdminStatus           AluRMAdminStatus,
+        aluRMAlarmOperStatus            AluRMOperStatus,
+        aluRMAlarmDescription           TItemLongDescription,
+        aluRMAlarmTriggerRule           INTEGER,
+        aluRMAlarmTrigger1              AluRMExtAlarmID,
+        aluRMAlarmTrigger2              AluRMExtAlarmID,
+        aluRMAlarmTrigger3              AluRMExtAlarmID,
+        aluRMAlarmTrigger4              AluRMExtAlarmID,
+        aluRMAlarmTrigger5              AluRMExtAlarmID,
+        aluRMAlarmTrigger6              AluRMExtAlarmID,
+        aluRMAlarmTrigger7              AluRMExtAlarmID,
+        aluRMAlarmTrigger8              AluRMExtAlarmID,
+        aluRMAlarmSeverity              INTEGER,
+        aluRMAlarmActionLog             TruthValue,
+        aluRMAlarmActionAlarmRelay      TruthValue,
+        aluRMAlarmActionAuxRelay        TruthValue,
+        aluRMAlarmAuxRelay              AluRMExtAlarmID,
+        aluRMAlarmDetectedTriggers      Unsigned32,
+        aluRMAlarmTHAnalogLevelOperation INTEGER,
+        aluRMAlarmTHAnalogLevel         INTEGER        
+   }
+
+aluRMAlarmID    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmID identifies the Remote Site Monitoring Alarm."
+    ::= { aluRMAlarmEntry 1 }
+
+aluRMAlarmRowStatus OBJECT-TYPE
+    SYNTAX          RowStatus
+    MAX-ACCESS      read-create
+    STATUS          current
+    DESCRIPTION     "aluRMAlarmRowStatus specifies the status of this row.
+
+                     To delete an entry from this table, the alarm must
+                     be adminstatively disabled."
+
+    ::= { aluRMAlarmEntry 2 }
+
+aluRMAlarmAdminStatus    OBJECT-TYPE
+    SYNTAX      AluRMAdminStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmAdminStatus specifies the administrative status of this
+        alarm."
+    DEFVAL      { disabled }
+    ::= { aluRMAlarmEntry 3 }
+
+aluRMAlarmOperStatus    OBJECT-TYPE
+    SYNTAX      AluRMOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmOperStatus indicates the current operational status of
+        the alarm."
+    ::= { aluRMAlarmEntry 4 }
+
+aluRMAlarmDescription    OBJECT-TYPE
+    SYNTAX      TItemLongDescription
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A textual string containing user supplied information about the
+         alarm.  This description is used as part of the log event generated
+         by the "
+    DEFVAL { ''H }
+    ::= { aluRMAlarmEntry 5 }
+
+aluRMAlarmTriggerRule  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    any-trigger   (1),
+                    all-triggers  (2)
+                 }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTriggerRule specifies the rule used by Remote-Monitoring
+        to determine if the criteria has been met to raise or clear this
+        alarm. 
+        A value of 'any-trigger' means that the alarm is raised when
+        any trigger occurs and is not cleared until no triggers are detected.
+        A value of 'all-triggers' means that the alarm will not be raised
+        unless all enabled triggers are detected.  The alarm is cleared as 
+        soon as some triggers are no longer detected."
+    DEFVAL      { any-trigger }
+    ::= { aluRMAlarmEntry 6 }
+
+aluRMAlarmTrigger1    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger1 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 7 }
+
+aluRMAlarmTrigger2    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger2 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 8 }
+
+aluRMAlarmTrigger3    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger3 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 9 }
+
+aluRMAlarmTrigger4    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger4 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 10 }
+
+aluRMAlarmTrigger5    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger5 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 11 }
+
+aluRMAlarmTrigger6    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger6 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 12 }
+
+aluRMAlarmTrigger7    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger7 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 13 }
+
+aluRMAlarmTrigger8    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTrigger8 identifies a trigger for this alarm."
+    ::= { aluRMAlarmEntry 14 }
+
+aluRMAlarmSeverity  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    -- none (0),
+                    -- cleared (1),
+                    -- indeterminate (2),
+                    critical (3),
+                    major (4),
+                    minor (5),
+                    warning (6)
+                 }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmSeverity specifies the severity of this alarm."
+    DEFVAL      { major }
+    ::= { aluRMAlarmEntry 15 }
+    
+aluRMAlarmActionLog  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmActionLog specifies if a log event is generated as a
+        result of this alarm."
+    DEFVAL      { true }
+    ::= { aluRMAlarmEntry 16 }
+
+aluRMAlarmActionAlarmRelay  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmActionAlarmRelay specifies if the alarm LEDs and 
+        alarm output relays located on the chassis are updated as a
+        result of this alarm."
+    DEFVAL      { true }
+    ::= { aluRMAlarmEntry 17 }
+
+aluRMAlarmActionAuxRelay  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmActionAuxRelay specifies if an auxiliary alarm
+        relay is triggered/controlled as a result of this alarm.
+        
+        This object must be set with aluRMAlarmAuxRelay"
+    DEFVAL      { false }
+    ::= { aluRMAlarmEntry 18 }
+
+aluRMAlarmAuxRelay    OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmAuxRelay identifies the relay that is triggered/
+        controlled by this alarm when aluRMAlarmActionAuxRelay is 
+        set to 'true'."
+    ::= { aluRMAlarmEntry 19 }
+
+aluRMAlarmDetectedTriggers  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmDetectedTriggers is a bitmask that identifies the 
+        currently detected triggers on this alarm. The bitmask is 
+        based on the trigger index assigned."
+    ::= { aluRMAlarmEntry 20 }
+
+
+aluRMAlarmTHAnalogLevelOperation    OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    not-monitored (0),
+                    greater-than (1),
+                    less-than (2)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTHAnalogLevelOperation indicates the operation to be 
+        performed to determine if aluRMAlarmTHAnalogLevel is crossed.
+        
+        The operation can not be 'not-monitored' while there are analog
+        triggers configured for the alarm.  The default value is 
+        'greater-than' when analog triggers are configured for the alarm."
+    DEFVAL		{ not-monitored }
+    ::= { aluRMAlarmEntry 21 }
+
+aluRMAlarmTHAnalogLevel    OBJECT-TYPE
+    SYNTAX      INTEGER (0..75000)
+    UNITS       "millivolts"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluRMAlarmTHAnalogLevel indicates the analog voltage threshold of
+        all analog triggers of this alarm."
+    DEFVAL		{ 0 }
+    ::= { aluRMAlarmEntry 22 }
+
+    
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ --
+ --     Notification Definition section
+ --
+ --                     Notification Objects
+ --
+ --
+ --  Remote-Monitoring Notification Objects
+ --
+
+aluRMAlarmNotifyID  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "Used by RM Alarm Notifications, the OID indicates the
+         alarm identifier."
+    ::= { aluRMNotifyObjs 1 }
+
+aluRMAlarmNotifyDescription    OBJECT-TYPE
+    SYNTAX      TItemLongDescription
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "A textual string containing user supplied information about the
+         alarm."
+    ::= { aluRMNotifyObjs 2 }
+
+aluRMNotifyID  OBJECT-TYPE
+    SYNTAX      AluRMExtAlarmID
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "Used by RM Oper Notifications, the OID indicates the
+         trigger or relay identifier."
+    ::= { aluRMNotifyObjs 3 }
+
+aluRMNotifyOperState  OBJECT-TYPE
+    SYNTAX      AluRMOperStatus
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "Used by RM Oper Notifications, the OID indicates the
+         trigger or relay oper state."
+    ::= { aluRMNotifyObjs 4 }
+ 
+aluRMCriticalAlarm         NOTIFICATION-TYPE
+    OBJECTS {
+        aluRMAlarmNotifyID,
+        aluRMAlarmNotifyDescription,
+        aluRMAlarmDetectedTriggers
+        
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when remote-monitoring detects a change for a critical
+        alarm."
+    ::= { aluRMNotification 1 }
+
+aluRMMajorAlarm         NOTIFICATION-TYPE
+    OBJECTS {
+        aluRMAlarmNotifyID,
+        aluRMAlarmNotifyDescription,
+        aluRMAlarmDetectedTriggers
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when remote-monitoring detects a change for a major
+        alarm."
+    ::= { aluRMNotification 2 }
+
+aluRMMinorAlarm         NOTIFICATION-TYPE
+    OBJECTS {
+        aluRMAlarmNotifyID,
+        aluRMAlarmNotifyDescription,
+        aluRMAlarmDetectedTriggers
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when remote-monitoring detects a change for a minor
+        alarm."
+    ::= { aluRMNotification 3 }
+
+aluRMWarningAlarm         NOTIFICATION-TYPE
+    OBJECTS {
+        aluRMAlarmNotifyID,
+        aluRMAlarmNotifyDescription,
+        aluRMAlarmDetectedTriggers
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when remote-monitoring detects a change for a
+        warning alarm."
+    ::= { aluRMNotification 4 }
+
+aluRMClearingAlarm         NOTIFICATION-TYPE
+    OBJECTS {
+        aluRMAlarmNotifyID,
+        aluRMAlarmNotifyDescription,
+        aluRMAlarmDetectedTriggers
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when remote-monitoring detects the clearing
+        of an alarm."
+    ::= { aluRMNotification 5 }
+
+aluRMOperStateUpdate      NOTIFICATION-TYPE
+    OBJECTS {
+        aluRMNotifyID,
+        aluRMNotifyOperState
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when triggers or relays change operational state."
+    ::= { aluRMNotification 6 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      The compliance specifications.
+--
+
+aluRMCompliances     OBJECT IDENTIFIER ::= { aluRMConformance 1 }
+aluRMGroups          OBJECT IDENTIFIER ::= { aluRMConformance 2 }
+
+aluRMComp7705        OBJECT IDENTIFIER ::= { aluRMCompliances 1 }
+--  aluRMComp7705V1v0  OBJECT IDENTIFIER ::= { aluRMComp7705 1}
+
+aluRMComp7705V1v0  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for revision 1.0 of 
+             ALU-REMOTE-MONITORING-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluRMGroup,
+            aluRMNotificationGroup
+        }
+    ::= { aluRMComp7705 1 }
+
+
+-- units of conformance
+
+aluRMGroup     OBJECT-GROUP
+    OBJECTS {  aluRMTriggerName,
+               aluRMTriggerAdminStatus,
+               aluRMTriggerOperStatus,
+               aluRMTriggerDescription,
+               aluRMTriggerDetectDebounce,
+               aluRMTriggerClearDebounce,
+               aluRMTriggerAnalogVoltage,
+               aluRMTriggerDigitalState,
+               aluRMTriggerAlias,
+               aluRMRelayName,
+               aluRMRelayMode,
+               aluRMRelayAdminStatus,
+               aluRMRelayOperStatus,
+               aluRMRelayDescription,
+               aluRMRelayAlias,
+               aluRMAlarmRowStatus,
+               aluRMAlarmAdminStatus,
+               aluRMAlarmOperStatus,
+               aluRMAlarmDescription,
+               aluRMAlarmTriggerRule,
+               aluRMAlarmTrigger1,
+               aluRMAlarmTrigger2,
+               aluRMAlarmTrigger3,
+               aluRMAlarmTrigger4,
+               aluRMAlarmTrigger5,
+               aluRMAlarmTrigger6,
+               aluRMAlarmTrigger7,
+               aluRMAlarmTrigger8,
+               aluRMAlarmSeverity,
+               aluRMAlarmActionLog,
+               aluRMAlarmActionAlarmRelay,
+               aluRMAlarmActionAuxRelay,
+               aluRMAlarmAuxRelay,
+               aluRMAlarmDetectedTriggers,
+               aluRMAlarmTHAnalogLevelOperation,
+               aluRMAlarmTHAnalogLevel
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of the Remote Site
+        Monitoring and Control on Nokia SAR series systems."
+    ::= { aluRMGroups 1 }
+
+aluRMNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   {   aluRMCriticalAlarm,
+                        aluRMMajorAlarm,
+                        aluRMMinorAlarm,
+                        aluRMWarningAlarm,
+                        aluRMClearingAlarm,
+                        aluRMOperStateUpdate
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of Remote Site
+         Monitoring and Conrol on Nokia SAR series systems."
+    ::= { aluRMGroups 2 }
+
+aluRMNotificationObjsGroup OBJECT-GROUP
+    OBJECTS         {   aluRMAlarmNotifyID,
+                        aluRMAlarmNotifyDescription,
+                        aluRMNotifyID,
+                        aluRMNotifyOperState
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications objs supporting the management of Remote Site
+         Monitoring and Conrol on Nokia SAR series systems."
+    ::= { aluRMGroups 3 }
+
+aluRMDigitalGroup     OBJECT-GROUP
+    OBJECTS       {  aluRMTriggerDigitalNorm
+                  }
+    STATUS        current
+    DESCRIPTION
+        "The group of objects supporting the management of Remote Site
+         Monitoring and Conrol on Digital Inputs for Nokia SAR series systems."
+    ::= { aluRMGroups 4 }
+
+aluRMAuxTriggerGroup     OBJECT-GROUP
+    OBJECTS {  aluRMTriggerRowStatus
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of the Auxilary 
+        Monitoring and Control on Nokia SAR series systems."
+    ::= { aluRMGroups 5 }
+
+END

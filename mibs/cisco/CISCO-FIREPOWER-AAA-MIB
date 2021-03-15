@@ -4,9 +4,9 @@
 -- MIB representation of the Cisco Firepower
 -- AAA management information model package
 -- 
--- Created March 2019 by Charles Bullis
+-- Created March 2020 by Charles Bullis
 -- 
--- Copyright (c) 2005-2019 Cisco Systems, Inc. All rights reserved.
+-- Copyright (c) 2005-2020 Cisco Systems, Inc. All rights reserved.
 -- 
 -- *********************************************************************
 
@@ -52,6 +52,7 @@ IMPORTS
     CfprAaaAuthRealmFsmCurrentFsm,
     CfprAaaAuthRealmFsmStageName,
     CfprAaaCimcSessionType,
+    CfprAaaCipherMode,
     CfprAaaClear,
     CfprAaaConfigState,
     CfprAaaDomainAuthRealm,
@@ -99,7 +100,7 @@ IMPORTS
         FROM CISCO-FIREPOWER-TC-MIB;
 
 cfprAaaObjects MODULE-IDENTITY
-    LAST-UPDATED    "201903120000Z"
+    LAST-UPDATED    "202003100000Z"
     ORGANIZATION    "Cisco Systems Inc."
     CONTACT-INFO
         "Cisco Systems
@@ -2770,7 +2771,9 @@ CfprAaaLdapProviderEntry ::= SEQUENCE {
     cfprAaaLdapProviderTimeout                                       Gauge32,
     cfprAaaLdapProviderVendor                                        CfprAaaLdapVendor,
     cfprAaaLdapProviderKeyring                                       SnmpAdminString,
-    cfprAaaLdapProviderRevokePolicy                                  CfprAaaRevokePolicy
+    cfprAaaLdapProviderRevokePolicy                                  CfprAaaRevokePolicy,
+    cfprAaaLdapProviderCipher                                        SnmpAdminString,
+    cfprAaaLdapProviderCiphermode                                    CfprAaaCipherMode
 }
 
 cfprAaaLdapProviderInstanceId OBJECT-TYPE
@@ -2935,6 +2938,23 @@ cfprAaaLdapProviderRevokePolicy OBJECT-TYPE
         "Cisco Firepower aaa:LdapProvider:revokePolicy
         managed object property"
     ::= { cfprAaaLdapProviderEntry 20 }
+
+cfprAaaLdapProviderCipher OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:LdapProvider:cipher managed object property"
+    ::= { cfprAaaLdapProviderEntry 21 }
+
+cfprAaaLdapProviderCiphermode OBJECT-TYPE
+    SYNTAX       CfprAaaCipherMode
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:LdapProvider:ciphermode managed
+        object property"
+    ::= { cfprAaaLdapProviderEntry 22 }
 
 cfprAaaLocaleTable OBJECT-TYPE
     SYNTAX           SEQUENCE OF CfprAaaLocaleEntry
@@ -3754,7 +3774,10 @@ CfprAaaPwdProfileEntry ::= SEQUENCE {
     cfprAaaPwdProfileName                                            SnmpAdminString,
     cfprAaaPwdProfileNoChangeInterval                                Gauge32,
     cfprAaaPwdProfilePolicyLevel                                     Gauge32,
-    cfprAaaPwdProfilePolicyOwner                                     CfprPolicyPolicyOwner
+    cfprAaaPwdProfilePolicyOwner                                     CfprPolicyPolicyOwner,
+    cfprAaaPwdProfileExpirationDays                                  Gauge32,
+    cfprAaaPwdProfileExpirationGracePeriod                           Gauge32,
+    cfprAaaPwdProfileReuseTime                                       Gauge32
 }
 
 cfprAaaPwdProfileInstanceId OBJECT-TYPE
@@ -3876,6 +3899,32 @@ cfprAaaPwdProfilePolicyOwner OBJECT-TYPE
         "Cisco Firepower aaa:PwdProfile:policyOwner managed
         object property"
     ::= { cfprAaaPwdProfileEntry 14 }
+
+cfprAaaPwdProfileExpirationDays OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:PwdProfile:expirationDays
+        managed object property"
+    ::= { cfprAaaPwdProfileEntry 15 }
+
+cfprAaaPwdProfileExpirationGracePeriod OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:PwdProfile:expirationGracePeriod
+        managed object property"
+    ::= { cfprAaaPwdProfileEntry 16 }
+
+cfprAaaPwdProfileReuseTime OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:PwdProfile:reuseTime managed object property"
+    ::= { cfprAaaPwdProfileEntry 17 }
 
 cfprAaaRadiusEpTable OBJECT-TYPE
     SYNTAX           SEQUENCE OF CfprAaaRadiusEpEntry
@@ -6403,7 +6452,8 @@ CfprAaaUserEntry ::= SEQUENCE {
     cfprAaaUserPwd                                                   SnmpAdminString,
     cfprAaaUserPwdLifeTime                                           Gauge32,
     cfprAaaUserPwdSet                                                TruthValue,
-    cfprAaaUserClearLockStatus                                       CfprAaaClear
+    cfprAaaUserClearLockStatus                                       CfprAaaClear,
+    cfprAaaUserPwdExpDate                                            DateAndTime
 }
 
 cfprAaaUserInstanceId OBJECT-TYPE
@@ -6582,6 +6632,14 @@ cfprAaaUserClearLockStatus OBJECT-TYPE
     DESCRIPTION
         "Cisco Firepower aaa:User:clearLockStatus managed object property"
     ::= { cfprAaaUserEntry 22 }
+
+cfprAaaUserPwdExpDate OBJECT-TYPE
+    SYNTAX       DateAndTime
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:User:pwdExpDate managed object property"
+    ::= { cfprAaaUserEntry 23 }
 
 cfprAaaUserDataTable OBJECT-TYPE
     SYNTAX           SEQUENCE OF CfprAaaUserDataEntry
@@ -7416,6 +7474,119 @@ cfprAaaUserLoginInfoNumSuccessLogin OBJECT-TYPE
         "Cisco Firepower aaa:UserLoginInfo:numSuccessLogin
         managed object property"
     ::= { cfprAaaUserLoginInfoEntry 5 }
+
+cfprAaaUserOldPwdTable OBJECT-TYPE
+    SYNTAX           SEQUENCE OF CfprAaaUserOldPwdEntry
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd managed object table"
+    ::= { cfprAaaObjects 61 }
+
+cfprAaaUserOldPwdEntry OBJECT-TYPE
+    SYNTAX           CfprAaaUserOldPwdEntry
+    MAX-ACCESS       not-accessible
+    STATUS           current
+    DESCRIPTION
+        "Entry for the cfprAaaUserOldPwdTable table."
+    INDEX { cfprAaaUserOldPwdInstanceId }
+    ::= { cfprAaaUserOldPwdTable 1 }
+
+CfprAaaUserOldPwdEntry ::= SEQUENCE {
+    cfprAaaUserOldPwdInstanceId                                      CfprManagedObjectId,
+    cfprAaaUserOldPwdDn                                              CfprManagedObjectDn,
+    cfprAaaUserOldPwdRn                                              SnmpAdminString,
+    cfprAaaUserOldPwdDescr                                           SnmpAdminString,
+    cfprAaaUserOldPwdEncPwd                                          SnmpAdminString,
+    cfprAaaUserOldPwdIntId                                           SnmpAdminString,
+    cfprAaaUserOldPwdName                                            SnmpAdminString,
+    cfprAaaUserOldPwdPolicyLevel                                     Gauge32,
+    cfprAaaUserOldPwdPolicyOwner                                     CfprPolicyPolicyOwner,
+    cfprAaaUserOldPwdPwdEndDate                                      DateAndTime
+}
+
+cfprAaaUserOldPwdInstanceId OBJECT-TYPE
+    SYNTAX       CfprManagedObjectId
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Instance identifier of the managed object."
+    ::= { cfprAaaUserOldPwdEntry 1 }
+
+cfprAaaUserOldPwdDn OBJECT-TYPE
+    SYNTAX       CfprManagedObjectDn
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:dn managed object property"
+    ::= { cfprAaaUserOldPwdEntry 2 }
+
+cfprAaaUserOldPwdRn OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:rn managed object property"
+    ::= { cfprAaaUserOldPwdEntry 3 }
+
+cfprAaaUserOldPwdDescr OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:descr managed object property"
+    ::= { cfprAaaUserOldPwdEntry 4 }
+
+cfprAaaUserOldPwdEncPwd OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:encPwd managed object property"
+    ::= { cfprAaaUserOldPwdEntry 5 }
+
+cfprAaaUserOldPwdIntId OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:intId managed object property"
+    ::= { cfprAaaUserOldPwdEntry 6 }
+
+cfprAaaUserOldPwdName OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:name managed object property"
+    ::= { cfprAaaUserOldPwdEntry 7 }
+
+cfprAaaUserOldPwdPolicyLevel OBJECT-TYPE
+    SYNTAX       Gauge32
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:policyLevel managed
+        object property"
+    ::= { cfprAaaUserOldPwdEntry 8 }
+
+cfprAaaUserOldPwdPolicyOwner OBJECT-TYPE
+    SYNTAX       CfprPolicyPolicyOwner
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:policyOwner managed
+        object property"
+    ::= { cfprAaaUserOldPwdEntry 9 }
+
+cfprAaaUserOldPwdPwdEndDate OBJECT-TYPE
+    SYNTAX       DateAndTime
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "Cisco Firepower aaa:UserOldPwd:pwdEndDate managed
+        object property"
+    ::= { cfprAaaUserOldPwdEntry 10 }
 
 cfprAaaUserRoleTable OBJECT-TYPE
     SYNTAX           SEQUENCE OF CfprAaaUserRoleEntry

@@ -1,0 +1,1690 @@
+ALU-QOS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        Unsigned32, Integer32                   FROM SNMPv2-SMI
+
+        MODULE-COMPLIANCE, OBJECT-GROUP         FROM SNMPv2-CONF
+
+        TEXTUAL-CONVENTION, RowStatus,
+        TimeStamp                               FROM SNMPv2-TC
+        
+        TBurstSizeBytes,
+        TBurstSize, TBurstPercentOrDefault,
+        TNamedItem, TPolicyID, TQueueId,
+        TCIRRate, TPIRRate,
+        TItemDescription,
+        TRateType                             FROM TIMETRA-TC-MIB
+          
+        aluSARMIBModules,
+        aluSARObjs,aluSARConfs                  FROM ALU-SAR-GLOBAL-MIB
+        
+        tSapIngressEntry,
+        tSapIngressQueueEntry,
+        tSapEgressQueueEntry,
+        tNetworkQueuePolicyEntry,
+        tNetworkQueueEntry,
+        tNetworkPolicyEntry,
+        tNetworkIngressDot1pEntry,
+        tSapEgressEntry                         FROM TIMETRA-QOS-MIB
+        ;
+
+aluQOSMIBModule MODULE-IDENTITY
+        LAST-UPDATED    "0801010000Z"
+        ORGANIZATION    "Nokia"
+        CONTACT-INFO    
+            "Nokia 7x50 Support
+             Web: http://www.nokia.com/comps/pages/carrier_support.jhtml"
+        DESCRIPTION
+        "This document is the SNMP MIB module to manage and provision the 
+        hardware components of the Nokia 7x50 device.
+        
+        Copyright 2003-2015 Nokia.  All rights reserved.
+        Reproduction of this document is authorized on the condition that
+        the foregoing copyright notice is included.
+
+        This SNMP MIB module (Specification) embodies Nokia's
+        proprietary intellectual property.  Nokia retains 
+        all title and ownership in the Specification, including any 
+        revisions.
+
+        Nokia grants all interested parties a non-exclusive 
+        license to use and distribute an unmodified copy of this 
+        Specification in connection with management of Nokia 
+        products, and without fee, provided this copyright notice and 
+        license appear on all copies.
+
+        This Specification is supplied 'as is', and Nokia 
+        makes no warranty, either express or implied, as to the use, 
+        operation, condition, or performance of the Specification."
+
+--
+--  Revision History
+--
+        REVISION        "0801240000Z"
+        DESCRIPTION     "Rev 1.0                24 Jan 2008 00:00 
+                         1.0 release of the ALU-QOS-MIB."
+
+        ::= { aluSARMIBModules 3 }
+
+aluQOSObjs              OBJECT IDENTIFIER ::= { aluSARObjs 5 }
+
+aluQOSConformance       OBJECT IDENTIFIER ::= { aluSARConfs 5 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      ALU-QOS-MIB textual conventions
+--
+
+AluIPsecStatsQueueId ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Id to uniquely describe a queue used for security traffic."
+         
+    SYNTAX       INTEGER {
+                     notUsed(0),
+                     ipsec-decrypt-bestEffort(1),
+                     ipsec-decrypt-expedited(2),
+                     ipsec-encrypt-bestEffort(3),
+                     ipsec-encrypt-expedited(4)    
+                 }
+                 
+AluSecQueueId ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Id to uniquely describe a queue used for security traffic."
+         
+    SYNTAX       INTEGER {
+                     notUsed(0),
+                     bestEffort(1),
+                     expedited(2)
+                 }
+                 AluFabricProfilePolicyID ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "The identification number of a Fabric Profile policy."
+    SYNTAX TPolicyID (1..256)
+
+AluFabricProfileMode ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "The mode in which the Fabric Profile is operating.
+
+         If the Profile is operating in the 'aggregate' mode, only 1
+         rate is provided as 'aluFabricProfileAggregateRate', while other rates
+         'aluFabricProfileRateToMdaIndex1' to 'aluFabricProfileRateToMdaIndex32'
+         are not used.  The 'aggregate' mode fabric profile is to provide the 
+         rate of all traffic to be sent from the source MDA toward the fabric, 
+         regardless of which destination MDA.
+
+         If the Profile is operating in the 'destination' mode, rates in
+         'aluFabricProfileRateToMdaIndex1' to 'aluFabricProfileRateToMdaIndex32'
+         are used to specify specific rate coming into the fabric, to a specific
+         destination MDA. "
+         
+    SYNTAX       INTEGER {
+                     aggregate(1),
+                     destination(2)
+                 }
+ 
+AluFabricProfileDestMdaRate ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "The Fabric Shaping rate, in kbp/sec. "
+    SYNTAX Unsigned32 (1..10000000)
+    
+AluSapSchedulerCir ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "The Fabric Shaping rate, in kbp/sec. "
+    SYNTAX      Integer32 (-1 | 0..10000000) 
+    
+AluSystemAggregateRate ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "The aggregate shaping rate, in kbp/sec."
+    SYNTAX Unsigned32 (0..10000000)
+
+AluExtNetworkPolicyType  ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "Network policy type"
+    SYNTAX INTEGER { default(0), ipInterface(1), ring(2) }
+
+AluPerPacketOffset ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "The value, in bytes, of the adjustment relative to the size of the packet on
+        the line for accounting and scheduling.  With the exception of 127 (0x7f), only
+        even integer within the range from -62 to 62 are accepted.
+        
+        When AluPerPacketOffset is 127, the size of the packet in the queue is used for
+        accounting and scheduling, which is the legacy behaviour of Nokia 7705
+        prior to the existence of AluPerPacketOffset."
+
+    SYNTAX Integer32 (-62..62 | 127)
+    
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      ALU-PORT-MIB at a glance
+-- 
+--  timetra (enterprises 6527)
+--    timetraBasedProducts (6)
+--        aluServiceAggrRouters (1)
+--        aluSARObjects (2)
+--            aluSARMIB (1)
+--            aluSARConfs (1)
+--              aluQOSMIBConformance(5)
+--            aluSARObjs (2)
+--              aluQosObjs (5)
+--                
+--
+
+--
+-- sap-ingress policy queue table
+--
+
+aluSapIngressQueueExtensionTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluSapIngressQueueExtensionEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about the Nokia 7705 SAR extensions to the 
+        sap-ingress policies queues table tSapIngressQueueTable.
+        "
+    ::= { aluQOSObjs 1 }
+
+    aluSapIngressQueueExtensionEntry OBJECT-TYPE
+        SYNTAX       AluSapIngressQueueExtensionEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the extensions of a particular queue 
+            for a sap-ingress policy entry tSapIngressQueueEntry."
+        AUGMENTS  { tSapIngressQueueEntry }
+        ::= { aluSapIngressQueueExtensionTable 1 }
+
+    AluSapIngressQueueExtensionEntry ::= SEQUENCE
+    {
+        aluSapIngressQueueSlopePolicy      TNamedItem,
+        aluSapIngressQueuePktOffset        AluPerPacketOffset
+    }
+
+    aluSapIngressQueueSlopePolicy OBJECT-TYPE
+        SYNTAX      TNamedItem
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "aluSapIngressQueueSlopePolicy specifies the slope policy being used for 
+            this queue. The Slope policies define the nature of the RED Slopes for 
+            the high and the low priority traffic."
+        DEFVAL { "default" }   
+        ::= { aluSapIngressQueueExtensionEntry 1 }
+    
+    aluSapIngressQueuePktOffset OBJECT-TYPE
+        SYNTAX      AluPerPacketOffset
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The value of aluSapIngressQueuePktOffset specifies the per packet byte
+             offset for this queue."
+        DEFVAL { 127 }   
+        ::= { aluSapIngressQueueExtensionEntry 2 }
+
+aluSapEgressQueueExtensionTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluSapEgressQueueExtensionEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about the Nokia 7705 SAR extensions to the 
+        sap-Egress policies queues table tSapIngressQueueTable.
+        "
+    ::= { aluQOSObjs 2 }
+
+    aluSapEgressQueueExtensionEntry OBJECT-TYPE
+        SYNTAX       AluSapEgressQueueExtensionEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the extensions of a particular queue 
+            for a sap-egress policy entry tSapIngressQueueEntry."
+        AUGMENTS  { tSapEgressQueueEntry }
+        ::= { aluSapEgressQueueExtensionTable 1 }
+
+    AluSapEgressQueueExtensionEntry ::= SEQUENCE
+    {
+        aluSapEgressQueueSlopePolicy      TNamedItem,
+        aluSapEgressQueuePktOffset        AluPerPacketOffset
+    }
+
+    aluSapEgressQueueSlopePolicy OBJECT-TYPE
+        SYNTAX      TNamedItem
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "aluSapEgressQueueSlopePolicy specifies the slope policy being used for 
+            this queue. The Slope policies define the nature of the RED Slopes for 
+            the high and the low priority traffic."
+        DEFVAL { "default" }   
+        ::= { aluSapEgressQueueExtensionEntry 1 }
+        
+    aluSapEgressQueuePktOffset OBJECT-TYPE
+        SYNTAX      AluPerPacketOffset
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The value of aluSapEgressQueuePktOffset specifies the per packet byte
+             offset for this queue."
+        DEFVAL { 127 }   
+        ::= { aluSapEgressQueueExtensionEntry 2 }
+
+--
+-- Network Queue table
+--
+aluNetworkQueueExtensionTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF AluNetworkQueueExtensionEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the Nokia 7705 SAR extensions to the 
+            network queue policies queues table tNetworkQueueTable."
+        ::= { aluQOSObjs 3 }
+
+    aluNetworkQueueExtensionEntry OBJECT-TYPE
+        SYNTAX       AluNetworkQueueExtensionEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the extensions of a particular queue 
+            for a network queue policy entry tNetworkQueueEntry."
+        AUGMENTS  { tNetworkQueueEntry }
+        ::= { aluNetworkQueueExtensionTable 1 }
+
+    AluNetworkQueueExtensionEntry ::= SEQUENCE
+    {
+        aluNetworkQueueSlopePolicy      TNamedItem,
+        aluNetworkQueuePktOffset        AluPerPacketOffset
+    }
+
+    aluNetworkQueueSlopePolicy OBJECT-TYPE
+        SYNTAX      TNamedItem
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "aluNetworkQueueSlopePolicy specifies the slope policy being used for 
+            this queue. The Slope policies define the nature of the RED Slopes for 
+            the high and the low priority traffic."
+        DEFVAL { "default" }   
+        ::= { aluNetworkQueueExtensionEntry 1 }
+        
+    aluNetworkQueuePktOffset OBJECT-TYPE
+        SYNTAX      AluPerPacketOffset
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The value of aluNetworkQueuePktOffset specifies the per packet byte
+             offset for this queue."
+        DEFVAL { 127 }   
+        ::= { aluNetworkQueueExtensionEntry 2 }
+        
+--
+-- Fabric Profile table
+--
+
+aluFabricProfileTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluFabricProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION   
+        "This table contains information about Fabric profile."
+    ::= { aluQOSObjs 4 }
+  
+aluFabricProfileEntry OBJECT-TYPE
+    SYNTAX      AluFabricProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the aluFabricProfileTable contains information
+        in a fabric shaping policy."
+    INDEX { aluFabricProfileIndex }
+    ::= { aluFabricProfileTable 1 }
+
+AluFabricProfileEntry ::= SEQUENCE
+    {
+        aluFabricProfileIndex                   AluFabricProfilePolicyID,
+        aluFabricProfileRowStatus               RowStatus,
+        aluFabricProfileDescription             TItemDescription,
+        aluFabricProfileRateToMdaIndex1         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex2         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex3         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex4         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex5         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex6         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex7         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex8         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex9         AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex10        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex11        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex12        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex13        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex14        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex15        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex16        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex17        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex18        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex19        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex20        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex21        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex22        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex23        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex24        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex25        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex26        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex27        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex28        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex29        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex30        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex31        AluFabricProfileDestMdaRate,
+        aluFabricProfileRateToMdaIndex32        AluFabricProfileDestMdaRate,
+        aluFabricProfileLastChanged             TimeStamp,
+        aluFabricProfileMode                    AluFabricProfileMode,
+        aluFabricProfileAggregateRate           AluFabricProfileDestMdaRate,
+        aluFabricProfileMultipointRate          AluFabricProfileDestMdaRate,
+        aluFabricProfileUnshapedSapCir          AluSapSchedulerCir
+    }
+ 
+aluFabricProfileIndex OBJECT-TYPE
+    SYNTAX       AluFabricProfilePolicyID (1..256)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "the policy ID is the index to this table."
+    ::= { aluFabricProfileEntry 1 }
+
+aluFabricProfileRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "Row Status for the policy."
+    ::= { aluFabricProfileEntry 2 }
+
+aluFabricProfileDescription OBJECT-TYPE
+    SYNTAX       TItemDescription
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided description of the policy."
+    ::= { aluFabricProfileEntry 3 }
+
+aluFabricProfileRateToMdaIndex1 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 1."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 4 }
+    
+aluFabricProfileRateToMdaIndex2 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 2."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 5 }
+
+aluFabricProfileRateToMdaIndex3 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 3."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 6 }
+    
+aluFabricProfileRateToMdaIndex4 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 3."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 7 }
+
+aluFabricProfileRateToMdaIndex5 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 4."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 8 }
+    
+aluFabricProfileRateToMdaIndex6 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 5."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 9 }
+
+aluFabricProfileRateToMdaIndex7 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 6."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 10 }
+    
+aluFabricProfileRateToMdaIndex8 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 7."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 11 }
+
+aluFabricProfileRateToMdaIndex9 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 8."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 12 }
+    
+aluFabricProfileRateToMdaIndex10 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 9."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 13 }
+
+aluFabricProfileRateToMdaIndex11 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 10."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 14 }
+    
+aluFabricProfileRateToMdaIndex12 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 11."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 15 }
+
+aluFabricProfileRateToMdaIndex13 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 12."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 16 }
+    
+aluFabricProfileRateToMdaIndex14 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 14."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 17 }
+
+aluFabricProfileRateToMdaIndex15 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 15."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 18 }
+    
+aluFabricProfileRateToMdaIndex16 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 16."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 19 }
+
+aluFabricProfileRateToMdaIndex17 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 17."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 20 }
+    
+aluFabricProfileRateToMdaIndex18 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 18."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 21 }
+
+aluFabricProfileRateToMdaIndex19 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 19."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 22 }
+    
+aluFabricProfileRateToMdaIndex20 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 20."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 23 }
+
+aluFabricProfileRateToMdaIndex21 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 21."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 24 }
+    
+aluFabricProfileRateToMdaIndex22 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 22."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 25 }
+ 
+aluFabricProfileRateToMdaIndex23 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 23."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 26 }
+    
+aluFabricProfileRateToMdaIndex24 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 24."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 27 }
+
+aluFabricProfileRateToMdaIndex25 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 25."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 28 }
+    
+aluFabricProfileRateToMdaIndex26 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 26."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 29 }
+
+aluFabricProfileRateToMdaIndex27 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 27."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 30 }
+    
+aluFabricProfileRateToMdaIndex28 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 28."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 31 }
+
+aluFabricProfileRateToMdaIndex29 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 29."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 32 }
+    
+aluFabricProfileRateToMdaIndex30 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 30."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 33 }
+
+aluFabricProfileRateToMdaIndex31 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 31."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 34 }
+    
+aluFabricProfileRateToMdaIndex32 OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate toward the destination MDA of index 32."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 35 }
+
+aluFabricProfileLastChanged OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "timestamp of last change to this row in aluFabricProfileTable."
+    ::= { aluFabricProfileEntry 36 }
+    
+aluFabricProfileMode OBJECT-TYPE
+    SYNTAX       AluFabricProfileMode
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "Mode of this fabric profile."
+    DEFVAL { aggregate }
+    ::= { aluFabricProfileEntry 37 }
+
+aluFabricProfileAggregateRate OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided aggregate rate to send from source MDA to all MDAs."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 38 } 
+
+aluFabricProfileMultipointRate OBJECT-TYPE
+    SYNTAX       AluFabricProfileDestMdaRate
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "user-provided rate to send multipoint traffic from source MDA to all MDAs."
+    DEFVAL { 200000 }
+    ::= { aluFabricProfileEntry 39 } 
+    
+aluFabricProfileUnshapedSapCir OBJECT-TYPE
+    SYNTAX      AluSapSchedulerCir
+    UNITS        "kbps"
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+         "The value of aluFabricProfileUnshapedSapCir specifies the CIR of all
+         ingress queues for each SAPs having aluSapIngressSchedulerMode set four-priority,
+         that are on the MDA using this fabric-policy.
+         
+         aluFabricProfileMode is only applicable to fabric profile
+         with aluFabricProfileMode being aggregate."
+    DEFVAL { 0 }
+    ::= { aluFabricProfileEntry 40 } 
+
+aluExtTSapEgressTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluExtTSapEgressEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about the Nokia 7705 SAR extensions to the 
+        sap-Egress policies table tSapEgressTable.
+        "
+    ::= { aluQOSObjs 5 }
+
+aluExtTSapEgressEntry OBJECT-TYPE
+    SYNTAX       AluExtTSapEgressEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about the extensions of sap-egress policies." 
+    AUGMENTS  { tSapEgressEntry }
+    ::= { aluExtTSapEgressTable 1 }
+
+AluExtTSapEgressEntry ::= SEQUENCE
+{
+    aluSapEgressPolicyType        INTEGER,
+    aluSapEgressPktOffset         AluPerPacketOffset
+}
+
+aluSapEgressPolicyType OBJECT-TYPE
+    SYNTAX       INTEGER {
+                    default     (1),
+                    standard    (2),
+                    mc-mlppp    (3)
+                 }
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "aluSapEgressPolicyType specifies the type of sap-egress policy. Depending on 
+         the type the policy may only be applied to SAPs running in particular
+         encapsulation modes. This attribute can not be modified while a policy 
+         has associations to SAPs.
+ 
+         'default'  - Policy ID 1 is the default sap-egress policy.  It may not be
+                      modified, but may be appliced to ANY type of SAP.
+         'standard' - This type of sap-egress policy may be applied to all SAPs with the
+                      exception of ml-ppp ports with multiclass enabled.
+         'mc-mlppp' - This sap-egress policy type may only be applied to SAPs on
+                      multiclass mlppp ports.
+         
+                      Mc-mlppp policies do not support profiled scheduling.  As a result,
+                      the following objects are ignored for Mc-mlppp policies:
+                           tSapEgressQueueCIRAdaptation
+                           tSapEgressQueueAdminCIR
+                           tSapEgressQueueOperCIR
+                           tSapEgressQueueExpedite
+                           tSapEgressFCDot1PValue
+                           tSapEgressFCDot1PInProfile
+                           tSapEgressFCDot1POutProfile"
+    DEFVAL { standard }
+    ::= { aluExtTSapEgressEntry 1 }
+
+aluSapEgressPktOffset OBJECT-TYPE
+    SYNTAX      AluPerPacketOffset
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSapEgressPktOffset specifies the per packet byte offset
+         for queues within this policy with aluSapEgressQueuePktOffset being zero."
+    DEFVAL { 127 }   
+    ::= { aluExtTSapEgressEntry 2 }
+
+--
+-- System-wide Qos Configuration
+--
+
+--
+aluSystemQosConfig                 OBJECT IDENTIFIER ::= {aluQOSObjs          6 }
+--
+
+aluSystemAccessIngAggRate OBJECT-TYPE
+    SYNTAX       AluSystemAggregateRate
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "System-wide aggregate rate to be applied to Access Ingress of every MDA.
+        
+        aluSystemAccessIngAggRate is only supported on Nokia SAR-M.
+        It is set to 0 on other platforms, indicating it's not applicable, and it's
+        not changable."
+    DEFVAL { 0 }
+    ::= { aluSystemQosConfig 1 } 
+
+aluSystemNetworkIngAggRate OBJECT-TYPE
+    SYNTAX       AluSystemAggregateRate
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "System-wide aggregate rate to be applied to Network Ingress of every MDA
+        in the system.
+        
+        aluSystemNetworkIngAggRate is only supported on Nokia SAR-M.
+        It is set to 0 on other platforms, indicating it's not applicable, and it's
+        not changable."
+    DEFVAL { 0 }
+    ::= { aluSystemQosConfig 2 }
+
+aluSystemQosLastChanged OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "timestamp of last change to any objects in aluSystemQosConfig."
+    ::= { aluSystemQosConfig 3 }
+
+
+aluSystemIngUnshapedSapCir OBJECT-TYPE
+    SYNTAX       AluSapSchedulerCir
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "System-wide aggregate CIR to be applied to Access Ingress of every MDA.
+        
+        aluSystemIngUnshapedSapCir is only supported on Nokia SAR-M.
+        It is not applicable or changable on other platforms, where it is set to 0."
+    DEFVAL { 0 }
+    ::= { aluSystemQosConfig 4 } 
+
+
+--
+-- network policy table
+--
+
+aluExtNetworkPolicyTable OBJECT-TYPE
+    SYNTAX          SEQUENCE OF AluExtNetworkPolicyEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION
+        "Extension table to tNetworkPolicyTable"
+    ::= { aluQOSObjs 7 }
+
+aluExtNetworkPolicyEntry OBJECT-TYPE
+    SYNTAX          AluExtNetworkPolicyEntry
+    MAX-ACCESS      not-accessible
+    STATUS          current
+    DESCRIPTION     ""
+    AUGMENTS   { tNetworkPolicyEntry }
+    ::= { aluExtNetworkPolicyTable 1 }
+
+AluExtNetworkPolicyEntry ::=
+    SEQUENCE {
+        aluExtNetworkPolicyType           AluExtNetworkPolicyType, 
+        aluExtNetworkPolicyDefActionQueue TQueueId
+    }
+
+aluExtNetworkPolicyType  OBJECT-TYPE
+    SYNTAX       AluExtNetworkPolicyType
+    MAX-ACCESS   read-write
+    STATUS       current
+    DESCRIPTION
+        "aluExtNetworkPolicyType determines the point of attachment of the
+         network qos policy.  'ipInterface' type can be attached to ip interfaces,
+         'ring' type can be attached to ring MDAs.
+        
+         Network Policy 1 is the only policy with 'default' type, that is used
+         as the default policy on both ip interfaces and ring MDAs."
+    DEFVAL { ipInterface }
+    ::= { aluExtNetworkPolicyEntry 1 }
+
+aluExtNetworkPolicyDefActionQueue OBJECT-TYPE
+    SYNTAX      TQueueId (1..8)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+         "aluExtNetworkPolicyDefActionQueue specifies the default
+         queue to be used while classifying the traffic on the ring."
+    DEFVAL { 1 }
+    ::= { aluExtNetworkPolicyEntry 2 }
+        
+--
+-- network ingress policy dot1p table
+--
+
+aluExtNetworkIngressDot1pTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluExtNetworkIngressDot1pEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about the Nokia 7705 SAR extensions to the 
+        Network policies table tNetworkIngressDot1pTable.
+        "
+    ::= { aluQOSObjs 8 }
+
+    aluExtNetworkIngressDot1pEntry OBJECT-TYPE
+        SYNTAX       AluExtNetworkIngressDot1pEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the extensions of a particular dot1p mapping on a ring MDA 
+            for a network policy dot1p."
+        AUGMENTS  { tNetworkIngressDot1pEntry }
+        ::= { aluExtNetworkIngressDot1pTable 1 }
+    
+    AluExtNetworkIngressDot1pEntry ::= SEQUENCE
+    {
+        aluExtNetworkRingDot1pQueue      TQueueId
+    }
+    
+    aluExtNetworkRingDot1pQueue OBJECT-TYPE
+        SYNTAX      TQueueId (1..8)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "aluExtNetworkRingDot1pQueue specifies queue mapping for this dot1p to apply to ring ports."
+        DEFVAL  { 1 }   
+        ::= { aluExtNetworkIngressDot1pEntry 1 }
+        
+--
+-- Shaper Policy table
+--
+
+aluShaperPolicyTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluShaperPolicyEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "  "
+    ::= { aluQOSObjs 9 }
+
+aluShaperPolicyEntry OBJECT-TYPE
+    SYNTAX       AluShaperPolicyEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  
+        "Information about a particular Shaper Policy."
+    INDEX { aluShaperPolicy }
+    ::= { aluShaperPolicyTable 1 }
+
+AluShaperPolicyEntry ::= SEQUENCE
+    {
+        aluShaperPolicy                              TNamedItem,
+        aluShaperPolicyRowStatus               RowStatus,
+        aluShaperPolicyLastChanged            TimeStamp,
+        aluShaperPolicyDescription               TItemDescription,
+        aluShaperPolicyUnshapedSapGroup   TNamedItem,
+        aluShaperPolicyUnshapedIntfGroup    TNamedItem
+    }
+
+aluShaperPolicy OBJECT-TYPE
+    SYNTAX       TNamedItem
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  
+        "Name of the shaper policy."
+    ::= { aluShaperPolicyEntry 1 }
+
+aluShaperPolicyRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  
+        "Row status of the entry."
+    ::= { aluShaperPolicyEntry 2 }
+    
+aluShaperPolicyLastChanged OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION    
+        "Timestamp of last change to this row in aluShaperPolicyTable."
+    ::= { aluShaperPolicyEntry 3}
+
+aluShaperPolicyDescription OBJECT-TYPE
+    SYNTAX       TItemDescription
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION 
+        "Description for the shaper policy."
+    DEFVAL { ''H }
+    ::= { aluShaperPolicyEntry 4 }
+
+aluShaperPolicyUnshapedSapGroup OBJECT-TYPE
+    SYNTAX       TNamedItem
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  
+        "Specifies the shaper group defined within this shaper policy to be used for unshaped SAPs."
+    DEFVAL { "default" }
+    ::= { aluShaperPolicyEntry 5 }
+ 
+aluShaperPolicyUnshapedIntfGroup OBJECT-TYPE
+    SYNTAX       TNamedItem
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  
+        "Specifies the shaper group defined within this shaper policy to be used for unshaped network interfaces."
+    DEFVAL { "default" }
+    ::= { aluShaperPolicyEntry 6 }
+    
+--
+-- Shaper Group table
+--
+
+aluShaperGroupTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluShaperGroupEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  ""
+    ::= { aluQOSObjs 10 }
+
+aluShaperGroupEntry OBJECT-TYPE
+    SYNTAX       AluShaperGroupEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  ""
+    INDEX { aluShaperPolicy, aluShaperGroup}
+    ::= { aluShaperGroupTable 1 }
+
+AluShaperGroupEntry ::= SEQUENCE
+    {
+        aluShaperGroup                    TNamedItem,
+        aluShaperGroupRowStatus           RowStatus,
+        aluShaperGroupDescription         TItemDescription,
+        aluShaperGroupCIR                 TCIRRate,
+        aluShaperGroupPIR                 TPIRRate,
+        aluShaperGroupLastChanged         TimeStamp,
+        aluShaperGroupCIRPercent          Unsigned32,
+        aluShaperGroupPIRPercent          Unsigned32,
+        aluShaperGroupRateType            TRateType
+    }
+
+aluShaperGroup OBJECT-TYPE
+    SYNTAX       TNamedItem
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Name of the Shaper Group is used as the secondary index to the table entry."
+    ::= { aluShaperGroupEntry 1 }
+
+aluShaperGroupRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "Row Status for this shaper group.  This allows the creation/deletion of rows in table."
+    ::= { aluShaperGroupEntry 2 }
+
+aluShaperGroupDescription OBJECT-TYPE
+    SYNTAX       TItemDescription
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "Specifies the user provided description string for this shaper group entry."
+    DEFVAL { ''H }
+    ::= { aluShaperGroupEntry 3 }
+   
+aluShaperGroupCIR OBJECT-TYPE
+    SYNTAX       TCIRRate
+    UNITS        "kbps"
+    MAX-ACCESS   read-create
+    STATUS        current
+    DESCRIPTION
+        "aluShaperGroupCIR specifies the committed rate for this shaper group.
+         A value of -1 implies maximum line rate."
+    DEFVAL { 0 }
+    ::= { aluShaperGroupEntry 4 }
+    
+aluShaperGroupPIR OBJECT-TYPE
+    SYNTAX       TPIRRate
+    UNITS        "kbps"
+    MAX-ACCESS    read-create
+    STATUS         current
+    DESCRIPTION
+        "aluShaperGroupPIR specifies the peak rate for this shaper group.
+         A value of -1 implies maximum line rate."
+    DEFVAL { -1 }
+    ::= { aluShaperGroupEntry 5 }
+
+aluShaperGroupLastChanged OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "timestamp of last change to this row in aluShaperGroupTable."
+    ::= { aluShaperGroupEntry 6 }
+    
+aluShaperGroupCIRPercent OBJECT-TYPE
+    SYNTAX       Unsigned32 (0..10000)
+    UNITS        "hundredths of a percent"
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The administrative CIR percentage, in hundredths of a percent.
+         An 'inconsistentValue' error is returned if
+         aluShaperGroupCIRPercent is set to non-default value when the
+         object aluShaperGroupRateType is set to 'kbps'."
+    DEFVAL { 0 }
+    ::= { aluShaperGroupEntry 7 }
+
+aluShaperGroupPIRPercent OBJECT-TYPE
+    SYNTAX       Unsigned32 (1..10000)
+    UNITS        "hundredths of a percent"
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The administrative PIR percentage, in hundredths of a percent.
+         An 'inconsistentValue' error is returned if
+         aluShaperGroupPIRPercent is set to non-default value when the
+         object aluShaperGroupRateType is set to 'kbps'."
+    DEFVAL { 10000 }
+    ::= { aluShaperGroupEntry 8 }
+
+aluShaperGroupRateType OBJECT-TYPE
+    SYNTAX       TRateType
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The value of aluShaperGroupRateType specifies the type of shaper group rate.
+
+         When the value of the object is set to 'kbps', the shaper group rates
+         are specified in kbps. The objects  aluShaperGroupCIRPercent and
+         aluShaperGroupPIRPercent will be set to their default values.
+
+         When the value of the object is set to either 'percent', the shaper group
+         rates are specified in percentage. The objects aluShaperGroupCIR and
+         aluShaperGroupPIR will be set to their default values."
+    DEFVAL { kbps }
+    ::= { aluShaperGroupEntry 9 }
+        
+--
+-- Security Queue Policy table
+--
+
+aluSecurityQueuePolicyTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluSecurityQueuePolicyEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "  "
+    ::= { aluQOSObjs 11 }
+
+aluSecurityQueuePolicyEntry OBJECT-TYPE
+    SYNTAX       AluSecurityQueuePolicyEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  
+        "Information about a particular Security Queue Policy."
+    INDEX { aluSecurityQueuePolicyIndex }
+    ::= { aluSecurityQueuePolicyTable 1 }
+
+AluSecurityQueuePolicyEntry ::= SEQUENCE
+    {
+        aluSecurityQueuePolicyIndex              TPolicyID,
+        aluSecurityQueuePolicyRowStatus          RowStatus,
+        aluSecurityQueuePolicyDescription        TItemDescription,
+        aluSecurityQueuePolicyLastChanged        TimeStamp
+    }
+
+aluSecurityQueuePolicyIndex OBJECT-TYPE
+    SYNTAX       TPolicyID
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  
+        "Index of the Security Queue policy."
+    ::= { aluSecurityQueuePolicyEntry 1 }
+
+aluSecurityQueuePolicyRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION  
+        "Row status of the entry."
+    ::= { aluSecurityQueuePolicyEntry 2 }
+
+aluSecurityQueuePolicyDescription OBJECT-TYPE
+    SYNTAX       TItemDescription
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION 
+        "Description for the Security Queue policy."
+    DEFVAL { ''H }
+    ::= { aluSecurityQueuePolicyEntry 3 }
+
+aluSecurityQueuePolicyLastChanged OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION    
+        "Timestamp of last change to this row in aluSecurityQueuePolicyTable."
+    ::= { aluSecurityQueuePolicyEntry 4}
+    
+--
+-- Security Queue Table
+--
+
+aluSecurityQueueTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluSecurityQueueEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  ""
+    ::= { aluQOSObjs 12 }
+
+aluSecurityQueueEntry OBJECT-TYPE
+    SYNTAX       AluSecurityQueueEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  ""
+    INDEX { aluSecurityQueuePolicyIndex, aluSecurityQueueIndex}
+    ::= { aluSecurityQueueTable 1 }
+
+AluSecurityQueueEntry ::= SEQUENCE
+    {
+        aluSecurityQueueIndex        AluSecQueueId,
+        aluSecurityQueueCIR          TCIRRate,
+        aluSecurityQueuePIR          TPIRRate,
+        aluSecurityQueueCBS          TBurstSize,
+        aluSecurityQueueMBSBytes     TBurstSizeBytes,
+        aluSecurityQueueHiPrioOnly   TBurstPercentOrDefault,
+        aluSecurityQueueLastChanged  TimeStamp
+    }
+
+aluSecurityQueueIndex OBJECT-TYPE
+    SYNTAX       AluSecQueueId
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Queue Id is used as secondary Index to the table entry."
+    ::= { aluSecurityQueueEntry 1 }
+
+aluSecurityQueueCIR OBJECT-TYPE
+    SYNTAX       TCIRRate
+    UNITS        "kbps"
+    MAX-ACCESS   read-create
+    STATUS        current
+    DESCRIPTION
+        "aluSecurityQueueCIR specifies the committed rate for this queue.
+         A value of -1 implies maximum line rate."
+    DEFVAL { 0 }
+    ::= { aluSecurityQueueEntry 2 }
+    
+aluSecurityQueuePIR OBJECT-TYPE
+    SYNTAX       TPIRRate
+    UNITS        "kbps"
+    MAX-ACCESS    read-create
+    STATUS         current
+    DESCRIPTION
+        "aluSecurityQueuePIR specifies the peak rate for this queue.
+         A value of -1 implies maximum line rate."
+    DEFVAL { -1 }
+    ::= { aluSecurityQueueEntry 3 }
+
+aluSecurityQueueCBS OBJECT-TYPE
+    SYNTAX       TBurstSize
+    UNITS        "kilo-bytes"
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The value of aluSecurityQueueCBS specifies the amount of reserved buffer
+         space for the queue."
+    DEFVAL { -1 }
+    ::= { aluSecurityQueueEntry 4 }
+
+aluSecurityQueueMBSBytes OBJECT-TYPE
+    SYNTAX       TBurstSizeBytes
+    UNITS        "bytes"
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The value of aluSecurityQueueMBSBytes specifies the maximum amount of buffer
+         space allowed for the queue."
+    DEFVAL { 500000 }
+    ::= { aluSecurityQueueEntry 5 }
+
+aluSecurityQueueHiPrioOnly OBJECT-TYPE
+    SYNTAX       TBurstPercentOrDefault
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The value of aluSecurityQueueHiPrioOnly specifies the percentage of buffer
+         space for the queue, used exclusively by high priority packets."
+    DEFVAL { 10 }
+    ::= { aluSecurityQueueEntry 6 }
+
+aluSecurityQueueLastChanged OBJECT-TYPE
+    SYNTAX       TimeStamp
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION
+        "timestamp of last change to this row in aluSecurityQueueTable."
+    ::= { aluSecurityQueueEntry 7 }
+
+--
+-- Sap Ingress Policy Extension table
+--
+aluExtSapIngressTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluExtSapIngressEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about the Nokia 7705 SAR extensions to the 
+        sap-ingress policy table tSapIngressTable."
+    ::= { aluQOSObjs 13 }
+
+    aluExtSapIngressEntry OBJECT-TYPE
+        SYNTAX       AluExtSapIngressEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the extensions of a particular sap-ingress 
+            policy entry tSapIngressEntry."
+        AUGMENTS  { tSapIngressEntry }
+        ::= { aluExtSapIngressTable 1 }
+
+    AluExtSapIngressEntry ::= SEQUENCE
+    {
+        aluSapIngressPktOffset        AluPerPacketOffset
+    }
+    
+    aluSapIngressPktOffset OBJECT-TYPE
+        SYNTAX      AluPerPacketOffset
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The value of aluSapIngressPktOffset specifies the per packet byte
+             offset for queues within this policy with aluSapIngressQueuePktOffset being zero."
+        DEFVAL { 127 }   
+        ::= { aluExtSapIngressEntry 1 }
+
+--
+-- Network Queue Policy Extension table
+--
+aluExtNetworkQueuePolicyTable OBJECT-TYPE
+        SYNTAX       SEQUENCE OF AluExtNetworkQueuePolicyEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the Nokia 7705 SAR extensions to the 
+            network queue policy table tNetworkQueuePolicyTable."
+        ::= { aluQOSObjs 14 }
+
+    aluExtNetworkQueuePolicyEntry OBJECT-TYPE
+        SYNTAX       AluExtNetworkQueuePolicyEntry
+        MAX-ACCESS   not-accessible
+        STATUS       current
+        DESCRIPTION
+            "Information about the extensions of a network queue policy entry tNetworkQueuePolicyEntry."
+        AUGMENTS  { tNetworkQueuePolicyEntry }
+        ::= { aluExtNetworkQueuePolicyTable 1 }
+
+    AluExtNetworkQueuePolicyEntry ::= SEQUENCE
+    {
+        aluNetworkQueuePolicyPktOffset        AluPerPacketOffset
+    }
+
+    aluNetworkQueuePolicyPktOffset OBJECT-TYPE
+        SYNTAX      AluPerPacketOffset
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION
+            "The value of aluNetworkQueuePolicyPktOffset specifies the per packet byte
+             offset for queues within this Policy with aluNetworkQueuePktOffset being zero."
+        DEFVAL { 127 }   
+        ::= { aluExtNetworkQueuePolicyEntry 1 }
+        
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      The compliance specifications.
+--
+
+aluQOSCompliances     OBJECT IDENTIFIER ::= { aluQOSConformance 1 }
+aluQOSGroups          OBJECT IDENTIFIER ::= { aluQOSConformance 2 }
+
+aluQOSComp7705        OBJECT IDENTIFIER ::= { aluQOSCompliances 1 }
+--  aluQOSComp7705V1v0  OBJECT IDENTIFIER ::= { aluQOSComp7705 1}
+--  aluQOSComp7705V4v0  OBJECT IDENTIFIER ::= { aluQOSComp7705 2}
+
+aluQOSComp7705V1v0  MODULE-COMPLIANCE
+    STATUS  obsolete
+    DESCRIPTION
+            "The compliance statement for revision 1.0 of ALU-QOS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluQosQueuePolicySlopePolicyGroup,
+            aluQosFabricProfileGroup,
+            aluQosSapEgressPolicyTypeGroup
+        }
+    ::= { aluQOSComp7705 1 }
+
+aluQOSComp7705V4v0  MODULE-COMPLIANCE
+    STATUS  obsolete
+    DESCRIPTION
+            "The compliance statement for revision 4.0 of ALU-QOS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluQosFabricProfileGroupV4v0
+        }
+    ::= { aluQOSComp7705 2 }
+
+aluQOSComp7705V5v0  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for ALU-QOS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluQosQueuePolicySlopePolicyGroup,
+            aluQosFabricProfileGroup,
+            aluQosSapEgressPolicyTypeGroup,
+            aluQosFabricProfileGroupV4v0,
+            aluSystemQosGroup
+        }
+    ::= { aluQOSComp7705 3 }
+
+
+aluQOSComp7705V7v0  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for ALU-QOS-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluHQosGroup,
+            aluExtNetworkPolicyGroup,
+            aluQosShaperPolicyGroup,
+            aluSecurityQueueGroup
+        }
+    ::= { aluQOSComp7705 4 }
+
+
+-- units of conformance
+aluQosQueuePolicySlopePolicyGroup  OBJECT-GROUP
+    OBJECTS {
+        aluSapIngressQueueSlopePolicy,
+        aluSapEgressQueueSlopePolicy,
+        aluNetworkQueueSlopePolicy
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of slope policies
+         configurable against queues on Nokia 7705 SR series systems."
+    ::= { aluQOSGroups 31 }
+    
+aluQosFabricProfileGroup OBJECT-GROUP
+    OBJECTS {
+        aluFabricProfileRowStatus ,
+        aluFabricProfileDescription ,
+        aluFabricProfileRateToMdaIndex1 ,
+        aluFabricProfileRateToMdaIndex2 ,
+        aluFabricProfileRateToMdaIndex3 ,
+        aluFabricProfileRateToMdaIndex4 ,
+        aluFabricProfileRateToMdaIndex5 ,
+        aluFabricProfileRateToMdaIndex6 ,
+        aluFabricProfileRateToMdaIndex7 ,
+        aluFabricProfileRateToMdaIndex8 ,
+        aluFabricProfileRateToMdaIndex9  ,
+        aluFabricProfileRateToMdaIndex10 ,
+        aluFabricProfileRateToMdaIndex11 ,
+        aluFabricProfileRateToMdaIndex12 ,
+        aluFabricProfileRateToMdaIndex13 ,
+        aluFabricProfileRateToMdaIndex14 ,
+        aluFabricProfileRateToMdaIndex15 ,
+        aluFabricProfileRateToMdaIndex16 ,
+        aluFabricProfileRateToMdaIndex17 ,
+        aluFabricProfileRateToMdaIndex18 ,
+        aluFabricProfileRateToMdaIndex19 ,
+        aluFabricProfileRateToMdaIndex20 ,
+        aluFabricProfileRateToMdaIndex21 ,
+        aluFabricProfileRateToMdaIndex22 ,
+        aluFabricProfileRateToMdaIndex23 ,
+        aluFabricProfileRateToMdaIndex24 ,
+        aluFabricProfileRateToMdaIndex25 ,
+        aluFabricProfileRateToMdaIndex26 ,
+        aluFabricProfileRateToMdaIndex27 ,
+        aluFabricProfileRateToMdaIndex28 ,
+        aluFabricProfileRateToMdaIndex29 ,
+        aluFabricProfileRateToMdaIndex30 ,
+        aluFabricProfileRateToMdaIndex31 ,        
+        aluFabricProfileRateToMdaIndex32 ,        
+        aluFabricProfileLastChanged,
+        aluFabricProfileMode,
+        aluFabricProfileAggregateRate
+    }
+    STATUS         obsolete
+        DESCRIPTION
+        "The group of objects supporting management of fabric profile
+         configurable against fabric shapers on Nokia 7705 series systems."
+    ::= { aluQOSGroups 32 }
+
+aluQosSapEgressPolicyTypeGroup OBJECT-GROUP
+    OBJECTS {
+        aluSapEgressPolicyType
+    } 
+    STATUS         current
+    DESCRIPTION
+        "The group of objects supporting management of sap-egress policy
+         types on Nokia 7705 SR series systems."
+    ::= { aluQOSGroups 33 }
+
+aluQosFabricProfileGroupV4v0 OBJECT-GROUP
+    OBJECTS {
+        aluFabricProfileRowStatus ,
+        aluFabricProfileDescription ,
+        aluFabricProfileRateToMdaIndex1 ,
+        aluFabricProfileRateToMdaIndex2 ,
+        aluFabricProfileRateToMdaIndex3 ,
+        aluFabricProfileRateToMdaIndex4 ,
+        aluFabricProfileRateToMdaIndex5 ,
+        aluFabricProfileRateToMdaIndex6 ,
+        aluFabricProfileRateToMdaIndex7 ,
+        aluFabricProfileRateToMdaIndex8 ,
+        aluFabricProfileRateToMdaIndex9  ,
+        aluFabricProfileRateToMdaIndex10 ,
+        aluFabricProfileRateToMdaIndex11 ,
+        aluFabricProfileRateToMdaIndex12 ,
+        aluFabricProfileRateToMdaIndex13 ,
+        aluFabricProfileRateToMdaIndex14 ,
+        aluFabricProfileRateToMdaIndex15 ,
+        aluFabricProfileRateToMdaIndex16 ,
+        aluFabricProfileRateToMdaIndex17 ,
+        aluFabricProfileRateToMdaIndex18 ,
+        aluFabricProfileRateToMdaIndex19 ,
+        aluFabricProfileRateToMdaIndex20 ,
+        aluFabricProfileRateToMdaIndex21 ,
+        aluFabricProfileRateToMdaIndex22 ,
+        aluFabricProfileRateToMdaIndex23 ,
+        aluFabricProfileRateToMdaIndex24 ,
+        aluFabricProfileRateToMdaIndex25 ,
+        aluFabricProfileRateToMdaIndex26 ,
+        aluFabricProfileRateToMdaIndex27 ,
+        aluFabricProfileRateToMdaIndex28 ,
+        aluFabricProfileRateToMdaIndex29 ,
+        aluFabricProfileRateToMdaIndex30 ,
+        aluFabricProfileRateToMdaIndex31 ,        
+        aluFabricProfileRateToMdaIndex32 ,        
+        aluFabricProfileLastChanged,
+        aluFabricProfileMode,
+        aluFabricProfileAggregateRate,
+        aluFabricProfileMultipointRate           
+        
+    }
+    STATUS         current
+        DESCRIPTION
+        "The group of objects supporting management of fabric profile
+         configurable against fabric shapers on Nokia 7705 series systems."
+    ::= { aluQOSGroups 34 }
+    
+aluSystemQosGroup OBJECT-GROUP
+    OBJECTS {
+        aluSystemAccessIngAggRate,
+        aluSystemNetworkIngAggRate,
+        aluSystemQosLastChanged
+    }
+    STATUS         current
+        DESCRIPTION
+        "The group of objects supporting system-wide QOS configuration."
+    ::= { aluQOSGroups 35 }
+    
+aluHQosGroup OBJECT-GROUP
+    OBJECTS {
+        aluFabricProfileUnshapedSapCir,
+        aluSystemIngUnshapedSapCir
+    }
+    STATUS         current
+        DESCRIPTION
+        "The group of objects supporting QOS configuration related to H-QOS in the Nokia 7705 systems"
+    ::= { aluQOSGroups 36 }
+    
+    
+aluExtNetworkPolicyGroup OBJECT-GROUP
+    OBJECTS {
+        aluExtNetworkPolicyType,
+        aluExtNetworkPolicyDefActionQueue,
+        aluExtNetworkRingDot1pQueue
+        }
+    STATUS         current
+        DESCRIPTION
+        "The group of objects supporting QOS network policy in the Nokia 7705 systems"
+    ::= { aluQOSGroups 37 }
+        
+ aluQosShaperPolicyGroup OBJECT-GROUP
+    OBJECTS {
+        aluShaperPolicyRowStatus,
+        aluShaperPolicyLastChanged,
+        aluShaperPolicyDescription,
+        aluShaperPolicyUnshapedSapGroup,
+        aluShaperPolicyUnshapedIntfGroup,
+        aluShaperGroupRowStatus,
+        aluShaperGroupDescription,
+        aluShaperGroupCIR,
+        aluShaperGroupPIR,
+        aluShaperGroupLastChanged   
+    }
+    STATUS         current
+        DESCRIPTION
+        "The group of objects supporting QOS configuration related to shapers in Nokia 7705 systems"
+    ::= { aluQOSGroups 38 }
+ 
+aluSecurityQueueGroup OBJECT-GROUP
+    OBJECTS {  
+        aluSecurityQueuePolicyRowStatus,
+        aluSecurityQueuePolicyDescription,
+        aluSecurityQueuePolicyLastChanged,      
+        aluSecurityQueueCIR,
+        aluSecurityQueuePIR,
+        aluSecurityQueueCBS,
+        aluSecurityQueueMBSBytes,
+        aluSecurityQueueHiPrioOnly,
+        aluSecurityQueueLastChanged
+    }
+    STATUS         current
+        DESCRIPTION
+        "The group of objects supporting QOS configuration related to security queues in Nokia 7705 systems"
+    ::= { aluQOSGroups 39 }
+    
+aluExtQosV7v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluSapIngressPktOffset,
+        aluSapEgressPktOffset,
+        aluNetworkQueuePolicyPktOffset,
+        aluSapIngressQueuePktOffset,
+        aluSapEgressQueuePktOffset,
+        aluNetworkQueuePktOffset
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of extended functionalities of QOS
+         on Nokia 7705 SR series systems."
+    ::= { aluQOSGroups 40 }
+ 
+aluQosV9v0Group OBJECT-GROUP
+   OBJECTS {
+            aluShaperGroupCIRPercent,
+            aluShaperGroupPIRPercent,
+            aluShaperGroupRateType
+   }
+   STATUS         current
+       DESCRIPTION
+       "The group of objects supporting QOS configurations in release 9.0 on Nokia 7705 series systems."
+   ::= { aluQOSGroups 41 }
+    
+END

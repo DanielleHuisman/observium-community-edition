@@ -40,14 +40,21 @@ if ($vars['submit'])
     if ($vars['toggle_ports'] && isset($config[$vars['toggle_ports']]) && strpos($vars['toggle_ports'], 'enable_ports_') === 0)
     {
       $module = $vars['toggle_ports'];
+      $module_name = str_replace('enable_', '', $module);
+      if (isset($config['os'][$device['os']]['modules'][$module_name]))
+      {
+        $config_val = $config['os'][$device['os']]['modules'][$module_name];
+      } else {
+        $config_val = $config[$module];
+      }
       if ($vars['submit'] === 'Disable' && $attribs[$module] !== '0')
       {
         set_dev_attrib($device, $module, "0");
       }
-      else if (isset($attribs[$module]) && $attribs[$module] != $config[$module])
+      elseif (isset($attribs[$module]) && $attribs[$module] != $config_val)
       {
         del_dev_attrib($device, $module);
-      } elseif ($config[$module] == 0) {
+      } elseif ($config_val == 0) {
         set_dev_attrib($device, $module, "1");
       } else {
         set_dev_attrib($device, $module, "0");
@@ -100,6 +107,7 @@ if ($vars['submit'])
 <?php
 foreach (array_merge(array('os' => 1, 'system' => 1), $config['poller_modules']) as $module => $module_status)
 {
+  //$module_status = is_module_enabled($device, $module, 'poller');
   $attrib_set = isset($attribs['poll_'.$module]);
 
   // Last module poll time and row class
@@ -118,7 +126,7 @@ foreach (array_merge(array('os' => 1, 'system' => 1), $config['poller_modules'])
     {
       $module_row_class = 'error';
     }
-    else if ($device_state['poller_mod_perf'][$module] > 3)
+    elseif ($device_state['poller_mod_perf'][$module] > 3)
     {
       $module_row_class = 'warning';
     }
@@ -138,13 +146,14 @@ foreach (array_merge(array('os' => 1, 'system' => 1), $config['poller_modules'])
     $toggle = "Locked"; $btn_class = ''; $btn_icon = 'icon-lock';
     $disabled = TRUE;
   }
-  else if (poller_module_excluded($device, $module))
+  elseif (poller_module_excluded($device, $module))
   {
     $attrib_status = '<span class="label label-default">excluded</span>';
     $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';
     $disabled = TRUE;
   }
-  else if (($attrib_set && $attribs['poll_'.$module]) || (!$attrib_set && $module_status))
+  //elseif (($attrib_set && $attribs['poll_'.$module]) || (!$attrib_set && $module_status))
+  elseif (is_module_enabled($device, $module, 'poller'))
   {
     $attrib_status = '<span class="label label-success">enabled</span>';
     $toggle = "Disable"; $btn_class = "btn-danger"; $btn_icon = 'icon-remove';
@@ -199,11 +208,16 @@ foreach (array_merge(array('os' => 1, 'system' => 1), $config['poller_modules'])
 <?php
 foreach (array_keys($config) as $module)
 {
-  if (strpos($module, 'enable_ports_') === FALSE) { continue; }
+  if (!str_starts($module, 'enable_ports_')) { continue; }
 
   $module_status = $config[$module];
   $attrib_set = isset($attribs[$module]);
   $module_name = str_replace('enable_ports_', '', $module);
+  // Enabled/disabled by os definition
+  if (isset($config['os'][$device['os']]['modules']['ports_'.$module_name]))
+  {
+    $module_status = $config['os'][$device['os']]['modules']['ports_'.$module_name];
+  }
 
   // Last ports module poll time and row class
   $module_row_class = '';
@@ -227,7 +241,7 @@ foreach (array_keys($config) as $module)
     {
       $module_row_class = 'error';
     }
-    else if ($device_state['poller_ports_perf'][$module_name] > 3)
+    elseif ($device_state['poller_ports_perf'][$module_name] > 3)
     {
       $module_row_class = 'warning';
     }
@@ -248,12 +262,6 @@ foreach (array_keys($config) as $module)
     $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';
     $disabled = TRUE;
   }
-  // elseif (discovery_module_excluded($device, $module)) // What? This is ports options..
-  // {
-  //   $attrib_status = '<span class="label label-disabled">excluded</span>';
-  //   $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';
-  //   $disabled = TRUE;
-  // }
   elseif (($attrib_set && $attribs[$module]) || (!$attrib_set && $module_status))
   {
     $attrib_status = '<span class="label label-success">enabled</span>';
@@ -261,7 +269,9 @@ foreach (array_keys($config) as $module)
   }
   elseif ($module == 'enable_ports_separate_walk' && !$attrib_set)
   {
-    if ($config['os'][$device['os']]['ports_separate_walk'] && $ports_total_count > 10)
+    // Model definition can override os definition
+    $model_separate_walk = isset($model['ports_separate_walk']) ? $model['ports_separate_walk'] : $config['os'][$device['os']]['ports_separate_walk'];
+    if ($model_separate_walk && $ports_total_count > 10)
     {
       $attrib_status = '<span class="label label-warning">FORCED</span>';
       $toggle = "Disable"; $btn_class = "btn-danger"; $btn_icon = 'icon-remove';
@@ -324,6 +334,7 @@ foreach (array_keys($config) as $module)
 <?php
 foreach ($config['discovery_modules'] as $module => $module_status)
 {
+  //$module_status = is_module_enabled($device, $module, 'discovery');
   $attrib_set = isset($attribs['discover_'.$module]);
 
   // Last module discovery time and row class
@@ -356,13 +367,15 @@ foreach ($config['discovery_modules'] as $module => $module_status)
   $attrib_status = '<span class="label label-important">disabled</span>';
   $toggle = 'Enable'; $btn_class = 'btn-success'; $btn_icon = 'icon-ok';
   $disabled = FALSE;
-  if (discovery_module_excluded($device,$module))
+
+  if (in_array($module, $config['os'][$device['os']]['discovery_blacklist']))
   {
     $attrib_status = '<span class="label label-disabled">excluded</span>';
     $toggle = "Excluded"; $btn_class = ''; $btn_icon = 'icon-lock';
     $disabled = TRUE;
   }
-  else if (($attrib_set && $attribs['discover_'.$module]) || (!$attrib_set && $module_status))
+  //elseif (($attrib_set && $attribs['discover_'.$module]) || (!$attrib_set && $module_status))
+  elseif (is_module_enabled($device, $module, 'discovery'))
   {
     $attrib_status = '<span class="label label-success">enabled</span>';
     $toggle = "Disable"; $btn_class = "btn-danger"; $btn_icon = 'icon-remove';

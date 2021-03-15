@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,16 +6,52 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-// Note, device attrib 'eqlgrpmemid' sets in equallogic 'os' module.
-$eqlgrpmemid = get_dev_attrib($device, 'eqlgrpmemid');
+// We are interested in equallogic group members (devices), not in the group
+// find group member id.
+
+// NOTE. This mib should be discovered first (before storage)
+
+// eqlMemberName.1.443914937 = hostname-1
+// eqlMemberName.1.1664046123 = hostname-2
+$eqlgrpmembers = snmpwalk_cache_multi_oid($device, 'eqlMemberName', [], 'EQLMEMBER-MIB');
+if (snmp_status())
+{
+  $sysName = strtolower(snmp_cache_oid($device, 'sysName.0', 'SNMPv2-MIB'));
+}
+
+foreach ($eqlgrpmembers as $index => $entry)
+{
+  // Find member id and name in results
+  if (!empty($entry['eqlMemberName']) && strtolower($entry['eqlMemberName']) == $sysName)
+  {
+    list(, $eqlgrpmemid) = explode('.', $index);
+    break;
+  }
+}
+
+if (!isset($eqlgrpmemid))
+{
+  // Fall-back to old method.
+  $eqlgrpmemid = snmp_get_oid($device, 'eqliscsiLocalMemberId.0', 'EQLVOLUME-MIB');
+}
+
+if (is_numeric($eqlgrpmemid) && $eqlgrpmemid != $attribs['eqlgrpmemid'])
+{
+  // Store member id when detected
+  set_dev_attrib($device, 'eqlgrpmemid', $eqlgrpmemid);
+  $attribs['eqlgrpmemid'] = $eqlgrpmemid;
+  print_debug("\neqlgrpmemid: $eqlgrpmemid");
+}
+
+print_debug_vars($eqlgrpmemid, 1);
 
 if (is_numeric($eqlgrpmemid))
 {
-  $oids = snmpwalk_cache_oid($device, 'eqlMemberHealthDetailsFanTable', array(), 'EQLMEMBER-MIB' );
+  $oids = snmpwalk_cache_oid($device, 'eqlMemberHealthDetailsFanTable', array(), 'EQLMEMBER-MIB');
 
   // copy of eqlMemberHealthDetailsFanIndex
   $sensorname = array(

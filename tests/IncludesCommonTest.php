@@ -33,6 +33,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     return array(
       array('3y 4M 6w 5d 3h 1m 3s',  109191663),
       array('3y4M6w5d3h1m3s',        109191663),
+      array('184 days 22 hrs 02 min 38 sec', 15976958),
       array('1.5w',                     907200),
       array(-886732,                         0),
       array('Star Wars',                     0),
@@ -558,11 +559,11 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @dataProvider providerFormatMac
-   * @group values
+   * @group mac
    */
-  public function testFormatMac($value, $result)
+  public function testFormatMac($value, $result, $char = ':')
   {
-    $this->assertSame($result, format_mac($value));
+    $this->assertSame($result, format_mac($value, $char));
   }
 
   public function providerFormatMac()
@@ -572,6 +573,30 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(   '1234.5678.9abc', '12:34:56:78:9a:bc'),
       array('12:34:56:78:9a:bc', '12:34:56:78:9a:bc'),
 
+      // Zeropad MAC
+      array( '66:c:9b:1b:62:7e', '66:0c:9b:1b:62:7e'),
+      array(      '0:0:0:0:0:0', '00:00:00:00:00:00'),
+      array(   '0x123456789ABC', '12:34:56:78:9a:bc'),
+
+      // MAC valid
+      array('0026.22eb.3bef',    '00:26:22:eb:3b:ef'), // Cisco
+      array('00-02-2D-11-55-4D', '00:02:2d:11:55:4d'), // Windows
+      array('00 0D 93 13 51 1A', '00:0d:93:13:51:1a'), // Old Unix
+      array('0x000E7F0D81D6',    '00:0e:7f:0d:81:d6'), // HP-UX
+      array('0004E25AA118',      '00:04:e2:5a:a1:18'), // DOS, RAW
+      array('00:08:C7:1B:8C:02', '00:08:c7:1b:8c:02'), // Unix/Linux
+      array('8:0:86:b6:82:9f',   '08:00:86:b6:82:9f'), // SNMP, Solaris
+
+      // Split chars
+      array(     '123456789ABC', '123456789abc',      ''),
+      array(   '1234.5678.9abc', '12 34 56 78 9A BC', ' '),
+      array('12:34:56:78:9a:bc', '1234.5678.9abc',    '.'),
+      array( '66:c:9b:1b:62:7e', '660c9b1b627e',      ''),
+      array(      '0:0:0:0:0:0', '00 00 00 00 00 00', ' '),
+      array(   '0x123456789ABC', '1234.5678.9abc',    '.'),
+      array(   '1234.5678.9abc', '0x123456789ABC',    '0x'),
+      array('12:34:56:78:9a:bc', '0x123456789ABC',    '0x'),
+
       // Fake MAC to IPv4 (for 6to4 tunnels)
       array('ff:fe:56:78:9a:bc',    '86.120.154.188'),
       array('ff:fe:00:00:9a:bc',       '154.188.X.X'),
@@ -580,7 +605,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
 
   /**
    * @dataProvider providerMacZeropad
-   * @group values
+   * @group mac
    */
   public function testMacZeropad($value, $result)
   {
@@ -678,7 +703,8 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array(        'dbm',   'W', 0.00001, -20.0),
       array(        'dbm',   'W',   0.001,   0.0),
       array(        'dbm',   'W',   10000,  70.0),
-      array(        'dbm',   'W',       0,  FALSE),
+      array(        'dbm',   'W',       0, -99.0),
+      array(        'dbm',   'W',    -0.1, FALSE),
       array(      'power', 'dBm',     -30,   0.000001),
       array(      'power', 'dBm',       0,   0.001),
       array(      'power', 'dBm',      50, 100.0),
@@ -998,66 +1024,100 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    * @dataProvider providerIsValidHostname
    * @group hostname
    */
-  public function testIsValidHostname($value, $result)
+  public function testIsValidHostname($value, $result, $result_fqdn)
   {
-    $this->assertSame($result, is_valid_hostname($value));
+    $this->assertSame($result, is_valid_hostname($value)); // Allow not FQDN
+    $this->assertSame($result_fqdn, is_valid_hostname($value, TRUE)); // FQDN
   }
 
   public function providerIsValidHostname()
   {
     return array(
-      array('router1',          TRUE),
-      array('1router',          TRUE),
-      array('router-1',         TRUE),
-      array('router.1',         TRUE),
+      array('router1',          TRUE, FALSE),
+      array('1router',          TRUE, FALSE),
+      array('router-1',         TRUE, FALSE),
+      array('router.1',         TRUE, FALSE),
 
-      array('router1.a.com',    TRUE),
-      array('1router.a.com',    TRUE),
-      array('router-1.a.com',   TRUE),
-      array('router.1.a.com',   TRUE),
+      array('router1.a.com',    TRUE, TRUE),
+      array('1router.a.com',    TRUE, TRUE),
+      array('router-1.a.com',   TRUE, TRUE),
+      array('router.1.a.com',   TRUE, TRUE),
 
       // Domains with underscores, see: http://stackoverflow.com/a/2183140
-      array('router_1',         TRUE),
-      array('router_1.a.com',   TRUE),
-      array('_router1',         TRUE),
-      array('_sip._udp.apnic.net', TRUE),
+      array('router_1',         TRUE, FALSE),
+      array('router_1.a.com',   TRUE, TRUE),
+      array('_router1',         TRUE, FALSE),
+      array('_sip._udp.apnic.net', TRUE, TRUE),
 
-      array('-router1',        FALSE),
-      array('.router1',        FALSE),
+      array('-router1',        FALSE, FALSE),
+      array('.router1',        FALSE, FALSE),
 
-      array('router~1',        FALSE),
-      array('router/1',        FALSE),
-      array('router,1',        FALSE),
-      array('router;1',        FALSE),
-      array('router 1',        FALSE),
+      array('router~1',        FALSE, FALSE),
+      array('router/1',        FALSE, FALSE),
+      array('router,1',        FALSE, FALSE),
+      array('router;1',        FALSE, FALSE),
+      array('router 1',        FALSE, FALSE),
 
       // Long hostnames
-      array('aaa' . str_repeat('.bb.cc.com', 25),   TRUE), // total 253
-      array(str_repeat('a', 63) . '.com',           TRUE), // per level 63
-      array('aaaa' . str_repeat('.bb.cc.com', 25), FALSE), // total 254
-      array(str_repeat('a', 64) . '.com',          FALSE), // per level 64
+      array('aaa' . str_repeat('.bb.cc.com', 25),   TRUE, TRUE), // total 253
+      array(str_repeat('a', 63) . '.com',           TRUE, TRUE), // per level 63
+      array('aaaa' . str_repeat('.bb.cc.com', 25), FALSE, FALSE), // total 254
+      array(str_repeat('a', 64) . '.com',          FALSE, FALSE), // per level 64
 
       // Test cases from http://stackoverflow.com/a/4694816
-      array('a',                TRUE),
-      array('0',                TRUE),
-      array('a.b',              TRUE),
-      array('localhost',        TRUE),
-      array('google.com',       TRUE),
-      array('news.google.co.uk',       TRUE),
-      array('xn--fsqu00a.xn--0zwm56d', TRUE),
-      array('goo gle.com',     FALSE),
-      array('google..com',     FALSE),
-      array('google.com ',     FALSE),
-      array('google-.com',     FALSE),
-      array('.google.com',     FALSE),
-      array('<script',         FALSE),
-      array('alert(',          FALSE),
-      array('.',               FALSE),
-      array('..',              FALSE),
-      array(' ',               FALSE),
-      array('-',               FALSE),
-      array('',                FALSE),
-      array('__',              FALSE),
+      array('a',                TRUE, FALSE),
+      array('0',                TRUE, FALSE),
+      array('a.b',              TRUE, FALSE),
+      array('localhost',        TRUE, FALSE),
+      array('google.com',       TRUE, TRUE),
+      array('news.google.co.uk',       TRUE, TRUE),
+      array('xn--fsqu00a.xn--0zwm56d', TRUE, TRUE),
+      array('goo gle.com',     FALSE, FALSE),
+      array('google..com',     FALSE, FALSE),
+      array('google.com ',     FALSE, FALSE),
+      array('google-.com',     FALSE, FALSE),
+      array('.google.com',     FALSE, FALSE),
+      array('<script',         FALSE, FALSE),
+      array('alert(',          FALSE, FALSE),
+      array('.',               FALSE, FALSE),
+      array('..',              FALSE, FALSE),
+      array(' ',               FALSE, FALSE),
+      array('-',               FALSE, FALSE),
+      array('',                FALSE, FALSE),
+      array('__',              FALSE, FALSE),
+    );
+  }
+
+  /**
+   * @dataProvider providerGetTime
+   * @group datetime
+   */
+  public function testGetTime($value, $result)
+  {
+    $diff = abs((int)$result - get_time($value));
+    $this->assertLessThanOrEqual(10, $diff); // +- 10 sec
+  }
+
+  public function providerGetTime()
+  {
+    $now = time();
+    return array(
+      [ 'now',         $now ],
+      [ 'fiveminute',  $now - 300 ],      //time() - (5 * 60);
+      [ 'fourhour',    $now - 14400 ],    //time() - (4 * 60 * 60);
+      [ 'sixhour',     $now - 21600 ],    //time() - (6 * 60 * 60);
+      [ 'twelvehour',  $now - 43200 ],    //time() - (12 * 60 * 60);
+      [ 'day',         $now - 86400 ],    //time() - (24 * 60 * 60);
+      [ 'twoday',      $now - 172800 ],   //time() - (2 * 24 * 60 * 60);
+      [ 'week',        $now - 604800 ],   //time() - (7 * 24 * 60 * 60);
+      [ 'twoweek',     $now - 1209600 ],  //time() - (2 * 7 * 24 * 60 * 60);
+      [ 'month',       $now - 2678400 ],  //time() - (31 * 24 * 60 * 60);
+      [ 'twomonth',    $now - 5356800 ],  //time() - (2 * 31 * 24 * 60 * 60);
+      [ 'threemonth',  $now - 8035200 ],  //time() - (3 * 31 * 24 * 60 * 60);
+      [ 'sixmonth',    $now - 16070400 ], //time() - (6 * 31 * 24 * 60 * 60);
+      [ 'year',        $now - 31536000 ], //time() - (365 * 24 * 60 * 60);
+      [ 'twoyear',     $now - 63072000 ], //time() - (2 * 365 * 24 * 60 * 60);
+      [ 'threeyear',   $now - 94608000 ], //time() - (3 * 365 * 24 * 60 * 60);
     );
   }
 
@@ -1067,6 +1127,8 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
    */
   public function testFormatTimestamp($value, $result)
   {
+    $GLOBALS['config']['timestamp_format'] = 'Y-m-d H:i:s'; // force fixed format
+    if ($value === 'now') { $result = date('Y-m-d H:i:s'); } // force same times
     $this->assertSame($result, format_timestamp($value));
   }
 
@@ -1075,6 +1137,7 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
     return array(
       array('Aug 30 2014',      '2014-08-30 00:00:00'),
       array('2012-04-18 14:25', '2012-04-18 14:25:00'),
+      array('now',              date('Y-m-d H:i:s')),
       array('Star Wars',        'Star Wars'),
     );
   }
@@ -1121,7 +1184,14 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   public function providerUnitStringToNumeric()
   {
     $results = array(
-      array('Sweet',                             'Sweet'), // String should stay string
+      // String should stay string
+      array('Sweet',                             'Sweet'),
+      array('acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline', 'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline'),
+      // Version string
+      array('15.1R5.5',                       '15.1R5.5'),
+      // Unknown unit
+      array('15.1R',                             '15.1R'),
+
       array(array('1'),                       array('1')), // Array should stay array
       array(TRUE,                                   TRUE), // Boolean should stay boolean
       array(NULL,                                   NULL), // NULL should stay NULL
@@ -1147,6 +1217,8 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array('50M',                        50*1024*1024.0),
       array('26MB',                       26*1024*1024.0),
       array('12.5MB',                   12.5*1024*1024.0),
+      array('512 MB',                    512*1024*1024.0),
+      array('119.1 GB',           119.1*1024*1024*1024.0), // Hrm, inaccurate 127882651200
       array('42 MByte',                   42*1024*1024.0),
       array('1 Mbyte',                     1*1024*1024.0),
       array('15Mb',                       15*1000*1000.0),
@@ -1171,6 +1243,9 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array('3 Tbit',            3*1000*1000*1000*1000.0),
       array('3.5 Tbit',        3.5*1000*1000*1000*1000.0),
       array('5 Tbps',            5*1000*1000*1000*1000.0),
+      // IEC prefixes
+      array('1024 MiB',                 1024*1024*1024.0),
+      array('1 ZiB', 1024*1024*1024*1024*1024*1024*1024.0),
     );
     return $results;
   }
@@ -1195,6 +1270,29 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
       array('1,2,3,5,7,9,10,11,12,14,0,-1', ', ', TRUE, '-1-3, 5, 7, 9-12, 14'),
       array(',', ',', TRUE, ''),
       array('edwd', ',', TRUE, ''),
+    );
+  }
+
+  /**
+   * @dataProvider providerListToRange
+   * @group numbers
+   */
+  public function testListToRange($result, $separator, $sort, $value)
+  {
+    //$arr = explode(',', $value);
+    $this->assertSame($result, list_to_range($value, $separator, $sort));
+  }
+
+  public function providerListToRange()
+  {
+    return array(
+      array([ 0 ], ',', TRUE, '0'),
+      array([ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ], ',', TRUE, '1-10'),
+      array([ -1, 0, 1, 2, 3, 5, 7, 9, 10, 11, 12, 14 ], ',', TRUE, '-1-3,5,7,9-12,14'),
+      array([ 1, 2, 3, 5, 7, 9, 10, 11, 12, 14, 0, -1 ], ',', FALSE, '1-3,5,7,9-12,14,0,-1'),
+      array([ -1, 0, 1, 2, 3, 5, 7, 9, 10, 11, 12, 14 ], ', ', TRUE, '-1-3, 5, 7, 9-12, 14'),
+      //array(',', ',', TRUE, ''),
+      //array('edwd', ',', TRUE, ''),
     );
   }
 
@@ -1658,6 +1756,44 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   }
 
   /**
+   * @dataProvider providerGetVarCsv
+   * @group vars
+   */
+  public function testGetVarCsv($var, $encoded, $result)
+  {
+    $this->assertSame($result, get_var_csv($var, $encoded));
+  }
+
+  public function providerGetVarCsv()
+  {
+    $var_encoded        = 'WzMuMTQwMDAwMDAwMDAwMDAwMSwiMCIsIlllbGxvdyBTdWJtYXJpbmUiLHRydWVd';
+    $var_encoded_quoted = '"WzMuMTQwMDAwMDAwMDAwMDAwMSwiMCIsIlllbGxvdyBTdWJtYXJpbmUiLHRydWVd"';
+    $var_string         = 'aksdlasmd';
+    $var_string_list    = 'asdjknd,aksjdnasd,adadda';
+    $var_string_csv     = '"asdjknd","aksjdnasd","adadda"';
+    $var_array          = [ 'asdasd', 'asdasd' ];
+
+    $array = [
+      // No decode
+      [ $var_encoded,         FALSE, $var_encoded ],
+      [ $var_encoded_quoted,  FALSE, $var_encoded ],
+      [ $var_string,          FALSE, $var_string ],
+      [ $var_string_list,     FALSE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+      [ $var_string_csv,      FALSE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+      [ $var_array,           FALSE, $var_array ],
+      // Decode
+      [ $var_encoded,          TRUE, [ 3.14, '0', 'Yellow Submarine', TRUE ] ],
+      [ $var_encoded_quoted,   TRUE, $var_encoded ],
+      [ $var_string,           TRUE, $var_string ],
+      [ $var_string_list,      TRUE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+      [ $var_string_csv,       TRUE, [ 'asdjknd', 'aksjdnasd', 'adadda' ] ],
+      [ $var_array,            TRUE, $var_array ],
+    ];
+
+    return $array;
+  }
+
+  /**
    * @dataProvider providerIsArrayAssoc
    * @group arrays
    */
@@ -1689,9 +1825,9 @@ class IncludesCommonTest extends \PHPUnit\Framework\TestCase
   {
     if ($incase)
     {
-      $this->assertSame($result, str_icontains($string, $needle, $encoding));
+      $this->assertSame($result, str_iexists($string, $needle, $encoding));
     } else {
-      $this->assertSame($result, str_contains($string, $needle, $encoding));
+      $this->assertSame($result, str_exists($string, $needle, $encoding));
     }
   }
 

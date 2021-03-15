@@ -1,0 +1,428 @@
+-- *****************************************************************
+-- MY CLUSTER MIB V1.0
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+
+
+DES7200-CLUSTER-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, 
+    Integer32
+        FROM SNMPv2-SMI
+    MacAddress, TimeStamp, DisplayString, RowStatus
+        FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP
+        FROM SNMPv2-CONF
+    EnabledStatus
+        FROM P-BRIDGE-MIB
+    myMgmt
+                FROM DES7200-SMI;
+
+myClusterMIB MODULE-IDENTITY
+    LAST-UPDATED "200304010000Z"
+    ORGANIZATION "$Company$"
+    CONTACT-INFO
+            " 
+            Tel: $Telephone$ 
+
+            E-mail: $E-mail$"
+    DESCRIPTION
+            "The MIB module for the management of a group of
+            devices called a 'cluster'.  A cluster comprises:
+
+            1. A command switch, which is a device that can provide
+               a single point of management (including SNMP, Web
+               Console and CLI/Telnet Console) for the devices
+               in the cluster;
+
+            2. Zero or more expansion switches, or called the
+               cluster members throughout the context of this MIB,
+               which are devices that can be managed via a command 
+               switch.  The command switch is also considered as a 
+               cluster member.  Thus it has an entry in the MIB tables
+               defined below for cluster members.
+
+            Only the command switch IP address, passwords, and SNMP
+            community strings need to be configured in order to
+            provide management access to members of the cluster.
+
+            The Entity MIB is not cross-referenced from this MIB.
+            
+            To determine if a particular device can be a command switch
+            or a member switch please refer to the device's
+            user's guide."
+    REVISION  "200304010000Z"
+    DESCRIPTION
+            "Initial version of this mib."
+    ::= { myMgmt 31 }
+
+myClusterMIBObjects OBJECT IDENTIFIER ::= { myClusterMIB 1 }
+
+-- MIB contains 3 groups
+
+scStatus          OBJECT IDENTIFIER ::= { myClusterMIBObjects 1 }
+scMember          OBJECT IDENTIFIER ::= { myClusterMIBObjects 2 }
+scCandidate       OBJECT IDENTIFIER ::= { myClusterMIBObjects 3 }
+
+-- The Cluster Status Group
+
+scStatusClusterName OBJECT-TYPE
+    SYNTAX        DisplayString (SIZE (0..16))
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION
+            "The name of the cluster.  Cluster command switch
+             functionality is only enabled if this object is
+             a non-NULL string.  Strings containing all blanks
+             or a NULL string will disable the cluster.
+             This object and scStatusClusterMode in this MIB are
+             the only objects that will be instantiated if the
+             command switch functionality is not enabled.
+             
+             This object in command switch or candidate switch
+             is read-write, and in candidate switch will return null
+             string when retrive. But in member switch this object is
+             read-only ."
+    DEFVAL        { "" }
+    ::= { scStatus 1 }
+
+scStatusClusterMode OBJECT-TYPE
+    SYNTAX       INTEGER {
+                           commandDevice(1),
+                           memberDevice(2),
+                           none(3)
+                          }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The mode of the device.  A device can become a member
+             switch only when it is added to the cluster at the command
+             switch.  For devices that do not belong to any cluster,
+             the scStatusClusterMode is set to 'none'."
+    ::= { scStatus 2 }
+
+scStatusClusterStatus OBJECT-TYPE
+    SYNTAX	EnabledStatus
+    MAX-ACCESS	read-write
+    STATUS      current
+    DESCRIPTION
+    	    "Wether the device can be added to a cluster, if this device
+    	    is already in a cluster, will be delete from cluster(if in the 
+    	    cluster) and will never be added to any cluster."
+    DEFVAL { 1 }
+   ::= { scStatus 3 }
+
+scStatusCommanderMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The management MAC address of the command switch of the
+             cluster, ie. the CPU MAC address.
+             
+             This object is not-accessible for candidate switch."
+    ::= { scStatus 4 }
+
+scStatusTimeOfLastChange OBJECT-TYPE
+    SYNTAX        TimeStamp
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The value of sysUpTime on the command switch when
+             the last time the value of an instance of scMemberOperStatus 
+             changed.  The value 0 indicates that no member's status
+             has ever changed since commander system initialization." 
+    DEFVAL   { 0 }
+    ::= { scStatus 5 }
+
+scStatusMaxNumberOfMembers OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The maximum number of cluster members allowed in the
+             cluster.  The command switch is considered as a cluster
+             member also. the max number of cluster members is 20"
+    ::= { scStatus 6 }
+
+scStatusLastFailureAddMember OBJECT-TYPE
+    SYNTAX      INTEGER {
+                           none(1),
+                           password(2),
+                           overmax(3),
+                           noncandidate(4),
+                           memberNumberInUse(5),
+                           unreachable(6),
+                           communityStringFull(7)
+                        }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION
+            "The reason why the last NMS was unable to add a switch
+             to be a member of the cluster.
+             
+             none: Not the status defined below including success and
+                   other error status.
+
+             password:  The member has an enable password configured.
+
+             overmax:   Adding the member exceeds the maximum number of
+                        cluster members supported by the command switch.
+                        See ccStatusMaxNumberOfMembers.
+ 
+             noncandidate:  The member is not a candidate switch, or it 
+                            does not show up in the candidate table.
+
+             memberNumberInUse:  The member number is used by an existing
+                                 member in the cluster.
+                                    
+             unreachable:   The member is a candidate but is unreachable or
+                            has no connectivity.
+             
+             communityStringFull:   The member is a candidate but its 
+                                    community string table is full."
+    ::= { scStatus 7 }
+
+--           The Cluster Member Table
+
+scMemberTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ScMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one row per cluster member,
+            including the command switch."
+    ::= { scMember 1 }
+
+scMemberEntry OBJECT-TYPE
+    SYNTAX      ScMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry containing cluster management information
+            applicable to a particular cluster member. If the
+            entry contain the command switch, this entry cannot
+            be modified."
+    INDEX { scMemberMacAddress }
+    ::= { scMemberTable 1 }
+
+ScMemberEntry ::= 
+      SEQUENCE {
+               scMemberMacAddress                MacAddress,
+               scMemberNumber                    Unsigned32,
+               scMemberOperStatus                INTEGER,
+               scMemberDeviceID		         MacAddress,
+               scMemberRowStatus                 RowStatus
+      }
+
+scMemberMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The management MAC address of the member device."
+    ::= { scMemberEntry 1 }
+
+scMemberNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "An arbitrary value which uniquely identifies the 
+             cluster member switch number. It ranges from 0 to
+             scStatusMaxNumberOfMembers - 1. incluing the command
+             switch."
+    ::= { scMemberEntry 2 }
+
+scMemberOperStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                           active(1),
+                           inactive(2)
+                        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The status of cluster management connectivity between
+             the command switch and a cluster member. Cluster management
+             connectivity is determined by the exchange of cluster
+             management messages between the command switch and a
+             cluster member. A member that has failed to exchange
+             cluster management messages with the command switch is
+             deemed to be inactive. Otherwise, it is deemed to be active."
+    ::= { scMemberEntry 3 }
+
+scMemberDeviceID OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The value of MacAddress used for identify the device in lldp pdu."
+    ::= { scMemberEntry 4 }
+
+scMemberRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this conceptual row.The
+         devices currently eligible to be added into the
+         cluster are listed in the scCandidateTable.
+         An attempt to add a new member may fail.  See
+         scStatusLastFailureAddMember for possible reasons
+         for that failure,consider security ,the value of 
+         active is not be used."
+    ::= { scMemberEntry 5 }
+
+--           The Cluster Candidate Table
+
+scCandidateTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ScCandidateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains one row per cluster candidate,
+             A cluster candidate is a device that is currently
+             eligible to be added to the cluster of a command
+             switch.  A device is eligible if it satisfies the
+             following conditions:
+             1. It supports the cluster management protocol.
+
+       
+             The entries in this table and the entries in 
+             scMemberTable are mutually exclusive at all
+             times.  That is, any device that is a cluster
+             member never shows up in the scCandidateTable
+             or is never a candidate at the same time .  Also, any 
+             candidate that shows up in scCandidateTable should not
+             appear in scMemberTable."
+    ::= { scCandidate 1 }
+
+scCandidateEntry       OBJECT-TYPE
+    SYNTAX      ScCandidateEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "An entry pertaining to a single candidate device."
+    INDEX { scCandidateMacAddress }
+    ::= { scCandidateTable 1 }
+
+ScCandidateEntry ::= SEQUENCE {
+      scCandidateMacAddress    MacAddress
+}
+
+scCandidateMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The management MAC address of a device qualified to
+             to be a cluster member of the command switch 
+             cluster."
+    ::= { scCandidateEntry 1 }
+
+-- traps definition    
+    
+myClusterTraps OBJECT IDENTIFIER ::= { myClusterMIB 2 }
+
+memberStateChangeTrap    NOTIFICATION-TYPE
+                OBJECTS { scMemberOperStatus}
+                STATUS  current
+                DESCRIPTION
+                    "while the state of member switch changed, then this trap will be sent.
+                    either state of member switch change from active to inactive or from
+                    inactive to active."
+            ::= { myClusterTraps 1}
+
+
+-- Conformance Information
+
+myClusterMIBConformance OBJECT IDENTIFIER ::= { myClusterMIB 3 }
+myClusterMIBCompliances OBJECT IDENTIFIER
+            ::= { myClusterMIBConformance 1 }
+myClusterMIBGroups      OBJECT IDENTIFIER
+            ::= { myClusterMIBConformance 2 }
+
+-- Compliance statements
+
+myClusterCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for the CLUSTER MIB."
+    MODULE  -- this module
+    MANDATORY-GROUPS { myClusterStatusGroup,
+                       myClusterMemberStatusGroup,
+                       myClusterMemberGroup,
+                       myClusterCandidateGroup }
+    ::= { myClusterMIBCompliances 1 }
+
+-- MIB groupings
+
+myClusterStatusGroup  OBJECT-GROUP
+    OBJECTS {
+             scStatusTimeOfLastChange,
+             scStatusMaxNumberOfMembers,
+             scStatusLastFailureAddMember
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the status of the cluster.  These objects are accessible
+             on the command switch."
+    ::= { myClusterMIBGroups 1 }
+
+myClusterMemberStatusGroup OBJECT-GROUP
+    OBJECTS {
+             scStatusClusterName, 
+             scStatusClusterMode,
+             scStatusClusterStatus,
+             scStatusCommanderMacAddress
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the status of members of the cluster.  These objects are accessible
+             on the cluster members and the command switch."
+    ::= { myClusterMIBGroups 2 }
+    
+myClusterCandidateStatusGroup OBJECT-GROUP
+    OBJECTS {
+             scStatusClusterName, 
+             scStatusClusterMode,
+             scStatusClusterStatus
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the status of single switches which are not in any cluster.  
+             These objects are accessible on any single switch."
+    ::= { myClusterMIBGroups 3 }
+
+myClusterMemberGroup    OBJECT-GROUP
+    OBJECTS {
+             scMemberOperStatus,
+             scMemberNumber,
+             scMemberDeviceID,
+             scMemberRowStatus
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             the members of a cluster.  These objects are accessible
+             on the command switch only."
+    ::= { myClusterMIBGroups 4 }
+
+myClusterCandidateGroup    OBJECT-GROUP
+    OBJECTS {
+             scCandidateMacAddress
+            }
+    STATUS  current
+    DESCRIPTION
+            "The collection of objects which are used to represent
+             cluster candidates.  These objects are accessible
+             on the command switch only."
+    ::= { myClusterMIBGroups 5 }
+
+END

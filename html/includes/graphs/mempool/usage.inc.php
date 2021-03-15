@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -36,13 +35,13 @@ if($width > "500")
   $rrd_options .= " COMMENT:'".substr(str_pad($unit_text, $descr_len+5),0,$descr_len+5)."Total      Used      Free\l'";
 }
 
-$descr = rrdtool_escape(rewrite_hrDevice($mempool['mempool_descr']), $descr_len);
+$descr = rrdtool_escape(rewrite_entity_name($mempool['mempool_descr'], 'mempool'), $descr_len);
 
 $perc  = round($mempool['mempool_perc'], 0);
 $background = get_percentage_colours($perc);
 
-$rrd_options .= " DEF:".$mempool['mempool_id']."used=$rrd_filename:used:AVERAGE";
-$rrd_options .= " DEF:".$mempool['mempool_id']."free=$rrd_filename:free:AVERAGE";
+$rrd_options .= " DEF:".$mempool['mempool_id']."used=$rrd_filename_escape:used:AVERAGE";
+$rrd_options .= " DEF:".$mempool['mempool_id']."free=$rrd_filename_escape:free:AVERAGE";
 $rrd_options .= " CDEF:".$mempool['mempool_id']."size=".$mempool['mempool_id']."used,".$mempool['mempool_id']."free,+";
 $rrd_options .= " CDEF:".$mempool['mempool_id']."perc=".$mempool['mempool_id']."used,".$mempool['mempool_id']."size,/,100,*";
 $rrd_options .= " CDEF:".$mempool['mempool_id']."percx=100,".$mempool['mempool_id']."perc,-";

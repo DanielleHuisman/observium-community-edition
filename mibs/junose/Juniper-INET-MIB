@@ -1,0 +1,332 @@
+
+-- *****************************************************************************
+-- Juniper-IPv6-MIB
+--
+-- Juniper Networks Enterprise MIB
+--   Extensions for IPv6 Protocol Management
+--
+-- Copyright (c) 2010 Juniper Networks, Inc.
+--   All Rights Reserved.
+-- *****************************************************************************
+
+Juniper-INET-MIB  DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    IpAddress, Integer32, Gauge32,
+    Counter32, Unsigned32, Opaque              FROM SNMPv2-SMI
+    RowStatus                          FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP    FROM SNMPv2-CONF
+    InterfaceIndexOrZero               FROM IF-MIB
+    InetAddress, InetAddressType, InetAddressIPv6,
+    InetAddressPrefixLength,
+    InetAutonomousSystemNumber         FROM INET-ADDRESS-MIB  
+    juniMibs                             FROM Juniper-MIBs;
+
+
+juniInetMIB  MODULE-IDENTITY
+    LAST-UPDATED "201008030930Z"  -- 03-Aug-10 03:00 PM EST
+    ORGANIZATION "Juniper Networks, Inc."
+    CONTACT-INFO
+        "       Juniper Networks, Inc.
+        Postal: 10 Technology Park Drive
+                Westford, MA  01886-3146
+                USA
+        Tel:    +1 978 589 5800
+        E-mail: mib@Juniper.net"
+    DESCRIPTION
+        "The INET Protocol MIB for the Juniper Networks enterprise."
+    -- Revision History
+    REVISION      "201008030930Z"  -- 03-Aug-10 03:00 PM EST  - JUNOSe 12.0
+    DESCRIPTION
+        "Initial version of this MIB module."
+    ::= { juniMibs 82 }
+   
+ 
+-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Managed objects
+-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+juniInetObjects     OBJECT IDENTIFIER ::= { juniInetMIB 1 }
+
+juniInetRoute       OBJECT IDENTIFIER ::= { juniInetObjects 1 }    
+
+--
+-- Extensions to INET CIDR ROUTE TABLE [currently used for v6 only]   
+--
+juniInetStaticRouteTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF JuniInetStaticRouteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Table of static routes configured on this entity.
+
+        The object definitions and indexing for this table are chosen to closely
+        align with the protocol independent IP-FORWARD-MIB's inetCidrRouteTable.
+        
+        Currently only IPv6 static route table is extended here."
+    ::= { juniInetRoute 1 }
+
+juniInetStaticRouteEntry  OBJECT-TYPE
+    SYNTAX      JuniInetStaticRouteEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Attributes of a static route." 
+    INDEX   { juniInetRouteDestType,
+              juniInetRouteDest,
+              juniInetRoutePfxLen,
+              juniInetRoutePolicy,
+              juniInetRouteNextHopType,
+              juniInetRouteNextHop,
+              juniInetRouteStaticPref }
+    ::= { juniInetStaticRouteTable 1 }
+
+JuniInetStaticRouteEntry ::= SEQUENCE {    
+	             juniInetRouteDestType          InetAddressType,
+                 juniInetRouteDest              InetAddress,
+                 juniInetRoutePfxLen            InetAddressPrefixLength,
+                 juniInetRoutePolicy            OBJECT IDENTIFIER,
+                 juniInetRouteNextHopType       InetAddressType,
+                 juniInetRouteNextHop           InetAddress,
+                 juniInetRouteStaticPref        Integer32,				 
+				 juniInetRouteStaticRowStatus   RowStatus,
+                 juniInetRouteIfIndex           InterfaceIndexOrZero,     
+                 juniInetRouteStaticStatus      INTEGER,				 
+                 juniInetRouteStaticNextHopAS   Integer32,
+                 juniInetRouteStaticMetric      Integer32,
+                 juniInetRouteStaticTag         Unsigned32,
+                 juniInetRouteStaticNullIntf    INTEGER }
+     
+juniInetRouteDestType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The type of the inetCidrRouteDest address, as defined
+            in the InetAddress MIB.
+
+            Only those address types that may appear in an actual
+            routing table are allowed as values of this object."
+    REFERENCE "RFC 4001"
+    ::= { juniInetStaticRouteEntry 1 }
+
+juniInetRouteDest OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The destination IP address of this route.
+
+            The type of this address is determined by the value of
+            the inetCidrRouteDestType object.
+
+            The values for the index objects inetCidrRouteDest and
+            inetCidrRoutePfxLen must be consistent.  When the value
+            of inetCidrRouteDest (excluding the zone index, if one
+            is present) is x, then the bitwise logical-AND
+            of x with the value of the mask formed from the
+            corresponding index object inetCidrRoutePfxLen MUST be
+            equal to x.  If not, then the index pair is not
+            consistent and an inconsistentName error must be
+            returned on SET or CREATE requests."
+    ::= { juniInetStaticRouteEntry 2 }
+
+juniInetRoutePfxLen OBJECT-TYPE
+    SYNTAX     InetAddressPrefixLength
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "Indicates the number of leading one bits that form the
+            mask to be logical-ANDed with the destination address
+            before being compared to the value in the
+
+            inetCidrRouteDest field.
+
+            The values for the index objects inetCidrRouteDest and
+            inetCidrRoutePfxLen must be consistent.  When the value
+            of inetCidrRouteDest (excluding the zone index, if one
+            is present) is x, then the bitwise logical-AND
+            of x with the value of the mask formed from the
+            corresponding index object inetCidrRoutePfxLen MUST be
+            equal to x.  If not, then the index pair is not
+            consistent and an inconsistentName error must be
+            returned on SET or CREATE requests."
+    ::= { juniInetStaticRouteEntry 3 }
+
+juniInetRoutePolicy OBJECT-TYPE
+    SYNTAX     OBJECT IDENTIFIER
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "This object is an opaque object without any defined
+            semantics.  Its purpose is to serve as an additional
+            index that may delineate between multiple entries to
+            the same destination.  The value { 0 0 } shall be used
+            as the default value for this object."
+    ::= { juniInetStaticRouteEntry 4 }
+
+juniInetRouteNextHopType OBJECT-TYPE
+    SYNTAX     InetAddressType
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "The type of the inetCidrRouteNextHop address, as
+            defined in the InetAddress MIB.
+
+            Value should be set to unknown(0) for non-remote
+            routes.
+
+            Only those address types that may appear in an actual
+            routing table are allowed as values of this object."
+    REFERENCE "RFC 4001"
+    ::= { juniInetStaticRouteEntry 5 }
+
+juniInetRouteNextHop OBJECT-TYPE
+    SYNTAX     InetAddress
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+           "On remote routes, the address of the next system en
+
+            route.  For non-remote routes, a zero length string.
+
+            The type of this address is determined by the value of
+            the inetCidrRouteNextHopType object."
+    ::= { juniInetStaticRouteEntry 6 }
+
+juniInetRouteStaticPref  OBJECT-TYPE
+    SYNTAX      Integer32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The preference of this static route.  Higher values correspond to
+        higher preference.  A static route with preference of zero will never be
+        installed as an active route."
+    ::= { juniInetStaticRouteEntry 7 }
+
+juniInetRouteStaticRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The row status variable, used according to row installation and removal
+        conventions."
+    ::= { juniInetStaticRouteEntry 8 }
+	
+juniInetRouteIfIndex OBJECT-TYPE
+    SYNTAX     InterfaceIndexOrZero
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+           "The ifIndex value that identifies the local interface
+            through which the next hop of this route should be
+            reached.  A value of 0 is valid and represents the
+            scenario where no interface is specified."
+    ::= { juniInetStaticRouteEntry 9 }
+
+juniInetRouteStaticStatus  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    active(0),
+                    inactive(1),
+                    incomplete(2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational status of this static route.
+
+        active(0) indicates this route is currently being used to reach the
+        specified destination.
+
+        inactive(1) indicates this route is considered valid, but currently is
+        superseded by another routing table entry for the destination, having a
+        higher preference value.
+
+        incomplete(2) indicates this route entry contains information that is
+        incomplete, or is inconsistent with other system configuration (for
+        example, the interface specified in juniIpRouteStaticIfIndex does not
+        exist)."
+    ::= { juniInetStaticRouteEntry 10 }
+	
+juniInetRouteStaticNextHopAS  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The Autonomous System Number of the Next Hop.  The semantics of this
+        object are determined by the routing-protocol specified in the route's
+        ipCidrRouteProto value.  When this object is unknown or not relevant its
+        value should be set to zero."
+    DEFVAL    { 0 }
+    ::= { juniInetStaticRouteEntry 11 }
+
+juniInetRouteStaticMetric  OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The primary routing metric for this route.  The semantics of this
+        metric are determined by the routing-protocol specified in the route's
+        ipCidrRouteProto value.  If this metric is not used, its value should be
+        set to -1."
+    DEFVAL    { -1 }
+    ::= { juniInetStaticRouteEntry 12 }
+
+juniInetRouteStaticTag  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A tag value for this static route."  
+    DEFVAL    { 0 }
+    ::= { juniInetStaticRouteEntry 13 }   
+            
+juniInetRouteStaticNullIntf  OBJECT-TYPE
+    SYNTAX     INTEGER {
+                   discard(1),
+                   reject(2) }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+        "This variable configures a static route with null0 as nexthop to 
+        reject/discard packets on the ingress"
+    DEFVAL     { discard }
+    ::= { juniInetStaticRouteEntry 14 }
+
+-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-- Conformance information
+-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+juniInetConformance     OBJECT IDENTIFIER ::= { juniInetMIB 2 }
+juniInetCompliances     OBJECT IDENTIFIER ::= { juniInetConformance 1 }
+juniInetGroups          OBJECT IDENTIFIER ::= { juniInetConformance 2 }
+
+--
+-- compliance statements
+--
+juniInetCompliance  MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for entities which implement the Juniper INET
+        MIB."
+    MODULE   -- this module
+        MANDATORY-GROUPS {
+            juniInetRouteGroup }
+    ::= { juniInetCompliances 1 }                                  -- JUNOSe 12.0
+    
+--
+-- units of conformance
+--
+juniInetRouteGroup  OBJECT-GROUP
+    OBJECTS {
+	    juniInetRouteStaticRowStatus,
+        juniInetRouteIfIndex,
+		juniInetRouteStaticStatus,
+        juniInetRouteStaticNextHopAS,
+        juniInetRouteStaticMetric,
+        juniInetRouteStaticTag,
+        juniInetRouteStaticNullIntf }
+    STATUS      current
+    DESCRIPTION
+        "A collection of objects for managing INET routing capabilities in a
+        Juniper product."
+    ::= { juniInetGroups 1 }                                        -- JUNOSe 12.0
+END

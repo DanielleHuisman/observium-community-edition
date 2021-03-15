@@ -14,14 +14,18 @@
 
 namespace Ramsey\Uuid;
 
+use DateTime;
+use JsonSerializable;
 use Ramsey\Uuid\Converter\NumberConverterInterface;
+use Ramsey\Uuid\Exception\UnsatisfiedDependencyException;
 use Ramsey\Uuid\Exception\UnsupportedOperationException;
+use Serializable;
 
 /**
  * UuidInterface defines common functionality for all universally unique
  * identifiers (UUIDs)
  */
-interface UuidInterface extends \JsonSerializable, \Serializable
+interface UuidInterface extends JsonSerializable, Serializable
 {
     /**
      * Compares this UUID to the specified UUID.
@@ -121,8 +125,10 @@ interface UuidInterface extends \JsonSerializable, \Serializable
      * has version type 1. If this UUID is not a time-based UUID then
      * this method throws `UnsupportedOperationException`.
      *
-     * @return \DateTime A PHP DateTime representation of the date
+     * @return DateTime A PHP DateTime representation of the date
      * @throws UnsupportedOperationException If this UUID is not a version 1 UUID
+     * @throws UnsatisfiedDependencyException if called in a 32-bit system and
+     *     `Moontoast\Math\BigNumber` is not present
      */
     public function getDateTime();
 
@@ -131,6 +137,7 @@ interface UuidInterface extends \JsonSerializable, \Serializable
      * representation.
      *
      * @return mixed Converted representation of the unsigned 128-bit integer value
+     * @throws UnsatisfiedDependencyException if `Moontoast\Math\BigNumber` is not present
      */
     public function getInteger();
 

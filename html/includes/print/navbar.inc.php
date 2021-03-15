@@ -327,7 +327,7 @@ function navbar_submenu($entry, $level = 1)
 
   foreach ($entry['entries'] as $subentry)
   {
-    if (count($subentry['entries']))
+    if (isset($subentry['entries']) && count($subentry['entries']))
     {
       navbar_submenu($subentry, $level+1);
     } else {

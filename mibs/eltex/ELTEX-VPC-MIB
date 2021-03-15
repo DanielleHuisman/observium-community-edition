@@ -1,0 +1,1243 @@
+ELTEX-VPC-MIB DEFINITIONS ::= BEGIN
+
+-- Title:   ELTEX VPC MIB
+-- Version: 1.0
+-- Date:    17 September 2018
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, Unsigned32, IpAddress
+         FROM SNMPv2-SMI
+
+    TruthValue, RowStatus, MacAddress
+         FROM SNMPv2-TC
+
+    InterfaceIndex
+         FROM IF-MIB
+
+    eltexLtd
+         FROM ELTEX-SMI-ACTUAL;
+
+eltexVpcMIB MODULE-IDENTITY
+    LAST-UPDATED "201810310000Z"
+    ORGANIZATION "Eltex Enterprise, Ltd."
+        CONTACT-INFO
+          "www.eltex-co.ru"
+    DESCRIPTION
+        "The ELTEX-VPC-MIB is used for management of the VPC(MLAG) configuration"
+    REVISION     "201809170000Z"
+    DESCRIPTION  "Initial revision of ELTEX-VPC-MIB."
+    ::= { eltexLtd 125 }
+    
+--**************************************************************************************
+-- Textual Conventions.
+
+
+
+
+eltexVpcMIBObjects                  OBJECT IDENTIFIER ::= { eltexVpcMIB 1 }
+
+--**************************************************************************************
+-- eltexVpcConfigGroup
+--
+--**************************************************************************************
+
+  eltexVpcConfigGroup            OBJECT IDENTIFIER ::= { eltexVpcMIBObjects 1 }
+
+     eltexVpcMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enabled(1),
+                     disabled(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To enable VPC globally. The VPC role election happens if both
+                      the VPC feature is enabled and if the keepalive state machine is
+                      enabled.
+                      The following options are supported:
+
+                      Note: VPC is supported only on standalone device. VPC is not supported on
+                      stacked devices. VPC behavior is undefined if the device is stacked with
+                      one another.
+                     "
+          ::= { eltexVpcConfigGroup 1 }
+
+     eltexVpcDomainConfigTable        OBJECT-TYPE
+         SYNTAX        SEQUENCE OF EltexVpcDomainConfigEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain config table."
+          ::= { eltexVpcConfigGroup 2 }
+
+     eltexVpcDomainConfigEntry       OBJECT-TYPE
+         SYNTAX        EltexVpcDomainConfigEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain config entry."
+         INDEX         { eltexVpcDomainIndex }
+          ::= { eltexVpcDomainConfigTable 1 }
+
+     EltexVpcDomainConfigEntry ::= SEQUENCE {
+         eltexVpcDomainIndex
+             Unsigned32,
+         eltexVpcDomainPeerLink
+             InterfaceIndex,
+         eltexVpcDomainKeepalivePriority
+             Unsigned32,
+         eltexVpcDomainKeepaliveTimeout
+             Unsigned32,
+         eltexVpcDomainKeepaliveMode
+             INTEGER,
+         eltexVpcDomainSystemMac
+             MacAddress,
+         eltexVpcDomainSystemPriority
+             Unsigned32,
+         eltexVpcDomainPeerDetectionMode
+             INTEGER,
+         eltexVpcDomainPeerDetectionInterval
+             Unsigned32,
+         eltexVpcDomainPeerDetectionTimeout
+             Unsigned32,
+         eltexVpcDomainPeerIpAddr
+             IpAddress,
+         eltexVpcDomainSourceIpAddr
+             IpAddress,
+         eltexVpcDomainDcpdpUdpPort
+             Unsigned32,
+         eltexVpcDomainStatus
+             RowStatus
+         }
+
+    eltexVpcDomainIndex   OBJECT-TYPE
+         SYNTAX      Unsigned32(1..255)
+         MAX-ACCESS  read-write 
+         STATUS      current
+         DESCRIPTION
+                     "VPC Domain ID."
+          ::= { eltexVpcDomainConfigEntry 1 }
+
+     eltexVpcDomainPeerLink OBJECT-TYPE
+         SYNTAX      InterfaceIndex
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configures a port channel as the VPC peer link.
+                      The configurable range is a valid port channel interface index."
+          ::= { eltexVpcDomainConfigEntry 2 }
+          
+    eltexVpcDomainKeepalivePriority OBJECT-TYPE
+         SYNTAX      Unsigned32(1..255)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the priority of the VPC switch. This value is used
+                      for the VPC role election.
+                      Note: The VPC switch with lower priority becomes the Primary. If
+                            both the VPC peer switches have the same role priority, the
+                            device with lower system MAC address becomes the Primary.
+                            "
+          DEFVAL {100}
+          ::= { eltexVpcDomainConfigEntry 3 }
+
+    eltexVpcDomainKeepaliveTimeout OBJECT-TYPE
+         SYNTAX      Unsigned32(2..15)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the peer keepalive timeout value (in seconds). If
+                      an VPC switch does not receive keepalive messages from the peer
+                      for this timeout value, it takes the decision to transition its
+                      role (if required).
+                      Note: The keepalive state machine is not restarted if keepalive
+                      priority is modified post election."
+          DEFVAL {5}
+          ::= { eltexVpcDomainConfigEntry 4 }
+
+      eltexVpcDomainKeepaliveMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enabled(1),
+                     disabled(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To start/stop the keepalive state machine on the VPC device, if
+                      VPC is globally enabled."
+          DEFVAL {disabled}
+          ::= { eltexVpcDomainConfigEntry 5 }
+
+     eltexVpcDomainSystemMac OBJECT-TYPE
+         SYNTAX      MacAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the MAC address for the VPC domain. This mac-address 
+                     is used in the LACP PDUs and STP BPDUs 
+                     that are sent out on VPC member ports. For the VPC domain to use 
+                     the manually configured VPC MAC address, it should be manually 
+                     configured on both the VPC peers and should be the same. If VPC 
+                     is configured on only one of the VPC peers or is configured 
+                     different on VPC peers, auto-generated MAC address is used. 
+                     The specified MAC address should be a unicast MAC address in 
+                     <aa:bb:cc:dd:ee:ff> format and should not be equal to the 
+                     MAC address of either primary VPC or secondary VPC device.  
+                     The manually configured VPC MAC address is used instead of 
+                     auto-generated VPC MAC address only if the VPC feature is 
+                     re-enabled after configuring the VPC MAC address."
+
+          ::= { eltexVpcDomainConfigEntry 6 }
+
+     eltexVpcDomainSystemPriority OBJECT-TYPE
+         SYNTAX      Unsigned32(1..65535)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the system priority for the VPC domain. This is used 
+                      in the LACP PDUs sent out on VPC member ports. System-priority 
+                      should be configured same on both the VPC peers. If the configured 
+                      VPC system priority is different on VPC peers, then VPC will not 
+                      come up."
+          DEFVAL {32767}
+          ::= { eltexVpcDomainConfigEntry 7 }
+
+     eltexVpcDomainPeerDetectionMode OBJECT-TYPE
+         SYNTAX      INTEGER {
+                     enabled(1),
+                     disabled(2)
+                  }
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To start/stop the dual control peer detection protocol on the
+                      VPC switch.
+                      The following options are supported:
+
+                      Note: The peer VPC switch's IP address has to be configured for
+                            the peer detection protocol to start on an VPC switch."
+         DEFVAL {disabled}
+          ::= { eltexVpcDomainConfigEntry 8 }
+          
+     eltexVpcDomainPeerDetectionInterval OBJECT-TYPE
+         SYNTAX      Unsigned32(200..4000)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the peer detection protocol transmission interval.
+                     Configurable range is 200 to 4000 mseconds."
+         DEFVAL {700}
+          ::= { eltexVpcDomainConfigEntry 9 }
+
+     eltexVpcDomainPeerDetectionTimeout OBJECT-TYPE
+         SYNTAX      Unsigned32(700..14000)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the peer detection protocol reception timeout.
+                     Configurable range is 700 to 14000 mseconds."
+         DEFVAL {5000}
+          ::= { eltexVpcDomainConfigEntry 10 }
+
+     eltexVpcDomainPeerIpAddr OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure IP address of the peer VPC switch. This
+                      configuration is used by the dual control plane detection
+                      protocol on the VPC switches.
+
+                      NOTE: In order to set value for the object, need to set values for 
+                      IP address of the peer VPC switch and destination IP of the peer 
+                      detection protocol message simultaneously."
+          DEFVAL {'00000000'H}
+          ::= { eltexVpcDomainConfigEntry 11 }
+
+     eltexVpcDomainSourceIpAddr OBJECT-TYPE
+         SYNTAX      IpAddress
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure Self IP address of the VPC switch that is used as
+                      the source IP by the dual control plane detection protocol 
+                      on the VPC switches.
+
+                      NOTE: In order to set value for the object, need to set values for 
+                      IP address of the peer VPC switch and destination IP of the peer 
+                      detection protocol message simultaneously."
+          DEFVAL {'00000000'H}
+          ::= { eltexVpcDomainConfigEntry 12 }
+
+     eltexVpcDomainDcpdpUdpPort OBJECT-TYPE
+         SYNTAX      Unsigned32(1..65535)
+         MAX-ACCESS  read-write
+         STATUS      current
+         DESCRIPTION
+                     "To configure the UDP port on which the VPC switch listens to
+                      the peer detection protocol messages."
+         DEFVAL {50000}
+          ::= { eltexVpcDomainConfigEntry 13 }
+          
+     eltexVpcDomainStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                       "Status of VPC Domain."
+          ::= { eltexVpcDomainConfigEntry 14 }
+
+--**************************************************************************************
+-- eltexVpcGroupStatus
+--
+--**************************************************************************************
+
+     eltexVpcGroupConfigTable        OBJECT-TYPE
+         SYNTAX      SEQUENCE OF EltexVpcGroupConfigEntry 
+         MAX-ACCESS  not-accessible
+         STATUS      current
+         DESCRIPTION
+                     "VPC group config table."
+          ::= { eltexVpcConfigGroup 3 }
+
+     eltexVpcGroupConfigEntry       OBJECT-TYPE
+         SYNTAX         EltexVpcGroupConfigEntry
+         MAX-ACCESS     not-accessible
+         STATUS         current
+         DESCRIPTION    
+                      "VPC status entry."
+          INDEX    {eltexVpcGroupIndex}
+          ::= {  eltexVpcGroupConfigTable 1 }
+
+     EltexVpcGroupConfigEntry  ::= SEQUENCE {
+          eltexVpcGroupIndex
+              Unsigned32,
+          eltexVpcGroupDomainIndex
+              Unsigned32,
+          eltexVpcGroupPortChannelIfIndex
+              InterfaceIndex,
+          eltexVpcGroupOperationalStatus
+              INTEGER,
+          eltexVpcGroupInterfaceState
+              INTEGER,
+          eltexVpcGroupStatus
+             RowStatus
+          }
+
+     eltexVpcGroupIndex      OBJECT-TYPE
+          SYNTAX        Unsigned32 (1..63)
+          MAX-ACCESS    read-write
+          STATUS        current
+          DESCRIPTION   
+                        "VPC group Index."
+             ::= {eltexVpcGroupConfigEntry 1}
+
+    eltexVpcGroupDomainIndex   OBJECT-TYPE
+         SYNTAX      Unsigned32(1..255)
+         MAX-ACCESS  read-write 
+         STATUS      current
+         DESCRIPTION
+                     "VPC Domain Index uncluded Vpc Group"
+          ::= { eltexVpcGroupConfigEntry 2 }
+          
+     eltexVpcGroupPortChannelIfIndex      OBJECT-TYPE
+          SYNTAX        InterfaceIndex
+          MAX-ACCESS    read-write
+          STATUS        current
+          DESCRIPTION
+                      "To configures a port channel as the VPC group member port.
+                      The configurable range is a valid port channel interface index."
+             ::= {eltexVpcGroupConfigEntry 3}
+
+     eltexVpcGroupOperationalStatus    OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          enabled (1),
+                          disabled (2)
+                        }
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC operational status."
+             ::= {eltexVpcGroupConfigEntry 4}
+
+     eltexVpcGroupInterfaceState   OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          disabled (1),
+                          wait     (2),
+                          error    (3),
+                          active   (4),
+                          inactive (5)
+                        }
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "The following states of a VPC port-channel interface mean:
+                         DISABLE:  The state of a port-channel before VPC functionality is enabled on it.
+                         WAIT:     The VPC port-channel 'waits' for the VPC functionality 
+                                   to be enabled on a port-channel of the peer switch.
+                         ERROR:    After VPC is enabled on a port-channel of both peer switches, 
+                                   the DOT3AD component checks to see if all entry criteria are met 
+                                   for the port-channel to be operational. 
+                         ACTIVE:   If the entry criteria are satisfied, then the VPC interface is set 
+                                   to ACTIVE and is operationally enabled. 
+                                   Traffic is now allowed to flow through the VPC member ports.
+                         INACTIVE: If links connected to the VPC member ports are down, 
+                                   then the VPC interface is set to INACTIVE on the switch. 
+                                   The VPC will remain ACTIVE on the peer switch."
+             ::= {eltexVpcGroupConfigEntry 5}          
+
+    eltexVpcGroupStatus OBJECT-TYPE
+         SYNTAX      RowStatus
+         MAX-ACCESS  read-create
+         STATUS      current
+         DESCRIPTION
+                       "Status of VPC Group."
+          ::= { eltexVpcGroupConfigEntry 6}
+
+--**************************************************************************************
+-- eltexVpcStatusGroup
+--
+--**************************************************************************************
+
+  eltexVpcStatusGroup                      OBJECT IDENTIFIER ::= { eltexVpcMIBObjects 2 }
+
+--**************************************************************************************
+-- eltexVpcDomainStatusTable
+--
+--**************************************************************************************
+     eltexVpcDomainStatusTable        OBJECT-TYPE
+         SYNTAX        SEQUENCE OF EltexVpcDomainStatusEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain stats table."
+          ::= { eltexVpcStatusGroup 1 }
+
+     eltexVpcDomainStatusEntry       OBJECT-TYPE
+         SYNTAX        EltexVpcDomainStatusEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain stats entry."
+         INDEX         { eltexVpcDomainIndex }
+          ::= { eltexVpcDomainStatusTable 1 }
+
+     EltexVpcDomainStatusEntry ::= SEQUENCE {
+         eltexVpcDomainTotalVpcConfigured
+             Unsigned32,
+         eltexVpcDomainTotalVpcOperational
+             Unsigned32,
+         eltexVpcDomainSelfRole
+             INTEGER,
+         eltexVpcDomainOperationMode
+             INTEGER,
+         eltexVpcDomainState
+             INTEGER,
+         eltexVpcDomainOperationalSystemPriority
+             Unsigned32,
+         eltexVpcDomainOperationalMac
+             MacAddress,
+         eltexVpcDomainLocalSystemMac
+             MacAddress,
+         eltexVpcDomainPeerRole
+             INTEGER,
+         eltexVpcDomainPeerRolePriority
+             Unsigned32,
+         eltexVpcDomainPeerConfSystemPriority
+             Unsigned32,
+         eltexVpcDomainPeerOperSystemPriority
+             Unsigned32,
+         eltexVpcDomainPeerConfMac
+             MacAddress,
+         eltexVpcDomainPeerOperMac
+             MacAddress,
+         eltexVpcDomainPeerLocalSystemMac
+             MacAddress,
+         eltexVpcDomainPeerKeepaliveDetected
+             TruthValue,
+         eltexVpcDomainPeerDetectionStatus
+             TruthValue,
+         eltexVpcDomainPeerDetectionDetected
+             TruthValue
+         }
+          
+     eltexVpcDomainTotalVpcConfigured   OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of VPC's configured."
+          ::= { eltexVpcDomainStatusEntry 1 }
+          
+     eltexVpcDomainTotalVpcOperational    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of VPC's operational."
+          ::= { eltexVpcDomainStatusEntry 2 }
+          
+     eltexVpcDomainSelfRole              OBJECT-TYPE
+         SYNTAX      INTEGER {
+                       none (1),
+                       primary (2),
+                       secondary (3)
+                     }
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "VPC role."
+          ::= { eltexVpcDomainStatusEntry 3 }
+
+     eltexVpcDomainOperationMode    OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          enabled  (1),
+                          disabled (2)
+                        }
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC operational mode."
+           ::= { eltexVpcDomainStatusEntry 4 }
+
+     eltexVpcDomainState            OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          disabled   (1),
+                          listen    (2),
+                          ready     (3),
+                          primary   (4),
+                          secondary (5)
+                        }
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "The following states of a VPC mean:
+                        DISABLE:   In this state, the VPC interfaces, if any are shut down.
+                        LISTEN:    The keepalive does not advertise any packets.
+                        READY:     The keepalive component starts sending keepalive messages periodically with the state as READY.
+                        PRIMARY:   Traffic over VPC interfaces is allowed to be forwarded. 
+                                   The keepalive protocol continues to advertise keepalive messages with the state as PRIMARY.
+                        SECONDARY: Traffic over VPC interfaces is allowed to be forwarded. 
+                                   The keepalive protocol continues to advertise keepalive messages with the state as SECONDARY."
+           ::= { eltexVpcDomainStatusEntry 5 }
+
+     eltexVpcDomainOperationalSystemPriority OBJECT-TYPE
+         SYNTAX      Unsigned32(1..65535)
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "To operational the system priority for the VPC domain. This is used 
+                      in the LACP PDUs sent out on VPC member ports."
+            ::= { eltexVpcDomainStatusEntry 6 }
+
+     eltexVpcDomainOperationalMac   OBJECT-TYPE
+         SYNTAX      MacAddress
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Operational MAC address for the VPC domain. This mac-address 
+                     is used in the LACP PDUs and STP BPDUs that are sent out on 
+                     VPC member ports."
+            ::= { eltexVpcDomainStatusEntry 7 }
+
+     eltexVpcDomainLocalSystemMac   OBJECT-TYPE
+         SYNTAX      MacAddress
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Local system MAC."
+            ::= { eltexVpcDomainStatusEntry 8 }
+
+     eltexVpcDomainPeerRole         OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          none      (1),
+                          primary   (2),
+                          secondary (3)
+                        }
+         MAX-ACCESS     read-only
+         STATUS         current
+         DESCRIPTION
+                        "Vpc peer role."
+            ::= { eltexVpcDomainStatusEntry 9 }
+
+     eltexVpcDomainPeerRolePriority     OBJECT-TYPE
+          SYNTAX        Unsigned32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC peer role priority."
+            ::= { eltexVpcDomainStatusEntry 10 }
+
+     eltexVpcDomainPeerConfSystemPriority     OBJECT-TYPE
+          SYNTAX        Unsigned32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC peer configured system priority."
+            ::= { eltexVpcDomainStatusEntry 11 }
+
+     eltexVpcDomainPeerOperSystemPriority     OBJECT-TYPE
+          SYNTAX        Unsigned32
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC peer operational system priority."
+            ::= { eltexVpcDomainStatusEntry 12 }
+           
+     eltexVpcDomainPeerConfMac    OBJECT-TYPE
+          SYNTAX        MacAddress
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC peer configured MAC address."
+            ::= { eltexVpcDomainStatusEntry 13 }
+           
+     eltexVpcDomainPeerOperMac    OBJECT-TYPE
+          SYNTAX        MacAddress
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC peer operational MAC address."
+            ::= { eltexVpcDomainStatusEntry 14 }
+
+     eltexVpcDomainPeerLocalSystemMac   OBJECT-TYPE
+         SYNTAX      MacAddress
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer local system MAC."
+            ::= { eltexVpcDomainStatusEntry 15 }
+
+     eltexVpcDomainPeerKeepaliveDetected   OBJECT-TYPE
+          SYNTAX        TruthValue
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "Indicates if the VPC peer is detected over peer-link with keepalive protocol."
+           ::= { eltexVpcDomainStatusEntry 16 }
+           
+     eltexVpcDomainPeerDetectionStatus    OBJECT-TYPE
+          SYNTAX        TruthValue
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC peer detection status."
+           ::= { eltexVpcDomainStatusEntry 17 }
+
+     eltexVpcDomainPeerDetectionDetected   OBJECT-TYPE
+          SYNTAX        TruthValue
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "Indicates if the VPC peer is detected over peer detection protocol (l3 network)."
+           ::= { eltexVpcDomainStatusEntry 18 }
+
+--**************************************************************************************
+-- eltexVpcDomainPeerKeepAliveStatsTable
+--
+--**************************************************************************************
+     eltexVpcDomainPeerKeepAliveStatsTable        OBJECT-TYPE
+         SYNTAX        SEQUENCE OF EltexVpcDomainPeerKeepAliveStatsEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain KeepAlive stats table."
+          ::= { eltexVpcStatusGroup 2 }
+
+     eltexVpcDomainPeerKeepAliveStatsEntry       OBJECT-TYPE
+         SYNTAX        EltexVpcDomainPeerKeepAliveStatsEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain KeepAliveStats entry."
+         INDEX         { eltexVpcDomainIndex }
+          ::= { eltexVpcDomainPeerKeepAliveStatsTable 1 }
+
+     EltexVpcDomainPeerKeepAliveStatsEntry ::= SEQUENCE {
+         eltexVpcDomainKeepaliveOperationalMode
+             INTEGER,    
+         eltexVpcDomainPeerKeepAliveTotalTx
+             Unsigned32,
+         eltexVpcDomainPeerKeepAliveSuccessTx
+             Unsigned32,
+         eltexVpcDomainPeerKeepAliveTxErrors
+             Unsigned32,
+         eltexVpcDomainPeerKeepAliveTotalRx
+             Unsigned32,
+         eltexVpcDomainPeerKeepAliveSuccessRx
+             Unsigned32,
+         eltexVpcDomainPeerKeepAliveRxErrors
+             Unsigned32,
+         eltexVpcDomainPeerKeepAliveTimeoutCount
+             Unsigned32
+         }
+
+     eltexVpcDomainKeepaliveOperationalMode    OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          enabled  (1),
+                          disabled (2)
+                        }
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION
+                        "VPC keepalive operational mode."
+           ::= { eltexVpcDomainPeerKeepAliveStatsEntry 1 }
+             
+    eltexVpcDomainPeerKeepAliveTotalTx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Total Packets transmitted"
+          ::= { eltexVpcDomainPeerKeepAliveStatsEntry 2 }
+
+    eltexVpcDomainPeerKeepAliveSuccessTx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Successfully Transmitted Packets."
+          ::= { eltexVpcDomainPeerKeepAliveStatsEntry 3 }
+
+    eltexVpcDomainPeerKeepAliveTxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Transmit Failed Packets."
+
+          ::= { eltexVpcDomainPeerKeepAliveStatsEntry 4 }
+
+     eltexVpcDomainPeerKeepAliveTotalRx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Total Packets Received."
+          ::= { eltexVpcDomainPeerKeepAliveStatsEntry 5 }
+
+     eltexVpcDomainPeerKeepAliveSuccessRx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Successfully Received Packets."
+          ::= { eltexVpcDomainPeerKeepAliveStatsEntry 6 }
+
+      eltexVpcDomainPeerKeepAliveRxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of packets received with errors."
+          ::= { eltexVpcDomainPeerKeepAliveStatsEntry 7 }
+
+      eltexVpcDomainPeerKeepAliveTimeoutCount OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Timeout counter."
+          ::= { eltexVpcDomainPeerKeepAliveStatsEntry 8 }
+
+
+--**************************************************************************************
+-- eltexVpcPeerLinkStatsTable
+--
+--**************************************************************************************
+     eltexVpcDomainPeerLinkStatsTable        OBJECT-TYPE
+         SYNTAX        SEQUENCE OF EltexVpcDomainPeerLinkStatsEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain PeerLink stats table."
+          ::= { eltexVpcStatusGroup 3 }
+
+     eltexVpcDomainLinkStatsEntry       OBJECT-TYPE
+         SYNTAX        EltexVpcDomainPeerLinkStatsEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain KeepAliveStats entry."
+         INDEX         { eltexVpcDomainIndex }
+          ::= { eltexVpcDomainPeerLinkStatsTable 1 }
+
+     EltexVpcDomainPeerLinkStatsEntry ::= SEQUENCE {
+         eltexVpcDomainPeerLinkStatus
+             TruthValue,
+         eltexVpcDomainPeerLinkControlMsgTx
+             Unsigned32,
+         eltexVpcDomainPeerLinkTxErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkTxTimeout
+             Unsigned32,
+         eltexVpcDomainPeerLinkControlMsgAckTx
+             Unsigned32,
+         eltexVpcDomainPeerLinkControlMsgAckErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkControlMsgRx
+             Unsigned32,
+         eltexVpcDomainPeerLinkDataMsgTx
+             Unsigned32,
+         eltexVpcDomainPeerLinkDataMsgTxErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkDataMsgTxTimeout
+             Unsigned32,
+         eltexVpcDomainPeerLinkDataMsgRx
+             Unsigned32,
+         eltexVpcDomainPeerLinkBPDUTx
+             Unsigned32,
+         eltexVpcDomainPeerLinkBPDUTxErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkBPDURx
+             Unsigned32,
+         eltexVpcDomainPeerLinkBPDURxErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkLACPDUTx
+             Unsigned32,
+         eltexVpcDomainPeerLinkLACPDUTxErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkLACPDURx
+             Unsigned32,
+         eltexVpcDomainPeerLinkLACPDURxErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkBulkTx
+             Unsigned32,
+         eltexVpcDomainPeerLinkBulkTxTimeout
+             Unsigned32,
+         eltexVpcDomainPeerLinkBulkTxErrors
+             Unsigned32,
+         eltexVpcDomainPeerLinkBulkRx
+             Unsigned32,
+         eltexVpcDomainPeerLinkBulkRxErrors
+             Unsigned32
+         }
+
+     eltexVpcDomainPeerLinkStatus    OBJECT-TYPE
+         SYNTAX      TruthValue
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link operational status."
+          ::= { eltexVpcDomainLinkStatsEntry 2 }
+          
+     eltexVpcDomainPeerLinkControlMsgTx    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link control messages transmitted."
+          ::= { eltexVpcDomainLinkStatsEntry 3 }
+          
+     eltexVpcDomainPeerLinkTxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link control messages Tx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 4 }
+          
+     eltexVpcDomainPeerLinkTxTimeout OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link control messages Tx timeout."
+          ::= { eltexVpcDomainLinkStatsEntry 5 }
+          
+     eltexVpcDomainPeerLinkControlMsgAckTx    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link control messages ACK transmitted."
+          ::= { eltexVpcDomainLinkStatsEntry 6 }
+          
+     eltexVpcDomainPeerLinkControlMsgAckErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link control messages ACK Tx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 7 }
+          
+     eltexVpcDomainPeerLinkControlMsgRx  OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link control messages received."
+          ::= { eltexVpcDomainLinkStatsEntry 8 }
+          
+     eltexVpcDomainPeerLinkDataMsgTx    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link data messages transmitted."
+          ::= { eltexVpcDomainLinkStatsEntry 9 }
+          
+     eltexVpcDomainPeerLinkDataMsgTxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link data messages Tx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 10 }
+          
+     eltexVpcDomainPeerLinkDataMsgTxTimeout OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link data messages Tx timeout."
+          ::= { eltexVpcDomainLinkStatsEntry 11 }
+
+     eltexVpcDomainPeerLinkDataMsgRx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link data messages received."
+          ::= { eltexVpcDomainLinkStatsEntry 12 }
+          
+     eltexVpcDomainPeerLinkBPDUTx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link BPDU's transmitted to peer."
+          ::= { eltexVpcDomainLinkStatsEntry 13 }
+          
+     eltexVpcDomainPeerLinkBPDUTxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link BPDU's Tx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 14 }
+          
+     eltexVpcDomainPeerLinkBPDURx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link BPDU's received from peer."
+          ::= { eltexVpcDomainLinkStatsEntry 15 }
+          
+     eltexVpcDomainPeerLinkBPDURxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link BPDU's Rx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 16 }
+          
+     eltexVpcDomainPeerLinkLACPDUTx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link LACPDU's tranmsitted to peer."
+          ::= { eltexVpcDomainLinkStatsEntry 17 }
+          
+     eltexVpcDomainPeerLinkLACPDUTxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link LACPDU's Tx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 18 }
+          
+     eltexVpcDomainPeerLinkLACPDURx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link MAC-address data base received from peer."
+          ::= { eltexVpcDomainLinkStatsEntry 19 }
+          
+     eltexVpcDomainPeerLinkLACPDURxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link LACPDU's Rx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 20 }
+          
+     eltexVpcDomainPeerLinkBulkTx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link MAC-address data base tranmsitted to peer."
+          ::= { eltexVpcDomainLinkStatsEntry 21 }
+          
+     eltexVpcDomainPeerLinkBulkTxTimeout OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link MAC-address data base Tx timeout."
+          ::= { eltexVpcDomainLinkStatsEntry 22 }
+          
+     eltexVpcDomainPeerLinkBulkTxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link MAC-address data base Tx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 23 }
+          
+     eltexVpcDomainPeerLinkBulkRx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link MAC-address data base received from peer."
+          ::= { eltexVpcDomainLinkStatsEntry 24 }
+          
+     eltexVpcDomainPeerLinkBulkRxErrors OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer link MAC-address data base Rx errors."
+          ::= { eltexVpcDomainLinkStatsEntry 25 }
+
+--**************************************************************************************
+-- eltexVpcPeerDetectionStatsTable
+--
+--**************************************************************************************
+     eltexVpcDomainPeerDetectionStatsTable        OBJECT-TYPE
+         SYNTAX        SEQUENCE OF EltexVpcDomainDetectionStatsEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain peer detection protocol statistics table."
+          ::= { eltexVpcStatusGroup 4 }
+
+     eltexVpcDomainPeerDetectionStatsEntry       OBJECT-TYPE
+         SYNTAX        EltexVpcDomainDetectionStatsEntry
+         MAX-ACCESS    not-accessible
+         STATUS        current
+         DESCRIPTION
+                       "VPC domain peer detection protocol entry."
+         INDEX         { eltexVpcDomainIndex }
+          ::= { eltexVpcDomainPeerDetectionStatsTable 1 }
+
+     EltexVpcDomainDetectionStatsEntry ::= SEQUENCE {
+         eltexVpcDomainPeerDetectionEnabled
+             Unsigned32,
+         eltexVpcDomainPeerDetectionEnableFailure
+             Unsigned32,
+         eltexVpcDomainPeerDetectionDisabled
+             Unsigned32,
+         eltexVpcDomainPeerDetectionPeerTimeout
+             Unsigned32,
+         eltexVpcDomainPeerDetectionPeerAdminDisable
+             Unsigned32,
+         eltexVpcDomainPeerDetectionTx
+             Unsigned32,
+         eltexVpcDomainPeerDetectionTxError
+             Unsigned32,
+         eltexVpcDomainPeerDetectionTxFdMsg
+             Unsigned32,
+         eltexVpcDomainPeerDetectionTxFdAckMsg
+             Unsigned32,
+         eltexVpcDomainPeerDetectionRx
+             Unsigned32,
+         eltexVpcDomainPeerDetectionRxError
+             Unsigned32,
+         eltexVpcDomainPeerDetectionRxFdMsg
+             Unsigned32,
+         eltexVpcDomainPeerDetectionRxFdAckMsg
+             Unsigned32
+         }
+
+     eltexVpcDomainPeerDetectionEnabled    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of peer detection protocol enabled."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 2 }
+          
+     eltexVpcDomainPeerDetectionEnableFailure    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of peer detection protocol enabled errors."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 3 }
+          
+     eltexVpcDomainPeerDetectionDisabled OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of peer detection protocol disabled."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 4 }
+          
+     eltexVpcDomainPeerDetectionPeerTimeout OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of peer timeout detected."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 5 }
+          
+     eltexVpcDomainPeerDetectionPeerAdminDisable    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Number of peer detection protocol admin disabled."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 6 }
+          
+     eltexVpcDomainPeerDetectionTx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection messages transmitted."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 7 }
+          
+     eltexVpcDomainPeerDetectionTxError  OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection messages transmitted errors."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 8 }
+          
+     eltexVpcDomainPeerDetectionTxFdMsg    OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection fast detect messages transmitted."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 9 }
+          
+     eltexVpcDomainPeerDetectionTxFdAckMsg OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection fast detect ack messages transmitted."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 10 }
+          
+     eltexVpcDomainPeerDetectionRx OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection messages received."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 11 }
+
+     eltexVpcDomainPeerDetectionRxError OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection messages received errors."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 12 }
+          
+     eltexVpcDomainPeerDetectionRxFdMsg OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection fast detect messages received."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 13 }
+          
+     eltexVpcDomainPeerDetectionRxFdAckMsg OBJECT-TYPE
+         SYNTAX      Unsigned32
+         MAX-ACCESS  read-only
+         STATUS      current
+         DESCRIPTION
+                     "Peer detection fast detect ack messages received."
+          ::= { eltexVpcDomainPeerDetectionStatsEntry 14 }
+          
+--**************************************************************************************
+-- eltexVpcSelfMemberStatus
+--
+--**************************************************************************************
+    eltexVpcMemberStatusTable      OBJECT-TYPE
+          SYNTAX        SEQUENCE OF EltexVpcMemberStatusEntry 
+          MAX-ACCESS    not-accessible
+          STATUS        current
+          DESCRIPTION
+                        "VPC member ports status table."
+             ::= { eltexVpcStatusGroup 5 }
+
+    eltexVpcMemberStatusEntry      OBJECT-TYPE
+          SYNTAX        EltexVpcMemberStatusEntry
+          MAX-ACCESS    not-accessible
+          STATUS        current
+          DESCRIPTION    
+                        "VPC member port status entry."
+          INDEX         { eltexVpcMemberStatusVpcGroupIndex, 
+                          eltexVpcMemberStatusIfIndex }
+             ::= { eltexVpcMemberStatusTable 1 }
+
+    EltexVpcMemberStatusEntry ::= SEQUENCE {
+          eltexVpcMemberStatusVpcGroupIndex
+               Unsigned32,
+          eltexVpcMemberStatusIfIndex
+               InterfaceIndex,
+          eltexVpcSelfMemberStatusIntfState
+               INTEGER,
+          eltexVpcPeerMemberStatusIntfState
+               INTEGER
+          }
+
+    eltexVpcMemberStatusVpcGroupIndex      OBJECT-TYPE
+          SYNTAX        Unsigned32 (1..63)
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION   
+                        "VPC Group Index."
+             ::= { eltexVpcMemberStatusEntry 1 }
+
+    eltexVpcMemberStatusIfIndex     OBJECT-TYPE
+          SYNTAX        InterfaceIndex
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION   
+                        "Interface Index."
+             ::= { eltexVpcMemberStatusEntry 2 }
+
+    eltexVpcSelfMemberStatusIntfState  OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          up   (1),
+                          down (2),
+                          notpresent (3) 
+                        }
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION   
+                        "VPC self member interface status."
+             ::= { eltexVpcMemberStatusEntry 3 }
+             
+       eltexVpcPeerMemberStatusIntfState  OBJECT-TYPE
+          SYNTAX        INTEGER {
+                          up   (1),
+                          down (2),
+                          notpresent (3) 
+                        }
+          MAX-ACCESS    read-only
+          STATUS        current
+          DESCRIPTION   
+                        "VPC peer member interface status."
+             ::= { eltexVpcMemberStatusEntry 4 }
+
+--**************************************************************************************
+-- eltexVpcStatusGroup
+--
+--**************************************************************************************
+
+eltexVpcMIBNotification                  OBJECT IDENTIFIER ::= { eltexVpcMIB 2 }
+     
+     
+END

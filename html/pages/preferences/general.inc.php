@@ -1,14 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -68,6 +66,40 @@ humanize_user($user_data); // Get level_label, level_real, row_class, etc
 
         </div>
       </div>
+
+        <?php
+
+        $roles = dbFetchRows("SELECT * FROM `roles_users` LEFT JOIN `roles` USING (`role_id`) WHERE `user_id` = ? AND `auth_mechanism` = ?", [ $user_data['user_id'], $config['auth_mechanism'] ]);
+        if (is_array($roles) && count($roles))
+        {
+            ?>
+
+    <div class="box box-solid">
+        <div class="box-header">
+            <h3 class="box-title">User Roles</h3>
+        </div>
+        <div class="box-body no-padding">
+            <table class="table table-striped table-condensed">
+              <?php
+
+              foreach($roles as $role)
+              {
+                  echo '<tr><td><b>'.$role['role_name'].'</td><td>'.$role['role_descr'].'</td></tr>';
+
+                  //print_vars($role);
+              }
+
+              ?>
+            </table>
+        </div>
+    </div>
+
+            <?php
+        }
+
+
+        ?>
+
 
       </div> <!-- userinfo end -->
 
@@ -154,7 +186,7 @@ echo generate_box_close();
 if ($user_data['permission_access'] && !$user_data['permission_read'])
 {
   // Cache user permissions
-  foreach (dbFetchRows("SELECT * FROM `entity_permissions` WHERE `user_id` = ?", array($user_data['user_id'])) as $entity)
+  foreach (dbFetchRows("SELECT * FROM `entity_permissions` WHERE `user_id` = ? AND `auth_mechanism` = ?", [ $user_data['user_id'], $config['auth_mechanism'] ]) as $entity)
   {
     $user_permissions[$entity['entity_type']][$entity['entity_id']] = TRUE;
   }

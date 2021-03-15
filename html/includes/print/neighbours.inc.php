@@ -47,21 +47,35 @@ function print_neighbours($vars)
 
     $string = generate_box_open($vars['header']);
 
-    $string .= '<table class="table  table-striped table-hover table-condensed">' . PHP_EOL;
+    $string .= '<table class="table table-hover table-striped table-condensed">' . PHP_EOL;
 
     $cols = array(
-                     array(NULL, 'class="state-marker"'),
-      'device_a' => 'Local Device',
-      'port_a'   => 'Local Port',
-      'NONE'     => NULL,
-      'device_b' => 'Remote Device',
-      'port_b'   => 'Remote Port',
-      'protocol' => 'Protocol',
+      array(NULL, 'class="state-marker"'),
+      'device_a'    => 'Local Device',
+      'port_a'      => 'Local Port',
+      'NONE'        => NULL,
+      'device_b'    => 'Remote Device',
+      'port_b'      => 'Remote Port',
+      'protocol'    => 'Protocol',
+      'last_change' => 'Last changed',
     );
+    if ($_SESSION['userlevel'] > 7)
+    {
+      $cols[] = '';//'Autodiscovery'
+    }
     if (!$list['device']) { unset($cols[0], $cols['device_a']); }
     $string .= get_table_header($cols, $vars);
 
     $string .= '  <tbody>' . PHP_EOL;
+
+    $protocol_classmap = [
+      'cdp'  => 'success',
+      'lldp' => 'warning',
+      'amap' => 'primary',
+      'mndp' => 'error',
+      'fdp'  => 'delayed',
+      'edp'  => 'suppressed'
+    ];
 
     foreach ($neighbours['entries'] as $entry)
     {
@@ -70,10 +84,13 @@ function print_neighbours($vars)
       if ($list['device'])
       {
         $string .=  '   <td class="state-marker"></td>';
-        $string .= '    <td class="entity">' . generate_device_link($entry, NULL, array('tab' => 'ports', 'view' => 'neighbours')) . '</td>' . PHP_EOL;
+        $string .= '    <td><span class="entity">' . generate_device_link($entry, NULL, array('tab' => 'ports', 'view' => 'neighbours')) . '</span></td>' . PHP_EOL;
       }
-      $string .= '    <td><span class="entity">'.generate_port_link($entry) . '</span><br />' . $entry['ifAlias'] . '</td>' . PHP_EOL;
+      $port = get_port_by_id_cache($entry['port_id']);
+      $string .= '    <td><span class="entity">'.generate_port_link($port) . '</span><br />' . escape_html($port['ifAlias']) . '</td>' . PHP_EOL;
       $string .= '    <td><i class="icon-resize-horizontal text-success"></i></td>' . PHP_EOL;
+
+      //$string  .= "<td></td><td></td>";
 
       // r($entry['remote_port_id']); r($entry['remote_port']);
 
@@ -81,13 +98,40 @@ function print_neighbours($vars)
       {
         $remote_port   = get_port_by_id_cache($entry['remote_port_id']);
         $remote_device = device_by_id_cache($remote_port['device_id']);
-        $string .= '    <td><span class="entity">' . generate_device_link($remote_device) . '</span><br />' . $remote_device['hardware'] . '</td>' . PHP_EOL;
-        $string .= '    <td><span class="entity">' . generate_port_link($remote_port) . '</span><br />' . $remote_port['ifAlias'] . '</td>' . PHP_EOL;
+        $remote_info = strlen($remote_device['hardware']) ? '<br />' . escape_html($remote_device['hardware']) : '';
+        if (strlen($remote_device['version']))
+        {
+          $remote_info .= '<br /><small><i>' . $GLOBALS['config']['os'][$remote_device['os']]['text'] . '&nbsp;' .
+                          escape_html($remote_device['version']) . '</i></small>';
+        }
+        if (empty($remote_info))
+        {
+          $remote_info = '<br />' . escape_html(truncate($entry['remote_platform'], '100'));
+          if (strlen($entry['remote_version']))
+          {
+            $remote_info .= '<br /><small><i>' . escape_html(truncate($entry['remote_version'], 150)) . '</i></small>';
+          }
+        }
+        $string .= '    <td><span class="entity">' . generate_device_link($remote_device) .'</span>' . $remote_info . '</td>' . PHP_EOL;
+        $string .= '    <td><span class="entity">' . generate_port_link($remote_port) . '</span><br />' . escape_html($remote_port['ifAlias']) . '</td>' . PHP_EOL;
       } else {
-        $string .= '    <td><span class="entity">' . $entry['remote_hostname'] . '</span><br />' . $entry['remote_platform'] . '</td>' . PHP_EOL;
-        $string .= '    <td><span class="entity">' . $entry['remote_port'] . '</span></td>' . PHP_EOL;
+        $remote_ip = strlen($entry['remote_address']) ? ' ('.generate_popup_link('ip', $entry['remote_address']).')' : '';
+        $remote_version = strlen($entry['remote_version']) ? ' <br /><small><i>'.escape_html(truncate($entry['remote_version'], 150)).'</i></small>' : '';
+
+        $string .= '    <td><span class="entity">' . escape_html($entry['remote_hostname']) . $remote_ip . '</span><br />';
+        $string .= escape_html(truncate($entry['remote_platform'], '100')) . $remote_version . PHP_EOL;
+        $string .= '</td>';
+        $string .= '    <td><span class="entity">' . escape_html($entry['remote_port']) . '</span></td>' . PHP_EOL;
       }
-      $string .= '    <td>' . strtoupper($entry['protocol']) . '</td>' . PHP_EOL;
+
+      if (isset($protocol_classmap[$entry['protocol']])) { $entry['protocol_class'] = 'label-'.$protocol_classmap[$entry['protocol']]; }
+
+      $string .= '    <td><span class="label '.$entry['protocol_class'].'">' . strtoupper($entry['protocol']) . '</span></td>' . PHP_EOL;
+      $string .= '    <td class="text-nowrap">' . format_uptime(get_time() - $entry['last_change_unixtime'], 'shorter') . ' ago</td>' . PHP_EOL;
+      if ($_SESSION['userlevel'] > 7)
+      {
+        $string .= '    <td>' . generate_popup_link('autodiscovery', $entry['autodiscovery_id']) . '</td>' . PHP_EOL;
+      }
       $string .= '  </tr>' . PHP_EOL;
     }
 
@@ -122,9 +166,13 @@ function get_neighbours_array($vars)
   $start    = $array['pagesize'] * $array['pageno'] - $array['pagesize'];
   $pagesize = $array['pagesize'];
 
+  // Active by default
+  if (!isset($vars['active'])) { $vars['active'] = '1'; }
+  elseif ($vars['active'] == 'any') { unset($vars['active']); }
+
   // Begin query generate
   $param = array();
-  $where = ' WHERE `active` = 1 ';
+  $where = ' WHERE 1 ';
   foreach ($vars as $var => $value)
   {
     if ($value != '')
@@ -154,6 +202,10 @@ function get_neighbours_array($vars)
         case 'version':
           $where .= generate_query_values($value, 'remote_version');
           break;
+        case 'active':
+          $value = $value && $value != 'no' ? '1' : '0';
+          $where .= generate_query_values($value, 'active');
+          break;
         case 'remote_port_id':
           if ($value == 'NULL' || $value == 0)
           {
@@ -170,20 +222,26 @@ function get_neighbours_array($vars)
   //$query_permitted = $GLOBALS['cache']['where']['ports_permitted'];
   $query_permitted = generate_query_permitted(array('ports', 'devices'));
 
-  $query  = 'SELECT * ';
-  $query .= 'FROM `neighbours` LEFT JOIN `ports` USING(`port_id`,`device_id`) ';
+  $query  = 'SELECT `neighbours`.*, UNIX_TIMESTAMP(`last_change`) AS `last_change_unixtime` ';
+  $query .= 'FROM `neighbours` ';
+  //$query .= 'FROM `neighbours` LEFT JOIN `ports` USING(`port_id`,`device_id`) ';
   $query .= $where . ' ' . $query_permitted;
 
   // Query neighbours
   $array['entries'] = dbFetchRows($query, $param);
+  //r($array['entries']);
   foreach ($array['entries'] as &$entry)
   {
     $device = &$GLOBALS['cache']['devices']['id'][$entry['device_id']];
-    if ((isset($device['status']) && !$device['status']))
+    if (!$entry['active'])
+    {
+      $entry['row_class']     = 'disabled';
+    }
+    elseif ((isset($device['status']) && !$device['status']))
     {
       $entry['row_class']     = 'error';
     }
-    else if (isset($device['disabled']) && $device['disabled'])
+    elseif (isset($device['disabled']) && $device['disabled'])
     {
       $entry['row_class']     = 'ignore';
     }
@@ -222,6 +280,9 @@ function get_neighbours_array($vars)
       break;
     case 'protocol':
       $array['entries'] = array_sort_by($array['entries'], 'protocol', $sort_order, SORT_STRING);
+      break;
+    case 'last_change':
+      $array['entries'] = array_sort_by($array['entries'], 'last_change_unixtime', $sort_order, SORT_NUMERIC);
       break;
     default:
       // Not sorted

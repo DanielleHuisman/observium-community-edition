@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -164,18 +163,21 @@ if ($entry = get_alert_entry_by_id($vars['alert_entry']))
                                       'min'         => 'current',
                                       'value'       => ($entry['ignore_until'] ? $entry['ignore_until'] : ''));
       $form['row'][1]['ignore_until_enable'] = array(
-                                      'type'        => 'switch',
+                                      'type'        => 'toggle',
+                                      'view'        => 'toggle',
+                                      'size'        => 'big',
+                                      'palette'     => 'blue',
                                       'readonly'    => $readonly,
                                       'onchange'    => "toggleAttrib('disabled', 'ignore_until')",
                                       'value'       => !empty($entry['ignore_until']));
 
       $form['row'][2]['ignore_until_ok'] = array(
-                                      'type'        => 'switch',
+                                      'type'        => 'toggle',
                                       'name'        => 'Ignore Until OK',
                                       //'fieldset'    => 'edit',
-                                      'size'        => 'small',
-                                      'on-color'    => 'danger',
-                                      'off-color'   => 'primary',
+                                      'view'        => 'toggle',
+                                      'size'        => 'big',
+                                      'palette'     => 'blue',
                                       'readonly'    => $readonly,
                                       'value'       => $entry['ignore_until_ok']);
 

@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -33,15 +32,31 @@ if ($contact = get_contact_by_id($vars['contact_id']))
   <div class="col-sm-6">
 <?php
 
-foreach (json_decode($contact['contact_endpoint']) as $field => $value)
-{
-  $contact['endpoint_parameters'][$field] = $value;
-}
+  foreach (json_decode($contact['contact_endpoint']) as $field => $value)
+  {
+    $contact['endpoint_parameters'][$field] = $value;
+  }
 
-$data = $config['transports'][$contact['contact_method']];
-if (!count($data['parameters']['global']))   { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
-// Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
-// This needs supporting code in the transport to check for set variable and if not, use the global default
+  $transport = $contact['contact_method'];
+  if (isset($config['transports'][$transport]))
+  {
+    $data = $config['transports'][$transport];
+  } else {
+    $data = [ 'name' => nicecase($transport) . ' (Missing)',
+              'docs' => $transport];
+  }
+
+    if (isset($data['docs']))
+    {
+      // Known key in docs page (use if transport name is different with docs page)
+      $docs_link = OBSERVIUM_DOCS_URL . '/alerting_transports/#' . $data['docs'];
+    } else {
+      $docs_link = OBSERVIUM_DOCS_URL . '/alerting_transports/#' . str_replace(' ', '-', strtolower($data['name']));
+    }
+
+    if (!count($data['parameters']['global']))   { $data['parameters']['global'] = array(); } // Temporary until we separate "global" out.
+    // Plan: add defaults for transport types to global settings, which we use by default, then be able to override the settings via this GUI
+    // This needs supporting code in the transport to check for set variable and if not, use the global default
 
     $form = array('type'      => 'horizontal',
                   'id'        => 'update_contact_status',
@@ -59,7 +74,6 @@ if (!count($data['parameters']['global']))   { $data['parameters']['global'] = a
                                     'readonly'    => $readonly,
                                     'value'       => $data['name']);
 
-    $docs_link = OBSERVIUM_URL . '/docs/alerting_transports/#' . str_replace(' ', '-', strtolower($data['name']));
     $form['row'][++$row]['contact_doc'] = array(
                                     'type'        => 'html',
                                     'fieldset'    => 'body',
@@ -96,14 +110,49 @@ if (!count($data['parameters']['global']))   { $data['parameters']['global'] = a
 
     foreach (array_merge($data['parameters']['required'], $data['parameters']['global']) as $parameter => $param_data) // Temporary merge req & global
     {
-      $form['row'][++$row]['contact_endpoint_'.$parameter] = array(
-                                    'type'        => 'text',
-                                    //'fieldset'    => 'edit',
-                                    'width'       => '80%',
-                                    'name'        => $param_data['description'],
-                                    'readonly'    => $readonly,
-                                    'value'       => $contact['endpoint_parameters'][$parameter]);
-
+      switch($param_data['type'])
+      {
+        case 'enum-freeinput':
+          $form_param = [
+            'type'     => 'tags',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '100%',
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter],
+            'values'   => $param_data['params']
+          ];
+          break;
+        case 'bool':
+        case 'boolean':
+          // Boolean type is just select with true/false string
+          if (!isset($param_data['params']))
+          {
+            $param_data['params'] = ['' => 'Unset', 'true' => 'True', 'false' => 'False' ];
+          }
+        // do not break here
+        case 'enum':
+          $form_param = [
+            'type'     => 'select',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '80%',
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter],
+            'values'   => $param_data['params']
+          ];
+          break;
+        default:
+          $form_param = [
+            'type'     => 'text',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '80%',
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter]
+          ];
+      }
+      $form['row'][++$row]['contact_endpoint_'.$parameter] = $form_param;
 
       if (isset($param_data['tooltip']))
       {
@@ -127,14 +176,49 @@ if (!count($data['parameters']['global']))   { $data['parameters']['global'] = a
 
     foreach ($data['parameters']['optional'] as $parameter => $param_data)
     {
-      $form['row'][++$row]['contact_endpoint_'.$parameter] = array(
-                                    'type'        => 'text',
-                                    //'fieldset'    => 'edit',
-                                    'width'       => '80%',
-                                    'name'        => $param_data['description'],
-                                    'readonly'    => $readonly,
-                                    'value'       => $contact['endpoint_parameters'][$parameter]);
-
+      switch($param_data['type'])
+      {
+        case 'enum-freeinput':
+          $form_param = [
+            'type'     => 'tags',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '100%',
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter],
+            'values'   => $param_data['params']
+          ];
+          break;
+        case 'bool':
+        case 'boolean':
+          // Boolean type is just select with true/false string
+          if (!isset($param_data['params']))
+          {
+            $param_data['params'] = ['' => 'Unset', 'true' => 'True', 'false' => 'False' ];
+          }
+        // do not break here
+        case 'enum':
+          $form_param = [
+            'type'     => 'select',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '80%',
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter],
+            'values'   => $param_data['params']
+          ];
+          break;
+        default:
+          $form_param = [
+            'type'     => 'text',
+            //'fieldset'    => 'edit',
+            'name'     => $param_data['description'],
+            'width'    => '80%',
+            'readonly' => $readonly,
+            'value'    => $contact['endpoint_parameters'][$parameter]
+          ];
+      }
+      $form['row'][++$row]['contact_endpoint_'.$parameter] = $form_param;
 
       if (isset($param_data['tooltip']))
       {
@@ -148,14 +232,14 @@ if (!count($data['parameters']['global']))   { $data['parameters']['global'] = a
     }
   }
 
-  $form['row'][++$row]['submit']    = array(
+  $form['row'][++$row]['action'] = array(
                                   'type'        => 'submit',
                                   'name'        => 'Save Changes',
                                   'icon'        => 'icon-ok icon-white',
                                   'right'       => TRUE,
                                   'class'       => 'btn-primary',
                                   'readonly'    => $readonly,
-                                  'value'       => 'update-contact-entry');
+                                  'value'       => 'update_contact');
 
     //print_vars($form);
     print_form($form);

@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -139,15 +138,23 @@ function get_vars($vars_order = array(), $auth = FALSE)
   {
     $vars_order = explode(' ', $vars_order);
   }
-  else if (empty($vars_order) || !is_array($vars_order))
+  elseif (empty($vars_order) || !is_array($vars_order))
   {
     $vars_order = array('POST', 'URI', 'GET'); // Default order
   }
 
+  // Content-Type=>application/x-www-form-urlencoded
+  $content_type = isset($_SERVER['HTTP_CONTENT_TYPE']) ? $_SERVER['HTTP_CONTENT_TYPE'] : $_SERVER['CONTENT_TYPE'];
+
+  // https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/XSS%20Injection
   // XSS script regex
   // <sCrIpT> < / s c r i p t >
   // javascript:alert("Hello world");/
-  $prevent_xss = '!(^\s*(J\s*A\s*V\s*A\s*)?S\s*C\s*R\s*I\s*P\s*T\s*:|<\s*/?\s*S\s*C\s*R\s*I\s*P\s*T\s*>)!i';
+  // <svg onload=alert(document.domain)>
+  $prevent_xss = '!(^\s*(J\s*A\s*V\s*A\s*)?S\s*C\s*R\s*I\s*P\s*T\s*:'.
+                 '|<\s*/?\s*S\s*C\s*R\s*I\s*P\s*T\s*>'.
+                 '|(<\s*s\s*v\s*g.*(o\s*n\s*l\s*o\s*a\s*d|s\s*c\s*r\s*i\s*p\s*t))'.
+                 '|<\s*i\s*m\s*g.*o\s*n\s*e\s*r\s*r\s*o\s*r)!i';
 
   // Allow to use var_decode(), this prevent to use potentially unsafe serialize functions
   $auth = $auth || $_SESSION['authenticated'];
@@ -158,6 +165,24 @@ function get_vars($vars_order = array(), $auth = FALSE)
     $order = strtoupper($order);
     switch ($order)
     {
+      case 'JSON':
+        //r(getallheaders());
+        //exit;
+
+        // https://stackoverflow.com/questions/8893574/php-php-input-vs-post
+        if (!in_array($content_type, [ 'application/x-www-form-urlencoded', 'multipart/form-data-encoded' ]))
+        {
+          $json = @json_decode(trim(file_get_contents("php://input")), TRUE, 512, OBS_JSON_DECODE);
+
+          if (is_array_assoc($json))
+          {
+            //$vars = array_merge_indexed($vars, $json);
+            $vars = $json; // Currently just override $vars, see ajax actions
+            //$vars_got['JSON'] = 1;
+          }
+        }
+        break;
+
       case 'POST':
         // Parse POST variables into $vars
         foreach ($_POST as $name => $value)
@@ -170,9 +195,11 @@ function get_vars($vars_order = array(), $auth = FALSE)
               // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
               unset($vars[$name]);
             }
+            //$vars_got['POST'] = 1;
           }
         }
         break;
+
       case 'URI':
       case 'URL':
         // Parse URI into $vars
@@ -180,7 +207,7 @@ function get_vars($vars_order = array(), $auth = FALSE)
         foreach ($segments as $pos => $segment)
         {
           //$segment = urldecode($segment);
-          if ($pos == "0" && !str_contains($segment, '='))
+          if ($pos == "0" && !str_exists($segment, '='))
           {
             if (!preg_match($prevent_xss, $segment))
             {
@@ -188,6 +215,7 @@ function get_vars($vars_order = array(), $auth = FALSE)
               $segment = urldecode($segment);
               $vars['page'] = $segment;
             }
+            //$vars_got['URI'] = 1;
           } else {
             list($name, $value) = explode('=', $segment, 2);
             if (!isset($vars[$name]))
@@ -202,28 +230,21 @@ function get_vars($vars_order = array(), $auth = FALSE)
                   // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
                   continue;
                 }
-                if (strpos($value, ','))
+
+                // Better to understand quoted vars
+                $vars[$name] = get_var_csv($value, $auth);
+                if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name]))
                 {
-                  // Here commas list (convert to array)
-                  $vars[$name] = explode(',', $value);
-                } else {
-                  // Here can be string as encoded array
-                  $vars[$name] = $auth ? var_decode($value) : $value;
-                  if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name]))
-                  {
-                    // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
-                    unset($vars[$name]);
-                  }
-                }
-                if (strpos($vars[$name], '%1F') !== FALSE)
-                {
-                  $vars[$name] = str_replace('%1F', ',', $vars[$name]); // %1F (US, unit separator) - not defined in HTML 4 standard
+                  // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
+                  unset($vars[$name]);
                 }
               }
+              //$vars_got['URI'] = 1;
             }
           }
         }
         break;
+
       case 'GET':
         // Parse GET variable into $vars
         foreach ($_GET as $name => $value)
@@ -236,28 +257,21 @@ function get_vars($vars_order = array(), $auth = FALSE)
               // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
               continue;
             }
-            if (strpos($value, ','))
+            
+            // Better to understand quoted vars
+            $vars[$name] = get_var_csv($value, $auth);
+            if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name]))
             {
-              // Here commas list (convert to array)
-              $vars[$name] = explode(',', $value);
-            } else {
-              // Here can be string as encoded array
-              $vars[$name] = $auth ? var_decode($value) : $value;
-              if (is_string($vars[$name]) && preg_match($prevent_xss, $vars[$name]))
-              {
-                // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
-                unset($vars[$name]);
-              }
+              // Prevent any <script> html tag inside vars, exclude any possible XSS with scripts
+              unset($vars[$name]);
             }
-            if (strpos($vars[$name], '%1F') !== FALSE)
-            {
-              $vars[$name] = str_replace('%1F', ',', $vars[$name]); // %1F (US, unit separator) - not defined in HTML 4 standard
-            }            
+            //$vars_got['GET'] = 1;
           }
         }
         break;
     }
   }
+  //print_success("Got [".implode(', ', array_keys($vars_got))."] vars ($content_type).");
 
   // Always convert location to array
   if (isset($vars['location']))
@@ -310,14 +324,14 @@ function request_token_valid($token = NULL)
     //print_warning("Request passed by unauthorized user.");
     return FALSE;
   }
-  else if (empty($token))
+  elseif (empty($token))
   {
     // Token not passed, WARNING seems as CSRF attack
     print_error("WARNING. Possible CSRF attack with EMPTY request token.");
     ///FIXME. need an user actions log
     return FALSE;
   }
-  else if (hash_equals($_SESSION['requesttoken'], $token))
+  elseif (hash_equals($_SESSION['requesttoken'], $token))
   {
     // Correct session and request tokens, all good
     return TRUE;
@@ -394,8 +408,8 @@ function datetime_preset($preset)
       $to   = date($end_fmt,   strtotime('-1 day'));
       break;
     case 'tweek':
-      $from = (date('l') == 'Monday') ? date($begin_fmt) : date($begin_fmt, strtotime('last Monday'));
-      $to   = (date('l') == 'Sunday') ? date($end_fmt)   : date($end_fmt,   strtotime('next Sunday'));
+      $from = (date('l') === 'Monday') ? date($begin_fmt) : date($begin_fmt, strtotime('last Monday'));
+      $to   = (date('l') === 'Sunday') ? date($end_fmt)   : date($end_fmt,   strtotime('next Sunday'));
       break;
     case 'lweek':
       $from = date($begin_fmt, strtotime('-6 days'));
@@ -413,7 +427,7 @@ function datetime_preset($preset)
     case 'tquarter':
     case 'lquarter':
       $quarter = ceil(date('m') / 3); // Current quarter
-      if ($preset == 'lquarter')
+      if ($preset === 'lquarter')
       {
         $quarter = $quarter - 1; // Previous quarter
       }
@@ -519,24 +533,26 @@ function detect_browser($user_agent = NULL)
     }
   }
 
-  // Load additional function
-  if (!function_exists('parse_user_agent'))
-  {
-    include_once($GLOBALS['config']['install_dir'].'/libs/UserAgentParser.php');
-  }
-
   // Detect Browser name, version and platform
+  $ua_info = [];
   if (!empty($user_agent))
   {
-    $ua_info = parse_user_agent($user_agent);
-  } else {
-    $ua_info = array();
+
+    //$ua_info = parse_user_agent($user_agent);
+    $parser = new \donatj\UserAgent\UserAgentParser();
+    $ua = $parser->parse($user_agent);
+    //r($ua);
+    $ua_info['browser']  = $ua->browser();
+    $ua_info['version']  = $ua->browserVersion();
+    $ua_info['platform'] = $ua->platform();
+    $ua_info['browser_full'] = $ua_info['browser'] . ' ' . preg_replace('/^([^\.]+(?:\.[^\.]+)?).*$/', '\1', $ua_info['version']);
+    //r($ua_info);
   }
 
   $detect_browser = array('user_agent' => $user_agent,
                           'type'       => $type,
                           'icon'       => $icon,
-                          'browser_full' => $ua_info['browser'] . ' ' . preg_replace('/^([^\.]+(?:\.[^\.]+)?).*$/', '\1', $ua_info['version']),
+                          'browser_full' => $ua_info['browser_full'],
                           'browser'    => $ua_info['browser'],
                           'version'    => $ua_info['version'],
                           'platform'   => $ua_info['platform']);
@@ -554,7 +570,7 @@ function detect_browser($user_agent = NULL)
   register_html_resource('js', 'observium-screen.js');
 
   // Additional browser info (screen_ratio, screen_size, svg)
-  if ($ua_info['browser'] == 'Firefox' && version_compare($ua_info['version'], '47.0') < 0)
+  if ($ua_info['browser'] === 'Firefox' && version_compare($ua_info['version'], '47.0') < 0)
   {
     // Do not use srcset in FF, while issue open:
     // https://bugzilla.mozilla.org/show_bug.cgi?id=1149357
@@ -597,25 +613,26 @@ function data_uri($file, $mime)
 // DOCME needs phpdoc block
 function toner_map($descr, $colour)
 {
-  foreach ($GLOBALS['config']['toner'][$colour] as $str)
-  {
-    if (stripos($descr, $str) !== FALSE) { return TRUE; }
-  }
-
-  return FALSE;
+  return str_istarts($descr, $GLOBALS['config']['toner'][$colour]);
 }
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
 function toner_to_colour($descr, $percent)
 {
-  if (substr($descr, -1) == 'C' || toner_map($descr, "cyan"   )) { $colour['left'] = "B6F6F6"; $colour['right'] = "33B4B1"; }
-  if (substr($descr, -1) == 'M' || toner_map($descr, "magenta")) { $colour['left'] = "FBA8E6"; $colour['right'] = "D028A6"; }
-  if (substr($descr, -1) == 'Y' || toner_map($descr, "yellow" )) { $colour['left'] = "FFF764"; $colour['right'] = "DDD000"; }
-  if (substr($descr, -1) == 'K' || toner_map($descr, "black"  )) { $colour['left'] = "888787"; $colour['right'] = "555555"; }
-  if (substr($descr, -1) == 'R' || toner_map($descr, "red"    )) { $colour['left'] = "FB6A4A"; $colour['right'] = "CB181D"; }
+  if     (str_starts($descr, 'C') || toner_map($descr, "cyan"   )) { $colour['left'] = "B6F6F6"; $colour['right'] = "33B4B1"; }
+  elseif (str_starts($descr, 'M') || toner_map($descr, "magenta")) { $colour['left'] = "FBA8E6"; $colour['right'] = "D028A6"; }
+  elseif (str_starts($descr, 'Y') || toner_map($descr, "yellow" )) { $colour['left'] = "FFF764"; $colour['right'] = "DDD000"; }
+  elseif (str_starts($descr, 'K') || toner_map($descr, "black"  )) { $colour['left'] = "888787"; $colour['right'] = "555555"; }
+  elseif (str_starts($descr, 'R') || toner_map($descr, "red"    )) { $colour['left'] = "FB6A4A"; $colour['right'] = "CB181D"; }
 
-  if (!isset($colour['left'])) { $colour = get_percentage_colours(100-$percent); $colour['found'] = FALSE; } else { $colour['found'] = TRUE; }
+  if (!isset($colour['left']))
+  {
+    $colour = get_percentage_colours(100-$percent);
+    $colour['found'] = FALSE;
+  } else {
+    $colour['found'] = TRUE;
+  }
 
   return $colour;
 }
@@ -828,7 +845,8 @@ function generate_url($vars, $new_vars = array())
 {
   $vars = ($vars) ? array_merge($vars, $new_vars) : $new_vars;
 
-  $url = $vars['page'];
+  $url = urlencode($vars['page']);
+
   if ($url[strlen($url)-1] !== '/') { $url .= '/'; }
   unset($vars['page']);
 
@@ -861,6 +879,38 @@ function generate_url($vars, $new_vars = array())
   }
 
   return($url);
+}
+
+function generate_html_attribs($attribs)
+{
+  if (!is_array($attribs)) { return ''; }
+
+  // Filter attributes (data-*, aria-*, role, style, class)
+  $attrib_pattern = '/^(data\-[_\w\-]+|aria\-[_\w\-]+|role|class|style|onclick)$/';
+
+  $elements = [];
+  foreach ($attribs as $attr => $value)
+  {
+    if (is_array($value))
+    {
+      $value = implode(' ', $value);
+    }
+    elseif (!strlen($value))
+    {
+      continue;
+    }
+
+    if (preg_match($attrib_pattern, $attr))
+    {
+      $elements[] = escape_html($attr) . '="' . escape_html($value) . '"';
+    }
+  }
+
+  if (count($elements))
+  {
+    return implode(' ', $elements);
+  }
+  return '';
 }
 
 // TESTME needs unit testing
@@ -980,27 +1030,73 @@ function generate_popup_link($type, $text = NULL, $vars = array(), $class = NULL
 {
   if (!is_string($type) || !is_string($text)) { return ''; }
 
-  if ($type == 'ip')
+  if ($type === 'ip')
   {
-    list($ip, $mask) = explode('/', $text, 2);
-    $ip_version = get_ip_version($ip);
-    if ($ip_version === 6)
+    $addresses = [];
+    // Find networks
+    if (preg_match_all(OBS_PATTERN_IP_NET_FULL, $text, $matches))
     {
-      // Autocompress IPv6 addresses
-      $ip   = Net_IPv6::compress($ip);
-      $text = $ip;
-      if (strlen($mask))
-      {
-        $text .= '/' . $mask;
-      }
+      $addresses += $matches['ip_network'];
     }
-    if (!$ip_version || in_array($ip, array('0.0.0.0', '127.0.0.1', '::', '::1')))
+    // Find single addresses
+    if (preg_match_all(OBS_PATTERN_IP_FULL, $text, $matches))
     {
-      return $text;
+      $addresses += $matches['ip'];
+    }
+    //r($addresses);
+    if (count($addresses))
+    {
+      $return = $escape ? escape_html($text) : $text; // escape before replace (ip nets not escaped anyway)
+
+      foreach ($addresses as $address)
+      {
+        list($ip, $net) = explode('/', $address);
+
+        $ip_version = get_ip_version($ip);
+        if ($ip_version === 6)
+        {
+          // Compress IPv6
+          $address_compressed = Net_IPv6::compress($ip);
+          if (strlen($net)) { $address_compressed = $address_compressed . '/' . $net; }
+        } else {
+          // IPv4 always compressed :)
+          $address_compressed = $address;
+        }
+
+        $ip_type = get_ip_type($ip);
+        //print_warning("$address : $ip_type");
+        // Do not linkify some types of ip addresses
+        if (in_array($ip_type, [ 'loopback', 'unspecified', 'broadcast', 'private', 'link-local', 'reserved' ]))
+        {
+          if (strlen($class))
+          {
+            $link = '<span class="'.$class.'">'.$address_compressed.'</span>';
+            $return = str_replace($address, $link, $return);
+          }
+          elseif ($ip_version === 6)
+          {
+            $return = str_replace($address, $address_compressed, $return);
+          }
+          continue;
+        }
+
+        $url  = (count($vars) ? generate_url($vars) : 'javascript:void(0)'); // If vars empty, set link not clickable
+        $link = '<a href="'.$url.'" class="entity-popup'.($class ? " $class" : '').'" data-eid="'.$ip.'" data-etype="'.$type.'">'.$address_compressed.'</a>';
+        $return = str_replace($address, $link, $return);
+      }
+
+      return $return;
     }
   }
+  elseif ($type === 'autodiscovery')
+  {
+    $data = $text;
+    $text = get_icon('error');
+    $escape = FALSE;
+  }
+
   $url  = (count($vars) ? generate_url($vars) : 'javascript:void(0)'); // If vars empty, set link not clickable
-  $data = $text;
+  $data = isset($data) ? $data : $text;
   if ($escape) { $text = escape_html($text); }
 
   return '<a href="'.$url.'" class="entity-popup'.($class ? " $class" : '').'" data-eid="'.$data.'" data-etype="'.$type.'">'.$text.'</a>';
@@ -1017,11 +1113,12 @@ function generate_popup_link($type, $text = NULL, $vars = array(), $class = NULL
  * @param string $text Text displayed as link
  * @param string $contents Text content displayed in mouseover tooltip (only for non-mobile devices)
  * @param string $class Css class name used for link
+ * @param array  $attribs Url/link extended attributes (ie data-*, class, style)
  * @param boolean $escape Escape or not link text
  * @return string
  */
 // TESTME needs unit testing
-function generate_tooltip_link($url, $text, $contents = '', $class = NULL, $escape = FALSE)
+function generate_tooltip_link($url, $text, $contents = '', $class = NULL, $attribs = [], $escape = FALSE)
 {
   global $config, $link_iter;
 
@@ -1030,17 +1127,19 @@ function generate_tooltip_link($url, $text, $contents = '', $class = NULL, $esca
   $href = (strlen($url) ? 'href="' . $url . '"' : '');
   if ($escape) { $text = escape_html($text); }
 
+  $attribs['class'] = array_merge((array)$class, (array)$attribs['class']);
+
   // Allow the Grinch to disable popups and destroy Christmas.
   $allow_mobile = (in_array(detect_browser_type(), array('mobile', 'tablet')) ? $config['web_mouseover_mobile'] : TRUE);
   if ($config['web_mouseover'] && strlen($contents) && $allow_mobile)
   {
-    $output  = '<a '.$href.' class="'.$class.'" style="cursor: pointer;" data-rel="tooltip" data-tooltip="'.escape_html($contents).'">'.$text.'</a>';
-    //$output  = '<a '.$href.' class="'.$class.'" data-toggle="tooltip" title="'.escape_html($contents).'">'.$text.'</a>';
-  } else {
-    $output  = '<a '.$href.' class="'.$class.'">'.$text.'</a>';
+    $attribs['style']        = 'cursor: pointer;';
+    $attribs['data-rel']     = 'tooltip';
+    $attribs['data-tooltip'] = $contents;
+    //$output  = '<a '.$href.' class="'.$class.'" style="cursor: pointer;" data-rel="tooltip" data-tooltip="'.escape_html($contents).'">'.$text.'</a>';
   }
 
-  return $output;
+  return '<a '.$href.' '.generate_html_attribs($attribs).'>'.$text.'</a>';
 }
 
 /**
@@ -1053,11 +1152,11 @@ function generate_tooltip_link($url, $text, $contents = '', $class = NULL, $esca
  * @param string $text Text displayed as link
  * @param string $contents Text content displayed in mouseover tooltip (only for non-mobile devices)
  * @param string $class Css class name used for link
+ * @param array  $attribs Url/link extended attributes (ie data-*, class, style)
  * @param boolean $escape Escape or not link text
  */
 // TESTME needs unit testing
-// RENAMEME to generate_mouseover_link() or something similar
-function overlib_link($url, $text, $contents, $class = NULL, $escape = FALSE)
+function generate_mouseover_link($url, $text, $contents, $class = NULL, $attribs = [], $escape = FALSE)
 {
   global $config, $link_iter;
 
@@ -1066,16 +1165,27 @@ function overlib_link($url, $text, $contents, $class = NULL, $escape = FALSE)
   $href = (strlen($url) ? 'href="' . $url . '"' : '');
   if ($escape) { $text = escape_html($text); }
 
+  if ($class)
+  {
+    $attribs['class'] = array_merge((array)$class, (array)$attribs['class']);
+  }
+
   // Allow the Grinch to disable popups and destroy Christmas.
   $allow_mobile = (in_array(detect_browser_type(), array('mobile', 'tablet')) ? $config['web_mouseover_mobile'] : TRUE);
   if ($config['web_mouseover'] && strlen($contents) && $allow_mobile)
   {
-    $output  = '<a '.$href.' class="tooltip-from-data '.$class.'" style="cursor: pointer;" data-tooltip="'.escape_html($contents).'">'.$text.'</a>';
-  } else {
-    $output  = '<a '.$href.' class="'.$class.'">'.$text.'</a>';
+    $attribs['style']        = 'cursor: pointer;';
+    $attribs['class']        = array_merge([ 'tooltip-from-data' ], (array)$attribs['class']);
+    $attribs['data-tooltip'] = $contents;
+    //$output  = '<a '.$href.' class="tooltip-from-data '.$class.'" style="cursor: pointer;" data-tooltip="'.escape_html($contents).'">'.$text.'</a>';
   }
 
-  return $output;
+  return '<a '.$href.' '.generate_html_attribs($attribs).'>'.$text.'</a>';
+}
+
+function overlib_link($url, $text, $contents, $class = NULL, $attribs = [], $escape = FALSE)
+{
+  return generate_mouseover_link($url, $text, $contents, $class, $attribs, $escape);
 }
 
 /**
@@ -1253,24 +1363,40 @@ function permissions_cache($user_id)
 {
   $permissions = array();
 
-  foreach (dbFetchRows("SELECT * FROM `entity_permissions` WHERE `user_id` = ?", array($user_id)) as $entity)
+  // Get permissions from user-specific and role tables.
+  $permission_where  = '`user_id` = ? AND `auth_mechanism` = ?';
+  $permission_params = [ $user_id, $GLOBALS['config']['auth_mechanism'] ];
+  $entity_permissions = dbFetchRows("SELECT * FROM `entity_permissions` WHERE " . $permission_where, $permission_params);
+  $roles_entity_permissions = dbFetchRows("SELECT * FROM `roles_entity_permissions` LEFT JOIN `roles_users` USING (`role_id`) WHERE " . $permission_where, $permission_params);
+  foreach (array_merge((array)$entity_permissions, (array)$roles_entity_permissions) as $entity)
   {
-    switch($entity['entity_type'])
+    // Set access to ro if it's not in the defined list.
+    $access = (in_array($entity['access'], array('ro', 'rw')) ? $entity['access'] : 'ro');
+
+    switch ($entity['entity_type'])
     {
-      case "group": // this is a group, so expand it's members into an array
+      case "group": // this is a group, so expand its members into an array
         $group = get_group_by_id($entity['entity_id']);
-        foreach(get_group_entities($entity['entity_id']) as $group_entity_id)
+        foreach (get_group_entities($entity['entity_id']) as $group_entity_id)
         {
-          $permissions[$group['entity_type']][$group_entity_id] = TRUE;
+          $permissions[$group['entity_type']][$group_entity_id] = $access;
         }
-        //break; // And also store self group permission in cache
+      //break; // And also store self group permission in cache
       default:
-        $permissions[$entity['entity_type']][$entity['entity_id']] = TRUE;
+        $permissions[$entity['entity_type']][$entity['entity_id']] = $access;
         break;
     }
   }
+  //r($permissions);
+
+  // Cache platform permissions
+  foreach (dbFetchRows("SELECT * FROM `roles_permissions` LEFT JOIN `roles_users` USING (`role_id`) WHERE " . $permission_where, $permission_params) as $perm)
+  {
+    $permissions['permission'][$perm['permission']] = TRUE;
+  }
 
   // Alerts
+  // FIXME - this seems like it would be slow on very large installs
   $alert = array();
   foreach (dbFetchRows('SELECT `alert_table_id`, `device_id`, `entity_id`, `entity_type` FROM `alert_table`') as $alert_table_entry)
   {
@@ -1286,6 +1412,7 @@ function permissions_cache($user_id)
   }
 
   return $permissions;
+
 }
 
 /**
@@ -1298,22 +1425,36 @@ function permissions_cache($user_id)
  */
 function get_remote_addr($use_http_header = FALSE)
 {
+  global $config;
+
   if ($use_http_header)
   {
     // Note, this headers is very dangerous for use as auth!
-    switch ($config['web_remote_addr_header'])
+    $addr_headers = [ 'HTTP_CF_CONNECTING_IP', // CF-Connecting-IP (CloudFlare network)
+                      'HTTP_X_REAL_IP',        // X-Real-IP
+                      'HTTP_X_FORWARDED_FOR',  // X-Forwarded-For
+                      'HTTP_CLIENT_IP' ];      // Client-IP
+
+    if (!in_array($config['web_remote_addr_header'], [ 'default', 'detect', 'auto' ]))
     {
-      case 'CF-Connecting-IP': // CloudFlare network
-      case 'X-Real-IP':
-      case 'Client-IP':
-      case 'X-Forwarded-For':
-        $header = 'HTTP_' . strtoupper(str_replace('-', '_', $config['web_remote_addr_header']));
-        if (!empty($_SERVER[$header]) && preg_match(OBS_PATTERN_IP_FULL, $_SERVER[$header], $matches))
-        {
-          // HTTP header founded and it contains valid IP address
-          return $matches[1];
-        }
-        break;
+      $remote_addr_header = 'HTTP_' . str_replace('-', '_', strtoupper($config['web_remote_addr_header']));
+      if (in_array($remote_addr_header, $addr_headers))
+      {
+        // Use only exact single header
+        $addr_headers = [ $remote_addr_header ];
+      } else {
+        // Unknown config value passed, do not check any header
+        $addr_headers = [];
+      }
+    }
+
+    foreach ($addr_headers as $header)
+    {
+      if (!empty($_SERVER[$header]) && preg_match(OBS_PATTERN_IP_FULL, $_SERVER[$header], $matches))
+      {
+        // HTTP header found and it contains valid IP address
+        return $matches[1];
+      }
     }
   }
 
@@ -1512,12 +1653,11 @@ function device_permitted($device_id)
   if ($_SESSION['userlevel'] >= "5")
   {
     $allowed = true;
-  } elseif ($permissions['device'][$device_id]) {
+  } elseif (isset($permissions['device'][$device_id])) {
     $allowed = true;
   } else {
     $allowed = false;
   }
-
   return $allowed;
 }
 
@@ -1577,7 +1717,7 @@ function generate_graph_tag($args, $return_array = FALSE)
 
   $i['img_url'] = $img_url;
   $i['img_tag'] = '<img id="' . $i['img_id'] . '" src="' . $img_url . '"' . $srcset . $attribs.' style="' . $style . '" alt="" />';
-
+  //$i['img_tag'] = '<img id="' . $i['img_id'] . '" src="' . $img_url . '"' . $srcset . $attribs.' style="' . $style . '" alt="" loading="lazy" />';
 
   if($return_array === TRUE)
   {
@@ -1588,23 +1728,33 @@ function generate_graph_tag($args, $return_array = FALSE)
 }
 
 
-function generate_graph_url($args)
+function generate_graph_url($args, $escape = TRUE)
 {
 
   foreach ($args as $key => $arg)
   {
-    if (is_array($arg)) { $arg = var_encode($arg); } // Encode arrays
-    $urlargs[] = $key."=".$arg;
+    if (is_array($arg))
+    {
+      // Encode arrays
+      $arg = var_encode($arg);
+    }
+    //elseif (strpos($arg, '"') !== FALSE)
+    elseif ($escape)
+    {
+      // Escape args
+      $arg = escape_html($arg);
+    }
+    $urlargs[] = $key . "=" . $arg;
   }
 
-  $url = 'graph.php?' . implode('&amp;',$urlargs);
+  $url = 'graph.php?' . implode('&amp;', $urlargs);
 
   if (is_cli())
   {
     if ($GLOBALS['config']['web_url'] == 'http://localhost:80/')
     {
       // override default web_url by http://localhost/
-      $url = 'http://'.get_localhost().'/'.$url;
+      $url = 'http://' . get_localhost() . '/' . $url;
     } else {
       $url = $GLOBALS['config']['web_url'] . $url;
     }
@@ -1715,26 +1865,6 @@ function print_optionbar_end()
 
 // TESTME needs unit testing
 // DOCME needs phpdoc block
-function geteventicon($message)
-{
-  if ($message == "Device status changed to Down") { $icon = "server_connect.png"; }
-  if ($message == "Device status changed to Up") { $icon = "server_go.png"; }
-  if ($message == "Interface went down" || $message == "Interface changed state to Down") { $icon = "if-disconnect.png"; }
-  if ($message == "Interface went up" || $message == "Interface changed state to Up") { $icon = "if-connect.png"; }
-  if ($message == "Interface disabled") { $icon = "if-disable.png"; }
-  if ($message == "Interface enabled") { $icon = "if-enable.png"; }
-  if (isset($icon)) { return $icon; } else { return false; }
-}
-
-function get_entity_icon($entity)
-{
-
-  $config['entities'][$entity['type']]['icon'];
-
-}
-
-// TESTME needs unit testing
-// DOCME needs phpdoc block
 function overlibprint($text)
 {
   return "onmouseover=\"return overlib('" . $text . "');\" onmouseout=\"return nd();\"";
@@ -1758,8 +1888,8 @@ function device_link_class($device)
 /**
  * Return cached locations list
  *
- * If filter used, return locations avialable only for specified params.
- * Without filter return all avialable locations (cached)
+ * If filter used, return locations available only for specified params.
+ * Without filter return all available locations (cached)
  *
  * @param array $filter
  * @return array
@@ -1800,33 +1930,6 @@ function get_locations($filter = array())
   sort($locations);
 
   return $locations;
-}
-
-// TESTME needs unit testing
-// DOCME needs phpdoc block
-function foldersize($path)
-{
-  $total_size = 0;
-  $files = scandir($path);
-  $total_files = 0;
-
-  foreach ($files as $t)
-  {
-    if (is_dir(rtrim($path, '/') . '/' . $t))
-    {
-      if ($t<>"." && $t<>"..")
-      {
-        $size = foldersize(rtrim($path, '/') . '/' . $t);
-        $total_size += $size;
-      }
-    } else {
-      $size = filesize(rtrim($path, '/') . '/' . $t);
-      $total_size += $size;
-      $total_files++;
-    }
-  }
-
-  return array($total_size, $total_files);
 }
 
 // return the filename of the device RANCID config file
@@ -2012,6 +2115,7 @@ function generate_query_permitted($type_array = array('device'), $options = arra
   $options['hide_disabled'] = (isset($options['hide_disabled']) ? (bool)$options['hide_disabled'] : !$GLOBALS['config']['web_show_disabled']);
 
   //$query_permitted = '';
+  $query_part = [];
 
   foreach ($type_array as $type)
   {
@@ -2244,6 +2348,14 @@ function generate_query_permitted($type_array = array('device'), $options = arra
   //r($query_permitted);
 
   return $query_permitted;
+}
+
+// TESTME needs unit testing
+// DOCME needs phpdoc block
+function dashboard_exists($dash_id)
+{
+  return dbExist('dashboards', '`dash_id` = ?', [ $dash_id ]);
+  //return count(dbFetchRow("SELECT * FROM `dashboards` WHERE `dash_id` = ?", array($dash_id)));
 }
 
 // TESTME needs unit testing
@@ -2652,6 +2764,60 @@ function adjust_colour_brightness($hex, $steps) {
     }
 
     return $return;
+}
+
+/**
+ * Highlight (or replace with specific strings) part of string.
+ * Optionally can search full words of search strings.
+ *
+ * @param string $text    Text where need highlight search string
+ * @param array  $search  Search array. Can be string, simple array or array with 'search', 'replace' pairs
+ * @param string $replace Default is just
+ * @param bool   $words   If True search full words
+ *
+ * @return string
+ */
+function html_highlight($text, $search = [], $replace = '', $words = FALSE)
+{
+  if (empty($replace))
+  {
+    // Default is highlight as danger class
+    $replace = $words ? '<em class="text-danger">$1</em>' : '<em class="text-danger">$0</em>';
+  }
+
+  $entries = [];
+  foreach ((array)$search as $entry)
+  {
+    if (isset($entry['search']))
+    {
+      if (!isset($entry['replace']))
+      {
+        $entry['replace'] = $replace;
+      }
+      $text = html_highlight($text, $entry['search'], $entry['replace'], $words);
+      continue;
+    }
+
+    if (strlen($entry) == 0) { continue; }
+    $entries[] = preg_quote($entry, '%');
+  }
+  if (!count($entries)) { return $text; }
+
+  $search_pattern = '(' . implode('|', $entries) . ')';
+  if ($words)
+  {
+    // Search full words
+    $search_pattern = str_replace('(?:', '(', OBS_PATTERN_START) .
+                      $search_pattern .
+                      str_replace('(?:', '(', OBS_PATTERN_END);
+    // append start and end in pattern search
+    $replace = '$1' . $replace . '$3';
+  } else {
+    // Search any search string
+    $search_pattern = '%' . $search_pattern . '%i';
+  }
+
+  return preg_replace($search_pattern, $replace, $text);
 }
 
 // EOF

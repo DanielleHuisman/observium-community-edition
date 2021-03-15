@@ -1,0 +1,321 @@
+-- **SDOC**********************************************************************
+-- ****************************************************************************
+--
+--             Copyright(c) 2005 Mediatrix Telecom, Inc.
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+--
+-- ****************************************************************************
+-- ****************************************************************************
+--
+-- MX-NAT-MIB.my
+--
+-- Root for module used to configure the NAT.
+--
+-- ****************************************************************************
+-- **EDOC**********************************************************************
+
+MX-NAT2-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpAddress
+    FROM MX-TC
+        mediatrixConfig
+    FROM MX-SMI;
+
+natMIB MODULE-IDENTITY
+    LAST-UPDATED "200603060000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION  "This MIB provides information to configure the NAT module.
+
+                  This module configures the port forwarding, also known as virtual server or
+                  destination NAT (DNAT)."
+
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "200603060000Z"
+    DESCRIPTION "Modified the description of variable natPortForwardingTable."
+    REVISION    "200504190000Z"
+    DESCRIPTION "Creation"
+    ::= { mediatrixConfig 500 }
+
+natMIBObjects  OBJECT IDENTIFIER ::= { natMIB 1 }
+natConformance OBJECT IDENTIFIER ::= { natMIB 2 }
+
+
+    -- *************************************************************************
+    -- Config variables
+    -- *************************************************************************
+
+
+    -- *************************************************************************
+    -- Port Forwarding variables
+    -- *************************************************************************
+    natPortForwarding  OBJECT IDENTIFIER ::= { natMIBObjects 10 }
+
+
+        -- ************************************************************************
+        -- Port Forwarding table
+        -- ************************************************************************
+
+        natPortForwardingTable OBJECT-TYPE
+            SYNTAX      SEQUENCE OF NatPortForwardingEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "
+                         A table that contains the port forwarding rules. This table is enabled if
+                         the variable ipRoutingEnable is enabled and if the variable ipRoutingMode is
+                         set to NAT.
+
+                         This table can contain up to 20 port forwarding rules.
+
+                         These rules will be applied only on the incoming WAN traffic destinated to the LAN.
+
+                         This table's semantics are different depending on the hardware platform.
+                         Please refer to the documentation shipped with your device for more
+                         details.
+                         "
+            ::= { natPortForwarding 10 }
+
+
+            natPortForwardingEntry OBJECT-TYPE
+                SYNTAX      NatPortForwardingEntry
+                MAX-ACCESS  not-accessible
+                STATUS      current
+                DESCRIPTION "
+                             A row in the natPortForwardingTable used to specify a port forwarding rule.
+                             An entry is enabled if the variable ipRoutingEnable is enabled and if the variable
+                             ipRoutingMode is in NAT mode. The variable natPortForwardingRuleEnable of
+                             this row must also be enabled.
+                             "
+                INDEX       {
+                                natPortForwardingIndex
+                            }
+                ::= { natPortForwardingTable 5 }
+
+
+                NatPortForwardingEntry ::= SEQUENCE
+                {
+                    natPortForwardingIndex          Unsigned32,
+                    natPortForwardingWanStartPort   MxIpPort,
+                    natPortForwardingWanFinishPort  MxIpPort,
+                    natPortForwardingProtocol       INTEGER,
+                    natPortForwardingLanAddr        MxIpAddress,
+                    natPortForwardingLanPort        MxAdvancedIpPort,
+                    natPortForwardingRuleLabel      OCTET STRING,
+                    natPortForwardingRuleEnable     MxEnableState
+                }
+
+
+                natPortForwardingIndex OBJECT-TYPE
+                    SYNTAX  Unsigned32 (1..20)
+                    MAX-ACCESS  read-only
+                    STATUS      current
+                    DESCRIPTION "
+                                 Port forwarding index for this row.
+                                 "
+                    ::= { natPortForwardingEntry 10 }
+
+
+                natPortForwardingWanStartPort OBJECT-TYPE
+                    SYNTAX      MxIpPort
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "The port on the unit's WAN side may be configured in two ways:
+                                 by identifying only one port or a port range.  If the redirection affects only
+                                 one port, the current variable represents this port and the variable
+                                 natPortForwardingWanFinishPort must be the same.
+
+                                 In the case of a port range, the current variable represents the first port of
+                                 the range, while the variable natPortForwardingWanFinishPort represents the
+                                 last port of the range.
+                                 "
+                    ::= { natPortForwardingEntry 20 }
+
+
+                natPortForwardingWanFinishPort OBJECT-TYPE
+                    SYNTAX      MxIpPort
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "If the redirection affects a port range, the current variable represents the last port
+                                 of the range, while the variable natPortForwardingWanStartPort represents the
+                                 first port of the range.
+
+                                 In the case of a single port forwarding, this variable must be the same as
+                                 natPortForwardingWanStartPort.
+                                 "
+                    ::= { natPortForwardingEntry 30 }
+
+
+                natPortForwardingProtocol OBJECT-TYPE
+                    SYNTAX      INTEGER {
+                                         udp(0),
+                                         tcp(1),
+                                         all(99)
+                                        }
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "The protocol of the packets to forward. The specified protocol can be UDP, TCP or both.
+
+                                 udp : User Datagram Protocol
+
+                                 tcp : Transmission Control Protocol
+
+                                 all : UDP and TCP
+                                 "
+                    ::= { natPortForwardingEntry 40 }
+
+
+                natPortForwardingLanAddr OBJECT-TYPE
+                    SYNTAX      MxIpAddress
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "The new destination address on the unit's LAN side is configured by this variable.
+
+                                 "
+                    ::= { natPortForwardingEntry 50 }
+
+
+                natPortForwardingLanPort OBJECT-TYPE
+                    SYNTAX      MxAdvancedIpPort
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "The destination port on the unit's LAN side may be configured in two ways.
+
+                                 First, the WAN destination port or port range remains the same on the
+                                 LAN side. For this configuration, the current variable must be set to 0.
+
+                                 Second, the traffic matching this rule is redirected to only one port on the LAN
+                                 side.  For this configuration, the current variable represents this port.
+                                 "
+                    DEFVAL      { 0 }
+                    ::= { natPortForwardingEntry 60 }
+
+
+                natPortForwardingRuleLabel OBJECT-TYPE
+                    SYNTAX  OCTET STRING (SIZE(0..255))
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "Short description of the port forwarding rule.
+                                 "
+                    ::= { natPortForwardingEntry 70 }
+
+
+                natPortForwardingRuleEnable OBJECT-TYPE
+                    SYNTAX  MxEnableState
+                    MAX-ACCESS  read-write
+                    STATUS      current
+                    DESCRIPTION "Indicates if the specific port forwarding rule of a row is used or not.
+                                 This rule is enabled if the variable ipRoutingEnable is enabled and if
+                                 the variable ipRoutingMode is set to NAT.
+
+                                 Since the modification of this variable will be applied in real time, new settings can
+                                 affect the current network connections.
+                                 "
+                    DEFVAL      { disable }
+                    ::= { natPortForwardingEntry 80 }
+
+
+
+    -- *************************************************************************
+    -- Syslog variables
+    -- *************************************************************************
+    natSyslog  OBJECT IDENTIFIER ::= { natMIBObjects 100 }
+
+
+        natSyslogEnable   OBJECT-TYPE
+            SYNTAX        MxEnableState
+            MAX-ACCESS    read-write
+            STATUS        current
+            DESCRIPTION   "Enables/Disables the syslog for NAT notification messages.
+                           "
+            DEFVAL         { disable }
+            ::= { natSyslog 10 }
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+
+    natCompliances OBJECT IDENTIFIER ::= { natConformance 1 }
+
+    natComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "Minimal parameters definitions to support the NAT."
+        MODULE -- This Module
+            MANDATORY-GROUPS {
+                                 natPortForwardingGroupVer1,
+                                 natSyslogGroupVer1
+                             }
+        ::= { natCompliances 1 }
+
+
+    -- ************************************************************************
+    -- MIB variable grouping
+    -- ************************************************************************
+    natGroups OBJECT IDENTIFIER ::= { natConformance 2 }
+
+    natPortForwardingGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                    natPortForwardingWanStartPort,
+                    natPortForwardingWanFinishPort,
+                    natPortForwardingProtocol,
+                    natPortForwardingLanAddr,
+                    natPortForwardingLanPort,
+                    natPortForwardingRuleLabel,
+                    natPortForwardingRuleEnable
+                }
+        STATUS current
+        DESCRIPTION
+            "
+             This group holds the minimal set of objects that defines
+             the port forwarding rules.
+             "
+        ::= { natGroups 1 }
+
+    natSyslogGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                   natSyslogEnable
+                }
+        STATUS current
+        DESCRIPTION
+            "
+             This group holds the minimal set of objects to enable the NAT syslog.
+             "
+        ::= { natGroups 2 }
+
+END
+

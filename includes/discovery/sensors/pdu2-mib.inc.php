@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2014 Adam Armstrong
- * @author                   Dolf Schimmel
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -119,7 +117,7 @@ foreach ($oids as $index => $entry)
   $index_id     = $pduId . '.' . $id;
   $index        = $index_id . '.' . $oid_types[$sensorType]['index']; // Convert to numeric index
 
-  if (!isset($oid_types[$sensorType]) || $entry['measurementsInletSensorIsAvailable'] == 'false')
+  if (!isset($oid_types[$sensorType]) || $entry['measurementsInletSensorIsAvailable'] === 'false')
   {
     continue;
   }
@@ -145,7 +143,7 @@ foreach ($oids as $index => $entry)
   //    upperCritical(3),
   // }
   $options      = array();
-  $limits_flags = base_convert($entry['inletSensorEnabledThresholds'], 16, 10);
+  $limits_flags = base_convert(str_replace(' ', '', $entry['inletSensorEnabledThresholds']), 16, 10);
   if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
   {
     $options['limit_low']       = $entry['inletSensorLowerCriticalThreshold'] * $scale;
@@ -223,7 +221,7 @@ foreach ($oids as $index => $entry)
   $index_id = $pduId . '.' . $id;
   $index        = $index_id . '.' . $oid_types[$sensorType]['index']; // Convert to numeric index
 
-  if (!isset($oid_types[$sensorType]) || $entry['measurementsOutletSensorIsAvailable'] == 'false')
+  if (!isset($oid_types[$sensorType]) || $entry['measurementsOutletSensorIsAvailable'] === 'false')
   {
     continue;
   }
@@ -249,7 +247,7 @@ foreach ($oids as $index => $entry)
   //    upperCritical(3),
   // }
   $options      = array();
-  $limits_flags = base_convert($entry['outletSensorEnabledThresholds'], 16, 10);
+  $limits_flags = base_convert(str_replace(' ', '', $entry['outletSensorEnabledThresholds']), 16, 10);
   if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
   {
     $options['limit_low']       = $entry['outletSensorLowerCriticalThreshold'] * $scale;
@@ -294,10 +292,6 @@ foreach ($oids as $index => $entry)
       $options['sensor_unit'] = $unit['unit'];
     }
 
-    // CLEANME. Compatibility, remove in r9500, but not before CE 17.8
-    rename_rrd_entity($device, 'sensor', array('descr' => $descr, 'class' => $unit['type'], 'index' => "outlet.$index_id.$sensorType", 'type' => 'raritan'), // old
-                                         array('descr' => $descr, 'class' => $unit['type'], 'index' => $index,                         'type' => $type));    // new
-
     discover_sensor($unit['type'], $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
   }
 }
@@ -324,7 +318,7 @@ foreach ($oids as $index => $entry)
   $index_id = $pduId . '.' . $id;
   $index        = $index_id . '.' . $oid_types[$sensorType]['index']; // Convert to numeric index
 
-  if (!isset($oid_types[$sensorType]) || $entry['measurementsOverCurrentProtectorSensorIsAvailable'] == 'false')
+  if (!isset($oid_types[$sensorType]) || $entry['measurementsOverCurrentProtectorSensorIsAvailable'] === 'false')
   {
     continue;
   }
@@ -350,7 +344,7 @@ foreach ($oids as $index => $entry)
   //    upperCritical(3),
   // }
   $options      = array();
-  $limits_flags = base_convert($entry['overCurrentProtectorSensorEnabledThresholds'], 16, 10);
+  $limits_flags = base_convert(str_replace(' ', '', $entry['overCurrentProtectorSensorEnabledThresholds']), 16, 10);
   if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
   {
     $options['limit_low']       = $entry['overCurrentProtectorSensorLowerCriticalThreshold'] * $scale;
@@ -384,10 +378,6 @@ foreach ($oids as $index => $entry)
     $type     = 'pdu2-sensorstate';
     $value    = $entry[$oid_name];
 
-    // CLEANME. Compatibility, remove in r9500, but not before CE 17.8
-    rename_rrd_entity($device, 'status', array('descr' => $descr, 'index' => "measurementsOverCurrentProtectorSensorValue".$index_id, 'type' => $type),  // old
-                                         array('descr' => $descr, 'index' => $oid_name.'.'.$index,                                    'type' => $type)); // new
-
     discover_status($device, $oid_num, $oid_name.'.'.$index, $type, $descr, $value, array('entPhysicalClass' => 'other'));
     continue;
   }
@@ -398,10 +388,6 @@ foreach ($oids as $index => $entry)
     {
       $options['sensor_unit'] = $unit['unit'];
     }
-
-    // CLEANME. Compatibility, remove in r9500, but not before CE 17.8
-    rename_rrd_entity($device, 'sensor', array('descr' => $descr, 'class' => $unit['type'], 'index' => "tripsensorvalue.$index_id", 'type' => 'raritan'), // old
-                                         array('descr' => $descr, 'class' => $unit['type'], 'index' => $index,                      'type' => $type));    // new
 
     discover_sensor($unit['type'], $device, $oid_num, $index, $type, $descr, $scale, $value, $options);
   }
@@ -427,7 +413,7 @@ foreach ($oids as $index => $entry)
 {
   $sensorType = $entry['externalSensorType'];
 
-  if (!isset($oid_types[$sensorType]) || $entry['measurementsExternalSensorIsAvailable'] == 'false')
+  if (!isset($oid_types[$sensorType]) || $entry['measurementsExternalSensorIsAvailable'] === 'false')
   {
     continue;
   }
@@ -456,7 +442,7 @@ foreach ($oids as $index => $entry)
   //    upperCritical(3),
   // }
   $options      = array();
-  $limits_flags = base_convert($entry['externalSensorEnabledThresholds'], 16, 10);
+  $limits_flags = base_convert(str_replace(' ', '', $entry['externalSensorEnabledThresholds']), 16, 10);
   if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
   {
     $options['limit_low']       = $entry['externalSensorLowerCriticalThreshold'] * $scale;

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -31,11 +30,14 @@ foreach ($processors_array as $index => $entry)
     if ($entPhysicalIndex)
     {
       $descr_oid = 'entPhysicalName.' . $entPhysicalIndex;
-      $descr = snmp_get($device, $descr_oid, '-Oqv', 'ENTITY-MIB');
+      $descr = snmp_get_oid($device, $descr_oid, 'ENTITY-MIB');
     }
-    if (!$descr) { $descr = "Processor $index"; }
+    if (!strlen($descr))
+    {
+      $descr = "Processor $index";
+    }
 
-    if (!strstr($descr, 'No') && !strstr($usage, 'No') && $descr != '')
+    if (!str_contains($descr, 'No') && !str_contains($usage, 'No') && $descr != '')
     {
       discover_processor($valid['processor'], $device, $usage_oid, $index, 'cpm', $descr, 1, $usage, $entPhysicalIndex);
     }

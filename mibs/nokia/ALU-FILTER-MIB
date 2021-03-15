@@ -1,0 +1,517 @@
+ALU-FILTER-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+    Unsigned32, Integer32, IpAddress, Counter32, Counter64,
+    Gauge32, TimeTicks, Opaque
+        FROM SNMPv2-SMI
+
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
+
+    TEXTUAL-CONVENTION, RowStatus, MacAddress,
+    TruthValue, DisplayString, TimeStamp,
+    RowPointer
+        FROM SNMPv2-TC
+
+    aluSARMIBModules, aluSARObjs,
+    aluSARConfs, aluSARNotifyPrefix
+        FROM ALU-SAR-GLOBAL-MIB
+
+    TOperator, TNamedItem, TNamedItemOrEmpty, TItemDescription,
+    TLNamedItemOrEmpty
+        FROM TIMETRA-TC-MIB
+
+    tIPFilterParamsEntry
+        FROM TIMETRA-FILTER-MIB    
+
+    ;
+
+aluFilterMIBModule   MODULE-IDENTITY
+        LAST-UPDATED    "0807010000Z"
+        ORGANIZATION    "Nokia"
+        CONTACT-INFO
+            "Nokia 7x50 Support
+             Web: http://www.nokia.com/comps/pages/carrier_support.jhtml"
+        DESCRIPTION
+        "This document is the SNMP MIB module to manage and provision
+         Filter features on Nokia 7705 systems.
+
+         Copyright 2012-2014 Nokia. All rights reserved.
+         Reproduction of this document is authorized on the condition that
+         the foregoing copyright notice is included.
+
+         This SNMP MIB module (Specification) embodies Nokia's
+         proprietary intellectual property.  Nokia retains
+         all title and ownership in the Specification, including any
+         revisions.
+
+         Nokia grants all interested parties a non-exclusive
+         license to use and distribute an unmodified copy of this
+         Specification in connection with management of Nokia
+         products, and without fee, provided this copyright notice and
+         license appear on all copies.
+
+         This Specification is supplied 'as is', and Nokia
+         makes no warranty, either express or implied, as to the use,
+         operation, condition, or performance of the Specification."
+
+--
+--  Revision History
+--
+        REVISION        "201201290000Z"
+        DESCRIPTION     "Rev 0.1                05 Nov 2012 00:00
+                         Initial version of the ALU-FILTER-MIB."
+
+        ::= { aluSARMIBModules 14 }
+
+aluFilterObjects             OBJECT IDENTIFIER ::= { aluSARObjs 16 }
+aluFilterNotificationsPrefix       OBJECT IDENTIFIER ::= { aluSARNotifyPrefix 13 }
+    alyFilterNotifications                OBJECT IDENTIFIER ::= { aluFilterNotificationsPrefix 0 }
+aluFilterMIBConformance      OBJECT IDENTIFIER ::= { aluSARConfs 26 }
+
+--
+-- TEXTUAL-CONVENTIONs for Nokia 770 SAR series Filter Elements
+--
+
+AluFilterID ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "the identification number of a filter. 0 indicates an invalid
+         filter-id."
+    SYNTAX Unsigned32  (0..65535)
+
+
+AluEntryId ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "uniquely identifies an entry in a policy or filter table.
+        to facilitate insertion of entries in the tables, we recommend
+        assigning entry IDs by 10s:  10, 20, 30, etc.
+        "
+    SYNTAX INTEGER (1..65535)
+
+AluFilterAction ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+        "action to take on the traffic when no filter entry matches.
+
+        when set to drop(1), packets matching the filter entry are dropped.
+
+        when set to forward(2), packets matching the filter entry are forwarded.
+        "
+    SYNTAX INTEGER { drop(1), forward(2) }
+
+AluFilterScope ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "This textual-convention determines some aspects of an item's
+         behavior regarding creation and use, unused entry garbage collection,
+         and automated promulgation by Element Management System to
+         other systems in the service domain.
+
+         AluFilterScope is an extension of the textual-convention TItemScope.
+
+         exclusive:
+
+            When the scope of an item is defined as exclusive, the item can
+            only be applied once, for example to a single SAP.  Attempting
+            to assign the policy to a second SAP is not allowed and will
+            result in an error.  If the item is removed from the exclusive
+            SAP, it will become available for assignment to another
+            exclusive SAP.
+
+            A non-applied exclusive scope policy is a candidate to be removed
+            from the system by a TBD garbage collection command.
+
+            The system default policies cannot be put into the exclusive scope.
+            An error will be generated if scope exclusive is executed in
+            any policies with a policy-id equal to 1.
+
+         template:
+
+            When the scope of an item is defined as template, the item can be
+            applied any number of times.  Policies with template scope
+            will not be considered for deletion by a TBD garbage collection
+            command; all items of scope 'template' must be deleted explicitly.
+
+            The system default policies will always be scope template.
+            An error will occur if a policy-id 1 is attempted to be
+            set to scope exclusive."
+    SYNTAX INTEGER { exclusive(1), template(2) }
+--
+-- mib objects
+--
+
+--
+-- Vlan Filter Table
+--
+
+aluVlanFilterTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluVlanFilterEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Contains a List of all VLAN filters configured on this system."
+    ::= { aluFilterObjects 1 }
+
+aluVlanFilterEntry OBJECT-TYPE
+    SYNTAX       AluVlanFilterEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about a particular VLAN Filter entry. Entries are
+         created/deleted  by user. Entries have a presumed StorageType of
+         nonVolatile."
+    INDEX { aluVlanFilterId }
+    ::= { aluVlanFilterTable 1 }
+
+AluVlanFilterEntry ::= SEQUENCE
+    {
+        aluVlanFilterId           AluFilterID,
+        aluVlanFilterRowStatus    RowStatus,
+        aluVlanFilterDescription  TItemDescription,
+        aluVlanFilterDefaultAction AluFilterAction,
+        aluVlanFilterName         TLNamedItemOrEmpty
+    }
+
+aluVlanFilterId  OBJECT-TYPE
+    SYNTAX       AluFilterID (1..65535)
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Uniquely identifies an VLAN filter as configures on this system."
+    ::= { aluVlanFilterEntry 1 }
+
+aluVlanFilterRowStatus  OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "This object allows entries to be created and deleted in the
+         aluVlanFilterTable."
+    ::= { aluVlanFilterEntry 2 }
+
+aluVlanFilterDescription  OBJECT-TYPE
+    SYNTAX       TItemDescription
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "User-provided description for this filter."
+    DEFVAL { ''H }
+    ::= { aluVlanFilterEntry 3 }
+
+aluVlanFilterDefaultAction  OBJECT-TYPE
+    SYNTAX       AluFilterAction
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The action to take for packets that do not match any filter entries."
+    DEFVAL { drop }
+    ::= { aluVlanFilterEntry 4 }
+aluVlanFilterName OBJECT-TYPE
+    SYNTAX      TLNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluVlanFilterName specifies the name to associate
+        with this filter."
+    DEFVAL { ''H }
+    ::= { aluVlanFilterEntry 5 }
+
+
+--
+-- VLAN Filter Entry parameters
+--
+
+aluVlanFilterParamsTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluVlanFilterParamsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION  "A table of all VLAN filter match entries for all VLAN filters."
+    ::= { aluFilterObjects 2 }
+
+aluVlanFilterParamsEntry OBJECT-TYPE
+    SYNTAX       AluVlanFilterParamsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Information about a particular IP Filter entry.
+        Every IP Filter can have zero or more IP Filter match entries.
+
+        a filter entry with no match criteria set will match every
+        packet, and the entry action will be taken.
+
+        Entries are created/deleted by user.
+
+        There is no StorageType object, entries have a presumed
+        StorageType of nonVolatile.
+        "
+    INDEX { aluVlanFilterId, aluVlanFilterParamsIndex }
+    ::= { aluVlanFilterParamsTable 1 }
+
+AluVlanFilterParamsEntry ::= SEQUENCE
+    {
+        aluVlanFilterParamsIndex           AluEntryId,
+        aluVlanFilterParamsRowStatus       RowStatus,
+        aluVlanFilterParamsDescription     TItemDescription,
+        aluVlanFilterParamsAction          AluFilterAction,
+        aluVlanFilterParamsVlanValue1      INTEGER,
+        aluVlanFilterParamsVlanValue2      INTEGER,
+        aluVlanFilterParamsVlanOperator    TOperator,
+        aluVlanFilterParamsUntagged        TruthValue
+    }
+
+aluVlanFilterParamsIndex  OBJECT-TYPE
+    SYNTAX       AluEntryId
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This is the secondary index for the entry. Every VLAN filter can have
+         multiple entries, therefore every VLAN filter entry is identified by
+         the aluVlanFilterId and aluVlanFilterParamsIndex."
+    ::= { aluVlanFilterParamsEntry 1 }
+
+aluVlanFilterParamsRowStatus  OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "This object allows entries to be created and deleted in the
+         aluVlanFilterParamsTable."
+    ::= { aluVlanFilterParamsEntry 2 }
+
+aluVlanFilterParamsDescription  OBJECT-TYPE
+    SYNTAX       TItemDescription
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "User-provided description for this filter entry."
+    DEFVAL { ''H }
+    ::= { aluVlanFilterParamsEntry 3 }
+
+aluVlanFilterParamsAction  OBJECT-TYPE
+    SYNTAX       AluFilterAction
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The action to take for packets that match this filter entry. The value
+         default(3) specifies this entry to inherit the behavior defined as the
+         default for the filter."
+    DEFVAL { drop }
+    ::= { aluVlanFilterParamsEntry 4 }
+
+aluVlanFilterParamsVlanValue1 OBJECT-TYPE
+    SYNTAX       INTEGER (0..4095)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "VLAN value1. The value of this object is used as per the
+         description for aluVlanFilterParamsVlanOperator."
+    DEFVAL { 0 }
+    ::= { aluVlanFilterParamsEntry 5 }
+
+aluVlanFilterParamsVlanValue2  OBJECT-TYPE
+    SYNTAX       INTEGER (0..4095)
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "VLAN value2. The value of this object is used as per the
+         description for aluVlanFilterParamsVlanOperator."
+    DEFVAL { 0 }
+    ::= { aluVlanFilterParamsEntry 6 }
+
+aluVlanFilterParamsVlanOperator OBJECT-TYPE
+    SYNTAX       TOperator
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "The operator specifies the manner in which
+         aluVlanFilterParamsVlanValue1 and aluVlanFilterParamsVlanValue2
+         are to be used. The value of these latter 2 objects and
+         aluVlanFilterParamsVlanOperator is used as described in
+         TOperator."
+    DEFVAL { none }
+    ::= { aluVlanFilterParamsEntry 7 }
+
+aluVlanFilterParamsUntagged  OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "Untagged Packets."
+    DEFVAL { false }
+    ::= { aluVlanFilterParamsEntry 8 }
+
+--
+-- ALU Extensions of tIPFilterParamsTable
+--
+aluExtIPFilterParamsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluExtIPFilterParamsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluExtIPFilterParamsTable is an extension to the tIPFilterParamsTable.
+         It contains extra action for all IP filter match entries"
+    ::= { aluFilterObjects 3 }
+
+
+aluExtIPFilterParamsEntry   OBJECT-TYPE
+    SYNTAX      AluExtIPFilterParamsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Each row entry contains additional action a filter entry with matching criteria
+         can take on Nokia 7705 SAR devices."
+    AUGMENTS  { tIPFilterParamsEntry }
+    ::= { aluExtIPFilterParamsTable 1 }
+
+AluExtIPFilterParamsEntry ::=
+    SEQUENCE {
+        aluExtIPFilterParamsForwardFC       TruthValue,
+        aluExtIPFilterParamsForwardFcType   INTEGER,
+        aluExtIPFilterParamsForwardFcPri    INTEGER
+    }
+
+aluExtIPFilterParamsForwardFC     OBJECT-TYPE
+    SYNTAX       TruthValue
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "aluExtIPFilterParamsForwardFC specifies if the traffic should be classified
+         based on IP criteria."
+    DEFVAL { false }
+    ::= { aluExtIPFilterParamsEntry 1 }
+
+aluExtIPFilterParamsForwardFcType  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                       be (0),
+                       l2 (1),
+                       af (2),
+                       l1 (3),
+                       h2 (4),
+                       ef (5),
+                       h1 (6),
+                       nc (7)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluExtIPFilterParamsForwardFcType specifies which forwarding class the matching filter traffic
+         should be belonged to."
+    ::= { aluExtIPFilterParamsEntry 2 }
+
+aluExtIPFilterParamsForwardFcPri  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                       low  (0),
+                       high (1)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "aluExtIPFilterParamsForwardFcPri specifies the priority queue which the forwarding class will be used."
+    DEFVAL    { low }
+    ::= { aluExtIPFilterParamsEntry 3 }
+
+-- ----------------------
+-- aluVlanFilterNameTable
+-- ----------------------
+aluVlanFilterNameTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluVlanFilterNameEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A table that contains VLAN filter name information. Entries
+         are created automatically by the system
+         when aluVlanFilterName object is set for the VLAN filter."
+    ::= { aluFilterObjects 4 }
+
+aluVlanFilterNameEntry OBJECT-TYPE
+    SYNTAX      AluVlanFilterNameEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Basic information about a specific VLAN filter name."
+    INDEX           { aluVlanFilterName }
+    ::= { aluVlanFilterNameTable 1 }
+
+AluVlanFilterNameEntry ::=
+    SEQUENCE {
+        aluVlanFilterNameId                   AluFilterID,
+        aluVlanFilterNameRowStatus            RowStatus
+    }
+
+aluVlanFilterNameId OBJECT-TYPE
+    SYNTAX      AluFilterID
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluVlanFilterNameId specifies the filter
+         name associated with this VLAN filter."
+    ::= { aluVlanFilterNameEntry 1 }
+
+aluVlanFilterNameRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This value of the object aluVlanFilterNameRowStatus specifies the
+         status of this row."
+    ::= { aluVlanFilterNameEntry 2 }
+
+--
+-- Notification Information
+--
+
+--
+-- Conformance Information
+--
+
+aluFilterMIBCompliances OBJECT IDENTIFIER ::= { aluFilterMIBConformance 1 }
+aluFilterMIBGroups      OBJECT IDENTIFIER ::= { aluFilterMIBConformance 2 }
+
+--
+-- Compliance Statements
+--
+
+
+aluFilter7705V6v0Compliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+        "The compliance statement for management of Filter features
+         on Nokia 7705 SAR series systems release R6.0."
+    MODULE  -- this module
+        MANDATORY-GROUPS {
+            aluFilterGroup
+        }
+    ::= { aluFilterMIBCompliances 1 }
+--
+-- Units of conformance
+--
+
+aluFilterGroup OBJECT-GROUP
+    OBJECTS {
+                aluVlanFilterRowStatus,
+                aluVlanFilterDescription,
+                aluVlanFilterDefaultAction,
+                aluVlanFilterName,
+                aluVlanFilterParamsRowStatus,
+                aluVlanFilterParamsDescription,
+                aluVlanFilterParamsAction,
+                aluVlanFilterParamsVlanValue1,
+                aluVlanFilterParamsVlanValue2,
+                aluVlanFilterParamsVlanOperator,
+                aluVlanFilterParamsUntagged,
+                aluExtIPFilterParamsForwardFC,
+                aluExtIPFilterParamsForwardFcType,
+                aluExtIPFilterParamsForwardFcPri,
+                aluVlanFilterNameId,
+                aluVlanFilterNameRowStatus
+            }
+    STATUS    current
+    DESCRIPTION
+        "The group of objects supporting management of filter log objects
+        on Nokia 7705 SAR series systems."
+    ::= { aluFilterMIBGroups 1 }
+
+END

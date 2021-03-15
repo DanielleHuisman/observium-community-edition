@@ -6,201 +6,786 @@
  *
  * @package    observium
  * @subpackage discovery
- * @subpackage functions
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function discover_new_device($hostname, $source = 'xdp', $protocol = NULL, $device = NULL, $snmp_port = 161)
+// CLEANME When removed all function calls
+function discover_new_device($hostname, $source = 'xdp', $protocol = NULL, $device = NULL, $port = [])
+{
+  return autodiscovery_device($hostname, NULL, $protocol, NULL, $device, $port);
+}
+
+function autodiscovery_device($hostname, $remote_ip = NULL, $protocol = NULL, $remote_platform = '', $device = NULL, $port = [])
 {
   global $config;
 
-  $source = strtolower($source);
+  // We really have too small cases, where need use $source,
+  // $protocol can used for detect it
+  // FIXME. Make function get_protocol_source($protocol)
+  switch (strtolower($protocol))
+  {
+    case 'bgp':
+    case 'ospf':
+    case 'libvirt':
+    case 'proxmox':
+    case 'vmware':
+      $source = strtolower($protocol);
+      break;
+
+    case 'cdp':
+    case 'lldp':
+    case 'isdp':
+    case 'mndp':
+    case 'amap':
+    default:
+      $source = 'xdp';
+  }
+  if (!$protocol) { $protocol = strtoupper($source); }
 
   // Check if source is enabled for autodiscovery
-  if ($config['autodiscovery'][$source])
+  if (!$config['autodiscovery'][$source])
   {
-    $flags = OBS_DNS_ALL;
+    print_debug('Autodiscovery for protocol ' . $protocol . ' disabled.');
+    return FALSE;
+  }
 
-    if (!$protocol) { $protocol = strtoupper($source); }
-    print_cli_data("Trying to discover host", "$hostname through $protocol ($source)", 3);
+  // All sources except XDP passed IP address instead hostname
+  $orig_hostname = $hostname;
+  $ip_key = safe_ip_hostname_key($hostname, $remote_ip);
 
-    // By first detect hostname is IP or domain name (IPv4/6 == 4/6, hostname == FALSE)
-    $ip_version = get_ip_version($hostname);
-    if ($ip_version)
+  $flags = OBS_DNS_ALL;
+
+  print_cli_data("Trying to discover host", "$hostname ($remote_ip) through $protocol ($source)", 3);
+
+  if ($source == 'xdp' && is_bad_xdp($hostname, $remote_platform))
+  {
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $remote_ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns' // 'ok','no_xdp','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'no_xdp', $insert);
+    return FALSE;
+  }
+
+  // By first detect hostname is IP or domain name (IPv4/6 == 4/6, hostname == FALSE)
+  $ip_version = get_ip_version($hostname);
+  if ($ip_version)
+  {
+    // Hostname is IPv4/IPv6
+    $use_ip = TRUE;
+    $hostname = ip_compress($hostname);
+    $ip = $hostname;
+  } else {
+    $use_ip = FALSE;
+
+    $remote_ip_type = get_ip_type($remote_ip);
+    if ($remote_ip_type && $remote_ip_type == 'unspecified') // 0.0.0.0, ::
     {
-      // Hostname is IPv4/IPv6
-      $use_ip = TRUE;
-      $ip = $hostname;
-    } else {
-      $use_ip = FALSE;
+      // In case when passed valid hostname and invalid IP, do not autodiscovery anyway
+      print_debug("$hostname passed with invalid IP ($remote_ip), not permitted for autodiscovery.");
+      $insert = [
+        //'poller_id'        => $config['poller_id'],
+        'device_id'        => $device['device_id'],
+        //'remote_hostname'  => $hostname,
+        'remote_ip'        => $remote_ip,
+        //'remote_device_id' => NULL,
+        'protocol'         => $protocol,
+        //'last_reason'      => 'no_dns'
+      ];
+      set_autodiscovery($hostname, 'no_ip_permit', $insert);
+      return FALSE;
+    }
 
-      // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
-      if (!empty($config['mydomain']) && isDomainResolves($hostname . '.' . $config['mydomain'], $flags))
-      {
-        $hostname .= '.' . $config['mydomain'];
-      }
+    // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
+    if (!empty($config['mydomain']) && is_domain_resolves($hostname . '.' . $config['mydomain'], $flags))
+    {
+      $hostname .= '.' . $config['mydomain'];
+    }
 
-      // Determine v4 vs v6
-      $ip = gethostbyname6($hostname, $flags);
-      if ($ip)
+    // Determine v4 vs v6
+    $ip = gethostbyname6($hostname, $flags);
+    if ($ip)
+    {
+      // DNS correct, but not same as discovered by protocol
+      if ($remote_ip_type && $remote_ip != $ip)
       {
-        $ip_version = get_ip_version($ip);
-        print_debug("Host $hostname resolved as $ip");
+        print_debug("Host $hostname resolved as $ip, but not same as discovered by protocol $remote_ip. Try autodiscover by IP.");
+        $use_ip = TRUE;
+        $ip = $remote_ip;
       } else {
-        // No DNS records
+        print_debug("Host $hostname resolved as $ip");
+      }
+    } else {
+      // No DNS records
+      if ($remote_ip_type)
+      {
+        print_debug("Host $hostname not resolved, try autodiscover by IP.");
+        $use_ip = TRUE;
+        $ip = $remote_ip;
+      } else {
         print_debug("Host $hostname not resolved, autodiscovery fails.");
+        $insert = [
+          //'poller_id'        => $config['poller_id'],
+          'device_id'        => $device['device_id'],
+          //'remote_hostname'  => $hostname,
+          //'remote_ip'        => $ip,
+          //'remote_device_id' => NULL,
+          'protocol'         => $protocol,
+          //'last_reason'      => 'no_dns'
+        ];
+        set_autodiscovery($hostname, 'no_dns', $insert);
         return FALSE;
       }
     }
-
-    if ($ip_version == 6)
-    {
-      $flags = $flags ^ OBS_DNS_A; // Exclude IPv4
-    }
-    if (isset($config['autodiscovery']['ping_skip']) && $config['autodiscovery']['ping_skip'])
-    {
-      $flags = $flags | OBS_PING_SKIP; // Add skip pings flag
-    }
-
-    if (match_network($ip, $config['autodiscovery']['ip_nets']))
-    {
-      print_debug("Host $hostname ($ip) founded inside configured nets, trying to add:");
-
-      // By first check if pingable
-      $pingable = isPingable($ip, $flags);
-      if (!$pingable && (isset($config['autodiscovery']['ping_skip']) && $config['autodiscovery']['ping_skip']))
-      {
-        $flags = $flags | OBS_PING_SKIP; // Add skip pings flag if allowed in config
-        $pingable = TRUE;
-      }
-      if ($pingable)
-      {
-        // Check if device duplicated by IP
-        //$ip = ($ip_version == 4 ? $ip : Net_IPv6::uncompress($ip, TRUE));
-        $ip_binary = inet_pton($ip);
-        $db = dbFetchRow('SELECT `hostname` FROM `ipv'.$ip_version.'_addresses`
-                         LEFT JOIN `devices` USING(`device_id`)
-                         WHERE `disabled` = 0 AND `ipv'.$ip_version.'_binary` = ? LIMIT 1', array($ip_binary));
-        if ($db)
-        {
-          print_debug('Already have device '.$db['hostname']." with IP $ip");
-          $reason = 'already in db';
-          return FALSE;
-        }
-
-        // Detect snmp transport, net-snmp needs udp6 for ipv6
-        $snmp_transport = ($ip_version == 4 ? 'udp' : 'udp6');
-
-        $new_device = detect_device_snmpauth($ip, $snmp_port, $snmp_transport);
-        if ($new_device)
-        {
-          if ($use_ip)
-          {
-            // Detect FQDN hostname
-            // by sysName
-            $snmphost = snmp_get_oid($new_device, 'sysName.0', 'SNMPv2-MIB');
-            if ($snmphost)
-            {
-              // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
-              if (!empty($config['mydomain']) && isDomainResolves($snmphost . '.' . $config['mydomain'], $flags))
-              {
-                $snmphost .= '.' . $config['mydomain'];
-              }
-              $snmp_ip = gethostbyname6($snmphost, $flags);
-            }
-
-            if ($snmp_ip == $ip)
-            {
-              $hostname = $snmphost;
-            } else {
-              // by PTR
-              $ptr = gethostbyaddr6($ip);
-              if ($ptr)
-              {
-                // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
-                if (!empty($config['mydomain']) && isDomainResolves($ptr . '.' . $config['mydomain'], $flags))
-                {
-                  $ptr .= '.' . $config['mydomain'];
-                }
-                $ptr_ip = gethostbyname6($ptr, $flags);
-              }
-
-              if ($ptr && $ptr_ip == $ip)
-              {
-                $hostname = $ptr;
-              }
-              else if ($config['autodiscovery']['require_hostname'])
-              {
-                print_debug("Device IP $ip does not seem to have FQDN.");
-                return FALSE;
-              } else {
-                // Hostname as IP string
-                $hostname = $ip_version == 4 ? $ip : Net_IPv6::compress($hostname, TRUE); // Always use compressed IPv6 name
-              }
-            }
-            print_debug("Device IP $ip linked to FQDN name: $hostname");
-          }
-
-          $new_device['hostname'] = $hostname;
-          if (!check_device_duplicated($new_device))
-          {
-            $snmp_v3 = array();
-            if ($new_device['snmp_version'] === 'v3')
-            {
-              $snmp_v3['snmp_authlevel']  = $new_device['snmp_authlevel'];
-              $snmp_v3['snmp_authname']   = $new_device['snmp_authname'];
-              $snmp_v3['snmp_authpass']   = $new_device['snmp_authpass'];
-              $snmp_v3['snmp_authalgo']   = $new_device['snmp_authalgo'];
-              $snmp_v3['snmp_cryptopass'] = $new_device['snmp_cryptopass'];
-              $snmp_v3['snmp_cryptoalgo'] = $new_device['snmp_cryptoalgo'];
-            }
-            $remote_device_id = createHost($new_device['hostname'], $new_device['snmp_community'], $new_device['snmp_version'], $new_device['snmp_port'], $new_device['snmp_transport'], $snmp_v3);
-
-            if ($remote_device_id)
-            {
-              if (is_flag_set(OBS_PING_SKIP, $flags))
-              {
-                set_entity_attrib('device', $remote_device_id, 'ping_skip', 1);
-              }
-              $remote_device = device_by_id_cache($remote_device_id, 1);
-
-              if ($port)
-              {
-                humanize_port($port);
-                log_event("Device autodiscovered through $protocol on " . $device['hostname'] . " (port " . $port['port_label'] . ")", $remote_device_id, 'port', $port['port_id']);
-              } else {
-                log_event("Device autodiscovered through $protocol on " . $device['hostname'], $remote_device_id, $protocol);
-              }
-
-              //array_push($GLOBALS['devices'], $remote_device); // createHost() already puth this
-              return $remote_device_id;
-            } else {
-              $reason = 'db insert error';
-            }
-          } else {
-            // When detected duplicate device, this mean it already SNMPable and not need check next auth!
-            $reason = 'duplicated';
-            //return FALSE;
-          }
-        } else {
-          $reason = 'not snmpable';
-        }
-      } else {
-        $reason = 'not pingable';
-      }
-    } else {
-      $reason = 'not permitted network';
-      print_debug("IP $ip ($hostname) not permitted inside \$config['autodiscovery']['ip_nets'] in config.php");
-    }
-    print_debug('Autodiscovery for host ' . $hostname . ' failed.');
-  } else {
-    print_debug('Autodiscovery for protocol ' . $protocol . ' disabled.');
   }
+
+  $ip_version = get_ip_version($ip);
+  if (isset($config['autodiscovery']['ignore_ip_types']) &&
+      !in_array(get_ip_type($ip), $config['autodiscovery']['ignore_ip_types']))
+  {
+    print_debug("IP $ip ($hostname) not permitted inside \$config['autodiscovery']['ignore_ip_types'] in config.");
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns'
+    ];
+    set_autodiscovery($hostname, 'no_ip_permit', $insert);
+    return FALSE;
+  }
+  if (!match_network($ip, $config['autodiscovery']['ip_nets']))
+  {
+    print_debug("IP $ip ($hostname) not permitted inside \$config['autodiscovery']['ip_nets'] in config.");
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns'
+    ];
+    set_autodiscovery($hostname, 'no_ip_permit', $insert);
+    return FALSE;
+  }
+
+  if ($ip_version == 6)
+  {
+    $flags = $flags ^ OBS_DNS_A; // Exclude IPv4
+  }
+
+  print_debug("Host $hostname ($ip) founded inside configured nets, trying to add:");
+
+  // By first check if pingable
+  if (isset($config['autodiscovery']['ping_skip']) && $config['autodiscovery']['ping_skip'])
+  {
+    $flags = $flags | OBS_PING_SKIP; // Add skip pings flag
+  }
+  $pingable = isPingable($ip, $flags);
+  if (!$pingable)
+  {
+    print_debug("Host $hostname not pingable. You can try set in config: \$config['autodiscovery']['ping_skip'] = TRUE;");
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns'
+    ];
+    set_autodiscovery($hostname, 'no_ping', $insert);
+    return FALSE;
+  }
+
+  // Check if device duplicated by IP
+  //$ip = ($ip_version == 4 ? $ip : Net_IPv6::uncompress($ip, TRUE));
+  $ip_binary = inet_pton($ip);
+  $db = dbFetchRow('SELECT `hostname` FROM `ipv'.$ip_version.'_addresses`
+                   LEFT JOIN `devices` USING(`device_id`)
+                   WHERE `disabled` = 0 AND `ipv'.$ip_version.'_binary` = ? LIMIT 1', array($ip_binary));
+  if ($db)
+  {
+    print_debug('Already have device '.$db['hostname']." with IP $ip");
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'duplicated', $insert);
+    return FALSE;
+  }
+
+  // Detect snmp transport, net-snmp needs udp6 for ipv6
+  $snmp_transport = ($ip_version == 4 ? 'udp' : 'udp6');
+  $snmp_port = 161;
+
+  // Detect snmp auth
+  $new_device = detect_device_snmpauth($ip, $snmp_port, $snmp_transport);
+  if (!$new_device)
+  {
+    print_debug("Host $hostname not snmpable by known snmp auth params.");
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'no_snmp', $insert);
+    return FALSE;
+  }
+
+  if ($use_ip)
+  {
+    // Detect FQDN hostname
+    // by sysName
+    $snmphost = snmp_get_oid($new_device, 'sysName.0', 'SNMPv2-MIB');
+    if ($snmphost)
+    {
+      // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
+      if (!empty($config['mydomain']) && is_domain_resolves($snmphost . '.' . $config['mydomain'], $flags))
+      {
+        $snmphost .= '.' . $config['mydomain'];
+      }
+      $snmp_ip = gethostbyname6($snmphost, $flags);
+    }
+
+    if ($snmp_ip == $ip)
+    {
+      $hostname = $snmphost;
+    } else {
+      // by PTR
+      $ptr = gethostbyaddr6($ip);
+      if ($ptr)
+      {
+        // Add "mydomain" configuration if this resolves, converts switch1 -> switch1.mydomain.com
+        if (!empty($config['mydomain']) && is_domain_resolves($ptr . '.' . $config['mydomain'], $flags))
+        {
+          $ptr .= '.' . $config['mydomain'];
+        }
+        $ptr_ip = gethostbyname6($ptr, $flags);
+      }
+
+      if ($ptr && $ptr_ip == $ip)
+      {
+        $hostname = $ptr;
+      }
+      elseif ($config['autodiscovery']['require_hostname'])
+      {
+        print_debug("Device IP $ip does not seem to have FQDN.");
+        $insert = [
+          //'poller_id'        => $config['poller_id'],
+          'device_id'        => $device['device_id'],
+          //'remote_hostname'  => $hostname,
+          'remote_ip'        => $ip,
+          //'remote_device_id' => NULL,
+          'protocol'         => $protocol,
+          //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+        ];
+        set_autodiscovery($hostname, 'no_fqdn', $insert);
+        return FALSE;
+      } else {
+        // Hostname as IP string
+        $hostname = ip_compress($ip); // Always use compressed IPv6 name
+      }
+    }
+    print_debug("Device IP $ip linked to FQDN name: $hostname");
+  }
+
+  $new_device['hostname'] = $hostname;
+  // Check if we already have same device
+  if (check_device_duplicated($new_device))
+  {
+    // When detected duplicate device, this mean it already SNMPable and not need check next auth!
+    print_debug("Already have device $hostname with IP $ip");
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'duplicated', $insert);
+    return FALSE;
+  }
+
+  // Add new device to db
+  $snmp_v3 = array();
+  if ($new_device['snmp_version'] === 'v3')
+  {
+    $snmp_v3['snmp_authlevel']  = $new_device['snmp_authlevel'];
+    $snmp_v3['snmp_authname']   = $new_device['snmp_authname'];
+    $snmp_v3['snmp_authpass']   = $new_device['snmp_authpass'];
+    $snmp_v3['snmp_authalgo']   = $new_device['snmp_authalgo'];
+    $snmp_v3['snmp_cryptopass'] = $new_device['snmp_cryptopass'];
+    $snmp_v3['snmp_cryptoalgo'] = $new_device['snmp_cryptoalgo'];
+  }
+  $remote_device_id = createHost($new_device['hostname'], $new_device['snmp_community'], $new_device['snmp_version'], $new_device['snmp_port'], $new_device['snmp_transport'], $snmp_v3);
+
+  if ($remote_device_id)
+  {
+    if (is_flag_set(OBS_PING_SKIP, $flags))
+    {
+      set_entity_attrib('device', $remote_device_id, 'ping_skip', 1);
+    }
+    //$remote_device = device_by_id_cache($remote_device_id, 1);
+
+    if ($port)
+    {
+      humanize_port($port);
+      log_event("Device autodiscovered through $protocol on " . $device['hostname'] . " (port " . $port['port_label'] . ")", $remote_device_id, 'port', $port['port_id']);
+    } else {
+      log_event("Device autodiscovered through $protocol on " . $device['hostname'], $remote_device_id, $protocol);
+    }
+
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      'remote_device_id' => $remote_device_id,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'ok', $insert);
+    return $remote_device_id;
+  } else {
+
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      //'remote_device_id' => NULL,
+      'protocol'         => $protocol,
+      //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'no_db', $insert);
+  }
+
   return FALSE;
+}
+
+function set_autodiscovery($hostname, $reason = 'unknown', $options = [])
+{
+  global $cache;
+
+  if (isset($options['remote_address'])) { $options['remote_ip'] = $options['remote_address']; }
+  $ip_key = safe_ip_hostname_key($hostname, $options['remote_ip']);
+
+  // Cache autodiscovery entry
+  $db_entry = get_autodiscovery_entry($hostname, $options['remote_ip'], $options['device_id']);
+
+  $insert = [
+    'poller_id'        => $GLOBALS['config']['poller_id'],
+    //'device_id'        => $device['device_id'],
+    'remote_hostname'  => $hostname,
+    //'remote_ip'        => $ip,
+    //'remote_device_id' => NULL,
+    //'protocol'         => $protocol,
+    'last_reason'      => $reason
+  ];
+  foreach ([ 'device_id', 'remote_ip', 'remote_device_id', 'protocol' ] as $param)
+  {
+    if (strlen($options[$param]))
+    {
+      // normalize ip address
+      if ($param == 'remote_ip')
+      {
+        $options[$param] = ip_compress($options[$param]);
+      }
+      $insert[$param] = $options[$param];
+    }
+  }
+
+  // Set cache key, for use in check_autodiscovery()
+  //$cache['autodiscovery_remote_device_id'][$hostname][$ip_key] = $insert['remote_device_id'];
+
+  $db_update = [];
+  //$db_params = [ 'device_id', 'remote_ip', 'remote_device_id', 'protocol', 'last_reason' ];
+  $db_params = [ 'device_id', 'remote_ip', 'remote_device_id', 'last_reason' ]; // do not change protocol when update
+
+  if ($reason == 'ok')
+  {
+    $db_params[] = 'protocol';
+  }
+  // BGP and OSPF (and others not XDP protocols not pass hostname, do not update it)
+  $hostname_update = !in_array(strtolower($insert['protocol']), [ 'bgp', 'ospf' ]);
+
+  if (is_array($db_entry))
+  {
+    // already discovered
+    $db_id = $db_entry['autodiscovery_id'];
+    foreach ($db_params as $param)
+    {
+      // Skip hostname update for non-xdp protocols
+      if ($param == 'remote_hostname' && !$hostname_update) { continue; }
+
+      if ($db_entry[$param] != $insert[$param] && strlen($insert[$param]))
+      {
+        $db_update[$param] = $insert[$param];
+      }
+    }
+
+    if (!count($db_update))
+    {
+      // not changed, but force update for increase last_checked
+      dbUpdate([ 'last_checked' => [ 'CURRENT_TIMESTAMP()' ] ], 'autodiscovery', '`autodiscovery_id` = ?', [ $db_id ]);
+
+      // Clear cache entry
+      unset($cache['autodiscovery'][$hostname][$ip_key]);
+
+      return $db_id;
+    }
+  }
+
+  /*
+  if (isset($cache['autodiscovery'][$hostname][$ip_key]))
+  {
+    // already discovered
+    $db_entry = $cache['autodiscovery'][$hostname][$ip_key];
+    $db_id = $db_entry['autodiscovery_id'];
+    foreach ($db_params as $param)
+    {
+      if ($db_entry[$param] != $insert[$param] && strlen($insert[$param]))
+      {
+        $db_update[$param] = $insert[$param];
+      }
+    }
+
+    if (!count($db_update))
+    {
+      // not changed, but force update for increase last_checked
+      dbUpdate([ 'last_checked' => [ 'CURRENT_TIMESTAMP()' ] ], 'autodiscovery', '`autodiscovery_id` = ?', [ $db_id ]);
+
+      // Clear cache entry
+      unset($cache['autodiscovery'][$hostname][$ip_key]);
+
+      return $db_id;
+    }
+  }
+  elseif (isset($cache['autodiscovery'][$hostname]['__']) && $ip_key != '__')
+  {
+    // already discovered, but without ip
+    $db_entry = $cache['autodiscovery'][$hostname]['__'];
+    $db_id = $db_entry['autodiscovery_id'];
+    foreach ($db_params as $param)
+    {
+      if ($db_entry[$param] != $insert[$param] && strlen($insert[$param]))
+      {
+        $db_update[$param] = $insert[$param];
+      }
+    }
+  }
+  elseif ($ip_key != '__' && isset($cache['autodiscovery_ip'][$ip_key]))
+  {
+    // FIXME. Host already discovered by IP, but we not check it this..
+    print_debug("DEVEL. Host already discovered by IP, but we not check it this..");
+  }
+  elseif ($hostname_ip_version = get_ip_version($hostname))
+  {
+    // FIXME. Try if hostname passed as IP
+    $hostname = ip_compress($hostname);
+    if (isset($cache['autodiscovery_ip'][$hostname]))
+    {
+      print_debug("DEVEL. Try if hostname passed as IP..");
+    }
+  }
+  */
+
+  if (count($db_update))
+  {
+    dbUpdate($db_update, 'autodiscovery', '`autodiscovery_id` = ?', [ $db_id ]);
+    print_debug("AUTODISCOVERY UPDATED");
+
+    // Clear cache entry
+    unset($cache['autodiscovery'][$hostname][$ip_key]);
+  } else {
+    $insert['added'] = [ 'NOW()' ];
+    $db_id = dbInsert($insert, 'autodiscovery');
+    print_debug("AUTODISCOVERY INSERTED");
+  }
+
+  return $db_id;
+}
+
+function check_autodiscovery($hostname, $ip = NULL)
+{
+  global $config, $cache;
+
+  $ip_key = safe_ip_hostname_key($hostname, $ip);
+
+  // Invalid hostname && IP
+  $valid_hostname = is_valid_hostname($hostname);
+  if (!$valid_hostname && $ip_key === '__')
+  {
+    print_debug("Invalid hostname $hostname and empty IP, skipped.");
+    return FALSE;
+  }
+
+  // Cache autodiscovery entry
+  if (!isset($cache['autodiscovery'][$hostname][$ip_key]))
+  {
+    if (!$valid_hostname && $ip_key === '__')
+    {
+      $cache['autodiscovery'][$hostname][$ip_key] = NULL;
+      return NULL;
+    }
+
+    $sql = 'SELECT `autodiscovery`.*, UNIX_TIMESTAMP(`last_checked`) AS `last_checked_unixtime` FROM `autodiscovery` WHERE `poller_id` = ? ';
+    $params = [ $GLOBALS['config']['poller_id'] ];
+    if ($ip == $hostname || !$valid_hostname)
+    {
+      // print_vars($ip);
+      // print_vars($ip_key);
+      // print_vars($hostname);
+      // Search by IP
+      $sql .= 'AND `remote_ip` = ?';
+      $params[] = $ip;
+    }
+    elseif ($ip_key === '__')
+    {
+      // Undefined IP
+      $sql .= 'AND `remote_hostname` = ? AND (`remote_ip` IS NULL OR `remote_ip` IN (?, ?))';
+      $params[] = $hostname;
+      $params[] = '0.0.0.0';
+      $params[] = '::';
+    } else {
+      // Search by $hostname/$ip
+      $sql .= 'AND `remote_hostname` = ? AND `remote_ip` = ?';
+      $params[] = $hostname;
+      $params[] = $ip;
+    }
+    $entry = dbFetchRow($sql, $params);
+    if (count($entry))
+    {
+      $cache['autodiscovery'][$hostname][$ip_key] = $entry;
+    }
+  }
+
+  if (isset($cache['autodiscovery'][$hostname][$ip_key]))
+  {
+    // already discovered
+    $db_entry = $cache['autodiscovery'][$hostname][$ip_key];
+    //$remote_device_id = $db_entry['remote_device_id'];
+    print_debug("AUTODISCOVERY DEVEL: hostname & ip DB found");
+  }
+  elseif (isset($cache['autodiscovery'][$hostname]['__']) && $ip_key !== '__')
+  {
+    // already discovered, but without ip
+    $db_entry = $cache['autodiscovery'][$hostname]['__'];
+    //$remote_device_id = $db_entry['remote_device_id'];
+    print_debug("AUTODISCOVERY DEVEL: hostname DB found");
+  }
+  // if (isset($cache['autodiscovery_remote_device_id'][$hostname]) &&
+  //     array_key_exists($ip_key, $cache['autodiscovery_remote_device_id'][$hostname]))
+  // {
+  //   print_debug("Hostname $hostname ($ip) already checked by autodiscovery.");
+  //   return $cache['autodiscovery_remote_device_id'][$hostname][$ip_key];
+  // }
+
+  if ($db_entry)
+  {
+    print_debug_vars($db_entry);
+    switch ($db_entry['last_reason'])
+    {
+      // 'ok','no_xdp','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+
+      case 'ok':
+        // Already added device, no need for discovery, also checked by get_autodiscovery_device_id()
+        print_debug("Remote device already discovered, no need for discovery again.");
+        return FALSE;
+
+      case 'duplicated':
+        print_debug("Remote device passed mostly checks, but detected as duplicated.");
+        return FALSE;
+
+      //case 'no_db':
+      //  break;
+      default:
+        // All other reasons check last_checked_unixtime not more than 24 hours
+        $interval = $config['time']['now'] - $db_entry['last_checked_unixtime'];
+        if ($interval <= $config['autodiscovery']['recheck_interval'])
+        {
+          $interval = format_uptime($interval);
+          $recheck_interval = format_uptime($config['autodiscovery']['recheck_interval']);
+          print_debug("Remote device checked $interval ago (less than $recheck_interval)");
+          //return FALSE;
+        }
+    }
+  }
+
+  return TRUE;
+}
+
+function get_autodiscovery_entry($hostname, $ip = NULL, $exclude_device_id = NULL)
+{
+  global $cache;
+
+  $ip_key = safe_ip_hostname_key($hostname, $ip);
+
+  if (!isset($cache['autodiscovery'][$hostname][$ip_key]))
+  {
+    $valid_hostname = is_valid_hostname($hostname);
+    if (!$valid_hostname && $ip_key === '__')
+    {
+      $cache['autodiscovery'][$hostname][$ip_key] = NULL;
+      return NULL;
+    }
+
+    $sql = 'SELECT `autodiscovery`.*, UNIX_TIMESTAMP(`last_checked`) AS `last_checked_unixtime` FROM `autodiscovery` WHERE `poller_id` = ?';
+    $params = [ $GLOBALS['config']['poller_id'] ];
+    if ($ip == $hostname || !$valid_hostname)
+    {
+      // Search by IP
+      // print_vars($ip);
+      // print_vars($ip_key);
+      // print_vars($hostname);
+      $sql .= ' AND `remote_ip` = ?';
+      $params[] = $ip;
+    }
+    elseif ($ip_key === '__')
+    {
+      // Undefined IP
+      $sql .= ' AND `remote_hostname` = ? AND (`remote_ip` IS NULL OR `remote_ip` IN (?, ?))';
+      $params[] = $hostname;
+      $params[] = '0.0.0.0';
+      $params[] = '::';
+    } else {
+      // Search by $hostname/$ip
+      $sql .= ' AND `remote_hostname` = ? AND `remote_ip` = ?';
+      $params[] = $hostname;
+      $params[] = $ip;
+    }
+    // Exclude local device
+    if (is_numeric($exclude_device_id))
+    {
+      $sql .= ' AND (`remote_device_id` IS NULL OR `remote_device_id` != ?)';
+      $params[] = $exclude_device_id;
+    }
+
+    $entry = dbFetchRow($sql, $params);
+    if (count($entry))
+    {
+      $cache['autodiscovery'][$hostname][$ip_key] = $entry;
+    }
+  }
+
+  return $cache['autodiscovery'][$hostname][$ip_key];
+}
+
+// Note return numeric device_id if already found, if not found: FALSE (for cached results) or NULL for not cached
+function get_autodiscovery_device_id($device, $hostname, $ip = NULL, $mac = NULL)
+{
+  global $cache;
+
+  $ip_key = safe_ip_hostname_key($hostname, $ip);
+  $ip_type = get_ip_type($ip);
+
+  // Check if cached
+  if (isset($cache['autodiscovery_remote_device_id'][$hostname]) &&
+      array_key_exists($ip_key, $cache['autodiscovery_remote_device_id'][$hostname]))
+  {
+    print_debug("AUTODISCOVERY DEVEL: remote_device_id from cache");
+    // Set to false, for prevent caching with NULL
+    if (empty($cache['autodiscovery_remote_device_id'][$hostname][$ip_key]))
+    {
+      return FALSE;
+    }
+    return $cache['autodiscovery_remote_device_id'][$hostname][$ip_key];
+  }
+
+  // Check previous autodiscovery rounds as mostly correct!
+  //$sql = 'SELECT `remote_device_id` FROM `autodiscovery` WHERE `remote_hostname` = ? AND `remote_ip` = ? AND `last_reason` = ?';
+  //$remote_device_id = dbFetchCell($sql, [ $hostname, $ip, 'ok' ]);
+  $autodiscovery_entry = get_autodiscovery_entry($hostname, $ip, $device['device_id']);
+  if (isset($autodiscovery_entry['last_reason']) && $autodiscovery_entry['last_reason'] == 'ok')
+  {
+    $remote_device_id = $autodiscovery_entry['remote_device_id'];
+  }
+
+  // Try to find remote host by remote chassis mac address from DB
+  if (!$remote_device_id)
+  {
+    $remote_device_id = get_device_id_by_mac($mac, $device['device_id']);
+  }
+
+  // We can also use IP address to find remote device.
+  if (!$remote_device_id && $ip_type && !in_array($ip_type, [ 'unspecified', 'loopback' ])) // 'link-local' ?
+  {
+    //$remote_device_id = dbFetchCell("SELECT `device_id` FROM `ports` LEFT JOIN `ipv4_addresses` on `ports`.`port_id`=`ipv4_addresses`.`port_id` WHERE `deleted` = '0' AND `ipv4_address` = ? LIMIT 1;", array($entry['mtxrNeighborIpAddress']));
+    $peer_where = generate_query_values($device['device_id'], 'device_id', '!='); // Additional filter for exclude self IPs
+    // Fetch all devices with peer IP and filter by UP
+    if ($ids = get_entity_ids_ip_by_network('device', $ip, $peer_where))
+    {
+      $remote_device_id = $ids[0];
+      if (count($ids) > 1)
+      {
+        // If multiple same IPs found, get first NOT disabled or down
+        foreach ($ids as $id)
+        {
+          $tmp_device = device_by_id_cache($id);
+          if (!$tmp_device['disabled'] && $tmp_device['status'])
+          {
+            $remote_device_id = $id;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Check if device already exist by hostname
+  if (!$remote_device_id)
+  {
+    $remote_device_id = get_device_id_by_hostname($hostname);
+    // If hostname is FQDN, also try by sysName
+    if (!$remote_device_id && is_valid_hostname($hostname, TRUE))
+    {
+      $remote_device_id = dbFetchCell("SELECT `device_id` FROM `devices` WHERE `sysName` = ?", [ $hostname ]);
+    }
+  }
+
+  // This is dumb, but I not remember if all functions return null :/
+  if ($remote_device_id === FALSE) { $remote_device_id = NULL; }
+
+  if ($remote_device_id)
+  {
+    // Founded remote device in local DB
+    $insert = [
+      //'poller_id'        => $config['poller_id'],
+      'device_id'        => $device['device_id'],
+      //'remote_hostname'  => $hostname,
+      'remote_ip'        => $ip,
+      'remote_device_id' => $remote_device_id,
+      'protocol'         => 'XDP',
+      //'last_reason'      => 'no_dns' // 'ok','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown'
+    ];
+    set_autodiscovery($hostname, 'ok', $insert);
+  }
+
+  $cache['autodiscovery_remote_device_id'][$hostname][$ip_key] = $remote_device_id;
+  return $remote_device_id;
 }
 
 // DOCME needs phpdoc block
@@ -259,7 +844,7 @@ function discover_device($device, $options = NULL)
       $device['sysObjectID'] = $sysObjectID;
     }
   }
-  else if (is_null($device['sysObjectID']))
+  elseif (is_null($device['sysObjectID']))
   {
     // Set device sysObjectID when device just added (required for some cases before other discovery/polling)
     $sysObjectID = snmp_cache_sysObjectID($device);
@@ -291,14 +876,18 @@ function discover_device($device, $options = NULL)
   echo(PHP_EOL);
 
   // Either only run the modules specified on the commandline, or run all modules in config.
+  $modules_forced = [];
   if ($options['m'])
   {
     foreach (explode(",", $options['m']) as $module)
     {
+      if (!isset($config['discovery_modules'][$module])) { continue; } // unknown module
+
       $modules[$module] = TRUE;
+      $modules_forced[] = $module;
     }
   }
-  else if ($device['force_discovery'] && $options['h'] == 'new' && isset($attribs['force_discovery_modules']))
+  elseif ($device['force_discovery'] && $options['h'] == 'new' && isset($attribs['force_discovery_modules']))
   {
     // Forced discovery specific modules
     foreach (json_decode($attribs['force_discovery_modules'], TRUE) as $module)
@@ -371,30 +960,30 @@ function discover_device($device, $options = NULL)
 
   foreach ($modules as $module => $module_status)
   {
-    if (discovery_module_excluded($device, $module) === FALSE)
-    {
-      if ($attribs['discover_'.$module] || ( $module_status && !isset($attribs['discover_'.$module])))
-      {
-        $m_start = utime();
-        $GLOBALS['module_stats'][$module] = array();
 
-        print_cli_heading("Module Start: %R".$module."");
+    if (!(in_array($module, $modules_forced) || is_module_enabled($device, $module))) { continue; }
+    //if ($attribs['discover_'.$module] || ( $module_status && !isset($attribs['discover_'.$module])))
 
-        include("includes/discovery/$module.inc.php");
+    $m_start = utime();
+    $GLOBALS['module_stats'][$module] = array();
 
-        $m_end   = utime();
-        $GLOBALS['module_stats'][$module]['time'] = round($m_end - $m_start, 4);
-        print_module_stats($device, $module);
-        echo PHP_EOL;
-        //print_cli_heading("Module End: %R".$module."");
-      } elseif (isset($attribs['discover_'.$module]) && $attribs['discover_'.$module] == "0")
-      {
-        print_debug("Module [ $module ] disabled on host.");
-      } else {
-        print_debug("Module [ $module ] disabled globally.");
-      }
-    }
+    print_cli_heading("Module Start: %R".$module."");
+
+    include("includes/discovery/$module.inc.php");
+
+    $m_end   = utime();
+    $GLOBALS['module_stats'][$module]['time'] = round($m_end - $m_start, 4);
+    print_module_stats($device, $module);
+    echo(PHP_EOL);
+    //print_cli_heading("Module End: %R".$module."");
   }
+
+  // Modules enabled stats:
+  $modules_stat = $GLOBALS['cache']['devices']['discovery_modules'][$device['device_id']];
+
+  if (count($modules_stat['excluded'])) { print_cli_data("Modules Excluded", implode(", ", $modules_stat['excluded']), 1); }
+  if (count($modules_stat['disabled'])) { print_cli_data("Modules Disabled", implode(", ", $modules_stat['disabled']), 1); }
+  if (count($modules_stat['enabled']))  { print_cli_data("Modules Enabled",  implode(", ", $modules_stat['enabled']), 1); }
 
   // Set type to a predefined type for the OS if it's not already set
   if ($device['type'] == "unknown" || $device['type'] == "")
@@ -509,7 +1098,7 @@ function discover_virtual_machine(&$valid, $device, $options = array())
                        'vm_source'   => $options['source']);
     $vm_id = dbInsert($vm_insert, 'vminfo');
     echo('+');
-    log_event("Virtual Machine added: " . $options['name'] . ' (' . format_bi($options['memory']) . 'B RAM, ' . $options['cpucount'] . ' CPU)', $device, $options['type'], $vm_id);
+    log_event("Virtual Machine added: " . $options['name'] . ' (' . format_bi($options['memory']) . 'B RAM, ' . $options['cpucount'] . ' CPU)', $device, 'virtualmachine', $vm_id);
 
     if (is_valid_hostname($options['name']) && in_array($options['status'], array('running', 'powered on', 'poweredOn')))
     {
@@ -582,11 +1171,19 @@ function discover_fetch_oids($device, $mib, $def, $table_oids)
 {
   $array = array();
   // SNMP flags
-  $flags = OBS_SNMP_ALL_NUMERIC_INDEX | OBS_SNMP_DISPLAY_HINT;
+  $flags = OBS_SNMP_ALL_NUMERIC_INDEX | OBS_SNMP_DISPLAY_HINT | OBS_SNMP_CONCAT;
   // Allow custom definition flags
   if (isset($def['snmp_flags']))
   {
+    if (is_flag_set(OBS_SNMP_TABLE, $def['snmp_flags']))
+    {
+      // If table output is used, exclude numeric index
+      $flags = $flags ^ OBS_SNMP_NUMERIC_INDEX;
+    }
     $flags = $flags | $def['snmp_flags'];
+  } else {
+    // Force UTF decode?
+    //$flags = $flags | OBS_SNMP_HEX | OBS_DECODE_UTF8;
   }
 
   $indexes_get = isset($def['indexes']) &&
@@ -628,7 +1225,11 @@ function discover_fetch_oids($device, $mib, $def, $table_oids)
       {
         foreach ((array)$def[$table_oid] as $get_oid)
         {
+          // Do not walk limit/unit/scale oids with passed indexes (they should be fetched by get)
+          if (str_exists($table_oid, [ 'limit', 'unit', 'scale']) && str_exists($get_oid, '.')) { continue; }
+
           $array = snmp_cache_table($device, $get_oid, $array, $mib, NULL, $flags);
+          //print_vars($array);
         }
       }
     }
@@ -645,18 +1246,29 @@ function discover_fetch_oids($device, $mib, $def, $table_oids)
     }
   }
 
-  // Populate entPhysical using value of supplied oid_entPhysicalIndex. Will populate with values from entPhysicalContainedIn if entPhys_parent set.
-
-  if (isset($def['oid_entPhysicalIndex']))
+  // Populate entPhysical using value of supplied oid_entPhysicalIndex.
+  // Will populate with values from entPhysicalContainedIn if entPhysical_parent set.
+  if (isset($def['oid_entPhysicalIndex']) || isset($def['entPhysicalIndex']))
   {
     $oids_tmp = array();
 
+    // Fetch entPhysicalIndex by defined oid or just use tag, mostly common is %index%
+    $use_oid = isset($def['oid_entPhysicalIndex']);
+    
     foreach ($array as $index => $array_tmp)
     {
-      if (isset($array_tmp[$def['oid_entPhysicalIndex']]) && is_numeric($array_tmp[$def['oid_entPhysicalIndex']]))
+      // Get entPhysicalIndex
+      if ($use_oid)
       {
+        $entPhysicalIndex = isset($array_tmp[$def['oid_entPhysicalIndex']]) ? $array_tmp[$def['oid_entPhysicalIndex']] : NULL;
+      } else {
+        $array_tmp['index'] = $index;
+        $entPhysicalIndex = array_tag_replace($array_tmp, $def['entPhysicalIndex']);
+      }
 
-        if (isset($def['entPhys_parent']) && $def['entPhys_parent'])
+      if (is_numeric($entPhysicalIndex))
+      {
+        if (isset($def['entPhysical_parent']) && $def['entPhysical_parent'])
         {
           $oidlist = array('entPhysicalContainedIn');
         } else {
@@ -665,7 +1277,7 @@ function discover_fetch_oids($device, $mib, $def, $table_oids)
 
         foreach ($oidlist as $oid_tmp)
         {
-          $oids_tmp[] = $oid_tmp.'.'.$array_tmp[$def['oid_entPhysicalIndex']];
+          $oids_tmp[] = $oid_tmp . '.' . $entPhysicalIndex;
         }
       }
     }
@@ -674,15 +1286,23 @@ function discover_fetch_oids($device, $mib, $def, $table_oids)
 
     foreach ($array as $index => $array_tmp)
     {
-      if (is_array($entPhysicalTable[$array_tmp[$def['oid_entPhysicalIndex']]]))
+      // Get entPhysicalIndex
+      if ($use_oid)
       {
-        $array[$index] = array_merge($array[$index], $entPhysicalTable[$array_tmp[$def['oid_entPhysicalIndex']]]);
+        $entPhysicalIndex = isset($array_tmp[$def['oid_entPhysicalIndex']]) ? $array_tmp[$def['oid_entPhysicalIndex']] : NULL;
+      } else {
+        $array_tmp['index'] = $index;
+        $entPhysicalIndex = array_tag_replace($array_tmp, $def['entPhysicalIndex']);
+      }
+
+      if (is_array($entPhysicalTable[$entPhysicalIndex]))
+      {
+        $array[$index] = array_merge($array[$index], $entPhysicalTable[$entPhysicalIndex]);
       }
     }
 
     if (isset($def['entPhysical_parent']) && $def['entPhysical_parent'])
     {
-
       $oids_tmp = array();
 
       foreach ($entPhysicalTable as $entPhysicalIndex => $entPhysicalEntry)
@@ -726,7 +1346,7 @@ function check_valid_virtual_machines($device, $valid, $source)
         echo("-");
         print_debug("Virtual Machine deleted: $id -> $type");
         dbDelete('vminfo', "`vm_id` = ?", array($entry['vm_id']));
-        log_event("Virtual Machine deleted: ".$entry['name']." ".$entry['vm_type']." ". $entry['vm_uuid'], $device, 'vm', $entry['vm_uuid']);
+        log_event("Virtual Machine deleted: ".$entry['name']." ".$entry['vm_type']." ". $entry['vm_uuid'], $device, 'virtualmachine', $entry['vm_uuid']);
       } else {
         echo('.');
       }
@@ -778,28 +1398,35 @@ function discover_juniAtmVp(&$valid, $port_id, $vp_id, $vp_descr)
   $valid[$port_id][$vp_id] = 1;
 }
 
-// FIXME. remove in r7000 -- uhh how? all link mibs still use discover_link. -T
-function discover_link($port, $protocol, $remote_port_id, $remote_hostname, $remote_port, $remote_platform, $remote_version, $remote_address = NULL)
-{
-  $params = array('remote_port_id', 'remote_hostname', 'remote_port', 'remote_platform', 'remote_version', 'remote_address');
-  foreach ($params as $param)
-  {
-    $neighbour[$param] = $$param;
-  }
-  // Call to new function
-  discover_neighbour($port, $protocol, $neighbour);
-}
-
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 function discover_neighbour($port, $protocol, $neighbour)
 {
-
   print_debug("Discover neighbour: " . $port['device_id'] . " -> $protocol, ".$port['port_id'].", " . implode(', ', $neighbour));
 
+  if (!is_numeric($port['port_id']))
+  {
+    print_debug("Local port unknown, skip neighbour.");
+    return NULL;
+  }
+  //elseif (is_bad_xdp($neighbour['remote_hostname'], $neighbour['remote_platform']) || empty($neighbour['remote_hostname']))
+  elseif (!strlen($neighbour['remote_hostname']) || is_bad_xdp($neighbour['remote_hostname']))
+  {
+    // Note in neighbour discovery, ignore only hostname!
+    print_debug("Hostname ignored, skip neighbour.");
+    return NULL;
+  }
+
+  // Autodiscovery id
+  $hostname = $neighbour['remote_hostname'];
+  safe_ip_hostname_key($hostname, $neighbour['remote_address']);
+  $autodiscovery_entry = get_autodiscovery_entry($hostname, $neighbour['remote_address'], $port['device_id']);
+  $neighbour['autodiscovery_id'] = $autodiscovery_entry['autodiscovery_id'];
+
   $neighbour['protocol'] = $protocol;
-  $params   = array('protocol', 'remote_port_id', 'remote_hostname', 'remote_port', 'remote_platform', 'remote_version', 'remote_address');
-  $neighbour_db = dbFetchRow("SELECT * FROM `neighbours` WHERE `port_id` = ? AND `protocol` = ? AND `remote_hostname` = ? AND `remote_port` = ?", array($port['port_id'], $protocol, $neighbour['remote_hostname'], $neighbour['remote_port']));
+  $neighbour['active'] = '1';
+  $params   = array('protocol', 'remote_port_id', 'remote_hostname', 'remote_port', 'remote_platform', 'remote_version', 'remote_address', 'autodiscovery_id', 'active');
+  $neighbour_db = dbFetchRow("SELECT `neighbours`.*, UNIX_TIMESTAMP(`last_change`) AS `last_change_unixtime` FROM `neighbours` WHERE `port_id` = ? AND `protocol` = ? AND `remote_hostname` = ? AND `remote_port` = ?", array($port['port_id'], $protocol, $neighbour['remote_hostname'], $neighbour['remote_port']));
   if (!isset($neighbour_db['neighbour_id']))
   {
     $update = array('port_id'   => $port['port_id'],
@@ -807,7 +1434,13 @@ function discover_neighbour($port, $protocol, $neighbour)
     foreach ($params as $param)
     {
       $update[$param] = $neighbour[$param];
-      if ($neighbour[$param] == NULL) { $update[$param] = array('NULL'); }
+      if (is_null($neighbour[$param])) { $update[$param] = [ 'NULL' ]; }
+    }
+    // Last change as unixtime
+    // FIXME. Need convert in db schema last_change to unixtime
+    if (is_numeric($neighbour['last_change']) && $neighbour['last_change'] > OBS_MIN_UNIXTIME)
+    {
+      $update['last_change'] = [ 'FROM_UNIXTIME('.$neighbour['last_change'].')' ];
     }
     $id = dbInsert($update, 'neighbours');
 
@@ -819,7 +1452,15 @@ function discover_neighbour($port, $protocol, $neighbour)
       if ($neighbour[$param] != $neighbour_db[$param])
       {
         $update[$param] = $neighbour[$param];
+        if (is_null($neighbour[$param])) { $update[$param] = [ 'NULL' ]; }
       }
+    }
+    // Last change as unixtime
+    // FIXME. Need convert in db schema last_change to unixtime
+    if (is_numeric($neighbour['last_change']) && $neighbour['last_change'] > OBS_MIN_UNIXTIME &&
+        abs($neighbour['last_change'] - $neighbour_db['last_change_unixtime']) > 90)
+    {
+      $update['last_change'] = [ 'FROM_UNIXTIME('.$neighbour['last_change'].')' ];
     }
     if (count($update))
     {
@@ -829,7 +1470,12 @@ function discover_neighbour($port, $protocol, $neighbour)
       $GLOBALS['module_stats']['neighbours']['unchanged']++; //echo('.');
     }
   }
-  $GLOBALS['valid']['neighbours'][$port['port_id']][$neighbour['remote_hostname']][$neighbour['remote_port']] = 1;
+  $valid_host_key = $neighbour['remote_hostname'];
+  if (strlen($neighbour['remote_address']))
+  {
+    $valid_host_key .= '-' . $neighbour['remote_address'];
+  }
+  $GLOBALS['valid']['neighbours'][$port['port_id']][$valid_host_key][$neighbour['remote_port']] = 1;
 }
 
 // DOCME needs phpdoc block
@@ -954,7 +1600,7 @@ function discover_processor(&$valid, $device, $processor_oid, $processor_index, 
   if (!isset($processor_db['processor_id']))
   {
     $update = array('device_id' => $device['device_id']);
-    if (!$processor_precision) { $processor_precision = 1; };
+    if (!$processor_precision) { $processor_precision = 1; }
     foreach ($params as $param) { $update[$param] = ($$param === NULL ? array('NULL') : $$param); }
 
     if ($processor_precision != 1)
@@ -975,6 +1621,15 @@ function discover_processor(&$valid, $device, $processor_oid, $processor_index, 
     {
       if ($$param != $processor_db[$param] ) { $update[$param] = ($$param === NULL ? array('NULL') : $$param); }
     }
+
+    // Skip WMI processor description update, this is done in poller
+    if (isset($update['processor_descr']) && $processor_type === 'hr' &&
+        ($update['processor_descr'] === 'Unknown Processor Type' || $update['processor_descr'] === 'Intel') &&
+        is_module_enabled($device, 'wmi', 'poller'))
+    {
+      unset($update['processor_descr']);
+    }
+
     if (count($update))
     {
       dbUpdate($update, 'processors', '`processor_id` = ?', array($processor_db['processor_id']));
@@ -1128,7 +1783,7 @@ function discover_printersupply(&$valid, $device, $options = array())
     {
       dbUpdate($update, 'printersupplies', '`supply_id` = ?', array($supply['supply_id']));
       $GLOBALS['module_stats']['printersupplies']['updated']++; //echo('U');
-      log_event("Printer supply updated: " . $options['description'] . " (" . nicecase($options['type']) . ", index " . $options['index'] . ")", $device, 'printersupply', $supply_id);
+      log_event("Printer supply updated: " . $options['description'] . " (" . nicecase($options['type']) . ", index " . $options['index'] . ")", $device, 'printersupply', $supply['supply_id']);
     } else {
       $GLOBALS['module_stats']['printersupplies']['unchanged']++; //echo('.');
     }
@@ -1213,25 +1868,24 @@ function discover_inventory($device, $index, $inventory_tmp, $mib)
 function check_valid_inventory($device)
 {
 
-  foreach ($GLOBALS['valid']['inventory'] as $mib => $array)
+  $query = 'SELECT * FROM `entPhysical` WHERE `device_id` = ?';
+  $entries = dbFetchRows($query, [ $device['device_id'] ]);
+
+  foreach ($entries as $entry)
   {
+    $index = $entry['entPhysicalIndex'];
+    $mib = $entry['inventory_mib'];
 
-    $query = 'SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `inventory_mib` = ?';
-    $entries = dbFetchRows($query, [$device['device_id'], $mib]);
-
-    foreach ($entries as $entry)
+    //if (!$array[$index] && $entry['deleted'] == NULL)
+    if (!isset($GLOBALS['valid']['inventory'][$mib][$index]) && empty($entry['deleted']))
     {
-      $index = $entry['entPhysicalIndex'];
-      if (!$array[$index] && $entry['deleted'] == NULL)
-      {
-        dbUpdate(['deleted' => ['NOW()']], 'entPhysical', "`entPhysical_id` = ?", [$entry['entPhysical_id']]);
-        // dbDelete('entPhysical', "`entPhysical_id` = ?", array($entry['entPhysical_id']));
-        print_debug('Inventory deleted: class ' . $entry['entPhysicalClass'] . ', name ' . $entry['entPhysicalName'] . ', index ' . $index);
-        $GLOBALS['module_stats']['inventory']['deleted']++; //echo('-');
-      }
+      dbUpdate([ 'deleted' => [ 'NOW()' ] ], 'entPhysical', "`entPhysical_id` = ?", [ $entry['entPhysical_id'] ]);
+      // dbDelete('entPhysical', "`entPhysical_id` = ?", array($entry['entPhysical_id']));
+      print_debug('Inventory deleted: class ' . $entry['entPhysicalClass'] . ', name ' . $entry['entPhysicalName'] . ', index ' . $index);
+      $GLOBALS['module_stats']['inventory']['deleted']++; //echo('-');
     }
-
   }
+
 }
 
 // DOCME needs phpdoc block
@@ -1240,56 +1894,42 @@ function is_bad_xdp($hostname, $platform = '')
 {
   global $config;
 
-  if (is_array($config['bad_xdp']))
+  // Ignore Hostname string
+  if (is_array($config['xdp']['ignore_hostname']) && str_exists($hostname, $config['xdp']['ignore_hostname']))
   {
-    foreach ($config['bad_xdp'] as $bad_xdp)
-    {
-      if (strstr($hostname, $bad_xdp)) { return TRUE; }
-    }
-  }
-
-  if (is_array($config['bad_xdp_regexp']))
-  {
-    foreach ($config['bad_xdp_regexp'] as $bad_xdp)
-    {
-      if (preg_match($bad_xdp ."i", $hostname)) { return TRUE; }
-    }
-  }
-
-  if ($platform)
-  {
-    foreach ($config['bad_xdp_platform'] as $bad_xdp)
-    {
-      if (stripos($platform, $bad_xdp) !== FALSE) { return TRUE; }
-    }
-  }
-
-  return FALSE;
-}
-
-function discovery_module_excluded($device, $module)
-{
-  global $config;
-
-  if (in_array($module, $config['os_group'][$device['os_group']]['discovery_blacklist']))
-  {
-    // Module is blacklisted for this OS group.
-    print_debug("Module [ $module ] is in the blacklist for ".$device['os_group']);
     return TRUE;
   }
-  elseif (in_array($module, $config['os'][$device['os']]['discovery_blacklist']))
+
+  // Ignore Hostname regex
+  if (is_array($config['xdp']['ignore_hostname_regex']))
   {
-    // Module is blacklisted for this OS.
-    print_debug("Module [ $module ] is in the blacklist for ".$device['os']);
-    return TRUE;
+    foreach ($config['xdp']['ignore_hostname_regex'] as $pattern)
+    {
+      if (preg_match($pattern, $hostname)) { return TRUE; }
+    }
   }
-  // elseif (!isset($config['discovery_modules'][$module]))
-  // {
-  //   // Unknown module
-  //   print_debug("Module [ $module ] unknown!");
-  //   print_error("Module [ $module ] unknown!");
-  //   return TRUE;
-  // }
+
+  if (strlen($platform))
+  {
+    // Ignore Platform string
+    if (is_array($config['xdp']['ignore_platform']) &&
+        str_iexists($platform, $config['xdp']['ignore_platform']))
+    {
+      return TRUE;
+    }
+    // Ignore Platform regex
+    if (is_array($config['xdp']['ignore_platform_regex']))
+    {
+      foreach ($config['xdp']['ignore_platform_regex'] as $pattern)
+      {
+        if (preg_match($pattern, $platform))
+        {
+          return TRUE;
+        }
+      }
+    }
+  }
+
   return FALSE;
 }
 

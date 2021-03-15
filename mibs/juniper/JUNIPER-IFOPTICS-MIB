@@ -21,12 +21,12 @@ IMPORTS
         FROM JUNIPER-SMI;
 
 jnxIfOpticsMib MODULE-IDENTITY
-    LAST-UPDATED "201609280000Z" -- Wed Sep 28 00:00:00 UTC
+    LAST-UPDATED "201805020000Z" -- Wed May 2, 2018 00:00:00 UTC
     ORGANIZATION "Juniper Networks, Inc."
     CONTACT-INFO
             "        Juniper Technical Assistance Center
                      Juniper Networks, Inc.
-                     1194 N. Mathilda Avenue
+                     1133 Innovation Way
                      Sunnyvale, CA 94089
                      E-mail: support@juniper.net"
 
@@ -52,6 +52,14 @@ jnxIfOpticsMib MODULE-IDENTITY
     REVISION    "201605310000Z" -- 31-May-16
     DESCRIPTION
             "Corrected name in table sequence"
+
+    REVISION    "201805020000Z" -- 2-May-18
+    DESCRIPTION
+            "Added jnxOpticsOTIfHighPolarization object"
+
+    REVISION    "201808090000Z" -- 9-Aug-18
+    DESCRIPTION
+            "Added FRR related pre-FEC BER threshold objects for ot interface"
 
     ::= { jnxOpticsMibRoot 1 }
 
@@ -119,7 +127,9 @@ JnxOpticsOTIfFecType ::= TEXTUAL-CONVENTION
     SYNTAX       INTEGER {
                      none(0),
                      sdfec(1),
-                     sdfec25(2)
+                     sdfec25(2),
+                     hgfec(3),
+                     sdfec15(4)
                  }
 
 JnxOpticsOTIfEncodingOptions ::= TEXTUAL-CONVENTION
@@ -6945,16 +6955,28 @@ JnxOpticsOTIfConfigEntry ::=
                                  Integer32,
         jnxOpticsOTIfLaserEnable
                                  TruthValue,
-	jnxOpticsOTIfFecMode
-	                         JnxOpticsOTIfFecType,
-	jnxOpticsOTIfEncodingOption
-	                         JnxOpticsOTIfEncodingOptions,
-	jnxOpticsOTIfModulation
-	                         Integer32,
-	jnxOpticsOTIfAdminState
-	                         JnxOpticsOTIfAdminStates,
-	jnxOpticsOTIfOperState
-	                         JnxOpticsOTIfOperStates
+        jnxOpticsOTIfFecMode
+                                 JnxOpticsOTIfFecType,
+        jnxOpticsOTIfEncodingOption
+                                 JnxOpticsOTIfEncodingOptions,
+        jnxOpticsOTIfModulation
+                                 Integer32,
+        jnxOpticsOTIfAdminState
+                                 JnxOpticsOTIfAdminStates,
+        jnxOpticsOTIfOperState
+                                 JnxOpticsOTIfOperStates,
+        jnxOpticsOTIfHighPolarization
+                                 TruthValue,
+        jnxOpticsOTIfPreFecBERThresholdMantissa
+                                 Integer32,
+        jnxOpticsOTIfPreFecBERThresholdExponent
+                                 Integer32,
+        jnxOpticsOTIfPreFecBERThresholdTime
+                                 Integer32,
+        jnxOpticsOTIfPreFecBERThresholdClearMantissa
+                                 Integer32,
+        jnxOpticsOTIfPreFecBERThresholdClearExponent
+                                 Integer32
         }
 
     jnxOpticsOTIfConfigContainerIndex OBJECT-TYPE
@@ -7044,6 +7066,70 @@ JnxOpticsOTIfConfigEntry ::=
         DESCRIPTION
                 "The operational state of this interface"
         ::= { jnxOpticsOTIfConfigEntry 10 }
+
+    jnxOpticsOTIfHighPolarization OBJECT-TYPE
+        SYNTAX          TruthValue
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+            "Enable/disable high-polarization mode."
+        ::= { jnxOpticsOTIfConfigEntry 11 }
+
+    jnxOpticsOTIfPreFecBERThresholdMantissa OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                " This will set the BER threshold(mantissa), which when
+                  crossed will trigger Signal Degrade.
+                "
+        ::= { jnxOpticsOTIfConfigEntry 12 }
+
+    jnxOpticsOTIfPreFecBERThresholdExponent OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                " This will set the BER threshold(exponent), which when
+                  crossed will trigger Signal Degrade.
+                "
+        ::= { jnxOpticsOTIfConfigEntry 13 }
+
+    jnxOpticsOTIfPreFecBERThresholdTime OBJECT-TYPE
+        SYNTAX          Integer32
+        UNITS           "ms"
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                " Specify the interval for which the BER must stay above
+                  the signal degradation threshold or below the clear threshold
+                  for the alarm to be raised or cleared respectively.
+                "
+        ::= { jnxOpticsOTIfConfigEntry 14 }
+
+    jnxOpticsOTIfPreFecBERThresholdClearMantissa OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                " This will set the BER threshold(mantissa) for clear signal
+                  degrade condition, which signal degrade condition will be
+                  cleared when Pre-Fec error count is below the clear
+                  threshold error count.
+                "
+        ::= { jnxOpticsOTIfConfigEntry 15 }
+
+    jnxOpticsOTIfPreFecBERThresholdClearExponent OBJECT-TYPE
+        SYNTAX          Integer32
+        MAX-ACCESS      read-write
+        STATUS          current
+        DESCRIPTION
+                " This will set the BER threshold(exponent) for clear signal
+                  degrade condition, which signal degrade condition will be
+                  cleared when Pre-Fec error count is below the clear threshold
+                  error count.
+                "
+        ::= { jnxOpticsOTIfConfigEntry 16 }
 
 --
 -- Optics Alarm/Alert  Table
@@ -7257,6 +7343,27 @@ jnxOpticsNotificationPrefix   OBJECT IDENTIFIER ::=
         DESCRIPTION
             "Notification of a recently cleared optics alarm."
         ::= { jnxOpticsNotificationPrefix 2 }
+
+
+    jnxIfOpticsNotificationAdminStatus NOTIFICATION-TYPE
+        OBJECTS {
+                  ifDescr,
+	              jnxOpticsOTIfAdminState
+                }
+        STATUS  current
+        DESCRIPTION
+                "Notification of the admin state of the optics interface."
+        ::= { jnxOpticsNotificationPrefix 3 }
+
+    jnxIfOpticsNotificationOperStatus NOTIFICATION-TYPE
+        OBJECTS {
+                  ifDescr,
+	              jnxOpticsOTIfOperState
+                }
+        STATUS  current
+        DESCRIPTION
+                "Notification of operational state of the optics interface"
+        ::= { jnxOpticsNotificationPrefix 4 }
 
 --
 -- Iplc Alarm/Alert Notifications

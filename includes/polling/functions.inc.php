@@ -56,7 +56,7 @@ function poll_cache_oids($device, $entity_type, &$oid_cache)
       $walk_params = [$device['device_id'], '0', 'snmp', '', ''];
 
       // Multi-get query
-      $get_query = "SELECT `$oid_field` FROM `$table` WHERE `$device_field` = ? AND `$deleted_field` = ? AND `poller_type` = ? ORDER BY `$oid_field`";
+      $get_query = "SELECT DISTINCT `$oid_field` FROM `$table` WHERE `$device_field` = ? AND `$deleted_field` = ? AND `poller_type` = ?";
       $get_params = [$device['device_id'], '0', 'snmp'];
 
       break;
@@ -115,9 +115,11 @@ function poll_device($device, $options)
   $device_state = array();
   //$old_device_state = unserialize($device['device_state']);
   $attribs = get_entity_attribs('device', $device['device_id']);
+  $model = get_model_array($device);
 
   print_debug_vars($device);
   print_debug_vars($attribs);
+  print_debug_vars($model);
 
   $pid_info = check_process_run($device); // This just clear stalled DB entries
   add_process_info($device); // Store process info
@@ -271,14 +273,10 @@ function poll_device($device, $options)
     // Run these base modules always and before all other modules!
     $poll_modules = array('system', 'os');
 
-    if(isset($options['m']) && $options['m'] == 'none')
+    if (isset($options['m']) && $options['m'] == 'none')
     {
       unset($poll_modules);
     }
-
-    $mods_disabled_global = array();
-    $mods_disabled_device = array();
-    $mods_excluded        = array();
 
     if ($options['m'])
     {
@@ -286,9 +284,10 @@ function poll_device($device, $options)
       {
         $module = trim($module);
         if (in_array($module, $poll_modules)) { continue; } // Skip already added modules
-        if ($module == 'unix-agent')
+        if (in_array($module, [ 'unix-agent', 'wmi' ]))
         {
-          array_unshift($poll_modules, $module);            // Add 'unix-agent' before all
+          // Add 'unix-agent' or 'wmi' before all
+          array_unshift($poll_modules, $module);
           continue;
         }
         if (is_file($config['install_dir'] . "/includes/polling/$module.inc.php"))
@@ -299,41 +298,30 @@ function poll_device($device, $options)
     } else {
       foreach ($config['poller_modules'] as $module => $module_status)
       {
-        if (in_array($module, $poll_modules)) { continue; } // Skip already added modules
-        if ($attribs['poll_'.$module] || ($module_status && !isset($attribs['poll_'.$module])))
+        if (!is_module_enabled($device, $module) || // Skip disabled/blacklisted modules
+            in_array($module, $poll_modules))       // Skip already added modules
         {
-          if (poller_module_excluded($device, $module))
-          {
-            $mods_excluded[] = $module;
-            //print_warning("Module [ $module ] excluded for device.");
-            continue;
-          }
-          if ($module == 'unix-agent')
-          {
-            array_unshift($poll_modules, $module);          // Add 'unix-agent' before all
-            continue;
-          }
-          if (is_file($config['install_dir'] . "/includes/polling/$module.inc.php"))
-          {
-            $poll_modules[] = $module;
-          }
+          continue;
         }
-        elseif (isset($attribs['poll_'.$module]) && !$attribs['poll_'.$module])
+
+        if (in_array($module, [ 'unix-agent', 'wmi' ]))
         {
-          $mods_disabled_device[] = $module;
-          //print_warning("Module [ $module ] disabled on device.");
-        } else {
-          $mods_disabled_global[] = $module;
-          //print_warning("Module [ $module ] disabled globally.");
+          // Add 'unix-agent' or 'wmi' before all
+          array_unshift($poll_modules, $module);
+        }
+        elseif (is_file($config['install_dir'] . "/includes/polling/$module.inc.php"))
+        {
+          $poll_modules[] = $module;
         }
       }
 
-    }
+      // Modules enabled stats:
+      $modules_stat = $GLOBALS['cache']['devices']['poller_modules'][$device['device_id']];
 
-    if (count($mods_excluded)) { print_cli_data("Modules Excluded", implode(", ", $mods_excluded), 1); }
-    if (count($mods_disabled_global)) { print_cli_data("Disabled Globally", implode(", ", $mods_disabled_global), 1); }
-    if (count($mods_disabled_device)) { print_cli_data("Disabled Device", implode(", ", $mods_disabled_global), 1); }
-    if (count($poll_modules)) { print_cli_data("Modules Enabled", implode(", ", $poll_modules), 1); }
+      if (count($modules_stat['excluded'])) { print_cli_data("Modules Excluded", implode(", ", $modules_stat['excluded']), 1); }
+      if (count($modules_stat['disabled'])) { print_cli_data("Modules Disabled", implode(", ", $modules_stat['disabled']), 1); }
+      if (count($modules_stat['enabled']))  { print_cli_data("Modules Enabled",  implode(", ", $modules_stat['enabled']), 1); }
+    }
 
     echo(PHP_EOL);
 

@@ -52,7 +52,7 @@ if ($vars['editing'])
 
     if ($override_sysLocation_bool) { set_entity_attrib( 'device', $device, 'override_sysLocation_bool', '1', $device['device_id']); }
     else                            { del_entity_attrib('device', $device, 'override_sysLocation_bool'); }
-    if (isset($override_sysLocation_string)) { set_entity_attrib('device', $device, 'override_sysLocation_string', $override_sysLocation_string); };
+    if (isset($override_sysLocation_string)) { set_entity_attrib('device', $device, 'override_sysLocation_string', $override_sysLocation_string); }
 
     // Changed Skip ping
     $ping_skip_set = isset($vars['ping_skip']) && ($vars['ping_skip'] == 'on' || $vars['ping_skip'] == '1');
@@ -170,7 +170,7 @@ else if ($update_message)
                                       //'class'       => 'input-xlarge',
                                       'width'       => '500px',
                                       'readonly'    => $readonly,
-                                      'value'       => escape_html($device['purpose']));
+                                      'value'       => $device['purpose']);
       $form['row'][2]['type']      = array(
                                       'type'        => 'select',
                                       //'fieldset'    => 'edit',
@@ -199,7 +199,7 @@ else if ($update_message)
                                       'width'       => '250px',
                                       'readonly'    => $readonly,
                                       'disabled'    => !$override_sysLocation_bool,
-                                      'value'       => escape_html($override_sysLocation_string));
+                                      'value'       => $override_sysLocation_string);
       $form['row'][3]['override_sysLocation'] = array(
                                       'type'        => 'toggle',
                                       'size'        => 'large',

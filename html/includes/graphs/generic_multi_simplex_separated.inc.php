@@ -48,7 +48,7 @@ $rrd_multi = array();
 
 $count = count($rrd_list);
 
-if(isset($colours) && $colours != "mixed" && strpos("mixed", $colours) !== FALSE)
+if (isset($colours) && $colours != "mixed" && strpos("mixed", $colours) !== FALSE)
 {
   $config['graph_colours']['colours'] = generate_colour_gradient(reset($config['graph_colours'][$colours]), end($config['graph_colours'][$colours]), $count);
   $colours = 'colours';
@@ -66,7 +66,9 @@ foreach ($rrd_list as $i => $rrd)
     $colour_iter++;
   }
 
-  $rrd_options .= " DEF:".$rrd['ds'].$i."=".$rrd['filename'].":".$rrd['ds'].":AVERAGE ";
+  $rrd_filename_escape = rrdtool_escape($rrd['filename']);
+
+  $rrd_options .= " DEF:".$rrd['ds'].$i."=".$rrd_filename_escape.":".$rrd['ds'].":AVERAGE ";
 
   $rrd_multi['aggregate'][]  = $rrd['ds'].$i;
 
@@ -75,13 +77,13 @@ foreach ($rrd_list as $i => $rrd)
     $rrd_options .= " CDEF:".$rrd['ds'].$i."min=".$rrd['ds'].$i." ";
     $rrd_options .= " CDEF:".$rrd['ds'].$i."max=".$rrd['ds'].$i." ";
   } else {
-    $rrd_options .= " DEF:".$rrd['ds'].$i."min=".$rrd['filename'].":".$rrd['ds'].":MIN ";
-    $rrd_options .= " DEF:".$rrd['ds'].$i."max=".$rrd['filename'].":".$rrd['ds'].":MAX ";
+    $rrd_options .= " DEF:".$rrd['ds'].$i."min=".$rrd_filename_escape.":".$rrd['ds'].":MIN ";
+    $rrd_options .= " DEF:".$rrd['ds'].$i."max=".$rrd_filename_escape.":".$rrd['ds'].":MAX ";
   }
 
   if ($vars['previous'])
   {
-    $rrd_options .= " DEF:".$i . "X=".$rrd['filename'].":".$rrd['ds'].":AVERAGE:start=".$prev_from.":end=".$from;
+    $rrd_options .= " DEF:".$i . "X=".$rrd_filename_escape.":".$rrd['ds'].":AVERAGE:start=".$prev_from.":end=".$from;
     $rrd_options .= " SHIFT:".$i . "X:$period";
 
     $rrd_multi['thingX'][] = $i . "X";

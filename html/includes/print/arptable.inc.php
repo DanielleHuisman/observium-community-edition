@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -97,7 +96,7 @@ function print_arptable($vars)
   }
 
   // Show ARP tables only for permitted ports
-  $query_permitted = generate_query_permitted(array('port'), array('port_table' => 'I'));
+  $query_permitted = generate_query_permitted(array('port', 'device'), array('port_table' => 'I'));
 
   $query = 'FROM `ip_mac` AS M ';
   $query .= 'LEFT JOIN `ports` AS I ON I.`port_id` = M.`port_id` ';
@@ -165,7 +164,7 @@ function print_arptable($vars)
       {
         $port_error = generate_port_link($entry, '<span class="label label-important">Errors</span>', 'port_errors');
       }
-      $string .= '    <td class="entity">' . generate_port_link($entry, $entry['port_label_short']) . ' ' . $port_error . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . generate_port_link_short($entry) . ' ' . $port_error . '</td>' . PHP_EOL;
     }
     $string .= '    <td class="entity" style="width: 200px;">' . $arp_name . '</td>' . PHP_EOL;
     $string .= '    <td class="entity">' . $arp_if . '</td>' . PHP_EOL;

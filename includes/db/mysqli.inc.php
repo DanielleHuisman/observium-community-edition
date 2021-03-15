@@ -61,9 +61,9 @@ function dbOpen($host = 'localhost', $user, $password, $database, $charset = 'ut
       $host = implode(':', $host_array);
       $GLOBALS['config']['db_persistent'] = TRUE;
     }
-    else if (count($host_array) === 2)
+    elseif (count($host_array) === 2)
     {
-      // This is for compatability with old style host option (from mysql extension)
+      // This is for compatibility with old style host option (from mysql extension)
       // IPv6 host not possible here
       $host = $host_array[0];
       if (is_numeric($host_array[1]))
@@ -82,7 +82,7 @@ function dbOpen($host = 'localhost', $user, $password, $database, $charset = 'ut
   {
     $port = $GLOBALS['config']['db_port'];
   }
-  else if (!isset($port))
+  elseif (!isset($port))
   {
     $port = ini_get("mysqli.default_port");
   }
@@ -92,7 +92,7 @@ function dbOpen($host = 'localhost', $user, $password, $database, $charset = 'ut
   {
     $socket = $GLOBALS['config']['db_socket'];
   }
-  else if (!isset($socket))
+  elseif (!isset($socket))
   {
     $socket = ini_get("mysqli.default_socket");
   }
@@ -114,7 +114,34 @@ function dbOpen($host = 'localhost', $user, $password, $database, $charset = 'ut
       $client_flags |= MYSQLI_CLIENT_COMPRESS;
     }
 
-    // Convert integer and float columns back to PHP numbers. Only valid for mysqlnd.
+    // Optionally enable SSL
+    if ($GLOBALS['config']['db_ssl'])
+    {
+      $client_flags |= MYSQLI_CLIENT_SSL;
+
+      if (!empty($GLOBALS['config']['db_ssl_key']) || !empty($GLOBALS['config']['db_ssl_cert']) ||
+          !empty($GLOBALS['config']['db_ssl_ca'])  || !empty($GLOBALS['config']['db_ssl_ca_path']) ||
+          !empty($GLOBALS['config']['db_ssl_ciphers']))
+      {
+        $db_ssl_key     = $GLOBALS['config']['db_ssl_key']     ? $GLOBALS['config']['db_ssl_key'] : '';
+        $db_ssl_cert    = $GLOBALS['config']['db_ssl_cert']    ? $GLOBALS['config']['db_ssl_cert'] : '';
+        $db_ssl_ca      = $GLOBALS['config']['db_ssl_ca']      ? $GLOBALS['config']['db_ssl_ca'] : '';
+        $db_ssl_ca_path = $GLOBALS['config']['db_ssl_ca_path'] ? $GLOBALS['config']['db_ssl_ca_path'] : '';
+        $db_ssl_ciphers = $GLOBALS['config']['db_ssl_ciphers'] ? $GLOBALS['config']['db_ssl_ciphers'] : '';
+        mysqli_ssl_set($connection, $db_ssl_key, $db_ssl_cert, $db_ssl_ca, $db_ssl_ca_path, $db_ssl_ciphers);
+      }
+
+      // Disables SSL certificate validation on mysqlnd for MySQL 5.6 or later
+      // https://bugs.php.net/bug.php?id=68344
+      if (!$GLOBALS['config']['db_ssl_verify'])
+      {
+        $client_flags |= MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT;
+
+        mysqli_options($connection, MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, $GLOBALS['config']['db_ssl_verify']);
+      }
+    }
+
+    // Convert integer and float columns back to PHP numbers. Boolean returns as int. Only valid for mysqlnd.
     /*
     if (defined('OBS_DB_MYSQLND') && OBS_DB_MYSQLND)
     {
@@ -122,16 +149,23 @@ function dbOpen($host = 'localhost', $user, $password, $database, $charset = 'ut
     }
     */
     // Report if no index or bad index was used in a query
-    mysqli_report(MYSQLI_REPORT_INDEX);
+    //mysqli_report(MYSQLI_REPORT_INDEX);
 
     if (!mysqli_real_connect($connection, $host, $user, $password, $database, (int)$port, $socket, $client_flags))
     {
+      $error_num = mysqli_connect_errno($connection);
       if (OBS_DEBUG)
       {
-        echo('MySQLi connection error ' . mysqli_connect_errno($connection) . ': ' . mysqli_connect_error($connection) . PHP_EOL);
+        echo('MySQLi connection error ' . $error_num . ': ' . mysqli_connect_error($connection) . PHP_EOL);
       }
+      if ($error_num == 2006 && version_compare(PHP_VERSION, '7.4.0', '>=') && version_compare(PHP_VERSION, '7.4.2', '<'))
+      {
+        print_error("PHP version less than 7.4.2 have multiple issues with MySQL 8.0, please update your PHP to latest.");
+      }
+
       return NULL;
     }
+
     if ($charset)
     {
       mysqli_set_charset($connection, $charset);
@@ -331,7 +365,18 @@ function dbLastID($connection = NULL)
     return;
   }
 
-  return mysqli_insert_id($connection);
+  if ($id = mysqli_insert_id($connection))
+  {
+    //print_debug("DEBUG ID by function");
+    //var_dump($id);
+    return $id;
+  } else {
+    // mysqli_insert_id() not return last id, after non empty warnings
+    //print_debug("DEBUG ID by query");
+    //var_dump($id);
+    return dbFetchCell('SELECT last_insert_id();');
+  }
+  //return mysqli_insert_id($connection);
 }
 
 /*
@@ -346,9 +391,15 @@ function dbFetchRows($sql, $parameters = array(), $print_query = FALSE)
   $rows = array();
   if ($result instanceof mysqli_result)
   {
-    while ($row = mysqli_fetch_assoc($result))
+    if (OBS_DB_MYSQLND)
     {
-      $rows[] = $row;
+      // MySQL Native Driver
+      $rows = mysqli_fetch_all($result, MYSQLI_ASSOC);
+    } else {
+      while ($row = mysqli_fetch_assoc($result))
+      {
+        $rows[] = $row;
+      }
     }
     mysqli_free_result($result);
 
@@ -402,7 +453,10 @@ function dbFetchCell($sql, $parameters = array(), $print_query = FALSE)
     $GLOBALS['db_stats']['fetchcell_sec'] += $time_end - $time_start;
     $GLOBALS['db_stats']['fetchcell']++;
 
-    return array_shift($row); // shift first field off first row
+    if (is_array($row))
+    {
+      return array_shift($row); // shift first field off first row
+    }
   }
 
   return NULL;

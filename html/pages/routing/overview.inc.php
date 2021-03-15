@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -19,7 +18,7 @@ foreach ($datas as $type)
     if (is_file($filename))
     {
       $g_i++;
-      if (!is_integer($g_i/2)) { $row_colour = $list_colour_a; } else { $row_colour = $list_colour_b; }
+      if (!is_integer($g_i/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
 
       echo('<div style="background-color: '.$row_colour.';">');
       echo('<div style="padding:4px 0px 0px 8px;"><span class=graphhead>'.$type_text[$type].'</span>');

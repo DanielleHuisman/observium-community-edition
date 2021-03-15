@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -18,7 +17,7 @@
 
 $db_cpu_names = dbFetchRows('SELECT `processor_descr` FROM `processors` WHERE `device_id` = ?', array($device['device_id']));
 
-if (count(array_unique($db_cpu_names)) === 1 && ($db_cpu_names[0]['processor_descr'] === 'Unknown Processor Type' || $db_cpu_names[0]['processor_descr'] ===  'Intel'))
+if (count(array_unique($db_cpu_names)) === 1 && ($db_cpu_names[0]['processor_descr'] === 'Unknown Processor Type' || $db_cpu_names[0]['processor_descr'] === 'Intel'))
 {
   $logical_proc_count = 0;
   $cpu_count = 0;
@@ -33,7 +32,7 @@ if (count(array_unique($db_cpu_names)) === 1 && ($db_cpu_names[0]['processor_des
 
   if (count(array_unique($cpu_names)) === 1 && $cpu_names[0] === $wmi['processors'][0]['Name'])
   {
-    dbUpdate(array('processor_descr' => $wmi['processors'][0]['Name']), 'processors', '`device_id` = ? AND (`processor_descr` = ? || `processor_descr` = ?)', array($device['device_id'], 'Unknown Processor Type', 'Intel'));
+    dbUpdate(array('processor_descr' => $wmi['processors'][0]['Name']), 'processors', '`device_id` = ? AND (`processor_descr` = ? OR `processor_descr` = ?)', array($device['device_id'], 'Unknown Processor Type', 'Intel'));
     echo(' Processor Name Updated:');
   }
 }

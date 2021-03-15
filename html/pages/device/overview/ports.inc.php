@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -19,7 +18,7 @@ $ports['down']     = dbFetchCell("SELECT COUNT(*) FROM `ports` $where AND `ifAdm
 $ports['shutdown'] = dbFetchCell("SELECT COUNT(*) FROM `ports` $where AND `ifAdminStatus` = 'down'", $params);
 $ports['deleted']  = dbFetchCell("SELECT COUNT(*) FROM `ports` WHERE `device_id` = ? AND `deleted` = ?", $params);
 
-if ($ports['down']) { $ports_colour = $warn_colour_a; } else { $ports_colour = $list_colour_a; }
+if ($ports['down']) { $ports_colour = OBS_COLOUR_WARN_A; }
 
 if ($ports['total'])
 {
@@ -52,7 +51,7 @@ if ($ports['total'])
   echo(overlib_link($link, $graph, $overlib_content, NULL));
 
   echo('</td></tr>
-    <tr style="background-color: ' . $ports_colour . '; align: center;">
+    <tr style="background-color: ' . $ports_colour_off . '; align: center;">
       <td style="width: 25%; text-align: center;"><i class="'.$config['icon']['port'].'" title="Total Ports"></i> ' . $ports['total'] . '</td>
       <td style="width: 25%; text-align: center;" class="green"><i class="'.$config['icon']['up'].'" title="Up Ports"></i> ' . $ports['up'] . '</td>
       <td style="width: 25%; text-align: center;" class="red">  <i class="'.$config['icon']['down'].'" title="Down Ports"></i> ' . $ports['down'] . '</td>
@@ -84,7 +83,8 @@ if ($ports['total'])
     'Other',
   );
   $port_links = array();
-  foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` != ?;", array($device['device_id'], '1')) as $data)
+  // We could possibly use different sorting methods for different devices. ifIndex is useful for most Cisco devices. 
+  foreach (dbFetchRows("SELECT * FROM `ports` WHERE `device_id` = ? AND `deleted` != ? ORDER BY `ifIndex`", array($device['device_id'], '1')) as $data)
   {
     humanize_port($data);
     if (!in_array($data['human_type'], $port_types))
@@ -122,7 +122,7 @@ if ($ports['total'])
       'label_num1' => $label_nums[1],
       'label_num2' => $label_nums[2],
       'label_num3' => $label_nums[3],
-      'link'       => generate_port_link($data, $data['port_label_short'])
+      'link'       => generate_port_link_short($data)
     );
   }
   // First sort iteration (by port type)

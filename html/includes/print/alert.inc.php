@@ -160,7 +160,7 @@ function print_alert_table($vars)
 
   echo '<table class="table table-condensed  table-striped  table-hover">' ;
 
-  if($vars['no_header'] == FALSE)
+  if ($vars['no_header'] == FALSE)
   {
     echo '
   <thead>
@@ -209,6 +209,12 @@ function print_alert_table($vars)
 
   foreach ($alerts as $alert)
   {
+    // Set the alert_rule from the prebuilt cache array
+    $alert_rule = $alert_rules[$alert['alert_test_id']];
+    //r($alert_rule);
+
+    $alert['severity'] = $alert_rule['severity'];
+
     // Process the alert entry, generating colours and classes from the data
     humanize_alert_entry($alert);
 
@@ -228,9 +234,6 @@ function print_alert_table($vars)
       $parent_entity = get_entity_by_id_cache($entity_type['parent_type'], $entity[$entity_type['parent_id_field']]);
     }
     */
-
-    // Set the alert_rule from the prebuilt cache array
-    $alert_rule = $alert_rules[$alert['alert_test_id']];
 
     echo('<tr class="'.$alert['html_row_class'].'" style="cursor: pointer;" onclick="openLink(\''.generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'alert', 'alert_entry' => $alert['alert_table_id'])).'\')">');
     echo('<td class="state-marker"></td>');
@@ -293,7 +296,7 @@ function print_alert_table($vars)
 
       foreach($state['failed'] as $test)
       {
-        $alert['state_popup'] .= '<tr><td><strong>'.$test['metric'].'</strong></td><td>'.$test['condition'].'</td><td>'.$test['value'].'</td><td><i class="red">'.$state['metrics'][$test['metric']].'</i></td></tr>';
+        $alert['state_popup'] .= '<tr><td><strong>'.$test['metric'].'</strong></td><td>'.$test['condition'].'</td><td>'.format_value($test['value']).'</td><td><i class="red">'.format_value($state['metrics'][$test['metric']]).'</i></td></tr>';
       }
       $alert['state_popup'] .= '</table>';
       $alert['state_popup'] .= generate_box_close();
@@ -323,7 +326,8 @@ function print_alert_table($vars)
                                         'type'        => 'submit',
                                         'icon_only'   => TRUE, // hide button styles
                                         'name'        => '',
-                                        'icon'        => 'icon-ok icon-primary',
+                                        'readonly'    => $alert['alert_status'] == '1',
+                                        'icon'        => $alert['alert_status'] == '1' ? 'icon-ok-circle text-muted' : 'icon-ok-sign text-muted',
                                         // confirmation dialog
                                         'attribs'     => array('data-toggle'            => 'confirm', // Enable confirmation dialog
                                                                'data-confirm-placement' => 'left',

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage db
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -74,11 +73,11 @@ function dbShowStatus($scope = 'SESSION')
 /**
  * Shows the values of MySQL system variables
  *
- * @param string $scope GLOBAL or SESSION variable scope modifier
  * @param string $where WHERE or LIKE clause
+ * @param string $scope GLOBAL or SESSION variable scope modifier
  * @return array Array with variables
  */
-function dbShowVariables($scope = 'SESSION', $where = '')
+function dbShowVariables($where = '', $scope = 'SESSION')
 {
   switch ($scope)
   {
@@ -100,6 +99,25 @@ function dbShowVariables($scope = 'SESSION', $where = '')
   }
 
   return $rows;
+}
+
+function dbSetVariable($var, $value, $scope = 'SESSION')
+{
+  if (!is_string($var) || !preg_match('/^[A-Z_]+$/i', $var) || !strlen($value))
+  {
+    return;
+  }
+
+  if (!in_array($scope, [ 'GLOBAL', 'SESSION' ]))
+  {
+    $scope = 'SESSION';
+  }
+  if (is_int($value))
+  {
+    $value = [ $value ];
+  }
+
+  return dbQuery("SET $scope $var=?;", [ $value ]);
 }
 
 /**
@@ -128,6 +146,27 @@ function dbShowIndexes($table, $index_name = NULL)
   }
 
   return $rows;
+}
+
+/**
+ * Get next Auto Increment value for main table ID
+ *
+ * @param string $table Table name
+ * @return integer Next auti increment id
+ */
+function dbShowNextID($table)
+{
+  $table  = dbEscape($table);
+  $sql = "SHOW TABLE STATUS LIKE '$table';";
+
+  $row = dbFetchRow($sql);
+  //print_debug_vars($row);
+  if (isset($row['Auto_increment']))
+  {
+    return $row['Auto_increment'];
+  }
+
+  return FALSE;
 }
 
 /*
@@ -463,7 +502,7 @@ function dbUpdateMulti($data, $table, $columns = NULL, $print_query = FALSE)
     // Update only passed columns from param
     $update_columns = $columns;
   } else {
-    // Fallbak for all columns (also indexes),
+    // Fallback for all columns (also indexes),
     // this is normal, UNIQUE indexes not updated anyway
     $update_columns = $all_columns;
   }
@@ -559,7 +598,7 @@ function dbDelete($table, $where = NULL, $parameters = array(), $print_query = F
 function dbMakeQuery($sql, $parameters)
 {
   // bypass extra logic if we have no parameters
-
+  
   if (sizeof($parameters) == 0)
   {
     return $sql;
@@ -604,7 +643,7 @@ function dbMakeQuery($sql, $parameters)
     if (array_key_exists($j, $result))
     {
       $test = $result[$j];
-      if ($test == '?')
+      if ($test === '?')
       {
         $query .= array_shift($questionParams);
       } else {
@@ -623,7 +662,7 @@ function dbPrepareData($data)
   foreach ($data as $key=>$value)
   {
     $escape = true;
-    // don't quote or esc if value is an array, we treat it
+    // don't quote if value is an array, we treat it
     // as a "decorator" that tells us not to escape the
     // value contained in the array IF there is one item in the array
     if (is_array($value) && !is_object($value))
@@ -632,12 +671,20 @@ function dbPrepareData($data)
       {
         $escape = false;
         $value = array_shift($value);
+        $value = dbEscape($value);
+        // Probably we use this only for pass NULL,
+        // but currently allow pass any other values and quote if space found
+        if (preg_match('/\s+/', $value))
+        {
+          $value = "'" . $value . "'";
+        }
       } else {
         // if this is a multi-value array, implode this as it's probably
         // (hopefully) used in an IN statement.
         $escape = false; // we'll escape on our own, thanks.
         // escape each entry by itself, unfortunately requires an extra array
         // but implode() can't first escape each string, of course.
+        $escaped = [];
         foreach ($value as $entry)
         {
           $escaped[] = "'" . dbEscape($entry) . "'";
@@ -696,7 +743,7 @@ function generate_query_values($value, $column, $condition = NULL, $leading_and 
   if (!is_array($value)) { $value = array((string)$value); }
   $column = '`' . str_replace(array('`', '.'), array('', '`.`'), $column) . '`'; // I.column -> `I`.`column`
   $condition = ($condition === TRUE ? 'LIKE' : strtoupper(trim($condition)));
-  if (str_contains($condition, ['NOT', '!=']))
+  if (str_exists($condition, [ 'NOT', '!=']))
   {
     $negative  = TRUE;
     $condition = str_replace(array('NOT', '!=', ' '), '', $condition);

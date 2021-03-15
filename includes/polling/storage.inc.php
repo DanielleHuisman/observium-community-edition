@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -29,7 +28,7 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $storage)
     include($file);
   } else {
      // Check if we can poll the device ourselves with generic code using definitions.
-     // Table is always set when defintions add storages.
+     // Table is always set when definitions add storage.
      if ($storage['storage_type'] != '' && is_array($config['mibs'][$storage['storage_mib']]['storage'][$storage['storage_type']]))
      {
         $table_def = $config['mibs'][$storage['storage_mib']]['storage'][$storage['storage_type']];
@@ -71,11 +70,18 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $storage)
         // Clean not numeric symbols from snmp output
         foreach (array('perc', 'free', 'used', 'total') as $param)
         {
-          if (isset($storage[$param])) { $storage[$param] = snmp_fix_numeric($storage[$param]); }
+          if (isset($storage[$param]))
+          {
+            // Convert strings '3.40 TB' to value
+            // See QNAP NAS-MIB or HIK-DEVICE-MIB
+            $unit = ($param != 'perc' && isset($table_def['unit'])) ? $table_def['unit'] : NULL;
+
+            $storage[$param] = snmp_fix_numeric($storage[$param], $unit);
+          }
         }
 
         // Merge calculated used/total/free/perc array keys into $storage variable (with additional options)
-        $storage = array_merge($storage, calculate_mempool_properties($storage['storage_multiplier'], $storage['used'], $storage['total'], $storage['free'], $storage['perc'], $table_def));
+        $storage = array_merge($storage, calculate_mempool_properties($storage['storage_units'], $storage['used'], $storage['total'], $storage['free'], $storage['perc'], $table_def));
         $storage['size'] = $storage['total'];
      } else {
         // Unknown, so force rediscovery as there's a broken storage
@@ -83,13 +89,18 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $storage)
      }
   }
 
-  if (OBS_DEBUG && count($storage)) { print_vars($storage); }
+  print_debug_vars($storage);
 
   if ($storage['size'])
   {
     $percent = round($storage['used'] / $storage['size'] * 100, 2);
   } else {
     $percent = 0;
+  }
+
+  if (!isset($storage['units']))
+  {
+    $storage['units'] = $storage['storage_units'];
   }
 
   $hc = ($storage['storage_hc'] ? ' (HC)' : '');
@@ -149,6 +160,6 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $storage)
 $headers = array('%WLabel%n', '%WType%n', '%WIndex%n', '%WTotal%n', '%WUsed%n', '%WFree%n', '%WPerc%n');
 print_cli_table($table_rows, $headers);
 
-unset($storage, $table, $table_row, $table_rows);
+unset($storage, $table, $table_row, $table_rows, $unit);
 
 // EOF

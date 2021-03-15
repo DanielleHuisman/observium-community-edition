@@ -132,7 +132,7 @@ function print_status_old($options)
       $string .= '    <td class="entity">' . generate_device_link($port, short_hostname($port['hostname'])) . '</td>' . PHP_EOL;
       // $string .= '    <td><span class="badge badge-info">Port</span></td>' . PHP_EOL;
       $string .= '    <td><span class="label label-important">Port Down</span></td>' . PHP_EOL;
-      $string .= '    <td class="entity"><i class="'.$config['icon']['port'].'"></i> ' . generate_port_link($port, short_ifname($port['port_label'])) . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . get_icon('port') . ' ' . generate_port_link_short($port) . '</td>' . PHP_EOL;
       // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($port['location'], 30)) . '</td>' . PHP_EOL;
       $string .= '    <td style="white-space: nowrap">Down for ' . format_uptime($config['time']['now'] - strtotime($port['ifLastChange']), 'short'); // This is like deviceUptime()
       if ($options['links']) { $string .= ' ('.nicecase($port['protocol']).': ' .$port['remote_hostname'].' / ' .$port['remote_port'] .')'; }
@@ -159,7 +159,7 @@ function print_status_old($options)
       $string .= '    <td class="entity">' . generate_device_link($port, short_hostname($port['hostname'])) . '</td>' . PHP_EOL;
       // $string .= '    <td><span class="badge badge-info">Port</span></td>' . PHP_EOL;
       $string .= '    <td><span class="label label-important">Port Errors</span></td>' . PHP_EOL;
-      $string .= '    <td class="entity"><i class="'.$config['icon']['port'].'"></i> '.generate_port_link($port, short_ifname($port['port_label']), 'port_errors') . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . get_icon('port') . ' ' . generate_port_link_short($port, NULL, 'port_errors') . '</td>' . PHP_EOL;
       // $string .= '    <td style="white-space: nowrap">' . escape_html(truncate($port['location'], 30)) . '</td>' . PHP_EOL;
       $string .= '    <td>Errors ';
       if ($port['ifInErrors_delta']) { $string .= 'In: ' . $port['ifInErrors_delta']; }
@@ -255,9 +255,9 @@ function generate_alert_entries($vars)
 
   foreach ($alerts as $alert)
   {
-
-    humanize_alert_entry($alert);
     $alert_rule = &$alert_rules[$alert['alert_test_id']];
+    $alert['severity'] = $alert_rule['severity'];
+    humanize_alert_entry($alert);
 
     $device = device_by_id_cache($alert['device_id']);
 
@@ -394,7 +394,7 @@ function get_status_array($options)
 
   $max_interval = filter_var($options['max']['interval'], FILTER_VALIDATE_INT, array('options' => array('default' => 24, 'min_range' => 1)));
   $max_count    = filter_var($options['max']['count'],    FILTER_VALIDATE_INT, array('options' => array('default' => 200, 'min_range' => 1)));
-  $query_device_permitted = generate_query_permitted(array('device'), array('device_table' => 'D', 'hide_ignored' => TRUE));
+  $query_device_permitted = generate_query_permitted(array('device'), array('device_table' => 'D', 'hide_ignored' => TRUE, 'hide_disabled' => TRUE));
   $query_port_permitted   = generate_query_permitted(array('port'),   array('port_table' => 'I',   'hide_ignored' => TRUE));
 
   // Show Device Status
@@ -473,12 +473,12 @@ function get_status_array($options)
         // Limit to 200 ports on overview page
         break;
       }
-      humanize_port($port);
+      //humanize_port($port);
       $boxes[] = array('sev' => 50,
                        'class' => 'Port',
                        'event' => 'Down',
                        'device_link' => generate_device_link($port, short_hostname($port['hostname'])),
-                       'entity_link' => generate_port_link($port, short_ifname($port['port_label'], 13)),
+                       'entity_link' => generate_port_link_short($port),
                        'time' => format_uptime($config['time']['now'] - strtotime($port['ifLastChange'])),
                        'location' => $device['location'],
                        'icon_tag' => '<i class="' . $config['entities']['port']['icon'] . '"></i>');
@@ -510,7 +510,7 @@ function get_status_array($options)
                        'class' => 'Port',
                        'event' => 'Errors',
                        'device_link' => generate_device_link($device, short_hostname($device['hostname'])),
-                       'entity_link' => generate_port_link($port, short_ifname($port['port_label'], 13)),
+                       'entity_link' => generate_port_link_short($port),
                        'time' => $port['string'],
                        'location' => $device['location'],
                        'icon_tag' => '<i class="' . $config['entities']['port']['icon'] . '"></i>');

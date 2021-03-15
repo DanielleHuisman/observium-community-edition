@@ -1,0 +1,6 @@
+-- NOTE WARNING! Required MySQL version 5.6+ or MariaDB 10.0+
+CREATE TABLE IF NOT EXISTS `autodiscovery` ( `autodiscovery_id` INT NOT NULL AUTO_INCREMENT , `poller_id` INT NOT NULL , `device_id` INT NULL DEFAULT NULL , `remote_hostname` VARCHAR(253) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL , `remote_ip` VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_general_ci NULL DEFAULT NULL , `remote_device_id` INT NULL DEFAULT NULL , `protocol` VARCHAR(11) CHARACTER SET latin1 COLLATE latin1_general_ci NOT NULL , `added` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00' , `last_checked` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00' , `last_reason` ENUM('ok','no_xdp','no_fqdn','no_dns','no_ip_permit','no_ping','no_snmp','no_db','duplicated','unknown') CHARACTER SET latin1 COLLATE latin1_general_ci NULL DEFAULT NULL , PRIMARY KEY (`autodiscovery_id`)) ENGINE = InnoDB CHARSET=utf8 COLLATE utf8_general_ci;
+ALTER TABLE `autodiscovery` CHANGE `added` `added` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00';
+ALTER TABLE `autodiscovery` CHANGE `last_checked` `last_checked` TIMESTAMP on update CURRENT_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+-- ERROR_IGNORE
+ALTER TABLE `autodiscovery` ADD INDEX `remote_hostname_ip` (`poller_id`, `remote_hostname`, `remote_ip`);

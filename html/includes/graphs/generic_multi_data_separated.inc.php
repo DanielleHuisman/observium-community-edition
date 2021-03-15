@@ -57,8 +57,10 @@ foreach ($rrd_list as $rrd)
   $descr     = str_replace("'", "", $descr); // FIXME does this mean ' should be filtered in rrdtool_escape? probably...
   $descr_out = str_replace("'", "", $descr_out);
 
-  $rrd_options .= " DEF:".$in.$i."=".$rrd['filename'].":".$ds_in.":AVERAGE ";
-  $rrd_options .= " DEF:".$out.$i."=".$rrd['filename'].":".$ds_out.":AVERAGE ";
+  $rrd_filename_escape = rrdtool_escape($rrd['filename']);
+
+  $rrd_options .= " DEF:".$in.$i."=".$rrd_filename_escape.":".$ds_in.":AVERAGE ";
+  $rrd_options .= " DEF:".$out.$i."=".$rrd_filename_escape.":".$ds_out.":AVERAGE ";
   $rrd_options .= " CDEF:inB".$i."=in".$i.",$multiplier,* ";
   $rrd_options .= " CDEF:outB".$i."=out".$i.",$multiplier,*";
   $rrd_options .= " CDEF:outB".$i."_neg=outB".$i.",-1,*";

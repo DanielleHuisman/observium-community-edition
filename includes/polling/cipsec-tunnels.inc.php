@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -260,7 +259,7 @@ if (!is_device_mib($device, 'CISCO-IPSEC-FLOW-MONITOR-MIB'))
       {
         if ($entry['tunnel_index']     == $index &&
             $entry['tunnel_ike_index'] == $tunnel['cipSecTunIkeTunnelIndex'] &&
-            $entry['tunnel_name']      == $tunnel['cikeTunLocalName']);
+            $entry['tunnel_name']      == $tunnel['cikeTunLocalName'])
         {
           // This is same tunnel, but endpoint changed!
           $tunnel_insert     = FALSE;

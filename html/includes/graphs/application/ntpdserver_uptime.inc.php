@@ -11,8 +11,6 @@
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $scale_min       = 0;
 $ds              = "uptime";
 //$colour_area     = "CEFFCE";
@@ -29,9 +27,9 @@ if (is_file($ntpdserver_rrd))
   $rrd_filename = $ntpdserver_rrd;
 }
 
-include($config['html_dir']."/includes/graphs/common.inc.php"); /// FIXME. duplicated
+include($config['html_dir']."/includes/graphs/common.inc.php");
 
-$rrd_options   .= " DEF:uptime=".$rrd_filename.":uptime:AVERAGE";
+$rrd_options   .= " DEF:uptime=".$rrd_filename_escape.":uptime:AVERAGE";
 $rrd_options   .= " CDEF:cuptime=uptime,86400,/";
 
 if ($width < 224)

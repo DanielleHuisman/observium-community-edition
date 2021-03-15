@@ -1,0 +1,3814 @@
+ELTEX-BGP-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+    MODULE-IDENTITY,
+    OBJECT-TYPE,
+    NOTIFICATION-TYPE,
+    Integer32,
+    Counter32,
+    Gauge32,
+    Unsigned32,
+    IpAddress
+      FROM SNMPv2-SMI
+
+    TEXTUAL-CONVENTION,
+    DisplayString,
+    TruthValue,
+    RowStatus,
+    TimeStamp,
+    TimeInterval
+      FROM SNMPv2-TC
+
+    MODULE-COMPLIANCE,
+    OBJECT-GROUP,
+    NOTIFICATION-GROUP
+      FROM SNMPv2-CONF
+
+    InetAddressType,
+    InetAddress,
+    InetPortNumber,
+    InetAddressPrefixLength
+      FROM INET-ADDRESS-MIB
+
+    InterfaceIndexOrZero
+      FROM IF-MIB
+
+    eltexLtd
+      FROM ELTEX-SMI-ACTUAL;
+
+  eltexBgpMIB MODULE-IDENTITY
+    LAST-UPDATED "201709040000Z" -- Mon Sep 04 00:00:00 GMT 2017
+    ORGANIZATION "Eltex Enterprise Co, Ltd."
+    CONTACT-INFO 
+        "www.eltex.nsk.ru"
+    DESCRIPTION  
+        "The MIB module for management of the BGP protocol."
+
+  ::= { eltexLtd 45 }
+
+-------------------------------------------------------------------------------
+-- Textual Conventions.
+
+  EltexBgpIdentifier ::= TEXTUAL-CONVENTION
+    STATUS     current
+    DESCRIPTION "The representation of a BGP Identifier. Could be any 32-bit
+                 number in a form of 4-octet IPv4 address."
+    SYNTAX       OCTET STRING (SIZE (4))
+
+  EltexBgpAfi ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION "The representation of a BGP AFI (Address Family Identifier)"
+    SYNTAX      INTEGER {
+                  other(0),
+                  ipv4(1),
+                  ipv6(2),
+                  l2vpn(25)
+                }
+
+  EltexBgpSafi ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION 
+        "The representation of a BGP SAFI (Sub-Address Family Identifier)"
+    SYNTAX      INTEGER {
+                  none(0),
+                  unicast(1),
+                  multicast(2),
+                  both(3),
+                  labeled(4),
+                  vpls(65),
+                  evpn(70),
+                  mplsBgpVpn(128),
+                  private(241)
+                }
+
+  EltexBgpAutonomousSystemNumber ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION "An autonomous System Number.  If <AsSize> is
+                 two-octet, the range is 0..65535.  If it is
+                 four-octet, it is the full range of Unsigned32."
+    SYNTAX      Unsigned32
+
+  EltexBgpAsSize ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The size of the AS number."
+    SYNTAX      INTEGER {
+                  twoOctet(1),
+                  fourOctet(2)
+                }
+
+  EltexBgpAdminStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The desired administrative state of an entry."
+    SYNTAX      INTEGER {
+                  adminStatusUp(1),
+                  adminStatusDown(2)
+                }
+
+  EltexBgpOperStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The current operational state of an entity."
+    SYNTAX      INTEGER {
+                  operStatusUp(1),        -- active
+                  operStatusDown(2),      -- inactive
+                  operStatusGoingUp(3),   -- activating
+                  operStatusGoingDown(4), -- deactivating
+                  operStatusActFailed(5)  -- activation failed
+                }
+
+  EltexBgpOriginCode ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "A BGP origin code."
+    SYNTAX      INTEGER {
+                  originIgp(0),           -- path interior to originating AS
+                  originEgp(1),           -- path learned via EGP protocol
+                  originIncomplete(2)     -- path was learned by other means
+                }
+
+  EltexBgpConfigDropOrWarn ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Whether to drop a session or just warn a parameter has been
+                 exceeded."
+    SYNTAX      INTEGER {
+                  drop(1),                -- the session is dropped
+                  warn(2)                 -- a warning is produced
+                }
+
+  EltexBgpPeerOrRib ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Whether an index refers to a BGP Peer Index or a RIB index."
+    SYNTAX      INTEGER {
+                  peerIndex(1),
+                  ribIndex(2)
+                }
+
+  EltexBgpPeerStates ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The current state of a connection to a BGP peer."
+    SYNTAX      INTEGER {
+                  none(0),
+                  idle(1),
+                  connect(2),
+                  active(3),
+                  opensent(4),
+                  openconfirm(5),
+                  established(6)
+                }
+
+  EltexBgpPeerEvents ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "An event that has occurred to a connection to a BGP peer."
+    SYNTAX      INTEGER {
+                  noEvent(0),             -- no event has yet occurred
+                  start(1),               -- the connection has been activated
+                                          --  (either outgoing or incoming)
+                  stop(2),                -- the connection has been
+                                          --  deactivated
+                  transportOpen(3),       -- the transport connection has been
+                                          --  opened
+                  transportClosed(4),     -- the transport connection has been
+                                          --  closed
+                  transportOpenFailed(5), -- an attempt to open the transport
+                                          --  connection has failed
+                  transportFatalError(6), -- a fatal error has occurred on the
+                                          --  transport connection
+                  connectRetryTimer(7),   -- the ConnectRetry timer has popped
+                  holdTimer(8),           -- the Hold timer has popped
+                  keepaliverTimer(9),     -- the Keepalive timer has popped
+                  recvOpen(10),           -- a BGP Open message has been
+                                          --  received
+                  recvKeepAlive(11),      -- a BGP KeepAlive message has been
+                                          --  received
+                  recvUpdate(12),         -- a BGP Update message has been
+                                          --  received
+                  recvNotification(13),   -- a BGP Notification message has
+                                          --  been received
+                  connParmsUpdate(14)     -- Connection parameters have been
+                                          --  updated
+                }
+
+  EltexBgpCapabilities ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The capabilities advertised by a BGP instance."
+    SYNTAX      BITS {
+                  mpIpv4Unicast(0),             -- multiprotocol BGP support
+                                                --  for IPv4 unicast routes
+                  mpIpv4Multicast(1),           -- multiprotocol BGP support
+                                                --  for IPv4 multicast routes
+                  mpIpv4Vpn(2),                 -- multiprotocol BGP support
+                                                --  for IPv4 VPN routes
+                  mpIpv4Label(3),               -- multiprotocol BGP support
+                                                --  for labeled IPv4 VPN
+                                                --  routes
+                  mpIpv6Unicast(4),             -- multiprotocol BGP support
+                                                --  for IPv6 unicast routes
+                  mpIpv6Multicast(5),           -- multiprotocol BGP support
+                                                --  for IPv6 multicast routes
+                  mpIpv6Vpn(6),                 -- multiprotocol BGP support
+                                                --  for IPv6 VPN routes
+                  mpIpv6Label(7),               -- multiprotocol BGP support
+                                                --  for labeled IPv6 VPN
+                                                --  routes
+                  routeRefresh(8),              -- support for Route Refresh
+                                                --  messages
+                  gracefulRestart(9),           -- support for graceful restart
+                                                --  processing
+                  routeRefreshCisco(10),        -- support for pre-standard
+                                                --  (Cisco) Route Refresh
+                                                --  messages
+                  outboundRouteFilter(11),      -- support for Outbound Route
+                                                --  Filtering, for one or more
+                                                --  AFI/SAFI types
+                  outboundRouteFilterCisco(12), -- support for pre-standard
+                                                --  (Cisco) Outbound Route
+                                                --  Filtering, for one or more
+                                                --  AFI/SAFI types
+                  fourOctetAs(13),              -- support for four-octet AS
+                                                --  numbers
+                  mpL2vpnVpls(14),              -- multiprotocol BGP support
+                                                --  for AFI/SAFI = L2VPN/VPLS
+                  addPath(15),                  -- support for additional BGP
+                                                --  paths
+                  mpL2vpnEvpn(16),              -- multiprotocol BGP support
+                                                --  for AFI/SAFI = L2VPN/EVPN
+                  mpIpv4Private(17),            -- multiprotocol BGP support
+                                                --  for AFI/SAFI = IPv4/Private
+                  enhancedRouteRefresh(18)      -- support for enhanced route
+                                                --  refresh (RFC7313)
+                }
+
+  EltexBgpCeaseErrorSubcode ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "The error subcode to be sent in the Cease Notification message."
+    SYNTAX      INTEGER {
+                  none(0),          -- no subcode is specified.
+                  adminShutdown(2), -- administrative Shutdown.
+                  peerUnconfig(3),  -- peer De-configured.
+                  adminReset(4),    -- administrative Reset.
+                  configChange(6),  -- other Configuration Change.
+                  noResource(8)     -- out of Resources.
+                }
+
+  EltexBgpNlriIsActiveFlag ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Indicates whether an NLRI is active in the routing table."
+    SYNTAX      INTEGER {
+                  notTracked(1),    -- BGP is not tracking active routes
+                  inactive(2),      -- The BGP route is inactive
+                  active(3)         -- The BGP route is active
+                }
+
+  EltexBgpPeerConfigStates ::= TEXTUAL-CONVENTION
+     STATUS      current
+     DESCRIPTION
+        "Reports the state of the peer configuration."
+     SYNTAX     INTEGER {
+                  stateUpToDate (1),            -- Up to date.
+                  stateOutOfDateAdminDown (2),  -- Out of date, requiring the
+                                                -- peer's admin status to be
+                                                -- set to down.
+                  stateOutOfDateRowInactive (3) -- Out of date, requiring the
+                                                -- peer's row status to be set
+                                                -- to inactive.
+                }
+
+  EltexBgpReasonNotBest ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Reports the reason a route was determined to be not the
+                 best route to that destination."
+    SYNTAX      INTEGER {
+                  notConsidered(0),       -- The route has not been considered
+                                          -- for best route
+                  routeIsBest(1),         -- The is the best route
+                  weight(2),              -- The route was beaten by one with a
+                                          -- better weight
+                  localPref(3),           -- The route was beaten by one with a
+                                          -- better local preference
+                  localOrigPreferred(4),  -- The route was beaten by a
+                                          -- locally-originated route
+                  asPathLen(5),           -- The route was beaten by one with a
+                                          -- shorter AS Path
+                  origin(6),              -- The route was beaten by one with a
+                                          -- lower origin code
+                  med(7),                 -- The route was beaten by one with a
+                                          -- lower MED
+                  localOrigTieBreaker(8), -- The route was beaten by another
+                                          -- locally originated route
+                  ebgpVsibgp(9),          -- The IBGP route was beaten by a
+                                          -- route from an external peer
+                  adminDistance(10),      -- The route was beaten by a route
+                                          -- with a lower admin distance
+                  pathCostToNextHop(11),  -- The route was beaten by a route
+                                          -- with a lower path cost to the
+                                          -- next hop.
+                  prefExisting(12),       -- The route was beaten because
+                                          -- existing route was preferred
+                  identifier(13),         -- The route was beaten by a route
+                                          -- with a lower identifier either
+                                          -- ORIGINATOR ID or BGP identifier
+                  clusterLen(14),         -- The route was beaten by a route
+                                          -- with a lower cluster length
+                  peerType(15),           -- The route was beaten by a route
+                                          -- with a preferred peer address
+                                          -- type.  IPv6 is preferred to IPv4
+                  peerAddress(16),        -- The route was beaten by a route
+                                          -- with a lower peer address
+                  peerPort(17),           -- The route was beaten by a route
+                                          -- with a lower peer port
+                  pathId(18)              -- The route was beaten by a route
+                                          -- with a lower path id
+                }
+
+  EltexBgpNlriPeerTypes ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The type of peer than a route was received from."
+    SYNTAX      INTEGER {
+                  none(1),    -- The route was not received from a BGP peer.
+                  iBGP(2),    -- The route was received from an iBGP BGP peer.
+                  eBGP(3)     -- The route was received from an eBGP BGP peer.
+                }
+
+  EltexBgpASNotation ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "Selecting the AS number notation."
+    SYNTAX      INTEGER {
+                  asplainASNumber(1),                -- AS_PLAIN notation
+                  asdotASnumber(2)                   -- AS_DOT notation
+                }
+
+  EltexBgpPeerReflectorClientType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "What type of client this BGP Peer is.  A client of a route
+                 reflector is a meshed client if and only if it is fully meshed
+                 with all meshed clients of that route reflector."
+    SYNTAX      INTEGER {
+                  nonClient(0),
+                  client(1),
+                  meshedClient(2)
+                }
+
+  EltexBgpRouteMapAsPathAction ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "How to handle setting an AS-Path attribute."
+    SYNTAX      INTEGER {
+                  none(0),          -- No action is carried out
+                  set(1)            -- The local AS number is prepended to the AS path
+                }
+
+  EltexBgpAddPathSrCap ::= TEXTUAL-CONVENTION
+     STATUS     current
+     DESCRIPTION "BGP additional path send/receive capability."
+     SYNTAX     INTEGER {
+                  disable (0),               -- disable sending and receiving
+                  receive (1),               -- receive but do not send
+                  send (2),                  -- send but do not receive
+                  both (3),                  -- send and receive
+                  inherit (4),               -- inherit configuration from
+                                             -- the entity AFI/SAFI level
+                  unknown (5)                -- unknown
+                }
+
+  EltexBfdSessionStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION "The current BFD session state of a peer."
+    SYNTAX      INTEGER {
+                bfdSessNotRequired(0),    -- not required
+                bfdSessInitial(1),        -- initial
+                bfdSessActivating(2),     -- activating
+                bfdSessActive(3),         -- active
+                bfdSessInactive(4),       -- inactive
+                bfdSessAdminDown(5),      -- admin down
+                bfdSessNoContact(6)       -- no contact
+                }
+
+-------------------------------------------------------------------------------
+
+  eltexBgpObjects    OBJECT IDENTIFIER ::= { eltexBgpMIB 1 }
+
+  eltexBgpProcess       OBJECT IDENTIFIER ::= { eltexBgpObjects 1 }
+
+--
+-- BGP Process Table.
+--
+-- This is the top-level MIB for the BGP Router feature. It controls
+-- creation and global configuration of the protocol.
+--
+
+  eltexBgpProcessTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpProcessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry in this table represents a single instance of
+                 BGP Router process. Only some fields in an entry can be 
+                 changed while the admin status is up.
+                 
+                 The current implementation allows only a single process of
+                 BGP is configured on the router. The single BGP process
+                 could be created only with process ID 1."
+    ::= { eltexBgpProcess 1 }
+
+  eltexBgpProcessEntry OBJECT-TYPE
+    SYNTAX      EltexBgpProcessEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Each entry represents a BGP Router entity."
+    INDEX       { eltexBgpProcessId }
+    ::= { eltexBgpProcessTable 1 }
+
+  EltexBgpProcessEntry ::= SEQUENCE {
+      eltexBgpProcessId                     Unsigned32,
+      eltexBgpProcessRowStatus              RowStatus,
+      eltexBgpProcessAdminStatus            EltexBgpAdminStatus,
+      eltexBgpProcessOperStatus             EltexBgpOperStatus,
+      eltexBgpProcessLocalAs                EltexBgpAutonomousSystemNumber,
+      eltexBgpProcessLocalIdentifier        EltexBgpIdentifier,
+      eltexBgpProcessOperLocalIdentifier    EltexBgpIdentifier,
+      eltexBgpProcessTableVersion           Unsigned32,
+      eltexBgpProcessASNotation             EltexBgpASNotation,
+      eltexBgpProcessClusterIdentifier      EltexBgpIdentifier,
+      eltexBgpProcessOperClusterIdentifier  EltexBgpIdentifier,
+      eltexBgpProcessInterClientReflEnabled TruthValue,
+      eltexBgpProcessPathMtuDiscovery       TruthValue
+    }
+
+  eltexBgpProcessId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Identifies a BGP Router entity."
+    ::= { eltexBgpProcessEntry 1 }
+
+  eltexBgpProcessRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this BGP Process Table entry, used to
+                 create and destroy table entries."
+    ::= { eltexBgpProcessEntry 2 }
+
+  eltexBgpProcessAdminStatus OBJECT-TYPE
+    SYNTAX      EltexBgpAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The administrative status of this BGP Process entity, used to
+                 activate and deactivate the protocol."
+    DEFVAL      { adminStatusDown }
+    ::= { eltexBgpProcessEntry 3 }
+
+  eltexBgpProcessOperStatus OBJECT-TYPE
+    SYNTAX      EltexBgpOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational status of this BGP Process entity."
+    ::= { eltexBgpProcessEntry 4 }
+
+  eltexBgpProcessLocalAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The local autonomous system number.
+
+                 For a router not in a confederation, it is equivalent to
+                 the Base Scalar bgpM2LocalAs.  For a router in a
+                 confederation, it is equivalent to the Base Scalar
+                 bgpM2ConfederationId.  If eltexBgpProcessConfederationId
+                 is not 0, then this router is in a confederation.
+
+                 If the eltexBgpProcessAsSize is twoOctet, then the range is
+                 constrained to be 0-65535.  A non-mappable 4-octet AS
+                 number should only be used when all BGP speakers within
+                 the AS support 4-octet AS numbers.
+
+                 This field can only be changed when the Admin Status is
+                 down."
+    ::= { eltexBgpProcessEntry 5 }
+
+  eltexBgpProcessLocalIdentifier OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The BGP Identifier of the local system. This is a generic
+                 identifier and not necessarily an IP address.  This field
+                 can only be changed when the Admin Status is down.
+                 It is equivalent to the Base Scalar bgpM2LocalIdentifier.
+                 
+                 The null value turns on ID election algorithm that chooses
+                 the highest loopback interface if any, or the highest IP
+                 interface otherwise."
+    DEFVAL       { '00000000'H }
+    ::= { eltexBgpProcessEntry 6 }
+
+  eltexBgpProcessOperLocalIdentifier OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The BGP Identifier of the local system that is used in the
+                 present moment. It could be selected by election algorithm
+                 or configured by user."
+    ::= { eltexBgpProcessEntry 7 }
+
+  eltexBgpProcessTableVersion OBJECT-TYPE
+       SYNTAX       Unsigned32 (0..4294967295)
+       MAX-ACCESS   read-only
+       STATUS       current
+       DESCRIPTION
+                 "The table version number of the Loc-RIB.  Initialized to 1
+                  when BGP starts or restarts, and is incremented every time
+                  the Loc-RIB is recalculated."
+    ::= { eltexBgpProcessEntry 8 }
+
+  eltexBgpProcessASNotation OBJECT-TYPE
+    SYNTAX      EltexBgpASNotation
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The choice between asplain and asdot notation AS numbers."
+    DEFVAL      { asplainASNumber }
+    ::= { eltexBgpProcessEntry 9 }
+
+  eltexBgpProcessClusterIdentifier OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The configured Cluster-ID of the local router.
+                 A value of 0.0.0.0 indicates the absence of this
+                 value.  This field can only be changed when the Admin
+                 Status is down. The BGP router will act as a route reflector
+                 if any peer is configured to be a client.  If no cluster ID is
+                 explicitly configured here, the Router ID will be used."
+    DEFVAL       { '00000000'H }
+    ::= { eltexBgpProcessEntry 10 }
+
+  eltexBgpProcessOperClusterIdentifier OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The Cluster-ID that is used in the present moment."
+    DEFVAL       { '00000000'H }
+    ::= { eltexBgpProcessEntry 11 }
+
+  eltexBgpProcessInterClientReflEnabled OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Routes will not be reflected between two peers that are
+                configured to be route reflector clients in the
+                eltexBgpPeerReflectorClient field if this field takes the value
+                FALSE."
+    DEFVAL       { true }
+    ::= { eltexBgpProcessEntry 12 }
+
+  eltexBgpProcessPathMtuDiscovery OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Enable path MTU discovery on all neighbors"
+    DEFVAL       { false }
+    ::= { eltexBgpProcessEntry 13 }
+
+--
+-- <AFI, SAFI> supported table
+--
+
+  eltexBgpProcessAddrFamilyTable OBJECT-TYPE
+  -- FAMILY-SHORT-NAME BGP_AFI
+    SYNTAX      SEQUENCE OF EltexBgpProcessAddrFamilyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Table of per-<AFI, SAFI> configuration information."
+    ::= { eltexBgpProcess 2 }
+
+  eltexBgpProcessAddrFamilyEntry OBJECT-TYPE
+    SYNTAX      EltexBgpProcessAddrFamilyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry containing information about support for an
+                 <AFI, SAFI>."
+    INDEX { eltexBgpProcessId,
+            eltexBgpProcessAddrFamilyAfi,
+            eltexBgpProcessAddrFamilySafi }
+    ::= { eltexBgpProcessAddrFamilyTable 1 }
+
+  EltexBgpProcessAddrFamilyEntry ::= SEQUENCE {
+      eltexBgpProcessAddrFamilyAfi                 EltexBgpAfi,
+      eltexBgpProcessAddrFamilySafi                EltexBgpSafi,
+      eltexBgpProcessAddrFamilyRowStatus           RowStatus
+      }
+
+  eltexBgpProcessAddrFamilyAfi OBJECT-TYPE
+    SYNTAX      EltexBgpAfi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The AFI index into the <AFI, SAFI> table."
+    ::= { eltexBgpProcessAddrFamilyEntry 2 }
+
+  eltexBgpProcessAddrFamilySafi OBJECT-TYPE
+    SYNTAX      EltexBgpSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The SAFI index into the <AFI, SAFI> table."
+    ::= { eltexBgpProcessAddrFamilyEntry 3 }
+
+  eltexBgpProcessAddrFamilyRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The row status for this <AFI, SAFI> entry, used to
+                 create and destroy table entries. This field can
+                 only be set while Process is admin down."
+    ::= { eltexBgpProcessAddrFamilyEntry 4 }
+
+-------------------------------------------------------------------------------
+
+  eltexBgpPeer          OBJECT IDENTIFIER ::= { eltexBgpObjects 2 }
+
+  eltexBgpPeerData      OBJECT IDENTIFIER ::= { eltexBgpPeer 1 }
+
+  --
+  -- BGP Peer Data Table.
+  --
+  -- This table contains all the information required for each peer including
+  -- protocol parameters, statistics and policy configuration.  A row in this
+  -- table is created for each peer the BGP process knows about.
+  --
+
+  eltexBgpPeerTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "BGP peer configuration table.
+
+                 This table allows a user to configure individual BGP peers.
+
+                 This table is a configuration table - all status, statistics
+                 and control fields are located in the BGP peer status table
+                 (eltexBgpPeerStatusTable).
+
+                 This table does not contain entries for dynamic peers."
+    ::= { eltexBgpPeerData 1 }
+
+  eltexBgpPeerEntry OBJECT-TYPE
+    SYNTAX      EltexBgpPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry containing information about the connection with
+                 a BGP peer."
+    INDEX { eltexBgpProcessId,
+            eltexBgpPeerRemoteAddrType,
+            eltexBgpPeerRemoteAddr }
+    ::= { eltexBgpPeerTable 1 }
+
+  EltexBgpPeerEntry ::= SEQUENCE {
+      eltexBgpPeerRemoteAddrType            InetAddressType,
+      eltexBgpPeerRemoteAddr                InetAddress,
+      eltexBgpPeerRowStatus                 RowStatus,
+      eltexBgpPeerAdminStatus               EltexBgpAdminStatus,
+      eltexBgpPeerOperStatus                EltexBgpOperStatus,
+      eltexBgpPeerRemoteAs                  EltexBgpAutonomousSystemNumber,
+      eltexBgpPeerSourceInterface           InterfaceIndexOrZero,
+      eltexBgpPeerNxtHopSlf                 TruthValue,
+      eltexBgpPeerConfigMaxPrfx             Unsigned32,
+      eltexBgpPeerConfigDropWarn            EltexBgpConfigDropOrWarn,
+      eltexBgpPeerMaxPrfxHold               Unsigned32,
+      eltexBgpPeerConfigThreshold           Unsigned32,
+      eltexBgpPeerConnectRetryInterval      Unsigned32,
+      eltexBgpPeerHoldTimeConfigd           Unsigned32,
+      eltexBgpPeerKeepAliveConfigd          Unsigned32,
+      eltexBgpPeerMinRouteAdvertiseInterval Unsigned32,
+      eltexBgpPeerMinASOriginationInterval  Unsigned32,
+      eltexBgpPeerMinRouteWithdrawInterval  Unsigned32,
+      eltexBgpPeerConfigOpenDelay           Unsigned32,
+      eltexBgpPeerConfigIdleHold            Unsigned32,
+      eltexBgpPeerDistListPlIn              DisplayString,
+      eltexBgpPeerDistListPlOut             DisplayString,
+      eltexBgpPeerReflectorClient           EltexBgpPeerReflectorClientType,
+      eltexBgpPeerSoftResetWithStoredInfo   TruthValue,
+      eltexBgpPeerConfigPeerGroup           DisplayString,
+      eltexBgpPeerPathMtuDiscovery          TruthValue,
+      eltexBgpPeerBfdDesired                TruthValue
+    }
+
+  eltexBgpPeerRemoteAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address family of the remote address for the peering
+                 session."
+    ::= { eltexBgpPeerEntry 1 }
+
+  eltexBgpPeerRemoteAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The remote address for the peering session.
+
+                 This is the address of the BGP peer.  It must be specified
+                 so the address length must be non-zero."
+    ::= { eltexBgpPeerEntry 2 }
+
+  eltexBgpPeerRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this BGP peer table entry, used to
+                create and destroy table entries."
+    ::= { eltexBgpPeerEntry 3 }
+
+  eltexBgpPeerAdminStatus OBJECT-TYPE
+    SYNTAX      EltexBgpAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The desired state of the BGP connection.
+
+                 This parameter can be used to restart BGP peer
+                 connections.  Care should be used in providing write
+                 access to this object without adequate authentication."
+    DEFVAL      { adminStatusDown }
+    ::= { eltexBgpPeerEntry 4 }
+
+  eltexBgpPeerOperStatus OBJECT-TYPE
+    SYNTAX      EltexBgpOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current operational status of this peer.  This usually
+                 reflects the desired AdminStatus, but can contain transitional
+                 values and failures."
+    ::= { eltexBgpPeerEntry 5 }
+
+  eltexBgpPeerRemoteAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The remote autonomous system number.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin status DOWN and then UP, thus forcing the
+                 peer session to be restarted.  In this case, until the
+                 peer is set admin_status DOWN, the peer will be marked as
+                 out of date (as reported by the config state field in the
+                 eltexBgpPeerStatusTable row for the peer)."
+    ::= { eltexBgpPeerEntry 6 }
+
+  eltexBgpPeerSourceInterface OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The interface index for the interface from which the
+                 source address for session is chosen.  If non-zero, BGP
+                 will look for the first address on this interface with a
+                 type matching eltexBgpPeerRemoteAddrType, and use that as the
+                 source address.
+
+                 This field can be changed at any time, causing the peer to
+                 be immediately deactivated and reactivated.
+
+                 If the configured interface (or address on that interface)
+                 did not exist when the peer was activated, and is
+                 subsequently added, the peer will automatically use the
+                 configured interface address.  This will cause the peer to
+                 be immediately deactivated and reactivated."
+    DEFVAL       { 0 }
+    ::= { eltexBgpPeerEntry 7 }
+
+  eltexBgpPeerNxtHopSlf OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "When eltexBgpPeerNxtHopSlf is 'true', routes will be 
+                 advertised to the peer with NEXT_HOP attribute set to 
+                 BGP router local address."
+    DEFVAL       { false }
+    ::= { eltexBgpPeerEntry 8 }
+
+    eltexBgpPeerConfigMaxPrfx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This object is used to limit the number of prefixes that
+                 can be accepted from this peer.
+
+                 Setting eltexBgpPeerConfigMaxPrfx to a non-zero value sets 
+                 the maximum number of prefixes that can be accepted from 
+                 this peer."
+    DEFVAL       { 0 }
+    ::= { eltexBgpPeerEntry 9 }
+
+    eltexBgpPeerConfigDropWarn OBJECT-TYPE
+    SYNTAX      EltexBgpConfigDropOrWarn
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This object is used  to determine whether the session is
+                 dropped or a warning is generated when the maximum number
+                 of prefixes set is exceeded.
+
+                 Setting eltexBgpPeerConfigDropWarn to 'drop' will cause the
+                 session to be dropped when the prefix limit is reached."
+    DEFVAL       { warn }
+    ::= { eltexBgpPeerEntry 10 }
+
+    eltexBgpPeerMaxPrfxHold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The time interval in seconds between when this BGP session
+                 is turn down due to the number of prefixes received from
+                 this peer exceeding the maximum in
+                 eltexBgpPeerConfigMaxPrfx and when BGP attempts to
+                 reestablish the session."
+    DEFVAL       { 90 }
+    ::= { eltexBgpPeerEntry 11 }
+
+    eltexBgpPeerConfigThreshold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "A percentage of the limit set by eltexBgpPeerConfigMaxPrfx.
+                 When the number of prefixes received from this peer reaches
+                 this threshold, BGP issues a warning.
+
+                 This field is not used if eltexBgpPeerConfigMaxPrfx is set to
+                 zero."
+    DEFVAL       { 75 }
+    ::= { eltexBgpPeerEntry 12 }
+
+    eltexBgpPeerConnectRetryInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval for the ConnectRetry timer.  The suggested
+                 value for this timer is 120 seconds.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 120 }
+    ::= { eltexBgpPeerEntry 13 }
+
+    eltexBgpPeerHoldTimeConfigd OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the Hold Time configured for
+                 this BGP speaker with this peer.  This value is placed in
+                 an OPEN message sent to this peer by this BGP speaker, and
+                 is compared with the Hold Time field in an OPEN message
+                 received from the peer when determining the Hold Time
+                 (eltexBgpPeerStatusHoldTime) with the peer.  This value must not be
+                 less than three seconds if it is not zero (0) in which
+                 case the Hold Time is NOT to be established with the peer.
+                 The value of this object is only allowed to be zero (0) if
+                 the value of eltexBgpPeerKeepAliveConfigd is also zero (0).
+                 The suggested value for this timer is 90 seconds.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 90 }
+    ::= { eltexBgpPeerEntry 14 }
+
+    eltexBgpPeerKeepAliveConfigd OBJECT-TYPE
+    SYNTAX      Unsigned32 ( 0 | 1..21845 )
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the KeepAlive configured for
+                 this BGP speaker with this peer.  The value of this object
+                 will only determine the KEEPALIVE messages frequency
+                 relative to the value specified in eltexBgpPeerHoldTimeConfigd
+                 the actual time interval for the KEEPALIVE messages is
+                 indicated by eltexBgpPeerStatusKeepAlive.  A reasonable 
+                 maximum value for this timer would be configured to be one 
+                 third of that of eltexBgpPeerHoldTimeConfigd.
+
+                 The value of this object is only allowed to be zero (0) if
+                 the value of eltexBgpPeerHoldTimeConfigd is also zero (0).  If
+                 the value of this object is zero (0), no periodical
+                 KEEPALIVE messages are sent to the peer after the BGP
+                 connection has been established.  The suggested value for
+                 this timer is 30 seconds.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 30 }
+    ::= { eltexBgpPeerEntry 15 }
+
+    eltexBgpPeerMinRouteAdvertiseInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the
+                 MinRouteAdvertisementInterval timer.  This determines the
+                 minimum time between a BGP UPDATE to a peer advertising or
+                 withdrawing a route and a subsequent BGP UPDATE to the
+                 peer advertising a route to the same destination.
+
+                 The default value for this timer is 30 seconds.  Its value
+                 must not be less than eltexBgpPeerMinRouteWithdrawInterval."
+    DEFVAL       { 30 }
+    ::= { eltexBgpPeerEntry 16 }
+
+    eltexBgpPeerMinASOriginationInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for determining the minimum amount
+                 of time that must elapse between successive advertisements of
+                 UPDATE messages that report changes to a route within the
+                 advertising BGP speaker's own autonomous system. The
+                 suggested value for this timer is 15 seconds."
+    DEFVAL       { 15 }
+    ::= { eltexBgpPeerEntry 17 }
+
+    eltexBgpPeerMinRouteWithdrawInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the MinRouteWithdrawInterval
+                 timer.  This is the interval which is enforced between
+                 advertisement and subsequent withdrawal of a route.
+
+                 The default value for this timer is 30 seconds.  The value
+                 must not exceed that of eltexBgpPeerMinRouteAdvertiseInterval."
+    DEFVAL       { 30 }
+    ::= { eltexBgpPeerEntry 18 }
+
+    eltexBgpPeerConfigOpenDelay OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..240)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The delay to enforce in between a TCP connection with this
+                 peer becoming established and a BGP Open message being
+                 sent.  If this delay is zero, then no delay will be
+                 injected, and a BGP Open message will be sent as soon as
+                 the TCP connection allows it.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 0 }
+    ::= { eltexBgpPeerEntry 19 }
+
+    eltexBgpPeerConfigIdleHold OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..32767)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The time to hold this peer in Idle state after a BGP
+                 session has progressed beyond Idle state initially and
+                 then returned to it.  No new connections will be initiated
+                 or accepted until the peer comes out of Idle state.  By
+                 setting this field to a large value, this timer can be
+                 used to provide some level of peer oscillation damping, if
+                 desired.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 15 }
+    ::= { eltexBgpPeerEntry 20 }
+
+    eltexBgpPeerDistListPlIn OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The Prefix List name identifying the Prefix List to use
+                 to filter routes received from the peer."
+    ::= { eltexBgpPeerEntry 21 }
+
+    eltexBgpPeerDistListPlOut OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The Prefix List name identifying the Prefix List to use
+                 to filter routes advertised to the peer."
+    ::= { eltexBgpPeerEntry 22 }
+
+  eltexBgpPeerReflectorClient OBJECT-TYPE
+    SYNTAX      EltexBgpPeerReflectorClientType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This value indicates whether the given peer is a reflector
+                client of this router, or not.  A value of nonClient(0)
+                indicates that this peer is not a reflector client.  A
+                value of client(1) indicates that this peer is a reflector
+                client that is not fully meshed with other reflector
+                clients.  A value of meshedClient(2) indicates that the
+                peer is a reflector client and is fully meshed with all
+                other reflector clients.
+
+                For specific AFI/SAFI, this can be configured using
+                eltexBgpPeerAddrFamilyReflectorClient."
+    DEFVAL       { nonClient }
+    ::= { eltexBgpPeerEntry 23 }
+
+  eltexBgpPeerSoftResetWithStoredInfo OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This option causes all routes learned from a peer to be stored
+                 so that the ARI can be recalculated (for example, due to a 
+                 change in import policy) without performing a route refresh or
+                 restarting the peer session.
+
+                 This field can only be changed when the peer is admin_status
+                 DOWN.
+
+                 This option overlaps with route refresh (RR) behavior. If the
+                 option is enabled, Route refresh capability continues to be
+                 advertized and the BGP router still responds to RR request
+                 from the peer. However, route refresh messages will never
+                 be sent to this peer."
+    DEFVAL { false }
+    ::= { eltexBgpPeerEntry 24 }
+
+  eltexBgpPeerConfigPeerGroup OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This is the index of the peer group. If a peer is  not in
+                 a peer group then its eltexBgpPeerConfigPeerGroup value is 0"
+    ::= { eltexBgpPeerEntry 25 }
+
+  eltexBgpPeerPathMtuDiscovery OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Enable path MTU discovery. If the feature is enabled, all
+                 packets are sent with the 'Do not fragment' flag to this peer.
+                 The maximum segment size for TCP connection with this peer
+                 will be adjusted to the next-hop MTU value if an ICMP error
+                 packet with 'Fragmentation needed' code is received."
+    DEFVAL       { false }
+    ::= { eltexBgpPeerEntry 26 }
+
+   eltexBgpPeerBfdDesired OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Indicates whether Bidirectional Forwarding Detection (BFD) is
+                 desired for this peer.
+
+                 This field can be changed at any time."
+    DEFVAL { false }
+    ::= { eltexBgpPeerEntry 27 }
+
+--
+-- BGP Peer <AFI, SAFI> configuration table.
+--
+
+  eltexBgpPeerAddrFamilyTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpPeerAddrFamilyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "BGP Peer <AFI, SAFI> configuration table.
+
+                 This table allows a user to configure peer characteristics
+                 on a per AFI/SAFI basis.
+
+                 This table is a configuration table - all status, statistics
+                 and control fields are deprecated in favor of the BGP peer
+                 AFI/SAFI status table (etlexBgpPeerAddrFamilyStatusTable).
+
+                 This table does not contain entries for dynamic peers."
+    ::= { eltexBgpPeerData 2 }
+    
+  eltexBgpPeerAddrFamilyEntry OBJECT-TYPE
+    SYNTAX      EltexBgpPeerAddrFamilyEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Peer <AFI, SAFI> configuration table entry."
+    INDEX { eltexBgpProcessId,
+            eltexBgpPeerRemoteAddrType,
+            eltexBgpPeerRemoteAddr,
+            eltexBgpPeerAddrFamilyAfi,
+            eltexBgpPeerAddrFamilySafi }
+    ::= { eltexBgpPeerAddrFamilyTable 1 }
+
+  EltexBgpPeerAddrFamilyEntry ::= SEQUENCE {
+      eltexBgpPeerAddrFamilyAfi               EltexBgpAfi,
+      eltexBgpPeerAddrFamilySafi              EltexBgpSafi,
+      eltexBgpPeerAddrFamilyDisable           TruthValue,
+      eltexBgpPeerAddrFamilyNxtHopSlf         TruthValue,
+      eltexBgpPeerAddrFamilyConfigMaxPrfx     Unsigned32,
+      eltexBgpPeerAddrFamilyConfigDropWarn    EltexBgpConfigDropOrWarn,
+      eltexBgpPeerAddrFamilyMaxPrfxHold       Unsigned32,
+      eltexBgpPeerAddrFamilyConfigThreshold   Unsigned32,
+      eltexBgpPeerAddrFamilyMinRteAdvertInt   Unsigned32,
+      eltexBgpPeerAddrFamilyMinASOrigInt      Unsigned32,
+      eltexBgpPeerAddrFamilyMinRteWithdrawInt Unsigned32,
+      eltexBgpPeerAddrFamilyReflectorClient   EltexBgpPeerReflectorClientType,
+      eltexBgpPeerAddrFamilyRouteMapIn        DisplayString,
+      eltexBgpPeerAddrFamilyRouteMapOut       DisplayString
+    }
+
+  eltexBgpPeerAddrFamilyAfi OBJECT-TYPE
+    SYNTAX      EltexBgpAfi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The AFI index into the peer <AFI, SAFI> table."
+    ::= { eltexBgpPeerAddrFamilyEntry 1 }
+
+  eltexBgpPeerAddrFamilySafi OBJECT-TYPE
+    SYNTAX      EltexBgpSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The SAFI index into the peer <AFI, SAFI> table."
+    ::= { eltexBgpPeerAddrFamilyEntry 2 }
+
+  eltexBgpPeerAddrFamilyDisable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "When eltexBgpPeerAddrFamilyDisable is 'true', BGP will not
+                 advertise Multiprotocol support to the peer for this
+                 address family.
+
+                 When eltexBgpPeerAddrFamilyDisable is 'false', BGP will
+                 advertise Multiprotocol support to the peer if support 
+                 for the address family has been enabled in the 
+                 corresponding bgpRmAfiSafiTable entry.
+
+                 Any update to this object will take effect the next time
+                 that the eltexBgpPeerTable entry is activated
+                 (eltexBgpPeerAdminStatus is changed to 'adminStatusUp').
+
+                 If config usage bit eltexBgpPeerAddrFamilyGroupDisable 
+                 is set, and the peer belongs to a peer group, then the
+                 eltexBgpPeerAddrFamilyGroupDisable value is used instead 
+                 of this value."
+    DEFVAL { true }
+    ::= { eltexBgpPeerAddrFamilyEntry 3 }
+
+  eltexBgpPeerAddrFamilyNxtHopSlf OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Gives finer control of the next-hop-self configuration
+                 provided by eltexBgpPeerNxtHopSlf.
+
+                 When eltexBgpPeerNxtHopSlf is 'false', BGP does not perform
+                 next-hop-self for any address family.
+
+                 When eltexBgpPeerNxtHopSlf is 'true', BGP performs 
+                 next-hop-self for those address families for which 
+                 eltexBgpPeerAddrFamilyNxtHopSlf is 'true'.
+
+                 If the value of this object is changed while the peer session
+                 is active, BGP will check for any routes that need to be
+                 advertised or withdrawn as a result of the change."
+    DEFVAL { true }
+    ::= { eltexBgpPeerAddrFamilyEntry 4 }
+
+  eltexBgpPeerAddrFamilyConfigMaxPrfx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Gives finer control of the maximum prefix configuration
+                 provided by eltexBgpPeerConfigMaxPrfx.
+
+                 To configure address family specific values for the maximum
+                 number of prefixes that can be accepted from the peer,
+                 set eltexBgpPeerConfigMaxPrfx to zero, and set
+                 eltexBgpPeerAddrFamilyConfigMaxPrfx to the limit 
+                 for this address family."
+    DEFVAL { 0 }
+    ::= { eltexBgpPeerAddrFamilyEntry 5 }
+
+  eltexBgpPeerAddrFamilyConfigDropWarn OBJECT-TYPE
+    SYNTAX      EltexBgpConfigDropOrWarn
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Gives finer control of the configuration provided by
+                 eltexBgpPeerConfigDropWarn, which determines the behavior
+                 when the maximum prefix limit is reached.
+
+                 To configure whether the session is dropped or a warning is
+                 behavior independently for different address
+                 families, set eltexBgpPeerConfigDropWarn to 'warn', and set
+                 the value of eltexBgpPeerAddrFamilyConfigDropWarn for 
+                 each address family as needed."
+    DEFVAL { warn }
+    ::= { eltexBgpPeerAddrFamilyEntry 6 }
+
+  eltexBgpPeerAddrFamilyMaxPrfxHold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Gives finer control of the configuration provided by
+                 eltexBgpPeerMaxPrfxHold, which determines the time interval in
+                 seconds between when this BGP session is torn down due to
+                 the number of prefixes received from this peer exceeding the
+                 maximum in eltexBgpPeerConfigMaxPrfx(AfiSafi) and when BGP
+                 attempts to reestablish the session.
+
+                 To configure a time interval for individual families, set
+                 eltexBgpPeerMaxPrfxHold to zero and set 
+                 eltexBgpPeerAddrFamilyMaxPrfxHold to the required time 
+                 interval for each address family."
+    DEFVAL { 90 }
+    ::= { eltexBgpPeerAddrFamilyEntry 7 }
+
+  eltexBgpPeerAddrFamilyConfigThreshold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Gives finer control of the threshold configuration
+                 provided by eltexBgpPeerConfigThreshold.  When the number of
+                 prefixes received from this peer for this address family
+                 reaches this threshold, BGP issues a warning.
+
+                 This field is not used if eltexBgpPeerConfigMaxPrfx and
+                 eltexBgpPeerAddrFamilyConfigThreshold are set to zero.
+
+                 To configure a threshold for individual families, set
+                 eltexBgpPeerConfigMaxPrfx to zero and set
+                 eltexBgpPeerAddrFamilyConfigThreshold to the required 
+                 threshold for each address family."
+    DEFVAL { 75 }
+    ::= { eltexBgpPeerAddrFamilyEntry 8 }
+
+  eltexBgpPeerAddrFamilyMinRteAdvertInt OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the
+                 MinRouteAdvertisementInterval timer.  This determines the
+                 minimum time between a BGP UPDATE to a peer advertising or
+                 withdrawing a route and a subsequent BGP UPDATE to the
+                 peer advertising a route to the same destination."
+    DEFVAL      { 30 }
+    ::= { eltexBgpPeerAddrFamilyEntry 9 }
+
+  eltexBgpPeerAddrFamilyMinASOrigInt OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for determining the minimum
+                 amount of time that must elapse between successive
+                 advertisements of UPDATE messages that report changes to a
+                 route within the advertising BGP speaker's own autonomous
+                 system.
+
+                 This field has no effect if
+                 eltexBgpPeerMinASOriginationInterval is set to a non-zero
+                 value.  To configure values independently for each address
+                 family, set eltexBgpPeerMinASOriginationInterval to 0 and set
+                 the values of eltexBgpPeerAddrFamilyMinASOrigInt as required."
+    DEFVAL      { 15 }
+    ::= { eltexBgpPeerAddrFamilyEntry 10 }
+
+  eltexBgpPeerAddrFamilyMinRteWithdrawInt OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the MinRouteWithdrawInterval
+                 timer.  This is the interval which is enforced between
+                 advertisement and subsequent withdrawal of a route.
+
+                 This field has no effect if 
+                 eltexBgpPeerMinRouteWithdrawInterval is set to a non-zero 
+                 value. To configure values independently for each address 
+                 family, set eltexBgpPeerMinRouteWithdrawInterval to 0 and
+                 set the values of eltexBgpPeerAddrFamilyMinRteWithdrawInt 
+                 as required."
+    DEFVAL      { 0 }
+    ::= { eltexBgpPeerAddrFamilyEntry 11 }
+
+  eltexBgpPeerAddrFamilyReflectorClient OBJECT-TYPE
+    SYNTAX      EltexBgpPeerReflectorClientType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Gives finer control of the configuration provided by
+                 eltexBgpPeerReflectorClient.
+
+                 This value indicates whether the given peer is a reflector
+                 client of this router for this AFI/SAFI, or not.  A value
+                 of nonClient(0) indicates that this peer is not a
+                 reflector client for this AFI/SAFI.  A value of client(1)
+                 indicates that this peer is a reflector client for this
+                 AFI/SAFI that is not fully meshed with other reflector
+                 clients.  A value of meshedClient(2) indicates that the
+                 peer is a reflector client for this AFI/SAFI and is fully
+                 meshed with all other reflector clients.
+
+                 The peer's reflector-client setting for this AFI/SAFI is
+                 chosen as follows.
+
+                 -  If the peer is not a member of a peer group
+                    o  If eltexBgpPeerReflectorClient is NOT non-client then use
+                       that
+                    o  Otherwise use eltexBgpPeerAddrFamilyReflectorClient.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL      { nonClient }
+    ::= { eltexBgpPeerAddrFamilyEntry 12 }
+
+  eltexBgpPeerAddrFamilyRouteMapIn OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The name of the Route Map to use for route imports from
+                 the peer for this AFI/SAFI."
+    ::= { eltexBgpPeerAddrFamilyEntry 13 }
+
+  eltexBgpPeerAddrFamilyRouteMapOut OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The name of the Route Map to use for route exports to the
+                 peer for this AFI/SAFI."
+    ::= { eltexBgpPeerAddrFamilyEntry 14 }
+
+  --
+  -- BGP peer status table.
+  --
+  -- This table reports BGP peer status and statistics.
+  --
+
+  eltexBgpPeerStatusTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpPeerStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "BGP peer status table.
+
+                 This table reports BGP peer status and statistics.  It also
+                 allows a user to control BGP peer statistics and peer
+                 sessions.
+
+                 This table does not contain any BGP peer configuration -
+                 the eltexBgpPeerTable MIB is the BGP peer configuration MIB.
+
+                 This table contains entries for both configured and dynamic
+                 peers.
+
+                 For configured peers the corresponding rows in the
+                 eltexBgpPeerTable MIB and eltexBgpPeerStatusTable MIB have
+                 identical index fields.
+
+                 The lifetime of a BGP peer status entry depends on whether
+                 the BGP peer is configured or dynamic.
+                 -  The entry for a configured peer is created and destroyed
+                 when the corresponding entry in the BGP peer
+                 configuration table (eltexBgpPeerTable) is created and
+                 destroyed.
+                 -  The entry for a dynamic peer is created when the BGP
+                 peering session is established.  It is destroyed when
+                 the BGP session has terminated."
+    ::= { eltexBgpPeerData 3 }
+
+  eltexBgpPeerStatusEntry OBJECT-TYPE
+    SYNTAX      EltexBgpPeerStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry containing information about the status of a BGP peer."
+    INDEX { eltexBgpProcessId,
+            eltexBgpPeerRemoteAddrType,
+            eltexBgpPeerRemoteAddr }
+    ::= { eltexBgpPeerStatusTable 1 }
+
+  EltexBgpPeerStatusEntry ::= SEQUENCE {
+      eltexBgpPeerStatusIdentifier              EltexBgpIdentifier,
+      eltexBgpPeerStatusState                   EltexBgpPeerStates,
+      eltexBgpPeerStatusDynamicPeer             TruthValue,
+      eltexBgpPeerStatusRemoteAs                EltexBgpAutonomousSystemNumber,
+      eltexBgpPeerStatusPeerIndex               Unsigned32,
+      eltexBgpPeerStatusCapsSupport             TruthValue,
+      eltexBgpPeerStatusLastError               OCTET STRING,
+      eltexBgpPeerStatusLastErrorDataLen        Unsigned32,
+      eltexBgpPeerStatusLastErrorData           OCTET STRING,
+      eltexBgpPeerStatusFsmEstablishedTime      Gauge32,
+      eltexBgpPeerStatusInUpdatesElpsTime       Gauge32,
+      eltexBgpPeerStatusHoldTime                Integer32,
+      eltexBgpPeerStatusKeepAlive               Integer32,
+      eltexBgpPeerStatusInOpens                 Counter32,
+      eltexBgpPeerStatusOutOpens                Counter32,
+      eltexBgpPeerStatusInNotifications         Counter32,
+      eltexBgpPeerStatusOutNotifications        Counter32,
+      eltexBgpPeerStatusInUpdates               Counter32,
+      eltexBgpPeerStatusOutUpdates              Counter32,
+      eltexBgpPeerStatusInKeepalives            Counter32,
+      eltexBgpPeerStatusOutKeepalives           Counter32,
+      eltexBgpPeerStatusInRefreshes             Counter32,
+      eltexBgpPeerStatusOutRefreshes            Counter32,
+      eltexBgpPeerStatusInTotalMessages         Counter32,
+      eltexBgpPeerStatusOutTotalMessages        Counter32,
+      eltexBgpPeerStatusFsmEstTransitions       Counter32,
+      eltexBgpPeerStatusConnectRetryCount       Counter32,
+      eltexBgpPeerStatusClearCnts               TruthValue,
+      eltexBgpPeerStatusRtRefresh               TruthValue,
+      eltexBgpPeerStatusLastErrorRcvd           OCTET STRING,
+      eltexBgpPeerStatusLastErrorRcvdTime       TimeStamp,
+      eltexBgpPeerStatusLastErrorSent           OCTET STRING,
+      eltexBgpPeerStatusLastErrorSentTime       TimeStamp,
+      eltexBgpPeerStatusLastState               EltexBgpPeerStates,
+      eltexBgpPeerStatusLastEvent               EltexBgpPeerEvents,
+      eltexBgpPeerStatusCapsSent                EltexBgpCapabilities,
+      eltexBgpPeerStatusCapsRcvd                EltexBgpCapabilities,
+      eltexBgpPeerStatusCapsNegotiated          EltexBgpCapabilities,
+      eltexBgpPeerStatusRcvdMsgElpsTime         TimeInterval,
+      eltexBgpPeerStatusIdleHoldRemTime         TimeInterval,
+      eltexBgpPeerStatusRouteRefrSent           Counter32,
+      eltexBgpPeerStatusRouteRefrRcvd           Counter32,
+      eltexBgpPeerStatusSelLocalAddrType        InetAddressType,
+      eltexBgpPeerStatusSelLocalAddr            InetAddress,
+      eltexBgpPeerStatusSelLocalPort            InetPortNumber,
+      eltexBgpPeerStatusSelRemotePort           InetPortNumber,
+      eltexBgpPeerStatusSelLocalAs              EltexBgpAutonomousSystemNumber,
+      eltexBgpPeerStatusSelRemoteAs             EltexBgpAutonomousSystemNumber,
+      eltexBgpPeerStatusInPrfxes                Gauge32,
+      eltexBgpPeerStatusOutPrfxes               Gauge32,
+      eltexBgpPeerStatusOutPrfxesAdvertised     Gauge32,
+      eltexBgpPeerStatusConfigState             EltexBgpPeerConfigStates,
+      eltexBgpPeerStatusConnectRetryInt         Unsigned32,
+      eltexBgpPeerStatusConfigPassive           TruthValue,
+      eltexBgpPeerStatusConfigOpenDelay         Unsigned32,
+      eltexBgpPeerStatusConfigIdleHold          Unsigned32,
+      eltexBgpPeerStatusTtl                     Integer32,
+      eltexBgpPeerStatusHoldTimeConfigd         Unsigned32,
+      eltexBgpPeerStatusKeepAliveConfigd        Unsigned32,
+      eltexBgpPeerStatusResendAllRoutes         TruthValue,
+      eltexBgpPeerStatusOutUpdateElpsTime       Gauge32,
+      eltexBgpPeerStatusOutPrfxesDenied         Counter32,
+      eltexBgpPeerStatusOutPrfxesImpWdr         Counter32,
+      eltexBgpPeerStatusOutPrfxesExpWdr         Counter32,
+      eltexBgpPeerStatusInPrfxesImpWdr          Counter32,
+      eltexBgpPeerStatusInPrfxesExpWdr          Counter32,
+      eltexBgpPeerStatusReceivedHoldTime        Integer32,
+      eltexBgpPeerStatusDropSession             TruthValue,
+      eltexBgpPeerStatusCeaseErrorSubcode       EltexBgpCeaseErrorSubcode,
+      eltexBgpPeerStatusBfdStatus               EltexBfdSessionStatus
+    }
+
+  eltexBgpPeerStatusIdentifier OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The BGP Identifier of this entry's BGP peer.
+
+                 This entry is zero unless the eltexBgpPeerStatusState is in the
+                 openconfirm or the established state."
+    ::= { eltexBgpPeerStatusEntry 1 }
+
+  eltexBgpPeerStatusState OBJECT-TYPE
+    SYNTAX      EltexBgpPeerStates
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The BGP peer's FSM state."
+    ::= { eltexBgpPeerStatusEntry 2 }
+
+  eltexBgpPeerStatusDynamicPeer OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether the peer is dynamic (true) or individually
+                 configured (false)."
+    ::= { eltexBgpPeerStatusEntry 3 }
+
+  eltexBgpPeerStatusRemoteAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote autonomous system number in use on the session.
+                 For configured peers not yet active, this is the
+                 configured value."
+    ::= { eltexBgpPeerStatusEntry 4 }
+
+  eltexBgpPeerStatusPeerIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The peer index.
+
+                 The peer index is a unique index for the peer entry in the
+                 eltexBgpPeerStatusTable.  It is used to provide an index value
+                 for other tables whose data is logically per-peer."
+    ::= { eltexBgpPeerStatusEntry 5 }
+
+  eltexBgpPeerStatusCapsSupport OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether or not this peer accepted our local capabilities
+                 optional parameter sent on the OPEN message.  This field
+                 will not be relevant until the peer has reached open_confirm
+                 state.  Note that this field indicates support or otherwise
+                 of the capabilities optional parameter, not a specific
+                 capability."
+    ::= { eltexBgpPeerStatusEntry 6 }
+
+  eltexBgpPeerStatusLastError OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (2))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The last error code and subcode sent or received on this
+                 connection.  If no error has occurred, this field is zero.
+                 Otherwise, the first byte of this two byte OCTET STRING
+                 contains the error code, and the second byte contains the
+                 subcode."
+    ::= { eltexBgpPeerStatusEntry 7 }
+
+  eltexBgpPeerStatusLastErrorDataLen OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The length of the last error data.  If this is zero no
+                 error data was provided or generated."
+    ::= { eltexBgpPeerStatusEntry 8 }
+
+  eltexBgpPeerStatusLastErrorData OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The last error code's data seen by this peer on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 9 }
+
+  eltexBgpPeerStatusFsmEstablishedTime OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This timer indicates how long in seconds this peer has
+                 been in the Established state or how long since this peer
+                 was last in the Established state.  It is set to zero when
+                 a new peer is configured or the router is booted."
+    ::= { eltexBgpPeerStatusEntry 10 }
+
+  eltexBgpPeerStatusInUpdatesElpsTime OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Elapsed time in seconds since the last BGP Update message
+                 was received from the peer."
+    ::= { eltexBgpPeerStatusEntry 11 }
+
+  eltexBgpPeerStatusHoldTime OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the Hold Timer established
+                 with the peer.
+
+                 The Hold Timer interval is calculated by this BGP speaker by
+                 using the smaller of the configured eltexBgpPeerHoldTimeConfigd
+                 value and the Hold Time received in the OPEN message.
+
+                 For dynamic peers the Hold Timer interval is calculated
+                 using the default eltexBgpPeerHoldTimeConfigd value rather than
+                 a configured value.
+
+                 A value of zero indicates that the Hold Timer has not been
+                 established with the peer."
+    ::= { eltexBgpPeerStatusEntry 12 }
+
+  eltexBgpPeerStatusKeepAlive OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the KeepAlive Timer
+                 established with the peer.
+
+                 The KeepAlive Timer interval is calculated by this BGP speaker
+                 such that, when compared with eltexBgpPeerStatusHoldTime,
+                 it has the same proportion as the configured
+                 eltexBgpPeerKeepAliveConfigd has when compared with
+                 eltexBgpPeerHoldTimeConfigd.
+
+                 For dynamic peers the KeepAlive Timer interval is calculated
+                 using the default eltexBgpPeerKeepAliveConfigd and
+                 eltexBgpPeerHoldTimeConfigd values rather than configured values.
+
+                 A value of zero indicates that the KeepAlive Timer has not
+                 been established with the peer."
+    ::= { eltexBgpPeerStatusEntry 13 }
+
+  eltexBgpPeerStatusInOpens OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP OPEN messages received on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 14 }
+
+  eltexBgpPeerStatusOutOpens OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP OPEN messages transmitted on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 15 }
+
+  eltexBgpPeerStatusInNotifications OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP NOTIFICATION messages received on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 16 }
+
+  eltexBgpPeerStatusOutNotifications OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP NOTIFICATION messages transmitted on
+                 this connection."
+    ::= { eltexBgpPeerStatusEntry 17 }
+
+  eltexBgpPeerStatusInUpdates OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP UPDATE messages received on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 18 }
+
+  eltexBgpPeerStatusOutUpdates OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP UPDATE messages transmitted on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 19 }
+
+  eltexBgpPeerStatusInKeepalives OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP KEEPALIVE messages received on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 20 }
+
+  eltexBgpPeerStatusOutKeepalives OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP KEEPALIVE messages transmitted on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 21 }
+
+  eltexBgpPeerStatusInRefreshes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP ROUTE REFRESH messages received on this
+                 connection."
+    ::= { eltexBgpPeerStatusEntry 22 }
+
+  eltexBgpPeerStatusOutRefreshes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of BGP ROUTE REFRESH messages transmitted on
+                 this connection."
+    ::= { eltexBgpPeerStatusEntry 23 }
+
+  eltexBgpPeerStatusInTotalMessages OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of messages received from the remote peer
+                 on this connection."
+    ::= { eltexBgpPeerStatusEntry 24 }
+
+  eltexBgpPeerStatusOutTotalMessages OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of messages transmitted to the remote
+                 peer on this connection."
+    ::= { eltexBgpPeerStatusEntry 25 }
+
+  eltexBgpPeerStatusFsmEstTransitions OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of times the BGP FSM transitioned into
+                 the established state for this peer."
+    ::= { eltexBgpPeerStatusEntry 26 }
+
+  eltexBgpPeerStatusConnectRetryCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current connect retry count of this peer.
+
+                 This is incremented each time the peer session flaps, and is
+                 used to determine the time to wait before retrying the
+                 session.
+
+                 Note this is only incremented when an active session
+                 terminates abnormally, and not when it simply fails to come
+                 up."
+    ::= { eltexBgpPeerStatusEntry 27 }
+
+  eltexBgpPeerStatusClearCnts OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Set this field to 'true' to clear the counters associated
+                 with this peer.
+
+                 Reading the value of this field has no meaning.  The field
+                 is not returned on a MIB Get."
+    ::= { eltexBgpPeerStatusEntry 28 }
+
+  eltexBgpPeerStatusRtRefresh OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Set this field to 'true' to trigger sending a route
+                 refresh request for this peer.
+
+                 Setting this field will only have an effect if a BGP
+                 session to the peer is active.  Peers that do not support
+                 route refresh will have their sessions toggled.
+
+                 Reading the value of this field has no meaning.  The field
+                 is not returned on a MIB Get."
+    ::= { eltexBgpPeerStatusEntry 29 }
+
+  eltexBgpPeerStatusLastErrorRcvd OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (2))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The last error code and subcode received from the peer on
+                 this connection.
+
+                 If no error has been received from the peer, this field is
+                 zero.  Otherwise, the first byte of this two byte OCTET
+                 STRING contains the error code, and the second byte contains
+                 the subcode."
+    ::= { eltexBgpPeerStatusEntry 30 }
+
+  eltexBgpPeerStatusLastErrorRcvdTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The value of sysUpTime when the last error was received
+                 from the peer on this connection.
+
+                 If no error has been received from the peer, this field is
+                 zero."
+    ::= { eltexBgpPeerStatusEntry 31 }
+
+  eltexBgpPeerStatusLastErrorSent OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (2))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The last error code and subcode sent to the peer on this
+                 connection.
+
+                 If no error has been sent to the peer, this field is zero.
+                 Otherwise, the first byte of this two byte OCTET STRING
+                 contains the error code, and the second byte contains the
+                 subcode."
+    ::= { eltexBgpPeerStatusEntry 32 }
+
+  eltexBgpPeerStatusLastErrorSentTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The value of sysUpTime when the last error was sent to the
+                 peer on this connection.
+
+                 If no error has been sent to the peer, this field is zero."
+    ::= { eltexBgpPeerStatusEntry 33 }
+
+  eltexBgpPeerStatusLastState OBJECT-TYPE
+    SYNTAX      EltexBgpPeerStates
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The BGP peer's previous FSM state."
+    ::= { eltexBgpPeerStatusEntry 34 }
+
+  eltexBgpPeerStatusLastEvent OBJECT-TYPE
+    SYNTAX      EltexBgpPeerEvents
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The last input to be made to the BGP peer's FSM."
+    ::= { eltexBgpPeerStatusEntry 35 }
+
+  eltexBgpPeerStatusCapsSent OBJECT-TYPE
+    SYNTAX      EltexBgpCapabilities
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The capabilities announced to the peer on the most recent
+                 Open message sent to the peer.  This field is set to zero
+                 before the first Open message is sent to the peer, and
+                 is unchanged if the session comes down."
+    ::= { eltexBgpPeerStatusEntry 36 }
+
+  eltexBgpPeerStatusCapsRcvd OBJECT-TYPE
+    SYNTAX      EltexBgpCapabilities
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The capabilities received on the most recent Open message
+                 received from the peer.  This field is set to zero before
+                 the first Open message is received from the peer, and is
+                 unchanged if the session comes down.
+
+                 In the event that the peer signals a capability that BGP
+                 does not recognize, this field will only contain those
+                 capabilities that BGP recognizes.  A user should walk the
+                 eltexBgpPeerCapsRcvdTable to confirm the full list of
+                 capabilities received from the peer."
+    ::= { eltexBgpPeerStatusEntry 37 }
+
+  eltexBgpPeerStatusCapsNegotiated OBJECT-TYPE
+    SYNTAX      EltexBgpCapabilities
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The capabilities negotiated for the session with the peer.
+                 This field is set to zero before Open messages have been
+                 exchanged with the peer, and is unchanged if the session
+                 comes down."
+    ::= { eltexBgpPeerStatusEntry 38 }
+
+  eltexBgpPeerStatusRcvdMsgElpsTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The elapsed time in hundredths of a second since anything
+                 was received from this peer.  If nothing has been received
+                 from this peer, this field is set to zero.  If the session
+                 comes down this value continues to increase."
+    ::= { eltexBgpPeerStatusEntry 39 }
+
+  eltexBgpPeerStatusIdleHoldRemTime OBJECT-TYPE
+    SYNTAX      TimeInterval
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "For a peer in 'idle' state, the time remaining in
+                 hundredths of a second until BGP will try to reactivate
+                 the connection.  If the peer is not in 'idle' state, this is
+                 set to zero."
+    ::= { eltexBgpPeerStatusEntry 40 }
+
+  eltexBgpPeerStatusRouteRefrSent OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of Route Refresh messages sent to the peer.
+
+                 If the session comes down this value is unchanged, and will
+                 continue to increment if the session is reestablished.
+
+                 However, for dynamic peers the peer status entry is lost
+                 if the BGP session is not re-established within the graceful
+                 restart period, and in this case the value of this field
+                 is lost."
+    ::= { eltexBgpPeerStatusEntry 41 }
+
+  eltexBgpPeerStatusRouteRefrRcvd OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of Route Refresh messages received from the
+                 peer.
+
+                 If the session comes down this value is unchanged, and will
+                 continue to increment if the session is reestablished.
+
+                 However, for dynamic peers the peer status entry is lost
+                 if the BGP session is not re-established within the graceful
+                 restart period, and in this case the value of this field
+                 is lost."
+    ::= { eltexBgpPeerStatusEntry 42 }
+
+  eltexBgpPeerStatusSelLocalAddrType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The address family of the local address used by the
+                 transport connection for the peering session.
+
+                 A value of none implies that there is currently no
+                 connection to this peer."
+    ::= { eltexBgpPeerStatusEntry 43 }
+
+  eltexBgpPeerStatusSelLocalAddr OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local address used by the transport connection for the
+                 peering session."
+    ::= { eltexBgpPeerStatusEntry 44 }
+
+  eltexBgpPeerStatusSelLocalPort OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local port used by the transport connection for the
+                 peering session.
+
+                 A value of zero implies that there is currently no
+                 connection to this peer."
+    ::= { eltexBgpPeerStatusEntry 45 }
+
+  eltexBgpPeerStatusSelRemotePort OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote port used by the transport connection for the
+                 peering session.
+
+                 A value of zero implies that there is currently no
+                 connection to this peer."
+    ::= { eltexBgpPeerStatusEntry 46 }
+
+  eltexBgpPeerStatusSelLocalAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local AS number used on this session.
+
+                 If the eltexBgpPeerStatusState is not 'established', then this
+                 field is zero."
+    ::= { eltexBgpPeerStatusEntry 47 }
+
+  eltexBgpPeerStatusSelRemoteAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The remote AS number used on this session.
+
+                 If the eltexBgpPeerStatusState is not 'established', then this
+                 field is zero."
+    ::= { eltexBgpPeerStatusEntry 48 }
+
+  eltexBgpPeerStatusInPrfxes OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of prefixes received from this peer."
+    ::= { eltexBgpPeerStatusEntry 49 }
+
+  eltexBgpPeerStatusOutPrfxes OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The number of prefixes that are installed in all of this
+                 peer's Adj-RIBs-Out."
+    ::= { eltexBgpPeerStatusEntry 50 }
+
+  eltexBgpPeerStatusOutPrfxesAdvertised OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of prefixes advertised to this peer."
+    ::= { eltexBgpPeerStatusEntry 51 }
+
+  eltexBgpPeerStatusConfigState OBJECT-TYPE
+    SYNTAX      EltexBgpPeerConfigStates
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This field reports the state of the peer configuration.
+                 The peer configuration may be in one of the following
+                 states.
+
+                 -  Up to date.  That is, all configuration set by MIBs for
+                 this peer has been applied to the current peer session
+                 (if it exists).
+
+                 -  Out of date, requiring the peer's admin status to be
+                 set to down before all the current MIB configuration
+                 for this peer can be applied.
+
+                 -  Out of date, requiring the peer's row status to be set
+                 to inactive before all the current MIB configuration
+                 for this peer can be applied."
+    ::= { eltexBgpPeerStatusEntry 52 }
+
+  eltexBgpPeerStatusConnectRetryInt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The currently active time interval for the ConnectRetry
+                 timer.
+
+                 This value may be different from the current peer MIB
+                 value (eltexBgpPeerConnectRetryInterval) if the peer takes its
+                 value from a peer group MIB
+                 (eltexBgpPeergrConnectRetryInterval) or the MIB which provides
+                 the value has been changed since the peer session was
+                 started."
+    ::= { eltexBgpPeerStatusEntry 53 }
+
+  eltexBgpPeerStatusConfigPassive OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The current active passive flag.  If TRUE, then no
+                 outbound connections will be initiated, and only incoming
+                 connections will be accepted.  If FALSE, then outbound
+                 connections will be attempted to this peer, and incoming
+                 connections will be accepted from this peer."
+    ::= { eltexBgpPeerStatusEntry 54 }
+
+  eltexBgpPeerStatusConfigOpenDelay OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The currently active delay to enforce in between a TCP
+                 connection with this peer becoming established and a BGP
+                 Open message being sent."
+    ::= { eltexBgpPeerStatusEntry 55 }
+
+  eltexBgpPeerStatusConfigIdleHold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The currently active time to hold this peer in Idle state
+                 after a BGP session has progressed beyond Idle state
+                 initially and then returned to it."
+    ::= { eltexBgpPeerStatusEntry 56 }
+
+  eltexBgpPeerStatusTtl OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The currently active Time To Live used by the connection
+                 on this peer."
+    ::= { eltexBgpPeerStatusEntry 57 }
+
+  eltexBgpPeerStatusHoldTimeConfigd OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The currently active time interval in seconds for the Hold
+                 Time configured for this BGP speaker with this peer."
+    ::= { eltexBgpPeerStatusEntry 58 }
+
+  eltexBgpPeerStatusKeepAliveConfigd OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The currently active time interval in seconds for the
+                 KeepAlive configured for this BGP speaker with this peer."
+    ::= { eltexBgpPeerStatusEntry 59 }
+
+  eltexBgpPeerStatusResendAllRoutes OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Set this to 'true' to trigger BGP to re-send all routes
+                to the peer.  If the peer supports enhanced route refresh,
+                then the routes will be sent as an unsolicited enhanced
+                route refresh.
+
+                Setting this field will only have an effect if a BGP
+                session to the peer is active.
+
+                This field always has the value 'false' when read."
+    DEFVAL     { false }
+    ::= { eltexBgpPeerStatusEntry 60 }
+
+  eltexBgpPeerStatusOutUpdateElpsTime OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Elapsed time in seconds since the last BGP UPDATE message
+                was sent to this peer.  Each time eltexBgpPeerStatusOutUpdates
+                is incremented, the value of this object is set to zero
+                (0)."
+    ::= { eltexBgpPeerStatusEntry 61 }
+
+  eltexBgpPeerStatusOutPrfxesDenied OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This is the number of prefixes in the Loc-RIB that have
+                have failed export policy checks and so have not been
+                installed in the Adj-RIB-Out for this peer."
+    ::= { eltexBgpPeerStatusEntry 62 }
+
+  eltexBgpPeerStatusOutPrfxesImpWdr OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of routes for which an implicit withdraw
+                has been sent to this peer.  A route is implicitly
+                withdrawn if a replacement route with the same NLRI is
+                advertised to the peer."
+    ::= { eltexBgpPeerStatusEntry 63 }
+
+  eltexBgpPeerStatusOutPrfxesExpWdr OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of routes for which an explicit withdraw
+                has been sent to this peer.  A route is explicitly
+                withdrawn if it is advertised in the WITHDRAWN ROUTES
+                field in an UPDATE message sent to the peer."
+    ::= { eltexBgpPeerStatusEntry 64 }
+
+  eltexBgpPeerStatusInPrfxesImpWdr OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of routes that have been implicitly
+                withdrawn by this peer.  A route is implicitly withdrawn
+                if a replacement route with the same NLRI is received from
+                the peer."
+    ::= { eltexBgpPeerStatusEntry 65 }
+
+  eltexBgpPeerStatusInPrfxesExpWdr OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The total number of routes that have been explicitly
+                withdrawn by this peer.  A route is explicitly withdrawn
+                if it is advertised in the WITHDRAWN ROUTES field in an
+                UPDATE message received from the peer."
+    ::= { eltexBgpPeerStatusEntry 66 }
+
+  eltexBgpPeerStatusReceivedHoldTime OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The Hold Time value received in the OPEN message from this
+                 peer.
+
+                 A value of zero indicates that no Hold Time has been
+                 received from the peer."
+    ::= { eltexBgpPeerStatusEntry 67 }
+
+  eltexBgpPeerStatusDropSession OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Set this field to 'true' to drop the current session with
+                 the BGP peer.  For a dynamic BGP peer this causes the
+                 peer status entry to disappear if the BGP session is not
+                 re-established within the graceful restart period.
+
+                 Reading the value of this field has no meaning.  The field
+                 is not returned on a MIB Get."
+    ::= { eltexBgpPeerStatusEntry 68 }
+
+  eltexBgpPeerStatusCeaseErrorSubcode OBJECT-TYPE
+    SYNTAX      EltexBgpCeaseErrorSubcode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The error subcode to be sent in the Cease Notification
+                 messages triggered by setting eltexBgpPeerStatusDropSession to
+                 'true'.  If set to 'none' then DC-BGP chooses the subcode
+                 itself.
+
+                 This field does not affect the error subcode for Cease
+                 Notification messages triggered for other reasons."
+    DEFVAL      { none }
+    ::= { eltexBgpPeerStatusEntry 69 }
+
+  eltexBgpPeerStatusBfdStatus OBJECT-TYPE
+    SYNTAX      EltexBfdSessionStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "BFD session state for this peer."
+    ::= { eltexBgpPeerStatusEntry 70 }
+
+  --
+  -- BGP peer <AFI, SAFI> status table.
+  --
+  -- This table allows a user to control BGP peer AFI/SAFI operations.
+  --
+
+  eltexBgpPeerAddrFamilyStatusTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpPeerAddrFamilyStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "BGP peer <AFI, SAFI> status table.
+
+                 This table allows a user to control BGP peer AFI/SAFI
+                 operations.
+
+                 In future this table may also report BGP peer AFI/SAFI
+                 status and statistics.
+
+                 This table does not contain any BGP peer AFI/SAFI
+                 configuration - the eltexBgpPeerAddrFamilyTable MIB is the BGP
+                 peer AFI/SAFI configuration MIB.
+
+                 This table contains entries for both configured and dynamic
+                 peers.
+
+                 Rows in this table cannot be created or destroyed manually.
+                 A table entry for each supported address family is created
+                 automatically when an entry in the eltexBgpPeerStatusTable is
+                 created.  The entries are destroyed when the
+                 eltexBgpPeerStatusTable entry is destroyed."
+    ::= { eltexBgpPeerData 4 }
+
+  eltexBgpPeerAddrFamilyStatusEntry OBJECT-TYPE
+    SYNTAX      EltexBgpPeerAddrFamilyStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry containing information about the status of a BGP peer
+                 for a particular AFI/SAFI."
+    INDEX { eltexBgpProcessId,
+            eltexBgpPeerRemoteAddrType,
+            eltexBgpPeerRemoteAddr,
+            eltexBgpPeerAddrFamilyAfi,
+            eltexBgpPeerAddrFamilySafi }
+    ::= { eltexBgpPeerAddrFamilyStatusTable 1 }
+
+  EltexBgpPeerAddrFamilyStatusEntry ::= SEQUENCE {
+      eltexBgpPeerAddrFamilyStatusRtRefresh              TruthValue,
+      eltexBgpPeerAddrFamilyStatusAddPathCapNeg          EltexBgpAddPathSrCap,
+      eltexBgpPeerAddrFamilyStatusReflectorClient        EltexBgpPeerReflectorClientType,
+      eltexBgpPeerAddrFamilyStatusUpdateGroup            Unsigned32,
+      eltexBgpPeerAddrFamilyStatusResendAllRoutes        TruthValue
+    }
+
+  eltexBgpPeerAddrFamilyStatusRtRefresh OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Set this to 'true' to trigger BGP to send a Route Refresh
+                 request to the peer for this AFI/SAFI.
+
+                 Setting this field will only have an effect if a BGP
+                 session to the peer is active.  Peers that do not support
+                 route refresh will have their sessions toggled.
+
+                 This field always has the value 'false' when read."
+    DEFVAL { false }
+    ::= { eltexBgpPeerAddrFamilyStatusEntry 1 }
+
+  eltexBgpPeerAddrFamilyStatusAddPathCapNeg OBJECT-TYPE
+    SYNTAX      EltexBgpAddPathSrCap
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The BGP additional path capability negotiated with this
+                 peer for this AFI/SAFI."
+    ::= { eltexBgpPeerAddrFamilyStatusEntry 2 }
+
+  eltexBgpPeerAddrFamilyStatusReflectorClient OBJECT-TYPE
+    SYNTAX      EltexBgpPeerReflectorClientType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The currently active value which indicates whether the
+                 given peer is a reflector client of this router for this
+                 AFI/SAFI, or not.
+
+                 This value may be different from the current peer AFI/SAFI
+                 MIB value (eltexBgpPeerAddrFamilyReflectorClient) if any of the
+                 following are true.
+                 -  The peer takes its reflector client status from the
+                    current peer MIB value (eltexBgpPeerReflectorClient) or from
+                    a peer group MIB (eltexBgpPeerGroupReflectorClient).
+                 -  The peer takes its value from a peer group AFI/SAFI MIB
+                    (eltexBgpPeerAddrFamilyGroupReflectorClient).
+                 -  The MIB which provides the value has been changed since
+                    the peer session was started."
+    ::= { eltexBgpPeerAddrFamilyStatusEntry 3 }
+
+  eltexBgpPeerAddrFamilyStatusUpdateGroup OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The index of the update group that the peer is a member of
+                for this AFI/SAFI.
+
+                Zero if the peer is not a member of an update group."
+    ::= { eltexBgpPeerAddrFamilyStatusEntry 4 }
+
+  eltexBgpPeerAddrFamilyStatusResendAllRoutes OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Set this to 'true' to trigger BGP to re-send all routes
+                to the peer for this AFI/SAFI.  If the peer supports
+                enhanced route refresh, then this will be sent as an
+                unsolicited enhanced route refresh.
+
+                Setting this field will only have an effect if a BGP
+                session to the peer is active.
+
+                This field always has the value 'false' when read."
+    DEFVAL { false }
+    ::= { eltexBgpPeerAddrFamilyStatusEntry 5 }
+
+-------------------------------------------------------------------------------
+
+  eltexBgpPeerGroup      OBJECT IDENTIFIER ::= { eltexBgpPeer 2 }
+
+  --
+  -- BGP Peer Group Table
+  --
+  -- This table is used to create and manage Peer Groups.
+  --
+
+
+  eltexBgpPeerGroupTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpPeerGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The table of peer groups.
+
+                 A peer group is a set of peers that share a common peer
+                 group configuration.
+
+                 Using peer groups simplifies peer configuration.  Instead of
+                 configuring many peers with the same set of configuration
+                 values, you can configure a single peer group and then
+                 assign peers to the peer group.
+
+                 Each peer in a peer group has its eltexBgpPeerConfigPeerGroup value
+                 set to the peer group index.  If a peer is  not in a peer group then
+                 its eltexBgpPeerConfigPeerGroup value is 0."
+    ::= { eltexBgpPeerGroup 1 }
+
+  eltexBgpPeerGroupEntry OBJECT-TYPE
+    SYNTAX      EltexBgpPeerGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry containing information about the connection with
+                 a BGP peer."
+    INDEX { eltexBgpProcessId,
+            eltexBgpPeerGroupName }
+    ::= { eltexBgpPeerGroupTable 1 }
+
+  EltexBgpPeerGroupEntry ::= SEQUENCE {
+      eltexBgpPeerGroupName                      DisplayString,
+      eltexBgpPeerGroupRowStatus                 RowStatus,
+      eltexBgpPeerGroupRemoteAs                  EltexBgpAutonomousSystemNumber,
+      eltexBgpPeerGroupSourceInterface           InterfaceIndexOrZero,
+      eltexBgpPeerGroupNxtHopSlf                 TruthValue,
+      eltexBgpPeerGroupConfigMaxPrfx             Unsigned32,
+      eltexBgpPeerGroupConfigDropWarn            EltexBgpConfigDropOrWarn,
+      eltexBgpPeerGroupMaxPrfxHold               Unsigned32,
+      eltexBgpPeerGroupConfigThreshold           Unsigned32,
+      eltexBgpPeerGroupConnectRetryInterval      Unsigned32,
+      eltexBgpPeerGroupHoldTimeConfigd           Unsigned32,
+      eltexBgpPeerGroupKeepAliveConfigd          Unsigned32,
+      eltexBgpPeerGroupMinRouteAdvertiseInterval Unsigned32,
+      eltexBgpPeerGroupMinASOriginationInterval  Unsigned32,
+      eltexBgpPeerGroupMinRouteWithdrawInterval  Unsigned32,
+      eltexBgpPeerGroupConfigOpenDelay           Unsigned32,
+      eltexBgpPeerGroupConfigIdleHold            Unsigned32,
+      eltexBgpPeerGroupDistListPlIn              DisplayString,
+      eltexBgpPeerGroupDistListPlOut             DisplayString,
+      eltexBgpPeerGroupReflectorClient           EltexBgpPeerReflectorClientType,
+      eltexBgpPeerGroupSoftResetWithStoredInfo   TruthValue,
+      eltexBgpPeerGroupBfdDesired                TruthValue
+    }
+
+  eltexBgpPeerGroupName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The name of this eltexBgpPeerGroupEntry.  This is the index of the
+                 peer group."
+    ::= { eltexBgpPeerGroupEntry 1 }
+
+  eltexBgpPeerGroupRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this BGP peer group table entry, used to
+                create and destroy table entries."
+    ::= { eltexBgpPeerGroupEntry 2 }
+
+  eltexBgpPeerGroupRemoteAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The remote autonomous system number.
+
+                 For individual peers, this can be configured using
+                 eltexBgpPeerRemoteAs.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin status DOWN and then UP, thus forcing the
+                 peer session to be restarted.  In this case, until the
+                 peer is set admin_status DOWN, the peer will be marked as
+                 out of date (as reported by the config state field in the
+                 eltexBgpPeerStatusTable row for the peer)."
+    ::= { eltexBgpPeerGroupEntry 3 }
+
+  eltexBgpPeerGroupSourceInterface OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The interface index for the interface from which the
+                 source address for session is chosen.  If non-zero, BGP
+                 will look for the first address on this interface with a
+                 type matching eltexBgpPeerRemoteAddrType, and use that as the
+                 source address.
+
+                 This field can be changed at any time, causing the peer to
+                 be immediately deactivated and reactivated.
+
+                 If the configured interface (or address on that interface)
+                 did not exist when the peer was activated, and is
+                 subsequently added, the peer will automatically use the
+                 configured interface address.  This will cause the peer to
+                 be immediately deactivated and reactivated."
+    DEFVAL       { 0 }
+    ::= { eltexBgpPeerGroupEntry 4 }
+
+  eltexBgpPeerGroupNxtHopSlf OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "When eltexBgpPeerGroupNxtHopSlf is 'true', routes will be 
+                 advertised to the peer with NEXT_HOP attribute set to 
+                 BGP router local address."
+    DEFVAL       { false }
+    ::= { eltexBgpPeerGroupEntry 5 }
+
+    eltexBgpPeerGroupConfigMaxPrfx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This object is used to limit the number of prefixes that
+                 can be accepted from this peer.
+
+                 Setting eltexBgpPeerGroupConfigMaxPrfx to a non-zero value sets 
+                 the maximum number of prefixes that can be accepted from 
+                 this peer."
+    DEFVAL       { 0 }
+    ::= { eltexBgpPeerGroupEntry 6 }
+
+    eltexBgpPeerGroupConfigDropWarn OBJECT-TYPE
+    SYNTAX      EltexBgpConfigDropOrWarn
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This object is used  to determine whether the session is
+                 dropped or a warning is generated when the maximum number
+                 of prefixes set is exceeded.
+
+                 Setting eltexBgpPeerGroupConfigDropWarn to 'drop' will cause the
+                 session to be dropped when the prefix limit is reached."
+    DEFVAL       { warn }
+    ::= { eltexBgpPeerGroupEntry 7 }
+
+    eltexBgpPeerGroupMaxPrfxHold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The time interval in seconds between when this BGP session
+                 is turn down due to the number of prefixes received from
+                 this peer exceeding the maximum in
+                 eltexBgpPeerGroupConfigMaxPrfx and when BGP attempts to
+                 reestablish the session."
+    DEFVAL       { 90 }
+    ::= { eltexBgpPeerGroupEntry 8 }
+
+    eltexBgpPeerGroupConfigThreshold OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "A percentage of the limit set by eltexBgpPeerGroupConfigMaxPrfx.
+                 When the number of prefixes received from this peer reaches
+                 this threshold, BGP issues a warning.
+
+                 This field is not used if eltexBgpPeerGroupConfigMaxPrfx is set to
+                 zero."
+    DEFVAL       { 75 }
+    ::= { eltexBgpPeerGroupEntry 9 }
+
+    eltexBgpPeerGroupConnectRetryInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval for the ConnectRetry timer.  The suggested
+                 value for this timer is 120 seconds.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 120 }
+    ::= { eltexBgpPeerGroupEntry 10 }
+
+    eltexBgpPeerGroupHoldTimeConfigd OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the Hold Time configured for
+                 this BGP speaker with this peer.  This value is placed in
+                 an OPEN message sent to this peer by this BGP speaker, and
+                 is compared with the Hold Time field in an OPEN message
+                 received from the peer when determining the Hold Time
+                 (eltexBgpPeerStatusHoldTime) with the peer.  This value must not be
+                 less than three seconds if it is not zero (0) in which
+                 case the Hold Time is NOT to be established with the peer.
+                 The value of this object is only allowed to be zero (0) if
+                 the value of eltexBgpPeerKeepAliveConfigd is also zero (0).
+                 The suggested value for this timer is 90 seconds.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 90 }
+    ::= { eltexBgpPeerGroupEntry 11 }
+
+    eltexBgpPeerGroupKeepAliveConfigd OBJECT-TYPE
+    SYNTAX      Unsigned32 ( 0 | 1..21845 )
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the KeepAlive configured for
+                 this BGP speaker with this peer.  The value of this object
+                 will only determine the KEEPALIVE messages frequency
+                 relative to the value specified in eltexBgpPeerGroupHoldTimeConfigd
+                 the actual time interval for the KEEPALIVE messages is
+                 indicated by eltexBgpPeerStatusKeepAlive.  A reasonable 
+                 maximum value for this timer would be configured to be one 
+                 third of that of eltexBgpPeerGroupHoldTimeConfigd.
+
+                 The value of this object is only allowed to be zero (0) if
+                 the value of eltexBgpPeerGroupHoldTimeConfigd is also zero (0).
+                 If the value of this object is zero (0), no periodical
+                 KEEPALIVE messages are sent to the peer after the BGP
+                 connection has been established.  The suggested value for
+                 this timer is 30 seconds.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 30 }
+    ::= { eltexBgpPeerGroupEntry 12 }
+
+    eltexBgpPeerGroupMinRouteAdvertiseInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the
+                 MinRouteAdvertisementInterval timer.  This determines the
+                 minimum time between a BGP UPDATE to a peer advertising or
+                 withdrawing a route and a subsequent BGP UPDATE to the
+                 peer advertising a route to the same destination.
+
+                 The default value for this timer is 30 seconds.  Its value
+                 must not be less than eltexBgpPeerGroupMinRouteAdvertiseInterval."
+    DEFVAL       { 30 }
+    ::= { eltexBgpPeerGroupEntry 13 }
+
+    eltexBgpPeerGroupMinASOriginationInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for determining the minimum amount
+                 of time that must elapse between successive advertisements of
+                 UPDATE messages that report changes to a route within the
+                 advertising BGP speaker's own autonomous system. The
+                 suggested value for this timer is 15 seconds."
+    DEFVAL       { 15 }
+    ::= { eltexBgpPeerGroupEntry 14 }
+
+    eltexBgpPeerGroupMinRouteWithdrawInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Time interval in seconds for the MinRouteWithdrawInterval
+                 timer.  This is the interval which is enforced between
+                 advertisement and subsequent withdrawal of a route.
+
+                 The default value for this timer is 30 seconds.  The value
+                 must not exceed that of eltexBgpPeerGroupMinRouteAdvertiseInterval."
+    DEFVAL       { 30 }
+    ::= { eltexBgpPeerGroupEntry 15 }
+
+    eltexBgpPeerGroupConfigOpenDelay OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..240)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The delay to enforce in between a TCP connection with this
+                 peer becoming established and a BGP Open message being
+                 sent.  If this delay is zero, then no delay will be
+                 injected, and a BGP Open message will be sent as soon as
+                 the TCP connection allows it.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 0 }
+    ::= { eltexBgpPeerGroupEntry 16 }
+
+    eltexBgpPeerGroupConfigIdleHold OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..32767)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The time to hold this peer in Idle state after a BGP
+                 session has progressed beyond Idle state initially and
+                 then returned to it.  No new connections will be initiated
+                 or accepted until the peer comes out of Idle state.  By
+                 setting this field to a large value, this timer can be
+                 used to provide some level of peer oscillation damping, if
+                 desired.
+
+                 This field can be changed at any time.  However, if the
+                 field is changed while the peer is admin_status UP, the
+                 change will only take effect after the peer has been
+                 cycled admin_status DOWN and then UP, thus forcing the
+                 peer session to be restarted."
+    DEFVAL       { 15 }
+    ::= { eltexBgpPeerGroupEntry 17 }
+
+    eltexBgpPeerGroupDistListPlIn OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The Prefix List name identifying the Prefix List to use
+                 to filter routes received from the peer."
+    ::= { eltexBgpPeerGroupEntry 18 }
+
+    eltexBgpPeerGroupDistListPlOut OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The Prefix List name identifying the Prefix List to use
+                 to filter routes advertised to the peer."
+    ::= { eltexBgpPeerGroupEntry 19 }
+
+  eltexBgpPeerGroupReflectorClient OBJECT-TYPE
+    SYNTAX      EltexBgpPeerReflectorClientType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This value indicates whether the given peer is a reflector
+                client of this router, or not.  A value of nonClient(0)
+                indicates that this peer is not a reflector client.  A
+                value of client(1) indicates that this peer is a reflector
+                client that is not fully meshed with other reflector
+                clients.  A value of meshedClient(2) indicates that the
+                peer is a reflector client and is fully meshed with all
+                other reflector clients."
+    DEFVAL       { nonClient }
+    ::= { eltexBgpPeerGroupEntry 20 }
+
+  eltexBgpPeerGroupSoftResetWithStoredInfo OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "This option causes all routes learned from a peer to be stored
+                 so that the ARI can be recalculated (for example, due to a 
+                 change in import policy) without performing a route refresh or
+                 restarting the peer session.
+
+                 This field can only be changed when the peer is admin_status
+                 DOWN.
+
+                 This option overlaps with route refresh (RR) behavior. If the
+                 option is enabled, Route refresh capability continues to be
+                 advertized and the BGP router still responds to RR request
+                 from the peer. However, route refresh messages will never
+                 be sent to this peer."
+    DEFVAL { false }
+    ::= { eltexBgpPeerGroupEntry 21 }
+
+  eltexBgpPeerGroupBfdDesired OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Indicates whether Bidirectional Forwarding Detection (BFD)
+                 is desired for peers in this peer group.
+
+                 This field can be changed at any time."
+    DEFVAL { false }
+    ::= { eltexBgpPeerGroupEntry 22 }
+
+-------------------------------------------------------------------------------
+
+  eltexBgpRib OBJECT IDENTIFIER ::= { eltexBgpObjects 3 }
+
+  --
+  -- BGP Local RIB Table
+  --
+  -- This table contains per route information including routes and attributes.
+  -- It is ordered by route prefix and basically represent Loc-RIB table.
+  --
+
+  eltexBgpLocRibTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpLocRibEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "This table contains information about paths to destination
+                 networks received from all BGP4 peers.
+
+                 This table reports routes and path attributes after import
+                 policy has been applied.  Only routes accepted by import
+                 policy are reported."
+    ::= { eltexBgpRib 1 }
+
+  eltexBgpLocRibEntry OBJECT-TYPE
+    SYNTAX      EltexBgpLocRibEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Information about a path to a network."
+    INDEX { eltexBgpProcessId,
+            eltexBgpLocRibAfi,
+            eltexBgpLocRibSafi,
+            eltexBgpLocRibPrfxType,
+            eltexBgpLocRibPrfx,
+            eltexBgpLocRibPrfxLen,
+            eltexBgpLocRibPeerOrRib,
+            eltexBgpLocRibPeerRibIndex,
+            eltexBgpLocRibPathId }
+    ::= { eltexBgpLocRibTable 1 }
+
+  EltexBgpLocRibEntry ::= SEQUENCE {
+      eltexBgpLocRibAfi                  EltexBgpAfi,
+      eltexBgpLocRibSafi                 EltexBgpSafi,
+      eltexBgpLocRibPrfxType             InetAddressType,
+      eltexBgpLocRibPrfx                 InetAddress,
+      eltexBgpLocRibPrfxLen              InetAddressPrefixLength,
+      eltexBgpLocRibPeerOrRib            EltexBgpPeerOrRib,
+      eltexBgpLocRibPeerRibIndex         Unsigned32,
+      eltexBgpLocRibPathId               Unsigned32,
+      eltexBgpLocRibBest                 TruthValue,
+      eltexBgpLocRibAsSize               EltexBgpAsSize,
+      eltexBgpLocRibASPathStr            OCTET STRING,
+      eltexBgpLocRibPathAttrOrigin       EltexBgpOriginCode,
+      eltexBgpLocRibPathAttrNextHopType  InetAddressType,
+      eltexBgpLocRibPathAttrNextHop      InetAddress,
+      eltexBgpLocRibPathAttrMultExtDisc  Unsigned32,
+      eltexBgpLocRibPathAttrLocalPref    Unsigned32,
+      eltexBgpLocRibPathAttrAtomicAgg    TruthValue,
+      eltexBgpLocRibPathAttrAggAS        EltexBgpAutonomousSystemNumber,
+      eltexBgpLocRibPathAttrAggAddr      EltexBgpIdentifier,
+      eltexBgpLocRibPathAttrCalcLclPref  Unsigned32,
+      eltexBgpLocRibPathAttrOrigId       EltexBgpIdentifier,
+      eltexBgpLocRibPathAttrWeight       Unsigned32,
+      eltexBgpLocRibEcmp                 TruthValue,
+      eltexBgpLocRibPathAttrAsPathLimAs  EltexBgpAutonomousSystemNumber,
+      eltexBgpLocRibPthAttAsPthLimUpper  Unsigned32,
+      eltexBgpLocRibIsActive             EltexBgpNlriIsActiveFlag,
+      eltexBgpLocRibPathAttrMEDPrsnt     TruthValue,
+      eltexBgpLocRibReasonNotBest        EltexBgpReasonNotBest,
+      eltexBgpLocRibPeerType             EltexBgpNlriPeerTypes
+    }
+
+  eltexBgpLocRibAfi OBJECT-TYPE
+    SYNTAX      EltexBgpAfi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address family of the prefix for this Loc-RIB route."
+    ::= { eltexBgpLocRibEntry 1 }
+
+  eltexBgpLocRibSafi OBJECT-TYPE
+    SYNTAX      EltexBgpSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The subsequent address family of the prefix for this Loc-RIB
+                 route."
+    ::= { eltexBgpLocRibEntry 2 }
+
+  eltexBgpLocRibPrfxType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "A type of address prefix in the Network Layer Reachability
+                 Information field."
+    ::= { eltexBgpLocRibEntry 3 }
+
+  eltexBgpLocRibPrfx OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "An address prefix in the Network Layer Reachability
+                 Information field.
+
+                 The prefix length is specified by eltexBgpLocRibPrfxLen. Any
+                 bits beyond the length specified by eltexBgpLocRibPrfxLen are
+                 zeroed."
+    ::= { eltexBgpLocRibEntry 4 }
+
+  eltexBgpLocRibPrfxLen OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Length in bits of the IP address prefix in the Network Layer
+                 Reachability Information field."
+    ::= { eltexBgpLocRibEntry 5 }
+
+  eltexBgpLocRibPeerOrRib OBJECT-TYPE
+    SYNTAX      EltexBgpPeerOrRib
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Whether this route was learned from a BGP peer or redistributed
+                 from Routing Information Base."
+    ::= { eltexBgpLocRibEntry 6 }
+
+  eltexBgpLocRibPeerRibIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The index of either the BGP peer or RIB this route was
+                 learned from.  If eltexBgpNlriPrefixPeerOrRib is peer, this field
+                 is equivalent to a eltexBgpPeerStatusPeerIndex.  If
+                 eltexBgpNlriPrefixPeerOrRib is afm, this field is equivalent to
+                 an internal index of RIB entity."
+    ::= { eltexBgpLocRibEntry 7 }
+
+  eltexBgpLocRibPathId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The path ID for this NLRI.
+
+                 If BGP additional path receive capability was negotiated
+                 with the peer for this AFI/SAFI then this is the received
+                 path ID for this NLRI, otherwise it is zero."
+    ::= { eltexBgpLocRibEntry 8 }
+
+  eltexBgpLocRibBest OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "An indication of whether or not this route was chosen as the
+                 best BGP4 route."
+    ::= { eltexBgpLocRibEntry 9 }
+
+  eltexBgpLocRibAsSize OBJECT-TYPE
+    SYNTAX      EltexBgpAsSize
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether the eltexBgpLocRibASPathStr field contains two or
+                 four byte AS numbers."
+    ::= { eltexBgpLocRibEntry 10 }
+
+  eltexBgpLocRibASPathStr OBJECT-TYPE
+    SYNTAX      OCTET STRING  (SIZE (0..128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This is a string depicting the autonomous system path to this
+                 network which was received from the peer which advertised it.
+                 Two-octet AS numbers appear as four-octet numbers by adding
+                 two bytes of zero padding."
+    ::= { eltexBgpLocRibEntry 11 }
+
+  eltexBgpLocRibPathAttrOrigin OBJECT-TYPE
+    SYNTAX      EltexBgpOriginCode
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The ultimate origin of the path information."
+    ::= { eltexBgpLocRibEntry 12 }
+
+  eltexBgpLocRibPathAttrNextHopType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "A type of nexthop address received in the UPDATE packet."
+    ::= { eltexBgpLocRibEntry 13 }
+
+  eltexBgpLocRibPathAttrNextHop OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The address of the border router that should be used to access
+                 the destination network.  This address is the nexthop address
+                 received in the UPDATE packet.  The address family of this
+                 object will be the same as that of the prefix in this row."
+    ::= { eltexBgpLocRibEntry 14 }
+
+  eltexBgpLocRibPathAttrMultExtDisc OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This metric is used to discriminate between multiple exit
+                 points to an adjacent autonomous system.
+                 Valid only if eltexBgpLocRibPathAttrMEDPrsnt is TRUE."
+    ::= { eltexBgpLocRibEntry 15 }
+
+  eltexBgpLocRibPathAttrLocalPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The originating BGP4 speaker's degree of preference for an
+                 advertised route."
+    ::= { eltexBgpLocRibEntry 16 }
+
+  eltexBgpLocRibPathAttrAtomicAgg OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "When this object is set to TRUE, the ATOMIC_AGGREGATE Path
+                 Attribute is present and indicates that the NLRI MUST NOT
+                 be made more specific."
+    ::= { eltexBgpLocRibEntry 17 }
+
+  eltexBgpLocRibPathAttrAggAS OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The AS number of the last BGP4 speaker that performed route
+                 aggregation."
+    ::= { eltexBgpLocRibEntry 18 }
+
+  eltexBgpLocRibPathAttrAggAddr OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The IP address of the last BGP4 speaker that performed route
+                 aggregation.  A value of zero indicates the absence of this
+                 attribute.  Note propagation of AS of zero is illegal in
+                 the Internet."
+    ::= { eltexBgpLocRibEntry 19 }
+
+  eltexBgpLocRibPathAttrCalcLclPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The degree of preference calculated by the receiving BGP4
+                 speaker for an advertised route."
+    ::= { eltexBgpLocRibEntry 20 }
+
+  eltexBgpLocRibPathAttrOrigId OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The Originator-ID identifying the router that initially
+                 advertised this destination to a Route Reflector.  A
+                 value of 0.0.0.0 indicates the absence of this attribute."
+    ::= { eltexBgpLocRibEntry 21 }
+
+  eltexBgpLocRibPathAttrWeight OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local degree of preference assigned to this route."
+    ::= { eltexBgpLocRibEntry 22 }
+
+  eltexBgpLocRibEcmp   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether or not this route was installed into the
+                 Forwarding Table as an ECMP route (it may or may not be
+                 the best BGP4 route advertised to BGP peers)."
+    ::= { eltexBgpLocRibEntry 23 }
+
+  eltexBgpLocRibPathAttrAsPathLimAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The AS number of the speaker that attached the AS_PATHLIMIT
+                 attribute.  A value of 0 indicates the absence of this
+                 attribute.  Note that propagation of AS of zero is illegal in
+                 the Internet."
+    ::= { eltexBgpLocRibEntry 24 }
+
+  eltexBgpLocRibPthAttAsPthLimUpper OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The upper bound on the number of ASes in the AS_PATH
+                 associated with this route before the route will be filtered.
+                 Only valid if eltexBgpLocRibPathAttrAsPathLimAs is non-zero."
+    ::= { eltexBgpLocRibEntry 25 }
+
+  eltexBgpLocRibIsActive OBJECT-TYPE
+    SYNTAX      EltexBgpNlriIsActiveFlag
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "An indication of whether or not this route is installed in
+                 the forwarding table.
+
+                 - 'active' if the route is installed in the forwarding
+                   table, or is a route redistributed from another routing
+                   protocol instance
+
+                 - 'inactive' otherwise.
+
+                 - 'notTracked' if BGP does not track active routes."
+    ::= { eltexBgpLocRibEntry 26 }
+
+  eltexBgpLocRibPathAttrMEDPrsnt OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If true, then the route has an associated MED attribute,
+                 whose value is given in eltexBgpLocRibPathAttrMultExitDisc.
+                 If false, the route has no MED attribute, and the value of
+                 eltexBgpLocRibPathAttrMultExitDisc is undefined."
+    ::= { eltexBgpLocRibEntry 27 }
+
+  eltexBgpLocRibReasonNotBest OBJECT-TYPE
+    SYNTAX      EltexBgpReasonNotBest
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If eltexBgpLocRibBest is 'true', then this field is set to
+                'routeIsBest'.  Otherwise, it reports the stage in the
+                decision process when the route was determined to be
+                non-best.
+
+                This is the reason that the route was discarded from the
+                decision process.  There may be other reasons why this route
+                is less preferred than the best route."
+    ::= { eltexBgpLocRibEntry 28 }
+
+  eltexBgpLocRibPeerType OBJECT-TYPE
+    SYNTAX      EltexBgpNlriPeerTypes
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If eltexBgpLocRibPeerOrRib is peer, this field indicates
+                 whether the source peer is an iBGP or eBGP peer.  If false,
+                 this field is set to 'none'."
+    ::= { eltexBgpLocRibEntry 29 }
+
+-------------------------------------------------------------------------------
+
+  --
+  -- BGP Adj-Rib-In Table
+  --
+  -- This table contains per route information including routes and attributes.
+  -- All routes received from peers are contained within this table, regardless
+  -- of whether they have been accepted by policy.  Routes that are 
+  -- redistributed from other routing protocols are not present.
+  --
+
+  eltexBgpAdjRibInTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpAdjRibInEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BGP-4 Adj-RIB-In Table contains information about all
+                 paths to destination networks received from all BGP4 peers.
+                 Paths from AFMs are not contained within this table.
+
+                 This table reports received routes and path attributes before
+                 import policy has been applied."
+    ::= { eltexBgpRib 2 }
+
+  eltexBgpAdjRibInEntry OBJECT-TYPE
+    SYNTAX      EltexBgpAdjRibInEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Information about a path to a network."
+    INDEX { eltexBgpProcessId,
+            eltexBgpAdjRibInPeerIndex,
+            eltexBgpAdjRibInAfi,
+            eltexBgpAdjRibInSafi,
+            eltexBgpAdjRibInPrfxType,
+            eltexBgpAdjRibInPrfx,
+            eltexBgpAdjRibInPrfxLen,
+            eltexBgpAdjRibInPathId }
+    ::= { eltexBgpAdjRibInTable 1 }
+
+  EltexBgpAdjRibInEntry ::= SEQUENCE {
+      eltexBgpAdjRibInPeerIndex                Unsigned32,
+      eltexBgpAdjRibInAfi                      EltexBgpAfi,
+      eltexBgpAdjRibInSafi                     EltexBgpSafi,
+      eltexBgpAdjRibInPrfxType                 InetAddressType,
+      eltexBgpAdjRibInPrfx                     InetAddress,
+      eltexBgpAdjRibInPrfxLen                  InetAddressPrefixLength,
+      eltexBgpAdjRibInPathId                   Unsigned32,
+      eltexBgpAdjRibInAsSize                   EltexBgpAsSize,
+      eltexBgpAdjRibInASPathStr                OCTET STRING,
+      eltexBgpAdjRibInPathAttrOrigin           EltexBgpOriginCode,
+      eltexBgpAdjRibInPathAttrNextHopType      InetAddressType,
+      eltexBgpAdjRibInPathAttrNextHop          InetAddress,
+      eltexBgpAdjRibInPathAttrMultiExitDisc    Unsigned32,
+      eltexBgpAdjRibInPathAttrLocalPref        Unsigned32,
+      eltexBgpAdjRibInPathAttrAtomicAggregate  TruthValue,
+      eltexBgpAdjRibInPathAttrAggregatorAS     EltexBgpAutonomousSystemNumber,
+      eltexBgpAdjRibInPathAttrAggregatorAddr   EltexBgpIdentifier,
+      eltexBgpAdjRibInPathAttrOrigId           EltexBgpIdentifier,
+      eltexBgpAdjRibInPathAttrAsPathLimAs      EltexBgpAutonomousSystemNumber,
+      eltexBgpAdjRibInPathAttrAsPathLimUpper   Unsigned32,
+      eltexBgpAdjRibInPathAttrMEDPrsnt         TruthValue,
+      eltexBgpAdjRibInPathAccepted             TruthValue
+    }
+
+  eltexBgpAdjRibInPeerIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The index of the BGP peer this route was learned from.
+                 This field is equivalent to a eltexBgpPeerStatusPeerIndex."
+    ::= { eltexBgpAdjRibInEntry 1 }
+
+  eltexBgpAdjRibInAfi OBJECT-TYPE
+    SYNTAX      EltexBgpAfi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address family of the prefix for this Adj-RIB-In route."
+    ::= { eltexBgpAdjRibInEntry 2 }
+
+  eltexBgpAdjRibInSafi OBJECT-TYPE
+    SYNTAX      EltexBgpSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The subsequent address family of the prefix for this
+                 Adj-RIB-In route."
+    ::= { eltexBgpAdjRibInEntry 3 }
+
+  eltexBgpAdjRibInPrfxType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "A type of address prefix in the Network Layer Reachability
+                 Information field."
+    ::= { eltexBgpAdjRibInEntry 4 }
+
+  eltexBgpAdjRibInPrfx OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "An address prefix in the Network Layer Reachability
+                 Information field.
+
+                 The prefix length is specified by eltexBgpAdjRibInPrfxLen.  Any
+                 bits beyond the length specified by eltexBgpAdjRibInPrfxLen are
+                 zeroed."
+    ::= { eltexBgpAdjRibInEntry 5 }
+
+  eltexBgpAdjRibInPrfxLen OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Length in bits of the IP address prefix in the Network Layer
+                 Reachability Information field."
+    ::= { eltexBgpAdjRibInEntry 6 }
+
+  eltexBgpAdjRibInPathId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The path ID for this NLRI.
+
+                If BGP additional path receive capability was negotiated
+                with the peer for this AFI/SAFI then this is the received
+                path ID for this NLRI, otherwise it is zero."
+    ::= { eltexBgpAdjRibInEntry 7 }
+
+  eltexBgpAdjRibInAsSize OBJECT-TYPE
+    SYNTAX      EltexBgpAsSize
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether the eltexBgpAdjRibInASPathStr field contains two or
+                 four byte AS numbers."
+    ::= { eltexBgpAdjRibInEntry 8 }
+
+  eltexBgpAdjRibInASPathStr OBJECT-TYPE
+    SYNTAX      OCTET STRING  (SIZE (0..128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This is a string depicting the autonomous system path to this
+                 network which was received from the peer which advertised it.
+                 Two-octet AS numbers appear as four-octet numbers by adding
+                 two bytes of zero padding."
+    ::= { eltexBgpAdjRibInEntry 9 }
+
+  eltexBgpAdjRibInPathAttrOrigin OBJECT-TYPE
+    SYNTAX      EltexBgpOriginCode
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The ultimate origin of the path information."
+    ::= { eltexBgpAdjRibInEntry 10 }
+
+  eltexBgpAdjRibInPathAttrNextHopType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "A type of the nexthop address received in the UPDATE packet."
+    ::= { eltexBgpAdjRibInEntry 11 }
+
+  eltexBgpAdjRibInPathAttrNextHop OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The address of the border router that should be used to access
+                 the destination network.  This address is the nexthop address
+                 received in the UPDATE packet.  The address family of this
+                 object will be the same as that of the prefix in this row."
+    ::= { eltexBgpAdjRibInEntry 12 }
+
+  eltexBgpAdjRibInPathAttrMultiExitDisc OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This metric is used to discriminate between multiple exit
+                 points to an adjacent autonomous system.
+                 Valid only if eltexBgpAdjRibInPathAttrMEDPrsnt is TRUE."
+    ::= { eltexBgpAdjRibInEntry 13 }
+
+  eltexBgpAdjRibInPathAttrLocalPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The originating BGP4 speaker's degree of preference for an
+                 advertised route."
+    ::= { eltexBgpAdjRibInEntry 14 }
+
+  eltexBgpAdjRibInPathAttrAtomicAggregate OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "When this object is set to true, the ATOMIC_AGGREGATE Path 
+                 Attribute is present and indicates that the NLRI MUST NOT
+                 be made more specific."
+    ::= { eltexBgpAdjRibInEntry 15 }
+
+  eltexBgpAdjRibInPathAttrAggregatorAS OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The AS number of the last BGP4 speaker that performed route
+                 aggregation."
+    ::= { eltexBgpAdjRibInEntry 16 }
+
+  eltexBgpAdjRibInPathAttrAggregatorAddr OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The IP address of the last BGP4 speaker that performed route
+                 aggregation.  A value of zero indicates the absence of this
+                 attribute.  Note propagation of AS of zero is illegal in
+                 the Internet."
+    ::= { eltexBgpAdjRibInEntry 17 }
+
+  eltexBgpAdjRibInPathAttrOrigId OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The Originator-ID identifying the router that initially
+                 advertised this destination to a Route Reflector.  A
+                 value of 0.0.0.0 indicates the absence of this attribute."
+    ::= { eltexBgpAdjRibInEntry 18 }
+
+  eltexBgpAdjRibInPathAttrAsPathLimAs OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The AS number of the speaker that attached the AS_PATHLIMIT
+                 attribute.  A value of 0 indicates the absence of this
+                 attribute.  Note that propagation of AS of zero is illegal in
+                 the Internet."
+    ::= { eltexBgpAdjRibInEntry 19 }
+
+  eltexBgpAdjRibInPathAttrAsPathLimUpper OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The upper bound on the number of ASes in the AS_PATH
+                 associated with this route before the route will be filtered.
+                 Only valid if eltexBgpAdjRibInPathAttrAsPathLimAs is non-zero."
+    ::= { eltexBgpAdjRibInEntry 20 }
+
+  eltexBgpAdjRibInPathAttrMEDPrsnt OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If true, then the route has an associated MED attribute,
+                 whose value is given in eltexBgpAdjRibInPathAttMultiExitDisc.
+                 If false, the route has no MED attribute, and the value of
+                 eltexBgpAdjRibInPathAttMultiExitDisc is undefined."
+    ::= { eltexBgpAdjRibInEntry 21 }
+
+  eltexBgpAdjRibInPathAccepted OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If true, then the route was accepted by policy.  If false it
+                 was denied."
+    ::= { eltexBgpAdjRibInEntry 22 }
+
+-------------------------------------------------------------------------------
+
+  --
+  -- BGP Adj-RIB Out Table
+  --
+  -- This table contains the set of routes advertised to each peer.
+  --
+
+  eltexBgpAdjRibOutTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpAdjRibOutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BGP Adj-RIB-Out Table contains the set of routes
+                 advertised to each peer."
+    ::= { eltexBgpRib 3 }
+
+  eltexBgpAdjRibOutEntry OBJECT-TYPE
+    SYNTAX      EltexBgpAdjRibOutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Information about a path to a network that has been
+                 advertised to a peer.  The route has been
+                 explicitly advertised in an UPDATE message sent to the
+                 peer, unless eltexBgpAdjRibOutLocalAggrType has the value
+                 suppressedAggregatedRoute(4), in which case the route
+                 has only been advertised as part of an aggregate
+                 route."
+    INDEX { eltexBgpProcessId,
+            eltexBgpPeerStatusPeerIndex,
+            eltexBgpAdjRibOutAfi,
+            eltexBgpAdjRibOutSafi,
+            eltexBgpAdjRibOutPrfxType,
+            eltexBgpAdjRibOutPrfx,
+            eltexBgpAdjRibOutPrfxLen,
+            eltexBgpAdjRibOutPathId }
+    ::= { eltexBgpAdjRibOutTable 1 }
+
+  EltexBgpAdjRibOutEntry ::= SEQUENCE {
+      eltexBgpAdjRibOutAfi                  EltexBgpAfi,
+      eltexBgpAdjRibOutSafi                 EltexBgpSafi,
+      eltexBgpAdjRibOutPrfxType             InetAddressType,
+      eltexBgpAdjRibOutPrfx                 InetAddress,
+      eltexBgpAdjRibOutPrfxLen              InetAddressPrefixLength,
+      eltexBgpAdjRibOutPathId               Unsigned32,
+      eltexBgpAdjRibOutBest                 TruthValue,
+      eltexBgpAdjRibOutAdvertStatus         INTEGER,
+      eltexBgpAdjRibOutLocalAggrType        INTEGER,
+      eltexBgpAdjRibOutAsSize               EltexBgpAsSize,
+      eltexBgpAdjRibOutASPathStr            OCTET STRING,
+      eltexBgpAdjRibOutOrigin               EltexBgpOriginCode,
+      eltexBgpAdjRibOutNextHopType          InetAddressType,
+      eltexBgpAdjRibOutNextHop              InetAddress,
+      eltexBgpAdjRibOutMultiExitDisc        Unsigned32,
+      eltexBgpAdjRibOutLocalPref            Unsigned32,
+      eltexBgpAdjRibOutAtomicAggregate      TruthValue,
+      eltexBgpAdjRibOutAggregatorAS         EltexBgpAutonomousSystemNumber,
+      eltexBgpAdjRibOutAggregatorAddr       EltexBgpIdentifier,
+      eltexBgpAdjRibOutOrigId               EltexBgpIdentifier,
+      eltexBgpAdjRibOutEcmp                 TruthValue,
+      eltexBgpAdjRibOutAsLimAs              EltexBgpAutonomousSystemNumber,
+      eltexBgpAdjRibOutAsLimUpper           Unsigned32,
+      eltexBgpAdjRibOutIsActive             EltexBgpNlriIsActiveFlag,
+      eltexBgpAdjRibOutMEDPrsnt             TruthValue,
+      eltexBgpAdjRibOutPeerType             EltexBgpNlriPeerTypes
+    }
+
+  eltexBgpAdjRibOutAfi OBJECT-TYPE
+    SYNTAX      EltexBgpAfi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The address family of the prefix for this Adj-RIB Out
+                 route."
+    ::= { eltexBgpAdjRibOutEntry 1 }
+
+  eltexBgpAdjRibOutSafi OBJECT-TYPE
+    SYNTAX      EltexBgpSafi
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The subsequent address family of the prefix for
+                 this Adj-RIB Out route."
+    ::= { eltexBgpAdjRibOutEntry 2 }
+
+  eltexBgpAdjRibOutPrfxType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "A type of the address prefix in the Network Layer Reachability
+                 Information field for this Adj-RIB Out route."
+    ::= { eltexBgpAdjRibOutEntry 3 }
+
+  eltexBgpAdjRibOutPrfx OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "An address prefix in the Network Layer Reachability
+                 Information field for this Adj-RIB Out route.
+
+                 The prefix length is specified by eltexBgpAdjRibOutPrfxLen.
+                 Any bits beyond the length specified by
+                 eltexBgpAdjRibOutPrfxLen are zeroed.
+
+                 This field contains the full line format BGP NLRI omitting
+                 any NLRI length field.
+
+                 For SAFI 128 the NLRI includes the MPLS label and Route
+                 Distinguisher as well as the IPv4 or IPv6 address prefix."
+    ::= { eltexBgpAdjRibOutEntry 4 }
+
+  eltexBgpAdjRibOutPrfxLen OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Length in bits of the address prefix contained in the
+                 eltexBgpAdjRibOutPrfx object."
+    ::= { eltexBgpAdjRibOutEntry 5 }
+
+  eltexBgpAdjRibOutPathId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The path ID for this Adj-RIB Out route.
+
+                 If BGP additional path send capability was negotiated with
+                 the peer for this AFI/SAFI then this is the path ID sent for
+                 this Adj-RIB Out route, otherwise it is zero."
+    ::= { eltexBgpAdjRibOutEntry 6 }
+
+  eltexBgpAdjRibOutBest OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "An indication of whether or not this route was chosen as the
+                 best BGP4 route."
+    ::= { eltexBgpAdjRibOutEntry 7 }
+
+  eltexBgpAdjRibOutAdvertStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  advertised(1),
+                  suppressed(2),
+                  pendingWithdrawal(3),
+                  withdrawn(4)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This object indicates the current state of
+                 advertisement of the route to the peer.
+
+                 A value of advertised(1) indicates that the route has
+                 been advertised to the peer.
+
+                 A value of suppressed(2) indicates that the route is
+                 not currently advertised to the peer, but will be
+                 advertised when a minimum advertisement interval timer
+                 expires.
+
+                 A value of pendingWithdrawal(3) indicates that the
+                 route is currently advertised to the peer, but will be
+                 withdrawn when the timer expires.
+
+                 A value of withdrawn(4) indicates that the route has
+                 been withdrawn from the peer, and this entry will be
+                 removed from the Adj-RIB-Out on the expiry of the
+                 timer."
+    ::= { eltexBgpAdjRibOutEntry 8 }
+
+  eltexBgpAdjRibOutLocalAggrType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                  noAggregation(1),
+                  aggregateRoute(2),
+                  unsuppAggregatedRoute(3),
+                  suppressedAggregatedRoute(4)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This object indicates any aggregation processing that
+                 has been applied to this Adj-RIB-Out route.
+
+                 A value of noAggregation(1) indicates that this route
+                 does not aggregate any other routes, and is not
+                 aggregated by any route.
+
+                 A value of aggregateRoute(2) indicates that this route
+                 is a locally configured aggregating route.
+
+                 A value of unsuppAggregatedRoute(3) indicates that this
+                 route has been aggregated by a locally configured
+                 aggregate route and is not suppressed - the route is
+                 still explicitly advertised to the peer.
+
+                 A value of suppressedAggregatedRoute(4) indicates that
+                 this route has been aggregated by a locally configured
+                 aggregate route and is flagged such that it should not be
+                 advertised along with the aggregate route.  Typically such
+                 routes are not installed on an Adj-RIB-Out.  If however the
+                 aggregate route itself is not permitted to be added to the
+                 Adj-RIB-Out then suppressed routes are advertised if they
+                 themselves are permitted by policy."
+    ::= { eltexBgpAdjRibOutEntry 9 }
+
+  eltexBgpAdjRibOutAsSize OBJECT-TYPE
+    SYNTAX      EltexBgpAsSize
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether the eltexBgpAdjRibOutASPathStr object contains
+                 two or four byte AS numbers."
+    ::= { eltexBgpAdjRibOutEntry 10 }
+
+  eltexBgpAdjRibOutASPathStr OBJECT-TYPE
+    SYNTAX      OCTET STRING  (SIZE (0..128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This is a string containing the autonomous system path sent to
+                 this peer in the AS_PATH attribute for this Adj-RIB-Out route.
+                 Two-octet AS numbers appear as four-octet numbers by adding
+                 two bytes of zero padding."
+    ::= { eltexBgpAdjRibOutEntry 11 }
+
+  eltexBgpAdjRibOutOrigin OBJECT-TYPE
+    SYNTAX      EltexBgpOriginCode
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The ultimate origin of the path information."
+    ::= { eltexBgpAdjRibOutEntry 12 }
+
+  eltexBgpAdjRibOutNextHopType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "A type of the next hop address transmitted 
+                 in the UPDATE packet."
+    ::= { eltexBgpAdjRibOutEntry 13 }
+
+  eltexBgpAdjRibOutNextHop OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The next hop address transmitted in the UPDATE packet.
+                 The address family of this object is the same as that
+                 of eltexBgpAdjRibOutPrfx."
+    ::= { eltexBgpAdjRibOutEntry 14 }
+
+  eltexBgpAdjRibOutMultiExitDisc OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This metric is used to discriminate between multiple
+                 exit points to an adjacent autonomous system.
+                 Valid only if eltexBgpAdjRibOutMEDPrsnt is TRUE."
+    ::= { eltexBgpAdjRibOutEntry 15 }
+
+  eltexBgpAdjRibOutLocalPref OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The local preference for this Adj-RIB-Out route, as
+                 transmitted in the UPDATE message sent to the peer."
+    ::= { eltexBgpAdjRibOutEntry 16 }
+
+  eltexBgpAdjRibOutAtomicAggregate OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "When this object is set to true, the ATOMIC_AGGREGATE Path 
+                 Attribute was included in the UPDATE sent to the peer
+                 for this Adj-RIB-Out route."
+    ::= { eltexBgpAdjRibOutEntry 17 }
+
+  eltexBgpAdjRibOutAggregatorAS OBJECT-TYPE
+    SYNTAX      EltexBgpAutonomousSystemNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The AS number of the last BGP4 speaker that performed
+                 route aggregation."
+    ::= { eltexBgpAdjRibOutEntry 18 }
+
+  eltexBgpAdjRibOutAggregatorAddr OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The IP address of the last BGP4 speaker that performed
+                 route aggregation.  A value of 0.0.0.0 indicates that
+                 this attribute was not included in the UPDATE message
+                 sent to the peer."
+    ::= { eltexBgpAdjRibOutEntry 19 }
+
+  eltexBgpAdjRibOutOrigId OBJECT-TYPE
+    SYNTAX      EltexBgpIdentifier
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The Originator-ID identifying the router that initially
+                 advertised this destination to a Route Reflector.  A
+                 value of 0.0.0.0 indicates the absence of this
+                 attribute."
+    ::= { eltexBgpAdjRibOutEntry 20 }
+
+  eltexBgpAdjRibOutEcmp   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "Whether or not this route was installed into the
+                 Forwarding Table as an ECMP route (it may or may not be
+                 the best BGP4 route advertised to BGP peers)."
+    ::= { eltexBgpAdjRibOutEntry 21 }
+
+  eltexBgpAdjRibOutAsLimAs OBJECT-TYPE
+    SYNTAX       EltexBgpAutonomousSystemNumber
+    MAX-ACCESS   read-only
+    STATUS       current
+    DESCRIPTION  "If non-zero this is the number of the AS that attached the
+                  AS_PATHLIMIT attribute."
+    ::= { eltexBgpAdjRibOutEntry 22 }
+
+  eltexBgpAdjRibOutAsLimUpper OBJECT-TYPE
+    SYNTAX      Unsigned32  (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "The upper bound on the number of ASes in the AS_PATH attribute
+                 after which the route will be filtered.  Only valid if
+                 eltexBgpAdjRibOutAsLimAs is non-zero."
+    ::= { eltexBgpAdjRibOutEntry 23 }
+
+  eltexBgpAdjRibOutIsActive OBJECT-TYPE
+    SYNTAX      EltexBgpNlriIsActiveFlag
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "An indication of whether or not this route is installed in
+                 the forwarding table.
+
+                 - 'active' if the route is installed in the forwarding
+                   table, or is a route redistributed from another routing
+                   protocol instance
+
+                 - 'inactive' otherwise.
+
+                 - 'notTracked' if BGP does not track active routes."
+    ::= { eltexBgpAdjRibOutEntry 24 }
+
+  eltexBgpAdjRibOutMEDPrsnt OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "If true, then the route has an associated MED attribute,
+                 whose value is given in eltexBgpAdjRibOutMultiExitDisc. 
+                 If false, the route has no MED attribute, and the value of
+                 eltexBgpAdjRibOutMultiExitDisc is undefined."
+    ::= { eltexBgpAdjRibOutEntry 25 }
+
+  eltexBgpAdjRibOutPeerType OBJECT-TYPE
+    SYNTAX      EltexBgpNlriPeerTypes
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "This field indicates whether the source peer is an iBGP or
+                 eBGP peer."
+    ::= { eltexBgpAdjRibOutEntry 26 }
+
+-------------------------------------------------------------------------------
+
+  --
+  -- BGP Network Table
+  --
+  -- This table contains the set of internal routes BGP advertised to each peer.
+  --
+
+  eltexBgpNetworkTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpNetworkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "BGP network configuration table.
+
+                 This table allows a user to configure internal networks
+                 advertised via BGP."
+    ::= { eltexBgpRib 4 }
+
+  eltexBgpNetworkEntry OBJECT-TYPE
+    SYNTAX      EltexBgpNetworkEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Entry containing information about the internal network
+                 announced via BGP."
+    INDEX { eltexBgpProcessId,
+            eltexBgpNetworkAfi,
+            eltexBgpNetworkSafi,
+            eltexBgpNetworkPrfxType,
+            eltexBgpNetworkPrfx,
+            eltexBgpNetworkPrfxLen }
+    ::= { eltexBgpNetworkTable 1 }
+
+  EltexBgpNetworkEntry ::= SEQUENCE {
+      eltexBgpNetworkAfi                    EltexBgpAfi,
+      eltexBgpNetworkSafi                   EltexBgpSafi,
+      eltexBgpNetworkPrfxType               InetAddressType,
+      eltexBgpNetworkPrfx                   InetAddress,
+      eltexBgpNetworkPrfxLen                InetAddressPrefixLength,
+      eltexBgpNetworkRowStatus              RowStatus
+    }
+
+  eltexBgpNetworkAfi OBJECT-TYPE
+    SYNTAX      EltexBgpAfi
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The address family of the prefix for this route."
+    DEFVAL      { ipv4 }
+    ::= { eltexBgpNetworkEntry 1 }
+
+  eltexBgpNetworkSafi OBJECT-TYPE
+    SYNTAX      EltexBgpSafi
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "The subsequent address family of the prefix for this
+                 route."
+    DEFVAL      { unicast }
+    ::= { eltexBgpNetworkEntry 2 }
+
+  eltexBgpNetworkPrfxType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "A type of address prefix."
+    ::= { eltexBgpNetworkEntry 3 }
+
+  eltexBgpNetworkPrfx OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "An address prefix."
+    ::= { eltexBgpNetworkEntry 4 }
+
+  eltexBgpNetworkPrfxLen OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "Length in bits of the address prefix contained in the
+                 eltexBgpNetworkPrfx object."
+    ::= { eltexBgpNetworkEntry 5 }
+
+  eltexBgpNetworkRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "The row status for this BGP Network Table entry, used to
+                 create and destroy table entries."
+    ::= { eltexBgpNetworkEntry 6 }
+
+-------------------------------------------------------------------------------
+
+  --
+  -- Path Attribute Extensions
+  --
+
+  eltexBgpPathAttrExtensions OBJECT IDENTIFIER ::= { eltexBgpRib 5 }
+
+  --
+  -- Path Attribute Route Reflection Extensions
+  --
+
+  eltexBgpPathAttrRouteReflectionExts OBJECT IDENTIFIER ::= { eltexBgpPathAttrExtensions 1 }
+
+
+  --
+  -- Cluster table
+  --
+  -- This table holds the clusters passed through on a given path.
+  --
+
+  eltexBgpPathAttrClusterLocTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltexBgpPathAttrClusterLocEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "The BGP-4 Path Attribute Cluster Table contains the per
+                 network path (NLRI) data on the reflection path which a
+                 route has traversed.  The absence of row data for a given
+                 network path indicates a lack of this attribute information
+                 for the indicated network path.
+
+                 This table reports received routes and path attributes after
+                 import policy has been applied.  Only routes accepted by
+                 import policy are reported."
+    ::= { eltexBgpPathAttrRouteReflectionExts 1 }
+
+  eltexBgpPathAttrClusterLocEntry OBJECT-TYPE
+    SYNTAX      EltexBgpPathAttrClusterLocEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "Information about a cluster traversal provided with a path to
+                 a network."
+    INDEX { eltexBgpProcessId,
+            eltexBgpLocRibPeerOrRib,
+            eltexBgpLocRibPeerRibIndex,
+            eltexBgpLocRibAfi,
+            eltexBgpLocRibSafi,
+            eltexBgpLocRibPrfx,
+            eltexBgpLocRibPrfxLen,
+            eltexBgpLocRibPathId,
+            eltexBgpPathAttrClusterLocIndex }
+    ::= { eltexBgpPathAttrClusterLocTable 1 }
+
+
+  EltexBgpPathAttrClusterLocEntry ::= SEQUENCE {
+      eltexBgpPathAttrClusterLocIndex      Unsigned32,
+      eltexBgpPathAttrClusterLocValue      Unsigned32
+      }
+
+  eltexBgpPathAttrClusterLocIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION "An integral index for a row in this table."
+    ::= { eltexBgpPathAttrClusterLocEntry 1 }
+
+  eltexBgpPathAttrClusterLocValue OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "A four octet long value representing a part of the
+                 reflection path that the route has passed.  Each such four
+                 octet long value represents the ID of a cluster that
+                 the route has traversed.  The sequence of this path as
+                 received in the route advertisement will be preserved in
+                 the sequence of eltexBgpPathAttrClusterTable rows (and the
+                 eltexBgpLocPathAttrClusterValue's in each row) as returned for a given
+                 network path, and the monotonically increasing sequence of
+                 eltexBgpLocPathAttrClusterIndex values for that network path."
+    ::= { eltexBgpPathAttrClusterLocEntry 2 }
+
+END

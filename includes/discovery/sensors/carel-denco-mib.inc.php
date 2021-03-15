@@ -14,47 +14,21 @@
 // This is Fake mib, based on descriptions from:
 // https://netopslife.wordpress.com/2017/10/12/nagios-snmp-denco-pco-web-carel/
 
-return;
+$numeric_oids = [
+  ['oid_num' => '.1.3.6.1.4.1.9839.2.1.2.1.0', 'class' => 'temperature', 'scale' => 0.1, 'type' => 'denco-analog', 'descr' => 'Temperature'],
+  ['oid_num' => '.1.3.6.1.4.1.9839.2.1.2.2.0', 'class' => 'humidity',    'scale' => 0.1, 'type' => 'denco-analog', 'descr' => 'Humidity'],
+];
 
-$entity_array   = snmpwalk_cache_oid($device, 'wsSFPTable', array(), 'WAYSTREAM-MIB');
-print_debug_vars($entity_array);
-
-foreach ($entity_array as $index => $entry)
+foreach ($numeric_oids as $entry)
 {
-  $port    = get_port_by_index_cache($device['device_id'], $index);
-  $options = array('entPhysicalIndex' => $index);
-  if (is_array($port))
+  $value = snmp_get_oid($device, $entry['oid_num']);
+  $scale = isset($entry['scale']) ? $entry['scale'] : 1;
+  $options = [];
+  if ($value > 0 && $value != 32767)
   {
-    $entry['ifDescr']                     = $port['ifDescr'];
-    $options['measured_class']            = 'port';
-    $options['measured_entity']           = $port['port_id'];
-    $options['entPhysicalIndex_measured'] = $port['ifIndex'];
-  } else {
-    // Skip?
-    continue;
+    discover_sensor_ng($device, $entry['class'], NULL, NULL, $entry['oid_num'], 0, $entry['type'], $entry['descr'], $scale, $value, $options);
   }
-
-  $temperatureoid = '.1.3.6.1.4.1.9303.4.1.4.1.12.'.$index;
-  $voltageoid     = '.1.3.6.1.4.1.9303.4.1.4.1.14.'.$index;
-  $rxpoweroid     = '.1.3.6.1.4.1.9303.4.1.4.1.20.'.$index;
-  $txpoweroid     = '.1.3.6.1.4.1.9303.4.1.4.1.18.'.$index;
-
-  //Ignore optical sensors with temperature of zero or negative
-  if ($entry['wsSFPTemp'] > 0)
-  {
-    discover_sensor('temperature', $device, $temperatureoid, $index, 'waystream', $entry['ifDescr'] . ' Temperature',          1, $entry['wsSFPTemp'], $options);
-    discover_sensor('voltage',     $device, $voltageoid,     $index, 'waystream', $entry['ifDescr'] . ' Voltage',          0.001, $entry['wsSFPVolt'], $options);
-
-    if ($entry['wsSFPRXPower'] >= 0)
-    {
-      discover_sensor('power', $device, $rxpoweroid, 'wsSFPRXPower.' . $index, 'waystream', $entry['ifDescr'] . ' Rx Power', 0.001, $entry['wsSFPRXPower'], $options);
-      discover_sensor('power', $device, $txpoweroid, 'wsSFPTXPower.' . $index, 'waystream', $entry['ifDescr'] . ' Tx Power', 0.001, $entry['wsSFPTXPower'], $options);
-    }
-  }
-
 }
-
-unset($entity_array);
 
 // EOF
 

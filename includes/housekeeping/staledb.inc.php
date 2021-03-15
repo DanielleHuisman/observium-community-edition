@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,24 +6,19 @@
  *
  * @package    observium
  * @subpackage housekeeping
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
-
-// Store highest device ID so we don't delete data from devices that were added during our run.
-// Counting on mysql auto_increment to never give out a lower ID, obviously.
-$max_id = -1;
 
 // Fetch all existing entities
 $entities       = array();
 $entities_count = 0;
-$type_exclude   = array('bill', 'group'); // Exclude pseudo-entities from permisssions checks
+$type_exclude   = array('bill', 'group'); // Exclude pseudo-entities from permissions checks
 
 $where          = " WHERE 1 " . generate_query_values($type_exclude, 'entity_type', '!=');
 foreach ($config['entity_tables'] as $table)
 {
-  $query = "SELECT `entity_type`, `entity_id` FROM `$table`" . $where;
+  $query = "SELECT DISTINCT `entity_type`, `entity_id` FROM `$table`" . $where;
   foreach (dbFetchRows($query) as $entry)
   {
     $entities[$table][$entry['entity_type']][] = $entry['entity_id'];
@@ -32,11 +26,22 @@ foreach ($config['entity_tables'] as $table)
   }
 }
 
+
+// Store highest device ID so we don't delete data from devices that were added during our run.
+// Counting on mysql auto_increment to never give out a lower ID, obviously.
+//$max_id = -1;
+$max_id = dbShowNextID('devices');
+
 // Fetch all existing device IDs and update the maximum ID.
 foreach (dbFetchRows("SELECT `device_id` FROM `devices` ORDER BY `device_id` ASC") as $device)
 {
   $devices[] = $device['device_id'];
-  $max_id = $device['device_id'];
+
+  // Not sure in which cases this can happen, but I keep this for compatibility
+  if ($device['device_id'] > $max_id)
+  {
+    $max_id = $device['device_id'];
+  }
 }
 
 //print_vars($entities);
@@ -94,10 +99,10 @@ if ($entities_count)
       }
     }
     print_debug("Database cleanup for tables '".implode("', '", array_keys($entities))."': deleted $entities_count entries");
-    logfile("cleanup.log", "Database cleanup for tables '".implode("', '", array_keys($entities))."': deleted $entities_count entries");
+    logfile("housekeeping.log", "Database cleanup for tables '".implode("', '", array_keys($entities))."': deleted $entities_count entries");
   }
 }
-else if ($prompt)
+elseif ($prompt)
 {
   print_message("No orphaned entity entries found.");
 }
@@ -105,7 +110,8 @@ else if ($prompt)
 // Cleanup tables with links to devices that on longer exist
 foreach ($config['device_tables'] as $table)
 {
-  $where = '`device_id` NOT IN (' . implode($devices, ',') . ') AND `device_id` < ?';
+  $where = '`device_id` NOT IN (' . implode(',', $devices) . ') AND `device_id` < ?';
+  //$where = '`device_id` NOT IN (' . implode(',', $devices) . ') OR `device_id` > ?';
 
   $rows  = dbFetchRows("SELECT 1 FROM `$table` WHERE $where", array($max_id));
   $count = count($rows);
@@ -117,12 +123,41 @@ foreach ($config['device_tables'] as $table)
     }
     if ($answer)
     {
+      // IP addresses need additionally check if associated network is empty
+      if ($table == 'ipv4_addresses')
+      {
+        $network_table = 'ipv4_networks';
+        $network_where = '`ipv4_network_id` = ?';
+        $network_ids = dbFetchColumn("SELECT DISTINCT `ipv4_network_id` FROM `$table` WHERE $where", array($max_id));
+        print_debug_vars($network_ids);
+      }
+      elseif ($table == 'ipv6_addresses')
+      {
+        $network_table = 'ipv6_networks';
+        $network_where = '`ipv6_network_id` = ?';
+        $network_ids = dbFetchColumn("SELECT DISTINCT `ipv6_network_id` FROM `$table` WHERE $where", array($max_id));
+        print_debug_vars($network_ids);
+      }
+
+      // Remove stale entries
       $table_status = dbDelete($table, $where, array($max_id));
       print_debug("Database cleanup for table '$table': deleted $count entries");
-      logfile("cleanup.log", "Database cleanup for table '$table': deleted $count entries");
+      logfile("housekeeping.log", "Database cleanup for table '$table': deleted $count entries");
+
+      // Clean network ids after delete ip addresses if network unused
+      if ($table_status && ($table == 'ipv4_addresses' || $table == 'ipv6_addresses'))
+      {
+        foreach ($network_ids as $network_id)
+        {
+          if (!dbExist($table, $network_where, [ $network_id ]))
+          {
+            $network_status = dbDelete($network_table, $network_where, array($network_id));
+          }
+        }
+      }
     }
   }
-  else if ($prompt)
+  elseif ($prompt)
   {
     print_message("No orphaned rows found in table '$table'.");
   }
@@ -151,7 +186,7 @@ foreach ($graphs as $device_id => $device_graph)
       {
         $table_status = dbDelete('device_graphs', "`device_graph_id` IN (?)", array($device_graph_ids));
         print_debug("Deleted " . count($device_graph_ids) . " duplicate graph rows of type $graph for device $device_id");
-        logfile("cleanup.log", "Deleted " . count($device_graph_ids) . " duplicate graph rows of type $graph for device $device_id");
+        logfile("housekeeping.log", "Deleted " . count($device_graph_ids) . " duplicate graph rows of type $graph for device $device_id");
       }
     }
   }

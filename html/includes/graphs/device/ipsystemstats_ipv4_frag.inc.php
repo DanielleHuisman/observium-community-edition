@@ -11,23 +11,23 @@
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "ipSystemStats-ipv4.rrd");
 
-$rrd_options .= " DEF:ipInDelivers=$rrd_filename:InDelivers:AVERAGE";
-$rrd_options .= " DEF:ipReasmReqds=$rrd_filename:ReasmReqds:AVERAGE";
-$rrd_options .= " DEF:ipReasmOKs=$rrd_filename:ReasmOKs:AVERAGE";
-$rrd_options .= " DEF:ipReasmFails=$rrd_filename:ReasmFails:AVERAGE";
-$rrd_options .= " DEF:ipFragFails=$rrd_filename:OutFragFails:AVERAGE";
-$rrd_options .= " DEF:ipFragCreates=$rrd_filename:OutFragCreates:AVERAGE";
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-$rrd_options .= " DEF:MipInDelivers=$rrd_filename:InDelivers:MAX";
-$rrd_options .= " DEF:MipReasmOKs=$rrd_filename:ReasmOKs:MAX";
-$rrd_options .= " DEF:MipReasmReqds=$rrd_filename:ReasmReqds:MAX";
-$rrd_options .= " DEF:MipReasmFails=$rrd_filename:ReasmFails:MAX";
-$rrd_options .= " DEF:MipFragFails=$rrd_filename:OutFragFails:MAX";
-$rrd_options .= " DEF:MipFragCreates=$rrd_filename:OutFragCreates:MAX";
+$rrd_options .= " DEF:ipInDelivers=$rrd_filename_escape:InDelivers:AVERAGE";
+$rrd_options .= " DEF:ipReasmReqds=$rrd_filename_escape:ReasmReqds:AVERAGE";
+$rrd_options .= " DEF:ipReasmOKs=$rrd_filename_escape:ReasmOKs:AVERAGE";
+$rrd_options .= " DEF:ipReasmFails=$rrd_filename_escape:ReasmFails:AVERAGE";
+$rrd_options .= " DEF:ipFragFails=$rrd_filename_escape:OutFragFails:AVERAGE";
+$rrd_options .= " DEF:ipFragCreates=$rrd_filename_escape:OutFragCreates:AVERAGE";
+
+$rrd_options .= " DEF:MipInDelivers=$rrd_filename_escape:InDelivers:MAX";
+$rrd_options .= " DEF:MipReasmOKs=$rrd_filename_escape:ReasmOKs:MAX";
+$rrd_options .= " DEF:MipReasmReqds=$rrd_filename_escape:ReasmReqds:MAX";
+$rrd_options .= " DEF:MipReasmFails=$rrd_filename_escape:ReasmFails:MAX";
+$rrd_options .= " DEF:MipFragFails=$rrd_filename_escape:OutFragFails:MAX";
+$rrd_options .= " DEF:MipFragCreates=$rrd_filename_escape:OutFragCreates:MAX";
 
 $rrd_options .= " CDEF:ReasmReqds=ipReasmReqds,ipInDelivers,/,100,*";
 $rrd_options .= " CDEF:ReasmOKs=ipReasmOKs,ipInDelivers,/,100,*";

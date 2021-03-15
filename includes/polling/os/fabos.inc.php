@@ -7,7 +7,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -18,14 +18,5 @@ if (!$version)
   $version  = snmp_get($device, '.1.3.6.1.3.94.1.7.1.3.16.0.0.5.51.61.220.34.0.0.0.0.0.0.0.0.2', '-Ovq');
 }
 $version = ltrim($version, 'v');
-
-if ($entPhysical['entPhysicalDescr'])
-{
-  $hardware = $entPhysical['entPhysicalDescr'];
-}
-if ($entPhysical['entPhysicalSerialNum'])
-{
-  $serial = $entPhysical['entPhysicalSerialNum'];
-}
 
 // EOF

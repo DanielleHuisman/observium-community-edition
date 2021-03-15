@@ -16,7 +16,7 @@ $scale_min = "0";
 include("memcached.inc.php");
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-$rrd_options .= " DEF:uptime=".$rrd_filename.":uptime:AVERAGE";
+$rrd_options .= " DEF:uptime=".$rrd_filename_escape.":uptime:AVERAGE";
 $rrd_options .= " CDEF:cuptime=uptime,86400,/";
 $rrd_options .= " 'COMMENT:Days      Current  Minimum  Maximum  Average\\n'";
 $rrd_options .= " AREA:cuptime#EEEEEE:Uptime";

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -20,9 +19,9 @@
   DS:shmemusedsize:GAUGE:600:0:125000000000 \
 */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "app-kamailio-".$app['app_id'].".rrd");
+
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 if($width > 500)
 {
@@ -41,10 +40,10 @@ if (is_file($rrd_filename))
 {
   $colour=$config['graph_colours'][$colours][$iter];
 
-  $descr = rrdtool_escape(rewrite_hrDevice('Max Used'), $descr_len);
+  $descr = 'Max Used';
 
-  $rrd_options .= " DEF:".$iter."used=$rrd_filename:shmemmaxusedsize:AVERAGE";
-  $rrd_options .= " DEF:".$iter."size=$rrd_filename:shmemtotalsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."used=$rrd_filename_escape:shmemmaxusedsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."size=$rrd_filename_escape:shmemtotalsize:AVERAGE";
   $rrd_options .= " CDEF:".$iter."free=".$iter."size,".$iter."used,-";
   $rrd_options .= " CDEF:".$iter."perc=".$iter."used,".$iter."size,/,100,*";
   $rrd_options .= " AREA:".$iter."used#" . $colour . "10";
@@ -55,11 +54,11 @@ if (is_file($rrd_filename))
 
   $colour=$config['graph_colours'][$colours][$iter];
 
-  $descr = rrdtool_escape(rewrite_hrDevice('Used'), $descr_len);
+  $descr = 'Used';
 
-  $rrd_options .= " DEF:".$iter."used=$rrd_filename:shmemusedsize:AVERAGE";
-  $rrd_options .= " DEF:".$iter."free=$rrd_filename:shmemfreesize:AVERAGE";
-  $rrd_options .= " DEF:".$iter."size=$rrd_filename:shmemtotalsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."used=$rrd_filename_escape:shmemusedsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."free=$rrd_filename_escape:shmemfreesize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."size=$rrd_filename_escape:shmemtotalsize:AVERAGE";
   $rrd_options .= " CDEF:".$iter."perc=".$iter."used,".$iter."size,/,100,*";
   $rrd_options .= " AREA:".$iter."used#" . $colour . "10";
   $rrd_options .= " LINE1.25:".$iter."used#" . $colour . ":'$descr'";
@@ -69,10 +68,10 @@ if (is_file($rrd_filename))
 
   $colour=$config['graph_colours'][$colours][$iter];
 
-  $descr = rrdtool_escape(rewrite_hrDevice('Real Used'), $descr_len);
+  $descr = 'Real Used';
 
-  $rrd_options .= " DEF:".$iter."used=$rrd_filename:shmemrealusedsize:AVERAGE";
-  $rrd_options .= " DEF:".$iter."size=$rrd_filename:shmemtotalsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."used=$rrd_filename_escape:shmemrealusedsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."size=$rrd_filename_escape:shmemtotalsize:AVERAGE";
   $rrd_options .= " CDEF:".$iter."free=".$iter."size,".$iter."used,-";
   $rrd_options .= " CDEF:".$iter."perc=".$iter."used,".$iter."size,/,100,*";
   $rrd_options .= " AREA:".$iter."used#" . $colour . "10";
@@ -83,10 +82,10 @@ if (is_file($rrd_filename))
 
   $colour=$config['graph_colours'][$colours][$iter];
 
-  $descr = rrdtool_escape(rewrite_hrDevice('Fragments'), $descr_len);
+  $descr = 'Fragments';
 
-  $rrd_options .= " DEF:".$iter."used=$rrd_filename:shmemfragments:AVERAGE";
-  $rrd_options .= " DEF:".$iter."size=$rrd_filename:shmemtotalsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."used=$rrd_filename_escape:shmemfragments:AVERAGE";
+  $rrd_options .= " DEF:".$iter."size=$rrd_filename_escape:shmemtotalsize:AVERAGE";
   $rrd_options .= " CDEF:".$iter."free=".$iter."size,".$iter."used,-";
   $rrd_options .= " CDEF:".$iter."perc=".$iter."used,".$iter."size,/,100,*";
   $rrd_options .= " AREA:".$iter."used#" . $colour . "10";
@@ -97,9 +96,9 @@ if (is_file($rrd_filename))
 
   $colour=$config['graph_colours'][$colours][$iter];
 
-  $descr = rrdtool_escape(rewrite_hrDevice('Total'), $descr_len);
+  $descr = 'Total';
 
-  $rrd_options .= " DEF:".$iter."size=$rrd_filename:shmemtotalsize:AVERAGE";
+  $rrd_options .= " DEF:".$iter."size=$rrd_filename_escape:shmemtotalsize:AVERAGE";
   $rrd_options .= " LINE1.25:".$iter."size#" . $colour . ":'$descr'";
   $rrd_options .= " GPRINT:".$iter."size:LAST:%6.2lf%sB";
   $rrd_options .= "\\\l";

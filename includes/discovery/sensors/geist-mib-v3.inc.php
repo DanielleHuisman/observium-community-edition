@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,14 +6,14 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 $scale = 0.1;
 
 //GEIST-MIB-V3::temperaturePrecision.0 = INTEGER: degree(0)
-if (snmp_get_oid($device, 'temperaturePrecision.0', $mib) == 'deciDegree')
+if (snmp_get_oid($device, 'temperaturePrecision.0', $mib) === 'deciDegree')
 {
   $temp_scale = 0.1;
 } else {
@@ -473,11 +472,6 @@ foreach ($oids as $index => $entry)
 
     if (is_numeric($value))
     {
-      // CLEANME not before 08/2018
-      $old_rrd_array = array('descr' => $descr, 'class' => 'temperature', 'type' => 'geist-mib-v3', 'index' => $prefix.'.'.$index);
-      rename_rrd_entity($device, 'sensor', $old_rrd_array, array('class' => 'dewpoint'));
-      unset($old_rrd_array);
-
       discover_sensor('dewpoint', $device, $oid, $prefix.'.'.$index, 'geist-mib-v3', $descr, $temp_scale, $value, $limits);
     }
 
@@ -638,11 +632,6 @@ foreach ($oids as $index => $entry)
 
     if (is_numeric($value))
     {
-      // CLEANME not before 08/2018
-      $old_rrd_array = array('descr' => $descr, 'class' => 'temperature', 'type' => 'geist-mib-v3', 'index' => $prefix.'.'.$index);
-      rename_rrd_entity($device, 'sensor', $old_rrd_array, array('class' => 'dewpoint'));
-      unset($old_rrd_array);
-
       discover_sensor('dewpoint', $device, $oid, $prefix.'.'.$index, 'geist-mib-v3', $descr, $temp_scale, $value, $limits);
     }
 

@@ -11,16 +11,16 @@
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $rrd_filename = get_rrd_path($device, "app-nginx-".$app['app_id'].".rrd");
+
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 if (is_file($rrd_filename))
 {
 
   $rrd_options .= " -b 1000 ";
   $rrd_options .= " -l 0 ";
-  $rrd_options .= " DEF:a=".$rrd_filename.":Requests:AVERAGE";
+  $rrd_options .= " DEF:a=".$rrd_filename_escape.":Requests:AVERAGE";
 
   $rrd_options .= " COMMENT:'Requests    Current    Average   Maximum\\n'";
 

@@ -13,17 +13,17 @@
 
 $hostname     = (isset($vars['hostname']) ? $vars['hostname'] : "unknown");
 
-$rrd_filename = get_rrd_path($device, "app-shoutcast-".$app['app_id']."-".$hostname);
+$rrd_filename_escape = get_rrd_path($device, "app-shoutcast-".$app['app_id']."-".$hostname);
 
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-$rrd_options .= " DEF:cur=".$rrd_filename.":current:AVERAGE";
-$rrd_options .= " DEF:max=".$rrd_filename.":max:MAX";
-//$rrd_options .= " DEF:bit=".$rrd_filename.":bitrate:LAST";
-$rrd_options .= " DEF:bit=".$rrd_filename.":bitrate:MAX";
-$rrd_options .= " DEF:peak=".$rrd_filename.":peak:MAX";
-$rrd_options .= " DEF:unique=".$rrd_filename.":unique:AVERAGE";
-$rrd_options .= " DEF:status=".$rrd_filename.":status:AVERAGE";
+$rrd_options .= " DEF:cur=".$rrd_filename_escape.":current:AVERAGE";
+$rrd_options .= " DEF:max=".$rrd_filename_escape.":max:MAX";
+//$rrd_options .= " DEF:bit=".$rrd_filename_escape.":bitrate:LAST";
+$rrd_options .= " DEF:bit=".$rrd_filename_escape.":bitrate:MAX";
+$rrd_options .= " DEF:peak=".$rrd_filename_escape.":peak:MAX";
+$rrd_options .= " DEF:unique=".$rrd_filename_escape.":unique:AVERAGE";
+$rrd_options .= " DEF:status=".$rrd_filename_escape.":status:AVERAGE";
 $rrd_options .= " CDEF:peakm=peak,1,-";
 $rrd_options .= " VDEF:avg=cur,AVERAGE";
 $rrd_options .= " VDEF:peakh=peakm,MAXIMUM";
@@ -51,6 +51,6 @@ $rrd_options .= " GPRINT:avg:\"\:%8.2lf\\n\"";
 $rrd_options .= " LINE1:peak#C000FFFF:\"Peak Listeners   \"";
 $rrd_options .= " GPRINT:peak:LAST:\"\:%8.2lf\\n\"";
 $rrd_options .= " TICK:stream_offline#B4FF00FF:1.0:\"Streaming client offline\\n\"";
-$rrd_options .= " TICK:server_offline".$warn_colour_b."FF:1.0:\"Streaming server offline\"";
+$rrd_options .= " TICK:server_offline#FFCCCCFF:1.0:\"Streaming server offline\"";
 
 // EOF

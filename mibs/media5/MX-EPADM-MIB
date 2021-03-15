@@ -1,0 +1,581 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-EPADM-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxActivationState,
+        MxIpHostName,
+        MxIpAddress,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpSubnetMask,
+        MxDigitMap
+    FROM MX-TC
+        MxUInt64,
+        MxFloat32,
+        MxIpHostNamePort,
+        MxIpAddr,
+        MxIpAddrPort,
+        MxIpAddrMask,
+        MxUri,
+        MxUrl
+    FROM MX-TC2
+        mediatrixServices
+    FROM MX-SMI2;
+
+epAdmMIB MODULE-IDENTITY
+ LAST-UPDATED   "1910210000Z"
+ ORGANIZATION " Mediatrix Telecom, Inc. "
+ CONTACT-INFO " Mediatrix Telecom, Inc.
+                4229, Garlock Street
+                Sherbrooke (Quebec)
+                Canada
+                Phone: (819) 829-8749
+                "
+ DESCRIPTION  " Endpoint Administration
+
+                The Endpoint Administration (EpAdm) service allows for
+                high-level management of telephony endpoints.
+                "
+ ::= { mediatrixServices 1500 }
+
+epAdmMIBObjects OBJECT IDENTIFIER ::= { epAdmMIB 1 }
+
+-- ****************************************************************************
+
+-- Group:Unit Group
+
+-- ****************************************************************************
+
+unitStateGroup OBJECT IDENTIFIER
+ ::= { epAdmMIBObjects 100 }
+ -- Scalar:Administrative State
+
+ unitAdminState OBJECT-TYPE
+  SYNTAX        INTEGER { unlocked(100) , shuttingDown(200) , locked(300) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Administrative State
+
+                Indicates the current maintenance state of a unit. This
+                attribute reflects the result of an operator-initiated
+                maintenance request.
+
+                  * Unlocked: no operator-initiated maintenance request is
+                    affecting the operation of the unit.
+                  * ShuttingDown: the unit is in a transition state between
+                    the unlocked and locked states. The unit will transition
+                    to a locked state only once all current activities are
+                    completed. No new request is accepted once all activities
+                    are terminated.
+                  * Locked: an operator-initiated request has been issued for
+                    this unit. This unit is unavailable for normal operation.
+
+                "
+  ::= { unitStateGroup 100 }
+
+ -- Scalar:Operational State
+
+ unitOpState OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Operational State
+
+                The operational state of the unit reflects the unit's internal
+                state. There are certain conditions that affect the internal
+                state of a unit.
+
+                  * Enabled: the unit is operationally functional.
+                  * Disabled: the unit is not operationally functional due to
+                    an internal condition that would not allow it to
+                    participate in normal operation. Such condition could be
+                    that all endpoints have failed to properly register.
+
+                "
+  ::= { unitStateGroup 200 }
+
+ -- Scalar:Usage State
+
+ unitUsageState OBJECT-TYPE
+  SYNTAX        INTEGER { idle(100) , active(200) , busy(300) , idleUnusable
+                (400) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Usage State
+
+                The usage state of the unit indicates its running state.
+
+                  * Idle: the unit is not currently active, but is available
+                    for use.
+                  * Active: the unit is currently being used, is available for
+                    processing, and still has additional capacity.
+                  * Busy: the unit is usable but is not available for any new
+                    additional processing requests, since all of its endpoints
+                    are currently being used.
+                  * IdleUnusable: the unit is not currently active and not
+                    available for use.
+
+                "
+  ::= { unitStateGroup 300 }
+
+-- End of group:Unit Group
+
+-- *****************************************************************************
+
+-- Table:Endpoints
+
+-- *****************************************************************************
+
+endpointTable OBJECT-TYPE
+ SYNTAX           SEQUENCE OF EndpointEntry
+ MAX-ACCESS       not-accessible
+ STATUS           current
+ DESCRIPTION    " Endpoints
+
+                  This table displays the state of all endpoints of the unit.
+                  "
+ ::= { epAdmMIBObjects 200 }
+ endpointEntry OBJECT-TYPE
+  SYNTAX        EndpointEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " A row in table Endpoints. "
+  INDEX         {
+                  endpointEpId
+                }
+
+  ::= { endpointTable 1 }
+
+ EndpointEntry ::= SEQUENCE
+ {
+   endpointEpId                    OCTET STRING,
+   endpointInitialAdminStateConfig INTEGER,
+   endpointAdminState              INTEGER,
+   endpointOpState                 MxEnableState,
+   endpointUsageState              INTEGER,
+   endpointUnlock                  INTEGER,
+   endpointLock                    INTEGER,
+   endpointForceLock               INTEGER
+ }
+
+ -- Index:Endpoint Identifier
+
+ endpointEpId OBJECT-TYPE
+  SYNTAX        OCTET STRING
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Endpoint Identifier
+
+                String that identifies an endpoint in other tables.
+                "
+  ::= { endpointEntry 100 }
+
+ -- Columnar:Initial Administrative State
+
+ endpointInitialAdminStateConfig OBJECT-TYPE
+  SYNTAX        INTEGER { unlocked(100), locked(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Initial Administrative State
+
+                The initial administrative state of an endpoint.
+
+                Indicates the administrative state an endpoint will have when
+                the service starts. Refer to AdminState for a description of
+                the states.
+
+                "
+  DEFVAL        { unlocked }
+  ::= { endpointEntry 200 }
+
+ -- Columnar:Administrative State
+
+ endpointAdminState OBJECT-TYPE
+  SYNTAX        INTEGER { unlocked(100) , shuttingDown(200) , locked(300) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Administrative State
+
+                The administrative state of an endpoint.
+
+                Indicates the current maintenance state of an endpoint. This
+                attribute reflects the result of an operator-initiated
+                maintenance request.
+
+                  * Unlocked: no operator-initiated maintenance request is
+                    affecting the operation of the endpoint.
+                  * ShuttingDown: the component is in a transition state
+                    between the unlocked and locked state. An active endpoint
+                    will only transition to a locked state once activity, if
+                    present, has completed. No new request are accepted once
+                    the activity is completed.
+                  * Locked: an operator-initiated request has been issued for
+                    this endpoint. This endpoint is unavailable for normal
+                    operation.
+
+                "
+  ::= { endpointEntry 300 }
+
+ -- Columnar:Operational State
+
+ endpointOpState OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Operational State
+
+                The operational state of an endpoint.
+
+                This state reflects the endpoint's capacity to participate in
+                normal operations.
+
+                  * Enabled: the endpoint is operationally functional.
+                  * Disabled: the endpoint is not operationally functional due
+                    to an internal condition that would not allow it to
+                    participate in normal operations.
+
+                "
+  ::= { endpointEntry 400 }
+
+ -- Columnar:Usage State
+
+ endpointUsageState OBJECT-TYPE
+  SYNTAX        INTEGER { idle(100) , active(200) , busy(300) , idleUnusable
+                (400) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Usage State
+
+                The usage state indicates the running state of an endpoint.
+
+                  * Idle: the endpoint is not currently active, but is
+                    available for use.
+                  * Active: the endpoint is currently being used, is available
+                    for processing, and still has additional capacity.
+                  * Busy: the endpoint is usable but is not available for any
+                    new additional processing requests, since all of its
+                    resources are currently being used.
+                  * IdleUnusable: the endpoint is not currently active and not
+                    available for use.
+
+                "
+  ::= { endpointEntry 500 }
+
+ -- Row command:Unlock
+
+ endpointUnlock OBJECT-TYPE
+  SYNTAX        INTEGER { noOp(0), unlock(10) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Unlock
+
+                Allows the use of an endpoint.
+
+                This command sets the administrative state of the endpoint to
+                'Unlocked'.
+
+                "
+  DEFVAL        { noOp }
+  ::= { endpointEntry 600 }
+
+ -- Row command:Lock
+
+ endpointLock OBJECT-TYPE
+  SYNTAX        INTEGER { noOp(0), lock(10) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Lock
+
+                Gracefully disallows the use of an endpoint.
+
+                When the usage state of the endpoint is 'Idle' or
+                'IdleUnusable', this command sets the administrative state to
+                'Locked'.
+
+                When the usage state of the endpoint is 'Busy' or 'Active',
+                this command sets the administrative state to 'ShuttingDown'
+                until the usage state of the endpoint transits to 'Idle'. The
+                administrative state is then set to 'Locked'.
+
+                "
+  DEFVAL        { noOp }
+  ::= { endpointEntry 700 }
+
+ -- Row command:Force Lock
+
+ endpointForceLock OBJECT-TYPE
+  SYNTAX        INTEGER { noOp(0), forceLock(10) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Force Lock
+
+                Forcefully disallows the use of an endpoint.
+
+                This command sets the administrative state of the endpoint to
+                'Locked'. All activities in progress are terminated
+                immediately.
+
+                "
+  DEFVAL        { noOp }
+  ::= { endpointEntry 800 }
+
+-- End of table:Endpoints
+
+-- ****************************************************************************
+
+-- Group:Unit Configuration Group
+
+-- ****************************************************************************
+
+unitConfigGroup OBJECT IDENTIFIER
+ ::= { epAdmMIBObjects 300 }
+ -- Scalar:Unit Disabled When No Gateway Ready Enable
+
+ unitDisabledWhenNoGatewayReadyEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Unit Disabled When No Gateway Ready Enable
+
+                Indicates if the unit operational state is automatically set
+                to disable when all signaling gateways are not ready.
+
+                  * Enabled: When all signaling gateways are not ready (
+                    GatewayStatus.State), the unit operational state (see the
+                    UnitOpState parameter) is set to disabled.
+                  * Disabled: Signaling gateways (see the GatewayStatus.State
+                    parameter) have no impact on unit operational state (see
+                    the UnitOpState parameter).
+
+                "
+  DEFVAL        { disable }
+  ::= { unitConfigGroup 100 }
+
+ -- Scalar:Unit Shutting Down Behavior
+
+ behaviorWhileInUnitShuttingDownState OBJECT-TYPE
+  SYNTAX        INTEGER { blockNewCalls(100) , allowNewCalls(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Unit Shutting Down Behavior
+
+                The behavior of the call permissions when the UnitAdminState
+                parameter is 'ShuttingDown' is the following:
+
+                  * BlockNewCalls: No new requests are accepted once all
+                    activity are terminated. Endpoints cannot make and receive
+                    calls.
+                  * AllowNewCalls: New requests are accepted until all
+                    activities are simultaneously terminated. Endpoints can
+                    make and receive calls.
+
+                "
+  DEFVAL        { blockNewCalls }
+  ::= { unitConfigGroup 200 }
+
+-- End of group:Unit Configuration Group
+
+-- ****************************************************************************
+
+-- Group:Gateway Configuration Group
+
+-- ****************************************************************************
+
+sipGatewayConfigGroup OBJECT IDENTIFIER
+ ::= { epAdmMIBObjects 350 }
+ -- Scalar:Disable SIP Gateways When Trunk Lines Down
+
+ disableSipGatewaysWhenTrunkLinesDown OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Disable SIP Gateways When Trunk Lines Down
+
+                Indicates if all SIP gateways should be stopped in the event
+                that all E1T1 lines are down.
+
+                  * Enabled: When all E1T1 lines are down, all SIP gateways
+                    will be stopped. All SIP gateways will be started when at
+                    least one E1T1 line is up. The up/down state refers to the
+                    physical link state of a E1T1 line.
+                  * Disabled: The physical link state of the E1T1 lines does
+                    not have any impact on the SIP gateways. Therefore, all
+                    SIP gateways remain operational, whether there is a E1T1
+                    line up or not.
+
+                The delay before switching the state of the SIP gateways can
+                be configured by the DisableSipGatewaysWhenTrunkLinesDownDelay
+                parameter.
+
+                The DisableSipGatewaysWhenTrunkLinesDown parameter only
+                applies to E1T1 lines.
+
+                When DisableSipGatewaysWhenTrunkLinesDown is enabled, the
+                EndpointAutomaticShutdownEnable parameter is considered as
+                'disabled'.
+
+                See SipEp.GatewayTable for the list of SIP gateways.
+
+                "
+  DEFVAL        { disable }
+  ::= { sipGatewayConfigGroup 100 }
+
+ -- Scalar:Disable SIP Gateways When Trunk Lines Down Delay
+
+ disableSipGatewaysWhenTrunkLinesDownDelay OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..60 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Disable SIP Gateways When Trunk Lines Down Delay
+
+                Delay, in seconds, before reporting a status change of a
+                telephony line.
+
+                This parameter only applies if the
+                DisableSipGatewaysWhenTrunkLinesDown parameter is enabled.
+
+                If the state of a telephony line changes back to its previous
+                state within the configured delay, there would be no
+                modification to the SIP gateways state.
+
+                A value of 0 means the status change is reported immediately.
+
+                "
+  DEFVAL        { 0 }
+  ::= { sipGatewayConfigGroup 200 }
+
+-- End of group:Gateway Configuration Group
+
+-- ****************************************************************************
+
+-- Group:Endpoint Configuration Group
+
+-- ****************************************************************************
+
+endpointConfigGroup OBJECT IDENTIFIER
+ ::= { epAdmMIBObjects 400 }
+ -- Scalar:Endpoint Automatic Shutdown Enable
+
+ endpointAutomaticShutdownEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Endpoint Automatic Shutdown Enable
+
+                Indicates if an endpoint is physically shutdown when it is not
+                operational and in the 'idle-unusable' usage state.
+
+                  * Disable: When an endpoint's usage state (
+                    Endpoint.UsageState) becomes 'Idle-unusable' whatever the
+                    value of its operational state, (Endpoint.OperationalState
+                    ) the endpoint remains physically up but the calls are
+                    denied.
+                  * Enabled: When the usage state (Endpoint.UsageState)
+                    becomes 'Idle-unusable' and the operational state (
+                    Endpoint.OperationalState) becomes 'Disable', the endpoint
+                    is physically shutdown.
+
+                This parameter only applies if the
+                DisableSipGatewaysWhenTrunkLinesDown parameter is disabled.
+
+                "
+  DEFVAL        { disable }
+  ::= { endpointConfigGroup 100 }
+
+-- End of group:Endpoint Configuration Group
+
+-- ****************************************************************************
+
+-- Group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+notificationsGroup OBJECT IDENTIFIER
+ ::= { epAdmMIBObjects 60010 }
+ -- Scalar:Minimal Severity of Notification
+
+ minSeverity OBJECT-TYPE
+  SYNTAX        INTEGER { disable(0) , debug(100) , info(200) , warning(300) ,
+                error(400) , critical (500) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Minimal Severity of Notification
+
+                Sets the minimal severity to issue a notification message
+                incoming from this service.
+
+                  * Disable: No notification is issued.
+                  * Debug: All notification messages are issued.
+                  * Info: Notification messages with a 'Informational' and
+                    higher severity are issued.
+                  * Warning: Notification messages with a 'Warning' and higher
+                    severity are issued.
+                  * Error: Notification messages with an 'Error' and higher
+                    severity are issued.
+                  * Critical: Notification messages with a 'Critical' severity
+                    are issued.
+
+                "
+  DEFVAL        { warning }
+  ::= { notificationsGroup 100 }
+
+-- End of group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+-- Group:Configuration Settings
+
+-- ****************************************************************************
+
+configurationGroup OBJECT IDENTIFIER
+ ::= { epAdmMIBObjects 60020 }
+ -- Scalar:Need Restart
+
+ needRestartInfo OBJECT-TYPE
+  SYNTAX        INTEGER { no(0) , yes(100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Need Restart
+
+                Indicates if the service needs to be restarted for the
+                configuration to fully take effect.
+
+                  * Yes: Service needs to be restarted.
+                  * No: Service does not need to be restarted.
+
+                Services can be restarted by using the
+                Scm.ServiceCommands.Restart command.
+
+                "
+  ::= { configurationGroup 100 }
+
+-- End of group:Configuration Settings
+
+END

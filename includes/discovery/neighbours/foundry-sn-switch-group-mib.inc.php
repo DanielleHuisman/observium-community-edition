@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,59 +6,68 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-$fdp_array = snmpwalk_cache_twopart_oid($device, "snFdpCacheEntry", array(), "FOUNDRY-SN-SWITCH-GROUP-MIB");
+$fdp_array = snmpwalk_cache_twopart_oid($device, "snFdpCacheEntry", [], "FOUNDRY-SN-SWITCH-GROUP-MIB", NULL, OBS_SNMP_ALL_MULTILINE);
+print_debug_vars($fdp_array);
 
 if ($fdp_array)
 {
-  unset($fdp_links);
-  foreach (array_keys($fdp_array) as $key)
+  foreach ($fdp_array as $ifIndex => $entry)
   {
-    $port = dbFetchRow("SELECT * FROM `ports` WHERE `device_id` = ? AND `ifIndex` = ?", array($device['device_id'], $key));
-    $fdp_if_array = $fdp_array[$key];
-    foreach (array_keys($fdp_if_array) as $entry_key)
+    $port = get_port_by_index_cache($device, $ifIndex);
+
+    foreach ($entry as $fdp)
     {
-      $fdp = $fdp_if_array[$entry_key];
+      // Remote Hostname
+      $remote_hostname  = $fdp['snFdpCacheDeviceId'];
 
-      $remote_device_id = FALSE;
-      if (is_valid_hostname($fdp['snFdpCacheDeviceId']))
+      // Remote address
+      $remote_address = hex2ip($fdp['snFdpCacheAddress']);
+
+      // Try find remote device and check if already cached
+      $remote_device_id = get_autodiscovery_device_id($device, $remote_hostname, $remote_address);
+      if (is_null($remote_device_id) &&                           // NULL - never cached in other rounds
+          check_autodiscovery($remote_hostname, $remote_address)) // Check all previous autodiscovery rounds
       {
-        if (isset($GLOBALS['cache']['discovery-protocols'][$fdp['snFdpCacheDeviceId']]))
+        // Neighbour never checked, try autodiscovery
+        $remote_device_id = autodiscovery_device($remote_hostname, $remote_address, 'FDP', $fdp['snFdpCachePlatform'], $device, $port);
+      }
+
+      $remote_port_id = NULL;
+      $if = $fdp['snFdpCacheDevicePort'];
+      if ($remote_device_id)
+      {
+        $query = 'SELECT `port_id` FROM `ports` WHERE (`ifName` = ? OR `ifDescr` = ? OR `port_label_short` = ?) AND `device_id` = ? AND `deleted` = ?';
+        $remote_port_id = dbFetchCell($query, array($if, $if, $if, $remote_device_id, 0));
+        if (!$remote_port_id)
         {
-          // This hostname already checked, skip discover
-          $remote_device_id = $GLOBALS['cache']['discovery-protocols'][$fdp['snFdpCacheDeviceId']];
-        } else {
-          $remote_device_id = dbFetchCell("SELECT `device_id` FROM `devices` WHERE `sysName` = ? OR `hostname` = ?", array($fdp['snFdpCacheDeviceId'], $fdp['snFdpCacheDeviceId']));
-
-          if (!$remote_device_id && !is_bad_xdp($fdp['snFdpCacheDeviceId'], $fdp['snFdpCachePlatform']))
+          // Try by IP
+          $peer_where = generate_query_values($remote_device_id, 'device_id'); // Additional filter for include self IPs
+          // Fetch all ports with peer IP and filter by UP
+          if ($ids = get_entity_ids_ip_by_network('port', $remote_address, $peer_where))
           {
-            $remote_device_id = discover_new_device($fdp['snFdpCacheDeviceId'], 'xdp', 'FDP', $device, $port);
+            $remote_port_id = $ids[0];
+            //$port = get_port_by_id_cache($ids[0]);
           }
-
-          // Cache remote device ID for other protocols
-          $GLOBALS['cache']['discovery-protocols'][$fdp['snFdpCacheDeviceId']] = $remote_device_id;
         }
       }
 
-      // FIXME do LLDP-code-style hostname overwrite here as well? (see below)
-      if ($remote_device_id)
-      {
-        $if = $fdp['snFdpCacheDevicePort'];
-        $remote_port_id = dbFetchCell("SELECT `port_id` FROM `ports` WHERE (`ifDescr` = ? OR `ifName` = ?) AND `device_id` = ?", array($if, $if, $remote_device_id));
-      } else {
-        $remote_port_id = NULL;
-      }
-
-      if (!is_bad_xdp($fdp['snFdpCacheDeviceId']))
-      {
-        discover_link($port, $fdp['snFdpCacheVendorId'], $remote_port_id, $fdp['snFdpCacheDeviceId'], $fdp['snFdpCacheDevicePort'], $fdp['snFdpCachePlatform'], $fdp['snFdpCacheVersion']);
-      }
+      $neighbour = [
+        'remote_port_id'  => $remote_port_id,
+        'remote_hostname' => $remote_hostname,
+        'remote_port'     => $fdp['snFdpCacheDevicePort'],
+        'remote_platform' => $fdp['snFdpCachePlatform'],
+        'remote_version'  => $fdp['snFdpCacheVersion'],
+        'remote_address'  => $remote_address,
+        //'last_change'     => $last_change
+      ];
+      discover_neighbour($port, 'fdp', $neighbour);
     }
   }
+
 }
 
 // EOF

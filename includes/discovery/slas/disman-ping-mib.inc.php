@@ -78,7 +78,7 @@ foreach ($oids as $sla_owner => $entry2)
     if (isHexString($entry['pingCtlTargetAddress']) ||
         stripos($data['rtt_type'], 'Echo') !== FALSE)
     {
-      $data['sla_target'] = hex2ip($data['sla_tag']);
+      $data['sla_target'] = hex2ip($data['sla_target']);
     }
     $data['sla_tag'] = $data['sla_target']; // FIXME. Here must be $sla_name, but migrate too hard
 

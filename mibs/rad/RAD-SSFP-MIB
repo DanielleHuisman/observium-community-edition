@@ -1,0 +1,231 @@
+RAD-SSFP-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       PhysicalIndexOrZero, entPhysicalAlias     FROM  ENTITY-MIB
+       Integer32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE, OBJECT-IDENTITY     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, RowStatus, DisplayString     FROM  SNMPv2-TC
+       radSpecificDevices     FROM  RAD-SMI-MIB
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB
+       SlotType     FROM  RAD-TC; 
+
+    smartSFP MODULE-IDENTITY
+        LAST-UPDATED "201607261808Z"  -- July 26, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+     
+         Email:  mibs@rad.com    
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Smart SFP MIB." 
+    ::= { radSpecificDevices 2 }
+
+
+
+SmartSfpModuleType  ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This object indicates a unique type of Smart SFP."
+    SYNTAX  INTEGER
+    {
+        notApplicable  (1), 
+        miRIC-E1       (2), 
+        miRIC-T1       (3), 
+        miRIC-E3       (4),
+        miRIC-T3       (5), 
+        miRICi-E1      (6), 
+        miRICi-T1      (7), 
+        miRICi-E3      (8), 
+        miRICi-T3      (9),      
+        miRICi-155     (10),
+        miRICi-622     (11),
+        miTOP-E1       (12),
+        miTOP-E3       (13),
+        miTOP-T1       (14),
+        miTOP-T3       (15),
+        sfp-VDSL-2W    (16)       
+    }
+
+
+smartSfpEvents OBJECT-IDENTITY
+     STATUS  current
+     DESCRIPTION
+     "The events for RAD products."
+     ::= { smartSFP  0 }
+    
+
+ smartSfpMismatch NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     entPhysicalAlias, smartSfpType, smartSfpInstall } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that Smart SFP is not supported or misconfigured."
+      ::= { smartSfpEvents 1}
+    
+    
+    -- Smart Sfp Table    
+    
+smartSfpTable  OBJECT-TYPE 
+      SYNTAX SEQUENCE OF SmartSfpEntry
+      MAX-ACCESS not-accessible
+      STATUS  current
+      DESCRIPTION
+      "A table that contains configuration for Smart SFP 
+      e.g. MiRIC or MiTOP    "
+      ::= { smartSFP 1 }
+   
+smartSfpEntry OBJECT-TYPE
+      SYNTAX SmartSfpEntry
+      MAX-ACCESS not-accessible
+      STATUS current
+    DESCRIPTION  "An entry in table."
+    INDEX { smartSfpSlotIdx, smartSfpPortIdx }
+      ::= { smartSfpTable 1 }
+
+SmartSfpEntry ::= SEQUENCE {
+    smartSfpSlotIdx                   SlotType,
+    smartSfpPortIdx                   Integer32,
+    smartSfpRowStatus                 RowStatus,
+    smartSfpType                      SmartSfpModuleType,
+    smartSfpAdminStatus               INTEGER,
+    smartSfpOperState                 INTEGER,
+    smartSfpResetCmd                  INTEGER,
+    smartSfpInstall                   SmartSfpModuleType,
+    smartSfpPhysicalIndex             PhysicalIndexOrZero 
+ }
+
+smartSfpSlotIdx OBJECT-TYPE
+      SYNTAX      SlotType
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "The Slot number used as first index. 
+      If there is not slot like in standalone device, 
+      then the value of smartSfpSlotIdx shall be notApplicable(255)."
+      ::= { smartSfpEntry 1 }
+
+smartSfpPortIdx OBJECT-TYPE
+      SYNTAX  Integer32
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+      "The port number used as second index. 
+      The first index (mdlCSlotIdx) is defined in 
+      mdlCEntry. If there is not slot like in standalone device, 
+      then the value of mdlCSlotIdx shall be notApplicable(255)."
+      ::= { smartSfpEntry 2 }
+
+smartSfpRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enable the user to create/delete entries in this table.
+    When the smartSfpType is notApplicable(1) the value of this object 
+    shall be notInService(2)."
+    ::= { smartSfpEntry 3 }   
+      
+      
+smartSfpType OBJECT-TYPE
+      SYNTAX  SmartSfpModuleType
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "The configured smart SFP type. The value notApplicable(1) is used by the 
+      device upon row creation. This value cannot be set."
+      DEFVAL { notApplicable}
+      ::= {smartSfpEntry 4}
+      
+
+smartSfpAdminStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+            up          (1),       
+            down        (2)
+            }
+    MAX-ACCESS  read-create
+    STATUS      deprecated
+    DESCRIPTION
+    "This object indicates the Administrative Status of the Smart SFP.
+    This object was deprecated. Use smartSfpRowStatus instead."
+    ::= { smartSfpEntry 5 }      
+      
+smartSfpOperState OBJECT-TYPE
+    SYNTAX  INTEGER {
+                onLine          (1),
+                offLine         (2),
+                notInstalled    (3),
+                mismatch        (4)
+             
+            }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current operational state of the Smart SFP
+    onLine - Indicates that the smartSfpRowStatus is up and the 
+         correct smart SFP is installed.
+    offLine - Indicates that the smart SFP is installed while its 
+         smartSfpRowStatus is down.
+    notInstalled - Indicates that the smart SFP is provisioned but not installed.
+    mismatch - Indicates that the configured SSFP does not comply with the installed device."
+    ::= { smartSfpEntry 6 }
+      
+smartSfpResetCmd OBJECT-TYPE
+    SYNTAX   INTEGER
+          {
+            off(2),
+            on (3)
+          }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Reset action to be performed on the smart SFP. 
+    Agent should set smarSfpResetCmd to off (2) during initialization."
+    DEFVAL  { off }
+    ::= { smartSfpEntry 7 }
+    
+smartSfpInstall  OBJECT-TYPE
+    SYNTAX      SmartSfpModuleType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This attribute indicates the installed smart SFP 
+    (as opposed to the configured smartSfpType)."
+    ::= { smartSfpEntry 8 }    
+    
+smartSfpPhysicalIndex  OBJECT-TYPE
+    SYNTAX      PhysicalIndexOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+                "The object contains index of the related entPhysicalEntry of the
+    ENTITY-MIB, see RFC4133. It points the relevant port and not the
+    port slot. The agent should build this index according to the rules
+    that are defined by the inventory.doc document.
+                Zero value means 'no entry defined', i.e. the sfp is not detected
+    in its slot."
+    ::= { smartSfpEntry 9 }
+    
+END
+

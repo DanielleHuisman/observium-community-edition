@@ -75,7 +75,7 @@ function humanize_sensor(&$sensor)
     $sensor['human_value'] = 'NaN';
     $sensor['sensor_symbol'] = '';
   } else {
-    $sensor['human_value'] = format_value($sensor['sensor_value'], $sensor['sensor_format']);
+    $sensor['human_value'] = format_value($sensor['sensor_value'], $sensor['sensor_format'], 2, 4);
   }
 
   if (isset($config['entity_events'][$sensor['sensor_event']]))
@@ -279,7 +279,7 @@ function print_sensor_table_header($vars)
   $cols = [];
   $cols[]              = array(NULL, 'class="state-marker"');
   $cols['device']      = array('Device', 'style="width: 250px;"');
-  $cols[]              = array(NULL, 'class="no-width"'); // Measure entity link
+  //$cols[]              = array(NULL, 'class="no-width"'); // Measured entity link
   $cols['descr']       = array('Description');
   $cols['class']       = array('Class', 'style="width: 100px;"');
   $cols['mib']         = array('MIB::Object');
@@ -339,6 +339,7 @@ function generate_sensor_row($sensor, $vars)
   }
 
   // Measured link & icon
+  /* Disabled because it breaks the overview box layout
   $row .= '        <td style="padding-right: 0px;" class="no-width vertical-align">'; // minify column if empty
   if ($vars['entity_icon']) // this used for entity popup
   {
@@ -352,6 +353,7 @@ function generate_sensor_row($sensor, $vars)
   }
   $row .= '</td>';
   $table_cols++;
+  */
 
   $row .= '        <td class="entity">' . generate_entity_link("sensor", $sensor) . '</td>';
   $table_cols++;

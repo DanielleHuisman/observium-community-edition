@@ -17,9 +17,10 @@
 //UPS-MIB::upsIdentAgentSoftwareVersion.0 = STRING: NetMan 100 plus
 //UPS-MIB::upsIdentName.0 = STRING: UPS1-60K
 
+/* Uses UPS-MIB, not correct Oids
+
 $hardware = snmp_get_oid($device, 'upsIdentAgentSoftwareVersion.0', 'UPS-MIB');
 $version  = snmp_get_oid($device, 'upsIdentUPSSoftwareVersion.0',   'UPS-MIB');
-
-// Uses UPS-MIB, not correct Oids
+*/
 
 // EOF

@@ -30,11 +30,14 @@ foreach ($drums as $drum => $letter)
   $descr = rrdtool_escape("$drum Drum",16);
   $colour = toner_to_colour($descr);
 
-  $hostname = get_device_by_device_id($device['device_id']);
+  // Not sure for what this used
+  //$hostname = get_device_hostname_by_device_id($supply['device_id']);
+  $hostname = $device['hostname'];
 
   $rrd_filename = get_rrd_path($device, "drum-$letter.rrd");
+  $rrd_filename_escape = rrdtool_escape($rrd_filename);
 
-  $rrd_options .= " DEF:drum$iter=$rrd_filename:drum:AVERAGE";
+  $rrd_options .= " DEF:drum$iter=$rrd_filename_escape:drum:AVERAGE";
   $rrd_options .= " LINE2:drum$iter#".$colour['left'].":'" . $descr . "'";
   $rrd_options .= " GPRINT:drum$iter:LAST:'%5.0lf%%'";
   $rrd_options .= " GPRINT:drum$iter:MIN:'%5.0lf%%'";

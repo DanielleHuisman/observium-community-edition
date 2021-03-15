@@ -104,5 +104,5 @@
         window.location = url;
       }
       chart.draw(view, options);
-    };
+    }
   </script>

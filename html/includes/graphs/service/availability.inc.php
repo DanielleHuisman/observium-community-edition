@@ -17,7 +17,7 @@ $scale_max = "1";
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $rrd_options .= " COMMENT:'                                Cur    Avail\\n'";
-$rrd_options .= " DEF:status=$rrd_filename:status:AVERAGE";
+$rrd_options .= " DEF:status=$rrd_filename_escape:status:AVERAGE";
 $rrd_options .= " CDEF:percent=status,100,*";
 $rrd_options .= " CDEF:down=status,1,LT,status,UNKN,IF";
 $rrd_options .= " CDEF:percentdown=down,100,*";

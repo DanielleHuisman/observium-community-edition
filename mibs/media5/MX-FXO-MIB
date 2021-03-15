@@ -1,0 +1,683 @@
+-- **SDOC***********************************************************************
+-- *****************************************************************************
+--
+--      Copyright(c) 2004-2005 Mediatrix Telecom, Inc.
+--      Copyright(c) 2008 Media5 Corporation. ("Media5")
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Media5.
+--
+--   Media5 reserves all rights to this document as well as to the Intellectual
+--   Property of the document and the technology and know-how that it includes
+--   and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in
+--   any form whatsoever without written prior approval by Media5.
+--
+--   Media5 reserves the right to revise this publication and make changes at
+--   any time and without the obligation to notify any person and/or entity of
+--   such revisions and/or changes.
+--
+-- *****************************************************************************
+-- **EDOC***********************************************************************
+
+MX-FXO-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        ifIndex
+    FROM RFC1213-MIB
+        mediatrixConfig
+    FROM MX-SMI
+        MxEnableState
+    FROM MX-TC;
+
+fxoMIB MODULE-IDENTITY
+    LAST-UPDATED "201206040000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada, J1L 2C8
+                  Phone: (819) 829-8749
+                  http://www.mediatrix.com"
+    DESCRIPTION  "This MIB is used customize properties of FXO lines."
+
+
+    -- *************************************************************************
+    -- Revision history
+    -- *************************************************************************
+    REVISION    "201206040000Z"
+    DESCRIPTION "Added fxoConnectCallDelay"
+    REVISION    "200808250000Z"
+    DESCRIPTION "Correction of fxoAnswerSupervisionMode enum syntax"
+    REVISION    "200807150000Z"
+    DESCRIPTION "Added fxoAnswerSupervisionMode."
+    REVISION    "200508230000Z"
+    DESCRIPTION "Added fxoIfIncomingCallNotAllowedBehaviorTable."
+    REVISION    "200507040000Z"
+    DESCRIPTION "Added variable fxoWaitForCalleeToAnswerEnable to fxoIfAnsweringDelayTable"
+    REVISION    "200408040000Z"
+    DESCRIPTION "Updated the description of MIB variable fxoLineStatus"
+    REVISION    "200311060000Z"
+    DESCRIPTION "Change default value of fxoDialtoneDetectionTimeout."
+    REVISION    "200310200000Z"
+    DESCRIPTION "Added fxoIfAnalogLineTypeTable (includes fxoIfAnalogLineType object)."
+    REVISION    "200309250000Z"
+    DESCRIPTION "Updated fxoEndOfCallToneCustomFrequency range."
+    REVISION    "200308190000Z"
+    DESCRIPTION "Updated fxoDialtoneDetectionTimeout range."
+    REVISION    "200302250000Z"
+    DESCRIPTION "Creation."
+    ::= { mediatrixConfig 45 }
+
+fxoMIBObjects OBJECT IDENTIFIER ::= { fxoMIB 1 }
+fxoConformance OBJECT IDENTIFIER ::= { fxoMIB 5 }
+
+
+    -- *************************************************************************
+    -- FxoLinePropertiesCustomization.
+    -- *************************************************************************
+    fxoLinePropertiesCustomization OBJECT IDENTIFIER ::= { fxoMIBObjects 5 }
+
+    fxoDialtoneDetectionMode OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             disable(0),
+                             countryTone(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enable the dial tone detection.
+                     When dial tone detection is enabled, the unit waits for a dial tone on the SCN
+                     before initiating the dialing sequence. If no dial tone is detected, the line is
+                     considered as busy with an incoming SCN call. This mechanism helps avoid
+                     collisions between incoming and outgoing SCN calls.
+
+                     disable     : Dial tone detection is disabled.
+
+                     countryTone : The unit will try to detect the tone specified for this purpose
+                                   in the current country's tone specification. Some country
+                                   specifications omit this information. In that case, the unit
+                                   behaves as if fxoDialtoneDetectionMode is 'disable'.
+                                   See telephonyCountrySelection."
+        DEFVAL      { countryTone }
+        ::= { fxoLinePropertiesCustomization  5 }
+
+    fxoDialtoneDetectionTimeout OBJECT-TYPE
+        SYNTAX      Unsigned32 (1300..10000)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Dial tone detection timeout.
+
+                     Indicates how long the unit waits for a dial tone before considering
+                     the line is busy with an incoming SCN call.
+
+                     This value is expressed in milliseconds (ms)."
+        DEFVAL      { 3000 }
+        ::= { fxoLinePropertiesCustomization  10 }
+
+    fxoCallerIdDetectionRange OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              high(0),
+                              low(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "The range of caller ID signals that can be detected.
+
+                        high : Between 30 and 530 mV RMS.
+
+                        low  : Between 7 and 110 mV RMS."
+        DEFVAL      { high }
+        ::= { fxoLinePropertiesCustomization  15 }
+
+    fxoAnswerSupervisionMode OBJECT-TYPE
+        SYNTAX      INTEGER {
+                             none(0),
+                             batteryReversal(1),
+                             billingTone(2)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "This feature configures when the IP call is established
+                     depending on the PSTN call state.
+
+                     none : No answer supervision, the IP call is established
+                            immediately after signalling on the PSTN.
+
+                     batteryReversal : The IP call is established after receiving
+                                       a battery reversal from the PSTN.
+
+                     billingTone : The IP call is established after receiving
+                                   a billing tone from the PSTN.
+
+                     This variable's semantics are different depending on the software version.
+                     Please refer to the documentation shipped with your device for more
+                     details."
+        DEFVAL      { none }
+        ::= { fxoLinePropertiesCustomization  50 }
+
+    -- *************************************************************************
+    -- FxoLineFaultDetection.
+    -- *************************************************************************
+    fxoLineFaultDetection OBJECT IDENTIFIER ::= { fxoMIBObjects 10 }
+
+    fxoLineFaultDetectionEnable OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enable the line fault detection.
+                     The line fault detection mechanism allows the detection of defective or
+                     disconnected lines based on the absence of current when closing the loop. The
+                     line status is reported in the fxoIfLineStatusTable."
+        DEFVAL      { enable }
+        ::= { fxoLineFaultDetection  5 }
+
+    fxoLineSeizureTimeout OBJECT-TYPE
+        SYNTAX      Unsigned32 (500..10000)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates how long the unit waits before considering the seizure of an analog
+                     line failed.
+
+                     This value is expressed in milliseconds (ms)."
+        DEFVAL      { 5000 }
+        ::= { fxoLineFaultDetection  10 }
+
+    -- *************************************************************************
+    -- IfLineStatusTable
+    -- *************************************************************************
+    fxoIfLineStatusTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF FxoIfLineStatusEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of line statuses updated by the line fault detection mechanism."
+        ::= { fxoLineFaultDetection 15 }
+
+        fxoIfLineStatusEntry OBJECT-TYPE
+            SYNTAX      FxoIfLineStatusEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the fxoIfLineStatusTable table.
+                         A table of line statuses updated by the line fault detection mechanism."
+            INDEX       {
+                            ifIndex
+                        }
+            ::= { fxoIfLineStatusTable 5 }
+
+            FxoIfLineStatusEntry ::= SEQUENCE
+                {
+                    fxoLineStatus             INTEGER
+                }
+
+            fxoLineStatus OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                  unknown(0),
+                                  connected(1),
+                                  disconnected(2)
+                                }
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "Line status as reported by the line fault detection mechanism. The line fault
+                             detection can be enabled by using the fxoLineFaultDetectionEnable object.
+
+                             The unit does not automatically detect when a previously connected port has
+                             changed to the disconnected status. The unit only detects the change of status
+                             when it attempts to use the port or after a restart.
+
+                             The unit automatically detects within seconds when a disconnected port becomes
+                             connected.
+
+
+                             unknown      : The line fault detection is disabled.
+
+                             connected    : When last polled, the line was connected.
+
+                             disconnected : When last polled, the line was disconnected."
+                DEFVAL      { unknown }
+                ::= { fxoIfLineStatusEntry 5 }
+
+    -- *************************************************************************
+    -- FxoIfAnsweringDelayTable.
+    -- *************************************************************************
+    fxoIfAnsweringDelayTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF FxoIfAnsweringDelayEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table holds the answering delay configuration. Each row in this table
+                     configures the answering delay of a line."
+        ::= { fxoMIBObjects 15 }
+
+        fxoIfAnsweringDelayEntry OBJECT-TYPE
+            SYNTAX      FxoIfAnsweringDelayEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the fxoIfAnsweringDelayTable table."
+            INDEX       {
+                            ifIndex
+                        }
+            ::= { fxoIfAnsweringDelayTable 5 }
+
+            FxoIfAnsweringDelayEntry ::= SEQUENCE
+                {
+                    fxoPreAnswerDelay                   Unsigned32,
+                    fxoAnswerOnCallerIdDetectionEnable  MxEnableState,
+                    fxoWaitForCalleeToAnswerEnable      MxEnableState
+                }
+
+            fxoPreAnswerDelay OBJECT-TYPE
+                SYNTAX  Unsigned32 (0..30000)
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "The waiting period before answering an incoming SCN call.
+
+                             If this delay expires before the caller ID signal is decoded, the call
+                             will proceed without caller ID information.
+
+                             If a minimal waiting period is required for the selected country, the
+                             highest of both values is used. See telephonyCountrySelection.
+
+                             This value is expressed in milliseconds (ms)."
+                DEFVAL      { 8000 }
+                ::= { fxoIfAnsweringDelayEntry 5 }
+
+            fxoAnswerOnCallerIdDetectionEnable OBJECT-TYPE
+                SYNTAX  MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Enables answering on caller ID detection.
+
+                             When enabled, an incoming SCN call is answered on the first occurrence of either
+                                 a) the reception of the caller ID signal.
+                                 b) the expiration of the delay configured by fxoPreAnswerDelay."
+                DEFVAL      { enable }
+                ::= { fxoIfAnsweringDelayEntry 10 }
+
+            fxoWaitForCalleeToAnswerEnable OBJECT-TYPE
+                SYNTAX  MxEnableState
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "When the line is set up for automatic call (see the
+                             telephonyAttributesAutomaticCallEnable variable), enabling
+                             this variable makes the FXO wait until the called party answers
+                             the phone before it picks up the PSTN line.
+
+                             When enabled, this feature renders the fxoPreAnswerDelay and
+                             fxoAnswerOnCallerIdDetectionEnable variables inoperative."
+                DEFVAL      { disable }
+                ::= { fxoIfAnsweringDelayEntry 60 }
+
+    -- *************************************************************************
+    -- Fxo Forced-End-Of-Call Customization.
+    -- *************************************************************************
+
+    fxoForcedEndOfCallCustomization OBJECT IDENTIFIER ::= { fxoMIBObjects 20 }
+
+        fxoFeocOnCallFailureEnable OBJECT-TYPE
+            SYNTAX      MxEnableState
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Enables forced-end-of-call on call failure.
+
+                         This feature forcefully terminates a call that stayed in an error state for some
+                         time.  When the line falls in an error state where a SIT, a ROH, a BUSY or any
+                         error tone is played, the unit waits for the timeout specified by
+                         fxoFeocOnCallFailureTimeout and then hangs up."
+            DEFVAL      { enable }
+            ::= { fxoForcedEndOfCallCustomization  5 }
+
+        fxoFeocOnCallFailureTimeout OBJECT-TYPE
+            SYNTAX      Unsigned32 (0 .. 180)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "The waiting period before terminating a call in an error state.
+                         This value is expressed in seconds (sec)."
+            DEFVAL      { 30 }
+            ::= { fxoForcedEndOfCallCustomization  10 }
+
+        fxoFeocOnSilenceDetectionMode OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                    disable(0),
+                                    onScnSilent(1),
+                                    onIpSilent(2),
+                                    onIpAndScnSilent(3),
+                                    onIpOrScnSilent(4)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Enables forced-end-of-call on silence detection.
+
+                         This feature forcefully terminates a call that stayed silent for some time.
+                         When silence is detected on the IP and/or SCN side call for an amount of time
+                         specified by fxoFeocOnSilenceDetectionTimeout, the call is terminated.
+
+                             disable          : Forced-end-of-call on silence detection is disabled.
+
+                             onScnSilent      : The call is terminated if the SCN side is silent.
+
+                             onIpSilent       : The call is terminated if the IP side is silent.
+
+                             onIpAndScnSilent : The call is terminated if both IP and SCN sides are
+                                                silent at the same time.
+
+                             onIpOrScnSilent  : The call is terminated if either the IP or SCN side is
+                                                silent.
+
+                         This feature is useful to free resources in the event of an IP network
+                         failure preventing the end-of-call to be detected or when SCN end-of-call
+                         tone was not detected."
+            DEFVAL      { disable }
+            ::= { fxoForcedEndOfCallCustomization  15 }
+
+        fxoFeocOnSilenceDetectionTimeout OBJECT-TYPE
+            SYNTAX      Unsigned32 (1 .. 300)
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Maximum amount of time that a call can remain silent, as specified by
+                         fxoForcedEndOfCallCustomization, before it is terminated and the line is
+                         released.
+
+                         This value is expressed in seconds (sec)."
+            DEFVAL      { 300 }
+            ::= { fxoForcedEndOfCallCustomization  20 }
+
+        fxoFeocOnToneDetectionMode OBJECT-TYPE
+            SYNTAX      INTEGER {
+                                    disable(0),
+                                    countryTone(1),
+                                    customTone(2)
+                                }
+            MAX-ACCESS  read-write
+            STATUS      current
+            DESCRIPTION "Enables forced-end-of-call on tone detection.
+
+                         This feature terminates a call on detection of an end-of-call tone on the SCN.
+
+                            disable     : Force-end-of-call on tone detection is disabled.
+
+                            countryTone : The unit will try to detect the tone specified for this purpose
+                                          in the current country's tone specification. Some country
+                                          specifications omit this information. In that case, the unit
+                                          behaves as if fxoFeocOnToneDetectionMode is 'disable'.
+                                          See telephonyCountrySelection.
+
+                            customTone  : Terminates a call on detection of a custom tone. See
+                                          fxoEndOfCallToneCustomSettings."
+            DEFVAL      { countryTone }
+            ::= { fxoForcedEndOfCallCustomization  25 }
+
+        fxoEndOfCallToneCustomSettings OBJECT IDENTIFIER ::= { fxoForcedEndOfCallCustomization 30 }
+
+            fxoEndOfCallToneCustomFrequency OBJECT-TYPE
+                SYNTAX      Unsigned32 (350 .. 620)
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Frequency to detect in the custom cadence.
+
+                             A customized tone detection can only detect a single frequency. To detect tones
+                             made of multiple frequencies, create the cadence for only one of the
+                             frequencies found in the tone.
+
+                             This value is expressed in hertz (Hz)."
+                 DEFVAL      { 440 }
+                ::= { fxoEndOfCallToneCustomSettings  5 }
+
+            fxoEndOfCallToneCustomCadence OBJECT-TYPE
+                SYNTAX      OCTET STRING (SIZE(0 .. 128))
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Custom cadence.
+
+                             A cadence is a series of frequencies that are played for a specified time,
+                             making up a tone. The format for a cadence is 'on, off, on, off, ...'  where
+                             'on' and 'off', respectively are numerical values representing the time in
+                             milliseconds that the frequency can and can't be detected.
+
+                             Example:  '2000, 1000, 2000, 0'  is a cadence where the frequency will play for
+                             2 seconds, stop for 1 second, and play for two more seconds. This example is
+                             also equivalent to setting the string '2000, 1000, 2000'.
+
+                             Up to three 'on, off' pairs can be specified.  Specifying less than those six
+                             values will result in '0' values being added as necessary. Specifying more than
+                             six will only use the six first values.
+
+                             A cadence starting with a value of zero (0) is invalid. The first zero (0)
+                             found in the string signals the end of the cadence (i.e. '200, 0, 300' is the
+                             same as '200').
+
+                             Allowed range for the 'on' and 'off' values are 0 to 32767.
+                             These values are expressed in milliseconds (ms)."
+                DEFVAL      { "" }
+                ::= { fxoEndOfCallToneCustomSettings  10 }
+
+            fxoEndOfCallToneCustomRepetition OBJECT-TYPE
+                SYNTAX      Unsigned32 (2 .. 10)
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Repetition of the cadence.
+
+                             Number of times the custom cadence must be detected to consider the custom
+                             end-of-call tone has been detected."
+                DEFVAL      { 3 }
+                ::= { fxoEndOfCallToneCustomSettings  15 }
+
+    -- *************************************************************************
+    -- FxoIfAnalogLineTable.
+    -- *************************************************************************
+    fxoIfAnalogLineTypeTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF FxoIfAnalogLineTypeEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Table that contains the type of analog lines used."
+        ::= { fxoMIBObjects 25 }
+
+        fxoIfAnalogLineTypeEntry OBJECT-TYPE
+            SYNTAX      FxoIfAnalogLineTypeEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the fxoIfAnalogLineTypeTable table."
+            INDEX       {
+                            ifIndex
+                        }
+            ::= { fxoIfAnalogLineTypeTable 5 }
+
+            FxoIfAnalogLineTypeEntry ::= SEQUENCE
+                {
+                    fxoIfAnalogLineType INTEGER
+                }
+
+            fxoIfAnalogLineType OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                 loopStart(0),
+                                 groundStart(1)
+                                }
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Analog line type based on the analog signaling method used.
+                             This method defines the way on-hook and off-hook conditions are
+                             detected in a voice network.
+
+                             loopStart : A way of signaling that seizes a line by bridging
+                                         both wires of the telephone line through a resistor.
+                                         The average telephone line uses the loop start signaling
+                                         method.
+
+                             groundStart : A way of signaling on subscriber trunks in which one
+                                           side of the two wire trunk is momentarily grounded to
+                                           get dial tone.
+                                           The ground start signaling method ensures proper Far End
+                                           Disconnect between an FXO interface and the SCN."
+                DEFVAL      { loopStart }
+                ::= { fxoIfAnalogLineTypeEntry 5 }
+
+    -- *************************************************************************
+    -- FxoIfIncomingCallNotAllowedBehaviorTable.
+    -- *************************************************************************
+    fxoIfIncomingCallNotAllowedBehaviorTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF FxoIfIncomingCallNotAllowedBehaviorEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "Table that defines how each line behaves when an incoming call is not allowed."
+        ::= { fxoMIBObjects 50 }
+
+        fxoIfIncomingCallNotAllowedBehaviorEntry OBJECT-TYPE
+            SYNTAX      FxoIfIncomingCallNotAllowedBehaviorEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the fxoIfIncomingCallNotAllowedBehaviorTable table."
+            INDEX       {
+                            ifIndex
+                        }
+            ::= { fxoIfIncomingCallNotAllowedBehaviorTable 5 }
+
+            FxoIfIncomingCallNotAllowedBehaviorEntry ::= SEQUENCE
+                {
+                    fxoIfIncomingCallNotAllowedBehavior INTEGER
+                }
+
+            fxoIfIncomingCallNotAllowedBehavior OBJECT-TYPE
+                SYNTAX  INTEGER {
+                                 doNotAnswer(0),
+                                 playCongestionTone(1)
+                                }
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "Under certain circumstances (locked port, call direction set
+                             to 'IP to SCN only', etc...), incoming calls from the SCN are
+                             not allowed. When that is the case, the FXO line behaves in
+                             one of the manners below.
+
+                             doNotAnswer : The incoming call is left unanswered.
+
+                             playCongestionTone : The incoming call is answered, a congestion
+                             tone is played for 10 seconds, and then the call is terminated."
+                DEFVAL      { playCongestionTone }
+                ::= { fxoIfIncomingCallNotAllowedBehaviorEntry 5 }
+
+    fxoConnectCallDelay OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..60000)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Connect Call Delay.
+
+                     Indicates how long the unit waits to consider an outgoing
+                     call to the SCN as connected after dialing the digits.
+
+                     This value is expressed in milliseconds (ms)."
+        DEFVAL      { 0 }
+        ::= { fxoMIBObjects  60 }
+
+    -- *************************************************************************
+    -- Conformance information
+    -- *************************************************************************
+    fxoCompliances OBJECT IDENTIFIER ::= { fxoConformance 1 }
+
+    fxoComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "List of groups required to support FXO lines customization."
+        MODULE  -- This Module
+            MANDATORY-GROUPS {
+                                fxoBasicGroupVer1,
+                                fxoLinePropertiesCustomizationVer1,
+                                fxoLineFaultDetectionVer1,
+                                fxoIfAnsweringDelayTableVer1,
+                                fxoForcedEndOfCallVer1,
+                                fxoIfAnalogLineTypeTableVer1,
+                                fxoIfIncomingCallNotAllowedBehaviorTableVer1
+                             }
+        ::= { fxoCompliances 1 }
+
+    -- *************************************************************************
+    --  MIB variable grouping
+    -- *************************************************************************
+    fxoGroups OBJECT IDENTIFIER ::= { fxoConformance 5 }
+
+    fxoBasicGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                    fxoConnectCallDelay
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the minimal set of objects configuring FXO."
+        ::= { fxoGroups 5 }
+
+    fxoLinePropertiesCustomizationVer1 OBJECT-GROUP
+        OBJECTS {
+                    fxoDialtoneDetectionMode,
+                    fxoDialtoneDetectionTimeout,
+                    fxoCallerIdDetectionRange
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of FXO lines."
+        ::= { fxoGroups 10 }
+
+    fxoLineFaultDetectionVer1 OBJECT-GROUP
+        OBJECTS {
+                    fxoLineFaultDetectionEnable,
+                    fxoLineSeizureTimeout,
+                    fxoLineStatus
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of the fault detection
+             mechanism."
+        ::= { fxoGroups 15 }
+
+    fxoIfAnsweringDelayTableVer1 OBJECT-GROUP
+        OBJECTS {
+                    fxoPreAnswerDelay,
+                    fxoAnswerOnCallerIdDetectionEnable,
+                    fxoWaitForCalleeToAnswerEnable
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of the answering delay."
+        ::= { fxoGroups 20 }
+
+    fxoForcedEndOfCallVer1 OBJECT-GROUP
+        OBJECTS {
+                    fxoFeocOnCallFailureEnable,
+                    fxoFeocOnCallFailureTimeout,
+                    fxoFeocOnSilenceDetectionMode,
+                    fxoFeocOnSilenceDetectionTimeout,
+                    fxoFeocOnToneDetectionMode,
+                    fxoEndOfCallToneCustomFrequency,
+                    fxoEndOfCallToneCustomCadence,
+                    fxoEndOfCallToneCustomRepetition
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of the
+             forced-end-of-call."
+        ::= { fxoGroups 25 }
+
+    fxoIfAnalogLineTypeTableVer1 OBJECT-GROUP
+        OBJECTS {
+                    fxoIfAnalogLineType
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the type of analog line."
+        ::= { fxoGroups 30 }
+
+    fxoIfIncomingCallNotAllowedBehaviorTableVer1 OBJECT-GROUP
+        OBJECTS {
+                    fxoIfIncomingCallNotAllowedBehavior
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines how each line behaves
+             when an incoming call is not allowed."
+        ::= { fxoGroups 35 }
+
+END

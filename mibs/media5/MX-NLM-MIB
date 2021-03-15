@@ -1,0 +1,1064 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-NLM-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxActivationState,
+        MxIpHostName,
+        MxIpAddress,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpSubnetMask,
+        MxDigitMap
+    FROM MX-TC
+        MxUInt64,
+        MxFloat32,
+        MxIpHostNamePort,
+        MxIpAddr,
+        MxIpAddrPort,
+        MxIpAddrMask,
+        MxUri,
+        MxUrl
+    FROM MX-TC2
+        mediatrixServices
+    FROM MX-SMI2;
+
+nlmMIB MODULE-IDENTITY
+ LAST-UPDATED   "1910210000Z"
+ ORGANIZATION " Mediatrix Telecom, Inc. "
+ CONTACT-INFO " Mediatrix Telecom, Inc.
+                4229, Garlock Street
+                Sherbrooke (Quebec)
+                Canada
+                Phone: (819) 829-8749
+                "
+ DESCRIPTION  " Notifications and Logging Manager
+
+                The Notifications and Logging Manager (Nlm) service manages the
+                routing and filtering of the unit's event notification
+                messages.
+                "
+ ::= { mediatrixServices 1100 }
+
+nlmMIBObjects OBJECT IDENTIFIER ::= { nlmMIB 1 }
+
+-- ****************************************************************************
+
+-- Group:Syslog
+
+-- ****************************************************************************
+
+syslogGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 100 }
+ -- Scalar:Remote Host
+
+ syslogRemoteHost OBJECT-TYPE
+  SYNTAX        MxIpHostNamePort
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Remote Host
+
+                Host name and port number of the device that archives log
+                entries sent by syslog transport. Specifying no port (or port
+                0) sends notification to port 514.
+                "
+  DEFVAL        { "" }
+  ::= { syslogGroup 100 }
+
+ -- Scalar:Message Format
+
+ syslogMessageFormat OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..1024) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Message Format
+
+                Specifies the format of a syslog notification.
+
+                Formal Syntax Description:
+
+                  * Precision = DIGIT
+                  * Width = DIGIT
+                  * MacroId = (ALPHA / '_')
+                  * Macro = %[Width]|[.Precision]|[Width.Precision]MacroId
+
+                The Width field is the minimum width of the converted
+                argument. If the converted argument has fewer characters than
+                the specified field width, then it is padded with spaces. If
+                the converted argument has more characters than the specified
+                field width, the field width is extended to whatever is
+                required. The Precision field specifies the maximum number of
+                characters to be printed from a string.
+
+                Examples: message = 'The button is pressed.'
+
+                  * Syslog : %message --> 'The button is pressed.'
+                  * Syslog : %25message --> 'The button is pressed.   '
+                  * Syslog : %10.5message --> 'The b     '
+                  * Syslog : %5.10message --> 'The button'
+                  * Syslog : %.5message --> 'The b'
+
+                Syslog Notification predefined macros:
+
+                Control characters
+
+                  * %% : %
+
+                Syslog notification macros
+
+                  * %msgid : The notification numkey.
+                  * %mac : Lowercase MAC address of the device.
+                  * %serial : Serial number of the device.
+                  * %serviceid : The numkey of the service that issued the
+                    notification.
+                  * %servicetextkey : The textkey of the service that issued
+                    the notification.
+                  * %servicename : The display name of the service that issued
+                    the notification.
+                  * %message : The message text of the notification.
+                  * %mfpname : The firmware name.
+                  * %version : The firmware version.
+                  * %profile : The firmware profile.
+
+                For example, syslog compliant to RFC 5424 may use a format
+                similar to:
+
+                  * 1 - %mac DGW-2.0 %servicetextkey %msgid %message
+
+                "
+  DEFVAL        { "%servicetextkey: %serviceid-%servicename: %msgid-%message"
+                }
+  ::= { syslogGroup 200 }
+
+-- End of group:Syslog
+
+-- *****************************************************************************
+
+-- Table:Events
+
+-- *****************************************************************************
+
+eventsTable OBJECT-TYPE
+ SYNTAX        SEQUENCE OF EventsEntry
+ MAX-ACCESS    not-accessible
+ STATUS        current
+ DESCRIPTION " Events
+
+               This table contains the rules that define how events are
+               filtered and routed.
+               "
+ ::= { nlmMIBObjects 200 }
+ eventsEntry OBJECT-TYPE
+  SYNTAX        EventsEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " A row in table Events. "
+  INDEX         {
+                  eventsIndex
+                }
+
+  ::= { eventsTable 1 }
+
+ EventsEntry ::= SEQUENCE
+ {
+   eventsIndex        Unsigned32,
+   eventsActivation   MxEnableState,
+   eventsType         INTEGER,
+   eventsCriteria     OCTET STRING,
+   eventsAction       INTEGER,
+   eventsConfigStatus INTEGER,
+   eventsDelete       INTEGER
+ }
+
+ -- Index:Index
+
+ eventsIndex OBJECT-TYPE
+  SYNTAX        Unsigned32
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Index
+
+                Unique identifier of the row in the table.
+                "
+  ::= { eventsEntry 100 }
+
+ -- Row command:Delete
+
+ eventsDelete OBJECT-TYPE
+  SYNTAX        INTEGER { noOp(0), delete(10) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Delete
+
+                Delete this row.
+                "
+  DEFVAL        { noOp }
+  ::= { eventsEntry 10000 }
+
+ -- Columnar:Activation
+
+ eventsActivation OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Activation
+
+                Current activation state for the routing rule defined in this
+                table entry.
+
+                  * Enable: This action is enabled for this table entry.
+                  * Disable: This action is disabled for this table entry.
+
+                "
+  DEFVAL        { enable }
+  ::= { eventsEntry 200 }
+
+ -- Columnar:Event Type
+
+ eventsType OBJECT-TYPE
+  SYNTAX        INTEGER { notification(100) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Event Type
+
+                Type of system event for which the routing rule applies.
+
+                Currently, the only type of supported event is the system
+                notification.
+
+                "
+  DEFVAL        { notification }
+  ::= { eventsEntry 300 }
+
+ -- Columnar:Expression Criteria
+
+ eventsCriteria OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..512) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Expression Criteria
+
+                Expression that an event must match in order to apply the
+                specified action. An expression can contain several 'basic'
+                criteria, separated by commas. The syntax accepts a group of
+                inclusion criteria followed by a group of exclusion criteria.
+                The group of exclusion criteria begins with a hyphen (-).
+
+                A basic criteria has the following syntax:
+
+                (Service NumKey || All).(Notification Numkey || Severity level
+                || All).
+
+                  * Keyword All can be used to specify a criteria that applies
+                    to all services or all notifications.
+                  * Severity level is specified using a single letter: W for
+                    Warnings, I for Information, C for Critical, D for Debug,
+                    and E for Error.
+                  * Several basic criteria can be specified on the same line,
+                    separated by commas.
+                  * Criteria can specify inclusion or exclusion. A group of
+                    exclusion criteria can follow the group of inclusion
+                    criteria. The group of exclusion criteria must begin with a
+                    hyphen (-).
+                  * Matching an inclusion criteria causes the action to be
+                    executed unless an exclusion criteria is also matched.
+                  * Exclusion criteria have precedence over inclusion criteria.
+
+                Instead of using an expression such as described above, the
+                single keyword 'All' can be used to accept any notification
+                from any service.
+
+                If the whole expression is empty, the criteria never matches
+                any notification and no action is executed.
+
+                Spaces can be present before or after a basic criteria.
+                However, spaces are not accepted within a basic criteria, i.e.
+                before or after the dot.
+
+                Examples
+
+                Basic criteria for the ISDN Service (service number key =
+                1850), Message 'Physical link state changed to up' (message
+                number key = 5): Basic criteria is 1850.5.
+
+                Expression 1850.All,1600.200,1600.W,-1850.500,1600.300.
+
+                  * 1850.All,1600.200,1600.W are inclusion criteria and
+                  * All notifications from service 1850, except notification
+                    500, will match the expression.
+                  * All notifications from service 1600 with Warning level,
+                    except notification 300, will match the expression.
+                  * Notification 200 from service 1600 will match the
+                    expression, no matter the severity level.
+
+                "
+  DEFVAL        { "" }
+  ::= { eventsEntry 400 }
+
+ -- Columnar:Action
+
+ eventsAction OBJECT-TYPE
+  SYNTAX        INTEGER { sendViaSyslog(100) , sendViaSip(200) , logLocally
+                (300) , logToFile(400) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Action
+
+                Action to apply to the system event if the criteria matches.
+
+                The possible actions are:
+
+                  * SendViaSyslog: The event notification is sent using syslog
+                    as transport.
+                  * SendViaSip: The event notification is sent using SIP Notify
+                    as transport.
+                  * LogLocally: The event notification is logged in LocalLog.
+                  * LogToFile: The event notification is logged into a file.
+
+                "
+  DEFVAL        { sendViaSyslog }
+  ::= { eventsEntry 500 }
+
+ -- Columnar:Configuration Status
+
+ eventsConfigStatus OBJECT-TYPE
+  SYNTAX        INTEGER { valid(100) , invalid(200) , notSupported(300) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Configuration Status
+
+                Configuration status of the row.
+
+                It indicates whether the configuration of the row is valid.
+
+                  * Valid: The current content of Criteria and Action fields is
+                    valid.
+                  * Invalid: The current content of Criteria and Action fields
+                    is not valid.
+                  * NotSupported: The current content Criteria and Action
+                    fields is valid but not supported. A possible reason could
+                    be, for instance, a resource limitation.
+
+                "
+  ::= { eventsEntry 600 }
+
+-- End of table:Events
+
+-- ****************************************************************************
+
+-- Group:Local log
+
+-- ****************************************************************************
+
+localLogGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 300 }
+ -- Scalar:Maximum number of entries
+
+ localLogMaxNbEntries OBJECT-TYPE
+  SYNTAX        Unsigned32
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Maximum number of entries
+
+                Maximum number of entries that the local log can contain. When
+                adding a new entry while the local log is full, the oldest
+                entry is erased to make room for the new one.
+                "
+  ::= { localLogGroup 100 }
+
+ -- Scalar:Number of error entries
+
+ localLogNbErrorEntries OBJECT-TYPE
+  SYNTAX        Unsigned32
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Number of error entries
+
+                Current number of error entries in the local log.
+                "
+  ::= { localLogGroup 200 }
+
+ -- Scalar:Number of critical entries
+
+ localLogNbCriticalEntries OBJECT-TYPE
+  SYNTAX        Unsigned32
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Number of critical entries
+
+                Current number of critical entries in the local log.
+                "
+  ::= { localLogGroup 300 }
+
+ -- ***************************************************************************
+ 
+ -- Table:LocalLogMessages
+
+ -- ***************************************************************************
+ 
+ localLogMessagesTable OBJECT-TYPE
+  SYNTAX          SEQUENCE OF LocalLogMessagesEntry
+  MAX-ACCESS      not-accessible
+  STATUS          current
+  DESCRIPTION   " LocalLogMessages
+
+                  This table contains the entries of the local log.
+                  "
+  ::= { localLogGroup 500 }
+  localLogMessagesEntry OBJECT-TYPE
+   SYNTAX        LocalLogMessagesEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table LocalLogMessages. "
+   INDEX         {
+                   localLogMessagesIndex
+                 }
+
+   ::= { localLogMessagesTable 1 }
+
+  LocalLogMessagesEntry ::= SEQUENCE
+  {
+    localLogMessagesIndex          Unsigned32,
+    localLogMessagesLocalTime      OCTET STRING,
+    localLogMessagesServiceNumkey  Unsigned32,
+    localLogMessagesNotificationId Unsigned32,
+    localLogMessagesSeverity       INTEGER,
+    localLogMessagesServiceTextkey OCTET STRING,
+    localLogMessagesMessage        OCTET STRING
+  }
+
+  -- Index:Index
+
+  localLogMessagesIndex OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Index
+
+                 Unique identifier of the row in the table.
+                 "
+   ::= { localLogMessagesEntry 100 }
+
+  -- Columnar:Local Time
+
+  localLogMessagesLocalTime OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Local Time
+
+                 Local date and time at which the log entry was inserted.
+                 Format is YYYY-MM-DD HH:MM:SS.
+                 "
+   ::= { localLogMessagesEntry 200 }
+
+  -- Columnar:Service Numkey
+
+  localLogMessagesServiceNumkey OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Service Numkey
+
+                 Numerical identifier of the service that issued the log
+                 entry.
+                 "
+   ::= { localLogMessagesEntry 300 }
+
+  -- Columnar:Notification Id
+
+  localLogMessagesNotificationId OBJECT-TYPE
+   SYNTAX        Unsigned32
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Notification Id
+
+                 Numerical identifier of the notification message.
+                 "
+   ::= { localLogMessagesEntry 400 }
+
+  -- Columnar:Severity
+
+  localLogMessagesSeverity OBJECT-TYPE
+   SYNTAX        INTEGER { critical(500) , error(400) , warning(300) ,
+                 information(200) , debug(100) }
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Severity
+
+                 Severity of the log entry.
+                 "
+   ::= { localLogMessagesEntry 500 }
+
+  -- Columnar:Service Textkey
+
+  localLogMessagesServiceTextkey OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Service Textkey
+
+                 Textual identifier of the service that issued the log entry.
+                 "
+   ::= { localLogMessagesEntry 600 }
+
+  -- Columnar:Message
+
+  localLogMessagesMessage OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Message
+
+                 The readable content of the log message.
+                 "
+   ::= { localLogMessagesEntry 700 }
+
+ -- End of table:LocalLogMessages
+
+-- End of group:Local log
+
+-- ****************************************************************************
+
+-- Group:Log File
+
+-- ****************************************************************************
+
+logFileGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 400 }
+ -- Scalar:Log file base name
+
+ logFileBaseName OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..40) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Log file base name
+
+                Base name of the log file. This base name is postfixed by a
+                time-stamp when a log file is created.
+                "
+  DEFVAL        { "Notifications" }
+  ::= { logFileGroup 100 }
+
+ -- Scalar:Maximum size of a log file
+
+ logFileMaxSize OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 1..2048 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Maximum size of a log file
+
+                Maximum size, in KB, that a single log file can have. A new
+                file is created if an entry is added to a full log file. Note
+                that the maximum size can be different depending on the size
+                of user storage, it is limited to 50% of the quota defined in
+                the FileSystemQuotaSize parameter.
+
+                "
+  DEFVAL        { 200 }
+  ::= { logFileGroup 200 }
+
+ -- Scalar:Maximum number of log files
+
+ logFileMaxNb OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 1..10 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Maximum number of log files
+
+                Maximum number of log files to keep. When the maximum number
+                of files is reached, the oldest file is deleted.
+                "
+  DEFVAL        { 2 }
+  ::= { logFileGroup 300 }
+
+-- End of group:Log File
+
+-- ****************************************************************************
+
+-- Group:Packet Capture
+
+-- ****************************************************************************
+
+pCaptureGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 500 }
+ -- Scalar:Packet Capture State
+
+ pCaptureState OBJECT-TYPE
+  SYNTAX        INTEGER { none(100) , requested(200) , completed(300) ,
+                undefinedFailure(400) , urlFailure(500) , filterFailure(600) ,
+                authenticationFailure(700) , hostUnreachableFailure(800) ,
+                tlsCertificateFailure(900) , sizeLimitFailure(1000) ,
+                linkFailure(1100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Packet Capture State
+
+                State of the packet capture. The state is reset to 'None' when
+                the Nlm service start.
+
+                  * None: No packet capture was requested since the start of
+                    the Nlm service.
+                  * Requested: A packet capture is currently in progress.
+                  * Completed: The last packet capture was completed without
+                    failure.
+                  * UndefinedFailure: The last packet capture was terminated
+                    by an undefined failure.
+                  * UrlFailure: The last packet capture was terminated because
+                    the PCaptureFileUrl parameter is empty.
+                  * FilterFailure: The last packet capture was terminated
+                    because the value of the PCaptureFilter parameter is
+                    invalid.
+                  * AuthenticationFailure: The last packet capture was
+                    terminated because the username/password of the
+                    PCaptureFileUrl parameter are rejected by the server.
+                  * HostUnreachableFailure: The last packet capture was
+                    terminated because the server is unreachable.
+                  * TlsCertificateFailure: The last packet capture was
+                    terminated because the server certificate was not trusted.
+                  * SizeLimitFailure: The last packet capture was terminated
+                    because of a size limit failure. Only part of the packet
+                    capture file will have been saved on the server or the
+                    File service.
+                  * LinkFailure: The last packet capture was stopped because
+                    the PCaptureLinkName parameter is empty or the link
+                    interface is unavailable.
+
+                "
+  ::= { pCaptureGroup 100 }
+
+ -- Scalar:Packet Capture Number Of Frames
+
+ pCaptureNbFrames OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..2147483648 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Packet Capture Number Of Frames
+
+                Specifies the maximum number of frames after which the packet
+                capture is automatically stopped.
+
+                0 means no limit.
+
+                "
+  DEFVAL        { 0 }
+  ::= { pCaptureGroup 200 }
+
+ -- Scalar:Packet Capture Number Of Seconds
+
+ pCaptureNbSecs OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..2678400 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Packet Capture Number Of Seconds
+
+                Specifies the maximum number of seconds after which the packet
+                capture is automatically stopped.
+
+                0 means no limit.
+
+                "
+  DEFVAL        { 0 }
+  ::= { pCaptureGroup 300 }
+
+ -- Scalar:Packet Capture Filter
+
+ pCaptureFilter OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..1024) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Packet Capture Filter
+
+                Selects which packets will be ignored. If no expression is
+                given, all packets on the net will be captured. Otherwise,
+                only packets for which expression value is 'true' will be
+                captured. For the expression syntax, see pcap-filter(7) (http:
+                //www.tcpdump.org/manpages/pcap-filter.7.txt).
+                "
+  DEFVAL        { "" }
+  ::= { pCaptureGroup 400 }
+
+ -- Scalar:Packet Capture File URL
+
+ pCaptureFileUrl OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..512) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Packet Capture File URL
+
+                URL where to send the packet capture. The URL should follow
+                this format:
+
+                protocol://[user[:password]@]hostname[:port]/[path/]filename
+
+                The brackets [] indicate an optional parameter.
+
+                The filename may only be composed of alphanumerical and
+                '-._%$' characters as well as macros. The macros used in this
+                field are replaced by the unit's MAC address or date/time of
+                when the capture was started.
+
+                The supported macros are:
+
+                  * %mac% - the MAC address of the unit.
+                  * %date% - the date if the capture start in format YYYYMMDD.
+                  * %time% - the time if the capture start in format hhmmss.
+
+                The supproted transfer protocols are:
+
+                  * HTTP
+                  * HTTPS
+                  * FILE
+
+                Examples of valid URLs:
+
+                  * http://httpserver.com:69/folder/capture.pcap
+                  * http://guest@httpserver.com/
+                    capture_%mac%_%date%_%time%.pcap
+                  * https://username:password@httpserver.com/capture.pcap
+                  * file://capture.pcap
+
+                The protocol default port is used if none is specified.
+
+                "
+  DEFVAL        { "" }
+  ::= { pCaptureGroup 500 }
+
+ -- Scalar:Packet Capture Link Name
+
+ pCaptureLinkName OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..50) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Packet Capture Link Name
+
+                Name of the link interface to capture.
+                "
+  DEFVAL        { "" }
+  ::= { pCaptureGroup 550 }
+
+ -- ***************************************************************************
+ 
+ -- Group:Packet Capture Transfer
+
+ -- ***************************************************************************
+ 
+ pCaptureTransferGroup OBJECT IDENTIFIER
+  ::= { pCaptureGroup 800 }
+  -- Scalar:Level of security for HTTPS certificate validation.
+
+  pCaptureTransferCertificateValidation OBJECT-TYPE
+   SYNTAX        INTEGER { noValidation(100) , hostName(200) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Level of security for HTTPS certificate validation.
+
+                 When saving a packet capture to a HTTPS server, this parameter
+                 defines the level of security to use when validating the
+                 server's certificate.
+
+                   * NoValidation: Allow a connection to the server without
+                     validating its certificate. The only condition is to
+                     receive a certificate from the server. This option
+                     provides partial security and should be selected with
+                     care.
+                   * HostName: Allow a connection to the server by validating
+                     if its certificate is trusted and valid. The validations
+                     performed on the certificate include the expiration date
+                     and indicates if the Subject Alternate Name (SAN) or
+                     Common Name (CN) matches the FQDN or IP address of the
+                     server.
+
+                 "
+   DEFVAL        { hostName }
+   ::= { pCaptureTransferGroup 100 }
+
+  -- Scalar:Certificate Trust Level for HTTPS connections
+
+  pCaptureTransferCertificateTrustLevel OBJECT-TYPE
+   SYNTAX        INTEGER { locallyTrusted(100) , ocspOptional(200) ,
+                 ocspMandatory(300) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Certificate Trust Level for HTTPS connections
+
+                 Define how a peer certificate is considered trusted for a
+                 HTTPS connection.
+
+                   * LocallyTrusted: A certificate is considered trusted when
+                     the certificate authority (CA) that signed the peer
+                     certificate is present in the Cert.OthersCertificatesInfo
+                     table. The certificate revocation status is not verified.
+                   * OcspOptional: A certificate is considered trusted when it
+                     is locally trusted and is not revoked by its certificate
+                     authority (CA). The certificate revocation status is
+                     queried using the Online Certificate Status Protocol
+                     (OCSP). If the OCSP server is not available or the
+                     verification status is unknown, the certificate is
+                     considered trusted.
+                   * OcspMandatory: A certificate is considered trusted when it
+                     is locally trusted and is not revoked by its certificate
+                     authority (CA). The certificate revocation status is
+                     queried using the Online Certificate Status Protocol
+                     (OCSP). If the OCSP server is not available or the
+                     verification status is unknown, the certificate is
+                     considered not trusted.
+
+                 "
+   DEFVAL        { locallyTrusted }
+   ::= { pCaptureTransferGroup 200 }
+
+  -- Scalar:Script Transfer Cipher Suite
+
+  pCaptureTransferCipherSuite OBJECT-TYPE
+   SYNTAX        INTEGER { cS1(100) , cS2(200) , cS3(300) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Script Transfer Cipher Suite
+
+                 Defines the allowed cipher suites for the network security
+                 settings when using the HTTPS transfer protocol. When the
+                 device initiates an HTTPS connection to a server, it will
+                 negotiate the cipher suite according to its configuration.
+
+                   * CS1:
+                       + TLS_DHE_RSA_WITH_AES_256_CBC_SHA
+                       + TLS_DHE_DSS_WITH_AES_256_CBC_SHA
+                       + TLS_RSA_WITH_AES_256_CBC_SHA
+                       + TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
+                       + TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA
+                       + TLS_RSA_WITH_3DES_EDE_CBC_SHA
+                       + TLS_DHE_RSA_WITH_AES_128_CBC_SHA
+                       + TLS_DHE_DSS_WITH_AES_128_CBC_SHA
+                       + TLS_RSA_WITH_AES_128_CBC_SHA
+                       + TLS_RSA_WITH_RC4_128_SHA
+                       + TLS_RSA_WITH_RC4_128_MD5
+                   * CS2:
+                       + TLS_RSA_WITH_AES_128_CBC_SHA
+                       + TLS_RSA_WITH_AES_256_CBC_SHA
+                       + TLS_RSA_WITH_3DES_EDE_CBC_SHA
+                       + TLS_DHE_RSA_WITH_AES_128_CBC_SHA
+                       + TLS_DHE_RSA_WITH_AES_256_CBC_SHA
+                       + TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA
+                   * CS3:
+                       + TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+                       + TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
+                       + TLS_DHE_RSA_WITH_AES_256_GCM_SHA384
+                       + TLS_DHE_RSA_WITH_AES_256_CBC_SHA256
+                       + TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+                       + TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384
+                       + TLS_ECDH_RSA_WITH_AES_256_CBC_SHA384
+                       + TLS_RSA_WITH_AES_256_GCM_SHA384
+                       + TLS_RSA_WITH_AES_256_CBC_SHA256
+                       + TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+                       + TLS_DHE_RSA_WITH_AES_128_GCM_SHA256
+                       + TLS_DHE_RSA_WITH_AES_128_CBC_SHA256
+                       + TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256
+                       + TLS_ECDH_RSA_WITH_AES_128_CBC_SHA256
+                       + TLS_RSA_WITH_AES_128_GCM_SHA256
+                       + TLS_RSA_WITH_AES_128_CBC_SHA256
+
+                 "
+   DEFVAL        { cS1 }
+   ::= { pCaptureTransferGroup 300 }
+
+  -- Scalar:TLS Version
+
+  pCaptureTransferTlsVersion OBJECT-TYPE
+   SYNTAX        INTEGER { sSLv3(100) , tLSv1(200) , tLSv1-1(300) , tLSv1-2
+                 (400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " TLS Version
+
+                 Defines the allowed TLS version for the network security
+                 settings when using the HTTPS transfer protocol. When the
+                 device initiates an HTTPS connection to a server, it will
+                 negotiate the TLS version according to its configuration.
+
+                   * SSLv3: Allow SSL version 3 and all TLS versions.
+                   * TLSv1: Allow TLS versions 1 and up.
+                   * TLSv1_1: Allow TLS versions 1.1 and up.
+                   * TLSv1_2: Allow TLS versions 1.2 and up.
+
+                 The device will always send its highest supported TLS version
+                 in the ClientHello message. The server will select the highest
+                 supported TLS version it supports from the ClientHello
+                 message. The device will then validate that the selected
+                 version is allowed. If the version is not allowed the device
+                 will close the connection.
+
+                 "
+   DEFVAL        { tLSv1 }
+   ::= { pCaptureTransferGroup 400 }
+
+ -- End of group:Packet Capture Transfer
+
+-- End of group:Packet Capture
+
+-- ****************************************************************************
+
+-- Group:Diagnostics Log
+
+-- ****************************************************************************
+
+diagLogGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 600 }
+ -- Scalar:Automatic Dump
+
+ diagLogAutomaticDump OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Automatic Dump
+
+                Enables or disables the automatic dump of diagnostic logs when
+                the system crashes.
+
+                The diagnostic log files are located under the File service.
+
+                Not available on Mediatrix 4102.
+
+                "
+  DEFVAL        { enable }
+  ::= { diagLogGroup 100 }
+
+-- End of group:Diagnostics Log
+
+-- ****************************************************************************
+
+-- Group:Technical Assistance Center
+
+-- ****************************************************************************
+
+tacGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 10000 }
+ -- Scalar:Diagnostic Traces
+
+ diagnosticTracesEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Diagnostic Traces
+
+                Enables the traces used by the Technical Assistance Centre to
+                further assist in resolving some issues.
+
+                Enabling this feature issues a lot of messages to the syslog
+                host. These messages may be filtered using the
+                DiagnosticTracesFilter parameter.
+
+                "
+  DEFVAL        { disable }
+  ::= { tacGroup 100 }
+
+ -- Scalar:Diagnostic Traces Filter
+
+ diagnosticTracesFilter OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..512) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Diagnostic Traces Filter
+
+                Filter applied to diagnostic traces. An empty filter means
+                that all diagnostic traces are enabled.
+                "
+  DEFVAL        { "" }
+  ::= { tacGroup 200 }
+
+-- End of group:Technical Assistance Center
+
+-- ****************************************************************************
+
+-- Group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+notificationsGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 60010 }
+ -- Scalar:Minimal Severity of Notification
+
+ minSeverity OBJECT-TYPE
+  SYNTAX        INTEGER { disable(0) , debug(100) , info(200) , warning(300) ,
+                error(400) , critical (500) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Minimal Severity of Notification
+
+                Sets the minimal severity to issue a notification message
+                incoming from this service.
+
+                  * Disable: No notification is issued.
+                  * Debug: All notification messages are issued.
+                  * Info: Notification messages with a 'Informational' and
+                    higher severity are issued.
+                  * Warning: Notification messages with a 'Warning' and higher
+                    severity are issued.
+                  * Error: Notification messages with an 'Error' and higher
+                    severity are issued.
+                  * Critical: Notification messages with a 'Critical' severity
+                    are issued.
+
+                "
+  DEFVAL        { warning }
+  ::= { notificationsGroup 100 }
+
+-- End of group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+-- Group:Configuration Settings
+
+-- ****************************************************************************
+
+configurationGroup OBJECT IDENTIFIER
+ ::= { nlmMIBObjects 60020 }
+ -- Scalar:Need Restart
+
+ needRestartInfo OBJECT-TYPE
+  SYNTAX        INTEGER { no(0) , yes(100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Need Restart
+
+                Indicates if the service needs to be restarted for the
+                configuration to fully take effect.
+
+                  * Yes: Service needs to be restarted.
+                  * No: Service does not need to be restarted.
+
+                Services can be restarted by using the
+                Scm.ServiceCommands.Restart command.
+
+                "
+  ::= { configurationGroup 100 }
+
+-- End of group:Configuration Settings
+
+END

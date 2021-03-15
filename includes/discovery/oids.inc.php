@@ -18,6 +18,8 @@ $sql .= " FROM  `oids_entries`";
 $sql .= " LEFT JOIN `oids` USING(`oid_id`)";
 $sql .= " WHERE `device_id` = ?";
 
+//print_vars($sql);
+
 $entries_db = dbFetchRows($sql, array($device['device_id']));
 
 foreach($entries_db as $entry_db)

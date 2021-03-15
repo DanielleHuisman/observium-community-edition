@@ -23,7 +23,7 @@
  * print_events(array('short' => TRUE)) - show small block with last events
  *
  * @param array $vars
- * @return none
+ * @return null
  *
  */
 function print_events($vars)
@@ -125,11 +125,11 @@ function print_events($vars)
         if ($entry['entity_type'] == 'port')
         {
           $this_if = get_port_by_id_cache($entry['entity_id']);
-          $entry['link'] = '<span class="entity"><i class="' . $config['entities']['port']['icon'] . '"></i> ' . generate_port_link($this_if, $this_if['port_label_short']) . '</span>';
+          $entry['link'] = '<span class="entity">' . get_icon('port') . ' ' . generate_port_link_short($this_if) . '</span>';
         }
         else if ($entry['entity_type'] == 'global')
         {
-          $entry['link'] = '<i class="' . $config['icon']['info'] . '"></i>';
+          $entry['link'] = get_icon('info');
         } else {
           if (!empty($config['entities'][$entry['entity_type']]['icon']))
           {

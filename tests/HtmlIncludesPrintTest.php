@@ -261,7 +261,7 @@ FORM;
 
     <div id="password_div" class="controls">
 
-    <input type="password"  autocomplete="new-password" placeholder="" name="password" id="password" class="input input-xlarge"  value="" />
+<input type="password" id="disable-pwd-mgr-1" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-1" /><input type="password" id="disable-pwd-mgr-2" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-2" /><input type="password" id="disable-pwd-mgr-3" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-3" />    <input type="password"  autocomplete="new-password" placeholder="" name="password" id="password" class="input input-xlarge"  value="" />
 
     </div>
   </div> <!-- END row-1 -->
@@ -310,7 +310,7 @@ FORM;
 
     <div id="password_div" class="controls">
 
-    <input type="password"  autocomplete="new-password" placeholder="" name="password" id="password" class="input input-xlarge"  value="" />
+<input type="password" id="disable-pwd-mgr-1" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-1" /><input type="password" id="disable-pwd-mgr-2" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-2" /><input type="password" id="disable-pwd-mgr-3" autocomplete="off" style="display:none;" tabindex="-1" value="disable-pwd-mgr-3" />    <input type="password"  autocomplete="new-password" placeholder="" name="password" id="password" class="input input-xlarge"  value="" />
 
     </div>
   </div> <!-- END row-1 -->

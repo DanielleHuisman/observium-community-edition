@@ -456,16 +456,16 @@ function print_device_row($device, $vars = array('view' => 'basic'), $link_vars 
   echo($hostbox);
 }
 
-
 /**
  * Returns icon tag (by default) or icon name for current device array
  *
- * @param array $device Array with device info (from DB)
- * @param bool $base_icon Return complete img tag with icon (by default) or just base icon name
+ * @param array $device    Array with device info (from DB)
+ * @param bool  $base_icon Return complete img tag with icon (by default) or just base icon name
+ * @param bool  $dark      Prefer dark variant of icon (also set by session var)
  *
  * @return string Img tag with icon or base icon name
  */
-function get_device_icon($device, $base_icon = FALSE)
+function get_device_icon($device, $base_icon = FALSE, $dark = FALSE)
 {
   global $config;
 
@@ -478,13 +478,14 @@ function get_device_icon($device, $base_icon = FALSE)
     // Custom device icon from DB
     $icon  = $device['icon'];
   }
-  else if ($model && isset($config['model'][$model][$device['sysObjectID']]['icon']) &&
-           is_file($config['html_dir'] . '/images/os/' . $config['model'][$model][$device['sysObjectID']]['icon'] . '.png'))
+  elseif ($model && isset($config['model'][$model][$device['sysObjectID']]['icon']) &&
+          is_file($config['html_dir'] . '/images/os/' . $config['model'][$model][$device['sysObjectID']]['icon'] . '.png'))
   {
     // Per model icon
     $icon  = $config['model'][$model][$device['sysObjectID']]['icon'];
   }
-  else if ($config['os'][$device['os']]['icon'] && is_file($config['html_dir'] . '/images/os/' . $config['os'][$device['os']]['icon'] . '.png'))
+  elseif ($config['os'][$device['os']]['icon'] &&
+          is_file($config['html_dir'] . '/images/os/' . $config['os'][$device['os']]['icon'] . '.png'))
   {
     // Icon defined in os definition
     $icon  = $config['os'][$device['os']]['icon'];
@@ -499,7 +500,7 @@ function get_device_icon($device, $base_icon = FALSE)
       }
     }
 
-    if ($icon == 'generic' && is_file($config['html_dir'] . '/images/os/' . $device['os'] . '.png'))
+    if ($icon === 'generic' && is_file($config['html_dir'] . '/images/os/' . $device['os'] . '.png'))
     {
       // Icon by OS name
       $icon  = $device['os'];
@@ -507,13 +508,13 @@ function get_device_icon($device, $base_icon = FALSE)
   }
 
   // Icon by vendor name
-  if ($icon == 'generic' && ($config['os'][$device['os']]['vendor'] || $device['vendor']))
+  if ($icon === 'generic' && ($config['os'][$device['os']]['vendor'] || $device['vendor']))
   {
     if ($device['vendor'])
     {
       $vendor = $device['vendor'];
     } else {
-      $vendor = rewrite_vendor($config['os'][$device['os']]['vendor']); // Compatability, if device not polled for long time
+      $vendor = rewrite_vendor($config['os'][$device['os']]['vendor']); // Compatibility, if device not polled for long time
     }
 
     $vendor_safe = safename(strtolower($vendor));
@@ -521,38 +522,51 @@ function get_device_icon($device, $base_icon = FALSE)
     {
       $icon  = $config['vendors'][$vendor_safe]['icon'];
     }
-    else if (is_file($config['html_dir'] . '/images/os/' . $vendor_safe . '.png'))
+    elseif (is_file($config['html_dir'] . '/images/os/' . $vendor_safe . '.png'))
     {
       $icon  = $vendor_safe;
     }
-    else if (isset($config['os'][$device['os']]['icons']))
+    elseif (isset($config['os'][$device['os']]['icons']))
     {
       // Fallback to os alternative icon
       $icon  = array_values($config['os'][$device['os']]['icons'])[0];
     }
   }
 
+  // Set dark mode by session
+  if (isset($_SESSION['dark_mode']))
+  {
+    $dark = (bool)$_SESSION['dark_mode'];
+  }
+
+  // Prefer dark variant of icon in dark mode
+  if ($dark && is_file($config['html_dir'] . '/images/os/' . $icon . '-dark.png'))
+  {
+    $icon .= '-dark';
+  }
+
   if ($base_icon)
   {
     // return base name for os icon
     return $icon;
-  } else {
-    // return image html tag
-    $srcset = '';
-    if (is_file($config['html_dir'] . '/images/os/' . $icon . '_2x.png')) // HiDPI imag exist?
-    {
-      // Detect allowed screen ratio for current browser
-      $ua_info = detect_browser();
-
-      if ($ua_info['screen_ratio'] > 1)
-      {
-        $srcset = ' srcset="' .$config['base_url'] . '/images/os/' . $icon . '_2x.png'.' 2x"';
-      }
-    }
-    // Image tag -- FIXME re-engineer this code to do this properly. This is messy.
-    $image =  '<img src="' . $config['base_url'] . '/images/os/' . $icon . '.png"' . $srcset . ' alt="" />';
-    return $image;
   }
+
+  // return image html tag
+  $srcset = '';
+  // Now we always have 2x icon variant!
+  //if (is_file($config['html_dir'] . '/images/os/' . $icon . '_2x.png')) // HiDPI image exist?
+  //{
+    // Detect allowed screen ratio for current browser
+    $ua_info = detect_browser();
+
+    if ($ua_info['screen_ratio'] > 1)
+    {
+      $srcset = ' srcset="' .$config['base_url'] . '/images/os/' . $icon . '_2x.png'.' 2x"';
+    }
+  //}
+
+  // Image tag -- FIXME re-engineer this code to do this properly. This is messy.
+  return '<img src="' . $config['base_url'] . '/images/os/' . $icon . '.png"' . $srcset . ' alt="" />';
 }
 
 // TESTME needs unit testing
@@ -656,7 +670,6 @@ function generate_device_popup($device, $vars = array(), $start = NULL, $end = N
       $graph_array['type']   = $graph;
       $graph_array['from']   = $config['time']['day'];
       $graph_array['legend'] = "no";
-      $graph_array['bg']     = "FFFFFF";
 
       $content .= '<div style="width: 730px; white-space: nowrap;">';
       $content .= "<div class=entity-title><h4>" . $text . "</h4></div>";
@@ -736,11 +749,11 @@ function generate_device_form_values($form_filter = FALSE, $column = 'device_id'
         // Force display disabled devices
         if (!$options['disabled']) { continue; }
       }
-      else if ($cache['devices']['id'][$device_id]['disabled'] && !$GLOBALS['config']['web_show_disabled']) { continue; }
+      elseif ($cache['devices']['id'][$device_id]['disabled'] && !$GLOBALS['config']['web_show_disabled']) { continue; }
 
       $form_items[$device_id]['group'] = 'DISABLED';
     }
-    else if ($cache['devices']['id'][$device_id]['status'] === '0')
+    elseif ($cache['devices']['id'][$device_id]['status'] === '0')
     {
       if (isset($options['down']) && !$options['down']) { continue; } // Skip down
 

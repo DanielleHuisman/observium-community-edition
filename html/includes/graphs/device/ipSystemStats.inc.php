@@ -13,8 +13,8 @@
 
 include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
-$rrd_filename_4 = get_rrd_path($device, "ipSystemStats-ipv4.rrd");
-$rrd_filename_6 = get_rrd_path($device, "ipSystemStats-ipv6.rrd");
+$rrd_filename_4 = rrdtool_escape(get_rrd_path($device, "ipSystemStats-ipv4.rrd"));
+$rrd_filename_6 = rrdtool_escape(get_rrd_path($device, "ipSystemStats-ipv6.rrd"));
 
 $rrd_options .= " DEF:InForwDatagrams_4=$rrd_filename_4:InForwDatagrams:AVERAGE";
 $rrd_options .= " DEF:InDelivers_4=$rrd_filename_4:InDelivers:AVERAGE";

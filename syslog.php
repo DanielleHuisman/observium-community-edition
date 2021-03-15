@@ -45,11 +45,13 @@ if (isset($config['syslog']['fifo']) && $config['syslog']['fifo'] !== FALSE)
 
 while ($line = fgets($s))
 {
+  /* Duplicate debugging
   if (isset($config['syslog']['debug']) && $config['syslog']['debug'])
   {
     // Store RAW syslog line into debug.log
     logfile('debug.log', $line);
   }
+  */
 
   // Update syslog ruleset if they've changed. (this query should be cheap).
   $new_rules = get_obs_attrib('syslog_rules_changed');

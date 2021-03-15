@@ -193,6 +193,13 @@ if (is_device_mib($device, 'UCD-SNMP-MIB'))
       $device_state['ucd_mem']['mem_shared'] = $mem_array['shared']; //$memShared;
       $device_state['ucd_mem']['mem_buffer'] = $mem_array['buffered']; //$memBuffer;
       $device_state['ucd_mem']['mem_cached'] = $mem_array['cached']; //$memCached;
+
+      if (isset($attribs['ucd_memory_bad']) && $attribs['ucd_memory_bad'])
+      {
+        $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'];
+      } else {
+        $device_state['ucd_mem']['mem_used'] = $mem_array['totalreal'] - $mem_array['availreal'] - $mem_array['cached'] - $mem_array['buffered'];
+      }
     }
 
     /* Moved to mib definition

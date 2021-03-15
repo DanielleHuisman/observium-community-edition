@@ -149,9 +149,7 @@ if (!$auth)
   {
 
     $dashboards = dbFetchRows("SELECT * FROM `dashboards`");
-
     // FIXME - widget_exists() dashboard_exists(), widget_permitted(), dashboard_permitted(), etc.
-
     // FIXME - convert this to ajax call, maybe make the code usable on other pages too
 
     $valid = array('id', 'device');
@@ -159,7 +157,7 @@ if (!$auth)
                        'period' => $vars['to'] - $vars['from']);
     foreach($vars as $var => $value) { if(in_array($var, $valid))  { $add_array[$var] = $value; } }
 
-    if(isset($vars['dash_add']) && is_array($dashboards[$vars['dash_add']]))
+    if(isset($vars['dash_add']) && dashboard_exists($vars['dash_add']))
     {
       $widget_id = dbInsert(array('dash_id' => $vars['dash_add'], 'widget_config' => json_encode($add_array), 'widget_type' => 'graph', 'x' => 0, 'y' => 99, 'width' => 3, 'height' => 2), 'dash_widgets');
       print_message('Graph widget added to dashboard.', 'info');
@@ -193,14 +191,16 @@ if (!$auth)
 
       foreach($dashboards as $dash)
       {
-        $navbar['options_right']['dash']['suboptions'][$avail_type]['text'] = "Add to " . $dash['dash_name'];
-        $navbar['options_right']['dash']['suboptions'][$avail_type]['url'] = generate_url($vars, array('page' => "graphs", 'dash_add' => $dash['dash_id']));
+        $navbar['options_right']['dash']['suboptions'][$dash['dash_id']]['text'] = "Add to " . $dash['dash_name'];
+        $navbar['options_right']['dash']['suboptions'][$dash['dash_id']]['url'] = generate_url($vars, array('page' => "graphs", 'dash_add' => $dash['dash_id']));
+/* Disable adding to specific widgets, the menu doesn't expand.
         $widgets = dbFetchRows("SELECT * FROM `dash_widgets` WHERE `dash_id` = ? AND widget_type = 'graph' AND `widget_config` = ?", array($dash['dash_id'], '[]'));
         foreach($widgets as $widget)
         {
-          $navbar['options_right']['dash']['suboptions'][$avail_type]['entries'][$widget['widget_id']]['text'] = "Add to Widget #".$widget['widget_id']."";
-          $navbar['options_right']['dash']['suboptions'][$avail_type]['entries'][$widget['widget_id']]['url'] = generate_url($vars, array('page' => "graphs", 'dash_add_widget' => $widget['widget_id']));
+          $navbar['options_right']['dash']['suboptions'][$dash['dash_id']]['entries'][$widget['widget_id']]['text'] = "Add to Widget #".$widget['widget_id']."";
+          $navbar['options_right']['dash']['suboptions'][$dash['dash_id']]['entries'][$widget['widget_id']]['url'] = generate_url($vars, array('page' => "graphs", 'dash_add_widget' => $widget['widget_id']));
         }
+*/
       }
 
     }
@@ -596,13 +596,13 @@ LINE1:d95thout#aa0000';
   if (isset($vars['showcommand']))
   {
     echo generate_box_open(array('title' => 'Performance &amp; Output', 'padding' => TRUE));
-    echo("RRDTool Output: " .$graph_return['output']."<br />
+    echo("RRDTool Output: " . escape_html($graph_return['output'])."<br />
           RRDtool Runtime: ".number_format($graph_return['runtime'], 3)."s |
           Total time: "     .number_format($graph_return['total'], 3)."s");
     echo generate_box_close();
     
     echo generate_box_open(array('title' => 'RRDTool Command', 'padding' => TRUE));
-    echo $graph_return['command'];
+    echo escape_html($graph_return['command']);
     echo generate_box_close();
     
     echo generate_box_open(array('title' => 'RRDTool Files Used', 'padding' => TRUE));

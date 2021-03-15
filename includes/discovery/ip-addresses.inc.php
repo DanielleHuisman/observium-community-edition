@@ -11,6 +11,8 @@
  *
  */
 
+global $ip_data;
+
 $ip_data = array('ipv4' => array(),
                  'ipv6' => array());
 //$valid['ip-addresses'] = array();
@@ -19,6 +21,20 @@ $include_dir   = 'includes/discovery/ip-addresses';
 $include_order = 'default'; // Use MIBs from default os definitions by first!
 
 include($config['install_dir']."/includes/include-dir-mib.inc.php");
+
+foreach (get_device_mibs_permitted($device) as $mib)
+{
+  // Detect addresses by definitions
+  if (is_array($config['mibs'][$mib]['ip-address']))
+  {
+    print_cli_data_field($mib);
+    foreach ($config['mibs'][$mib]['ip-address'] as $oid_data)
+    {
+      discover_ip_address_definition($device, $mib, $oid_data);
+    }
+    print_cli(PHP_EOL);
+  }
+}
 
 // Process IP Addresses
 $table_rows = array();
@@ -32,7 +48,7 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
             WHERE `device_id` = ?';
   foreach (dbFetchRows($query, array($device['device_id'])) as $entry)
   {
-    if (empty($entry['ifIndex']))
+    if (!strlen($entry['ifIndex']))
     {
       // Compatibility
       $ifIndex = dbFetchCell('SELECT `ifIndex` FROM `ports` WHERE `port_id` = ? AND `deleted` = ?', array($entry['port_id'], 0));
@@ -69,72 +85,53 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
       if ($ip_version == 'ipv4')
       {
         // IPv4
-        if (isset($entry['prefix']))
-        {
-          if (!is_numeric($entry['prefix']))
-          {
-            if (strlen($entry['mask']))
-            {
-              // Yeah, passed empty prefix, but with correct mask
-              $entry['prefix'] = $entry['mask'];
-            } else {
-              $entry['prefix'] = '32';
-            }
-          }
-        } else {
-          $entry['prefix'] = $entry['mask'];
-        }
         $ip_prefix = $entry['prefix'];
         $ip_origin = $entry['origin'];
         $ip_compressed = $ip_address; // just for compat with IPv6
 
-        if (is_ipv4_valid($ip_address, $ip_prefix) === FALSE)
-        {
-          print_debug("Address '$ip_compressed/$ip_prefix' skipped as invalid.");
-          continue;
-        }
-
-        if (empty($entry['type']))
-        {
-          $entry['type'] = get_ip_type("$ip_compressed/$ip_prefix");
-        }
+        $ip_type = $entry['type'];
         $addr = Net_IPv4::parseAddress($ip_address.'/'.$ip_prefix);
         $ip_cidr = $addr->bitmask;
         $ip_network = $addr->network . '/' . $ip_cidr;
         $full_address = $ip_address . '/' . $ip_cidr;
 
-        $new_address = array('port_id'         => $port_id,
-                             'ifIndex'         => $ifIndex,
-                             'device_id'       => $device['device_id'],
-                             'ipv4_address'    => $ip_address,
-                             'ipv4_binary'     => inet_pton($ip_address),
-                             'ipv4_prefixlen'  => $ip_cidr);
+        $new_address = [
+          'port_id'         => $port_id,
+          'ifIndex'         => $ifIndex,
+          'device_id'       => $device['device_id'],
+          'ipv4_address'    => $ip_address,
+          'ipv4_binary'     => inet_pton($ip_address),
+          'ipv4_prefixlen'  => $ip_cidr,
+          'ipv4_type'       => $ip_type
+        ];
       } else {
         // IPv6
-        if (!is_numeric($entry['prefix'])) { $entry['prefix'] = '128'; }
         $ip_prefix = $entry['prefix'];
         $ip_origin = $entry['origin'];
         $ip_compressed = Net_IPv6::compress($ip_address, TRUE);
-        if (is_ipv6_valid($ip_address, $ip_prefix) === FALSE)
-        {
-          print_debug("Address '$ip_compressed/$ip_prefix' skipped as invalid.");
-          continue;
-        }
         $full_address = $ip_compressed.'/'.$ip_prefix;
-        if (empty($entry['type']))
-        {
-          $entry['type'] = get_ip_type($full_address);
-        }
+        $ip_type = $entry['type'];
         $ip_network = Net_IPv6::getNetmask($full_address) . '/' . $ip_prefix;
         //$full_compressed = $ip_compressed.'/'.$ipv6_prefixlen;
-        $new_address = array('port_id'         => $port_id,
-                             'ifIndex'         => $ifIndex,
-                             'device_id'       => $device['device_id'],
-                             'ipv6_address'    => $ip_address,
-                             'ipv6_binary'     => inet_pton($ip_address),
-                             'ipv6_compressed' => $ip_compressed,
-                             'ipv6_prefixlen'  => $ip_prefix,
-                             'ipv6_origin'     => $ip_origin);
+        $new_address = [
+          'port_id'         => $port_id,
+          'ifIndex'         => $ifIndex,
+          'device_id'       => $device['device_id'],
+          'ipv6_address'    => $ip_address,
+          'ipv6_binary'     => inet_pton($ip_address),
+          'ipv6_compressed' => $ip_compressed,
+          'ipv6_prefixlen'  => $ip_prefix,
+          'ipv6_type'       => $ip_type,
+          'ipv6_origin'     => $ip_origin
+        ];
+      }
+
+      // VRFs
+      $sql = "SELECT `vrf_id` FROM `vrfs` WHERE `device_id` = ? AND `vrf_name` = ?";
+      if (strlen($entry['vrf']) &&
+          $vrf_id = dbFetchCell($sql, [ $device['device_id'], $entry['vrf'] ]))
+      {
+        $new_address['vrf_id'] = $vrf_id;
       }
 
       // Check network
@@ -148,7 +145,7 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
       $new_address[$ip_version.'_network_id'] = $ip_network_id;
 
       // Add to display table
-      $table_rows[] = array($ifIndex, truncate($port['ifDescr'], 30), nicecase($ip_version), $full_address, $ip_network, $ip_origin);
+      $table_rows[] = array($ifIndex, truncate($port['ifDescr'], 30), nicecase($ip_version), $full_address, $ip_network, $entry['type'], $ip_origin);
 
       // Check IP in DB
       $update_array = array();
@@ -156,14 +153,15 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
       {
         $old_address = &$old_table[$ip_version][$ifIndex][$ip_address];
         $ip_address_id = $old_address[$ip_version.'_address_id'];
-        foreach (array_keys($new_address) as $param)
+        $params = array_diff(array_keys($old_address), [ 'device_id', $ip_version.'_address_id' ]);
+        foreach ($params as $param)
         {
           if ($param == 'ipv6_binary')
           {
             // Compare decoded binary IPv6 address
             if (inet_ntop($old_address[$param]) != $new_address['ipv6_compressed']) { $update_array[$param] = $new_address[$param]; }
           }
-          else if ($param == 'ipv4_binary')
+          elseif ($param == 'ipv4_binary')
           {
             // Compare decoded binary IPv4 address
             if (inet_ntop($old_address[$param]) != $new_address['ipv4_address'])    { $update_array[$param] = $new_address[$param]; }
@@ -171,7 +169,12 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
             // All other params as string
             if ($old_address[$param] != $new_address[$param])
             {
-              $update_array[$param] = $new_address[$param];
+              if (in_array($param, [ 'vrf_id', 'ifIndex', $ip_version.'_type' ]) && !strlen($new_address[$param]))
+              {
+                $update_array[$param] = [ 'NULL' ];
+              } else {
+                $update_array[$param] = $new_address[$param];
+              }
             }
           }
         }
@@ -183,7 +186,7 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
           dbUpdate($update_array, $ip_version.'_addresses', '`'.$ip_version.'_address_id` = ?', array($old_address[$ip_version.'_address_id']));
           $GLOBALS['module_stats'][$module]['unchanged']++;
         }
-        else if ($update_count)
+        elseif ($update_count)
         {
           // Updated
           dbUpdate($update_array, $ip_version.'_addresses', '`'.$ip_version.'_address_id` = ?', array($old_address[$ip_version.'_address_id']));
@@ -259,7 +262,7 @@ foreach (array('ipv4', 'ipv6') as $ip_version)
   }
 }
 
-$table_headers = array('%WifIndex%n', '%WifDescr%n', '%WIP: Version%n', '%WAddress%n', '%WNetwork%n', '%WOrigin%n');
+$table_headers = array('%WifIndex%n', '%WifDescr%n', '%WIP: Version%n', '%WAddress%n', '%WNetwork%n', '%WType%n', '%WOrigin%n');
 print_cli_table($table_rows, $table_headers);
 
 // Clean

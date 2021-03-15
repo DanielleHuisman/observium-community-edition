@@ -164,8 +164,8 @@ var last_ifin = 0;
 var last_ifout = 0;
 var last_ugmt = 0;
 var max = 0;
-var plot_in = new Array();
-var plot_out = new Array();
+var plot_in = [];
+var plot_out = [];
 
 var max_num_points = <?php echo($nb_plot) ?>;  // maximum number of plot data points
 var step = <?php echo($width) ?> / max_num_points ;

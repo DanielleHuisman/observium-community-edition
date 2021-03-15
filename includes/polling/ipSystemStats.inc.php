@@ -122,7 +122,7 @@ if (!in_array("IP-MIB", get_device_mibs_blacklist($device))) // Skip blacklisted
 
     echo(PHP_EOL);
 
-    print_cli_data("Graphs",  implode($show_graphs," "), 2);
+    print_cli_data("Graphs",  implode(" ", $show_graphs), 2);
   }
 }
 unset($show_graphs);

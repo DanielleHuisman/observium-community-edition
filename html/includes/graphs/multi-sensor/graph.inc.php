@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -30,7 +29,7 @@ foreach ($vars['id'] as $port_id)
   $rrd_filename = get_rrd_path($device, get_sensor_rrd($device, $sensor));
 
   $rrd_list[$i]['filename'] = $rrd_filename;
-  $rrd_list[$i]['descr'] = $sensor['sensor_descr'];
+  $rrd_list[$i]['descr'] = rewrite_entity_name($sensor['sensor_descr'], 'sensor');
   $rrd_list[$i]['ds'] = 'sensor';
 
   $i++;

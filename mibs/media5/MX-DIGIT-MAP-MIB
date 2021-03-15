@@ -1,0 +1,523 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--
+--      Copyright(c) 2001-2004 Mediatrix Telecom, Inc.
+--      Copyright(c) 2008 Media5 Corporation. ("Media5")
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Media5.
+--
+--   Media5 reserves all rights to this document as well as to the Intellectual
+--   Property of the document and the technology and know-how that it includes
+--   and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part, in
+--   any form whatsoever without written prior approval by Media5.
+--
+--   Media5 reserves the right to revise this publication and make changes at
+--   any time and without the obligation to notify any person and/or entity of
+--   such revisions and/or changes.
+--
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-DIGIT-MAP-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        mediatrixConfig
+    FROM MX-SMI
+        MxEnableState
+    FROM MX-TC;
+
+digitMapMIB MODULE-IDENTITY
+    LAST-UPDATED "200810160000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION  "This MIB is used to configure digit maps for all endpoints of
+                  the unit. A digit map is a sequence of digits that is
+                  acceptable (or inacceptable) for calling. For example, the
+                  digit map 'xx' will accept any two dialed numbers as a valid
+                  digit map.
+
+                  The permitted digit map syntax is taken from the core MGCP
+                  specification, RFC2705: ftp://ftp.isi.edu/in-notes/rfc2705.txt,
+                  section 3.4.
+
+                  DigitMap = DigitString  / '(' DigitStringList ')'
+                  DigitStringList = DigitString 0*( '|' DigitString )
+                  DigitString = 1*(DigitStringElement)
+                  DigitStringElement = DigitPosition ['.']
+                  DigitPosition = DigitMapLetter / DigitMapRange
+                  DigitMapLetter = DIGIT / '#' / '*' / 'A' / 'B' / 'C' / 'D' / 'T'
+                  DigitMapRange =  'x' / '[' 1*DigitLetter ']'
+                  DigitLetter ::= *((DIGIT '-' DIGIT ) / DigitMapLetter)
+
+                  where 'x' means 'any digit' and '.' means 'any number of'."
+
+
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "200910140000Z"
+    DESCRIPTION "Updated digitMapAllowedLineToApply and digitMapRefusedLineToApply description."
+    REVISION    "200810160000Z"
+    DESCRIPTION "Updated digitMapProcessDigitsWhenPressed description."
+    REVISION    "200808250000Z"
+    DESCRIPTION "Added digitMapProcessDigitsWhenPressed."
+    REVISION    "200411010000Z"
+    DESCRIPTION "Added digitMapAllowedLineToApply and digitMapRefusedLineToApply."
+    REVISION    "200302240000Z"
+    DESCRIPTION "Deprecated digitMapAllowedIsValid and digitMapRefusedIsValid."
+    REVISION    "200302170000Z"
+    DESCRIPTION "Added digitMap timeouts."
+    REVISION    "200211210000Z"
+    DESCRIPTION "digitMapAllowedIndex and digitMapRefusedIndex are read-only"
+    ::= { mediatrixConfig 55 }
+
+digitMapMIBObjects OBJECT IDENTIFIER ::= { digitMapMIB 1 }
+digitMapConformance OBJECT IDENTIFIER ::= { digitMapMIB 2 }
+
+    -- ************************************************************************
+    -- Allowed Digit map table parameters
+    -- ************************************************************************
+
+    digitMapProcessDigitsWhenPressed OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Determines when a digit is processed through the digit maps.
+
+                     disable :
+                        Digits are processed only when released. Disabling this
+                        feature increases the delay needed to match a dialed
+                        string to a digit map. There is also an impact on
+                        digitMapTimeoutFirstDigit and digitMapTimeoutCompletion
+                        since the timers are stopped at the end of a DTMF
+                        instead of the beginning. It can also lead to small DTMF
+                        leaks when using subscriber services if the variable
+                        subscriberServicesProcessingTrigger is set to flashHookAndDigits.
+
+                     enable :
+                        Digits are processed as soon as they are pressed.
+                        This can lead to a DTMF leak in the RTP at the beginning
+                        of a call if the voice stream is established before the
+                        last DTMF is released.
+
+                     This variable's semantics are different depending on
+                     protocol and/or hardware platforms.
+                     Please refer to the documentation shipped with your
+                     device for more details."
+        DEFVAL      { enable }
+        ::= { digitMapMIBObjects  1 }
+
+
+    digitMapAllowedTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF DigitMapAllowedEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of the digit maps that are considered valid if
+                     dialed, indexed by the digitMap entry number."
+        ::= { digitMapMIBObjects 10 }
+
+        digitMapAllowedEntry OBJECT-TYPE
+            SYNTAX      DigitMapAllowedEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the digitMapAllowedTable. It contains all
+                         informations pertaining to an accepted digit map."
+            INDEX       {
+                            digitMapAllowedIndex
+                        }
+            ::= { digitMapAllowedTable 1 }
+
+            DigitMapAllowedEntry ::= SEQUENCE
+                {
+                    digitMapAllowedIndex                Unsigned32,
+                    digitMapAllowedEnable               INTEGER,
+                    digitMapAllowedDigitMap             OCTET STRING,
+                    digitMapAllowedIsValid              INTEGER,
+                    digitMapPrefixedDigitRemovalCount   Unsigned32,
+                    digitMapPrependedString             OCTET STRING,
+                    digitMapSuffixStringToRemove        OCTET STRING,
+                    digitMapAllowedLineToApply          OCTET STRING
+                }
+
+            digitMapAllowedIndex OBJECT-TYPE
+                SYNTAX  Unsigned32 (1..10)
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "Accepted digit map index for this row."
+                ::= { digitMapAllowedEntry 5 }
+
+            digitMapAllowedEnable OBJECT-TYPE
+                SYNTAX  INTEGER {
+                            disable(0),
+                            enable(1)
+                           }
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "If enabled, this digit map will be recognised and
+                             accepted only if it is also valid.
+
+                             If disabled, this digit map will not be recognised."
+                DEFVAL      { enable }
+                ::= { digitMapAllowedEntry 10 }
+
+            digitMapAllowedDigitMap OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..63))
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "A string composing a digit map that will be
+                             considered valid when dialed. The string must
+                             be declared with the syntax described in the
+                             digitMapMIB entry description."
+                DEFVAL      { "x.T" }
+                ::= { digitMapAllowedEntry 15 }
+
+            digitMapAllowedIsValid OBJECT-TYPE
+            SYNTAX  INTEGER {
+                             invalid(0),
+                             valid(1)
+                            }
+                MAX-ACCESS  read-only
+                STATUS      deprecated
+                DESCRIPTION "This object is deprecated. This means some agents may implement it and some
+                             agents may not implement it.
+
+                             Diagnosis of the string entered in
+                             digitMapAllowedDigitMap.
+
+                             Possible values are: invalid (0)
+                                                  valid   (1)
+
+                             If the value is invalid, an error was found in the
+                             entered string. Make sure that the syntax
+                             respects that which is described in the
+                             digitMapMIB entry description."
+                DEFVAL      { invalid }
+                ::= { digitMapAllowedEntry 20 }
+
+
+            digitMapPrefixedDigitRemovalCount OBJECT-TYPE
+                SYNTAX  Unsigned32 (0..10)
+                MAX-ACCESS   read-write
+                STATUS       current
+                DESCRIPTION "Post-Dial number modification. This leaf
+                             specifies the amount of digits to remove from the
+                             beginning of the dialed number, after dialing, but
+                             before starting the call.
+
+                             For example, when dialing '1-819-xxx-xxxx',
+                             specifying a value of '4' would mean that the call
+                             is started using the number 'xxx-xxxx'.
+
+                             Also see digitMapPrependedString and
+                             digitMapSuffixStringToRemove.
+
+                             This rule is applied BEFORE applying both
+                             digitMapSuffixStringToRemove and
+                             digitMapPrependedString."
+                DEFVAL      { 0 }
+                ::= { digitMapAllowedEntry 25 }
+
+            digitMapPrependedString OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..20))
+                MAX-ACCESS   read-write
+                STATUS       current
+                DESCRIPTION "Post-Dial number modification.  This leaf specifies
+                             a string to insert at the beginning of the dialed
+                             number before starting the call.  This string is
+                             added after executing the operation required by the
+                             digitMapPrefixedDigitRemovalCount leaf.
+
+                             For example, say that you need to dial a special
+                             digit, '9', for all local calls. Dialing 'xxx-xxxx'
+                             with a value of '9' for this leaf would yield
+                             '9-xxx-xxxx' as the number with which we would
+                             initiate the call.
+
+                             Also see digitMapPrefixedDigitRemovalCount and
+                             digitMapSuffixStringToRemove.
+
+                             This rule is applied AFTER applying both
+                             digitMapPrefixedDigitRemovalCount and
+                             digitMapSuffixStringToRemove."
+                DEFVAL      { "" }
+                ::= { digitMapAllowedEntry 30 }
+
+            digitMapSuffixStringToRemove OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..20))
+                MAX-ACCESS   read-write
+                STATUS       current
+                DESCRIPTION "Post-Dial number modification.  This leaf specifies
+                             a string to look for and remove, from the end of
+                             the dialed number.  This can be especially helpful
+                             if one of your digit maps contains a terminating
+                             character that must not be dialed.
+
+                             For example, a digit map such as '25#' in which the
+                             '#' signals that the user has finished entering
+                             digits.  If, for some reason, you wish to remove the
+                             '#', simply specify '#' in this leaf and the
+                             resulting number will be '25'.
+
+                             Also see digitMapPrefixedDigitRemovalCount and
+                             digitMapPrependedString.
+
+                             This rule is applied AFTER applying
+                             digitMapPrefixedDigitRemovalCount but BEFORE
+                             applying digitMapPrependedString."
+                DEFVAL      { "" }
+                ::= { digitMapAllowedEntry 35 }
+
+            digitMapAllowedLineToApply OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..64))
+                MAX-ACCESS   read-write
+                STATUS       current
+                DESCRIPTION "Specifies the line(s) on which to apply the digit map.
+
+                             The string has the following syntax:
+                              - 'all': Applies to all lines.
+                              - ',': Separator between non-consecutive lists of lines
+                                     or single line.
+                              - 'n': A single line, where n is the line number.
+                              - 'm-n': List of lines where m is the start line number
+                                       and n is the end line number.
+
+                              NOTE: Line duplication is not allowed. Lines must be
+                              specified in low to high order.
+
+                              Example:
+                                '1,3-6': Applies to lines 1, 3, 4, 5, and 6."
+                DEFVAL      { "all" }
+                ::= { digitMapAllowedEntry 50 }
+
+
+
+    -- ************************************************************************
+    -- Refused Digit map table parameters
+    -- ************************************************************************
+    digitMapRefusedTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF DigitMapRefusedEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "A table of the digit maps that are considered invalid if
+                     dialed, indexed by the digitMap entry number."
+        ::= { digitMapMIBObjects 20 }
+
+        digitMapRefusedEntry OBJECT-TYPE
+            SYNTAX      DigitMapRefusedEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the digitMapRefusedTable. It contains all
+                         informations pertaining to a refused digit map."
+            INDEX       {
+                            digitMapRefusedIndex
+                        }
+            ::= { digitMapRefusedTable 1 }
+
+            DigitMapRefusedEntry ::= SEQUENCE
+                {
+                    digitMapRefusedIndex        Unsigned32,
+                    digitMapRefusedEnable       INTEGER,
+                    digitMapRefusedDigitMap     OCTET STRING,
+                    digitMapRefusedIsValid      INTEGER,
+                    digitMapRefusedLineToApply  OCTET STRING
+                }
+
+            digitMapRefusedIndex OBJECT-TYPE
+                SYNTAX  Unsigned32 (1..10)
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "Refused digit map index for this row."
+                ::= { digitMapRefusedEntry 5 }
+
+            digitMapRefusedEnable OBJECT-TYPE
+                SYNTAX  INTEGER {
+                            disable(0),
+                            enable(1)
+                           }
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "If enabled, this digit map will be recognised and
+                             refused only if it is also valid.
+
+                             If disabled, this digit map will not be recognised."
+                DEFVAL      { disable }
+                ::= { digitMapRefusedEntry 10 }
+
+            digitMapRefusedDigitMap OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..63))
+                MAX-ACCESS  read-write
+                STATUS      current
+                DESCRIPTION "A string composing a digit map that will be
+                             considered invalid when dialed. The string must
+                             be declared with the syntax described in the
+                             digitMapMIB entry description."
+                DEFVAL      { "" }
+                ::= { digitMapRefusedEntry 15 }
+
+            digitMapRefusedIsValid OBJECT-TYPE
+            SYNTAX  INTEGER {
+                             invalid(0),
+                             valid(1)
+                            }
+                MAX-ACCESS  read-only
+                STATUS      deprecated
+                DESCRIPTION "This object is deprecated. This means some agents may implement it and some
+                             agents may not implement it.
+
+                             Diagnosis of the string entered in
+                             digitMapRefusedDigitMap.
+
+                             Possible values are: invalid (0)
+                                                  valid   (1)
+
+                             If the value is invalid, an error was found in the
+                             entered string. Make sure that the syntax
+                             respects that which is described in the
+                             digitMapMIB entry description."
+                DEFVAL      { valid }
+                ::= { digitMapRefusedEntry 20 }
+
+            digitMapRefusedLineToApply OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..64))
+                MAX-ACCESS   read-write
+                STATUS       current
+                DESCRIPTION "Specifies the line(s) on which to apply the digit map.
+
+                             The string has the following syntax:
+                              - 'all': Applies to all lines.
+                              - ',': Separator between non-consecutive lists of lines
+                                     or single line.
+                              - 'n': A single line, where n is the line number.
+                              - 'm-n': List of lines where m is the start line number
+                                       and n is the end line number.
+
+                              NOTE: Line duplication is not allowed. Lines must be
+                              specified in low to high order.
+
+                              Example:
+                                '1,3-6': Applies to lines 1, 3, 4, 5, and 6."
+                DEFVAL      { "all" }
+                ::= { digitMapRefusedEntry 50 }
+
+
+    -- ************************************************************************
+    -- Timeout parameters
+    -- ************************************************************************
+    digitMapTimeouts OBJECT IDENTIFIER ::= { digitMapMIBObjects 30 }
+
+        digitMapTimeoutCompletion OBJECT-TYPE
+            SYNTAX  Unsigned32 (1000..180000)
+            MAX-ACCESS   read-write
+            STATUS       current
+            DESCRIPTION "Total time that the user has to dial the DTMF sequence.
+                         The timer starts when the dial tone is played.
+                         When the timer expires, the receiver off-hook tone will be played.
+
+                         This value is expressed in milliseconds (ms)."
+            DEFVAL      { 60000 }
+            ::= { digitMapTimeouts 5 }
+
+        digitMapTimeoutFirstDigit OBJECT-TYPE
+            SYNTAX  Unsigned32 (1000..180000)
+            MAX-ACCESS   read-write
+            STATUS       current
+            DESCRIPTION "Time between the start of the dial tone and the receiver off-hook tone, if no
+                         DTMF is detected.
+
+                         This value is expressed in milliseconds (ms)."
+            DEFVAL      { 20000 }
+            ::= { digitMapTimeouts 10 }
+
+        digitMapTimeoutInterDigit OBJECT-TYPE
+            SYNTAX  Unsigned32 (500..10000)
+            MAX-ACCESS   read-write
+            STATUS       current
+            DESCRIPTION "Value of the 'T' digit in the digitMapAllowedDigitMap strings.
+
+                         The 'T' digit is used to express a time lapse between the detection of two DTMFs.
+
+                         This value is expressed in milliseconds (ms)."
+            DEFVAL      { 4000 }
+            ::= { digitMapTimeouts 15 }
+
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    digitMapCompliances OBJECT IDENTIFIER ::= { digitMapConformance 1 }
+
+    digitMapComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "List of groups required to support digit maps and speed dials."
+        MODULE  -- This Module
+            MANDATORY-GROUPS {
+                                digitMapAllowedVer1,
+                                digitMapRefusedVer1,
+                                digitMapTimeoutVer1
+                             }
+        ::= { digitMapCompliances 1 }
+
+    -- ************************************************************************
+    --  MIB variable grouping
+    -- ************************************************************************
+    digitMapGroups OBJECT IDENTIFIER ::= { digitMapConformance 2 }
+
+    digitMapAllowedVer1 OBJECT-GROUP
+        OBJECTS {
+                    digitMapAllowedIndex,
+                    digitMapAllowedEnable,
+                    digitMapAllowedDigitMap,
+                    digitMapAllowedIsValid,
+                    digitMapPrefixedDigitRemovalCount,
+                    digitMapPrependedString,
+                    digitMapSuffixStringToRemove,
+                    digitMapAllowedLineToApply
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of a digit map."
+        ::= { digitMapGroups 1 }
+
+    digitMapRefusedVer1 OBJECT-GROUP
+        OBJECTS {
+                    digitMapRefusedIndex,
+                    digitMapRefusedEnable,
+                    digitMapRefusedDigitMap,
+                    digitMapRefusedIsValid,
+                    digitMapRefusedLineToApply
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of a digit map."
+        ::= { digitMapGroups 2 }
+
+    digitMapTimeoutVer1 OBJECT-GROUP
+        OBJECTS {
+                    digitMapTimeoutCompletion,
+                    digitMapTimeoutFirstDigit,
+                    digitMapTimeoutInterDigit
+                }
+        STATUS current
+        DESCRIPTION
+            "A collection of objects that defines the characteristics of the digit map timers."
+        ::= { digitMapGroups 3 }
+
+END

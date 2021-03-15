@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -39,7 +38,7 @@ foreach ($config['device_types'] as $entry)
 $form_items = array();
 foreach (array('os', 'hardware', 'vendor', 'version', 'features', 'type', 'distro') as $entry)
 {
-  $query  = "SELECT `$entry` FROM `devices`";
+  $query  = "SELECT DISTINCT `$entry` FROM `devices`";
   if (isset($where_array[$entry]))
   {
     $tmp = $where_array[$entry];
@@ -49,23 +48,27 @@ foreach (array('os', 'hardware', 'vendor', 'version', 'features', 'type', 'distr
   } else {
     $query .= $where;
   }
-  $query .= " AND `$entry` != '' $query_permitted GROUP BY `$entry` ORDER BY `$entry`";
-  foreach (dbFetchColumn($query) as $item)
+  $query .= " AND `$entry` != '' $query_permitted";
+  $selected = dbFetchColumn($query);
+
+  $query_all = "SELECT DISTINCT `$entry` FROM `devices` WHERE `$entry` != '' $query_permitted ORDER BY `$entry`";
+  foreach (dbFetchColumn($query_all) as $item)
   {
+    $group = in_array($item, $selected) ? "Listed" : "Other";
     if ($entry == 'os')
     {
-      $name = $config['os'][$item]['text'];
+      $name = [ 'name' => $config['os'][$item]['text'], 'group' => $group ];
     }
-    else if ($entry == 'type')
+    elseif ($entry == 'type')
     {
       if (isset($types[$item]))
       {
-        $name = array('name' => $types[$item]['text'], 'icon' => $types[$item]['icon']);
+        $name = [ 'name' => $types[$item]['text'], 'icon' => $types[$item]['icon'], 'group' => $group ];
       } else {
-        $name = array('name' => nicecase($item),       'icon' => $config['icon']['exclamation']);
+        $name = [ 'name' => nicecase($item),       'icon' => $config['icon']['exclamation'], 'group' => $group ];
       }
     } else {
-      $name = nicecase($item);
+      $name = [ 'name' => nicecase($item), 'group' => $group ];
     }
     $form_items[$entry][$item] = $name;
   }
@@ -73,16 +76,29 @@ foreach (array('os', 'hardware', 'vendor', 'version', 'features', 'type', 'distr
 
 asort($form_items['os']);
 
+$tmp = $where_array;
+if (isset($where_array['location']))
+{
+  unset($tmp['location']);
+}
+$query  = "SELECT DISTINCT `location` FROM `devices`";
+$query .= ' WHERE 1 ' . implode('', $tmp);
+$query .= " $query_permitted";
+$selected = dbFetchColumn($query);
+unset($tmp);
+
 foreach (get_locations() as $entry)
 {
+  $group = in_array($entry, $selected) ? "Listed" : "Other";
   if ($entry === '') { $entry = OBS_VAR_UNSET; }
-  $form_items['location'][$entry] = $entry;
+  $form_items['location'][$entry] = [ 'name' => $entry, 'group' => $group ];
 }
 
 foreach (get_type_groups('device') as $entry)
 {
   $form_items['group'][$entry['group_id']] = $entry['group_name'];
 }
+//print_vars($form_items);
 
 $form_items['sort'] = array('hostname' => 'Hostname',
                             'domain'   => 'Hostname in Domain Order',
@@ -110,24 +126,28 @@ $form['row'][0]['location'] = array(
                                 'width'       => '100%', //'180px',
                                 'encode'      => TRUE,
                                 'value'       => $vars['location'],
+                                'groups'      => [ 'Listed', 'Other' ],
                                 'values'      => $form_items['location']);
 $form['row'][0]['os']       = array(
                                 'type'        => 'multiselect',
                                 'name'        => 'Select OS',
                                 'width'       => '100%', //'180px',
                                 'value'       => $vars['os'],
+                                'groups'      => [ 'Listed', 'Other' ],
                                 'values'      => $form_items['os']);
 $form['row'][0]['hardware'] = array(
                                 'type'        => 'multiselect',
                                 'name'        => 'Select Hardware',
                                 'width'       => '100%', //'180px',
                                 'value'       => $vars['hardware'],
+                                'groups'      => [ 'Listed', 'Other' ],
                                 'values'      => $form_items['hardware']);
 $form['row'][0]['vendor']   = array(
                                 'type'        => 'multiselect',
                                 'name'        => 'Select Vendor',
                                 'width'       => '100%', //'180px',
                                 'value'       => $vars['vendor'],
+                                'groups'      => [ 'Listed', 'Other' ],
                                 'values'      => $form_items['vendor']);
 $form['row'][0]['group']    = array(
                                 'type'        => 'multiselect',
@@ -162,20 +182,23 @@ $form['row'][1]['version']  = array(
                                 'name'        => 'Select OS Version',
                                 'width'       => '100%', //'180px',
                                 'value'       => $vars['version'],
+                                'groups'      => [ 'Listed', 'Other' ],
                                 'values'      => $form_items['version']);
 $form['row'][1]['features'] = array(
                                 'type'        => 'multiselect',
                                 'name'        => 'Select Featureset',
                                 'width'       => '100%', //'180px',
                                 'value'       => $vars['features'],
+                                'groups'      => [ 'Listed', 'Other' ],
                                 'values'      => $form_items['features']);
 $form['row'][1]['type']     = array(
                                 'type'        => 'multiselect',
                                 'name'        => 'Select Device Type',
                                 'width'       => '100%', //'180px',
                                 'value'       => $vars['type'],
+                                'groups'      => [ 'Listed', 'Other' ], // Order
                                 'values'      => $form_items['type']);
-// Select sort pull-rigth
+// Select sort pull-right
 $form['row'][1]['sort']     = array(
                                 'type'        => 'select',
                                 'icon'        => $config['icon']['sort'],
@@ -212,6 +235,7 @@ $form['row'][2]['distro'] = array(
   'name'        => 'Select Distro',
   'width'       => '100%', //'180px',
   'value'       => $vars['distro'],
+  'groups'      => [ 'Listed', 'Other' ],
   'values'      => $form_items['distro']);
 
 $form['row'][2]['serial']  = array(
@@ -221,14 +245,33 @@ $form['row'][2]['serial']  = array(
   'width'       => '100%', //'180px',
   'placeholder' => TRUE);
 
+$form['row'][2]['disabled']  = array(
+  'type'          => 'switch-ng',
+  //'on-text'       => 'Disabled',
+  'on-color'      => 'primary',
+  'on-icon'       => 'icon-eye-close',
+  //'off-text'      => 'Enabled',
+  'off-icon'      => 'icon-eye-open',
+  'grid'          => 1,
+  //'size'          => 'large',
+  //'height'        => '15px',
+  'title'         => 'Show Enabled/Disabled',
+  //'placeholder'   => 'Disabled',
+  //'readonly'      => TRUE,
+  //'disabled'      => TRUE,
+  //'submit_by_key' => TRUE,
+  'value'         => $vars['disabled']
+);
+
 // search button
 $form['row'][2]['search']   = array(
-                                'type'        => 'submit',
-                                //'name'        => 'Search',
+  'type'        => 'submit',
+  //'name'        => 'Search',
   //'class' => 'btn-primary',
-                                //'icon'        => 'icon-search',
-                                'right'       => TRUE,
-                                );
+  //'icon'        => 'icon-search',
+  'grid'          => 1,
+  'right'       => TRUE,
+);
 
 $panel_form = array('type'          => 'rows',
                     'title'         => 'Search Devices',
@@ -260,8 +303,13 @@ $panel_form['row'][6]['type']          = $form['row'][1]['type'];
 $panel_form['row'][6]['features']      = $form['row'][1]['features'];
 
 $panel_form['row'][7]['group']         = $form['row'][0]['group'];
+$panel_form['row'][7]['group']['grid'] = 4;
 $panel_form['row'][7]['sort']          = $form['row'][1]['sort'];
+$panel_form['row'][7]['sort']['grid'] = 4;
+$panel_form['row'][7]['disabled']      = $form['row'][2]['disabled'];
+$panel_form['row'][7]['disabled']['grid'] = 2;
 $panel_form['row'][7]['search']        = $form['row'][2]['search'];
+$panel_form['row'][7]['search']['grid'] = 2;
 
 // Register custom panel
 register_html_panel(generate_form($panel_form));

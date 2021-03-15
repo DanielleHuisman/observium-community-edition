@@ -1,0 +1,2715 @@
+LUM-DCN-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32, Counter32, IpAddress, NOTIFICATION-TYPE,
+    Gauge32, Integer32
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE, NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
+    TEXTUAL-CONVENTION, DisplayString, DateAndTime
+        FROM SNMPv2-TC
+    lumModules, lumDcnMIB
+	FROM LUM-REG
+    FaultStatus, MgmtNameString, SubrackNumber, SlotNumber, PortNumber,
+    BoardOrInterfaceOperStatus, BoardOrInterfaceAdminStatus, CommandString,
+    LambdaFrequency, ObjectProperty
+	FROM LUM-TC;
+
+lumDcnMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201806290000Z" -- June 29th 2018
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+        "The DCN mib.
+
+"
+	REVISION
+        "201806290000Z" -- June 29th 2018
+    DESCRIPTION
+        "Changes made for release r31.0:
+        - Added interface number for GCC PPP"
+    REVISION
+        "201712080000Z" -- Dec 8th 2017
+    DESCRIPTION
+        "Changes made for release r30.0:
+         - Added dcnEthAdminStatus and dcnEthOperStatus
+         - Add vlanId and vlanEtherType attributes in PPP-mib table"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "Changes made for release r29.0:
+         - Changed ORGANIZATION and CONTACT-INFO"
+    REVISION
+        "201611300000Z" -- November 2016
+    DESCRIPTION
+        "Changes made for release r28.0:
+        - added AID and physical location."
+    REVISION
+        "201601110000Z" -- Jan 11th 2016
+    DESCRIPTION
+	"Added default operStatus to notPresent."
+    REVISION
+        "201511300000Z" -- November 30th 2015
+    DESCRIPTION
+        "Updated alarm text for Configuration Mismatch alarm"
+    REVISION
+        "201505290000Z" -- May 29th 2015
+    DESCRIPTION
+        "Added cc - communication channel table"
+    REVISION
+        "201112200945Z" -- Dec 20th 2011
+    DESCRIPTION
+        "Changed oscmode to support new cusfpii"
+    REVISION
+        "201108160945Z" -- Aug 16th 2011
+    DESCRIPTION
+        "Added eth table"
+    REVISION
+        "201002010000Z" -- Feb 1st 2010
+    DESCRIPTION
+        "LongAlias changes, GCC-channels etc."
+    REVISION
+        "200302120000Z" -- Feb 12th 2003
+    DESCRIPTION
+        "Added PPP links."
+    REVISION
+        "200211150000Z" -- Nov 15th 2002
+    DESCRIPTION
+        "The initial revision of this module."
+    ::= { lumModules 21 }
+
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and complicance
+-- specifications.
+-- ----------------------------------------------------
+
+lumDcnConfs OBJECT IDENTIFIER ::= { lumDcnMIB 1 }
+lumDcnGroups OBJECT IDENTIFIER ::= { lumDcnConfs 1 }
+lumDcnCompl OBJECT IDENTIFIER ::= { lumDcnConfs 2 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the DCN MIB
+-- ----------------------------------------------------
+
+lumDcnMIBObjects OBJECT IDENTIFIER ::= { lumDcnMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+dcnGeneral OBJECT IDENTIFIER ::= { lumDcnMIBObjects 1 }
+dcnIfList OBJECT IDENTIFIER ::= { lumDcnMIBObjects 2 }
+lumentisDcnNotifications  OBJECT IDENTIFIER ::= { lumDcnMIBObjects 3 }
+dcnPppList OBJECT IDENTIFIER ::= { lumDcnMIBObjects 4 }
+dcnAddress OBJECT IDENTIFIER ::= { lumDcnMIBObjects 5 }
+dcnEthList OBJECT IDENTIFIER ::= { lumDcnMIBObjects 6 }
+dcnCcList OBJECT IDENTIFIER ::= { lumDcnMIBObjects 7 }
+
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+DcnSignalType ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "Signal format for DCN interfaces."
+
+    SYNTAX INTEGER {
+	undefined (0),
+	electrical  (1),
+	optical (2)  }
+
+DcnOscMode ::= TEXTUAL-CONVENTION
+    STATUS current
+    DESCRIPTION
+        "The usage mode of the OSC channel."
+
+    SYNTAX INTEGER {
+	icn (0),
+	dcn  (1),
+	customer  (2),
+	mixed (3),
+	unused (4),
+	lan (5),
+	customerOpto (6),
+	mixedOpto (7)  }
+
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+
+dcnGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The time when the configuration of the MIB was
+	last changed.
+
+"
+    ::= { dcnGeneral 1 }
+
+dcnGeneralStateLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The time when the state of the MIB was last	
+	changed.
+
+"
+    ::= { dcnGeneral 2 }
+
+dcnGeneralDcnIfTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"Size of table
+
+"
+    ::= { dcnGeneral 3 }
+
+dcnGeneralDcnPppTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"Size of table
+
+"
+    ::= { dcnGeneral 4 }
+
+dcnGeneralDcnEthTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"Size of table
+
+"
+    ::= { dcnGeneral 5 }
+
+dcnGeneralDcnCcTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Size of table
+
+"
+    ::= { dcnGeneral 6 }
+
+-- ----------------------------------------------------
+-- CC group
+-- ----------------------------------------------------
+
+dcnCcTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF DcnCcEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The cc list."
+    ::= { dcnCcList 1 }
+
+dcnCcEntry OBJECT-TYPE
+    SYNTAX      DcnCcEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the interface list.
+
+"
+    INDEX { dcnCcIndex }
+    ::= { dcnCcTable 1 }
+
+DcnCcEntry ::=
+    SEQUENCE {
+    dcnCcIndex              Unsigned32,
+    dcnCcName               MgmtNameString,
+    dcnCcDescr              DisplayString,
+    dcnCcSubrack            SubrackNumber,
+    dcnCcSlot               SlotNumber,
+    dcnCcTxPort             PortNumber,
+    dcnCcRxPort             PortNumber,
+    dcnCcAdminStatus        BoardOrInterfaceAdminStatus,
+    dcnCcChannelStatus      INTEGER,
+    dcnCcErrorCounter       Counter32,
+    dcnCcResetCounter       INTEGER,
+    dcnCcFecFailure         FaultStatus,
+    dcnCcTrxNotSupportCommChannel   FaultStatus,
+    dcnCcConfigurationMismatch      FaultStatus}
+
+dcnCcIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "An arbitrary index assigned to each entry.
+
+"
+   ::= { dcnCcEntry 1 }
+
+dcnCcName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The management name of the communication channel interface, for example
+    'line:1:1:1-2', where the first number indicates subrack,
+    the second slot number and the third is the port number.
+
+"
+    ::= { dcnCcEntry 2 }
+
+dcnCcDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "User configurable label.
+
+"
+    DEFVAL { "" }
+    ::= { dcnCcEntry 3 }
+
+dcnCcSubrack OBJECT-TYPE
+    SYNTAX      SubrackNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of the subrack where the interface
+    is located.
+
+"
+    ::= { dcnCcEntry 4 }
+
+dcnCcSlot OBJECT-TYPE
+    SYNTAX      SlotNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of the slot where the interface is
+    located.
+
+"
+    ::= { dcnCcEntry 5 }
+
+dcnCcTxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of the port where the TX-side of the
+    interface is located.
+
+"
+    ::= { dcnCcEntry 6 }
+
+dcnCcRxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of the port where the RX-side of the
+    interface is located.
+
+"
+    ::= { dcnCcEntry 7 }
+
+dcnCcAdminStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The administrative state for the communication channel link.
+
+    down - The communication channel link should be inactive.
+
+    service - The link is activated but alarms
+    are suppressed. Intended for use during service
+    or re-configuration. When service is concluded
+    adminStatus should be set to 'up' again.
+
+    up - The interface should be activated when
+    it becomes available. Alarms are not suppressed.
+
+"
+    DEFVAL { down }
+    ::= { dcnCcEntry 8 }
+
+dcnCcChannelStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+                notPresent (1),
+                down (2),
+                calling (3),
+                up (4),
+                waitToHangup (5),
+                broken (6),
+                restarting (7)}
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Status of the communication channel.
+
+        NotPresent - The HW (board) is not in place to execute the function.
+
+        Down - Admin is Down and a incoming communication channel is not detected
+
+        Calling - The communication channel is transmitted, but no incoming communication channel is detected
+
+        Up - The communication channel is sent and received
+
+        WaitToHangUp - The communication channel is sent and received. It is maintained on request of the peer.
+         The transmission will be terminated as soon as the peer stops sending.
+
+        Broken - The communication channel is unavailable due to a fault in the carrier signal (the traffic signal).
+
+"
+    ::= { dcnCcEntry 9 }
+
+dcnCcErrorCounter OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The counter associated FEC errors of the management channel.
+	    The errors are accumulated since last reset.
+
+"
+    ::= { dcnCcEntry 10 }
+
+dcnCcResetCounter OBJECT-TYPE
+    SYNTAX  INTEGER {
+                normal (1),
+                reset (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Reset the error counter to 0.
+
+"
+    DEFVAL { normal }
+    ::= { dcnCcEntry 11 }
+
+dcnCcFecFailure OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "FEC failure
+
+"
+    ::= { dcnCcEntry 12 }
+
+dcnCcTrxNotSupportCommChannel OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Trx does not support communication channel
+
+        The inserted transceiver does not support usage of communication channel.
+
+        Alarm - The transceiver does not support usage of communication channel.
+
+        OK - The transceiver support usage of communication channel
+
+"
+    ::= { dcnCcEntry 13 }
+
+dcnCcConfigurationMismatch OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Communication channel configuration mismatch
+
+        Local communication channel is configured, but the remote side sends enabled=False.
+        This mismatch must be persistent for 60 seconds before the alarm is generated.
+        The extra delay will allow a restart of the transponder at the remote NE without unnecessary alarms.
+
+        Alarm - Local communication channel is configured, but the remote side sends enabled=False
+
+        OK - Local communication channel is configured and the remote side sends enabled=True
+
+"
+    ::= { dcnCcEntry 14 }
+
+-- ----------------------------------------------------
+-- Address group
+-- ----------------------------------------------------
+
+dcnAddressCurrentPppAddress OBJECT-TYPE
+    SYNTAX   	IpAddress
+    MAX-ACCESS 	read-only
+    STATUS   	current
+    DESCRIPTION
+       "The IP address associated with the PPP i/fs
+
+       If set to empty-string, then the IP-address
+       of eth1 is used.
+
+       Updating this variable requires a restart of
+       the system.
+
+"
+    ::= { dcnAddress 1 }
+
+dcnAddressNextPppAddress OBJECT-TYPE
+    SYNTAX   	IpAddress
+    MAX-ACCESS 	read-write
+    STATUS   	current
+    DESCRIPTION
+       "The IP address to be used for the PPP i/fs
+        after the next restart.
+
+       Updating this variable requires a restart of
+       the system.
+
+"
+    ::= { dcnAddress 2 }
+
+-- ----------------------------------------------------
+-- DCN client interfaces
+-- ----------------------------------------------------
+
+dcnIfTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF DcnIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"The interface list."
+    ::= { dcnIfList 1 }
+
+dcnIfEntry OBJECT-TYPE
+    SYNTAX      DcnIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"An entry in the interface list.
+
+"
+    INDEX { dcnIfIndex }
+    ::= { dcnIfTable 1 }
+
+DcnIfEntry ::=
+    SEQUENCE {
+	dcnIfIndex 			Unsigned32,
+	dcnIfName			MgmtNameString,
+	dcnIfDescr			DisplayString,
+	dcnIfSubrack			SubrackNumber,
+	dcnIfSlot			SlotNumber,
+	dcnIfTxPort			PortNumber,
+	dcnIfRxPort			PortNumber,
+	dcnIfInvPhysIndexOrZero		Unsigned32,
+	dcnIfType			DcnSignalType,
+	dcnIfMaxSpeed			Gauge32,
+	dcnIfOscMode		        DcnOscMode,
+	dcnIfAdminStatus		BoardOrInterfaceAdminStatus,
+	dcnIfOperStatus			BoardOrInterfaceOperStatus,
+     	dcnIfTxSignalStatus		INTEGER,
+	dcnIfLinkDown		        FaultStatus,
+	dcnIfTxFrequency                LambdaFrequency,
+	dcnIfObjectProperty             ObjectProperty,
+        dcnIfLaserStatus                INTEGER,
+        dcnIfPowerLevel                 Integer32,
+        dcnIfTxPowerLevel               Integer32,
+        dcnIfReceiverSensitivity        Integer32,
+        dcnIfPowerLevelLowRelativeThreshold Integer32,
+        dcnIfLaserTempActual            Integer32,
+        dcnIfTrxClass                   DisplayString,
+        dcnIfHighSpeedMin               Gauge32,
+        dcnIfHighSpeedMax               Gauge32,
+	dcnIfExpectedTxFrequency        LambdaFrequency,
+	dcnIfLaserBias                  Unsigned32,
+        dcnIfLossOfSignal               FaultStatus,
+        dcnIfTrxCodeMismatch            FaultStatus,
+        dcnIfTrxBitrateUnavailable      FaultStatus,
+        dcnIfTrxMissing                 FaultStatus,
+        dcnIfTransmitterFailed          FaultStatus,
+        dcnIfIllegalFrequency           FaultStatus,
+	dcnIfUnexpectedTxFrequency      FaultStatus,
+        dcnIfReceivedPowerHigh          FaultStatus,
+        dcnIfReceivedPowerLow           FaultStatus,
+	dcnIfTrxMediaMismatch           FaultStatus,
+        dcnIfProtocolVersionMismatch    FaultStatus,
+        dcnIfRemoteDefectIndication     FaultStatus,
+	dcnIfTraceTransmitted           DisplayString,
+	dcnIfTraceReceived              DisplayString,
+	dcnIfTraceExpected              DisplayString,
+	dcnIfTraceAlarmMode             INTEGER,
+	dcnIfTraceMismatch              FaultStatus,
+	dcnIfLaserMode                  INTEGER,
+	dcnIfLinkSupervisionFailure	FaultStatus,
+	dcnIfAid                        DisplayString,
+	dcnIfPhysicalLocation           DisplayString }
+
+
+dcnIfIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"An arbitrary index assigned to each entry.
+
+"
+   ::= { dcnIfEntry 1 }
+
+dcnIfName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The management name of the interface, for example
+	'osc:1:1:1-2', where the first number indicates
+	sub-rack, the second slot number and the third is
+	the port number.
+	Examples:
+
+	osc:s:s:p - DCN client interface
+
+"
+    ::= { dcnIfEntry 2 }
+
+dcnIfDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"User configurable label.
+
+"
+    DEFVAL { "" }
+    ::= { dcnIfEntry 3 }
+
+dcnIfSubrack OBJECT-TYPE
+    SYNTAX      SubrackNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The number of the subrack where the interface
+	is located.
+
+"
+    ::= { dcnIfEntry 4 }
+
+dcnIfSlot OBJECT-TYPE
+    SYNTAX      SlotNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The number of the slot where the interface is
+	located.
+
+"
+    ::= { dcnIfEntry 5 }
+
+dcnIfTxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The number of the port where the TX-side of the
+	interface is located.
+
+"
+    ::= { dcnIfEntry 6 }
+
+dcnIfRxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The number of the port where the RX-side of the
+	interface is located.
+
+"
+    ::= { dcnIfEntry 7 }
+
+dcnIfInvPhysIndexOrZero OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The row in the invPhysTable for this interface.
+	Set to 0 if not known.
+
+"
+    ::= { dcnIfEntry 8 }
+
+dcnIfType OBJECT-TYPE
+    SYNTAX      DcnSignalType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The expected signal type.
+
+"
+    ::= { dcnIfEntry 9 }
+
+dcnIfMaxSpeed OBJECT-TYPE
+    SYNTAX      Gauge32 (10..100)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The expected signal bit rate in units of
+	1,000,000 bits (Mb) per second.
+
+"
+    ::= { dcnIfEntry 10 }
+
+dcnIfOscMode OBJECT-TYPE
+    SYNTAX      DcnOscMode
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"The usage mode for the OSC channel
+
+	icn - Used for node internal communication
+	
+	dcn - Used for external communication
+	(main CU only)
+
+	customer - Used for customer communication
+
+        mixed - Used both for 'dcn' and 'customer'
+                communication (main CU only)
+                Only available for cuSfpii
+
+        lan - Used as external DCN, part of DCN
+              Only available for cuSfpii (main CU only)
+
+        customerOpto - as customer but optical mode
+                       Only available for port 5-6 and 7-8 on cuSfpii
+
+        mixedOpto - as mixed but optical mode
+                    Only available on cuSfpii port 5-6 and 7-8
+
+	unused - Only available for port 5-6 and 7-8 on cuSfpii
+	(main CU only)
+
+
+	For port 3 and 4 on cuSfpii (main cu) unused is default value.
+	For slave subracks, 'icn' is default value.
+
+"
+    DEFVAL { dcn }
+    ::= { dcnIfEntry 11 }
+
+dcnIfAdminStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"The administrative state for the interface.
+
+	down - The interface should be inactive.
+	
+	service - The interface is activated but alarms
+	are suppressed. Intended for use during service
+	or re-configuration. When service is concluded
+	adminStatus should be set to 'up' again.
+
+	up - The interface should be activated when
+	it becomes available. Alarms are not suppressed.
+
+	For slave subracks, 'up' is default value.
+
+"
+    DEFVAL { down }
+    ::= { dcnIfEntry 12 }
+
+dcnIfOperStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The operational state for the interface.
+
+	notPresent - The physical resources are not
+	available.
+
+	down - The interface is de-activated or the are
+	faults preventing it from going to the
+	'up'-state.
+	
+	up - The interface is operational.
+
+"
+    DEFVAL { notPresent }
+    ::= { dcnIfEntry 13 }
+
+dcnIfTxSignalStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+			down (1),
+			degraded (2),
+			up (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The operational state for outgoing (TX) signal
+	of the interface.
+
+	down - A fault that would lead to a protection
+	switch has occurred.
+
+	degraded - The signal quality is impaired.
+	
+	up - The signal is OK.
+
+"
+    ::= { dcnIfEntry 14 }
+
+dcnIfLinkDown OBJECT-TYPE
+    SYNTAX	FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"A: Failure to negotiate a connection with the
+	other party.
+
+         D: A connection is negotiated.
+
+"
+    ::= { dcnIfEntry 15 }
+
+dcnIfTxFrequency OBJECT-TYPE
+    SYNTAX      LambdaFrequency
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The transmitted frequency given.
+
+"
+    ::= { dcnIfEntry 16 }
+
+dcnIfObjectProperty OBJECT-TYPE
+    SYNTAX  	ObjectProperty
+    MAX-ACCESS  read-only
+    STATUS	current
+    DESCRIPTION
+        "Property mask.
+
+"
+    ::= { dcnIfEntry 17 }
+
+dcnIfLaserStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    off (1),
+                    on (2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational state of the TX-side laser.
+
+        off - The laser is turned off.
+
+        on - The laser is turned on.
+
+"
+    ::= { dcnIfEntry 18 }
+
+dcnIfPowerLevel OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The received power level in units of 0.1 dBm.
+
+"
+    ::= { dcnIfEntry 19 }
+
+dcnIfTxPowerLevel OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The transmitted power level in units of 0.1 dBm.
+
+"
+    ::= { dcnIfEntry 20 }
+
+
+dcnIfReceiverSensitivity OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The lowest power that the receiver is guaranteed
+        to handle, in units of 0.1 dBm.
+
+"
+    ::= { dcnIfEntry 21 }
+
+dcnIfPowerLevelLowRelativeThreshold OBJECT-TYPE
+    SYNTAX      Integer32 (-50..100)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The lower threshold for received power level in
+        units of 0.1 dB, relative to the receiver
+        sensitivity.
+
+"
+    DEFVAL { 30 }
+    ::= { dcnIfEntry 22 }
+
+
+dcnIfLaserTempActual OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The actual laser temperature in units of
+        0.1 degrees centigrade.
+
+"
+    ::= { dcnIfEntry 23 }
+
+dcnIfTrxClass OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "String that describes the transceiver class.
+
+"
+    DEFVAL { "" }
+    ::= { dcnIfEntry 24 }
+
+dcnIfHighSpeedMin OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The minmum speed in units of 1,000,000 bits (Mb)
+        per second. If this object reports a value of 'n'
+        then the speed of the interface is somewhere in
+        the range of 'n-500,000' to 'n+499,999'.
+
+"
+    ::= { dcnIfEntry 25 }
+
+dcnIfHighSpeedMax OBJECT-TYPE
+    SYNTAX      Gauge32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The maximum speed in units of 1,000,000 bits per
+        second. If this object reports a value of 'n'
+        then the speed of the interface is somewhere in
+        the range of 'n-500,000' to 'n+499,999'.
+
+"
+    ::= { dcnIfEntry 26 }
+
+dcnIfExpectedTxFrequency OBJECT-TYPE
+    SYNTAX      LambdaFrequency
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The expected frequency given in hundreds of GHz
+        (0.01 GHz).
+
+"
+    DEFVAL { 0 }
+    ::= { dcnIfEntry 27 }
+
+dcnIfLaserBias OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Measures laser bias current value in tenths of
+        mA (0.1 mA).
+
+"
+    ::= { dcnIfEntry 28 }
+
+
+dcnIfLossOfSignal OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Loss of signal.
+        Applicable for all signal formats.
+
+        A(ctivation): Active loss of signal HW indication.
+
+        D(e-activation): Inactive loss of signal HW
+        indication.
+
+"
+    ::= { dcnIfEntry 29 }
+
+
+dcnIfTrxCodeMismatch OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The inserted transceiver does not have a legal
+        manufacturer code.
+
+        A: A transceiver with illegal code is inserted.
+
+        D: The transceiver with illegal code is removed.
+
+"
+    ::= { dcnIfEntry 30 }
+
+dcnIfTrxBitrateUnavailable OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The inserted transceiver does not support the requested
+        bit rate.
+
+        A: A transceiver with other supported bit rate than
+           the requested bit rate is inserted.
+
+        D: The transceiver with the non-requested bit rate is
+           removed, or the object is reconfigured.
+
+"
+    ::= { dcnIfEntry 31 }
+
+dcnIfTrxMissing OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An expected transceiver is missing.
+
+        A: An expected transceiver is missing.
+
+        D: The missing transceiver is inserted.
+
+"
+    ::= { dcnIfEntry 32 }
+
+
+dcnIfTransmitterFailed OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The transceiver HW has detected a failure
+         in the transmitter part.
+
+        A: The transmitter has failed
+
+        D: The transmitter is OK again
+
+"
+    ::= { dcnIfEntry 33 }
+
+dcnIfIllegalFrequency OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The frequency supported by the transceiver is not
+        recognized by the system.
+
+        A: Invalid or unknown frequency information is
+           detected in the (pluggable) transceiver or
+           board production data.
+
+        D: The (pluggable) transceiver or board is
+           replaced.
+
+"
+    ::= { dcnIfEntry 34 }
+
+dcnIfUnexpectedTxFrequency OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The actual frequency does not match the
+        pre-configured frequency.
+
+        A pre-configured frequency of '0' matches
+        all actual frequencies.
+
+        A: The configured frequency does not match the
+        actual frequency.
+
+        D: The configured frequency matches the actual
+        frequency.
+
+"
+    ::= { dcnIfEntry 35 }
+
+dcnIfReceivedPowerHigh OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Received power level is too high.
+        Applicable for all signal formats.
+
+        A: The received power level exceeds the
+        the built-in overload threshold.
+
+        D: The received power level is 0.5 dB below the
+        overload threshold.
+
+"
+    ::= { dcnIfEntry 36 }
+
+dcnIfReceivedPowerLow OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Received power level low threshold exceeded.
+        Applicable for all signal formats.
+
+        A: The received power level is below the
+        associated threshold.
+
+        D: The received power level is 0.5 dB above
+        the threshold.
+
+"
+    ::= { dcnIfEntry 37 }
+
+dcnIfTrxMediaMismatch OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The TRX media does not match the expected one.
+
+        A: Invalid or mismatching trx media is
+           detected.
+
+        D: The (pluggable) transceiver or board is
+           replaced, or the configuration is changed.
+
+"
+    ::= { dcnIfEntry 38 }
+
+dcnIfProtocolVersionMismatch OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The peer interfaces uses different versions of the communication
+         protocol.
+
+        A: Incoming messages have the wrong version
+
+        D: Incoming messages have the expected version
+
+"
+    ::= { dcnIfEntry 39 }
+
+dcnIfRemoteDefectIndication OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The remote interfaces signals failures on the received
+         signal.
+
+        A: The remote interface signals failure
+
+        D: The remote interface does not signal failure
+
+"
+    ::= { dcnIfEntry 40 }
+
+dcnIfTraceTransmitted   OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The trace identifier to be transmitted from this
+        interface.
+
+	Set to empty string for default value:
+
+	<IP address>:<subrack>:<slot>:<port>
+
+	Note that only the last part of the address
+	is used.
+"
+    DEFVAL { "" }
+    ::= { dcnIfEntry 41 }
+
+dcnIfTraceReceived OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The received trace identifier for this interface.
+
+"
+    ::= { dcnIfEntry 42 }
+
+dcnIfTraceExpected OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Trace identifier used for matching against
+        the received trace identifier.
+
+"
+    DEFVAL { "" }
+    ::= { dcnIfEntry 43 }
+
+dcnIfTraceAlarmMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    disabled (1),
+                    enabled (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Controls if the trace identifier mismatch alarm
+        should be raised.
+
+        disabled - The alarm is disabled.
+
+        enabled - The alarm is raised if expected trace
+        identifier differs from the received trace
+        identifier.
+
+"
+    DEFVAL { disabled }
+    ::= { dcnIfEntry 44 }
+
+dcnIfTraceMismatch OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates if the expected trace identifier
+        differs from the received trace identifier.
+
+        A: The received trace identifier differs from
+        the expected trace identifier.
+
+        D: The identifiers match.
+
+"
+    ::= { dcnIfEntry 55 }
+
+dcnIfLaserMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    on (1),
+                    als (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative state of the TX-side laser
+
+        on - The laser is turned on.
+
+        als - Automatic Laser Shutdown/Turn-Off
+        when lossOfSignal is detected on the RX side of
+        the interface.
+
+"
+    DEFVAL { on }
+    ::= { dcnIfEntry 56 }
+
+dcnIfLinkSupervisionFailure OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The supervision procedure of the protection link
+         failed.
+
+        A: The protection board loses contact with its peer
+
+        D: The contact is re-established
+
+"
+    ::= { dcnIfEntry 57 }
+
+
+dcnIfAid OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The access identifier (AID) of the interface.
+         The format is according to GR-833.
+
+"
+    ::= { dcnIfEntry 58 }
+
+dcnIfPhysicalLocation OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The physical location of the if.
+         The format is according to GR-833.
+
+"
+    ::= { dcnIfEntry 59 }
+
+
+-- ----------------------------------------------------
+-- Notifications
+-- ----------------------------------------------------
+
+dcnNotifyPrefix OBJECT IDENTIFIER ::= { lumentisDcnNotifications 0 }
+
+dcnIfTxSignalStatusDown NOTIFICATION-TYPE
+    OBJECTS {
+	dcnIfIndex,
+	dcnIfName,
+	dcnIfSubrack,
+	dcnIfSlot,
+	dcnIfTxPort,
+	dcnIfRxPort,
+	dcnIfTxSignalStatus }
+    STATUS      current
+    DESCRIPTION
+	"Sent when the signal status attribute of an
+	interface changes.
+
+"
+    ::= { dcnNotifyPrefix 1 }
+
+dcnIfTxSignalStatusUp NOTIFICATION-TYPE
+    OBJECTS {
+	dcnIfIndex,
+	dcnIfName,
+	dcnIfSubrack,
+	dcnIfSlot,
+	dcnIfTxPort,
+	dcnIfRxPort,
+	dcnIfTxSignalStatus }
+    STATUS      current
+    DESCRIPTION
+	"Sent when the signal status attribute of an
+	interface changes.
+
+"
+    ::= { dcnNotifyPrefix 2 }
+
+
+-- ----------------------------------------------------
+-- PPP links
+-- ----------------------------------------------------
+
+dcnPppTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF DcnPppEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"The PPP list."
+    ::= { dcnPppList 1 }
+
+dcnPppEntry OBJECT-TYPE
+    SYNTAX      DcnPppEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"An entry in the PPP list.
+
+"
+    INDEX { dcnPppIndex }
+    ::= { dcnPppTable 1 }
+
+DcnPppEntry ::=
+    SEQUENCE {
+	dcnPppIndex 			Unsigned32,
+	dcnPppName			MgmtNameString,
+	dcnPppDescr			DisplayString,
+	dcnPppTxSubrack			SubrackNumber,
+	dcnPppTxSlot			SlotNumber,
+	dcnPppTxPort			PortNumber,
+	dcnPppRxSubrack			SubrackNumber,
+	dcnPppRxSlot			SlotNumber,
+	dcnPppRxPort			PortNumber,
+	dcnPppInvPhysIndexOrZero	Unsigned32,
+	dcnPppType			INTEGER,
+	dcnPppAdminStatus		BoardOrInterfaceAdminStatus,
+	dcnPppOperStatus		BoardOrInterfaceOperStatus,
+	dcnPppRouteName                 MgmtNameString,
+	dcnPppDialCommand               CommandString,
+	dcnPppAcceptCommand             CommandString,
+	dcnPppLogicalLinkId             Integer32,
+	dcnPppObjectProperty            ObjectProperty,
+	dcnPppGccChannel		Integer32,
+	dcnPppVlanId                    Integer32,
+	dcnPppVlanEtherType             Integer32,
+	dcnPppTxIfNo                    PortNumber,
+	dcnPppRxIfNo                    PortNumber}
+
+dcnPppIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"An arbitrary index assigned to each entry.
+
+"
+   ::= { dcnPppEntry 1 }
+
+dcnPppName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The management name of the PPP link, for example
+	'ppp:1:2:3-4', meaning ports 3 and 4 on the board in
+        subrack 1, slot 2.
+
+"
+    ::= { dcnPppEntry 2 }
+
+dcnPppDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"User configurable label.
+
+"
+    DEFVAL { "" }
+    ::= { dcnPppEntry 3 }
+
+dcnPppTxSubrack OBJECT-TYPE
+    SYNTAX      SubrackNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"The number of the subrack where the TX side of
+	the PPP link is located.
+
+"
+    ::= { dcnPppEntry 4 }
+
+dcnPppTxSlot OBJECT-TYPE
+    SYNTAX      SlotNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"The number of the slot where the TX side of the
+	PPP link is located.
+
+"
+    ::= { dcnPppEntry 5 }
+
+dcnPppTxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"The number of the port where the TX side of the
+	PPP link is located.
+
+"
+    ::= { dcnPppEntry 6 }
+
+dcnPppRxSubrack OBJECT-TYPE
+    SYNTAX      SubrackNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"The number of the subrack where the RX side of
+	the PPP link is located.
+
+"
+    ::= { dcnPppEntry 7 }
+
+dcnPppRxSlot OBJECT-TYPE
+    SYNTAX      SlotNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"The number of the slot where the RX side of the
+	PPP link is located.
+
+"
+    ::= { dcnPppEntry 8 }
+
+dcnPppRxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"The number of the port where the RX-side of the
+	PPP link is located.
+
+"
+    ::= { dcnPppEntry 9 }
+
+dcnPppInvPhysIndexOrZero OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The row in the invPhysTable for this interface.
+	Set to 0 if not known.
+
+"
+    ::= { dcnPppEntry 10 }
+
+dcnPppType OBJECT-TYPE
+    SYNTAX      INTEGER {
+		proprietary (1),
+		osc (2),
+		sdh (3),
+		g709 (4),
+		sonet (5) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The expected signal type.
+
+"
+    ::= { dcnPppEntry 11 }
+
+dcnPppAdminStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"The administrative state for the PPP link.
+
+	down - The PPP link should be inactive.
+	
+	service - The interface is activated but alarms
+	are suppressed. Intended for use during service
+	or re-configuration. When service is concluded
+	adminStatus should be set to 'up' again.
+
+	up - The interface should be activated when
+	it becomes available. Alarms are not suppressed.
+
+"
+    DEFVAL { up }
+    ::= { dcnPppEntry 12 }
+
+dcnPppOperStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The operational state for the PPP link.
+
+	notPresent - The physical resources are not
+	available.
+
+	down - The interface is de-activated or the are
+	faults preventing it from going to the 'up'-state.
+	
+	up - The interface is operational.
+
+"
+    DEFVAL { notPresent }
+    ::= { dcnPppEntry 13 }
+
+dcnPppRouteName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The Linux name of the PPP link, for example
+	'p1-1-1-1-2', where the first number indicates
+	subrack, the second and third is slot and port
+        number for the TX side. The fourth and fifth is
+	slot and port for the RX side.
+
+	This is the name that you will see and use in
+        ::ip::route.
+
+"
+    ::= { dcnPppEntry 14 }
+
+dcnPppDialCommand OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"Command to dial up the remote node to enable PPP link
+
+"
+    ::= { dcnPppEntry 15 }
+
+dcnPppAcceptCommand OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"Accept a PPP object that has been created by a dial up
+         command from the remote node.
+
+         Accepting the object will make it persistent, otherwise
+         it will not be saved in the backup.
+
+"
+    ::= { dcnPppEntry 16 }
+
+dcnPppLogicalLinkId OBJECT-TYPE
+    SYNTAX      Integer32 (-1..11)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	"This attribute is settable only on ppp links
+         terminated on a specific type of boards.
+         Namely, traffic units that may terminate more
+         than one ppp-link.
+
+	 The tricky part is that the ppp-link
+         object in the node at the other end, must
+         have the same ID configured.
+
+         For PPP over OSC, -1 is allowed as a
+         do-not-use value.
+
+"
+    DEFVAL { 0 }
+    ::= { dcnPppEntry 17 }
+
+dcnPppObjectProperty OBJECT-TYPE
+    SYNTAX  	ObjectProperty
+    MAX-ACCESS  read-only
+    STATUS	current
+    DESCRIPTION
+        "Property mask.
+
+"
+    ::= { dcnPppEntry 18 }
+
+dcnPppGccChannel OBJECT-TYPE
+    SYNTAX      Integer32 (-1..2)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The chosen Gcc channel used for PPP link.
+         Valid values for the user to set is 0, 1 or 2.
+
+"
+    DEFVAL { -1 }
+    ::= { dcnPppEntry 19 }
+
+dcnPppVlanId OBJECT-TYPE
+    SYNTAX      Integer32 (-1..4095)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "VLAN ID when the PPP-link is carried on a VLAN.
+         0 if link is not carried by a VLAN.
+
+"
+    DEFVAL { -1 }
+    ::= { dcnPppEntry 20 }
+
+dcnPppVlanEtherType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        qTag0x8100 (1),
+                        sTag0x88a8 (2)}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Specifies the ether type of the VLAN.
+
+        qTag0x8100      - 802.1Q
+        sTag0x88a8      - 802.1ad Service tag
+"
+        DEFVAL { sTag0x88a8 }
+    ::= { dcnPppEntry 21 }
+
+dcnPppTxIfNo OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	    "The number of the interface where the TX side of the
+	    PPP link is located.
+
+"
+    ::= { dcnPppEntry 22 }
+
+dcnPppRxIfNo OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+	    "The number of the interface where the RX side of the
+	    PPP link is located.
+
+"
+    ::= { dcnPppEntry 23 }
+
+-- ----------------------------------------------------
+-- ETH links
+-- ----------------------------------------------------
+
+dcnEthTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF DcnEthEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"The ETH table spcifies information for configurating
+	the dcn ports."
+    ::= { dcnEthList 1 }
+
+dcnEthEntry OBJECT-TYPE
+    SYNTAX      DcnEthEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+	"An entry in the ETH list.
+	Each entry represents a physical dcn port.
+
+"
+    INDEX { dcnEthIndex }
+    ::= { dcnEthTable 1 }
+
+DcnEthEntry ::=
+    SEQUENCE {
+	dcnEthIndex 			Unsigned32,
+	dcnEthName			MgmtNameString,
+	dcnEthDescr			DisplayString,
+	dcnEthSubrack			SubrackNumber,
+	dcnEthSlot			SlotNumber,
+	dcnEthPort			PortNumber,
+        dcnEthAutoNegotiationMode       INTEGER,
+        dcnEthLinkStatus                INTEGER,
+	dcnEthSpeed                     INTEGER,
+        dcnEthDuplexCapability          INTEGER,
+	dcnEthRateLimit                 Integer32,
+        dcnEthFlowControlMode           INTEGER,
+	dcnEthObjectProperty            ObjectProperty,
+	dcnEthChangeSpeedCommand        CommandString,
+    dcnEthAdminStatus               BoardOrInterfaceAdminStatus,
+    dcnEthOperStatus                BoardOrInterfaceOperStatus }
+
+dcnEthIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"An arbitrary index assigned to each entry.
+
+"
+   ::= { dcnEthEntry 1 }
+
+dcnEthName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The management name of the ETH link, for example
+	'eth:2:1:3', meaning dcn port 3 on the board in
+        subrack 2, slot 1.
+
+"
+    ::= { dcnEthEntry 2 }
+
+dcnEthDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+	"User configurable label.
+
+"
+    DEFVAL { "" }
+    ::= { dcnEthEntry 3 }
+
+dcnEthSubrack OBJECT-TYPE
+    SYNTAX      SubrackNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The number of the subrack where the
+	ETH link is located.
+
+"
+    ::= { dcnEthEntry 4 }
+
+dcnEthSlot OBJECT-TYPE
+    SYNTAX      SlotNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The number of the slot where the
+	ETH link is located.
+
+"
+    ::= { dcnEthEntry 5 }
+
+dcnEthPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+	"The number of the port where the
+	ETH link is located.
+
+"
+    ::= { dcnEthEntry 6 }
+
+dcnEthAutoNegotiationMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                         off (1),
+                         on (2) }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The wanted auto negotiation mode.
+
+        off - auto negotiation process is disabled
+	not possible to set off when speed or duplex
+	is set to both
+
+        on - auto negotiation process is enabled
+
+"
+    DEFVAL { on }
+    ::= { dcnEthEntry 7 }
+
+dcnEthLinkStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+    			 up (0),
+                         down (1),
+                         unknown (2) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The status of the link
+
+"
+    ::= { dcnEthEntry 8 }
+
+dcnEthSpeed OBJECT-TYPE
+    SYNTAX      INTEGER {
+        mbps10 (0),
+        mbps100 (1),
+        auto (2),
+        mbps1000 (3) }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The expected speed of the dcn port.
+
+        mbps10   - 10 Mbps
+        mbps100  - 100 Mbps
+        mbps1000 - 1000 Mbps
+        auto - Autodetect what speed to use
+        not possible to set auto when autonegotiation mode
+        is set to off
+
+"
+    DEFVAL { auto }
+    ::= { dcnEthEntry 9 }
+
+dcnEthDuplexCapability OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        half (1),
+                        full (2),
+			both (3) }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The expected duplex capability.
+
+         half - supports half duplex
+
+         full - supports full duplex
+
+	 both - supports both half and full duplex
+	 not possible to set both when autonegotiation mode
+	 is set to off
+
+"
+    DEFVAL { both }
+    ::= { dcnEthEntry 10 }
+
+dcnEthRateLimit OBJECT-TYPE
+    SYNTAX      Integer32 (0..125)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Rate limit in steps of 0.08 Mb/s if 10 Mb/s link
+	speed, 0.8 Mb/s if 100 Mb/s link speed and 8 Mb/s
+        if 1000 Mb/s link speed.
+	Frames above the limit are dropped.
+	Bucket size is 130 kB.
+
+        Zero (0) is a special value meaning that the
+        rate-limiting procedure is disabled.
+
+        The legal range is: 1...125, in step of 1
+
+"
+    DEFVAL { 0 }
+    ::= { dcnEthEntry 11 }
+
+dcnEthFlowControlMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                        noPause (1),
+                        rxPause (2),
+                        txPause (3),
+                        bothPause (4) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The mode for handling of pause messages between
+        the peers.
+
+         noPause - PAUSE frame reception and
+         transmission is disabled
+
+         rxPause - PAUSE frame reception is enabled
+         (asymmetric)
+
+         txPause - PAUSE frame transmission is enabled
+         (asymmetric)
+
+         bothPause - send and accept pause messages
+         (symmetric).
+
+"
+    DEFVAL { bothPause }
+    ::= { dcnEthEntry 12 }
+
+dcnEthObjectProperty OBJECT-TYPE
+    SYNTAX  	ObjectProperty
+    MAX-ACCESS  read-only
+    STATUS	current
+    DESCRIPTION
+        "Property mask.
+
+"
+    ::= { dcnEthEntry 13 }
+
+dcnEthChangeSpeedCommand OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Command to change speed, autonegotiation mode
+	and duplex capability.
+
+"
+    ::= { dcnEthEntry 15 }
+
+dcnEthAdminStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceAdminStatus
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The administrative state for the ethernet port.
+
+    down - The interface should be inactive.
+
+    up - The interface should be activated when
+    it becomes available. Alarms are not suppressed.
+
+"
+    DEFVAL { up }
+    ::= { dcnEthEntry 16 }
+
+dcnEthOperStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The operational state for the ethernet interface.
+
+    down - The interface is de-activated or the are
+    faults preventing it from going to the
+    'up'-state.
+
+    up - The interface is operational.
+
+"
+    DEFVAL { notPresent }
+    ::= { dcnEthEntry 17 }
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+dcnGeneralGroup OBJECT-GROUP
+    OBJECTS {
+	dcnGeneralLastChangeTime,
+        dcnGeneralStateLastChangeTime}
+    STATUS	deprecated
+    DESCRIPTION
+        "The general objects."
+    ::= { lumDcnGroups 1 }
+
+dcnIfGroup OBJECT-GROUP
+    OBJECTS {
+        dcnIfIndex,
+	dcnIfName,
+	dcnIfDescr,
+	dcnIfSubrack,
+	dcnIfSlot,
+	dcnIfTxPort,
+	dcnIfRxPort,
+	dcnIfInvPhysIndexOrZero,
+	dcnIfType,
+	dcnIfMaxSpeed,
+	dcnIfOscMode,
+	dcnIfAdminStatus,
+	dcnIfOperStatus,
+	dcnIfTxSignalStatus,
+	dcnIfLinkDown }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn interface objects."
+    ::= { lumDcnGroups 2 }
+
+dcnNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        dcnIfTxSignalStatusDown,
+        dcnIfTxSignalStatusUp }
+    STATUS	current
+    DESCRIPTION
+        "The dcn notifications."
+    ::= { lumDcnGroups 3 }
+
+dcnPppGroup OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn PPP objects."
+    ::= { lumDcnGroups 4 }
+
+dcnPppGroupV2 OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus,
+	dcnPppOperStatus }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn PPP objects v2."
+    ::= { lumDcnGroups 5 }
+
+dcnAddressGroup OBJECT-GROUP
+    OBJECTS {
+	dcnAddressCurrentPppAddress,	
+        dcnAddressNextPppAddress }
+    STATUS	current
+    DESCRIPTION
+        "The general objects."
+    ::= { lumDcnGroups 6 }
+
+dcnPppGroupV3 OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus,
+	dcnPppOperStatus,
+	dcnPppDialCommand,
+	dcnPppAcceptCommand }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn PPP objects v3."
+    ::= { lumDcnGroups 7 }
+
+dcnPppGroupV4 OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus,
+	dcnPppOperStatus,
+	dcnPppDialCommand,
+	dcnPppAcceptCommand,
+	dcnPppLogicalLinkId }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn PPP objects V4 (3.1)."
+    ::= { lumDcnGroups 8 }
+
+dcnGeneralGroupV2 OBJECT-GROUP
+    OBJECTS {
+	dcnGeneralLastChangeTime,
+        dcnGeneralStateLastChangeTime,
+	dcnGeneralDcnIfTableSize,
+	dcnGeneralDcnPppTableSize }
+    STATUS	deprecated
+    DESCRIPTION
+        "The general objects. (3.1)"
+    ::= { lumDcnGroups 9 }
+
+dcnIfGroupV2 OBJECT-GROUP
+    OBJECTS {
+        dcnIfIndex,
+	dcnIfName,
+	dcnIfDescr,
+	dcnIfSubrack,
+	dcnIfSlot,
+	dcnIfTxPort,
+	dcnIfRxPort,
+	dcnIfInvPhysIndexOrZero,
+	dcnIfType,
+	dcnIfMaxSpeed,
+	dcnIfOscMode,
+	dcnIfAdminStatus,
+	dcnIfOperStatus,
+	dcnIfTxSignalStatus,
+	dcnIfLinkDown,
+	dcnIfTxFrequency,
+	dcnIfObjectProperty }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn interface objects V2 (4.0)."
+    ::= { lumDcnGroups 10 }
+
+dcnPppGroupV5 OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus,
+	dcnPppOperStatus,
+	dcnPppRouteName,
+	dcnPppDialCommand,
+	dcnPppAcceptCommand,
+	dcnPppLogicalLinkId,
+	dcnPppObjectProperty }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn PPP objects V5 (4.0)."
+    ::= { lumDcnGroups 11 }
+
+dcnIfGroupV3 OBJECT-GROUP
+    OBJECTS {
+        dcnIfIndex,
+	dcnIfName,
+	dcnIfDescr,
+	dcnIfSubrack,
+	dcnIfSlot,
+	dcnIfTxPort,
+	dcnIfRxPort,
+	dcnIfInvPhysIndexOrZero,
+	dcnIfType,
+	dcnIfMaxSpeed,
+	dcnIfOscMode,
+	dcnIfAdminStatus,
+	dcnIfOperStatus,
+	dcnIfTxSignalStatus,
+	dcnIfLinkDown,
+	dcnIfTxFrequency,
+	dcnIfObjectProperty,
+        dcnIfLaserStatus,
+        dcnIfHighSpeedMin,
+        dcnIfHighSpeedMax,
+        dcnIfTrxClass,
+        dcnIfReceiverSensitivity,
+        dcnIfPowerLevelLowRelativeThreshold,
+        dcnIfPowerLevel,
+        dcnIfTxPowerLevel,
+        dcnIfLaserTempActual,
+	dcnIfExpectedTxFrequency,
+	dcnIfLaserBias,
+        dcnIfLossOfSignal,
+        dcnIfTrxBitrateUnavailable,
+        dcnIfTrxMissing,
+        dcnIfTrxCodeMismatch,
+        dcnIfTransmitterFailed,
+        dcnIfIllegalFrequency,
+	dcnIfUnexpectedTxFrequency,
+        dcnIfReceivedPowerHigh,
+        dcnIfReceivedPowerLow,
+	dcnIfTrxMediaMismatch }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn interface objects V3 (7.0)."
+    ::= { lumDcnGroups 12 }
+
+dcnIfGroupV4 OBJECT-GROUP
+    OBJECTS {
+        dcnIfIndex,
+	dcnIfName,
+	dcnIfDescr,
+	dcnIfSubrack,
+	dcnIfSlot,
+	dcnIfTxPort,
+	dcnIfRxPort,
+	dcnIfInvPhysIndexOrZero,
+	dcnIfType,
+	dcnIfMaxSpeed,
+	dcnIfOscMode,
+	dcnIfAdminStatus,
+	dcnIfOperStatus,
+	dcnIfTxSignalStatus,
+	dcnIfLinkDown,
+	dcnIfTxFrequency,
+	dcnIfObjectProperty,
+        dcnIfLaserStatus,
+        dcnIfHighSpeedMin,
+        dcnIfHighSpeedMax,
+        dcnIfTrxClass,
+        dcnIfReceiverSensitivity,
+        dcnIfPowerLevelLowRelativeThreshold,
+        dcnIfPowerLevel,
+        dcnIfTxPowerLevel,
+        dcnIfLaserTempActual,
+	dcnIfExpectedTxFrequency,
+	dcnIfLaserBias,
+        dcnIfLossOfSignal,
+        dcnIfTrxBitrateUnavailable,
+        dcnIfTrxMissing,
+        dcnIfTrxCodeMismatch,
+        dcnIfTransmitterFailed,
+        dcnIfIllegalFrequency,
+	dcnIfUnexpectedTxFrequency,
+        dcnIfReceivedPowerHigh,
+        dcnIfReceivedPowerLow,
+	dcnIfTrxMediaMismatch,
+        dcnIfProtocolVersionMismatch,
+        dcnIfRemoteDefectIndication,
+	dcnIfTraceTransmitted,
+	dcnIfTraceReceived,
+	dcnIfTraceExpected,
+	dcnIfTraceAlarmMode,
+	dcnIfTraceMismatch,
+	dcnIfLaserMode,
+	dcnIfLinkSupervisionFailure }
+
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn interface objects V4 (13.0)."
+    ::= { lumDcnGroups 13 }
+
+dcnPppGroupV6 OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus,
+	dcnPppOperStatus,
+	dcnPppRouteName,
+	dcnPppDialCommand,
+	dcnPppAcceptCommand,
+	dcnPppLogicalLinkId,
+	dcnPppObjectProperty,
+	dcnPppGccChannel }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn PPP objects V6 (14.0)."
+    ::= { lumDcnGroups 14 }
+
+dcnEthGroupV1 OBJECT-GROUP
+    OBJECTS {
+	dcnEthIndex,
+	dcnEthName,
+	dcnEthDescr,
+	dcnEthSubrack,
+	dcnEthSlot,
+	dcnEthPort,
+        dcnEthAutoNegotiationMode,
+        dcnEthLinkStatus,
+     	dcnEthSpeed,
+        dcnEthDuplexCapability,
+	dcnEthRateLimit,
+        dcnEthFlowControlMode,
+	dcnEthObjectProperty }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn eth objects V1 (17.0)."
+    ::= { lumDcnGroups 15 }
+
+dcnGeneralGroupV3 OBJECT-GROUP
+    OBJECTS {
+	dcnGeneralLastChangeTime,
+        dcnGeneralStateLastChangeTime,
+	dcnGeneralDcnIfTableSize,
+	dcnGeneralDcnPppTableSize }
+    STATUS	current
+    DESCRIPTION
+        "The general objects V3 (17.0)."
+    ::= { lumDcnGroups 16 }
+
+dcnEthGroupV2 OBJECT-GROUP
+    OBJECTS {
+	dcnEthIndex,
+	dcnEthName,
+	dcnEthDescr,
+	dcnEthSubrack,
+	dcnEthSlot,
+	dcnEthPort,
+        dcnEthAutoNegotiationMode,
+        dcnEthLinkStatus,
+     	dcnEthSpeed,
+        dcnEthDuplexCapability,
+	dcnEthRateLimit,
+        dcnEthFlowControlMode,
+	dcnEthObjectProperty,
+	dcnEthChangeSpeedCommand }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn eth objects V2 (18.0)."
+    ::= { lumDcnGroups 17 }
+
+dcnCcGroup OBJECT-GROUP
+    OBJECTS {
+    dcnCcIndex,
+    dcnCcName,
+    dcnCcDescr,
+    dcnCcSubrack,
+    dcnCcSlot,
+    dcnCcTxPort,
+    dcnCcRxPort,
+    dcnCcAdminStatus,
+    dcnCcChannelStatus,
+    dcnCcErrorCounter,
+    dcnCcResetCounter,
+    dcnCcFecFailure,
+    dcnCcTrxNotSupportCommChannel,
+    dcnCcConfigurationMismatch
+    }
+    STATUS  current
+    DESCRIPTION
+        "The dcn cc objects (26.0)."
+    ::= { lumDcnGroups 18 }
+
+dcnIfGroupV5 OBJECT-GROUP
+    OBJECTS {
+        dcnIfIndex,
+	dcnIfName,
+	dcnIfDescr,
+	dcnIfSubrack,
+	dcnIfSlot,
+	dcnIfTxPort,
+	dcnIfRxPort,
+	dcnIfInvPhysIndexOrZero,
+	dcnIfType,
+	dcnIfMaxSpeed,
+	dcnIfOscMode,
+	dcnIfAdminStatus,
+	dcnIfOperStatus,
+	dcnIfTxSignalStatus,
+	dcnIfLinkDown,
+	dcnIfTxFrequency,
+	dcnIfObjectProperty,
+        dcnIfLaserStatus,
+        dcnIfHighSpeedMin,
+        dcnIfHighSpeedMax,
+        dcnIfTrxClass,
+        dcnIfReceiverSensitivity,
+        dcnIfPowerLevelLowRelativeThreshold,
+        dcnIfPowerLevel,
+        dcnIfTxPowerLevel,
+        dcnIfLaserTempActual,
+	dcnIfExpectedTxFrequency,
+	dcnIfLaserBias,
+        dcnIfLossOfSignal,
+        dcnIfTrxBitrateUnavailable,
+        dcnIfTrxMissing,
+        dcnIfTrxCodeMismatch,
+        dcnIfTransmitterFailed,
+        dcnIfIllegalFrequency,
+	dcnIfUnexpectedTxFrequency,
+        dcnIfReceivedPowerHigh,
+        dcnIfReceivedPowerLow,
+	dcnIfTrxMediaMismatch,
+        dcnIfProtocolVersionMismatch,
+        dcnIfRemoteDefectIndication,
+	dcnIfTraceTransmitted,
+	dcnIfTraceReceived,
+	dcnIfTraceExpected,
+	dcnIfTraceAlarmMode,
+	dcnIfTraceMismatch,
+	dcnIfLaserMode,
+	dcnIfLinkSupervisionFailure,
+        dcnIfAid,
+        dcnIfPhysicalLocation }
+
+    STATUS	current
+    DESCRIPTION
+        "The dcn interface objects V5 (28.0)."
+    ::= { lumDcnGroups 19 }
+
+dcnPppGroupV7 OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus,
+	dcnPppOperStatus,
+	dcnPppRouteName,
+	dcnPppDialCommand,
+	dcnPppAcceptCommand,
+	dcnPppLogicalLinkId,
+	dcnPppObjectProperty,
+	dcnPppGccChannel,
+	dcnPppVlanId,
+	dcnPppVlanEtherType }
+    STATUS	deprecated
+    DESCRIPTION
+        "The dcn PPP objects V7 (30.0)."
+    ::= { lumDcnGroups 20 }
+
+dcnEthGroupV3 OBJECT-GROUP
+    OBJECTS {
+    dcnEthIndex,
+    dcnEthName,
+    dcnEthDescr,
+    dcnEthSubrack,
+    dcnEthSlot,
+    dcnEthPort,
+    dcnEthAutoNegotiationMode,
+    dcnEthLinkStatus,
+    dcnEthSpeed,
+    dcnEthDuplexCapability,
+    dcnEthRateLimit,
+    dcnEthFlowControlMode,
+    dcnEthObjectProperty,
+    dcnEthChangeSpeedCommand,
+    dcnEthAdminStatus,
+    dcnEthOperStatus }
+    STATUS  current
+    DESCRIPTION
+        "The dcn eth objects V3 (30.0)."
+    ::= { lumDcnGroups 21 }
+
+dcnPppGroupV8 OBJECT-GROUP
+    OBJECTS {
+        dcnPppIndex,
+	dcnPppName,
+	dcnPppDescr,
+	dcnPppTxSubrack,
+	dcnPppTxSlot,
+	dcnPppTxIfNo,
+	dcnPppTxPort,
+	dcnPppRxSubrack,
+	dcnPppRxSlot,
+	dcnPppRxIfNo,
+	dcnPppRxPort,
+	dcnPppInvPhysIndexOrZero,
+	dcnPppType,
+	dcnPppAdminStatus,
+	dcnPppOperStatus,
+	dcnPppRouteName,
+	dcnPppDialCommand,
+	dcnPppAcceptCommand,
+	dcnPppLogicalLinkId,
+	dcnPppObjectProperty,
+	dcnPppGccChannel,
+	dcnPppVlanId,
+	dcnPppVlanEtherType }
+    STATUS	current
+    DESCRIPTION
+        "The dcn PPP objects V8 (31.0)."
+    ::= { lumDcnGroups 22 }
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+lumDcnBasicComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V1."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroup,
+	    dcnIfGroup,
+	    dcnNotificationGroup }
+    ::= { lumDcnCompl 1 }
+
+lumDcnBasicComplV2 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V2."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroup,
+	    dcnIfGroup,
+	    dcnNotificationGroup,
+	    dcnPppGroup }
+    ::= { lumDcnCompl 2 }
+
+lumDcnBasicComplV3 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V3."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroup,
+	    dcnIfGroup,
+	    dcnNotificationGroup,
+	    dcnPppGroupV2 }
+    ::= { lumDcnCompl 3 }
+
+lumDcnBasicComplV4 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V4."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroup,
+	    dcnIfGroup,
+	    dcnNotificationGroup,
+	    dcnPppGroupV2,
+	    dcnAddressGroup }
+    ::= { lumDcnCompl 4 }
+
+lumDcnBasicComplV5 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V5 (3.0)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroup,
+	    dcnIfGroup,
+	    dcnNotificationGroup,
+	    dcnPppGroupV3,
+	    dcnAddressGroup }
+    ::= { lumDcnCompl 5 }
+
+lumDcnBasicComplV6 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V6 (3.1)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroupV2,
+	    dcnIfGroup,
+	    dcnNotificationGroup,
+	    dcnPppGroupV4,
+	    dcnAddressGroup }
+    ::= { lumDcnCompl 6 }
+
+lumDcnBasicComplV7 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V6 (4.0)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroupV2,
+	    dcnIfGroupV2,
+	    dcnNotificationGroup,
+	    dcnPppGroupV5,
+	    dcnAddressGroup }
+    ::= { lumDcnCompl 7 }
+
+lumDcnBasicComplV8 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V7 (7.0)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroupV2,
+	    dcnIfGroupV3,
+	    dcnNotificationGroup,
+	    dcnPppGroupV5,
+	    dcnAddressGroup }
+    ::= { lumDcnCompl 8 }
+
+lumDcnBasicComplV9 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V8 (13.0)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroupV2,
+	    dcnIfGroupV4,
+	    dcnNotificationGroup,
+	    dcnPppGroupV5,
+	    dcnAddressGroup }
+    ::= { lumDcnCompl 9 }
+
+lumDcnBasicComplV10 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V9 (14.0)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroupV2,
+	    dcnIfGroupV4,
+	    dcnNotificationGroup,
+	    dcnPppGroupV6,
+	    dcnAddressGroup }
+    ::= { lumDcnCompl 10 }
+
+lumDcnBasicComplV11 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V10 (17.0)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroupV2,
+	    dcnIfGroupV4,
+	    dcnNotificationGroup,
+	    dcnPppGroupV6,
+	    dcnAddressGroup,
+	    dcnEthGroupV1 }
+    ::= { lumDcnCompl 11 }
+
+lumDcnBasicComplV12 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V10 (17.0)."
+    MODULE
+        MANDATORY-GROUPS {
+	    dcnGeneralGroupV3,
+	    dcnIfGroupV4,
+	    dcnNotificationGroup,
+	    dcnPppGroupV6,
+	    dcnAddressGroup,
+	    dcnEthGroupV2 }
+    ::= { lumDcnCompl 12 }
+
+lumDcnBasicComplV13 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V13 (26.0)."
+    MODULE
+        MANDATORY-GROUPS {
+        dcnGeneralGroupV3,
+        dcnIfGroupV4,
+        dcnNotificationGroup,
+        dcnPppGroupV6,
+        dcnAddressGroup,
+        dcnEthGroupV2,
+        dcnCcGroup }
+    ::= { lumDcnCompl 13 }
+
+lumDcnBasicComplV14 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V14 (28.0)."
+    MODULE
+        MANDATORY-GROUPS {
+        dcnGeneralGroupV3,
+        dcnIfGroupV5,
+        dcnNotificationGroup,
+        dcnPppGroupV6,
+        dcnAddressGroup,
+        dcnEthGroupV2,
+        dcnCcGroup }
+    ::= { lumDcnCompl 14 }
+
+lumDcnBasicComplV15 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V15 (30.0)."
+    MODULE
+        MANDATORY-GROUPS {
+        dcnGeneralGroupV3,
+        dcnIfGroupV5,
+        dcnNotificationGroup,
+        dcnPppGroupV7,
+        dcnAddressGroup,
+        dcnEthGroupV3,
+    dcnCcGroup }
+::= { lumDcnCompl 15 }
+
+lumDcnBasicComplV16 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V16 (30.1)."
+    MODULE
+        MANDATORY-GROUPS {
+        dcnGeneralGroupV3,
+        dcnIfGroupV5,
+        dcnNotificationGroup,
+        dcnPppGroupV7,
+        dcnAddressGroup,
+        dcnEthGroupV3,
+    dcnCcGroup }
+::= { lumDcnCompl 16 }
+
+lumDcnBasicComplV17 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the dcn MIB V17 (31.0)."
+    MODULE
+        MANDATORY-GROUPS {
+        dcnGeneralGroupV3,
+        dcnIfGroupV5,
+        dcnNotificationGroup,
+        dcnPppGroupV8,
+        dcnAddressGroup,
+        dcnEthGroupV3,
+    dcnCcGroup }
+::= { lumDcnCompl 17 }
+END
+
+

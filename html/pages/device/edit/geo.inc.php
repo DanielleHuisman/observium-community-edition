@@ -154,7 +154,7 @@ if ($updated && $update_message)
                                       'width'       => '66.6667%',
                                       //'readonly'    => $readonly,
                                       'disabled'    => TRUE, // Always disabled, just for see
-                                      'value'       => escape_html($location['location_text']));
+                                      'value'       => $location['location_text']);
       if ($location['location_help'])
       {
         $form['row'][1]['location_help'] = array(
@@ -169,7 +169,7 @@ if ($updated && $update_message)
                                       'width'       => '66.6667%',
                                       //'readonly'    => $readonly,
                                       'disabled'    => TRUE, // Always disabled, just for see
-                                      'value'       => escape_html($location['location_geo']));
+                                      'value'       => $location['location_geo']);
       $form['row'][3]['location_lat'] = array(
                                       'type'        => 'text',
                                       //'fieldset'    => 'edit',
@@ -178,7 +178,7 @@ if ($updated && $update_message)
                                       'width'       => '16.6667%',
                                       //'readonly'    => $readonly,
                                       'disabled'    => TRUE, // Always disabled, just for see
-                                      'value'       => escape_html($location['location_lat']));
+                                      'value'       => $location['location_lat']);
       if ($location['location_link'])
       {
         $form['row'][3]['location_link'] = array(
@@ -193,10 +193,10 @@ if ($updated && $update_message)
                                       'width'       => '16.6667%',
                                       //'readonly'    => $readonly,
                                       'disabled'    => TRUE, // Always disabled, just for see
-                                      'value'       => escape_html(strtoupper($location['location_geoapi'])));
+                                      'value'       => strtoupper($location['location_geoapi']));
       $form['row'][4]['help_link'] = array(
                                       'type'        => 'raw',
-                                      'value'       => '<span class="help-inline"><small><a target="_blank" href="' . OBSERVIUM_URL . '/docs/config_options/#syslocation-configuration">
+                                      'value'       => '<span class="help-inline"><small><a target="_blank" href="' . OBSERVIUM_DOCS_URL . '/config_options/#syslocation-configuration">
       <i class="'.$config['icon']['question'].'"></i> View available Geolocation APIs and other configuration options</a></small></span>');
       $form['row'][5]['location_updated'] = array(
                                       'type'        => 'text',
@@ -206,7 +206,7 @@ if ($updated && $update_message)
                                       'width'       => '16.6667%',
                                       //'readonly'    => $readonly,
                                       'disabled'    => TRUE, // Always disabled, just for see
-                                      'value'       => escape_html($location['location_updated']));
+                                      'value'       => $location['location_updated']);
       $form['row'][6]['location_status'] = array(
                                       'type'        => 'textarea',
                                       //'fieldset'    => 'edit',
@@ -215,7 +215,7 @@ if ($updated && $update_message)
                                       'width'       => '66.6667%',
                                       //'readonly'    => $readonly,
                                       'disabled'    => TRUE, // Always disabled, just for see
-                                      'value'       => escape_html($location['location_status']));
+                                      'value'       => $location['location_status']);
       $form['row'][7]['coordinates'] = array(
                                       'type'        => 'text',
                                       //'fieldset'    => 'edit',
@@ -224,7 +224,7 @@ if ($updated && $update_message)
                                       'width'       => '16.6667%',
                                       'readonly'    => $readonly,
                                       'disabled'    => !$location['location_manual'],
-                                      'value'       => escape_html($location['coordinates_manual']));
+                                      'value'       => $location['coordinates_manual']);
       $form['row'][7]['location_manual'] = array(
                                       'type'        => 'toggle',
                                       'size'        => 'large',

@@ -1,8 +1,7 @@
--- Copyright(c) 2006-2007, LSI Corporation
+-- Copyright(c) 2006-2007, Avago Technologies
 -- MIB file for MegaRAID SAS controllers
--- File Ver: 1.32-00
--- Previous: 1.31-02
--- Date: 10-05-2013
+-- File Ver: 1.42-01
+-- Previous: 1.42-00
 -- Revision : Medusa Phase 1
 -- Revision : Dimmer Switch II Changes
 -- Revision : New Events added for Block HDD  
@@ -15,7 +14,7 @@
 -- Revision : Added new attributes and traps for MegaRaid Encryption Solution.
 -- Revision : Added Support Drive Speed Down(Phase 1).
 -- Revision : Added Support for SSD Devices,link speed and device speed.
--- Revision : Replaced LSI Logic Corporation with LSI Corporation 
+-- Revision : Replaced LSI Corporation with Avago Technologies 
 -- Revision : Multipath support Feature added.
 -- Revision : CopyBack Feature,CopyBack is Enabled or Disabled added.
 -- Revision : Multipath Feature,Parther Device Id is added.
@@ -177,7 +176,11 @@ adapterPropertiesTable               OBJECT-TYPE
         maximumControllerNodes  INTEGER,
         incompatibilityDetails  	DisplayString,
         topologyType  		    DisplayString,
-	supportOnlineFWUpdate		INTEGER
+	supportOnlineFWUpdate		INTEGER,
+	supportFastPathWB			INTEGER,
+	supportConfigAutoBalance	INTEGER,
+	maintenanceMode		DisplayString,
+	disableLargeIO		INTEGER
     }
 
 -- defines for each attribute in AdapterEntry
@@ -574,7 +577,35 @@ supportOnlineFWUpdate	OBJECT-TYPE
     STATUS                      optional
     DESCRIPTION                 "1 = Online firmware update is supported, 0 = Online firmware update is not supported"
     ::= { adapterPropertiesEntry 59 }
-      
+
+supportFastPathWB		OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "1 = Support Fast Path WB on Raptor Type Ld ,0 = Does not support Fast Path WB on Raptor Type Ld"
+    ::= { adapterPropertiesEntry 60 }
+ 
+supportConfigAutoBalance		OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+	    STATUS                      optional
+    DESCRIPTION                 "0 = no configuration auto balance support, 1 = configuration auto balance support is present"
+    ::= { adapterPropertiesEntry 61 }
+  
+maintenanceMode		OBJECT-TYPE
+    SYNTAX                      DisplayString
+    ACCESS                      read-only
+	    STATUS                      optional
+    DESCRIPTION                 "1=FW supports maintenance mode"
+    ::= { adapterPropertiesEntry 62 }
+
+disableLargeIO		OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+	    STATUS                      optional
+    DESCRIPTION                 "0 = Large IO is supported, 1 = Large IO is unsupported"
+    ::= { adapterPropertiesEntry 63 }
+   
 --------------start adp info-------------------------------------
 adapterInfoTable                    OBJECT-TYPE
     SYNTAX                      SEQUENCE OF AdapterInfoEntry
@@ -1081,7 +1112,10 @@ bbuTable                    OBJECT-TYPE
 	    bbuRetentiontime		DisplayString,
 	    bbuState		DisplayString,
 	    memoryModuleFRU             DisplayString,
-	    bbuFirmwareVersion		DisplayString
+	    bbumoduleVersion		DisplayString,
+		autoLearnMode           DisplayString,
+		chargingStatus          DisplayString,
+		capacitance             INTEGER
     }
 
 -- defines for each attribute in BBUEntry
@@ -1288,13 +1322,33 @@ memoryModuleFRU                OBJECT-TYPE
     DESCRIPTION                 "tmm FRU"
     ::= { bbuEntry 30 }
 
-bbuFirmwareVersion                OBJECT-TYPE
+bbumoduleVersion                OBJECT-TYPE
     SYNTAX                      DisplayString
     ACCESS                      read-only
     STATUS                      optional
     DESCRIPTION                 "Battery Firmware Version"
     ::= { bbuEntry 31 }
 
+autoLearnMode                OBJECT-TYPE
+    SYNTAX                      DisplayString
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Automatic Learn Mode"
+    ::= { bbuEntry 32 }
+	
+chargingStatus                OBJECT-TYPE
+    SYNTAX                      DisplayString
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Charging Status"
+    ::= { bbuEntry 33 }
+	
+capacitance                OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Capacitance"
+    ::= { bbuEntry 34 }
 
 
 -- starts adapterStatusSupportInfoTable -------------------------
@@ -1597,7 +1651,8 @@ physicalDriveEntry                     OBJECT-TYPE
 		shieldCounter		INTEGER,
 		shieldDiagCompletionTime 	DisplayString,
 		ineligibleForSSCD	INTEGER,
-		ineligibleForLd		INTEGER
+		ineligibleForLd		INTEGER,
+		serviceable		INTEGER
         }
 
 -- defines for each attribute in PhysicaldriveEntry
@@ -1919,6 +1974,13 @@ ineligibleForLd                 OBJECT-TYPE
     DESCRIPTION                 "Whether PD cannot be used for a regular LD. PD can not be used for a regular LD(1), PD can be used for a regular LD(0)"
     ::= { physicalDriveEntry 47}
 
+serviceable	                OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Whether PD is removeable for service. PD is removeable for service(1), PD is not removeable for service(0)"
+    ::= { physicalDriveEntry 48}
+
 
 --Virtual Devices
 virtualDevice                   OBJECT IDENTIFIER ::= {megaRAID-SAS 3}
@@ -2071,9 +2133,9 @@ virtualDriveEntry                     OBJECT-TYPE
 	    defaultWritePolicy		DisplayString,
             associatedVD		DisplayString,
 			hostAccessPolicy       DisplayString,
-			guid                DisplayString
-			
-          		
+			guid                DisplayString,
+	    fastPathWBEnabled  		INTEGER,
+			peerHasNoAccess		DisplayString
 	    		 
         }
         
@@ -2312,6 +2374,19 @@ guid                        	OBJECT-TYPE
     DESCRIPTION                  "This property gives the LD GUID."
     ::= { virtualDriveEntry 36 }
 
+fastPathWBEnabled              	OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "0= FastPathWB disabled, not a Raptor like LD, 1= FastPathWB enabled, Raptor like LD"
+    ::= { virtualDriveEntry 37 }
+
+peerHasNoAccess              	OBJECT-TYPE
+    SYNTAX                      DisplayString
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Peer can't access this shared ld, not applicable for exclusive LD"
+    ::= { virtualDriveEntry 38 }
 
 --VD Span
 vdSpanInfoTable                    OBJECT-TYPE
@@ -2667,7 +2742,7 @@ enclosureType              OBJECT-TYPE
     SYNTAX                      INTEGER
     ACCESS                      read-only
     STATUS                      optional
-    DESCRIPTION                 "Information about type of enclosure : 0= UNKNOWN ,1= SAFTE ,2=SES ,3= SGPIO."
+    DESCRIPTION                 "Information about type of enclosure : 0= UNKNOWN ,1= SAFTE ,2=SES ,3= SGPIO ,4=OEM specific"
     ::= { enclosureEntry 15 }
 
 enclFirmwareVersion                OBJECT-TYPE
@@ -3150,7 +3225,7 @@ adpCacheDiscarded TRAP-TYPE
     --#TYPE "LSI SAS Trap: Controller Cache Discarded"
 	--#SUMMARY "Controller %d cache discarded due to memory/battery problems"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY FATAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3165,7 +3240,7 @@ adpCacheRebootCantRecover TRAP-TYPE
     --#TYPE "LSI SAS Trap: Unable to Recover Cache data"
 	--#SUMMARY "Unable to recover Cache Data due to configuration mismatch for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY FATAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3195,7 +3270,7 @@ adpCacheVersionMismatch TRAP-TYPE
     --#TYPE "LSI SAS Trap: Controller Cache Discarded"
 	--#SUMMARY "Controller Cache Discarded due to Firmware version incompatibility for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY FATAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3227,7 +3302,7 @@ adpFlashBadImage TRAP-TYPE
     --#TYPE "LSI SAS Trap: Flash Download Image corrupted"
 	--#SUMMARY "Flash download image corrupted for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3242,7 +3317,7 @@ adpFlashEraseError TRAP-TYPE
     --#TYPE "LSI SAS Trap: Flash Erase Error"
 	--#SUMMARY "Flash erase error for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3257,7 +3332,7 @@ adpFlashEraseTimeout TRAP-TYPE
     --#TYPE "LSI SAS Trap: Flash Timeout during Erase"
 	--#SUMMARY "Flash Timeout during Erase for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3272,7 +3347,7 @@ adpFlashGeneralError TRAP-TYPE
     --#TYPE "LSI SAS Trap: Flash Error"
 	--#SUMMARY "General Flash Error occurred for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3318,7 +3393,7 @@ adpFlashProgramError TRAP-TYPE
     --#TYPE "LSI SAS Trap: Flash programming Error"
 	--#SUMMARY "Flash programming error for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3333,7 +3408,7 @@ adpFlashProgramTimeout TRAP-TYPE
     --#TYPE "LSI SAS Trap: Flash timeout"
 	--#SUMMARY "Flash timeout during programming for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL 
@@ -3596,7 +3671,7 @@ bbuNotPresent TRAP-TYPE
     --#TYPE "LSI SAS Trap: Battery not present"
 	--#SUMMARY "Battery not Present for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -3641,7 +3716,7 @@ bbuTempHigh TRAP-TYPE
     --#TYPE "LSI SAS Trap: Battery temperature high"
 	--#SUMMARY "Battery Temperature is high for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -3656,7 +3731,7 @@ bbuVoltageLow TRAP-TYPE
     --#TYPE "LSI SAS Trap: Battery voltage low"
 	--#SUMMARY "Battery voltage low for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -3716,7 +3791,7 @@ bbuReplace TRAP-TYPE
     --#TYPE "LSI SAS Trap: Battery needs replacement"
 	--#SUMMARY "Battery needs replacement for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY FATAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -3776,7 +3851,7 @@ bbuRelearnTimeout TRAP-TYPE
     --#TYPE "LSI SAS Trap: Battery relearn timed out"
 	--#SUMMARY "Battery Relearn timed out for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -3821,7 +3896,7 @@ bbuRemoved TRAP-TYPE
     --#TYPE "LSI SAS Trap: Battery removed"
 	--#SUMMARY "Battery removed for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -3836,7 +3911,7 @@ bbuCapacityLow TRAP-TYPE
     --#TYPE "LSI SAS Trap: Current capacity below threshold"
 	--#SUMMARY "Current capacity of the battery is below threshold for Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -3857,7 +3932,7 @@ bbuCapacityAbove TRAP-TYPE
 	--#STATE OPERATIONAL
     ::= 8049   
    
-bbuFRU TRAP-TYPE
+bbuFRUChanged TRAP-TYPE
     ENTERPRISE adapterTraps
     VARIABLES 
     { 
@@ -3874,7 +3949,7 @@ bbuFRU TRAP-TYPE
     ::= 8050 
 
 
-revisionIdentifier TRAP-TYPE
+revisionIdentifierChanged TRAP-TYPE
     ENTERPRISE adapterTraps
     VARIABLES 
     { 
@@ -4045,7 +4120,7 @@ bbuChargeDisabled TRAP-TYPE
     --#TYPE "LSI SAS Trap: Battery Charge Disabled"
 	--#SUMMARY "Battery charging was suspended due to high battery temperature on Adapter %d"
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4105,7 +4180,7 @@ haNodeBreak TRAP-TYPE
     --#TYPE "LSI SAS Trap: Peer controller has left HA domain"
 	--#SUMMARY "Peer controller exited HA Domain at Adapter -%d" 
 	--#ARGUMENTS {0}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4116,7 +4191,7 @@ haPeerIncompatible TRAP-TYPE
     DESCRIPTION "Peer controller settings are incompatible"
     --#TYPE "LSI SAS Trap: Peer controller is incompatible"
 	--#SUMMARY "Peer controller settings are incompatible" 
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4127,7 +4202,7 @@ haCtrlpropIncompatible TRAP-TYPE
     DESCRIPTION "Controller property mismatch detected with Peer controller"
     --#TYPE "LSI SAS Trap: Controller properties are incompatible with peer's"
 	--#SUMMARY "Controller property mismatch detected with Peer controller" 
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4138,7 +4213,7 @@ haFWVersionMismatch TRAP-TYPE
    DESCRIPTION "FW version does not match Peer controller"
     --#TYPE "LSI SAS Trap: FW versions of the cluster nodes do not match"
 	--#SUMMARY "FW version does not match Peer controller" 
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4160,7 +4235,7 @@ haCacheMirrorOffline TRAP-TYPE
     DESCRIPTION "Cache mirroring is offline"
     --#TYPE "LSI SAS Trap: HA cache mirror is offline"
 	--#SUMMARY "Cache mirroring is offline" 
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4205,7 +4280,7 @@ adpResetNowDone TRAP-TYPE
     atAdpNumber
     }
     DESCRIPTION "Controller reset requested by host, completed for Adapter $1"
-    --#TYPE "Controller reset requested by host, completed"
+    --#TYPE "LSI SAS Trap: Controller reset requested by host, completed"
 	--#SUMMARY "Controller reset requested by host, completed for Adapter %d"
 	--#ARGUMENTS {0}
 	--#SEVERITY INFORMATIONAL
@@ -4213,6 +4288,60 @@ adpResetNowDone TRAP-TYPE
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
     ::= 8073
+	
+peerControllerKeyMismatch TRAP-TYPE
+    ENTERPRISE adapterTraps
+    DESCRIPTION "Peer controller security key mismatch"
+    --#TYPE "Peer controller security key mismatch"
+	--#SUMMARY "Peer controller security key mismatch"
+	--#SEVERITY CRITICAL
+	--#GENERIC 6
+	--#CATEGORY "Error Events"
+	--#STATE OPERATIONAL
+    ::= 8074
+
+peerControllerKeyMatch TRAP-TYPE
+    ENTERPRISE adapterTraps
+    DESCRIPTION "Peer controller security key match"
+    --#TYPE "LSI SAS Trap: Peer controller security key match"
+	--#SUMMARY "Peer controller security key match"
+	--#SEVERITY INFORMATIONAL
+	--#GENERIC 6
+	--#CATEGORY "Error Events"
+	--#STATE OPERATIONAL
+    ::= 8075
+
+cfgAutoCreated TRAP-TYPE
+    ENTERPRISE adapterTraps
+    VARIABLES
+    {
+    atAdpNumber
+    }
+    DESCRIPTION "Configuration automatically created on Adapter $1"
+    --#TYPE "LSI SAS Trap: Configuration automatically created on Adapter"
+	--#SUMMARY "Configuration automatically created on Adapter %d" 
+	--#ARGUMENTS {0}
+	--#SEVERITY INFORMATIONAL
+	--#GENERIC 6
+	--#CATEGORY "Error Events"
+	--#STATE OPERATIONAL
+    ::= 8077
+
+nvcacheBlockRecoverySkipped TRAP-TYPE
+    ENTERPRISE adapterTraps
+    VARIABLES
+    {
+    atAdpNumber
+    }
+    DESCRIPTION "Block recovery is skipped for Cache-vault. Reboot the system to recover the blocks $1"
+    --#TYPE "LSI SAS Trap: Block recovery is skipped for Cache-vault. Reboot the system to recover the blocks"
+	--#SUMMARY "Block recovery is skipped for Cache-vault. Reboot the system to recover the blocks %d" 
+	--#ARGUMENTS {0}
+	--#SEVERITY WARNING
+	--#GENERIC 6
+	--#CATEGORY "Error Events"
+	--#STATE OPERATIONAL
+    ::= 8078
 	
 ---------------vd trap----------
 vdTraps                      OBJECT IDENTIFIER ::= {lsiRAIDServer 7}
@@ -4241,12 +4370,14 @@ vdCachePolicyChangeReason            OBJECT-TYPE
     STATUS                      optional
     DESCRIPTION                 "VD cache policy."
     ::= { vdTraps 1104 }
+
 vdNewState            OBJECT-TYPE
     SYNTAX                      INTEGER
     ACCESS                      read-only
     STATUS                      optional
     DESCRIPTION                 "Virtual Drive state. Values are: offline(0),partially-degraded(1),degraded(2),optimal(3)"
     ::= { vdTraps 1105 }
+
 vdOldState            OBJECT-TYPE
     SYNTAX                      INTEGER
     ACCESS                      read-only
@@ -4261,6 +4392,266 @@ isRemote                 OBJECT-TYPE
     DESCRIPTION                 "HA cluster locale: 0=local, 1=remote (at peer)"
     ::= { vdTraps 1107 }
 	
+vdOldAccessPolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive access policy. Values are: read/write(0), read-only(2), blocked(3), transport-ready(14), hidden(15)"
+    ::= { vdTraps 1108 }
+
+vdNewAccessPolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive access policy. Values are: read/write(0), read-only(2), blocked(3), transport-ready(14), hidden(15)"
+    ::= { vdTraps 1109 }
+
+vdOldAutoSnapshot                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive auto snapshot. Values are: enabled(1), disabled(0)"
+    ::= { vdTraps 1110 }
+
+vdNewAutoSnapshot                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive auto snapshot. Values are: enabled(1), disabled(0)"
+    ::= { vdTraps 1111 }
+
+vdOldcacheBypassIOSize                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive cache bypass IO size. Values are: 64k(0), 128k(1), 256k(2)"
+    ::= { vdTraps 1112 }
+
+vdNewcacheBypassIOSize                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive cache bypass IO size. Values are: 64k(0), 128k(1), 256k(2)"
+    ::= { vdTraps 1113 }
+
+vdOldcacheBypassMode                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive cache bypass mode. Values are: intelligent(0), standard(1), custom_mode_1(2), custom_mode_2(3), custom_mode_3(4), reserved_mode_1(5), reserved_mode_2(6), disable(7)"
+    ::= { vdTraps 1114 }
+
+vdNewcacheBypassMode                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive cache bypass mode. Values are: intelligent(0), standard(1), custom_mode_1(2), custom_mode_2(3), custom_mode_3(4), reserved_mode_1(5), reserved_mode_2(6), disable(7)"
+    ::= { vdTraps 1115 }
+
+vdOldcurrentCachePolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive current cache policy. Values are: write-back(1), write-adaptive(2), read-ahead(4), read-adaptive(8), write-cache-bad-bbu(16), allow-write-cache(32), allow-read-cache(64)"
+    ::= { vdTraps 1116 }
+
+vdNewcurrentCachePolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive current cache policy. Values are: write-back(1), write-adaptive(2), read-ahead(4), read-adaptive(8), write-cache-bad-bbu(16), allow-write-cache(32), allow-read-cache(64)"
+    ::= { vdTraps 1117 }
+
+vdOldcurrentPSPolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive current powersave policy. Values are: ctrl-default(0), auto(1), max(2), no-cache(4), t10(8), none(254), reserved(255)"
+    ::= { vdTraps 1118 }
+
+vdNewcurrentPSPolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive current powersave policy. Values are: ctrl-default(0), auto(1), max(2), no-cache(4), t10(8), none(254), reserved(255)"
+    ::= { vdTraps 1119 }
+
+vdOlddefaultCachePolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive default cache policy. Values are: write-back(1), write-adaptive(2), read-ahead(4), read-adaptive(8), write-cache-bad-bbu(16), allow-write-cache(32), allow-read-cache(64)"
+    ::= { vdTraps 1120 }
+
+vdNewdefaultCachePolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive default cache policy. Values are: write-back(1), write-adaptive(2), read-ahead(4), read-adaptive(8), write-cache-bad-bbu(16), allow-write-cache(32), allow-read-cache(64)"
+    ::= { vdTraps 1121 }
+
+vdOlddefaultPSPolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive default powersave policy. Values are: ctrl-default(0), auto(1), max(2), no-cache(4), t10(8), none(254), reserved(255)"
+    ::= { vdTraps 1122 }
+
+vdNewdefaultPSPolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive default powersave policy. Values are: ctrl-default(0), auto(1), max(2), no-cache(4), t10(8), none(254), reserved(255)"
+    ::= { vdTraps 1123 }
+
+vdOlddisableAutoDeleteOldestPIT                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual drive disable auto delete oldest pit. Values are: enabled(1), disabled(0)"
+    ::= { vdTraps 1124 }
+
+vdNewdisableAutoDeleteOldestPIT                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive disable auto delete oldest pit. Values are: enabled(1), disabled(0)"
+    ::= { vdTraps 1125 }
+
+vdOlddiskCachePolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive disk cache policy. Values are: unchanged(0), enabled(1), disabled(2)"
+    ::= { vdTraps 1126 }
+
+vdNewdiskCachePolicy                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive disk cache policy. Values are: unchanged(0), enabled(1), disabled(2)"
+    ::= { vdTraps 1127 }
+
+vdOldemulationType                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive emulation type. Values are: default(0), disabled(1)"
+    ::= { vdTraps 1128 }
+
+vdNewemulationType                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive emulation type. Values are: default(0), disabled(1)"
+    ::= { vdTraps 1129 }
+
+vdOldenabledAtomicityType                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive enabled automicity type. Values are: disabled(0), write-all(1), write-t10(2)"
+    ::= { vdTraps 1130 }
+
+vdNewenabledAtomicityType                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive enabled automicity type. Values are: disabled(0), write-all(1), write-t10(2)"
+    ::= { vdTraps 1131 }
+
+vdOldexclusiveAccess                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive exclusive access. Values are: true(1), false(0)"
+    ::= { vdTraps 1132 }
+
+vdNewexclusiveAccess                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive exclusive access. Values are: true(1), false(0)"
+    ::= { vdTraps 1133 }
+
+vdOldforceEmulation                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive force emulation. Values are: set(1), not-set(0)"
+    ::= { vdTraps 1134 }
+
+
+vdNewforceEmulation                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive force emulation. Values are: set(1), not-set(0)"
+    ::= { vdTraps 1135 }
+
+
+vdOldname                 OBJECT-TYPE
+    SYNTAX                      STRING
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive name"
+    ::= { vdTraps 1136 }
+
+
+vdNewname                 OBJECT-TYPE
+    SYNTAX                      STRING
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive name"
+    ::= { vdTraps 1137 }
+
+
+vdOldnoBGI                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive set no BGI. Values are: 1(disabled), 0 (enabled)"
+    ::= { vdTraps 1138 }
+
+
+vdNewnoBGI                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive set no BGI. Values are: 1(disabled), 0 (enabled)"
+    ::= { vdTraps 1139 }
+
+
+vdOldscsiUnmapEnabled                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive SCSI unmap enabled. Values are: 0(disabled), 1(enabled)"
+    ::= { vdTraps 1140 }
+
+
+vdNewscsiUnmapEnabled                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive SCSI unmap enabled. Values are: 0(disabled), 1(enabled)"
+    ::= { vdTraps 1141 }
+
+
+vdOldSSCWriteBuferMode                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive SSC write buffer mode. Values are: 0(disabled), 1(enabled)"
+    ::= { vdTraps 1142 }
+
+
+vdNewSSCWriteBuferMode                 OBJECT-TYPE
+    SYNTAX                      INTEGER
+    ACCESS                      read-only
+    STATUS                      optional
+    DESCRIPTION                 "Virtual Drive SSC write buffer mode. Values are: 0(disabled), 1(enabled)"
+    ::= { vdTraps 1143 }
 
 
 -- Following are the trap definitions, which use variables defined
@@ -4412,7 +4803,7 @@ vdtInitFailed TRAP-TYPE
     --#TYPE "LSI SAS Trap: Initialization failed"
 	--#SUMMARY "Initialization failed on Adapter -%d  VD Target-%d Remote VD -%d"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4503,7 +4894,7 @@ vdtReconStopped TRAP-TYPE
     --#TYPE "LSI SAS Trap: Reconstruction stopped"
 	--#SUMMARY "Reconstruction stopped on Adapter -%d  VD Target -%d Remote VD -%d"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY FATAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4626,7 +5017,7 @@ vdtERASEFailed TRAP-TYPE
     --#TYPE "LSI SAS Trap: LD Erase failed"
 	--#SUMMARY "LD Erase failed on Adapter -%d  VD Target -%d Remote VD -%d"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4678,7 +5069,7 @@ vdtSSCDISASSOCIATEFailed TRAP-TYPE
     --#TYPE "LSI SAS Trap: CacheCade(TM) disassociate failed"
 	--#SUMMARY "CacheCade(TM) disassociate failed on Adapter -%d  VD Target -%d Remote VD -%d"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4704,7 +5095,7 @@ vdtACCESSBLOCKEDSSCOFFLINE TRAP-TYPE
     --#TYPE "LSI SAS Trap: ACCESS BLOCKED SSC OFFLINE"
 	--#SUMMARY "access blocked as cached data in CacheCade(TM) is unavailable on Adapter -%d  VD Target -%d Remote VD -%d"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY FATAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4743,7 +5134,7 @@ haLDTargetIDConflict TRAP-TYPE
     --#TYPE "LSI SAS Trap: LD has a conflict in HA domain"
 	--#SUMMARY "Target ID conflict detected. VD on Adapter -%d  VD Target -%d Remote VD -%d access is restricted from Peer controller"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4782,7 +5173,7 @@ haLDIncompatible TRAP-TYPE
     --#TYPE "LSI SAS Trap: LD is incompatible in the HA domain"
 	--#SUMMARY "Adapter -%d  VD Target -%d Remote VD -%d is incompatible in the HA domain"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4795,11 +5186,37 @@ vdAccessBlockedPeerUnavailable TRAP-TYPE
     --#TYPE "LSI SAS Trap: LD access blocked as cached data from peer controller is unavailable"
 	--#SUMMARY "Cached data from peer controller is unavailable. LD on Adapter -%d  VD Target -%d Remote VD -%d access policy is set to Blocked"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY FATAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
     ::= 8142	
+	
+haLDCompatible TRAP-TYPE
+    ENTERPRISE vdTraps
+    VARIABLES { atAdpNumber,vdNumber,isRemote}  
+    DESCRIPTION "Adapter -$1 VD Target -$2 Remote VD -$3 is compatible in the HA domain"
+    --#TYPE "LSI SAS Trap: LD is compatible in the HA domain"
+	--#SUMMARY "Adapter -%d  VD Target -%d Remote VD -%d is compatible in the HA domain"
+	--#ARGUMENTS {0,1,2}
+	--#SEVERITY INFORMATIONAL
+	--#GENERIC 6
+	--#CATEGORY "Error Events"
+	--#STATE OPERATIONAL
+    ::= 8143
+
+vdPropChanged TRAP-TYPE
+    ENTERPRISE vdTraps
+    VARIABLES { atAdpNumber,vdNumber,vdNewAccessPolicy,vdNewcurrentCachePolicy,vdNewcurrentPSPolicy,vdNewdefaultCachePolicy,vdNewdefaultPSPolicy,vdNewdiskCachePolicy,vdNewname}  
+    DESCRIPTION "Adapter -$1 VD Target -$2 Properties changed. Access policy to $3, currentCachePolicy to $4, currentPSPolicy to $5, defaultCachePolicy to $6, defaultPSPolicy to $7, diskCachePolicy to $8, name to $9"
+    --#TYPE "LSI SAS Trap: VD properties changed"
+    --#SUMMARY "Adapter -$1 VD Target -$2 Properties changed. Access policy to $3, currentCachePolicy to $4, currentPSPolicy to $5, defaultCachePolicy to $6, defaultPSPolicy to $7, diskCachePolicy to $8, name to $9"
+    --#ARGUMENTS {0,1,2,3,4,5,6,7,8}
+    --#SEVERITY INFORMATIONAL
+    --#GENERIC 6
+    --#CATEGORY "Error Events"
+    --#STATE OPERATIONAL
+    ::= 8144
 	
 ---------------vd trap----------
 pdTraps                      OBJECT IDENTIFIER ::= {lsiRAIDServer 8}
@@ -4890,7 +5307,7 @@ pdtClearFailed TRAP-TYPE
     --#TYPE "LSI SAS Trap: Physical Drive Clear failed"
 	--#SUMMARY "Physical Drive Clear failed on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -4927,7 +5344,7 @@ pdtError TRAP-TYPE
     --#TYPE "LSI SAS Trap: Error occurred"
 	--#SUMMARY "Error occurred on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5005,7 +5422,7 @@ pdtRblFailedBS TRAP-TYPE
     --#TYPE "LSI SAS Trap: Rebuild failed(bad source)"
 	--#SUMMARY "Rebuild failed(bad source) on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5018,7 +5435,7 @@ pdtRblFailedBT TRAP-TYPE
     --#TYPE "LSI SAS Trap: Rebuild failed(bad target)"
 	--#SUMMARY "Rebuild failed(bad target) on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5071,7 +5488,7 @@ pdtRemoved TRAP-TYPE
     --#TYPE "LSI SAS Trap: Physical Drive removed"
 	--#SUMMARY "Physical Drive removed on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5098,7 +5515,7 @@ pdtRedundantPathBroken TRAP-TYPE
     --#TYPE "LSI SAS Trap: Redundant Path Broken For Physical Drive "
 	--#SUMMARY "Redundant Path For Physical Drive Broken on Adapter -%d  Dev -%d  Enc -%d  Slot -%d EncDevId -%d pdSAS -%s"
 	--#ARGUMENTS {0,1,2,3,4,5}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5254,7 +5671,7 @@ pdtNotSupported TRAP-TYPE
     --#TYPE "LSI SAS Trap: PD is not supported"
 	--#SUMMARY "PD Not Supported on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5268,7 +5685,7 @@ pdtNotCertified TRAP-TYPE
     --#TYPE "LSI SAS Trap: PD is not a certified drive"
 	--#SUMMARY "PD Not Certified on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5324,7 +5741,7 @@ pdtERASEFailed TRAP-TYPE
     --#TYPE "LSI SAS Trap: PD Erase Failed"
 	--#SUMMARY "PD Erase Failed on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
 	--#ARGUMENTS {0,1,2,3}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5358,6 +5775,33 @@ haPDIsLocal TRAP-TYPE
 	--#STATE OPERATIONAL
     ::= 8236	
 	
+pdtLOCATEStart TRAP-TYPE
+    ENTERPRISE pdTraps
+    VARIABLES
+        {atAdpNumber,pdID}
+    DESCRIPTION "Locate LED started on PD Adapter -$1 PD -$2"
+    --#TYPE "LSI SAS Trap: Locate LED started on PD"
+	--#SUMMARY "Local controller now manages PD on Adapter -%d  Dev -%d  Enc -%d  Slot -%d"
+	--#ARGUMENTS {0,1}
+	--#SEVERITY INFORMATIONAL
+	--#GENERIC 6
+	--#CATEGORY "Error Events"
+	--#STATE OPERATIONAL
+    ::= 8237	
+
+pdtLOCATEStop TRAP-TYPE
+    ENTERPRISE pdTraps
+    VARIABLES
+        {atAdpNumber,pdID}
+    DESCRIPTION "Locate LED stopped on PD Adapter -$1 PD -$2"
+    --#TYPE "LSI SAS Trap: Locate LED stopped on PD"
+	--#SUMMARY "Locate LED stopped on PD Adapter -$1 PD -$2"
+	--#ARGUMENTS {0,1}
+	--#SEVERITY INFORMATIONAL
+	--#GENERIC 6
+	--#CATEGORY "Error Events"
+	--#STATE OPERATIONAL
+    ::= 8238	
 	
 	---------------Enclosure trap----------
 enclTraps                      OBJECT IDENTIFIER ::= {lsiRAIDServer 9}
@@ -5382,7 +5826,7 @@ widePortLinkLost TRAP-TYPE
     --#TYPE "LSI SAS Trap: Link lost on SAS wide port"
 	--#SUMMARY "Link lost on SAS wide port on Adapter -%d  port -%d  PHY -%d"
 	--#ARGUMENTS {0,1,2}
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY WARNING
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL
@@ -5434,7 +5878,7 @@ haHwIncompatible TRAP-TYPE
     DESCRIPTION "Peer Controller hardware is incompatible"
     --#TYPE "LSI SAS Trap: Controllers in the HA domain are incompatible"
 	--#SUMMARY "Peer Controller hardware is incompatible"
-	--#SEVERITY INFORMATIONAL
+	--#SEVERITY CRITICAL
 	--#GENERIC 6
 	--#CATEGORY "Error Events"
 	--#STATE OPERATIONAL

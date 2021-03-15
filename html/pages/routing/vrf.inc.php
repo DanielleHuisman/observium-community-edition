@@ -1,13 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -127,7 +126,7 @@ $link_array = array('page'    => 'routing',
               $port['bg'] = "#".$bg;
               $port['graph_type'] = "port_".$vars['graph'];
               echo("<div style='display: block; padding: 3px; margin: 3px; min-width: 135px; max-width:135px; min-height:75px; max-height:75px;
-                 text-align: center; float: left; background-color: ".$list_colour_b_b.";'>
+                 text-align: center; float: left; background-color: " . OBS_COLOUR_LIST_B_B . ";'>
                  <div style='font-weight: bold;'>".short_ifname($port['ifDescr'])."</div>");
               generate_port_thumbnail($port);
               echo("<div style='font-size: 9px;'>".short_port_descr($port['ifAlias'])."</div>
@@ -135,7 +134,7 @@ $link_array = array('page'    => 'routing',
               break;
 
             default:
-              echo($seperator.generate_port_link($port, short_ifname($port['ifDescr'])));
+              echo($seperator.generate_port_link_short($port));
               $seperator = ", ";
               break;
            }

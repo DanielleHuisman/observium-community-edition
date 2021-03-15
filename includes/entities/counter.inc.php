@@ -6,8 +6,7 @@
  *
  * @package    observium
  * @subpackage entities
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
- *
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -17,13 +16,13 @@ function discover_counter_definition($device, $mib, $entry)
   echo($entry['oid']. ' [');
 
   // Check that types listed in skip_if_valid_exist have already been found
-  if (discovery_check_if_type_exist($GLOBALS['valid'], $entry, 'counter')) { echo '!]'; return; }
+  if (discovery_check_if_type_exist($entry, 'counter')) { echo '!]'; return; }
 
   // Check array requirements list
   if (discovery_check_requires_pre($device, $entry, 'counter')) { echo '!]'; return; }
 
   // Fetch table or Oids
-  $table_oids = array('oid', 'oid_descr', 'oid_scale', 'oid_unit', 'oid_class',
+  $table_oids = array('oid', 'oid_descr', 'oid_scale', 'oid_unit', 'oid_class', 'oid_add',
                       'oid_limit_low', 'oid_limit_low_warn', 'oid_limit_high_warn', 'oid_limit_high',
                       'oid_limit_nominal', 'oid_limit_delta_warn', 'oid_limit_delta', 'oid_limit_scale',
                       'oid_extra', 'oid_entPhysicalIndex');
@@ -37,13 +36,10 @@ function discover_counter_definition($device, $mib, $entry)
     $entry['oid_num'] = rtrim($entry['oid_num'], '.');
   }
 
-  if (!isset($entry['scale']))
+  // Just append mib name to definition entry, for simple pass to external functions
+  if (empty($entry['mib']))
   {
-    $scale            = 1;
-    $options['scale'] = 1;
-  } else {
-    $scale            = $entry['scale'];
-    $options['scale'] = $entry['scale'];
+    $entry['mib'] = $mib;
   }
 
   $counters = array(); // Reset per-class counters for each MIB
@@ -74,7 +70,7 @@ function discover_counter_definition($device, $mib, $entry)
       }
     }
 
-    $dot_index = '.' . $index;
+    $dot_index = strlen($index) ? '.' . $index : '';
     $oid_num   = $entry['oid_num'] . $dot_index;
 
     // echo PHP_EOL; print_vars($entry); echo PHP_EOL; print_vars($counter); echo PHP_EOL; print_vars($descr); echo PHP_EOL;
@@ -86,6 +82,10 @@ function discover_counter_definition($device, $mib, $entry)
 
     $counter['class'] = nicecase($class);  // Class in descr
     $counter['index'] = $index;            // Index in descr
+    foreach (explode('.', $index) as $k => $i)
+    {
+      $counter['index'.$k] = $i;           // Index parts
+    }
     $counter['i']     = $counters[$class]; // i++ counter in descr (per counter class)
 
     // Check array requirements list
@@ -104,77 +104,22 @@ function discover_counter_definition($device, $mib, $entry)
       print_debug("Excluded by current value ($value) is equals or below min (".$entry['min'].").");
       continue;
     }
-    else if (isset($entry['max']) && $value >= $entry['max'])
+    elseif (isset($entry['max']) && $value >= $entry['max'])
     {
       print_debug("Excluded by current value ($value) is equals or above max (".$entry['max'].").");
       continue;
     }
-    else if (isset($entry['invalid']) && in_array($value, (array)$entry['invalid']))
+    elseif (isset($entry['invalid']) && in_array($value, (array)$entry['invalid']))
     {
       print_debug("Excluded by current value ($value) in invalid range [".implode(', ', (array)$entry['invalid'])."].");
       continue;
     }
 
-    // Check limits oids if set
-    foreach (array('limit_low', 'limit_low_warn', 'limit_high_warn', 'limit_high') as $limit)
-    {
-      $oid_limit = 'oid_'   . $limit;
-      if (isset($entry[$oid_limit]))
-      {
-        if (isset($counter[$entry[$oid_limit]])) { $options[$limit] = $counter[$entry[$oid_limit]]; } // Named oid, exist in table
-        else                                     { $options[$limit] = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-        $options[$limit] = snmp_fix_numeric($options[$limit]);
-        // Scale limit
-        if (isset($entry['limit_scale']) && is_numeric($entry['limit_scale']) && $entry['limit_scale'] != 0)
-        {
-          $options[$limit] *= $entry['limit_scale'];
-        }
-      }
-      elseif (isset($entry[$limit]) && is_numeric($entry[$limit]))
-      {
-        $options[$limit] = $entry[$limit]; // Limit from definition
-      }
-    }
+    // Scale
+    $scale = entity_scale_definition($device, $entry, $counter);
 
-    // Limits based on nominal +- delta oids (see TPT-HEALTH-MIB)
-    if (isset($entry['oid_limit_nominal']) && (isset($entry['oid_limit_delta']) || isset($entry['oid_limit_delta_warn'])))
-    {
-      $oid_limit = 'oid_limit_nominal';
-      if (isset($counter[$entry[$oid_limit]])) { $limit_nominal = $counter[$entry[$oid_limit]]; } // Named oid, exist in table
-      else                                    { $limit_nominal = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-
-      if (is_numeric($limit_nominal) && isset($entry['oid_limit_delta_warn']))
-      {
-        $oid_limit = 'oid_limit_delta_warn';
-        if (isset($counter[$entry[$oid_limit]])) { $limit_delta_warn = $counter[$entry[$oid_limit]]; } // Named oid, exist in table
-        else                                    { $limit_delta_warn = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-        $options['limit_low_warn']  = $limit_nominal - $limit_delta_warn; //$entry['limit_scale'];
-        $options['limit_high_warn'] = $limit_nominal + $limit_delta_warn; //$entry['limit_scale'];
-        if (isset($entry['limit_scale']) && is_numeric($entry['limit_scale']) && $entry['limit_scale'] != 0)
-        {
-          $options['limit_low_warn']  *= $entry['limit_scale'];
-          $options['limit_high_warn'] *= $entry['limit_scale'];
-        }
-      }
-      if (is_numeric($limit_nominal) && isset($entry['oid_limit_delta']))
-      {
-        $oid_limit = 'oid_limit_delta';
-        if (isset($counter[$entry[$oid_limit]])) { $limit_delta = $counter[$entry[$oid_limit]]; } // Named oid, exist in table
-        else                                    { $limit_delta = snmp_get_oid($device, $entry[$oid_limit] . $dot_index, $mib); } // Numeric oid
-        $options['limit_low']  = $limit_nominal - $limit_delta;
-        $options['limit_high'] = $limit_nominal + $limit_delta;
-        if (isset($entry['limit_scale']) && is_numeric($entry['limit_scale']) && $entry['limit_scale'] != 0)
-        {
-          $options['limit_low']  *= $entry['limit_scale'];
-          $options['limit_high'] *= $entry['limit_scale'];
-        }
-      }
-    }
-    // Limit by
-    if (isset($entry['limit_by']))
-    {
-      $options['limit_by'] = $entry['limit_by'];
-    }
+    // Limits
+    $options = array_merge($options, entity_limits_definition($device, $entry, $counter, $scale));
 
     // Unit
     if (isset($entry['unit'])) { $options['counter_unit'] = $entry['unit']; }
@@ -199,6 +144,19 @@ function discover_counter_definition($device, $mib, $entry)
     {
       // Just set physical index
       $options['entPhysicalIndex'] = array_tag_replace($counter, $entry['entPhysicalIndex']);
+    }
+
+    // Add extra value, dirty hack for  DANTHERM-COOLING-MIB:
+    // heaterOpertdurHour.0 = INTEGER: 13 Hours
+    // heaterOpertdurMin.0 = INTEGER: 59
+    if (isset($entry['oid_add']) && isset($counter[$entry['oid_add']]))
+    {
+      $options['value_add'] = snmp_fix_numeric($counter[$entry['oid_add']]);
+      $options['oid_add']   = snmp_translate($entry['oid_add'] . $dot_index, $mib);
+      if (isset($entry['scale_add']))
+      {
+        $options['scale_add'] = $entry['scale_add'];
+      }
     }
 
     // Generate Description
@@ -278,6 +236,12 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
     $value = scale_value($value, $scale);
     // $value *= $scale; // Scale before unit conversion
     $value = value_to_si($value, $options['counter_unit'], $class); // Convert if not SI unit
+
+    // Extra add value
+    if (isset($options['value_add']) && is_numeric($options['value_add']))
+    {
+      $value += scale_value($options['value_add'], $options['scale_add']);
+    }
   } else {
     print_debug("Counter skipped by not numeric value: '$value', '$counter_descr'");
     if (strlen($value))
@@ -371,8 +335,10 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
       print_debug("High/low limits swapped.");
     }
 
-    $counter_insert = array('poller_type' => $poller_type, 'counter_class' => $class, 'device_id' => $device['device_id'],
-                            'counter_index' => $index);
+    $counter_insert = [
+      'poller_type' => $poller_type, 'device_id' => $device['device_id'],
+      'counter_class' => $class, 'counter_index' => $index
+    ];
 
     foreach ($param_main as $key => $column)
     {
@@ -397,6 +363,16 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
     $counter_insert['counter_polled'] = time();
 
     $counter_id = dbInsert($counter_insert, 'counters');
+
+    // Extra oid add
+    if ($counter_id && isset($options['oid_add']))
+    {
+      set_entity_attrib('counter', $counter_id, 'oid_add', $options['oid_add'], $device['device_id']);
+      if (isset($options['scale_add']))
+      {
+        set_entity_attrib('counter', $counter_id, 'scale_add', $options['scale_add'], $device['device_id']);
+      }
+    }
 
     print_debug("( $counter_id inserted )");
     echo('+');
@@ -491,9 +467,29 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
     if (count($update))
     {
       $updated = dbUpdate($update, 'counters', '`counter_id` = ?', array($counter_entry['counter_id']));
+
+      // Extra oid add
+      if (isset($options['oid_add']))
+      {
+        set_entity_attrib('counter', $counter_entry['counter_id'], 'oid_add', $options['oid_add'], $device['device_id']);
+        if (isset($options['scale_add']))
+        {
+          set_entity_attrib('counter', $counter_entry['counter_id'], 'scale_add', $options['scale_add'], $device['device_id']);
+        }
+      }
+
       echo('U');
       log_event("Counter updated: $class $mib::$object.$index $counter_descr", $device, 'counter', $counter_entry['counter_id']);
     } else {
+      if (isset($options['oid_add']) &&
+          !dbExist('entity_attribs', '`entity_type` = ? AND `entity_id` = ? AND `attrib_type` = ?', array('counter', $counter_entry['counter_id'], 'oid_add')))
+      {
+        set_entity_attrib('counter', $counter_entry['counter_id'], 'oid_add', $options['oid_add'], $device['device_id']);
+        if (isset($options['scale_add']))
+        {
+          set_entity_attrib('counter', $counter_entry['counter_id'], 'scale_add', $options['scale_add'], $device['device_id']);
+        }
+      }
       echo('.');
     }
   }
@@ -508,12 +504,12 @@ function discover_counter($device, $class, $mib, $object, $oid, $index, $counter
       $options['rename_rrd'] = array_tag_replace($rrd_tags, $options['rename_rrd']);
       $old_rrd               = 'counter-' . $class . '-' . $options['rename_rrd'];
     }
-    else if (isset($options['rename_rrd_full']))
+    elseif (isset($options['rename_rrd_full']))
     {
       $options['rename_rrd_full'] = array_tag_replace($rrd_tags, $options['rename_rrd_full']);
       $old_rrd               = 'counter-' . $options['rename_rrd_full'];
     }
-    $new_rrd = 'counter-'.$class.'-'.$type.'-'.$index;
+    $new_rrd = "counter-" . $class . "-" . $mib . "-" . $object . "-" . $index . ".rrd";
     rename_rrd($device, $old_rrd, $new_rrd);
   }
 
@@ -532,10 +528,13 @@ function poll_counter($device, &$oid_cache)
   $sql .= " WHERE `device_id` = ? AND `counter_deleted` = ?";
   $sql .= ' ORDER BY `counter_oid`'; // This fix polling some OIDs (when not ordered)
 
-  //print_vars($GLOBALS['cache']['entity_attribs']);
+  //print_debug_vars($GLOBALS['cache']['entity_attribs']);
   foreach (dbFetchRows($sql, array($device['device_id'], '0')) as $counter_db)
   {
     $counter_poll = array();
+    $counter_attribs = get_entity_attribs('counter', $counter_db);
+    //print_debug_vars($GLOBALS['cache']['entity_attribs']);
+    //print_debug_vars($counter_attribs);
     $class = $counter_db['counter_class'];
     // Counter not have type attribute, this need for compat with agent or ipmi
     $type = $counter_db['counter_mib'] . '-' . $counter_db['counter_object'];
@@ -555,18 +554,26 @@ function poll_counter($device, &$oid_cache)
       // Take value from $oid_cache if we have it, else snmp_get it
       if (isset($oid_cache[$counter_db['counter_oid']]))
       {
-        $oid_cache[$counter_db['counter_oid']] = snmp_fix_numeric($oid_cache[$counter_db['counter_oid']]);
+        $oid_cache_tmp = $oid_cache[$counter_db['counter_oid']]; // keep original value, while cache entry can reused
+        $oid_cache[$counter_db['counter_oid']] = snmp_fix_numeric($oid_cache[$counter_db['counter_oid']], $counter_db['counter_unit']);
       }
       if (is_numeric($oid_cache[$counter_db['counter_oid']]))
       {
         print_debug("value taken from oid_cache");
         $counter_poll['counter_value'] = $oid_cache[$counter_db['counter_oid']];
+        $oid_cache[$counter_db['counter_oid']] = $oid_cache_tmp; // restore original cached value
       } else {
         // Get by numeric oid
         $counter_poll['counter_value'] = snmp_get_oid($device, $counter_db['counter_oid'], 'SNMPv2-MIB');
-        $counter_poll['counter_value'] = snmp_fix_numeric($counter_poll['counter_value']);
+        $counter_poll['counter_value'] = snmp_fix_numeric($counter_poll['counter_value'], $counter_db['counter_unit']);
       }
       $unit = $counter_db['counter_unit'];
+
+      // Extra add
+      if (isset($counter_attribs['oid_add']))
+      {
+        $counter_poll['counter_value_add'] = snmp_fix_numeric(snmp_get_oid($device, $counter_attribs['oid_add'], 'SNMPv2-MIB'));
+      }
     }
     elseif ($counter_db['poller_type'] == "agent")
     {
@@ -604,6 +611,14 @@ function poll_counter($device, &$oid_cache)
 
     // Unit conversion to SI (if required)
     $counter_poll['counter_value'] = value_to_si($counter_poll['counter_value'], $counter_db['counter_unit'], $class);
+
+    // Extra add
+    if (isset($counter_attribs['oid_add']) && is_numeric($counter_poll['counter_value_add']))
+    {
+      print_debug("Extra value add: ".$counter_poll['counter_value']." + (".$counter_poll['counter_value_add']." * ".$counter_attribs['scale_add'].") =");
+      $counter_poll['counter_value'] += scale_value($counter_poll['counter_value_add'], $counter_attribs['scale_add']);
+      print_debug($counter_poll['counter_value']);
+    }
 
     // Rate /s
     $value_diff = int_sub($counter_poll['counter_value'], $counter_db['counter_value']);
@@ -860,18 +875,27 @@ function get_counter_rrd($device, $counter)
 {
   global $config;
 
-  # For IPMI, counters tend to change order, and there is no index, so we prefer to use the description as key here.
-  if ($config['os'][$device['os']]['counter_descr'] || ($counter['poller_type'] != "snmp" && $counter['poller_type'] != ''))
+  # For IPMI/agent, counters tend to change order, and there is no index, so we prefer to use the description as key here.
+  if ((isset($config['os'][$device['os']]['sensor_descr']) && $config['os'][$device['os']]['sensor_descr']) ||                         // per os definition
+      (isset($config['mibs'][$counter['counter_mib']]['sensor_descr']) && $config['mibs'][$counter['counter_mib']]['sensor_descr']) || // per mib definition
+      ($counter['poller_type'] != "snmp" && $counter['poller_type'] != ''))
   {
-    $rrd_file = "counter-".$counter['counter_class']."-".$counter['poller_type']."-".$counter['counter_descr'] . ".rrd";
+    $index = $counter['counter_descr'];
+  } else {
+    $index = $counter['counter_index'];
+  }
+
+  if ($counter['poller_type'] != "snmp" && $counter['poller_type'] != '')
+  {
+    $rrd_file = "counter-" . $counter['counter_class'] . "-" . $counter['poller_type'] . "-" . $index . ".rrd";
   }
   elseif ($counter['counter_mib'] == '' || $counter['counter_object'] == '')
   {
     // Seems as numeric Oid polling (not known MIB & Oid)
     // counter_oid is full numeric oid with index
-    $rrd_file = "counter-".$counter['counter_class']."-".$counter['counter_oid'] . ".rrd";
+    $rrd_file = "counter-" . $counter['counter_class'] . "-" . $counter['counter_oid'] . ".rrd";
   } else {
-    $rrd_file = "counter-".$counter['counter_class']."-".$counter['counter_mib']."-".$counter['counter_object']."-".$counter['counter_index'] . ".rrd";
+    $rrd_file = "counter-" . $counter['counter_class'] . "-" . $counter['counter_mib'] . "-" . $counter['counter_object'] . "-" . $index . ".rrd";
   }
 
   return($rrd_file);

@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -23,7 +22,6 @@ if (is_numeric($vars['id']))
 
     $auth = TRUE;
 
-    if (!isset($sla['sla_mib'])) { $sla['sla_mib'] = 'cisco-rttmon-mib'; } // CLEANME, remove in r7500, but not before CE 0.16.1
     $mib_lower = strtolower($sla['sla_mib']);
     $index        = $mib_lower . '-' . $sla['sla_index'];
     $unit_text    = 'SLA '.$sla['sla_index'];

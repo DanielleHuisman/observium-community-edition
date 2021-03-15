@@ -1,20 +1,19 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage search
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
 /// SEARCH DEVICES
 $results = dbFetchRows("SELECT * FROM `devices`
-                        WHERE (`hostname` LIKE ? OR `location` LIKE ? OR `sysDescr` LIKE ? OR `os` LIKE ? OR `purpose` LIKE ?) $query_permitted_device
-                        ORDER BY `hostname` LIMIT $query_limit", array($query_param, $query_param, $query_param, $query_param, $query_param));
+                        WHERE (`hostname` LIKE ? OR `location` LIKE ? OR `sysDescr` LIKE ? OR `os` LIKE ? OR `vendor` LIKE ? OR `purpose` LIKE ?) $query_permitted_device
+                        ORDER BY `hostname` LIMIT $query_limit", [ $query_param, $query_param, $query_param, $query_param, $query_param, $query_param ]);
 if (count($results))
 {
   foreach ($results as $result)
@@ -35,7 +34,7 @@ if (count($results))
       'icon'   => get_device_icon($result),
       'data'   => array(
         escape_html($result['hardware'] . ' | ' . $config['os'][$result['os']]['text'] . ' ' . $result['version']),
-        highlight_search(escape_html($result['location']) . ' | ' . ( strlen($result['purpose']) ? $result['purpose'] . ' | ' : '' ))  . $num_ports . ' ports'),
+        html_highlight(escape_html($result['location']) . ' | ' . ( strlen($result['purpose']) ? $result['purpose'] . ' | ' : '' ), $queryString) . $num_ports . ' ports'),
     );
   }
   

@@ -1,0 +1,2139 @@
+LUM-SYNC-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32, Integer32, NOTIFICATION-TYPE
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE, NOTIFICATION-GROUP
+        FROM SNMPv2-CONF
+    DateAndTime, TruthValue, DisplayString
+        FROM SNMPv2-TC
+    lumModules, lumSyncMIB
+        FROM LUM-REG
+    SubrackNumber, SlotNumber, PortNumber, MgmtNameString, FaultStatus, CommandString, SyncSourceState, SyncSourceMode,
+    BoardOrInterfaceOperStatus, BoardOrInterfaceAdminStatus, AdminStatus
+        FROM LUM-TC;
+
+lumSyncMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201801250000Z" -- January 25th 2018
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+        "The MIB module for manamement of Synchronizatrion sources.
+         The tables included in this MIB are:
+
+        (1) The General group contains some general attributes as timestamps
+            and tables sizes.
+
+        (2) The Sync group table contains information on the group of
+            synchronization sources available on each board.
+
+        (3) The Sync source table contains information and configuration of each
+            individual synchronization source. Sources can be either external
+            traffic ports, other external ports, internal oscillators or backplane buses.
+
+        (4) The Sync domain table contains information and configuration on each
+            defined synchronization domain. A sync domain is defined as a number
+            of sync groups that have possibility to share synchronization signals
+            and information on the quality of these signals via one or several
+            interconnections, like a backplane bus or external ports.
+
+        (5) The Sync bus table contains information and configuration of each
+            available backplane bus used for distributing sync signal between boards.
+
+        (6) The Sync Board to domain table contains information on what domain
+            a board is part of and what boards are part of what domain.
+
+"
+    REVISION
+        "201801250000Z" -- January 25th 2018
+    DESCRIPTION
+        "Changes made for release r31.0:
+         - Added hdea1600 board"
+    REVISION
+        "201709010000Z" -- September 1st 2017
+    DESCRIPTION
+        "Changes made for release r30.0:
+         - Added emxp440 board"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "Changes made for release r29.0:
+         - Changed ORGANIZATION and CONTACT-INFO"
+    REVISION
+        "201602010000Z" -- Feb 1st 2016
+    DESCRIPTION
+        "- Add syncSourceIfNo, syncSourceUpPortId syncSourceLocalId for EMXP3.
+         - Correct admin status and oper status type for syncSource."
+    REVISION
+        "201501140000Z" -- Jan 14th 2015
+    DESCRIPTION
+        "Added emxp240iie board"
+    REVISION
+        "201212251200Z" -- 25 December 2012
+    DESCRIPTION
+        "Added two sync source alarms.
+         SyncWander is set to hidden."
+    REVISION
+        "201105310000Z" -- May 31st 2011
+    DESCRIPTION
+        "Added sync domain table.
+         Added sync bus table.
+         Added sync board to domain mapping table.
+         Deprecated sync subrack table, replaced by sync bus table."
+    REVISION
+        "200711120000Z" -- Nov 12th 2007
+    DESCRIPTION
+        "Fixed compliance."
+    REVISION
+        "200212110000Z" -- Dec 11th 2002
+    DESCRIPTION
+        "Added sourceChanged notification."
+    REVISION
+        "200211200000Z" -- Nov 20th 2002
+    DESCRIPTION
+        "Changed help text for ringMode."
+    REVISION
+        "200205160000Z" -- May 16th 2002
+    DESCRIPTION
+        "The initial revision of this module."
+    ::= { lumModules 17 }
+
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and complicance
+-- specifications.
+-- ----------------------------------------------------
+
+lumSyncConfs OBJECT IDENTIFIER ::= { lumSyncMIB 1 }
+lumSyncGroups OBJECT IDENTIFIER ::= { lumSyncConfs 1 }
+lumSyncCompl OBJECT IDENTIFIER ::= { lumSyncConfs 2 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the sync MIB
+-- ----------------------------------------------------
+
+lumSyncMIBObjects OBJECT IDENTIFIER ::= { lumSyncMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+syncGeneral OBJECT IDENTIFIER ::= { lumSyncMIBObjects 1 }
+syncGroups OBJECT IDENTIFIER ::= { lumSyncMIBObjects 2 }
+syncSources OBJECT IDENTIFIER ::= { lumSyncMIBObjects 3 }
+lumentisSyncNotifications OBJECT IDENTIFIER ::= { lumSyncMIBObjects 4 }
+syncSubracks OBJECT IDENTIFIER ::= { lumSyncMIBObjects 5 }
+syncDomains OBJECT IDENTIFIER ::= { lumSyncMIBObjects 6 }
+syncBuses OBJECT IDENTIFIER ::= { lumSyncMIBObjects 7 }
+syncBoardToDomain OBJECT IDENTIFIER ::= { lumSyncMIBObjects 8 }
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+-- n/a
+
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+
+syncGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the configuration of the MIB was
+        last changed.
+
+"
+    ::= { syncGeneral 1 }
+
+syncGeneralStateLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the state of the MIB was last
+        changed.
+
+"
+    ::= { syncGeneral 2 }
+
+syncGeneralSyncGroupTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of sync group table
+
+"
+    ::= { syncGeneral 3 }
+
+syncGeneralSyncSourceTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of sync source table
+
+"
+    ::= { syncGeneral 4 }
+
+syncGeneralSyncSubrackTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      deprecated
+    DESCRIPTION
+        "Size of subrack table
+
+"
+    ::= { syncGeneral 5 }
+
+syncGeneralSyncDomainTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of sync domain table
+
+"
+    ::= { syncGeneral 6 }
+
+syncGeneralSyncBusTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of sync bus table
+
+"
+    ::= { syncGeneral 7 }
+
+syncGeneralSyncBoardToDomainTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of sync board to domain table
+
+"
+    ::= { syncGeneral 8 }
+
+-- ----------------------------------------------------
+-- Sync groups
+-- ----------------------------------------------------
+
+syncGroupTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SyncGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+     "The sync group table."
+::= { syncGroups 1 }
+
+syncGroupEntry OBJECT-TYPE
+    SYNTAX  SyncGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in the sync group table.
+        One entry per group of interfaces where sync
+        can be configured.
+
+"
+    INDEX   { syncGroupIndex }
+    ::= { syncGroupTable 1 }
+
+SyncGroupEntry ::=
+    SEQUENCE {
+        syncGroupIndex                  Unsigned32,
+        syncGroupName                   MgmtNameString,
+        syncGroupSubrack                SubrackNumber,
+        syncGroupSlot                   SlotNumber,
+        syncGroupMode                   INTEGER,
+        syncGroupManualSource           Unsigned32,
+        syncGroupSelectedSource         MgmtNameString,
+        syncGroupQuality                Unsigned32,
+        --syncGroupLocalOscActiveC2W      FaultStatus,
+        syncGroupLocalOscActiveW2C      FaultStatus,
+        syncGroupLocalOscActive         FaultStatus,
+        syncGroupAdminStatus            BoardOrInterfaceAdminStatus,
+        syncGroupOperStatus             BoardOrInterfaceOperStatus,
+        syncGroupRingMode               INTEGER,
+        syncGroupLastChangeTime         DateAndTime,
+        syncGroupManualSourceName       MgmtNameString,
+        syncGroupConfigurationMode      INTEGER,
+	syncGroupStatus                 INTEGER,
+        syncGroupSourceSwitch           CommandString,
+        syncGroupSourceSwitchType       INTEGER,
+        syncGroupHoldover               FaultStatus,
+        syncGroupQualityLevelSelectionMode INTEGER}
+
+syncGroupIndex OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+      "An arbitrary index assigned to each if entry.
+
+"
+     ::= { syncGroupEntry 1 }
+
+syncGroupName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the sync group.
+
+"
+    ::= { syncGroupEntry 2 }
+
+syncGroupSubrack OBJECT-TYPE
+    SYNTAX  SubrackNumber
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+        "The subrack number for the group of interfaces.
+
+"
+     ::= { syncGroupEntry 3 }
+
+syncGroupSlot OBJECT-TYPE
+    SYNTAX  SlotNumber
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+         "The slot number for the group of interfaces.
+
+"
+     ::= { syncGroupEntry 4 }
+
+syncGroupMode OBJECT-TYPE
+    SYNTAX  INTEGER {
+        manual(1),
+        auto(2) }
+    MAX-ACCESS read-write
+    STATUS  current
+    DESCRIPTION
+         "The sync mode for the sync group.
+
+         manual - Sync source is chosen manually.
+
+         auto - The sync source is chosen automatically.
+
+"
+     DEFVAL { manual }
+     ::= { syncGroupEntry 5 }
+
+--- 040109 B2098
+--- To handle conversion 2.1 -> 2.2, this is an hidden attribute that is saved
+--- A new string attribute is introduced, syncGroupManualSourceName: it is
+--- settable, but is NOT saved in the backup
+--- Note the confusion with the aliases for these two attributes: this is
+--- intentional.
+syncGroupManualSource OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS read-create
+    STATUS  current
+    DESCRIPTION
+         "The name of the sync source currently used
+         to sync the trunk.
+
+"
+     DEFVAL { 0 }
+     ::= { syncGroupEntry 6 }
+
+syncGroupSelectedSource OBJECT-TYPE
+    SYNTAX  MgmtNameString
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+         "The name for the sync source currently used
+         to sync the trunk.
+
+"
+     ::= { syncGroupEntry 7 }
+
+syncGroupQuality OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..15)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The sync quality that will be distributed to the
+        outgoing (client) tributaries.
+
+"
+    ::= { syncGroupEntry 8 }
+
+syncGroupLocalOscActiveW2C OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      deprecated
+    DESCRIPTION
+        "Local oscillator used to sync clients.
+
+        A: The sync for clients is taken from the local
+        sync source.
+
+        D: The sync for clients is taken from the WDM
+        signal.
+
+"
+    ::= { syncGroupEntry 9 }
+
+syncGroupLocalOscActive OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Local oscillator used to synchronize trunc and clients
+
+        A: The sync is taken from the local sync source.
+
+        D: The sync is taken from the trunc or any of the client
+        signals.
+
+"
+    ::= { syncGroupEntry 10 }
+
+
+syncGroupAdminStatus OBJECT-TYPE
+    SYNTAX  BoardOrInterfaceAdminStatus
+    MAX-ACCESS read-write
+    STATUS  current
+    DESCRIPTION
+         "Administrative state for the sync group.
+
+         down - Alarms are not sent.
+
+         up - The sync function is enabled
+
+         service - Alarms are not sent
+
+"
+     DEFVAL { up }
+     ::= { syncGroupEntry 11 }
+
+syncGroupOperStatus OBJECT-TYPE
+    SYNTAX  BoardOrInterfaceOperStatus
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+         "The operational state for the sync group.
+
+         notPresent - The physical resource is not
+         available.
+
+         down - The sync group is disabled.
+
+         up - The sync group is enabled.
+
+"
+     DEFVAL { notPresent }
+     ::= { syncGroupEntry 12 }
+
+syncGroupRingMode OBJECT-TYPE
+    SYNTAX  INTEGER {
+        off (1),
+        on (2) }
+    MAX-ACCESS read-write
+    STATUS  deprecated
+    DESCRIPTION
+         "Decides whether sync group is part of a sync
+         ring or not.
+
+         off - Used when the muxponder is used as a
+         terminal multiplexor for point-to-point
+         connections, or as a hub-node in an SDH ring.
+         In this mode, the incoming trunc can never be
+         selected as synchronization source for the
+         outgoing trunc.
+
+         on - Used when the muxponder is used as an
+         add-drop muxFeeder in an SDH ring, i.e. some
+         AU4s are passed-through to the outgoing trunc.
+         In this mode, the outgoing S1 byte on the trunc
+         is set to the actual quality of the
+         synchronization function, even if the outgoing
+         trunc is synchronized by the incoming trunc.
+
+"
+     DEFVAL { off }
+     ::= { syncGroupEntry 13 }
+
+syncGroupLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the sync selected sync source
+        changed the last time.
+
+"
+    ::= { syncGroupEntry 14 }
+
+syncGroupManualSourceName OBJECT-TYPE
+    SYNTAX  MgmtNameString
+    MAX-ACCESS read-write
+    STATUS  current
+    DESCRIPTION
+         "The name of the sync source that the user
+         has selected to sync the trunk and the outgoing
+         (client) tributaries. Only applicable if
+         'manual' is used.
+
+"
+     DEFVAL { "" }
+     ::= { syncGroupEntry 15 }
+
+syncGroupConfigurationMode OBJECT-TYPE
+    SYNTAX  INTEGER {
+        neverUseTrunc (1),
+        uniDirRingSatellite (2),
+        standardG707 (3) }
+    MAX-ACCESS read-write
+    STATUS  current
+    DESCRIPTION
+         "Decides the synchronization behaviour.
+
+         neverUseTrunc - Used when the muxponder is
+         used as a terminal multiplexor for point-to-point
+         connections, or as a hub-node in an SDH ring.
+         In this mode, the incoming trunc can never be
+         selected as synchronization source for the
+         outgoing trunc.
+
+         uniDirRingSatellite - Used when the muxponder is
+         used as an add-drop muxFeeder in an SDH ring, i.e.
+         some AU4s are passed-through to the outgoing trunc.
+         In this mode, the outgoing S1 byte on the trunc
+         is set to the actual quality of the
+         synchronization function, even if the outgoing
+         trunc is synchronized by the incoming trunc.
+
+         standardG707 - The incoming trunc can be selected
+         as a synchronization source. When the incoming
+         trunc is selected, the S1 byte sent on the outgoing
+         trunc is set to 'DoNotUse'.
+
+"
+     ::= { syncGroupEntry 16 }
+
+syncGroupStatus OBJECT-TYPE
+    SYNTAX  INTEGER {
+        normal (1),
+        holdover (2) }
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+         "The status for the selected source.
+
+         normal - The selected source is not in holdover mode.
+
+         holdover - The selected source is in holdover (digital hold) mode.
+
+"
+     DEFVAL { normal }
+     ::= { syncGroupEntry 17 }
+
+syncGroupSourceSwitch  OBJECT-TYPE
+    SYNTAX             CommandString
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+         "The command for performing a manual or forced sync source switch
+         as defined in ITU-T G.781:
+
+         - The manual switched source can be used to override the currently
+           selected source, on condition that the manual source is nominated in
+           the selection process, and it is not in Failed state. If the sync selection
+           process is running in Quality Level enabled mode, the manual switch source
+           must also have a Quality Level equal to or better than the currently selected
+           source.
+	 -  The forced switched source can be used to override the currently
+         selected source, on condition that the forced source is nominated in the
+         selection process and it is not in Failed State.
+
+         The forced source switch command overrides the manual switch command.
+
+"
+     ::= { syncGroupEntry 18 }
+
+syncGroupSourceSwitchType  OBJECT-TYPE
+    SYNTAX                 INTEGER {
+                           auto (1),
+                           manual (2),
+                           forced (3) }
+    MAX-ACCESS             read-only
+    STATUS                 current
+    DESCRIPTION
+         "Indication on what caused the currently selected source to be selected.
+
+          auto -    The source was selected from a normal sync selection process
+                    without any user commands.
+          manual -  The source was selected via a Manual Source Switch command.
+          forced -  The source was selected via a Forced Source Switch command.
+
+"
+     DEFVAL { auto }
+     ::= { syncGroupEntry 19 }
+
+syncGroupHoldover OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The sync group is in holdover mode.
+
+        A: The chosen sync source has gone into holdover (digital hold) mode,
+           or no source has been chosen.
+
+        D: A sync source is chosen which is not holdover mode.
+
+"
+    ::= { syncGroupEntry 20 }
+
+syncGroupQualityLevelSelectionMode OBJECT-TYPE
+    SYNTAX  INTEGER {disabled (1),
+                     enabled (2)}
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates wether the sync group is operating in Quality Level selection mode.
+         For Layer 2 ethernet boards, this attribute is dependant on the configuration
+         of the sync domain that the group is a member of. If the group is not part of
+         a sync domain, the attribute is set to disabled.
+
+"
+     DEFVAL { disabled }
+     ::= { syncGroupEntry 21 }
+
+-- ----------------------------------------------------
+-- Sync sources
+-- ----------------------------------------------------
+
+syncSourceTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SyncSourceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+     "The sync source table."
+::= { syncSources 1 }
+
+syncSourceEntry OBJECT-TYPE
+    SYNTAX  SyncSourceEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in the sync source table.
+
+"
+    INDEX   { syncSourceIndex }
+    ::= { syncSourceTable 1 }
+
+SyncSourceEntry ::=
+    SEQUENCE {
+        syncSourceIndex         Unsigned32,
+        syncSourceName          MgmtNameString,
+        syncSourceId            Unsigned32,
+        syncSourceIfNo          PortNumber,
+        syncSourceRxPort        PortNumber,
+        syncSourceTxPort        PortNumber,
+        syncSourceType          INTEGER,
+        syncSourceQuality       Unsigned32,
+        syncSourcePriority      Unsigned32,
+        syncSourceAdminStatus   AdminStatus,
+        syncSourceOperStatus    BoardOrInterfaceOperStatus,
+        syncSourceIsSelected    TruthValue,
+        syncSourceAlwaysSendDoNotUse INTEGER,
+        syncSourceStaticQuality Unsigned32,
+        syncSourceFilterState   SyncSourceState,
+        syncSourceMode          SyncSourceMode,
+        syncSourceClearWaitToRestore  CommandString,
+        syncSourceClockWanderExceeded      FaultStatus,
+        syncSourceNonSyncEClock FaultStatus,
+        syncSourceUpPortId      Integer32,
+        syncSourceLocalId       Integer32
+        }
+
+syncSourceIndex OBJECT-TYPE
+    SYNTAX  Unsigned32 (1..2000000000)
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+      "An arbitrary index assigned to the sync source.
+
+"
+     ::= { syncSourceEntry 1 }
+
+syncSourceName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the sync source.
+
+"
+    ::= { syncSourceEntry 2 }
+
+syncSourceId OBJECT-TYPE
+    SYNTAX  Unsigned32 (0..10000)
+    MAX-ACCESS read-create
+    STATUS  current
+    DESCRIPTION
+      "A unique number of the source within its group.
+
+"
+     DEFVAL { 1 }
+     ::= { syncSourceEntry 3 }
+
+syncSourceRxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The port number for the Rx-side of the interface
+        where the signal is retrieved.
+
+        0 if the sync source is a local oscillator.
+
+"
+    DEFVAL { 0 }
+    ::= { syncSourceEntry 4 }
+
+syncSourceTxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The port number for the Tx-side of the interface
+        where the signal is retrieved.
+
+        0 if the sync source is a local oscillator.
+
+"
+    DEFVAL { 0 }
+    ::= { syncSourceEntry 5 }
+
+syncSourceType OBJECT-TYPE
+    SYNTAX  INTEGER {
+        oscillator (1),
+        signal (2),
+        external (3),
+        bus (4) }
+    MAX-ACCESS read-create
+    STATUS  current
+    DESCRIPTION
+         "The type of sync source.
+
+         oscillator - The sync source is a local
+         oscillator.
+
+         signal - The sync source is a signal.
+
+         external - External sync source
+
+         bus - The sync bus in the back plane
+
+"
+     DEFVAL { 3 }
+     ::= { syncSourceEntry 6 }
+
+syncSourceQuality OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..18)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The quality for the sync source. The received S1-byte
+        is shown.
+
+        The integer values can be interpreted as follows:
+
+        SDH/SyncE (G.707/G.781):
+        S1  Quality Description
+        -----------------------
+         0      0   Quality unknown (existing sync. network)
+         2      2   Traceable to PRC G.811
+         4      4   Traceable to Transit G.812
+         8      8   Traceable to Local G.812
+        11     11   Derived from SETS
+        15     15   Do not use for Synchronization.
+        Other bytes are reserved.
+
+        SONET (GR253 CORE) - not applicable for EMXP boards:
+        S1  Quality Description
+        -----------------------
+         0      2   Synchronized - Traceability Unknown
+         1      1   Traceble to Stratum 1
+         4      4   Transit Node Clock Traceable
+         7      3   Traceble to Stratum 2
+        10      6   Traceble to Stratum 3
+        12      7   SONET Minimum Clock
+        13      5   Traceble to Stratum 3E
+        14      X   Provisonable by operator User
+        15      9   Do not use for Synchronization
+
+        The following values are also defined for interal use:
+
+        Value Quality Description
+        -------------------------
+        16    NSUPP   Quality Level not supported by function.
+        17    FAIL    Sync Source in fail state.
+        18    UNC     Sync source unconnected.
+
+"
+    ::= { syncSourceEntry 7 }
+
+syncSourcePriority OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..16)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The sync source priority.
+        Used to prioritize among sync source with the
+        same quality.
+
+        1 is the best, 16 is the worst.
+
+"
+    DEFVAL { 8 }
+    ::= { syncSourceEntry 8 }
+
+syncSourceAdminStatus OBJECT-TYPE
+    SYNTAX  AdminStatus
+    MAX-ACCESS read-write
+    STATUS  current
+    DESCRIPTION
+         "Administrative state for the sync source.
+
+         down - The sync source is disabled.
+
+         up - The sync source is enabled and can be
+         used for syncing.
+
+"
+     DEFVAL { down }
+     ::= { syncSourceEntry 9 }
+
+syncSourceOperStatus OBJECT-TYPE
+    SYNTAX  BoardOrInterfaceOperStatus
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+         "The operational state for the sync source.
+
+         notPresent - The physical resource is not
+         available.
+
+         down - The sync source is disabled.
+
+         up - The sync source is enabled.
+
+"
+     DEFVAL { notPresent }
+     ::= { syncSourceEntry 10 }
+
+syncSourceIsSelected OBJECT-TYPE
+    SYNTAX  TruthValue
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+         "Shows if the sync source is selected or not.
+
+         false - The sync source is not in use.
+
+         true - The sync source is in use.
+
+"
+     ::= { syncSourceEntry 11 }
+
+syncSourceAlwaysSendDoNotUse OBJECT-TYPE
+    SYNTAX  INTEGER {
+        disabled (1),
+        enabled (2) }
+    MAX-ACCESS read-write
+    STATUS  current
+    DESCRIPTION
+         "This attribute controls whether to ALWAYS
+          send S1 = 'Do not use' on the port
+         corresponding to this source.
+
+         disabled - Send the actual S1 value of the
+         synchronization function. However, if this
+         source is the selected sync source, then
+         S1 = 'Do not use' is sent on the corresponding
+         port.
+
+         enabled - Always send 'Do not use', regardless
+         of the state of the synchonization function.
+
+"
+     DEFVAL { disabled }
+     ::= { syncSourceEntry 12 }
+
+syncSourceStaticQuality OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..15)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+          " This attribute is used to assign a static G.781 Option 1
+          Quality level to the source for use in the Synch Source
+          Selection process. Values are interpreted as below:
+
+          S1  Quality Decsription
+          -----------------------
+          0      0   Static Quality Disabled
+          2      2   Traceable to PRC G.811
+          4      4   Traceable to Transit G.812
+          8      8   Traceable to Local G.812
+          11     11   Derived from SETS
+          15     15   Do not use for Synchronisation.
+          Other bytes are reserved.
+
+"
+          DEFVAL { 0 }
+     ::= { syncSourceEntry 13 }
+
+syncSourceFilterState OBJECT-TYPE
+     SYNTAX      SyncSourceState
+     MAX-ACCESS read-only
+     STATUS  current
+     DESCRIPTION
+          " The state of the source in the synchronization selection
+            algorithm it is included in.
+
+            undefined - The source is not included in any selection
+                        algorithm or the state is not been reported.
+            normal    - The source is functional
+            fail      - The source has indicated a failure and is
+                        excluded from the selection algorithm.
+            waitToRestore - The source has recovered from failure state,
+                            but is held out of the selection algorithm
+                            until the wait to restore time has run out.
+
+
+"
+      ::= { syncSourceEntry 14 }
+
+syncSourceMode    OBJECT-TYPE
+     SYNTAX       SyncSourceMode
+     MAX-ACCESS   read-write
+     STATUS       current
+     DESCRIPTION
+          " The operating mode of the sync source.
+
+            disabled    - The source is disabled from the sync selection process
+                          and will not send or terminate SSM messages.
+                          Any incoming SSM messages will be passed on transparently.
+            enabled     - The source is included in the sync selection process
+                          and will both send and terminate SSM messages.
+            lockedOut   - The source is not enabled in the sync selection process,
+                          but terminates all incoming SSM messages.
+                          If the sync selection process is operating in
+                          Quality level enabled mode it will also send the Quality level
+                          of the selected sync source. The quality level for a source in
+                          lockedOut mode will be shown as DNU.
+
+"
+       DEFVAL { disabled }
+       ::= { syncSourceEntry 15 }
+
+syncSourceClearWaitToRestore  OBJECT-TYPE
+      SYNTAX       CommandString
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+           "Clears an active Wait To Restore timer for the sync source.
+
+"
+       ::= { syncSourceEntry 16 }
+
+--- 121019
+--- This attribute is hidden in R20 but will be fully implemented in R21
+--- Code is operational but the implementation of the alarm , ie how it
+--- works will be reworked according to ITU-T Rec. G.810(08/96)
+syncSourceClockWanderExceeded OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The sync source has drifted at a rate that exceeds the limit.
+
+"
+    ::= { syncSourceEntry 17 }
+
+syncSourceNonSyncEClock OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Sync source not SyncE compliant.
+
+"
+    ::= { syncSourceEntry 18 }
+
+syncSourceIfNo OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The physical interface number of the actual multi-connector port.
+
+"
+    DEFVAL { 1  }
+    ::= { syncSourceEntry 19 }
+
+
+syncSourceUpPortId OBJECT-TYPE
+    SYNTAX      Integer32   (-1..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Internal port reference for traffic unit.
+"
+    DEFVAL { -1  }
+    ::= { syncSourceEntry 20 }
+
+
+syncSourceLocalId OBJECT-TYPE
+    SYNTAX      Integer32   (-1..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Id for index calculation.
+
+"
+    DEFVAL { -1 }
+    ::= { syncSourceEntry 21 }
+
+
+-- ----------------------------------------------------
+-- Sync subracks
+-- ----------------------------------------------------
+
+syncSubrackTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SyncSubrackEntry
+    MAX-ACCESS  not-accessible
+    STATUS  deprecated
+    DESCRIPTION
+     "The sync subrack table.
+      Note: This table is deprecated!"
+::= { syncSubracks 1 }
+
+syncSubrackEntry OBJECT-TYPE
+    SYNTAX  SyncSubrackEntry
+    MAX-ACCESS  not-accessible
+    STATUS  deprecated
+    DESCRIPTION
+        "An entry in the sync subrack table.
+
+"
+    INDEX   { syncSubrackIndex }
+    ::= { syncSubrackTable 1 }
+
+SyncSubrackEntry ::=
+    SEQUENCE {
+        syncSubrackIndex                  Unsigned32,
+        syncSubrackName                   MgmtNameString,
+        syncSubrackSubrack                SubrackNumber,
+        syncSubrackMasterBusA             SlotNumber,
+        syncSubrackMasterBusB             SlotNumber,
+        syncSubrackConfigureLocalBus      CommandString,
+        syncSubrackGroupMasterBusA        DisplayString,
+        syncSubrackGroupMasterBusB        DisplayString }
+
+syncSubrackIndex OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS read-only
+    STATUS  deprecated
+    DESCRIPTION
+      "An arbitrary index assigned to each if entry.
+
+"
+     ::= { syncSubrackEntry 1 }
+
+syncSubrackName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      deprecated
+    DESCRIPTION
+        "The name of the sync subrack.
+
+"
+    ::= { syncSubrackEntry 2 }
+
+syncSubrackSubrack OBJECT-TYPE
+    SYNTAX     SubrackNumber
+    MAX-ACCESS read-only
+    STATUS  deprecated
+    DESCRIPTION
+        "The subrack number.
+
+"
+     ::= { syncSubrackEntry 3 }
+
+syncSubrackMasterBusA OBJECT-TYPE
+    SYNTAX  SlotNumber
+    MAX-ACCESS read-create
+    STATUS  deprecated
+    DESCRIPTION
+         "The slotnumber for the sync group currently driving local bus A.
+
+"
+     ::= { syncSubrackEntry 4 }
+
+syncSubrackMasterBusB OBJECT-TYPE
+    SYNTAX  SlotNumber
+    MAX-ACCESS read-create
+    STATUS  deprecated
+    DESCRIPTION
+         "The slotnumber for the sync group currently driving local bus B.
+
+"
+     ::= { syncSubrackEntry 5 }
+
+syncSubrackConfigureLocalBus OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      deprecated
+    DESCRIPTION
+        "Configures synchronization of the local buses.
+
+"
+    ::= { syncSubrackEntry 6 }
+
+syncSubrackGroupMasterBusA OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS read-only
+    STATUS  deprecated
+    DESCRIPTION
+         "The sync group currently driving local bus A.
+
+"
+     ::= { syncSubrackEntry 7 }
+
+syncSubrackGroupMasterBusB OBJECT-TYPE
+    SYNTAX  DisplayString
+    MAX-ACCESS read-only
+    STATUS  deprecated
+    DESCRIPTION
+         "The sync group currently driving local bus B.
+
+"
+     ::= { syncSubrackEntry 8 }
+
+
+-- ----------------------------------------------------
+-- Sync Domains
+-- ----------------------------------------------------
+
+syncDomainTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SyncDomainEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+     "The sync domain table."
+    ::= { syncDomains 1 }
+
+syncDomainEntry OBJECT-TYPE
+    SYNTAX  SyncDomainEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in the sync domain table.
+
+"
+    INDEX   { syncDomainIndex }
+    ::= { syncDomainTable 1 }
+
+SyncDomainEntry ::=
+    SEQUENCE {
+        syncDomainIndex                     Unsigned32,
+        syncDomainNumber                    Unsigned32,
+        syncDomainName                      MgmtNameString,
+        syncDomainQualityLevelSelectionMode INTEGER,
+        syncDomainWaitToRestore             Unsigned32,
+        syncDomainHoldOff                   Unsigned32,
+        syncDomainSource                    MgmtNameString,
+        syncDomainQuality                   Unsigned32,
+        syncDomainAssociateBoard            CommandString}
+
+syncDomainIndex  OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+      "An arbitrary index assigned to each domain entry.
+
+"
+     ::= { syncDomainEntry 1 }
+
+syncDomainNumber  OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+      "The number unique to each domain entry.
+
+"
+     ::= { syncDomainEntry 2 }
+
+syncDomainName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the sync domain.
+
+"
+    ::= { syncDomainEntry 3 }
+
+syncDomainQualityLevelSelectionMode  OBJECT-TYPE
+    SYNTAX  INTEGER {disabled (1),
+                     enabled (2)}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The mode in which the Synchronization Selection Process
+        for the domain operates.
+        enabled - The reported Quality Level of the
+                    Synchronization sources are taken into
+                    account in the selection process.
+        disabled - The Quality Level is not taken into account.
+"
+        DEFVAL { 1 }
+    ::= { syncDomainEntry 4 }
+
+syncDomainWaitToRestore  OBJECT-TYPE
+    SYNTAX  Unsigned32 (0..12)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The time in minutes that a synchronization source
+         is removed from the synchronization selection process
+         after it has changed its Quality level from Failed to
+         another value. The time is configurable in the range
+         from 0 to 12 in the steps of 1 minute for all sources
+         in the domain.
+
+"
+        DEFVAL { 5 }
+    ::= { syncDomainEntry 5 }
+
+syncDomainHoldOff   OBJECT-TYPE
+    SYNTAX  Unsigned32 (0..10000)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The time in milliseconds that a source should have
+        failed until this is passed on the Synchronization
+        selection process.
+
+"
+        DEFVAL { 300 }
+    ::= { syncDomainEntry 6 }
+
+syncDomainSource OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the currently selected sync source.
+
+"
+    ::= { syncDomainEntry 7 }
+
+syncDomainQuality OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..15)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The quality of the currently selected sync source.
+
+"
+    ::= { syncDomainEntry 8 }
+
+syncDomainAssociateBoard OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Assigns boards to a sync domain.
+
+	Boards within a domain will share domain configuration
+        and information on the sync quality of the sync signal
+        being distributed in the domain. A sync bus must also
+        be assigned to the domain and a board set as the sync
+        bus master.
+
+"
+    ::= { syncDomainEntry 9 }
+
+-- ----------------------------------------------------
+-- Sync Bus
+-- ----------------------------------------------------
+
+syncBusTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SyncBusEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+     "The sync bus table."
+    ::= { syncBuses 1 }
+
+syncBusEntry OBJECT-TYPE
+    SYNTAX  SyncBusEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in the sync bus table.
+
+"
+    INDEX   { syncBusIndex }
+    ::= { syncBusTable 1 }
+
+SyncBusEntry ::=
+     SEQUENCE {
+        syncBusIndex                     Unsigned32,
+        syncBusName                      MgmtNameString,
+        syncBusSubrack                   Unsigned32,
+        syncBusDomain                    Unsigned32,
+        syncBusDomainIndex               Unsigned32,
+        syncBusStaticMasterSlot          SlotNumber,
+        syncBusStaticMasterIndex         Unsigned32 }
+
+syncBusIndex  OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+      "An arbitrary index assigned to each if entry.
+
+"
+     ::= { syncBusEntry 1 }
+
+syncBusName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the sync bus.
+
+"
+    ::= { syncBusEntry 2 }
+
+syncBusSubrack  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The number of the subrack that the bus belongs to.
+
+"
+    ::= { syncBusEntry 3 }
+
+syncBusDomain  OBJECT-TYPE
+    SYNTAX     Unsigned32(0..160)
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The number of the domain that the bus belongs to.
+
+"
+   ::= { syncBusEntry 4 }
+
+syncBusDomainIndex  OBJECT-TYPE
+     SYNTAX     Unsigned32(0..2147483647)
+     MAX-ACCESS read-create
+     STATUS     current
+     DESCRIPTION
+      "The index of the domain the bus belongs to.
+
+"
+     ::= { syncBusEntry 5 }
+
+syncBusStaticMasterSlot  OBJECT-TYPE
+     SYNTAX     SlotNumber
+     MAX-ACCESS read-write
+     STATUS     current
+     DESCRIPTION
+       "The slot number of the board driving the bus.
+
+"
+     ::= { syncBusEntry 6 }
+
+syncBusStaticMasterIndex  OBJECT-TYPE
+     SYNTAX    Unsigned32(0..2147483647)
+     MAX-ACCESS read-create
+     STATUS     current
+     DESCRIPTION
+       "The index number of the board driving the bus.
+
+"
+     ::= { syncBusEntry 7 }
+
+-- ----------------------------------------------------
+-- Sync Board to Domain
+-- ----------------------------------------------------
+
+syncBoardToDomainTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SyncBoardToDomainEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+     "The sync board to domain table."
+    ::= { syncBoardToDomain 1 }
+
+syncBoardToDomainEntry OBJECT-TYPE
+    SYNTAX  SyncBoardToDomainEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+        "An entry in the board to domain table.
+
+"
+    INDEX   { syncBoardToDomainIndex }
+    ::= { syncBoardToDomainTable 1 }
+
+SyncBoardToDomainEntry ::=
+    SEQUENCE {
+        syncBoardToDomainIndex                  Unsigned32,
+        syncBoardToDomainName                   MgmtNameString,
+        syncBoardToDomainDomainIndex            Unsigned32,
+        syncBoardToDomainDomainName             MgmtNameString,
+        syncBoardToDomainBoardIndex             Unsigned32,
+        syncBoardToDomainBoardName              MgmtNameString}
+
+syncBoardToDomainIndex  OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS read-only
+    STATUS  current
+    DESCRIPTION
+      "An arbitrary index assigned to each if entry.
+
+"
+     ::= { syncBoardToDomainEntry 1 }
+
+syncBoardToDomainName  OBJECT-TYPE
+     SYNTAX   MgmtNameString
+     MAX-ACCESS read-only
+     STATUS  current
+     DESCRIPTION
+      "The name of the mapped entry
+
+"
+     ::= { syncBoardToDomainEntry 2 }
+
+syncBoardToDomainDomainIndex  OBJECT-TYPE
+     SYNTAX  Unsigned32(0..2147483647)
+     MAX-ACCESS read-create
+     STATUS  current
+     DESCRIPTION
+      "The index of the domain mapped in the entry.
+
+"
+     ::= { syncBoardToDomainEntry 3 }
+
+syncBoardToDomainDomainName  OBJECT-TYPE
+     SYNTAX   MgmtNameString
+     MAX-ACCESS read-only
+     STATUS  current
+     DESCRIPTION
+      "The name of the domain mapped in the entry
+
+"
+     ::= { syncBoardToDomainEntry 4 }
+
+syncBoardToDomainBoardIndex  OBJECT-TYPE
+     SYNTAX  Unsigned32(0..2147483647)
+     MAX-ACCESS read-create
+     STATUS  current
+     DESCRIPTION
+      "The index of the board mapped in the entry.
+
+"
+     ::= { syncBoardToDomainEntry 5 }
+
+syncBoardToDomainBoardName  OBJECT-TYPE
+     SYNTAX   MgmtNameString
+     MAX-ACCESS read-only
+     STATUS  current
+     DESCRIPTION
+      "The name of the board mapped in the entry
+
+"
+     ::= { syncBoardToDomainEntry 6 }
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+syncNotifyPrefix OBJECT IDENTIFIER ::= { lumentisSyncNotifications 0 }
+
+syncGroupSourceChanged NOTIFICATION-TYPE
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupName,
+        syncGroupSelectedSource,
+        syncSourceName,
+        syncGroupLastChangeTime,
+        syncSourceQuality }
+    STATUS      current
+    DESCRIPTION
+        "Sent when the sync group changes its selected sync source.
+
+"
+    ::= { syncNotifyPrefix 1 }
+
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+syncGeneralGroup OBJECT-GROUP
+    OBJECTS {
+        syncGeneralLastChangeTime }
+    STATUS      deprecated
+    DESCRIPTION
+        "The general sync objects."
+    ::= { lumSyncGroups 1 }
+
+syncGroupGroup OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        -- syncGroupLocalOscActiveC2W,
+        syncGroupLocalOscActiveW2C }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 2 }
+
+syncSourceGroup OBJECT-GROUP
+    OBJECTS {
+        syncSourceIndex,
+        syncSourceName,
+        syncSourceRxPort,
+        syncSourceTxPort,
+        syncSourceType,
+        syncSourceQuality,
+        syncSourcePriority,
+        syncSourceAdminStatus,
+        syncSourceOperStatus,
+        syncSourceIsSelected }
+    STATUS      current
+    DESCRIPTION
+        "The sync source objects."
+    ::= { lumSyncGroups 3 }
+
+syncGeneralGroupV2 OBJECT-GROUP
+    OBJECTS {
+        syncGeneralLastChangeTime,
+        syncGeneralStateLastChangeTime }
+    STATUS      deprecated
+    DESCRIPTION
+        "The general sync objects."
+    ::= { lumSyncGroups 4 }
+
+syncGroupGroupV2 OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        -- syncGroupLocalOscActiveC2W,
+        syncGroupLocalOscActiveW2C,
+        syncGroupAdminStatus,
+        syncGroupOperStatus }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 5 }
+
+syncGroupGroupV3 OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        -- syncGroupLocalOscActiveC2W,
+        syncGroupLocalOscActiveW2C,
+        syncGroupAdminStatus,
+        syncGroupOperStatus,
+        syncGroupRingMode }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 6 }
+
+syncSourceGroupV2 OBJECT-GROUP
+    OBJECTS {
+        syncSourceIndex,
+        syncSourceId,
+        syncSourceName,
+        syncSourceRxPort,
+        syncSourceTxPort,
+        syncSourceType,
+        syncSourceQuality,
+        syncSourcePriority,
+        syncSourceAdminStatus,
+        syncSourceOperStatus,
+        syncSourceIsSelected }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync source objects V2."
+    ::= { lumSyncGroups 7 }
+
+syncNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        syncGroupSourceChanged }
+    STATUS      current
+    DESCRIPTION
+        "The sync notifications."
+    ::= { lumSyncGroups 8 }
+
+syncGroupGroupV4 OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        -- syncGroupLocalOscActiveC2W,
+        syncGroupLocalOscActiveW2C,
+        syncGroupAdminStatus,
+        syncGroupOperStatus,
+        syncGroupRingMode,
+        syncGroupLastChangeTime }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 9 }
+
+syncSourceGroupV3 OBJECT-GROUP
+    OBJECTS {
+        syncSourceIndex,
+        syncSourceId,
+        syncSourceName,
+        syncSourceRxPort,
+        syncSourceTxPort,
+        syncSourceType,
+        syncSourceQuality,
+        syncSourcePriority,
+        syncSourceAdminStatus,
+        syncSourceOperStatus,
+        syncSourceIsSelected,
+        syncSourceAlwaysSendDoNotUse }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync source objects V3."
+    ::= { lumSyncGroups 10 }
+
+--syncGroupGroupV5 OBJECT-GROUP
+--    OBJECTS {
+--        syncGroupIndex,
+--        syncGroupSubrack,
+--        syncGroupSlot,
+--        syncGroupName,
+--        syncGroupMode,
+--        syncGroupManualSource,
+--        syncGroupSelectedSource,
+--        syncGroupQuality,
+--        syncGroupLocalOscActive,
+--        syncGroupAdminStatus,
+--        syncGroupOperStatus,
+--        syncGroupRingMode,
+--        syncGroupLastChangeTime }
+--    STATUS      deprecated
+--    DESCRIPTION
+--        "The sync group objects."
+--    ::= { lumSyncGroups 11 }
+
+syncGroupGroupV6 OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        syncGroupLocalOscActive,
+        syncGroupAdminStatus,
+        syncGroupOperStatus,
+        syncGroupRingMode,
+        syncGroupLastChangeTime,
+        syncGroupManualSourceName }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 12 }
+
+syncGeneralGroupV3 OBJECT-GROUP
+    OBJECTS {
+        syncGeneralLastChangeTime,
+        syncGeneralStateLastChangeTime,
+        syncGeneralSyncGroupTableSize,
+        syncGeneralSyncSourceTableSize,
+        syncGeneralSyncSubrackTableSize }
+    STATUS      current
+    DESCRIPTION
+        "The general sync objects."
+    ::= { lumSyncGroups 13 }
+
+syncGroupGroupV7 OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        syncGroupLocalOscActive,
+        syncGroupAdminStatus,
+        syncGroupOperStatus,
+        syncGroupRingMode,
+        syncGroupLastChangeTime,
+        syncGroupManualSourceName,
+        syncGroupConfigurationMode }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 14 }
+
+syncSubrackGroup OBJECT-GROUP
+    OBJECTS {
+        syncSubrackIndex,
+        syncSubrackSubrack,
+        syncSubrackName,
+        syncSubrackMasterBusA,
+        syncSubrackMasterBusB,
+	syncSubrackConfigureLocalBus }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 15 }
+
+syncGroupGroupV8 OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        syncGroupLocalOscActive,
+        syncGroupAdminStatus,
+        syncGroupOperStatus,
+        syncGroupRingMode,
+        syncGroupLastChangeTime,
+        syncGroupManualSourceName,
+        syncGroupConfigurationMode,
+	syncGroupStatus }
+    STATUS      current
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 16 }
+
+syncSubrackGroupV2 OBJECT-GROUP
+    OBJECTS {
+        syncSubrackIndex,
+        syncSubrackSubrack,
+        syncSubrackName,
+        syncSubrackMasterBusA,
+        syncSubrackMasterBusB,
+	syncSubrackConfigureLocalBus,
+        syncSubrackGroupMasterBusA,
+        syncSubrackGroupMasterBusB }
+    STATUS      current
+    DESCRIPTION
+        "The sync group objects."
+    ::= { lumSyncGroups 17 }
+
+syncSourceGroupV4 OBJECT-GROUP
+    OBJECTS {
+        syncSourceIndex,
+        syncSourceId,
+        syncSourceName,
+        syncSourceRxPort,
+        syncSourceTxPort,
+        syncSourceType,
+        syncSourceQuality,
+        syncSourcePriority,
+        syncSourceAdminStatus,
+        syncSourceOperStatus,
+        syncSourceIsSelected,
+        syncSourceAlwaysSendDoNotUse,
+	syncSourceStaticQuality,
+        syncSourceFilterState }
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync source objects V4."
+    ::= { lumSyncGroups 18 }
+
+syncDomainGroup OBJECT-GROUP
+    OBJECTS {
+        syncDomainIndex,
+        syncDomainName,
+        syncDomainNumber,
+	syncDomainQualityLevelSelectionMode,
+        syncDomainWaitToRestore,
+        syncDomainHoldOff,
+        syncDomainSource,
+        syncDomainQuality,
+        syncDomainAssociateBoard }
+   STATUS      current
+    DESCRIPTION
+        "The sync domain objects."
+    ::= { lumSyncGroups 19 }
+
+syncBusGroup  OBJECT-GROUP
+    OBJECTS {
+        syncBusIndex,
+        syncBusName,
+        syncBusSubrack,
+        syncBusDomain,
+        syncBusDomainIndex,
+        syncBusStaticMasterSlot,
+        syncBusStaticMasterIndex }
+    STATUS      current
+    DESCRIPTION
+        "The sync bus objects."
+    ::= { lumSyncGroups 20 }
+
+syncBoardToDomainGroup OBJECT-GROUP
+    OBJECTS {
+        syncBoardToDomainIndex,
+        syncBoardToDomainName,
+        syncBoardToDomainDomainIndex,
+        syncBoardToDomainDomainName,
+        syncBoardToDomainBoardIndex,
+        syncBoardToDomainBoardName }
+   STATUS      current
+    DESCRIPTION
+        "The Board to domain objects."
+    ::= { lumSyncGroups 21 }
+
+syncGroupGroupV9 OBJECT-GROUP
+    OBJECTS {
+        syncGroupIndex,
+        syncGroupSubrack,
+        syncGroupSlot,
+        syncGroupName,
+        syncGroupMode,
+        syncGroupManualSource,
+        syncGroupSelectedSource,
+        syncGroupQuality,
+        syncGroupLocalOscActive,
+        syncGroupAdminStatus,
+        syncGroupOperStatus,
+        syncGroupRingMode,
+        syncGroupLastChangeTime,
+        syncGroupManualSourceName,
+        syncGroupConfigurationMode,
+	syncGroupStatus,
+        syncGroupSourceSwitch,
+	syncGroupSourceSwitchType,
+        syncGroupHoldover,
+        syncGroupQualityLevelSelectionMode}
+    STATUS      current
+    DESCRIPTION
+        "The sync group objects V9."
+    ::= { lumSyncGroups 22 }
+
+syncSourceGroupV5 OBJECT-GROUP
+    OBJECTS {
+        syncSourceIndex,
+        syncSourceId,
+        syncSourceName,
+        syncSourceRxPort,
+        syncSourceTxPort,
+        syncSourceType,
+        syncSourceQuality,
+        syncSourcePriority,
+        syncSourceAdminStatus,
+        syncSourceOperStatus,
+        syncSourceIsSelected,
+        syncSourceAlwaysSendDoNotUse,
+        syncSourceStaticQuality,
+        syncSourceFilterState,
+        syncSourceClockWanderExceeded,
+        syncSourceNonSyncEClock}
+    STATUS      deprecated
+    DESCRIPTION
+        "The sync source objects V5."
+    ::= { lumSyncGroups 23 }
+
+
+syncSourceGroupV6 OBJECT-GROUP
+    OBJECTS {
+        syncSourceIndex,
+        syncSourceId,
+        syncSourceName,
+        syncSourceRxPort,
+        syncSourceTxPort,
+        syncSourceType,
+        syncSourceQuality,
+        syncSourcePriority,
+        syncSourceAdminStatus,
+        syncSourceOperStatus,
+        syncSourceIsSelected,
+        syncSourceAlwaysSendDoNotUse,
+        syncSourceStaticQuality,
+        syncSourceFilterState,
+        syncSourceClockWanderExceeded,
+        syncSourceNonSyncEClock,
+        syncSourceIfNo,
+        syncSourceUpPortId,
+        syncSourceLocalId}
+    STATUS      current
+    DESCRIPTION
+        "The sync source objects V6."
+    ::= { lumSyncGroups 24 }
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+lumSyncBasicComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroup,
+            syncGroupGroup,
+            syncSourceGroup }
+    ::= { lumSyncCompl 1 }
+
+lumSyncBasicComplV2 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v2."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroup,
+            syncSourceGroup }
+    ::= { lumSyncCompl 2 }
+
+lumSyncBasicComplV3 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v3."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroupV2,
+            syncSourceGroup }
+    ::= { lumSyncCompl 3 }
+
+lumSyncBasicComplV4 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v4."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroupV3,
+            syncSourceGroup }
+    ::= { lumSyncCompl 4 }
+
+lumSyncBasicComplV5 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v5."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroupV3,
+            syncSourceGroupV2 }
+    ::= { lumSyncCompl 5 }
+
+lumSyncBasicComplV6 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v6."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroupV3,
+            syncSourceGroupV2,
+            syncNotificationGroup }
+    ::= { lumSyncCompl 6 }
+
+lumSyncBasicComplV7 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v7."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroupV4,
+            syncSourceGroupV2,
+            syncNotificationGroup }
+    ::= { lumSyncCompl 7 }
+
+lumSyncBasicComplV8 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v8."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroupV4,
+            syncSourceGroupV3,
+            syncNotificationGroup }
+    ::= { lumSyncCompl 8 }
+
+lumSyncBasicComplV9 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB v9 (2.2)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV2,
+            syncGroupGroupV6,
+            syncSourceGroupV3,
+            syncNotificationGroup }
+    ::= { lumSyncCompl 9 }
+
+lumSyncBasicComplV10 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V10 (3.1)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV6,
+            syncSourceGroupV3,
+            syncNotificationGroup }
+    ::= { lumSyncCompl 10 }
+
+lumSyncBasicComplV11 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V11 (8.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV6,
+            syncSourceGroupV3,
+            syncNotificationGroup }
+    ::= { lumSyncCompl 11 }
+
+lumSyncBasicComplV12 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V12 (11.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV7,
+            syncSourceGroupV3,
+            syncNotificationGroup }
+    ::= { lumSyncCompl 12 }
+
+lumSyncBasicComplV13 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V13 (14.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV8,
+            syncSourceGroupV3,
+            syncNotificationGroup,
+            syncSubrackGroup }
+    ::= { lumSyncCompl 13 }
+
+lumSyncBasicComplV14 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V14 (15.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV8,
+            syncSourceGroupV3,
+            syncNotificationGroup,
+            syncSubrackGroupV2 }
+    ::= { lumSyncCompl 14 }
+
+lumSyncBasicComplV15 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V15 (17.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV9,
+            syncSourceGroupV4,
+            syncNotificationGroup,
+            syncDomainGroup,
+            syncBusGroup,
+            syncBoardToDomainGroup }
+    ::= { lumSyncCompl 15 }
+
+lumSyncBasicComplV16 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V16 (20.0)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV9,
+            syncSourceGroupV5,
+            syncNotificationGroup,
+            syncDomainGroup,
+            syncBusGroup,
+            syncBoardToDomainGroup }
+    ::= { lumSyncCompl 16 }
+
+lumSyncBasicComplV17 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the sync MIB V17 (26.1)."
+    MODULE
+        MANDATORY-GROUPS {
+            syncGeneralGroupV3,
+            syncGroupGroupV9,
+            syncSourceGroupV6,
+            syncNotificationGroup,
+            syncDomainGroup,
+            syncBusGroup,
+            syncBoardToDomainGroup }
+    ::= { lumSyncCompl 17 }
+
+
+END
+

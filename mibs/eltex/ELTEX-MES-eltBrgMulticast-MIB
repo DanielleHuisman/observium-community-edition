@@ -1,8 +1,8 @@
 ELTEX-MES-eltBrgMulticast-MIB DEFINITIONS ::= BEGIN
 
 -- Title:      Eltex MES Multicast Bridge Configuration
--- Version:    1.3
--- Date:       12-Jul-2016
+-- Version:    1.4
+-- Date:       28-Jan-2019
 
 IMPORTS
     InterfaceIndex                                       FROM IF-MIB
@@ -12,7 +12,7 @@ IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE                         FROM SNMPv2-SMI
     rlIgmpMldSnoopVlanEntry                              FROM RADLAN-rlMacMulticast-MIB
     eltMesMacMulticast                                   FROM ELTEX-MES
-    InetAddress                                          FROM INET-ADDRESS-MIB;
+    InetAddress,InetAddressType                          FROM INET-ADDRESS-MIB;
 
 -- mld
 eltMesMldSnoop  OBJECT IDENTIFIER ::= { eltMesMacMulticast 5 }
@@ -46,7 +46,10 @@ EltIgmpMldSnoopVlanEntry ::= SEQUENCE {
     eltIgmpMldSnoopVlanCos                          INTEGER,
     eltIgmpMldSnoopVlanReplaceSourceIp              InetAddress,
     eltIgmpMldSnoopVlanProxyReportEnable            TruthValue,
-    eltIgmpMldSnoopVlanProxyReportVersion           INTEGER
+    eltIgmpMldSnoopVlanProxyReportVersion           INTEGER,
+    eltIgmpMldSnoopVlanGsqSuppress                  TruthValue,
+    eltIgmpMldSnoopVlanImmediateLeavePortlist       PortList,
+    eltIgmpMldSnoopVlanHostBasedPortlist            PortList
 }
 
 eltIgmpMldSnoopVlanIsImmediateLeaveHostBased OBJECT-TYPE
@@ -98,7 +101,30 @@ eltIgmpMldSnoopVlanProxyReportVersion OBJECT-TYPE
     DEFVAL {0}
     ::= { eltIgmpMldSnoopVlanEntry 5 }
 
+eltIgmpMldSnoopVlanGsqSuppress OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable suppression of flooding IGMP Group specific queries."
+    DEFVAL {false}
+    ::= { eltIgmpMldSnoopVlanEntry 6 }
 
+eltIgmpMldSnoopVlanImmediateLeavePortlist OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Immediate leave ports list"
+    ::= { eltIgmpMldSnoopVlanEntry 7 }
+
+eltIgmpMldSnoopVlanHostBasedPortlist OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Immediate leave host based ports list"
+    ::= { eltIgmpMldSnoopVlanEntry 8 }
 
 -- eltMesMacMulticastUnregFilterPerVlanEnable
 
@@ -133,5 +159,343 @@ eltMacMulticastUnregFilterEnableVlanId3073To4094 OBJECT-TYPE
     DESCRIPTION
         "Each bit represent a VLAN whether Unregistered Multicast Filtering enable "
  ::= { eltMesMacMulticastFilterPerVlan  4 }
+
+
+-- PIM
+
+eltMesPimSnoop  OBJECT IDENTIFIER ::= { eltMesMacMulticast 6 }
+
+eltMesPimSnoopObjects       OBJECT IDENTIFIER ::= { eltMesPimSnoop 1 }
+eltMesPimSnoopNotifications OBJECT IDENTIFIER ::= { eltMesPimSnoop 2 }
+eltMesPimSnoopConformance   OBJECT IDENTIFIER ::= { eltMesPimSnoop 3 }
+
+eltMesPimSnoopGlobals    OBJECT IDENTIFIER ::= { eltMesPimSnoopObjects 1 }
+eltMesPimSnoopConfigs    OBJECT IDENTIFIER ::= { eltMesPimSnoopObjects 2 }
+eltMesPimSnoopStatictics OBJECT IDENTIFIER ::= { eltMesPimSnoopObjects 3 }
+
+eltMesPimSnoopNotificationsPrefix OBJECT IDENTIFIER ::= { eltMesPimSnoopNotifications 0 }
+
+eltPimSnoopEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Enable/Disable PIM Snooping in the switch."
+    DEFVAL      {false}
+    ::= { eltMesPimSnoopGlobals 1 }
+
+--
+-- eltPimSnoopVlanConfigTable
+--
+
+eltPimSnoopVlanConfigTable OBJECT-TYPE
+     SYNTAX      SEQUENCE OF EltPimSnoopVlanConfigEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "The table listing the per vlan parameters : enable/disable ,
+         designated router flooding."
+     ::= { eltMesPimSnoopConfigs 1 }
+
+ eltPimSnoopVlanConfigEntry OBJECT-TYPE
+     SYNTAX      EltPimSnoopVlanConfigEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+         "An entry (conceptual row) in the eltPimSnoopVlanConfigTable."
+     INDEX  { eltPimSnoopVlanConfigVlanTag }
+     ::= { eltPimSnoopVlanConfigTable 1 }
+
+EltPimSnoopVlanConfigEntry ::= SEQUENCE {
+     eltPimSnoopVlanConfigVlanTag    VlanIndex,
+     eltPimSnoopVlanConfigEnable     TruthValue
+ }
+
+ eltPimSnoopVlanConfigVlanTag OBJECT-TYPE
+     SYNTAX      VlanIndex
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The tag of the VLAN for which this entry contains
+          information for an IP Multicast Router."
+     ::= { eltPimSnoopVlanConfigEntry 1 }
+
+ eltPimSnoopVlanConfigEnable OBJECT-TYPE
+     SYNTAX      TruthValue
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+         "Enable/Disable PIM Snooping in the vlan."
+     DEFVAL      { false }
+     ::= { eltPimSnoopVlanConfigEntry 2 }
+
+--
+-- eltPimSnoopMembershipTable
+--
+
+eltPimSnoopMembershipTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltPimSnoopMembershipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table listing the IP multicast memberships."
+    ::= { eltMesPimSnoopStatictics 1 }
+
+eltPimSnoopMembershipEntry OBJECT-TYPE
+    SYNTAX      EltPimSnoopMembershipEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry (conceptual row) in the eltPimSnoopMembershipTable."
+    INDEX  { eltPimSnoopMembershipVlanTag,
+             eltPimSnoopMembershipGroupIpAddressType,
+             eltPimSnoopMembershipGroupIpAddress,
+             eltPimSnoopMembershipSourceIpAddressType,
+             eltPimSnoopMembershipSourceIpAddress,
+             eltPimSnoopMembershipOutgoingPort }
+    ::= { eltPimSnoopMembershipTable 1 }
+
+EltPimSnoopMembershipEntry ::= SEQUENCE {
+    eltPimSnoopMembershipVlanTag             VlanIndex,
+    eltPimSnoopMembershipGroupIpAddressType  InetAddressType,
+    eltPimSnoopMembershipGroupIpAddress      InetAddress,
+    eltPimSnoopMembershipSourceIpAddressType InetAddressType,
+    eltPimSnoopMembershipSourceIpAddress     InetAddress,
+    eltPimSnoopMembershipOutgoingPort        InterfaceIndex,
+    eltPimSnoopMembershipExpiryTime          INTEGER
+}
+
+eltPimSnoopMembershipVlanTag OBJECT-TYPE
+    SYNTAX      VlanIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The VLAN tag for which this entry contains multicast membership information."
+    ::= { eltPimSnoopMembershipEntry 1}
+
+eltPimSnoopMembershipGroupIpAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Inet type IPv4/IPv6."
+    ::= { eltPimSnoopMembershipEntry 2}
+
+eltPimSnoopMembershipGroupIpAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The multicast group address."
+    ::= { eltPimSnoopMembershipEntry 3}
+
+eltPimSnoopMembershipSourceIpAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Inet type IPv4/IPv6."
+    ::= { eltPimSnoopMembershipEntry 4}
+
+eltPimSnoopMembershipSourceIpAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The unicast source address."
+    ::= { eltPimSnoopMembershipEntry 5}
+    
+eltPimSnoopMembershipOutgoingPort OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Outgoing port, where a join message was heard for the group."
+    ::= { eltPimSnoopMembershipEntry 6}
+    
+eltPimSnoopMembershipExpiryTime OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Time in seconds till entry will expire."
+    ::= { eltPimSnoopMembershipEntry 7}
+
+
+--
+-- eltPimSnoopNeighborTable
+--
+
+eltPimSnoopNeighborTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltPimSnoopNeighborEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table listing PIM Neighbors."
+    ::= { eltMesPimSnoopStatictics 2 }
+
+eltPimSnoopNeighborEntry OBJECT-TYPE
+    SYNTAX      EltPimSnoopNeighborEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry (conceptual row) in the eltPimSnoopNeighborsTable."
+    INDEX  { eltPimSnoopNeighborVlanTag,
+             eltPimSnoopNeighborIpAddressType,
+             eltPimSnoopNeighborIpAddress }
+    ::= { eltPimSnoopNeighborTable 1 }
+
+EltPimSnoopNeighborEntry ::= SEQUENCE {
+    eltPimSnoopNeighborVlanTag        VlanIndex,
+    eltPimSnoopNeighborIpAddressType  InetAddressType,
+    eltPimSnoopNeighborIpAddress      InetAddress,
+    eltPimSnoopNeighborPort           InterfaceIndex,
+    eltPimSnoopNeighborDrPriority     INTEGER,
+    eltPimSnoopNeighborExpiryTime     INTEGER
+}
+
+eltPimSnoopNeighborVlanTag OBJECT-TYPE
+    SYNTAX      VlanIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The VLAN tag for which this entry contains multicast membership information."
+    ::= { eltPimSnoopNeighborEntry 1}
+
+eltPimSnoopNeighborIpAddressType OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Inet type IPv4/IPv6."
+    ::= { eltPimSnoopNeighborEntry 2}
+
+eltPimSnoopNeighborIpAddress OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The neighbor address."
+    ::= { eltPimSnoopNeighborEntry 3}
+
+eltPimSnoopNeighborPort OBJECT-TYPE
+    SYNTAX      InterfaceIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The port connected to neighbor."
+    ::= { eltPimSnoopNeighborEntry 4}
+    
+eltPimSnoopNeighborDrPriority OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Neighbor's DR priority."
+    ::= { eltPimSnoopNeighborEntry 5}
+
+eltPimSnoopNeighborExpiryTime OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Time in seconds till entry will expire."
+    ::= { eltPimSnoopNeighborEntry 6}
+
+--
+-- eltPimSnoopVlanStatisticTable
+--
+
+eltPimSnoopVlanStatisticTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF EltPimSnoopVlanStatisticEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The table listing PIM Snooping statistics."
+    ::= { eltMesPimSnoopStatictics 3 }
+
+eltPimSnoopVlanStatisticEntry OBJECT-TYPE
+    SYNTAX      EltPimSnoopVlanStatisticEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry (conceptual row) in the eltPimSnoopVlanStatisticTable."
+    INDEX  { eltPimSnoopVlanStatisticVlanTag }
+    ::= { eltPimSnoopVlanStatisticTable 1 }
+
+EltPimSnoopVlanStatisticEntry ::= SEQUENCE {
+    eltPimSnoopVlanStatisticVlanTag             VlanIndex,
+    eltPimSnoopVlanStatisticEnable              TruthValue,
+    eltPimSnoopVlanStatisticRouterPortList      PortList,
+    eltPimSnoopVlanStatisticNeighborsCount      INTEGER,
+    eltPimSnoopVlanStatisticGroupsCount         INTEGER,
+    eltPimSnoopVlanStatisticJoinedCount         INTEGER,
+    eltPimSnoopVlanStatisticPrunedCount         INTEGER,
+    eltPimSnoopVlanStatisticHelloCount          INTEGER
+}
+
+eltPimSnoopVlanStatisticVlanTag OBJECT-TYPE
+    SYNTAX      VlanIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The VLAN tag for which this entry contains PIM Snooping stats."
+    ::= { eltPimSnoopVlanStatisticEntry 1 }
+
+eltPimSnoopVlanStatisticEnable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Status of PIM Snooping."
+    ::= { eltPimSnoopVlanStatisticEntry 2 }
+
+eltPimSnoopVlanStatisticRouterPortList OBJECT-TYPE
+    SYNTAX      PortList
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Portlist contain ports which connected to neighbors."
+    ::= { eltPimSnoopVlanStatisticEntry 3 }
+
+eltPimSnoopVlanStatisticNeighborsCount OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Neighbors count."
+    ::= { eltPimSnoopVlanStatisticEntry 4 }
+    
+eltPimSnoopVlanStatisticGroupsCount OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The Groups count."
+    ::= { eltPimSnoopVlanStatisticEntry 5 }
+
+eltPimSnoopVlanStatisticJoinedCount OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The count of joined sources."
+    ::= { eltPimSnoopVlanStatisticEntry 6 }
+    
+eltPimSnoopVlanStatisticPrunedCount OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The count of pruned sources."
+    ::= { eltPimSnoopVlanStatisticEntry 7 }
+    
+eltPimSnoopVlanStatisticHelloCount OBJECT-TYPE
+    SYNTAX      INTEGER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Time count of Hello messages."
+    ::= { eltPimSnoopVlanStatisticEntry 8 }
 
 END

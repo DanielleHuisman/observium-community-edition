@@ -1,0 +1,520 @@
+-- *****************************************************************
+-- MY-BGP-MIB.mib:  My BGP MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+
+MY-BGP4-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, 
+        OBJECT-TYPE, 
+        NOTIFICATION-TYPE,
+        Integer32,
+        INTEGER, 
+        IpAddress, 
+        Counter32, 
+        Gauge32,
+        TimeTicks
+              FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus
+              FROM SNMPv2-TC
+        InetAddressType, 
+        InetAddress, 
+        InetAddressPrefixLength,
+        InetPortNumber,
+	InetAutonomousSystemNumber 	
+	      FROM INET-ADDRESS-MIB
+	SnmpAdminString
+	      FROM SNMP-FRAMEWORK-MIB
+	bgpPeerEntry,
+	bgpPeerRemoteAddr
+              FROM BGP4-MIB
+        myMgmt
+              FROM MY-SMI;
+
+-- BEGIN£ºNoun definition 
+MyBgpID ::= TEXTUAL-CONVENTION
+	DISPLAY-HINT "1d."
+	STATUS	     current
+	DESCRIPTION
+	    "The representation of a BGP Identifier.  The BGP
+	     Identifier should be represented in the OCTET STRING
+	     as with the first OCTET of the string containing
+	     the first OCTET of the BGP Identifier received or sent
+	     in the OPEN packet and so on.
+
+	     Even though the BGP Identifier is trending away from
+	     an IP address it is still displayed as if it was one,
+	     even when it would be an illegal IP address."
+	SYNTAX OCTET STRING(SIZE (4))                             
+-- END£ºNoun definition          
+
+-- BEGIN£ºMODULE-IDENTITY
+myBgp4MIB MODULE-IDENTITY    
+        LAST-UPDATED "200304010000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "This module defines my bgp4 mibs."
+        REVISION      "200304010000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 38}        
+-- END£ºMODULE-IDENTITY
+
+-- BEGIN£ºmyBgpBaseScalars
+
+myBgpBaseScalars
+	OBJECT IDENTIFIER ::= { myBgp4MIB 1 }
+
+-- BEGIN£ºmyBgpSupportedCapabilities
+-- BGP Capabilities information
+
+myBgpSupportedCapabilities
+        OBJECT IDENTIFIER ::= { myBgpBaseScalars 1 }
+        
+myBgpCapabilitySupportAvailable OBJECT-TYPE
+	SYNTAX	   TruthValue
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "This value is TRUE if capability support is
+	     available."
+	::= { myBgpSupportedCapabilities 1 }
+	
+myBgpSupportedCapabilitiesTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF MyBgpSupportedCapabilityEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Table of supported BGP-4 capabilities."
+	::= { myBgpSupportedCapabilities 2 }
+	
+myBgpSupportedCapabilitiesEntry OBJECT-TYPE
+	SYNTAX	   MyBgpSupportedCapabilityEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Information about supported capabilities indexed
+	     by capability number."
+	INDEX {
+	    myBgpSupportedCapabilityCode
+	}
+	::= { myBgpSupportedCapabilitiesTable 1 }
+	
+MyBgpSupportedCapabilityEntry ::= SEQUENCE {
+	myBgpSupportedCapabilityCode
+	    Unsigned32,
+	myBgpSupportedCapability
+	    TruthValue
+    }
+    
+myBgpSupportedCapabilityCode OBJECT-TYPE
+	SYNTAX	   Unsigned32 (0..255)
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "Index of supported capability.  The index directly
+	     corresponds with the BGP-4 Capability Advertisement
+	     Capability Code."
+	::= { myBgpSupportedCapabilitiesEntry 1 }
+	
+myBgpSupportedCapability OBJECT-TYPE
+	SYNTAX	   TruthValue
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "This value is True if this capability is supported,
+	     False otherwise."
+	::= { myBgpSupportedCapabilitiesEntry 2 }
+	
+-- END£ºmyBgpSupportedCapabilities
+
+-- BEGIN£ºmyBgpBaseScalarExtensions
+-- BGP Extensions
+
+myBgpBaseScalarExtensions
+        OBJECT IDENTIFIER ::= { myBgpBaseScalars 2 }
+        
+-- Base Scalar Route Reflection Extensions
+myBgpBaseScalarRouteReflectExts OBJECT IDENTIFIER ::=
+	{ myBgpBaseScalarExtensions 1 }
+
+myBgpRouteReflector OBJECT-TYPE
+	SYNTAX	    TruthValue
+	MAX-ACCESS  read-only
+	STATUS	    current
+	DESCRIPTION
+	    "This value is TRUE if this implementation supports the
+	     BGP Route Reflection Extension and is enabled as a
+	     route reflector.  If the BGP Route Reflection extension
+	     is not supported this value must be FALSE."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { myBgpBaseScalarRouteReflectExts 1 }
+
+myBgpClusterId OBJECT-TYPE
+	SYNTAX	    MyBgpID
+	MAX-ACCESS  read-only 
+	STATUS	    current
+	DESCRIPTION
+	    "The configured Cluster-ID of the BGP Speaker.  This will
+	     default to the BGP Speaker's myBgpIdentifier if this
+	     speaker is functioning as a route reflector and an
+	     explicit Cluster-ID has not been configured.
+
+	     A value of 0.0.0.0 will be present if Route Reflection is
+	     not enabled."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { myBgpBaseScalarRouteReflectExts 2 }
+
+-- Base Scalar AS Confederation Extensions
+ 
+myBgpBaseScalarASConfedExts OBJECT IDENTIFIER ::=
+        { myBgpBaseScalarExtensions 2 }
+
+myBgpConfederationRouter OBJECT-TYPE
+	SYNTAX	   TruthValue
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "This value is TRUE if this implementation supports the
+	     BGP AS Confederations Extension and this router is
+	     configured to be in a confederation."
+	REFERENCE
+	    "RFC 3065 - Autonomous System Confederations for BGP"
+	::= { myBgpBaseScalarASConfedExts 1 }
+
+myBgpConfederationId OBJECT-TYPE
+	SYNTAX	   InetAutonomousSystemNumber
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The local Confederation Identification Number.
+	    
+	     This value will be zero (0) if this BGP Speaker is not
+	     a confederation router."
+	REFERENCE
+	    "RFC 3065 - Autonomous System Confederations for BGP"
+	    ::= { myBgpBaseScalarASConfedExts 2 }
+
+-- END£ºmyBgpBaseScalarExtensions
+
+-- END£ºmyBgpBaseScalars
+
+-- BEGIN£ºmyBgpPeer
+
+myBgpPeer
+	OBJECT IDENTIFIER ::= { myBgp4MIB 2 }
+
+-- BEGIN£ºmyBgpPeerPrefixInfoTable
+
+myBgpPeerPrefixInfoTable OBJECT-TYPE
+        SYNTAX     SEQUENCE OF MyBgpPeerPrefixInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "This table contains prefix info with peers,
+                 One entry per BGP peer ."
+        ::= { myBgpPeer 1 }
+
+myBgpPeerPrefixInfoEntry  OBJECT-TYPE
+        SYNTAX     MyBgpPeerPrefixInfoEntry
+        MAX-ACCESS not-accessible
+        STATUS     current
+        DESCRIPTION
+                "Entry containing information about the
+                connection with a BGP peer."
+        AUGMENTS {
+	    bgpPeerEntry
+	}
+        ::= { myBgpPeerPrefixInfoTable 1 }
+
+MyBgpPeerPrefixInfoEntry ::= SEQUENCE {
+        myBgpPeerPrefixLimit       Unsigned32,
+        myBgpPeerPrefixAccepted    Counter32,
+        myBgpPeerPrefixAdvertised  Counter32
+        }
+    
+myBgpPeerPrefixLimit  OBJECT-TYPE
+        SYNTAX      Unsigned32 (1..4294967295)
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+                "Max number of route prefixes accepted on this 
+                 connection"
+        ::= { myBgpPeerPrefixInfoEntry 1 }
+        
+myBgpPeerPrefixAccepted  OBJECT-TYPE  
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+                "Number of Route prefixes received on this connnection,
+                 which are accepted after applying filters. Possible
+                 filters are route maps, prefix lists, distributed
+                 lists, etc."
+        ::= { myBgpPeerPrefixInfoEntry 2 } 
+
+myBgpPeerPrefixAdvertised  OBJECT-TYPE
+        SYNTAX      Counter32
+        MAX-ACCESS  read-only
+        STATUS      deprecated
+        DESCRIPTION
+                "Counter which gets incremented when a route prefix
+                 is advertised on this connection. This object is
+                 initialized to zero when the peer is configured or 
+                 the router is rebooted"
+        ::= { myBgpPeerPrefixInfoEntry 3 }
+
+-- END£ºmyBgpPeerPrefixInfoTable
+
+-- BEGIN£ºmyBgpPeerCapabilities
+
+myBgpPeerCapabilities
+	OBJECT IDENTIFIER ::= { myBgpPeer 2 }
+
+-- BEGIN£ºmyBgpPeerCapsAnnouncedTable
+-- Announced Capabilities
+
+myBgpPeerCapsAnnouncedTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF MyBgpPeerCapsAnnouncedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "This table contains the capabilities
+	     that are announced to a given peer."
+	::= { myBgpPeerCapabilities 1 }
+
+myBgpPeerCapsAnnouncedEntry OBJECT-TYPE
+	SYNTAX	   MyBgpPeerCapsAnnouncedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "These entries are keyed by a BGP-4 peer remote
+	     address and the BGP Capability Code"
+	INDEX {
+	    bgpPeerRemoteAddr,
+	    myBgpPeerCapAnnouncedCode
+	}
+	::= { myBgpPeerCapsAnnouncedTable 1 }
+
+MyBgpPeerCapsAnnouncedEntry ::= SEQUENCE {
+	myBgpPeerCapAnnouncedCode
+	    Unsigned32,
+	myBgpPeerCapAnnouncedValue
+	    OCTET STRING
+    }
+
+myBgpPeerCapAnnouncedCode OBJECT-TYPE
+	SYNTAX	   Unsigned32 (0..255)
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The BGP Capability Advertisement Capability Code."
+	::= { myBgpPeerCapsAnnouncedEntry 1 }
+
+myBgpPeerCapAnnouncedValue OBJECT-TYPE
+	SYNTAX	   OCTET STRING (SIZE(0..255))
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The value of the announced capability."
+	::= { myBgpPeerCapsAnnouncedEntry 2 }
+
+-- END£ºmyBgpPeerCapsAnnouncedTable
+
+-- BEGIN£ºmyBgpPeerCapsReceivedTable
+-- Received Capabilities
+
+myBgpPeerCapsReceivedTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF MyBgpPeerCapsReceivedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "This table contains the capabilities
+	    that are supported for a given peer."
+	::= { myBgpPeerCapabilities 2 }
+
+myBgpPeerCapsReceivedEntry OBJECT-TYPE
+	SYNTAX	   MyBgpPeerCapsReceivedEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "These entries are keyed by a BGP-4 peer remote
+	    address and the BGP Capability Code"
+	INDEX {
+	    bgpPeerRemoteAddr,
+	    myBgpPeerCapReceivedCode
+	}
+	::= { myBgpPeerCapsReceivedTable 1 }
+
+MyBgpPeerCapsReceivedEntry ::= SEQUENCE {
+	myBgpPeerCapReceivedCode
+	    Unsigned32,
+	myBgpPeerCapReceivedValue
+	    OCTET STRING
+    }
+
+myBgpPeerCapReceivedCode OBJECT-TYPE
+	SYNTAX	   Unsigned32 (0..255)
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The BGP Capability Advertisement Capability Code."
+	::= { myBgpPeerCapsReceivedEntry 1 }
+
+myBgpPeerCapReceivedValue OBJECT-TYPE
+	SYNTAX	   OCTET STRING (SIZE(0..255))
+	MAX-ACCESS read-only
+	STATUS	   current
+	DESCRIPTION
+	    "The value of the announced capability."
+	::= { myBgpPeerCapsReceivedEntry 3 }
+
+-- END£ºmyBgpPeerCapsReceivedTable
+	
+-- END£ºmyBgpPeerCapabilities
+
+-- BEGIN£ºmyBgpPeerExtensions
+
+myBgpPeerExtensions
+	OBJECT IDENTIFIER ::= { myBgpPeer 3 }
+
+-- BEGIN£º
+-- Peer Route Reflection Extensions
+
+myBgpPeerRouteReflectionExts
+	OBJECT IDENTIFIER ::= { myBgpPeerExtensions 1 }
+
+myBgpPeerReflectorClientTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF MyBgpPeerReflectorClientEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Table of route reflection client settings on a per-peer
+	     basis."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { myBgpPeerRouteReflectionExts 1 }
+
+myBgpPeerReflectorClientEntry OBJECT-TYPE
+	SYNTAX	   MyBgpPeerReflectorClientEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Entry containing data on a per-peer basis on whether
+	     the peer is configured as a route reflector client."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	AUGMENTS {
+	    bgpPeerEntry
+	}
+	::= { myBgpPeerReflectorClientTable 1 }
+
+MyBgpPeerReflectorClientEntry ::= SEQUENCE {
+	myBgpPeerReflectorClient
+	    INTEGER
+    }
+
+myBgpPeerReflectorClient OBJECT-TYPE
+	SYNTAX	  INTEGER {
+	    nonClient(0),
+	    client(1),
+	    meshedClient(2)
+	}
+	MAX-ACCESS  read-only
+	STATUS	    current
+	DESCRIPTION
+	    "This value indicates whether the given peer is a
+	     reflector client of this router, or not.  A value of
+	     nonClient indicates that this peer is not a reflector
+	     client.  A value of client indicates that this peer is a
+	     reflector client that is not fully meshed with other
+	     reflector clients.	 A value of meshedClient indicates
+	     that the peer is a reflector client and is fully meshed
+	     with all other reflector clients.
+
+	     This value must be nonClient (0) for BGP external peers."
+	REFERENCE
+	    "RFC 2796 - BGP Route Reflection"
+	::= { myBgpPeerReflectorClientEntry 1 }
+
+-- Peer AS Confederations Extensions
+
+myBgpPeerASConfederationExts
+	OBJECT IDENTIFIER ::= { myBgpPeerExtensions 2 }
+
+myBgpPeerConfedMemberTable OBJECT-TYPE
+	SYNTAX	   SEQUENCE OF MyBgpPeerConfedMemberEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Table of confederation member settings on a per-peer
+	     basis."
+	REFERENCE
+	    "RFC 3065 - BGP Confederations"
+	::= { myBgpPeerASConfederationExts 1 }
+
+myBgpPeerConfedMemberEntry OBJECT-TYPE
+	SYNTAX	   MyBgpPeerConfedMemberEntry
+	MAX-ACCESS not-accessible
+	STATUS	   current
+	DESCRIPTION
+	    "Entry containing data on a per-peer basis on whether
+	     the peer is configured as a BGP confederation member."
+	REFERENCE
+	    "RFC 3065 - BGP Confederations"
+	AUGMENTS {
+	    bgpPeerEntry
+	}
+	::= { myBgpPeerConfedMemberTable 1 }
+
+MyBgpPeerConfedMemberEntry ::= SEQUENCE {
+	myBgpPeerConfedMember
+	    TruthValue
+    }
+    
+myBgpPeerConfedMember OBJECT-TYPE
+	SYNTAX	    TruthValue
+	MAX-ACCESS  read-only
+	STATUS	    current
+	DESCRIPTION
+	    "This value indicates whether the given peer is in our
+	     confederation or not."
+	REFERENCE
+	    "RFC 3065 - BGP Confederations"
+	::= { myBgpPeerConfedMemberEntry 1 }
+	
+-- END£ºmyBgpPeerExtensions	 
+	
+-- END£ºmyBgpPeer
+
+-- BEGIN£ºConformance Information
+
+myBgpConformance
+	OBJECT IDENTIFIER ::= { myBgp4MIB 3 }
+
+myBgpMIBCompliances OBJECT IDENTIFIER ::=
+	{ myBgpConformance 1 }
+myBgpMIBGroups	OBJECT IDENTIFIER ::=
+	{ myBgpConformance 2 }
+
+-- END£ºConformance Information
+
+END
+
+
+	
+
+
+

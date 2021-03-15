@@ -1,17 +1,16 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
-include($config['install_dir'] . '/includes/polling/functions.inc.php');
+include_once($config['install_dir'] . '/includes/polling/functions.inc.php');
 
 // Fetch all MIBs we support for this specific OS
 foreach (get_device_mibs($device) as $mib) { $mibs[$mib]++; }
@@ -46,21 +45,30 @@ if ($vars['submit'])
   }
 }
 
-//$poll_period = 300;
-$error_codes = $GLOBALS['config']['snmp']['errorcodes'];
-$poll_period = $GLOBALS['config']['rrd']['step'];
 // Count critical errors into DB (only for poller)
-$snmp_errors = array();
-$sql  = 'SELECT * FROM `snmp_errors` WHERE `device_id` = ?;';
-foreach (dbFetchRows($sql, array($device['device_id'])) as $entry)
+$mib_grid = 12;
+$snmp_errors = [];
+if ($config['snmp']['errors'])
 {
-  $timediff   = $entry['updated'] - $entry['added'];
-  $poll_count = round($timediff / $poll_period) + 1;
+  //$poll_period = 300;
+  $error_codes = $GLOBALS['config']['snmp']['errorcodes'];
+  $poll_period = $GLOBALS['config']['rrd']['step'];
 
-  $entry['error_rate'] = $entry['error_count'] / $poll_count; // calculate error rate
-  $snmp_errors[$entry['mib']][] = $entry;
+  $sql         = 'SELECT * FROM `snmp_errors` WHERE `device_id` = ?;';
+  foreach (dbFetchRows($sql, [ $device['device_id'] ]) as $entry)
+  {
+    $timediff   = $entry['updated'] - $entry['added'];
+    $poll_count = round($timediff / $poll_period) + 1;
+
+    $entry['error_rate']          = $entry['error_count'] / $poll_count; // calculate error rate
+    $snmp_errors[$entry['mib']][] = $entry;
+  }
+  ksort($snmp_errors);
+  if (count($snmp_errors))
+  {
+    $mib_grid = 5;
+  }
 }
-ksort($snmp_errors);
 
 print_warning("This page allows you to disable certain MIBs to be polled for a device. This configuration disables all discovery modules using this MIB.");
 
@@ -68,7 +76,7 @@ print_warning("This page allows you to disable certain MIBs to be polled for a d
 
 <div class="row"> <!-- begin row -->
 
-  <div class="col-md-5"> <!-- begin MIB options -->
+  <div class="col-md-<?php echo($mib_grid); ?>"> <!-- begin MIB options -->
 
     <div class="box box-solid">
 

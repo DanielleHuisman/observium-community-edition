@@ -1,0 +1,379 @@
+RAD-LAG-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       dot3adAggPortEntry     FROM  IEEE8023-LAG-MIB
+       ifAlias, InterfaceIndexOrZero     FROM  IF-MIB
+       PortList     FROM  Q-BRIDGE-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       RowStatus     FROM  SNMPv2-TC
+       agnt     FROM  RAD-SMI-MIB
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+	lag MODULE-IDENTITY
+		LAST-UPDATED "201502191802Z"  -- February 19, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "LAG MIB."
+	::= { agnt 54 }
+
+
+--  LAG definitions
+
+lagEvents OBJECT IDENTIFIER  ::= {lag 0}		 -- Notifications
+
+lagTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF LagEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "A table defining Link Aggregation Groups port association,
+     and other parameters."
+::= {lag 1}
+
+lagEntry OBJECT-TYPE
+    SYNTAX  LagEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the LAG table."
+     INDEX  { lagCnfgIdx, lagIdx }
+    ::= { lagTable 1 }
+
+LagEntry ::= SEQUENCE {
+    lagCnfgIdx             Unsigned32,
+    lagIdx                 Unsigned32,
+    lagPortMembers         PortList,
+    lagDistributionMethod  INTEGER,
+    lagRecoveryMode     INTEGER,
+    lagWaitToRestore     Unsigned32,
+    lagRowStatus           RowStatus,
+    lagShutDownDurationUponFlip Unsigned32,
+    lagRdnMethod         INTEGER,
+    lagLacpEnable          INTEGER,
+    lagMinimumLinks        Unsigned32,
+    lagAnchorPort          InterfaceIndexOrZero 
+ }
+
+lagCnfgIdx OBJECT-TYPE
+    SYNTAX      Unsigned32	  (1..255)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+     "This object indicates the Idx of the Cnfg(1..255) being
+      accessed ; Idx of 255 relates to the TmpCnfg."
+    ::= { lagEntry 1}
+
+lagIdx  OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+    "This object indicates LAG unique index."
+    ::= { lagEntry 2}
+
+lagPortMembers  OBJECT-TYPE
+    SYNTAX      PortList
+	MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+   "The set of ports which are permanently assigned to the
+    Link Aggregation Group.
+    The default value of this object is a string of zeros."
+    ::= { lagEntry 3}
+
+lagDistributionMethod OBJECT-TYPE
+    SYNTAX    INTEGER
+	{
+     portBased                    (2),
+     oneToOne                     (3),
+     sourceMac                    (4),
+     destinationMac               (5),
+     sourceXorDestinationMac      (6),
+     sourceAndDestinationMac      (7),
+     sourceIp                     (8),
+     destinationIp                (9),
+     sourceAndDestinationMacAndIp (10),
+	 roundRobin					  (11),
+	 sourceAndDestinationIp       (12)
+    }
+    MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "This object defines the criteria for the 802.3ad (LAG)
+     to  split the traffic between ports"
+    ::= { lagEntry 4}
+
+lagRecoveryMode OBJECT-TYPE
+    SYNTAX    INTEGER
+	{
+     nonRevertive (2),
+     revertive    (3)
+    }
+	MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "This object defines whether traffic will be returned to
+     a port after its recovery.
+     This object is applicable only when
+     lagDistributionMethod= oneToOne (3)."
+    ::= { lagEntry 5}
+
+lagWaitToRestore  OBJECT-TYPE
+    SYNTAX    Unsigned32 (0..720)
+    MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "This object defines traffic recovery time (in seconds)
+     to the port after its recovery.
+     This object is applicable only when
+     lagRecoveryMode= revertive (3)."
+    ::= { lagEntry 6}
+
+lagRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables user to create/delete
+     entries of this table.
+     Note:
+     When using LAG standard package, this table is static,
+     hence, only the values active(1), notInService(2) are used."
+    ::= { lagEntry 7}
+
+lagShutDownDurationUponFlip  OBJECT-TYPE
+    SYNTAX    Unsigned32 (0..30)
+    MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "This object defines the duration (in seconds) the active
+     port transmission is shut down after LAG Flip occurs.
+	 The transmission is shut down and then opened again (after the duration
+	 defined by this object), in order to cause the other side to flip
+	 to the new active port.
+	 0=no shut-down.
+     This object is applicable only when lagDistributionMethod=oneToOne(3)
+     and mainly when each of the Links of our device is connected to a different device."
+    ::= { lagEntry 8}
+
+	lagRdnMethod    OBJECT-TYPE
+    SYNTAX    INTEGER
+	{
+     loadSharing (1),
+     redundancy  (2)
+     }
+    MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "This object defines the redundancy method."
+    ::= { lagEntry 9}
+
+lagLacpEnable    OBJECT-TYPE
+    SYNTAX    INTEGER
+	{
+        no  (2),
+        yes (3)
+     }
+    MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "Enabling/Disabling the LACP for a LAG.
+     The LACP will be enabled for all ports belonging to this LAG."
+    ::= { lagEntry 10}
+
+lagMinimumLinks  OBJECT-TYPE
+    SYNTAX    Unsigned32 (1..4)
+    MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "This object defines the minimum number of active ports in the LAG
+     for it to be considered OK .
+     This object is valid only for Load Sharing LAGs.
+     Default value shall be 1."
+    ::= { lagEntry 12}
+
+lagAnchorPort  OBJECT-TYPE
+    SYNTAX    InterfaceIndexOrZero
+    MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+    "This object indicates ifIndex of the port selected
+	 as Anchor Port."
+    ::= { lagEntry 13}
+
+
+lagStatTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF LagStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "A table defining Link Aggregation Groups Redundancy. This table is applicable only
+     when lagDistributionMethod = oneToOne."
+	::= {lag 2}
+
+lagStatEntry OBJECT-TYPE
+    SYNTAX  LagStatEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the LAG Status table."
+     INDEX  { lagIdx }
+    ::= { lagStatTable 1 }
+
+LagStatEntry ::= SEQUENCE {
+    lagStatForcePort       Unsigned32,
+    lagStatActivePort      Unsigned32 
+ }
+
+lagStatForcePort	OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-write
+   STATUS       current
+   DESCRIPTION
+   "This object enables user to enforce the active port.
+    0 = No Enforcement; Otherwise the ifIndex of the port."
+    ::= { lagStatEntry 1}
+
+lagStatActivePort	OBJECT-TYPE
+   SYNTAX       Unsigned32
+   MAX-ACCESS   read-only
+   STATUS       current
+   DESCRIPTION
+   "This object indicates the current active port. It is applicable only
+    when lagDistributionMethod = oneToOne. The value is the ifIndex of the port.
+    0 = none of the ports is active."
+    ::= { lagStatEntry 2}
+
+
+dot3adAggPortXTable OBJECT-TYPE
+	SYNTAX  	SEQUENCE OF Dot3adAggPortXEntry
+    MAX-ACCESS  not-accessible
+    STATUS  	current
+    DESCRIPTION
+		"An Augment to the Link Aggregation Control configuration table
+		 (dot3adAggPortTable in IEEE8023-LAG-MIB; IEEE 802.3ad)."
+     ::= {lag 3}
+
+dot3adAggPortXEntry OBJECT-TYPE
+	SYNTAX  	Dot3adAggPortXEntry
+    MAX-ACCESS	not-accessible
+    STATUS  	current
+    DESCRIPTION
+       "An entry in the table."
+    AUGMENTS { dot3adAggPortEntry }
+     ::= { dot3adAggPortXTable 1 }
+
+Dot3adAggPortXEntry ::= SEQUENCE {
+    dot3adAggPortXprotectionState  INTEGER 
+ }
+
+dot3adAggPortXprotectionState OBJECT-TYPE
+	SYNTAX  INTEGER {
+	  notApplicable		(1),
+	  standby			(2),
+	  active			(3)
+	  }
+	 MAX-ACCESS  read-only
+	 STATUS  current
+	 DESCRIPTION
+	 "This object indicates the state of the LAG protection."
+	   ::= { dot3adAggPortXEntry 1 }
+
+
+--------------------------------------------
+--  LAG Common Trap Definitions
+--------------------------------------------
+
+-- LAG LACP (LINK AGGREGATION CONTROL PROTOCOL) DOWN
+lagLacpDown  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias, ifAlias } 
+      STATUS  deprecated
+      DESCRIPTION
+	  "This trap indicates that Ethernet port is active but LACP is out-of-sync.
+	   The first  ifAlias that is attached is the Group's  ifAlias.
+	   The second ifAlias that is attached is the Member's ifAlias.
+	  "
+      ::= { lagEvents  1 }
+
+-- LAG LACP (LINK AGGREGATION CONTROL PROTOCOL) DETECTION
+lagLacpLoopDetection  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias } 
+      STATUS  deprecated
+      DESCRIPTION
+	  "This trap indicates that LACP loop was detected between two ports assigned to a LAG.
+	  "
+      ::= { lagEvents  2 }
+
+-- LAG LACP (LINK AGGREGATION CONTROL PROTOCOL) CHURN
+lagLacpChurn  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias } 
+      STATUS  deprecated
+      DESCRIPTION
+	  "This trap indicates that the LACP was unable to synchronize with the partner.
+	  "
+      ::= { lagEvents  3 }
+
+lagSubGroupSwitchover       NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias } 
+      STATUS  current
+      DESCRIPTION
+	  "Switchover between sub-groups of inter-card LAG."
+      ::= { lagEvents  4 }
+
+lagFailure     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias } 
+      STATUS  deprecated
+      DESCRIPTION
+	  "All LAG member ports are down."
+      ::= { lagEvents  5}
+
+lagMinimumMembers     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     ifAlias, lagMinimumLinks } 
+      STATUS  deprecated
+      DESCRIPTION
+	  "Number of Active Links is below Minumum configured in lagMinimumLinks."
+      ::= { lagEvents  6}
+
+
+END
+

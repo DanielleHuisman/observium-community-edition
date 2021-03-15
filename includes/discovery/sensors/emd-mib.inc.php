@@ -129,7 +129,7 @@ foreach ($oids as $index => $entry)
   //    upperCritical(3),
   // }
   $options      = array();
-  $limits_flags = base_convert($entry['externalSensorEnabledThresholds'], 16, 10);
+  $limits_flags = base_convert(str_replace(' ', '', $entry['externalSensorEnabledThresholds']), 16, 10);
   if (is_flag_set(bindec(10000000), $limits_flags)) // 0b 1000 0000
   {
     $options['limit_low']       = $entry['externalSensorLowerCriticalThreshold'] * $scale;

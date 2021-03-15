@@ -11,22 +11,21 @@
  *
  */
 
-include_once($config['html_dir']."/includes/graphs/common.inc.php");
-
 $device = device_by_id_cache($id);
-
 $rrd_filename = get_rrd_path($device, "mem.rrd");
+
+include_once($config['html_dir']."/includes/graphs/common.inc.php");
 
 $rrd_options .= " -b 1024";
 
-$rrd_options .= " DEF:atotalswap=$rrd_filename:totalswap:AVERAGE";
-$rrd_options .= " DEF:aavailswap=$rrd_filename:availswap:AVERAGE";
-$rrd_options .= " DEF:atotalreal=$rrd_filename:totalreal:AVERAGE";
-$rrd_options .= " DEF:aavailreal=$rrd_filename:availreal:AVERAGE";
-$rrd_options .= " DEF:atotalfree=$rrd_filename:totalfree:AVERAGE";
-$rrd_options .= " DEF:ashared=$rrd_filename:shared:AVERAGE";
-$rrd_options .= " DEF:abuffered=$rrd_filename:buffered:AVERAGE";
-$rrd_options .= " DEF:acached=$rrd_filename:cached:AVERAGE";
+$rrd_options .= " DEF:atotalswap=$rrd_filename_escape:totalswap:AVERAGE";
+$rrd_options .= " DEF:aavailswap=$rrd_filename_escape:availswap:AVERAGE";
+$rrd_options .= " DEF:atotalreal=$rrd_filename_escape:totalreal:AVERAGE";
+$rrd_options .= " DEF:aavailreal=$rrd_filename_escape:availreal:AVERAGE";
+$rrd_options .= " DEF:atotalfree=$rrd_filename_escape:totalfree:AVERAGE";
+$rrd_options .= " DEF:ashared=$rrd_filename_escape:shared:AVERAGE";
+$rrd_options .= " DEF:abuffered=$rrd_filename_escape:buffered:AVERAGE";
+$rrd_options .= " DEF:acached=$rrd_filename_escape:cached:AVERAGE";
 $rrd_options .= " CDEF:totalswap=atotalswap,1024,*";
 $rrd_options .= " CDEF:availswap=aavailswap,1024,*";
 $rrd_options .= " CDEF:totalreal=atotalreal,1024,*";

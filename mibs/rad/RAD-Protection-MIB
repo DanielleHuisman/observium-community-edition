@@ -1,0 +1,624 @@
+RAD-Protection-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE, OBJECT-IDENTITY     FROM  SNMPv2-SMI
+       RowStatus, DateAndTime     FROM  SNMPv2-TC
+       ifAlias     FROM  IF-MIB
+       agnt     FROM  RAD-SMI-MIB
+       alarmEventLogSourceName, alarmEventReason, alarmEventLogAlarmOrEventId, 
+       alarmEventLogDescription, alarmEventLogSeverity, alarmEventLogDateAndTime     FROM  RAD-GEN-MIB
+       ProtectClassType, ProtectGroupCmdType, ProtectLastSwitchReasonType, 
+       ProtectionStateType     FROM  RAD-TC; 
+
+	agnProtection MODULE-IDENTITY
+		LAST-UPDATED "201605031811Z"  -- May 03, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+     
+         Email:  mibs@rad.com    
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Protection MIB." 
+	::= { agnt 72 }
+
+
+--  RAD Protection Mechanism
+
+protectionEvents OBJECT-IDENTITY
+    STATUS  current
+    DESCRIPTION
+        "The events for RAD protection."
+    ::= { agnProtection 0 }
+
+
+protectGroupTable OBJECT-TYPE
+	SYNTAX      SEQUENCE OF ProtectGroupEntry
+	MAX-ACCESS  not-accessible
+	STATUS      current
+	DESCRIPTION
+            "This object defines the protection group table."
+	::= { agnProtection 1 }
+ 
+protectGroupEntry OBJECT-TYPE
+	SYNTAX      ProtectGroupEntry
+	MAX-ACCESS  not-accessible
+	STATUS      current
+	DESCRIPTION
+            "This is an entry of the protectGroupTable."
+	INDEX       { protectGroupClass, protectGroupIdx }
+	::= { protectGroupTable 1 }
+
+ProtectGroupEntry ::= SEQUENCE {
+    protectGroupClass    ProtectClassType,
+    protectGroupIdx     Unsigned32,
+    protectGroupRowStatus        RowStatus,
+    protectGroupName             SnmpAdminString,
+    protectGroupMode             INTEGER,
+    protectGroupRevertMode   INTEGER,
+    protectGroupWaitToRestore    Unsigned32,
+    protectGroupCmd     ProtectGroupCmdType,
+    protectGroupLastCmd          ProtectGroupCmdType,
+    protectGroupLastSwitchTime   DateAndTime,
+    protectGroupLastSwitchReason ProtectLastSwitchReasonType,
+    protectGroupSwitchReason     INTEGER,
+    protectGroupDownDuration     Unsigned32 
+ }
+
+protectGroupClass OBJECT-TYPE
+	SYNTAX      ProtectClassType
+	MAX-ACCESS	not-accessible
+    STATUS		current
+    DESCRIPTION
+            "This index defines protection group type."
+    ::= { protectGroupEntry 1 }
+ 
+protectGroupIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This index defines the protection group number."
+    ::= { protectGroupEntry 2 }
+
+protectGroupRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "Table row status. It is based on the standard RowStatus
+            definition of RFC2579."
+    ::= { protectGroupEntry 3 }
+
+protectGroupName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object defines the protection group name."
+    DEFVAL {""}
+    ::= { protectGroupEntry 4 }
+
+protectGroupMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+        manual              (1),
+        onePlusOne          (2), -- 1+1
+        oneToOne            (3), -- 1:1
+        oneToOneIndepend    (4), -- 1:1 TDM PW protection, independent node
+        oneToOneMaster      (5), -- 1:1 TDM PW protection, master node
+        oneToOneSlave       (6)	 -- 1:1 TDM PW protection, slave node
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object defines mode of protection that the group uses.
+            
+            TDM PW protection uses 2 modes:
+            1. Independent - PW endpoint nodes independently select
+                which PW they intend to make active and which PW they
+                intend to make standby.
+            2.	Master/slave - one endpoint node of the redundant set of
+                PWs is designated the master and is responsible for
+                selecting which PW both endpoints must use to forward
+                user traffic. The other endpoint node, the slave, must
+                follow the decision of the master."
+	DEFVAL { oneToOne }
+    ::= { protectGroupEntry 5 }
+
+protectGroupRevertMode OBJECT-TYPE
+	SYNTAX      INTEGER {
+        nonRevertive (1),
+        revertive    (2)
+        }
+	MAX-ACCESS read-create
+    STATUS       current
+    DESCRIPTION
+            "The revertive mode of the specific protection group type.
+
+            nonRevertive
+
+            Traffic remains on the protection until another switch
+            request is received.
+
+            revertive
+
+            When the condition that caused a switch to the protection
+            has been cleared the signal is switched back to the
+            working member. "
+    DEFVAL { nonRevertive }
+    ::= { protectGroupEntry 6 }
+
+protectGroupWaitToRestore OBJECT-TYPE
+    SYNTAX		Unsigned32 (0..720)
+    UNITS		"seconds"
+    MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+            "This object defines traffic recovery time (in seconds) 
+            to the entry after its recovery."
+    DEFVAL { 300 }
+    ::= { protectGroupEntry 7 }
+
+protectGroupCmd OBJECT-TYPE
+    SYNTAX      ProtectGroupCmdType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object defines commands that the protection group
+            should perform. The object should be created with 'none'
+            value  by default. After a specific set command the agent
+            shall copy the command to protectGroupLastCmd object then
+            shall restore it to its initial value 'none'."
+	DEFVAL { none }
+    ::= { protectGroupEntry 8 }
+
+protectGroupLastCmd OBJECT-TYPE
+    SYNTAX      ProtectGroupCmdType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object contains the last command that the protection
+            group was requested to perform. See description on
+            protectGroupCmd object."
+    ::= { protectGroupEntry 9 }	
+
+protectGroupLastSwitchTime OBJECT-TYPE
+    SYNTAX      DateAndTime   	
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object specifies the last protection switch date and
+            time. The object is read-only and should be updated by the
+            agent on each occurence of a protection switch."
+    ::= { protectGroupEntry 10 }
+
+protectGroupLastSwitchReason OBJECT-TYPE
+    SYNTAX      ProtectLastSwitchReasonType
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object specifies the last protection switch reason.
+            Agent should update the object upon each protection switch."
+    ::= { protectGroupEntry 11 }
+       
+protectGroupSwitchReason  OBJECT-TYPE
+	SYNTAX      INTEGER {
+            other                   (1),
+            revertiveModeMismatch   (2)
+        }
+	MAX-ACCESS  read-only
+	STATUS  current
+	DESCRIPTION      
+        "Reason of the EPS protection configuration mismatch."
+    ::= { protectGroupEntry 12 }
+
+protectGroupDownDuration    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This objects defines the duration time in seconds
+             upon flip."
+    ::= { protectGroupEntry 13 }
+
+
+-- protectMemberTable
+
+protectMemberTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ProtectMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The table defines members associated with certain
+            protection group. It uses the same indices as
+            protectGroupTable and an additional per member index."
+ 	::= { agnProtection 2 }
+
+protectMemberEntry OBJECT-TYPE
+    SYNTAX      ProtectMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This is an entry of the protectMemberEntry."
+    INDEX       { protectGroupClass, protectGroupIdx,
+                protectMemberNumber }
+ 	::= { protectMemberTable 1 }
+
+ProtectMemberEntry ::= SEQUENCE {
+    protectMemberNumber      Unsigned32,
+    protectMemberRowStatus   RowStatus,
+    protectMemberId          Unsigned32,
+    protectMemberState       ProtectionStateType,
+    protectMemberIsProtected INTEGER 
+ }
+
+protectMemberNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Number of protection member in the protection group.
+            In the revertive mode this object defines Protection and
+            Working functionality:
+                0 - Protection
+                1 or higher - Working."
+    ::= { protectMemberEntry 1 }
+
+protectMemberRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object enables creation and deletion of entries in the
+            protectMemberEntry and handling the row status according to
+            RFC2579."
+    ::= { protectMemberEntry 2 }
+
+protectMemberId OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	read-create
+    STATUS		current
+    DESCRIPTION
+            "This object indicates the logical or physical entity of the 
+            protection group member.This object may be used as the entity's
+			ifIndex."
+    ::= { protectMemberEntry 3 }
+
+protectMemberState OBJECT-TYPE
+	SYNTAX  ProtectionStateType
+	MAX-ACCESS  read-only
+	STATUS  current
+	DESCRIPTION
+            "This object indicates the state of the protection member."
+	::= { protectMemberEntry 4 }
+
+protectMemberIsProtected OBJECT-TYPE
+	SYNTAX      INTEGER {
+        no  (2),
+        yes (3)
+        }
+	MAX-ACCESS  read-only
+	STATUS  current
+	DESCRIPTION
+            "This object contains 'yes' value when it is actually
+            protected and 'no' if it isn't. Activate of the protection
+            if required is possible when the primary object belongs to
+            the Protection Group, the operational status of its
+            secondary mate is 'up' and it is able to function as the
+            primary one, such as:
+            For certain IO card: all the line interfaces of the module
+            are protected."
+	::= { protectMemberEntry 5 }
+
+protectInverseMapTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ProtectInverseMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table contains objects of protectGroupTable and
+            protectMemberTable. The purpose of this table is to obtain
+            the protection Group and protection member information of a
+            specific logical or physical entity.
+            The Agent should create this table."
+ 	::= { agnProtection 3 }
+
+protectInverseMapEntry OBJECT-TYPE
+    SYNTAX      ProtectInverseMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object defines an entry of the protectInverseMapTable."
+    INDEX     { protectInverseMapGroupClass, protectInverseMapMemberId }
+ 	::= { protectInverseMapTable 1 }
+
+ProtectInverseMapEntry ::= SEQUENCE {
+    protectInverseMapGroupClass  ProtectClassType,
+    protectInverseMapMemberId  Unsigned32,
+    protectInverseMapGroupIdx  Unsigned32,
+    protectInverseMapMemberNumber Unsigned32 
+ }
+
+protectInverseMapGroupClass OBJECT-TYPE
+	SYNTAX      ProtectClassType
+	MAX-ACCESS	not-accessible
+    STATUS		current
+    DESCRIPTION
+            "This object defines protection group type as an index of
+            the protectInverseMapTable. It should be equal to
+            protectGroupClass of ProtectGroupEntry."
+    ::= { protectInverseMapEntry 1 }
+
+protectInverseMapMemberId OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	not-accessible
+    STATUS		current
+    DESCRIPTION
+            "This object defines index of the protectInverseMapTable.
+            The protectInverseMapMemberId should be equal to
+            protectMemberId of ProtectMemberEntry."
+    ::= { protectInverseMapEntry 2 }
+
+protectInverseMapGroupIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object defines protection group index within
+            protectInverseMapTable. It should be equal to 
+            protectGroupIdx  of ProtectGroupEntry."
+    ::= { protectInverseMapEntry 3 }
+
+protectInverseMapMemberNumber OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object defines Member Number of the protection Group
+            within the protectInverseMapTable. It should be equal to
+            protectMemberNumber of ProtectMemberEntry."
+	::= { protectInverseMapEntry 4 }
+
+
+protectEpsGroupTable OBJECT-TYPE
+	SYNTAX      SEQUENCE OF ProtectEpsGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table defines Ethernet Protection Switching (G.8031)
+            specific configuration parameters. The table augments the
+            Protection Group configuration."
+    ::= { agnProtection 4 }
+ 	
+protectEpsGroupEntry OBJECT-TYPE
+	SYNTAX      ProtectEpsGroupEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object defines an augmentation of the Protection Group
+            table for EPS."
+    AUGMENTS    { protectGroupEntry }
+    ::= { protectEpsGroupTable 1 }
+
+ProtectEpsGroupEntry ::= SEQUENCE {
+    protectEpsGroupUseAps   INTEGER,
+    protectEpsGroupMaster   Unsigned32,
+    protectEpsGroupSwitchDirection INTEGER 
+ }
+
+protectEpsGroupUseAps    OBJECT-TYPE
+    SYNTAX      INTEGER {
+        no  (2),
+        yes (3)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This object defines whether APS protocol is used for EPS
+        protection."
+    ::= { protectEpsGroupEntry 1 }
+
+protectEpsGroupMaster	OBJECT-TYPE
+	SYNTAX  Unsigned32 
+	MAX-ACCESS  read-create
+	STATUS		current
+	DESCRIPTION
+        "This object determines Master-Slave configuration of the EPS 
+        protection groups. Each group may play Master Group or Slave
+        Group role. Activation of the EPS protection in a Master Group
+        causes activation of the EPS protection in all Slave Groups
+        depending on this Master.
+        The configuration may define few masters. An independent Group
+        should be marked Master.
+	 
+        If protectEpsGroupMaster = 0, the member is a Master.
+
+        If protectEpsGroupMaster > 0 it should be equal to the
+        protectGroupIdx of the Master Group."
+	::= { protectEpsGroupEntry 2 }
+
+protectEpsGroupSwitchDirection	OBJECT-TYPE
+    SYNTAX      INTEGER {
+        biDirectional  (2),
+        uniDirectional (3)
+        }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object specifies Protection group switch direction
+            policy.
+
+            With bidirectional switching, an attempt is made to
+            coordinate the two directions, even for a unidirectional
+            failure.
+
+            With unidirectional switching, the protection switching at
+            each direction is fully independent."
+    ::= { protectEpsGroupEntry 3 }
+
+
+protectEpsMemberTable OBJECT-TYPE
+	SYNTAX      SEQUENCE OF ProtectEpsMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table adds Ethernet Protection Switching (G.8031)
+            definition to the Protection Member table."
+    ::= { agnProtection 5 }
+
+protectEpsMemberEntry OBJECT-TYPE
+	SYNTAX      ProtectEpsMemberEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object defines a protectMemberEntry augmentation
+            defining set of G.8031 using the protection OAM CFM codes."
+    AUGMENTS    { protectMemberEntry }
+    ::= { protectEpsMemberTable 1 }
+
+ProtectEpsMemberEntry ::= SEQUENCE {
+    protectEpsOamCfmMdId Unsigned32,
+    protectEpsOamCfmMaId Unsigned32,
+    protectEpsOamCfmMepId Unsigned32,
+    protectEpsIfIndex       Unsigned32 
+ }
+
+protectEpsOamCfmMdId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object defines MD ID code (Maintenance Domain ID) of
+            G.8031 protection according to OAM CFM definitions."
+    ::= { protectEpsMemberEntry 1 }
+
+protectEpsOamCfmMaId OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object defines MA ID code (Maintenance Association ID)
+            of G.8031 protection according to OAM CFM definitions."
+    ::= { protectEpsMemberEntry 2 }
+
+protectEpsOamCfmMepId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..8191)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object defines MEP ID code (Maintenance End Point ID)
+            of G.8031 protection according to OAM CFM definitions."
+    ::= { protectEpsMemberEntry 3 }
+
+protectEpsIfIndex     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This object defines the operational status of the port 
+            as the trigger for the protection (instead of the MEP)."
+    ::= { protectEpsMemberEntry 4 }
+
+
+
+protectEpsMasterMapTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF ProtectEpsMasterMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table depicts bounding between EPS Protection groups.
+            Each Master group should be bound with at least one Slave
+            group. The table should not include groups that are defined
+            'Master group', but are not bound with any Slave group.
+            The Agent is responsible to create this table according to
+            the protectEpsGroupMaster of the protectEpsGroupEntry."
+ 	::= { agnProtection 6 }
+
+protectEpsMasterMapEntry OBJECT-TYPE
+    SYNTAX      ProtectEpsMasterMapEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object defines an entry of the
+            protectEpsMasterMapTable. It defines the bounding between
+            Master Groups and their respective Slave Groups."
+    INDEX	    { protectEpsMasterMapMasterIdx,
+                protectEpsMasterMapSlaveIdx }
+ 	::= { protectEpsMasterMapTable 1 }
+
+ProtectEpsMasterMapEntry ::= SEQUENCE {
+    protectEpsMasterMapMasterIdx Unsigned32,
+    protectEpsMasterMapSlaveIdx  Unsigned32,
+    protectEpsMasterMapParam  INTEGER 
+ }
+
+protectEpsMasterMapMasterIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This index defines the EPS Master group.
+            It is equal to the protectGroupIdx of the EPS Master group."
+    ::= { protectEpsMasterMapEntry 1 }
+
+protectEpsMasterMapSlaveIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This index defines the EPS Slave group that is bound with
+            the Master group that is defined by
+            protectEpsMasterMapMasterIdx. It is equal to the
+            protectGroupIdx of the EPS Slave Group,hence all Slave
+            groups that are bound with a given Master have the same
+            protectEpsMasterMapMasterIdx value."
+    ::= { protectEpsMasterMapEntry 2 }
+
+protectEpsMasterMapParam OBJECT-TYPE
+	SYNTAX      INTEGER
+	MAX-ACCESS	read-only
+    STATUS		current
+    DESCRIPTION
+            "This is a dummy object."
+    ::= { protectEpsMasterMapEntry 3 }
+
+epsConfigurationMismatch         NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     protectGroupName, protectGroupSwitchReason } 
+      STATUS  deprecated
+      DESCRIPTION
+      "EPS configuration mismatch."	
+      ::= {protectionEvents  3}       
+      
+etpEpsPortSwitchover        NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     protectGroupName, ifAlias, protectGroupLastSwitchReason } 
+      STATUS  current
+      DESCRIPTION
+      "EPS configuration mismatch."	
+      ::= {protectionEvents  5} 
+ 
+END
+

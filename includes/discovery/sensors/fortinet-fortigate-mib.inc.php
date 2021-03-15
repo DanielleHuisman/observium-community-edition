@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -26,15 +25,33 @@ foreach ($oids as $index => $entry)
   $value    = $entry[$oid_name];
 
   // Detect class based on descr anv value (this is derp, table not have other data for detect class
-  if (str_istarts($descr, 'FAN') && $value > 100)
+  if (str_iexists($descr, 'Fan') && ($value > 100 || $value == 0))
   {
+    if ($value == 0) { continue; }
     $class = 'fanspeed';
   }
-  elseif (preg_match('/\d+V(SB)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) ||
-          str_icontains($descr, ['VCC', 'VTT', 'VBAT', 'PVSA']))
+  elseif (preg_match('/\d+V(SB|DD)?\d*$/', $descr) || preg_match('/P\d+V\d+/', $descr) ||
+          str_iexists($descr, [ 'VCC', 'VTT', 'VDD', 'VDQ', 'VBAT', 'VSA', 'Vcore', 'VIN', 'VOUT', 'Vbus', 'Vsht' ]))
   {
     if ($value == 0) { continue; }
     $class = 'voltage';
+  }
+  elseif (str_iexists($descr, 'Status'))
+  {
+    // FORTINET-FORTIGATE-MIB::fgHwSensorEntName.45 = STRING: PS1 Status
+    // FORTINET-FORTIGATE-MIB::fgHwSensorEntName.50 = STRING: PS2 Status
+    // FORTINET-FORTIGATE-MIB::fgHwSensorEntValue.45 = STRING: 0
+    // FORTINET-FORTIGATE-MIB::fgHwSensorEntValue.50 = STRING: 9
+    // FORTINET-FORTIGATE-MIB::fgHwSensorEntAlarmStatus.45 = INTEGER: false(0)
+    // FORTINET-FORTIGATE-MIB::fgHwSensorEntAlarmStatus.50 = INTEGER: true(1)
+    $descr    = str_ireplace('Status', 'Alarm Status', $descr);
+    $oid_name = 'fgHwSensorEntAlarmStatus';
+    $oid_num  = '.1.3.6.1.4.1.12356.101.4.3.2.1.4.'.$index;
+    $type     = 'fgHwSensorEntAlarmStatus';
+    $value    = $entry[$oid_name];
+
+    discover_status_ng($device, $mib, $oid_name, $oid_num, $index, $type, $descr, $value, array('entPhysicalClass' => 'powersupply'));
+    continue;
   } else {
     // FIXME, not always?
     $class = 'temperature';

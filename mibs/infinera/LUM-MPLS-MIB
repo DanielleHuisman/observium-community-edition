@@ -1,0 +1,2761 @@
+LUM-MPLS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32, Integer32, Counter64
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE
+        FROM SNMPv2-CONF
+    TEXTUAL-CONVENTION, DisplayString, DateAndTime, MacAddress, RowStatus
+        FROM SNMPv2-TC
+    lumModules, lumMplsMIB
+        FROM LUM-REG
+    MplsLabel, PortNumber
+    		FROM LUM-TC
+    MgmtNameString, CommandString
+        FROM LUM-TC;
+
+lumMplsMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201706150000Z" -- June 15th 2017
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+        "The MIB module for management of MPLS.
+
+        The tables contained in this MIB are:
+
+        (1) The General group contains some general attributes as time stamps
+            and tables sizes.
+
+        (2) The IF (interface) table contains information and configuration for all
+            interfaces available for MPLS.
+
+        (3) The XC table is used to associate in and out segments together,
+            in order to form a cross-connect.
+
+        (4) The Node table contains general information and configuration for each
+            individual MPLS node. Every board in the physical node that supports MPLS
+            is considered an individual MPLS node.
+
+        (4) The tunnel table contains information and configuration for MPLS tunnel,
+            which is a connection between two Label Switch Router, LSRs.
+
+        (5) The LSP table contains information and configuration for each individual
+            bidirectional Label Switched Path, LSP.
+
+        (6) The tunnel-lsp table contains information about cross reference of
+            tunnel and LSP.
+
+"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "Changes made for release r29.0:
+         - Changed ORGANIZATION and CONTACT-INFO"
+    REVISION
+        "201611300000Z" -- November 30th 2016
+    DESCRIPTION
+        "Changes made for release r28.0:
+        - Added mplsIfIfNo"
+    REVISION
+        "201501230000Z" -- January 23rd 2015
+    DESCRIPTION
+        "Changes made for release r24.0:
+        - Added description fields for MPLS Tunnel and MPLS LSP; mplsTunnelDescr, mplsLspDescr"
+    REVISION
+        "201310110000Z" --  October 11th 2013
+    DESCRIPTION
+        "Updated for software release R22.0"
+    REVISION
+        "201304010000Z" --  April 1st 2013
+    DESCRIPTION
+        "Updated for software release R21.0"
+    REVISION
+        "201212200000Z" --  December 20th 2012
+    DESCRIPTION
+        "Update for software release R20.0:
+        - Removed traffic class from LSP to pseudowires.
+        - Updated mplsTunnelBookedBW to 64bit counter to avoid wrap.
+        - Corrected ranges for MplsIdentifier, tunnelId and lspId.
+        - Added range for mplsLspPriority."
+    REVISION
+        "201203010000Z" -- March 1st 2012
+    DESCRIPTION
+        "Update for software release R19.0:
+        - Added global ID and changed ITU ICC global ID to hidden.
+        - Changed read/write properties of MEP IDs
+        - Corrected maximum value of MEP IDs.
+        - Changed support info.
+        - Added support for BFD.
+        - Added support for MPLS linear protection.
+        - Added traffic class for LSP.
+        - Changed storage class to read-create for XC out and in IF names."
+    REVISION
+        "201112200000Z" -- December 20th 2011
+    DESCRIPTION
+        "The initial revision of this module."
+    ::= { lumModules 40 }
+
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and compliance
+-- specifications.
+-- ----------------------------------------------------
+
+lumMplsConfs OBJECT IDENTIFIER ::= { lumMplsMIB 1 }
+lumMplsGroups OBJECT IDENTIFIER ::= { lumMplsConfs 1 }
+lumMplsCompl OBJECT IDENTIFIER ::= { lumMplsConfs 2 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the MPLS MIB
+-- ----------------------------------------------------
+
+lumMplsMIBObjects OBJECT IDENTIFIER ::= { lumMplsMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+mplsGeneral OBJECT IDENTIFIER ::= { lumMplsMIBObjects 1 }
+mplsIfList OBJECT IDENTIFIER ::= { lumMplsMIBObjects 2 }
+mplsXCList OBJECT IDENTIFIER ::= { lumMplsMIBObjects 3 }
+mplsTunnelList OBJECT IDENTIFIER ::= { lumMplsMIBObjects 4 }
+mplsNodeList OBJECT IDENTIFIER ::= { lumMplsMIBObjects 5 }
+mplsLspList OBJECT IDENTIFIER ::= { lumMplsMIBObjects 6 }
+mplsTnlXLspList OBJECT IDENTIFIER ::= { lumMplsMIBObjects 7 }
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+
+
+MplsIdentifier ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS current
+    DESCRIPTION
+        "MPLS identifier type, 16-bit integer."
+    SYNTAX Unsigned32 (0..65535)
+
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+
+mplsGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the configuration of the MIB was
+        last changed.
+"
+    ::= { mplsGeneral 1 }
+
+mplsGeneralStateLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the state of the MIB was last
+        changed.
+"
+    ::= { mplsGeneral 2 }
+
+mplsGeneralMplsIfTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of interface table
+"
+    ::= { mplsGeneral 3 }
+
+mplsGeneralMplsXCTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of cross connect table
+"
+    ::= { mplsGeneral 4 }
+
+mplsGeneralMplsTunnelTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of tunnel table
+"
+    ::= { mplsGeneral 5 }
+
+mplsGeneralMplsNodeTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of node table
+"
+    ::= { mplsGeneral 6 }
+
+mplsGeneralMplsLspTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of LSP table
+"
+    ::= { mplsGeneral 7 }
+
+mplsGeneralMplsTnlXLspTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Size of Tunnel LSP cross reference table
+"
+    ::= { mplsGeneral 8 }
+
+-- ----------------------------------------------------
+-- Interface group
+-- ----------------------------------------------------
+
+mplsIfTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MplsIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The MPLS interface list."
+    ::= { mplsIfList 1 }
+
+mplsIfEntry OBJECT-TYPE
+    SYNTAX      MplsIfEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the mpls interface list.
+"
+    INDEX { mplsIfIndex }
+    ::= { mplsIfTable 1 }
+
+MplsIfEntry ::=
+    SEQUENCE {
+        mplsIfIndex                             Unsigned32,
+        mplsIfName                              MgmtNameString,
+        mplsIfSubrack                           Unsigned32,
+        mplsIfSlot                              Unsigned32,
+        mplsIfTxPort                            PortNumber,
+        mplsIfPortIndex                         Unsigned32,
+        mplsIfPortName                          DisplayString,
+        mplsIfInternalReference                 Unsigned32,
+        mplsIfAdminStatus                       INTEGER,
+        mplsIfIdentifier                        DisplayString,
+        mplsIfNextHopMacAddress                 MacAddress,
+        mplsIfInterfaceMacAddress               MacAddress,
+        mplsIfVlan                              Unsigned32,
+        mplsIfRowStatus                         RowStatus,
+        mplsIfIfNo                              PortNumber,
+        mplsIfResourceType                      INTEGER,
+        mplsIfLagId                             MgmtNameString
+}
+
+mplsIfIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { mplsIfEntry 1 }
+
+mplsIfName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the interface, for example
+        'if:1:2:myIdentifier', where the first number indicates
+        subrack and the second slot number.
+"
+    ::= { mplsIfEntry 2 }
+
+mplsIfSubrack OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The subrack of the physical port that this interface is
+        bound to.
+"
+    ::= { mplsIfEntry 3 }
+
+mplsIfSlot OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The slot of the physical port that this interface is
+        bound to.
+"
+    ::= { mplsIfEntry 4 }
+
+mplsIfTxPort OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The transmitting physical port that this interface is
+        bound to.
+"
+        DEFVAL { 0 }
+    ::= { mplsIfEntry 5 }
+
+mplsIfPortIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The index of the port or lag that this interface is bound to.
+"
+    ::= { mplsIfEntry 6 }
+
+mplsIfPortName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Name of the port or lag that this interface is bound to.
+"
+    ::= { mplsIfEntry 7 }
+
+mplsIfInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+"
+    DEFVAL { 0 }
+    ::= { mplsIfEntry 8 }
+
+mplsIfAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    down (1),
+                    up (2)}
+    MAX-ACCESS read-write
+    STATUS     current
+    DESCRIPTION
+        "The administrative state of the MPLS interface.
+
+        down - The interface is de-activated.
+
+        up - The interface is activated.
+"
+    DEFVAL { up }
+    ::= { mplsIfEntry 9 }
+
+mplsIfIdentifier OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A unique identifier for the MPLS interface.
+"
+    DEFVAL { "" }
+    ::= { mplsIfEntry 10 }
+
+mplsIfNextHopMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The unicast or valid multicast (01:00:5E:90:00:00)
+         MAC address used for sending MPLS packets on the
+         interface. A configured next hop MAC Address on an
+         interface will be used as the next hop MAC address
+         for any cross-connect that the interface is part of.
+"
+    ::= { mplsIfEntry 11 }
+
+mplsIfInterfaceMacAddress OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The unicast MAC address used for receiving MPLS packets
+         on the interface. If no interface MAC address is
+         defined, the predefined MAC address for the physical
+         port will be used.
+"
+    ::= { mplsIfEntry 12 }
+
+mplsIfVlan OBJECT-TYPE
+    SYNTAX      Unsigned32(0..4094)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The backbone VLAN id used when transmitting and
+        receiving MPLS packets on the interface.
+"
+     DEFVAL { 0 }
+   ::= { mplsIfEntry 13 }
+
+mplsIfRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Manages creation and deletion of conceptual rows.
+        See also SNMPv2-TC.
+
+        Note: The newly created object will not necessarily
+        receive the same index as used in the create
+        procedure.
+"
+    ::= { mplsIfEntry 14 }
+
+mplsIfIfNo      OBJECT-TYPE
+    SYNTAX      PortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The physical interface number of the multi-connector port.
+
+"
+    DEFVAL { 1 }
+    ::= { mplsIfEntry 15 }
+
+mplsIfResourceType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    port  (1),
+                    lag   (2) }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The type of resource the Mpls If is created on.
+"
+    DEFVAL { port }
+    ::= { mplsIfEntry 16 }
+
+mplsIfLagId OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The identifier of the LAG for Mpls If.
+
+        An empty string means no Mpls interface on LAG.
+"
+    DEFVAL { "" }
+    ::= { mplsIfEntry 17 }
+
+
+-- ----------------------------------------------------
+-- XC table
+-- ----------------------------------------------------
+
+mplsXCTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MplsXCEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table specifies information for associating in and
+        out segments together in order to form a cross-connect."
+    ::= { mplsXCList 1 }
+
+mplsXCEntry OBJECT-TYPE
+    SYNTAX      MplsXCEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the MPLS cross-connect list.
+
+        There are two special cases for LERs:
+
+        1. LSPs originated at this LSR:
+           These are represented by using the value zero for
+           inSegmentIfIndex.
+
+        2. LSPs terminating at this LSR:
+           These are represented by using the value zero for
+           outSegmentIfIndex.
+"
+    INDEX { mplsXCIndex }
+    ::= { mplsXCTable 1 }
+
+MplsXCEntry ::=
+    SEQUENCE {
+        mplsXCIndex                       Unsigned32,
+        mplsXCName                        MgmtNameString,
+        mplsXCInternalReference           Unsigned32,
+        mplsXCIdentifier                  DisplayString,
+        mplsXCInSegmentIfIndex            Unsigned32,
+        mplsXCInSegmentIfName             DisplayString,
+        mplsXCInSegmentLabel              MplsLabel,
+        mplsXCOutSegmentIfIndex           Unsigned32,
+        mplsXCOutSegmentIfName            DisplayString,
+        mplsXCOutSegmentLabel             MplsLabel,
+        mplsXCRowStatus                   RowStatus
+ }
+
+mplsXCIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { mplsXCEntry 1 }
+
+mplsXCName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the entry, for example
+        'xc:1:2:myIdentifier', where the first number indicates
+        subrack, the second slot number. 'myIdentifier' is the
+        unique identifier specified by mplsXCIdentifier.
+"
+    ::= { mplsXCEntry 2 }
+
+mplsXCInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+"
+    DEFVAL { 0 }
+    ::= { mplsXCEntry 3 }
+
+mplsXCIdentifier OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A unique identifier for the cross-connect object.
+"
+    DEFVAL { "" }
+    ::= { mplsXCEntry 4 }
+
+mplsXCInSegmentIfIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Index of the incoming MPLS interface.
+        The value zero indicates a special case (LER) outlined
+        in the table description.
+"
+    ::= { mplsXCEntry 5 }
+
+mplsXCInSegmentIfName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Name of the incoming segment.
+"
+    ::= { mplsXCEntry 6 }
+
+mplsXCInSegmentLabel OBJECT-TYPE
+    SYNTAX      MplsLabel
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The MPLS label for the incoming traffic.
+        Actual label range is 16-1048575, 0-15 is reserved.
+"
+    ::= { mplsXCEntry 7 }
+
+mplsXCOutSegmentIfIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Index of the outgoing MPLS interface.
+        The value zero indicates a special case (LER) outlined
+        in the table description.
+"
+    ::= { mplsXCEntry 8 }
+
+mplsXCOutSegmentIfName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Name of the outgoing segment.
+"
+    ::= { mplsXCEntry 9 }
+
+mplsXCOutSegmentLabel OBJECT-TYPE
+    SYNTAX      MplsLabel
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The MPLS label for the outgoing traffic.
+        Actual label range is 16-1048575, 0-15 is reserved.
+"
+    ::= { mplsXCEntry 10 }
+
+mplsXCRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Manages creation and deletion of conceptual rows.
+        See also SNMPv2-TC.
+
+        Note: The newly created object will not necessarily
+        receive the same index as used in the create
+        procedure.
+"
+    ::= { mplsXCEntry 11 }
+
+-- ----------------------------------------------------
+-- Tunnel table
+-- ----------------------------------------------------
+
+mplsTunnelTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MplsTunnelEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The MPLS tunnel list."
+    ::= { mplsTunnelList 1 }
+
+mplsTunnelEntry OBJECT-TYPE
+    SYNTAX      MplsTunnelEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the MPLS tunnel list.
+"
+    INDEX { mplsTunnelIndex }
+    ::= { mplsTunnelTable 1 }
+
+MplsTunnelEntry ::=
+    SEQUENCE {
+        mplsTunnelIndex                       Unsigned32,
+        mplsTunnelInternalReference           Unsigned32,
+        mplsTunnelIdentifier                  DisplayString,
+        mplsTunnelName                        MgmtNameString,
+        mplsTunnelActiveLSP                   DisplayString,
+        mplsTunnelActiveLspIndex              Unsigned32,
+        mplsTunnelState                       INTEGER,
+        mplsTunnelSrcNodeId                   Unsigned32,
+        mplsTunnelSrcTunnelId                 MplsIdentifier,
+        mplsTunnelDestNodeId                  Unsigned32,
+        mplsTunnelDestTunnelId                MplsIdentifier,
+        mplsTunnelExtId                       DisplayString,
+        mplsTunnelAssociateLSP                CommandString,
+        mplsTunnelRowStatus                   RowStatus,
+        mplsTunnelLinearProtection            DisplayString,
+        mplsTunnelProtectionState             INTEGER,
+        mplsTunnelAssociateLinearProt         CommandString,
+        mplsTunnelGlobalId                    Unsigned32,
+        mplsTunnelDestGlobalId                Unsigned32,
+        mplsTunnelWorkingLSP                  DisplayString,
+        mplsTunnelProtectionLSP               DisplayString,
+        mplsTunnelReservedBW                  Unsigned32,
+        mplsTunnelBookedBW                    Counter64,
+        mplsTunnelDescr                       DisplayString}
+
+mplsTunnelIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { mplsTunnelEntry 1 }
+
+mplsTunnelInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+"
+    DEFVAL { 0 }
+    ::= { mplsTunnelEntry 2 }
+
+mplsTunnelIdentifier OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Unique identifier used for referencing this object.
+"
+    DEFVAL { "" }
+    ::= { mplsTunnelEntry 3 }
+
+mplsTunnelName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the entry, for example
+        'tunnel:1:2:id', where the first number indicates
+        subrack, the second slot number and the id
+        is the unique tunnel identifier.
+"
+    ::= { mplsTunnelEntry 4 }
+
+mplsTunnelActiveLSP OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "ID of the associated LSP that is active, if exists.
+"
+    DEFVAL { "" }
+    ::= { mplsTunnelEntry 5 }
+
+mplsTunnelActiveLspIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The index of the associated LSP that is active,
+        if exists.
+"
+    ::= { mplsTunnelEntry 6 }
+
+mplsTunnelState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    down    (1),
+                    up      (2),
+                    unknown (3)}
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the state of the tunnel.
+        down (1)
+              -- The tunnel is de-actived or unavailable to carry any traffic.
+        up (2)
+              -- The tunnel is active and ready to carry traffic.
+        unknown (3)
+              -- The tunnel status can not be verified.
+"
+    ::= { mplsTunnelEntry 7 }
+
+mplsTunnelSrcNodeId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The ID of the source node, i.e. the node where this
+        tunnel originates. Used for externally uniquely
+        identifying the tunnel in the standardized format,
+        '[Src Global ID]:[Src Node ID]:[Src Tunnel ID]-
+        [Dest. Global ID]:[Dest. Node ID]:[Dest. Tunnel ID]'.
+
+        A zero value indicates that the node ID is not set.
+
+        This value can be set in the MPLS node settings. A change
+        in the MPLS node attribute will change this value for the
+        whole traffic unit.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsTunnelEntry 8 }
+
+mplsTunnelSrcTunnelId OBJECT-TYPE
+    SYNTAX      MplsIdentifier
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The source node MPLS-TP tunnel ID of this tunnel.
+        Used for externally uniquely identifying the tunnel
+        in the standardized format,
+        '[Src Global ID]:[Src Node ID]:[Src Tunnel ID]-
+        [Dest. Global ID]:[Dest. Node ID]:[Dest. Tunnel ID]'.
+
+        A zero value indicates that the tunnel ID is not set.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsTunnelEntry 9 }
+
+mplsTunnelDestNodeId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The ID of the destination node, i.e. the node
+        where this tunnel terminates. Used for externally uniquely
+        identifying the tunnel in the standardized format,
+        '[Src Global ID]:[Src Node ID]:[Src Tunnel ID]-
+        [Dest. Global ID]:[Dest. Node ID]:[Dest. Tunnel ID]'.
+        A zero value indicates that the node ID is not set.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsTunnelEntry 10 }
+
+mplsTunnelDestTunnelId OBJECT-TYPE
+    SYNTAX      MplsIdentifier
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The destination node MPLS-TP tunnel ID of the tunnel.
+        Used for externally uniquely identifying the tunnel
+        in the standardized format,
+        '[Src global ID]:[Src node ID]:[Src tunnel ID]-
+        [Dest. global ID]:[Dest. node ID]:[Dest. tunnel ID]'.
+        A zero value indicates that the tunnel ID is not set.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsTunnelEntry 11 }
+
+mplsTunnelExtId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The global ID of the tunnel, used for externally
+        uniquely identifying the tunnel in the standardized format,
+        '[Src global ID]:[Src node ID]:[Src tunnel ID]-
+        [Dest. global ID]:[Dest. node ID]:[Dest. tunnel ID]'.
+        An empty string indicates that the external tunnel ID is not set.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    ::= { mplsTunnelEntry 12 }
+
+mplsTunnelAssociateLSP OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for mapping a new LSP to the tunnel.
+         The first LSP associated to the tunnel will be the
+         primary path and the additional LSPs will be the
+         protection path.
+
+         Identifier -- the tunnel which the LSP is associated to.
+
+         LSP ID -- which LSP to associated with the tunnel.
+
+"
+    ::= { mplsTunnelEntry 13 }
+
+mplsTunnelRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Manages creation and deletion of conceptual rows.
+        See also SNMPv2-TC.
+
+        Note: The newly created object will not necessarily
+        receive the same index as used in the create
+        procedure.
+"
+    ::= { mplsTunnelEntry 14 }
+
+mplsTunnelLinearProtection OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The linear protection profile applied to the tunnel.
+        Protection state coordination (PSC) protocol is used
+        for linear protection.
+"
+    DEFVAL { "none" }
+    ::= { mplsTunnelEntry 15 }
+
+mplsTunnelProtectionState OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    fullyworking (1),
+                    degraded (2),
+                    failed (3),
+                    unknown (4)}
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Status of the linear protection that applied to the tunnel
+        fullyworking (1) -- both protection and working path are fully active
+        degraded (2)     -- service degraded on the protection domain
+        failed (3)       -- failure condition reported on both protection
+                            and working path
+        unknown (4)      -- no board present
+"
+    ::= { mplsTunnelEntry 16 }
+
+mplsTunnelAssociateLinearProt OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for create and associate a PSC
+        (Protection State Coordination) protocol for linear protection of the tunnel.
+        Only supported 1:1 protection architecture: a protection transport path is
+        dedicated to the working transport path of a single service and the traffic
+        is only transmitted either on the working or the protection path, by
+        using a selector at the source of the protection domain.
+        The active LSP associated with the tunnel will be the working path.
+
+        Protection path  -- the Identifier of the protection LSP path
+
+        Mode             -- revertive/non-revertive mode of the protection domain
+
+        WTR timer        -- wait-to-restore timer, used to delay reversion to
+                            normal state when recovering from a failure condition
+                            on the working path and the protection domain is
+                            configured for revertive behavior
+
+        Continuous message interval
+                         -- interval of continuous control message
+
+        Rapid message interval
+                         -- interval of three rapid control messages
+
+        After associate the linear protection, the cross reference of the protection
+        LSP and the tunnel will be displayed in mplsTnlXLspTable.
+"
+    ::= { mplsTunnelEntry 17 }
+
+mplsTunnelGlobalId OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "This object allows the administrator to assign a unique
+          operator identifier also called MPLS-TP Global
+          Identifier.
+          The Global Identifier can contain the 2-octet or
+          4-octet value of the operators Autonomous System
+          Number (ASN).
+
+          The value zero indicates that the value is not initialized
+          but will work inside a single carrier network.
+
+          This value can be set in the MPLS node settings. A change
+          in the MPLS node attribute will change this value for the
+          whole traffic unit.
+
+"
+     REFERENCE
+         "MPLS-TP Identifiers"
+     DEFVAL { 0 }
+    ::= { mplsTunnelEntry 18 }
+
+mplsTunnelDestGlobalId OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+         "This object allows the administrator to assign a unique
+          operator identifier also called MPLS-TP Global
+          Identifier.
+          The Global Identifier can contain the 2-octet or
+          4-octet value of the operators Autonomous System
+          Number (ASN).
+
+          The value zero indicates that the value is not initialized
+          but will work inside a single carrier network.
+
+"
+     REFERENCE
+         "MPLS-TP Identifiers"
+     DEFVAL { 0 }
+    ::= { mplsTunnelEntry 19 }
+
+mplsTunnelWorkingLSP OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Identifier of the working path of the linear protection.
+"
+    ::= { mplsTunnelEntry 20 }
+
+mplsTunnelProtectionLSP OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Identifier of the protection path of the linear protection.
+"
+    ::= { mplsTunnelEntry 21 }
+
+
+mplsTunnelReservedBW  OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+         "Bandwidth reserved by the tunnel.
+          Default value is 0 and indicates that no bandwidth
+          has been allocated by the tunnel.
+"
+     DEFVAL { 0 }
+    ::= { mplsTunnelEntry 22 }
+
+mplsTunnelBookedBW  OBJECT-TYPE
+     SYNTAX      Counter64
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+         "The total amount of bandwidth booked by pseudowires in the tunnel.
+"
+    ::= { mplsTunnelEntry 23 }
+
+mplsTunnelDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "User configurable label.
+"
+    DEFVAL { "" }
+    ::= { mplsTunnelEntry 24 }
+
+
+-- ----------------------------------------------------
+-- Node table
+-- ----------------------------------------------------
+mplsNodeTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MplsNodeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The MPLS node list. Each individual board that
+         supports MPLS node is considered a MPLS node."
+    ::= { mplsNodeList 1 }
+
+mplsNodeEntry OBJECT-TYPE
+    SYNTAX      MplsNodeEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the MPLS node list.
+"
+    INDEX { mplsNodeIndex }
+    ::= { mplsNodeTable 1 }
+
+MplsNodeEntry ::=
+    SEQUENCE {
+        mplsNodeIndex                 Unsigned32,
+        mplsNodeName                  MgmtNameString,
+        mplsNodeSubrack               Unsigned32,
+        mplsNodeSlot                  Unsigned32,
+        mplsNodeIccIdStr              OCTET STRING,
+        mplsNodeIdNum                 Unsigned32,
+        mplsNodeCreateXC              CommandString,
+        mplsNodeCreateTunnel          CommandString,
+        mplsNodeCreateLsp             CommandString,
+        mplsNodeCreatePw              CommandString,
+        mplsNodeCreateIf              CommandString,
+        mplsNodeLinearProtMode        INTEGER,
+        mplsNodeLinearProtWtrTimer    Unsigned32,
+        mplsNodeLPContMsgInterval     Unsigned32,
+        mplsNodeLPRapidMsgInterval    Unsigned32,
+        mplsNodeGlobalId              Unsigned32,
+        mplsNodeCreateMsPw            CommandString,
+        mplsNodeCreateLsp2            CommandString,
+        mplsNodeCreateTunnelAdvanced  CommandString,
+        mplsNodeCreateLspAdvanced     CommandString,
+        mplsNodeCreatePwGeneric       CommandString,
+        mplsNodeCreatePwMpls          CommandString,
+        mplsNodeCreatePwEnet          CommandString,
+        mplsNodeCreateBfdTemplate     CommandString,
+        mplsNodeCreateXCAdvanced      CommandString }
+
+mplsNodeIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { mplsNodeEntry 1 }
+
+mplsNodeName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the interface, for example
+        'node:1:2', where the first number indicates
+        subrack, the second slot number.
+"
+    ::= { mplsNodeEntry 2 }
+
+mplsNodeSubrack OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The subrack that this MPLS node belongs to.
+"
+    ::= { mplsNodeEntry 3 }
+
+mplsNodeSlot OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The slot that this MPLS node belongs to.
+"
+    ::= { mplsNodeEntry 4 }
+
+mplsNodeIccIdStr OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(1..6))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Unique code assigned to the network operator or
+         service provider maintained by ITU-T.
+         The ITU carrier code used to form a globally unique
+         node ID for non IP environments.
+"
+    ::= { mplsNodeEntry 5 }
+
+mplsNodeIdNum OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+
+        "Unique node ID / router ID assigned with in the scope
+        of the network of the operator / service provider,
+        defined by the ICC ID. This value is unique and only
+        valid for this board.
+        Accepted values are 0.0.0.0 - 255.255.255.255.
+
+        If this value is changed all MPLS-TP MP IDs on this
+        board will be updated. All BFD sessions on the board will
+        need to be in administrative down.
+
+"
+    ::= { mplsNodeEntry 6 }
+
+mplsNodeCreateXC OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a XC entry.
+        In-segment name   - Name of the incoming segment.
+        In-segment label  - The MPLS label for the incoming
+                            traffic.
+        Out-segment name  - Name of the outgoing segment.
+        Out-segment label - The MPLS label for the outgoing
+                            traffic.
+        By not selecting an out interface or an in interface
+        a cross-connect for a LER, Label Edge Router, is
+        created.
+"
+    ::= { mplsNodeEntry 7 }
+
+mplsNodeCreateTunnel OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "
+        Identifier     - Unique tunnel ID used when referencing
+                         the tunnel within the node.
+        MPLS-TP ID     - Set the standard MPLS-TP ID for the
+                         tunnel on the format:
+                         '<Source Global ID>::<Source Node ID>::<Source Tunnel ID>
+                         ::<Destination Global ID>
+                         ::<Destination Node ID>
+                         ::<Destination Tunnel ID>'.
+                         This is to simplify unique
+                         identification of the tunnel in the
+                         entire network. Local node and tunnel
+                         ID will be used as source IDs, while
+                         peer node and tunnel ID will be used
+                         as destination IDs.
+
+        Associate LSP  - Associate any existing LSP not already
+                         allocated to a tunnel.
+
+        Create new LSP - Create a new LSP allocated with the
+                         tunnel.
+        LSP identifier - Unique LSP ID used when referencing the
+                         LSP within the node.
+        Interface      - Id of the MPLS interface the LSP is
+                         bound to.
+        Outgoing label - MPLS label appended to outgoing MPLS
+                         packets for this LSP.
+        Incoming label - MPLS label used to identify incoming
+                         MPLS packets on the interface above as
+                         part of this LSP.
+"
+    ::= { mplsNodeEntry 8 }
+
+mplsNodeCreateLsp OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a bidirectional LSP entry.
+
+        Identifier    - Unique LSP ID used when referencing
+                        the LSP within the node.
+        Role          - Defines whether the LSP is terminated/initiated
+                        in the node (edge) or not (transit).
+        Interface     - ID of the MPLS interface the LSP is bound to.
+        Outlabel      - MPLS label appended to outgoing MPLS packets
+                        for this LSP.
+        Inlabel       - MPLS label used to identify incoming MPLS
+                        packets on the interface above as part of
+                        this LSP.
+        Interface 2   - Id of the MPLS interface the LSP bound to in
+                        the reverse direction. Only valid for transit
+                        LSPs.
+        Outlabel 2    - MPLS label appended to outgoing MPLS packets
+                        on Interface 2. Only valid for transit LSPs.
+        Inlabel 2     - MPLS label used identify incoming MPLS packets
+                        on Interface 2 as part of this LSP. Only valid
+                        for transit LSPs.
+        Tunnel        - The internal ID of the tunnel an edge LSP
+                        shall be part of. Only valid for edge LSP
+                        objects.
+        MPLS-TP ID    - For transit LSPs, it is possible to set the
+                        standard MPLS-TP ID on the format:
+                        '<Source Global ID>::<Source Node ID>::<Source Tunnel ID>::<LSP ID>
+                        ::<Destination Global ID>
+                        ::<Destination Node ID>
+                        ::<Destination Tunnel ID>::<LSP ID>'.
+                        This is to simplify identification of the LSP
+                        on all nodes in the network. LSPs
+                        initiated/terminated on this node (edge) will
+                        inherit MPLS-TP ID data from its associated
+                        tunnel.
+"
+    ::= { mplsNodeEntry 9 }
+
+
+mplsNodeCreatePw OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "
+         Pseudowire ID     - Unique pseudowire ID used when referencing
+                             the pseudowire within the node.
+         Pseudowire type   - Edge pseudowire connects to a singel tunnel while
+                             a multi-segment pseudowire connects two tunnels.
+         Outlabel          - Pseudowire label appended to outgoing packets
+                             for this pseudowire.
+         Inlabel           - Pseudowire label used to identify incoming MPLS
+                             packets as part of this pseudowire.
+         Traffic class     - The traffic class of the pseudowire
+         TTL               - Time to live indicates the time that a packet still
+                             has before its life ends and is dropped. The packets
+                             TTL is decremented by 1 at each hop. If the TTL
+                             reaches 0, the packet is dropped.
+         Tunnel            - ID of the MPLS tunnel the pseudowire is bound to.
+         Flow label        - Flow label (acccording to RFC 6391). Set to
+                             enabled or disabled.
+         port              - Pseudowire classification on port means that all
+                             traffic on this port is mapped into the pseudowire.
+         VLAN              - All traffic on the selected port with the specified
+                             VLAN tag is mapped into the pseudowire
+         Classification    - All traffic identified by this policy classification
+                             is mapped into the pseudowire.
+         PW operation mode - Service delimiting operations is performed on the
+                             packages in the pseudowire by selecting Raw or Tagged
+                             mode.
+"
+    ::= { mplsNodeEntry 10 }
+
+mplsNodeCreateIf OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating an interface.
+         Identifier   - Unique MPLS interface ID used when referencing
+                        the interface within the node.
+         Admin Status - Defines whether the interface shall be active
+                        or not.
+         Port         - Physical port that the interface is connected to.
+         VLAN ID      - VLAN ID prepended on all MPLS packets sent on
+                        this interface.
+         Next hop MAC - Destination MAC address prepended to all MPLS
+                        packets sent on this interface.
+         Interface    - Source MAC address prepended to all MPLS packets
+                        sent on this interface.
+"
+    ::= { mplsNodeEntry 11 }
+
+mplsNodeLinearProtMode OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    nonRevertive (1),
+                    revertive (2)}
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The mode of the protection domain, configured for all MPLS linear
+        protection service on the board.
+        nonRevertive (1)  -- non-revertive mode
+        revertive (2)     -- revertive mode
+"
+    DEFVAL { revertive }
+    ::= { mplsNodeEntry 12 }
+
+mplsNodeLinearProtWtrTimer OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..720)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The wait-to-restore (WTR) timer configured for all MPLS linear
+        protection service on the board.
+        A WTR timer is used to delay reversion to Normal state
+        when recovering from a failure condition on the working path
+        and the protection domain is configured for revertive behavior.
+        Unit: second.
+"
+    DEFVAL { 300 }
+    ::= { mplsNodeEntry 13 }
+
+mplsNodeLPContMsgInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..30)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "In linear protection domain, the control message is transmitted over
+        the protection path only.
+        Subsequent messages are continuously transmitted to verify that the
+        session is alive. If no valid control message is received, that last
+        valid received message is applicable.
+        The continuous message interval is configured for all linear
+        protection service on the board.
+        Unit: second.
+"
+    DEFVAL { 5 }
+    ::= { mplsNodeEntry 14 }
+
+mplsNodeLPRapidMsgInterval OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..1000)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "In linear protection domain, when the state of the protection domain
+        is changed, three control messages shall be transmitted as quickly as
+        possible to allow for rapid protection switching.
+        After the transmission of the three rapid messages, the most
+        recently transmitted control message will be retransmitted on the
+        continual basis.
+        The rapid message interval is configured for all linear
+        protection service on the board.
+        Unit: millisecond.
+"
+    DEFVAL { 3 }
+    ::= { mplsNodeEntry 15 }
+
+mplsNodeGlobalId OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+         "This object allows the administrator to assign a unique
+          operator identifier also called MPLS-TP Global
+          Identifier.
+          The Global Identifier can contain the 2-octet or
+          4-octet value of the operators Autonomous System
+          Number (ASN).
+
+          The value zero indicates that the value is not initialized
+          but will work inside a single carrier network.
+
+          When changing this value all global IDs on the board will be changed.
+          Destination Global IDs will also be set unless already set to a value.
+
+"
+     REFERENCE
+         "MPLS-TP Identifiers"
+     DEFVAL { 0 }
+    ::= { mplsNodeEntry 16 }
+
+mplsNodeCreateMsPw OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a multi-segment pseudowire.
+         Identifier     - Unique pseudowire ID used when referencing
+                          the pseudowire within the node.
+         East outlabel  - Pseudowire label appended to outgoing packets
+                          for this pseudowire in east direction.
+         East Inlabel   - Pseudowire label used to identify incoming MPLS
+                          packets as part of this pseudowire in east direction.
+         East Tunnel    - ID of the MPLS tunnel the pseudowire is bound to in east direction.
+         West outlabel  - Pseudowire label appended to outgoing packets
+                          for this pseudowire in west direction.
+         West Inlabel   - Pseudowire label used to identify incoming MPLS
+                          packets as part of this pseudowire in west direction.
+         West Tunnel    - ID of the MPLS tunnel the pseudowire is bound to in west direction.
+"
+    ::= { mplsNodeEntry 17 }
+
+mplsNodeCreateLsp2 OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a bidirectional LSP entry.
+
+        Identifier    - Unique LSP ID used when referencing
+                        the LSP within the node.
+        Role          - Defines whether the LSP is terminated/initiated
+                        in the node (edge) or not (transit).
+        Interface     - ID of the MPLS interface the LSP is bound to.
+        Outlabel      - MPLS label appended to outgoing MPLS packets
+                        for this LSP.
+        Inlabel       - MPLS label used to identify incoming MPLS
+                        packets on the interface above as part of
+                        this LSP.
+        Interface 2   - Id of the MPLS interface the LSP bound to in
+                        the reverse direction. Only valid for transit
+                        LSPs.
+        Outlabel 2    - MPLS label appended to outgoing MPLS packets
+                        on Interface 2. Only valid for transit LSPs.
+        Inlabel 2     - MPLS label used identify incoming MPLS packets
+                        on Interface 2 as part of this LSP. Only valid
+                        for transit LSPs.
+        Tunnel        - The internal ID of the tunnel an edge LSP
+                        shall be part of. Only valid for edge LSP
+                        objects.
+        MPLS-TP ID    - For transit LSPs, it is possible to set the
+                        standard MPLS-TP ID on the format:
+                        '<Source Global ID>::<Source Node ID>::<Source Tunnel ID>::<LSP ID>
+                        ::<Destination Global ID>
+                        ::<Destination Node ID>
+                        ::<Destination Tunnel ID>::<LSP ID>'.
+                        This is to simplify identification of the LSP
+                        on all nodes in the network. LSPs
+                        initiated/terminated on this node (edge) will
+                        inherit MPLS-TP ID data from its associated
+                        tunnel.
+"
+    ::= { mplsNodeEntry 18 }
+
+mplsNodeCreateTunnelAdvanced OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "
+        Identifier     - Unique tunnel ID used when referencing
+                         the tunnel within the node.
+        MPLS-TP ID     - Set the standard MPLS-TP ID for the
+                         tunnel on the format:
+                         '<Source Global ID>::<Source Node ID>::<Source Tunnel ID>
+                         ::<Destination Global ID>
+                         ::<Destination Node ID>
+                         ::<Destination Tunnel ID>'.
+                         This is to simplify unique
+                         identification of the tunnel in the
+                         entire network. Local node and tunnel
+                         ID will be used as source IDs, while
+                         peer node and tunnel ID will be used
+                         as destination IDs.
+
+        Associate LSP  - Associate any existing LSP not already
+                         allocated to a tunnel.
+
+        Create new LSP - Create a new LSP allocated with the
+                         tunnel.
+        LSP identifier - Unique LSP ID used when referencing the
+                         LSP within the node.
+        Interface      - Id of the MPLS interface the LSP is
+                         bound to.
+        Outgoing label - MPLS label appended to outgoing MPLS
+                         packets for this LSP.
+        Incoming label - MPLS label used to identify incoming
+                         MPLS packets on the interface above as
+                         part of this LSP.
+"
+    ::= { mplsNodeEntry 19 }
+
+
+mplsNodeCreateLspAdvanced OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a bidirectional LSP entry.
+
+        Identifier    - Unique LSP ID used when referencing
+                        the LSP within the node.
+        Role          - Defines whether the LSP is terminated/initiated
+                        in the node (edge) or not (transit).
+        Interface     - ID of the MPLS interface the LSP is bound to.
+        Outlabel      - MPLS label appended to outgoing MPLS packets
+                        for this LSP.
+        Inlabel       - MPLS label used to identify incoming MPLS
+                        packets on the interface above as part of
+                        this LSP.
+        Interface 2   - Id of the MPLS interface the LSP bound to in
+                        the reverse direction. Only valid for transit
+                        LSPs.
+        Outlabel 2    - MPLS label appended to outgoing MPLS packets
+                        on Interface 2. Only valid for transit LSPs.
+        Inlabel 2     - MPLS label used identify incoming MPLS packets
+                        on Interface 2 as part of this LSP. Only valid
+                        for transit LSPs.
+        Tunnel        - The internal ID of the tunnel an edge LSP
+                        shall be part of. Only valid for edge LSP
+                        objects.
+        MPLS-TP ID    - For transit LSPs, it is possible to set the
+                        standard MPLS-TP ID on the format:
+                        '<Source Global ID>::<Source Node ID>::<Source Tunnel ID>::<LSP ID>
+                        ::<Destination Global ID>
+                        ::<Destination Node ID>
+                        ::<Destination Tunnel ID>::<LSP ID>'.
+                        This is to simplify identification of the LSP
+                        on all nodes in the network. LSPs
+                        initiated/terminated on this node (edge) will
+                        inherit MPLS-TP ID data from its associated
+                        tunnel.
+"
+    ::= { mplsNodeEntry 20 }
+
+
+
+mplsNodeCreatePwGeneric OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a bidirectional LSP entry.
+
+        Identifier    - Unique LSP ID used when referencing
+                        the LSP within the node.
+"
+    ::= { mplsNodeEntry 21 }
+
+
+mplsNodeCreatePwMpls OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a bidirectional LSP entry.
+
+        Identifier    - Unique LSP ID used when referencing
+                        the LSP within the node.
+"
+    ::= { mplsNodeEntry 22 }
+
+
+mplsNodeCreatePwEnet OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a bidirectional LSP entry.
+
+        Identifier    - Unique LSP ID used when referencing
+                        the LSP within the node.
+"
+    ::= { mplsNodeEntry 23 }
+
+mplsNodeCreateBfdTemplate OBJECT-TYPE
+    SYNTAX     CommandString
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "Internal command for creating a new BFD template.
+
+         Identifier - The unique identifier for the template.
+
+         Tx Interval - Minimum interval for sending BFD control packets.
+                       Configurable in intervals of 100 ms.
+
+         Rx Interval - Minimum interval for receiving BFD control packets.
+                       Configurable in intervals of 100 ms.
+"
+    ::= { mplsNodeEntry 24 }
+
+mplsNodeCreateXCAdvanced OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command for creating a XC entry.
+        In-segment name   - Name of the incoming segment.
+        In-segment label  - The MPLS label for the incoming
+                            traffic.
+        Out-segment name  - Name of the outgoing segment.
+        Out-segment label - The MPLS label for the outgoing
+                            traffic.
+        By not selecting an out interface or an in interface
+        a cross-connect for a LER, Label Edge Router, is
+        created.
+"
+    ::= { mplsNodeEntry 25 }
+
+-- ----------------------------------------------------
+-- The MPLS tunnel LSP cross connect table
+-- ----------------------------------------------------
+mplsTnlXLspTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MplsTnlXLspEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The MPLS tunnel to LSP cross reference group list."
+    ::= { mplsTnlXLspList 1 }
+
+mplsTnlXLspEntry OBJECT-TYPE
+    SYNTAX      MplsTnlXLspEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the MPLS tunnel LSP cross reference list.
+"
+    INDEX { mplsTnlXLspIndex }
+    ::= { mplsTnlXLspTable 1 }
+
+MplsTnlXLspEntry ::=
+    SEQUENCE {
+        mplsTnlXLspIndex              Unsigned32,
+        mplsTnlXLspName               MgmtNameString,
+        mplsTnlXLspInternalReference  Unsigned32,
+        mplsTnlXLspTunnelId           DisplayString,
+        mplsTnlXLspLspId              DisplayString,
+        mplsTnlXLspRowStatus          RowStatus}
+
+
+mplsTnlXLspIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+
+"
+    ::= { mplsTnlXLspEntry 1 }
+
+mplsTnlXLspName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the interface, for example
+        'tnlXLsp:1:2', where the first number indicates
+        subrack, the second slot number.
+
+"
+    ::= { mplsTnlXLspEntry 2 }
+
+mplsTnlXLspInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+"
+    DEFVAL { 0 }
+    ::= { mplsTnlXLspEntry 3 }
+
+mplsTnlXLspTunnelId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Tunnel ID of this cross reference entry.
+"
+    DEFVAL { "" }
+    ::= { mplsTnlXLspEntry 4 }
+
+mplsTnlXLspLspId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "LSP ID of this cross reference entry.
+"
+    DEFVAL { "" }
+    ::= { mplsTnlXLspEntry 5 }
+
+mplsTnlXLspRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Manages creation and deletion of conceptual rows.
+        See also SNMPv2-TC.
+
+        Note: The newly created object will not necessarily
+        receive the same index as used in the create
+        procedure.
+"
+    ::= { mplsTnlXLspEntry 6 }
+
+
+-- ----------------------------------------------------
+-- Lsp table
+-- ----------------------------------------------------
+
+mplsLspTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF MplsLspEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The MPLS Label Switched Path group list.
+         Each entry in the table represent a bidirectional LSP."
+    ::= { mplsLspList 1 }
+
+mplsLspEntry OBJECT-TYPE
+    SYNTAX      MplsLspEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the MPLS LSP list.
+"
+    INDEX { mplsLspIndex }
+    ::= { mplsLspTable 1 }
+
+MplsLspEntry ::=
+    SEQUENCE {
+        mplsLspIndex                       Unsigned32,
+        mplsLspName                        MgmtNameString,
+        mplsLspInternalReference           Unsigned32,
+        mplsLspIdentifier                  DisplayString,
+        mplsLspState                       INTEGER,
+        mplsLspRole                        INTEGER,
+        mplsLspForwardXCId                 DisplayString,
+        mplsLspReverseXCId                 DisplayString,
+        mplsLspPriority                    INTEGER,
+        mplsLspSrcNodeId                   Unsigned32,
+        mplsLspDestNodeId                  Unsigned32,
+        mplsLspSrcTunnelId                 Unsigned32,
+        mplsLspDestTunnelId                Unsigned32,
+        mplsLspLspId                       Unsigned32,
+        mplsLspExtId                       DisplayString,
+        mplsLspIntTunnelId                 DisplayString,
+        mplsLspRowStatus                   RowStatus,
+        mplsLspBFDSession                  DisplayString,
+        mplsLspCreateBFD                   CommandString,
+        mplsLspTrafficClass                Unsigned32,
+        mplsLspGlobalId                    Unsigned32,
+        mplsLspDestGlobalId                Unsigned32,
+        mplsLspReservedBW                  Unsigned32,
+        mplsLspDescr                       DisplayString,
+        mplsLspCreateBFDAdvanced           CommandString }
+
+mplsLspIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each entry.
+"
+    ::= { mplsLspEntry 1 }
+
+mplsLspName OBJECT-TYPE
+    SYNTAX      MgmtNameString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The management name of the entry, for example
+        'lsp:1:2:identifier', where the first number indicates
+        subrack, the second slot number and the third
+        is the unique identifier.
+"
+    ::= { mplsLspEntry 2 }
+
+mplsLspInternalReference OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..2147483647)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "For internal use only.
+"
+    DEFVAL { 0 }
+    ::= { mplsLspEntry 3 }
+
+mplsLspIdentifier OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A unique identifier for the LSP object.
+"
+    DEFVAL { "" }
+    ::= { mplsLspEntry 4 }
+
+mplsLspState OBJECT-TYPE
+    SYNTAX  INTEGER {
+              up (1),
+              down (2),
+              unknown (3) }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The indicated state of the LSP.
+
+         up - The LSP is active and the connection has been
+              verified.
+         down - The LSP is not active, or the connection has
+              not been verified.
+         unknown - The LSP connectivity can not be verified.
+"
+    DEFVAL { 3 }
+    ::= { mplsLspEntry 5 }
+
+mplsLspRole OBJECT-TYPE
+    SYNTAX  INTEGER {
+              edge (1),
+              transit (2) }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The entry signifies the role the LSP entry represents.
+
+        edge - The LSP is originated and terminated in the node,
+               which is considered a Label edge router, LER.
+        transit - The LSP is not originated in the node, which
+               is considered a Label switch router, LSR.
+"
+    DEFVAL { 1 }
+    ::= { mplsLspEntry 6 }
+
+mplsLspForwardXCId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The identifier for the outgoing XC entry in a LER.
+         For a LSR transit LSP, the terms forward and reverse
+         have no significance, and the forward XC indicates
+         one direction of the bidirectional LSP.
+"
+    DEFVAL { "" }
+    ::= { mplsLspEntry 7 }
+
+mplsLspReverseXCId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The identifier for the incoming XC entry in a LER.
+         For a LSR transit LSP, the terms forward and reverse
+         have no significance, and the reverse XC indicates
+         one direction of the bidirectional LSP.
+"
+    DEFVAL { "" }
+    ::= { mplsLspEntry 8 }
+
+mplsLspPriority OBJECT-TYPE
+    SYNTAX  Integer32 (1..2)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The entry signifies the priority of the LSP within the tunnel.
+
+         1 - Highest priority, working LSP in a revertive
+             protected tunnel with multiple LSPs.
+
+         2 - Second highest priority, protecting LSP in a
+             revertive protected tunnel with multiple LSPs.
+
+         The first LSP created in a tunnel will receive the
+         highest priority and be regarded a the working LSP.
+"
+    DEFVAL { 1 }
+    ::= { mplsLspEntry 9 }
+
+mplsLspSrcNodeId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "
+        The ID of the source node of the LSP, i.e. the node
+        where this LSP originates. Used for externally uniquely
+        identifying the LSP in the standardized format,
+
+        '[Src node ID]:[SrcTunnelId]-[Dest. Node ID]:[DestTunnelId][LSPNum]'.
+
+        A zero value indicates that the node ID is not set.
+
+        This value can be changed in the MPLS node page.
+
+        This value can be set in the MPLS node settings page.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsLspEntry 10 }
+
+mplsLspDestNodeId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "
+        The ID of the destination node of the LSP, i.e. the node
+        where this LSP terminates. Used for externally uniquely
+        identifying the LSP in the standardized format.
+
+        '[Src global ID]:[Src node ID]:[Src Tunnel ID]:[Src LSP ID]-
+         [Dest global ID]:[Dest. Node ID]:[Dest Tunnel ID]:[Dest LSP ID]'.
+
+        A zero value indicates that the node ID is not set.
+
+        This value can be set in the MPLS node settings page.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsLspEntry 11 }
+
+mplsLspSrcTunnelId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "
+        The source node MPLS-TP tunnel ID of the tunnel
+        that this LSP is a part of. Used for externally uniquely
+        identifying the LSP in the standardized format.
+
+        '[Src Global ID]:[Src Node ID]:[Src Tunnel ID]:[Src LSP ID]-
+         [Dest Global ID]:[Dest. Node ID]:[Dest Tunnel ID]:[Dest LSP ID]'.
+
+        A zero value indicates that the tunnel ID is not set.
+
+        This value can be changed in the associated tunnel page.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsLspEntry 12 }
+
+mplsLspDestTunnelId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "
+        The destination node MPLS-TP tunnel ID of the tunnel
+        that this LSP is a part of. Used for externally uniquely
+        identifying the LSP in the standardized format,
+
+        '[Src Global ID]:[Src Node ID]:[Src Tunnel ID]:[Src LSP ID]-
+         [Dest Global ID]:[Dest. Node ID]:[Dest Tunnel ID]:[Dest LSP ID]'.
+
+        A zero value indicates that the tunnel ID is not set.
+
+        This value can be changed in the associated tunnel page.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsLspEntry 13 }
+
+mplsLspLspId OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65535)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION "
+        The ID of the LSP, used for externally uniquely
+        identifying the LSP in the standardized format,
+
+        '[Src Global ID]:[Src Node ID]:[Src Tunnel ID]:[Src LSP ID]-
+         [Dest Global ID]:[Dest. Node ID]:[Dest Tunnel ID]:[Dest LSP ID]'.
+
+        This value is automatically updated when the LSP is associated
+        with a tunnel. A working LSP will get the ID value = 1 and protecting
+        LSP will get the ID value = 2.
+
+        A zero value indicates that the LSP ID is not set.
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { 0 }
+    ::= { mplsLspEntry 14 }
+
+mplsLspExtId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION "
+        The ID string of the LSP, used for externally uniquely
+        identifying the LSP in the standardized format,
+
+        '[Src Global ID]:[Src Node ID]:[Src Tunnel ID]:[Src LSP ID]-
+         [Dest Global ID]:[Dest. Node ID]:[Dest Tunnel ID]:[Dest LSP ID]'.
+
+        An empty string indicates that the LSP ID is not set.
+
+"
+    REFERENCE
+       "MPLS-TP Identifiers [TPIDS]"
+    DEFVAL { "" }
+    ::= { mplsLspEntry 15 }
+
+mplsLspIntTunnelId OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "
+        The Internal ID of the MPLS-TP tunnel that the LSP is a
+        part of. This entry is used for internal cross-reference
+        between tunnels and LSPs.
+"
+    DEFVAL { "" }
+    ::= { mplsLspEntry 16 }
+
+mplsLspRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "Manages creation and deletion of conceptual rows.
+        See also SNMPv2-TC.
+
+        Note: The newly created object will not necessarily
+        receive the same index as used in the create
+        procedure.
+"
+    ::= { mplsLspEntry 17 }
+mplsLspBFDSession OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION "
+        The Internal ID of the BFD session the LSP that is monitoring
+        the LSP data connections. This entry is used for internal cross-reference
+        between BFD sessions and LSPs.
+"
+    DEFVAL { "" }
+    ::= { mplsLspEntry 18 }
+
+mplsLspCreateBFD OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command to create a BFD session object and
+        connect it to an LSP.
+
+        BFD Template - Select preferred BFD template to
+                       setup timing of BFD session.
+        Admin status - Set the initial state of the BFD
+                       session administrative status on
+                       creation.
+
+"
+    ::= { mplsLspEntry 19 }
+
+mplsLspTrafficClass OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      deprecated
+    DESCRIPTION "
+        The entry signifies the Traffic Class.
+"
+    DEFVAL { 4 }
+    ::= { mplsLspEntry 20 }
+
+
+
+mplsLspGlobalId OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+         "This object allows the administrator to assign a unique
+          operator identifier also called MPLS-TP Global
+          Identifier.
+          The Global Identifier can contain the 2-octet or
+          4-octet value of the operators Autonomous System
+          Number (ASN).
+
+          The value zero indicates that the value is not initialized
+          but will work inside a single carrier network.
+
+          The value zero indicates that the value is not initialized
+          but will work inside a single carrier network.
+
+          This value can be set in the MPLS node settings page.
+"
+     REFERENCE
+         "MPLS-TP Identifiers"
+     DEFVAL { 0 }
+    ::= { mplsLspEntry 21 }
+
+mplsLspDestGlobalId OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-create
+     STATUS      current
+     DESCRIPTION
+         "This object allows the administrator to assign a unique
+          operator identifier also called MPLS-TP Global
+          Identifier.
+          The Global Identifier can contain the 2-octet or
+          4-octet value of the operators Autonomous System
+          Number (ASN).
+
+          The value zero indicates that the value is not initialized
+          but will work inside a single carrier network.
+
+          This value can be set in the MPLS tunnel settings page.
+"
+     REFERENCE
+         "MPLS-TP Identifiers"
+     DEFVAL { 0 }
+    ::= { mplsLspEntry 22 }
+
+mplsLspReservedBW  OBJECT-TYPE
+     SYNTAX      Unsigned32 (0..4294967295)
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+         "Bandwidth reserved by the LSP.
+          Default value is 0 and inidcates that no bandwidth
+          has been allocated by the LSP.
+"
+     DEFVAL { 0 }
+    ::= { mplsLspEntry 23 }
+
+mplsLspDescr OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "User configurable label.
+
+"
+    DEFVAL { "" }
+    ::= { mplsLspEntry 24 }
+
+mplsLspCreateBFDAdvanced OBJECT-TYPE
+    SYNTAX      CommandString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Internal command to create a BFD session object and
+        connect it to an LSP.
+
+        BFD Template - Select preferred BFD template to
+                       setup timing of BFD session.
+        Admin status - Set the initial state of the BFD
+                       session administrative status on
+                       creation.
+
+"
+    ::= { mplsLspEntry 25 }
+
+-- ----------------------------------------------------
+-- Notifications
+-- ----------------------------------------------------
+
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+mplsGeneralGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsGeneralLastChangeTime,
+        mplsGeneralStateLastChangeTime,
+        mplsGeneralMplsIfTableSize,
+        mplsGeneralMplsXCTableSize,
+        mplsGeneralMplsTunnelTableSize,
+        mplsGeneralMplsLspTableSize,
+        mplsGeneralMplsTnlXLspTableSize}
+    STATUS      current
+    DESCRIPTION
+        "The general objects."
+    ::= { lumMplsGroups 1 }
+
+mplsIfGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsIfIndex,
+        mplsIfName,
+        mplsIfSubrack,
+        mplsIfSlot,
+        mplsIfTxPort,
+        mplsIfPortIndex,
+        mplsIfPortName,
+        mplsIfInternalReference,
+        mplsIfAdminStatus,
+        mplsIfIdentifier,
+        mplsIfNextHopMacAddress,
+        mplsIfInterfaceMacAddress,
+        mplsIfVlan,
+        mplsIfRowStatus}
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS if objects (R18.0)."
+    ::= { lumMplsGroups 2 }
+
+mplsXCGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsXCIndex,
+        mplsXCName,
+        mplsXCInternalReference,
+        mplsXCIdentifier,
+        mplsXCInSegmentIfIndex,
+        mplsXCInSegmentIfName,
+        mplsXCInSegmentLabel,
+        mplsXCOutSegmentIfIndex,
+        mplsXCOutSegmentIfName,
+        mplsXCOutSegmentLabel,
+        mplsXCRowStatus }
+    STATUS      current
+    DESCRIPTION
+        "The MPLS cross-connect objects (R18.0)."
+    ::= { lumMplsGroups 3 }
+
+mplsTunnelGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsTunnelIndex,
+        mplsTunnelInternalReference,
+        mplsTunnelIdentifier,
+        mplsTunnelName,
+        mplsTunnelActiveLSP,
+        mplsTunnelActiveLspIndex,
+        mplsTunnelSrcNodeId,
+        mplsTunnelSrcTunnelId,
+        mplsTunnelDestNodeId,
+        mplsTunnelDestTunnelId,
+        mplsTunnelExtId,
+        mplsTunnelAssociateLSP,
+        mplsTunnelRowStatus
+}
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS tunnel objects (R18.0)."
+    ::= { lumMplsGroups 4 }
+
+mplsNodeGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsNodeIndex,
+        mplsNodeName,
+        mplsNodeSubrack,
+        mplsNodeSlot,
+        mplsNodeIccIdStr,
+        mplsNodeIdNum,
+        mplsNodeCreateXC,
+        mplsNodeCreateTunnel,
+        mplsNodeCreateLsp,
+        mplsNodeCreatePw,
+        mplsNodeCreateIf}
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS node objects (R18.0)."
+    ::= { lumMplsGroups 5 }
+
+mplsLspGroupV1 OBJECT-GROUP
+    OBJECTS {
+        mplsLspIndex,
+        mplsLspName,
+        mplsLspInternalReference,
+        mplsLspIdentifier,
+        mplsLspState,
+        mplsLspRole,
+        mplsLspForwardXCId,
+        mplsLspReverseXCId,
+        mplsLspPriority,
+        mplsLspSrcNodeId,
+        mplsLspDestNodeId,
+        mplsLspSrcTunnelId,
+        mplsLspDestTunnelId,
+        mplsLspLspId,
+        mplsLspExtId,
+        mplsLspIntTunnelId,
+        mplsLspRowStatus}
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS LSP objects (R18.0)."
+    ::= { lumMplsGroups 6 }
+
+mplsTnlXLspV1 OBJECT-GROUP
+    OBJECTS {
+        mplsTnlXLspIndex,
+        mplsTnlXLspName,
+        mplsTnlXLspInternalReference,
+        mplsTnlXLspTunnelId,
+        mplsTnlXLspLspId,
+        mplsTnlXLspRowStatus}
+    STATUS      current
+    DESCRIPTION
+        "The MPLS tunnel LSP cross reference table (R18.0)."
+    ::= { lumMplsGroups 7 }
+
+mplsTunnelGroupV2 OBJECT-GROUP
+    OBJECTS {
+        mplsTunnelIndex,
+        mplsTunnelInternalReference,
+        mplsTunnelIdentifier,
+        mplsTunnelName,
+        mplsTunnelActiveLSP,
+        mplsTunnelActiveLspIndex,
+        mplsTunnelSrcNodeId,
+        mplsTunnelSrcTunnelId,
+        mplsTunnelDestNodeId,
+        mplsTunnelDestTunnelId,
+        mplsTunnelExtId,
+        mplsTunnelAssociateLSP,
+        mplsTunnelRowStatus,
+        mplsTunnelLinearProtection,
+        mplsTunnelProtectionState,
+        mplsTunnelAssociateLinearProt,
+        mplsTunnelGlobalId,
+        mplsTunnelDestGlobalId,
+        mplsTunnelWorkingLSP,
+        mplsTunnelProtectionLSP }
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS tunnel objects (R19.0)."
+    ::= { lumMplsGroups 8 }
+
+mplsNodeGroupV2 OBJECT-GROUP
+    OBJECTS {
+        mplsNodeIndex,
+        mplsNodeName,
+        mplsNodeSubrack,
+        mplsNodeSlot,
+        mplsNodeIccIdStr,
+        mplsNodeIdNum,
+        mplsNodeCreateXC,
+        mplsNodeCreateTunnel,
+        mplsNodeCreateLsp,
+        mplsNodeCreatePw,
+        mplsNodeCreateIf,
+        mplsNodeLinearProtMode,
+        mplsNodeLinearProtWtrTimer,
+        mplsNodeLPContMsgInterval,
+        mplsNodeLPRapidMsgInterval }
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS node objects (R19.0)."
+    ::= { lumMplsGroups 9 }
+
+mplsLspGroupV2 OBJECT-GROUP
+    OBJECTS {
+        mplsLspIndex,
+        mplsLspName,
+        mplsLspInternalReference,
+        mplsLspIdentifier,
+        mplsLspState,
+        mplsLspRole,
+        mplsLspForwardXCId,
+        mplsLspReverseXCId,
+        mplsLspPriority,
+        mplsLspSrcNodeId,
+        mplsLspDestNodeId,
+        mplsLspSrcTunnelId,
+        mplsLspDestTunnelId,
+        mplsLspLspId,
+        mplsLspExtId,
+        mplsLspIntTunnelId,
+        mplsLspRowStatus,
+        mplsLspBFDSession,
+        mplsLspCreateBFD,
+        mplsLspTrafficClass,
+        mplsLspGlobalId,
+        mplsLspDestGlobalId}
+
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS LSP objects (R19.0)."
+    ::= { lumMplsGroups 10 }
+
+mplsNodeGroupV3 OBJECT-GROUP
+    OBJECTS {
+        mplsNodeIndex,
+        mplsNodeName,
+        mplsNodeSubrack,
+        mplsNodeSlot,
+        mplsNodeIccIdStr,
+        mplsNodeIdNum,
+        mplsNodeCreateXC,
+        mplsNodeCreateTunnel,
+        mplsNodeCreateLsp,
+        mplsNodeCreatePw,
+        mplsNodeCreateIf,
+        mplsNodeLinearProtMode,
+        mplsNodeLinearProtWtrTimer,
+        mplsNodeLPContMsgInterval,
+        mplsNodeLPRapidMsgInterval,
+        mplsNodeCreateMsPw }
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS node objects (R20.0)."
+    ::= { lumMplsGroups 11 }
+
+mplsTunnelGroupV3 OBJECT-GROUP
+    OBJECTS {
+        mplsTunnelIndex,
+        mplsTunnelInternalReference,
+        mplsTunnelIdentifier,
+        mplsTunnelName,
+        mplsTunnelActiveLSP,
+        mplsTunnelActiveLspIndex,
+        mplsTunnelSrcNodeId,
+        mplsTunnelSrcTunnelId,
+        mplsTunnelDestNodeId,
+        mplsTunnelDestTunnelId,
+        mplsTunnelExtId,
+        mplsTunnelAssociateLSP,
+        mplsTunnelRowStatus,
+        mplsTunnelLinearProtection,
+        mplsTunnelProtectionState,
+        mplsTunnelAssociateLinearProt,
+        mplsTunnelGlobalId,
+        mplsTunnelDestGlobalId,
+        mplsTunnelWorkingLSP,
+        mplsTunnelProtectionLSP,
+        mplsTunnelReservedBW,
+        mplsTunnelBookedBW}
+
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS tunnel objects (R20.0)."
+    ::= { lumMplsGroups 12 }
+
+mplsLspGroupV3 OBJECT-GROUP
+    OBJECTS {
+        mplsLspIndex,
+        mplsLspName,
+        mplsLspInternalReference,
+        mplsLspIdentifier,
+        mplsLspState,
+        mplsLspRole,
+        mplsLspForwardXCId,
+        mplsLspReverseXCId,
+        mplsLspPriority,
+        mplsLspSrcNodeId,
+        mplsLspDestNodeId,
+        mplsLspSrcTunnelId,
+        mplsLspDestTunnelId,
+        mplsLspLspId,
+        mplsLspExtId,
+        mplsLspIntTunnelId,
+        mplsLspRowStatus,
+        mplsLspBFDSession,
+        mplsLspCreateBFD,
+        mplsLspTrafficClass,
+        mplsLspGlobalId,
+        mplsLspDestGlobalId,
+        mplsLspReservedBW}
+
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS LSP objects (R20.0)."
+    ::= { lumMplsGroups 13 }
+
+mplsNodeGroupV4 OBJECT-GROUP
+    OBJECTS {
+        mplsNodeIndex,
+        mplsNodeName,
+        mplsNodeSubrack,
+        mplsNodeSlot,
+        mplsNodeIccIdStr,
+        mplsNodeIdNum,
+        mplsNodeCreateXC,
+        mplsNodeCreateTunnel,
+        mplsNodeCreateLsp,
+        mplsNodeCreatePw,
+        mplsNodeCreateIf,
+        mplsNodeLinearProtMode,
+        mplsNodeLinearProtWtrTimer,
+        mplsNodeLPContMsgInterval,
+        mplsNodeLPRapidMsgInterval,
+        mplsNodeCreateMsPw,
+        mplsNodeCreateLsp2 }
+    STATUS     deprecated
+    DESCRIPTION
+        "The MPLS node objects (R23.0)."
+    ::= { lumMplsGroups 14 }
+
+
+mplsLspGroupV4 OBJECT-GROUP
+    OBJECTS {
+        mplsLspIndex,
+        mplsLspName,
+        mplsLspInternalReference,
+        mplsLspIdentifier,
+        mplsLspState,
+        mplsLspRole,
+        mplsLspForwardXCId,
+        mplsLspReverseXCId,
+        mplsLspPriority,
+        mplsLspSrcNodeId,
+        mplsLspDestNodeId,
+        mplsLspSrcTunnelId,
+        mplsLspDestTunnelId,
+        mplsLspLspId,
+        mplsLspExtId,
+        mplsLspIntTunnelId,
+        mplsLspRowStatus,
+        mplsLspBFDSession,
+        mplsLspCreateBFD,
+        mplsLspTrafficClass,
+        mplsLspGlobalId,
+        mplsLspDestGlobalId,
+        mplsLspReservedBW,
+        mplsLspDescr}
+
+    STATUS      deprecated
+    DESCRIPTION
+        "The MPLS LSP objects (R24.0)."
+    ::= { lumMplsGroups 15 }
+
+mplsTunnelGroupV4 OBJECT-GROUP
+    OBJECTS {
+        mplsTunnelIndex,
+        mplsTunnelInternalReference,
+        mplsTunnelIdentifier,
+        mplsTunnelName,
+        mplsTunnelActiveLSP,
+        mplsTunnelActiveLspIndex,
+        mplsTunnelSrcNodeId,
+        mplsTunnelSrcTunnelId,
+        mplsTunnelDestNodeId,
+        mplsTunnelDestTunnelId,
+        mplsTunnelExtId,
+        mplsTunnelAssociateLSP,
+        mplsTunnelRowStatus,
+        mplsTunnelLinearProtection,
+        mplsTunnelProtectionState,
+        mplsTunnelAssociateLinearProt,
+        mplsTunnelGlobalId,
+        mplsTunnelDestGlobalId,
+        mplsTunnelWorkingLSP,
+        mplsTunnelProtectionLSP,
+        mplsTunnelReservedBW,
+        mplsTunnelBookedBW,
+        mplsTunnelDescr}
+
+    STATUS      current
+    DESCRIPTION
+        "The MPLS tunnel objects (R24.0)."
+    ::= { lumMplsGroups 16 }
+
+mplsIfGroupV2 OBJECT-GROUP
+    OBJECTS {
+        mplsIfIndex,
+        mplsIfName,
+        mplsIfSubrack,
+        mplsIfSlot,
+        mplsIfTxPort,
+        mplsIfPortIndex,
+        mplsIfPortName,
+        mplsIfInternalReference,
+        mplsIfAdminStatus,
+        mplsIfIdentifier,
+        mplsIfNextHopMacAddress,
+        mplsIfInterfaceMacAddress,
+        mplsIfVlan,
+        mplsIfRowStatus,
+        mplsIfIfNo,
+        mplsIfResourceType,
+        mplsIfLagId}
+    STATUS      current
+    DESCRIPTION
+        "The MPLS if objects (R28.0)."
+    ::= { lumMplsGroups 17 }
+
+mplsNodeGroupV5 OBJECT-GROUP
+    OBJECTS {
+        mplsNodeIndex,
+        mplsNodeName,
+        mplsNodeSubrack,
+        mplsNodeSlot,
+        mplsNodeIccIdStr,
+        mplsNodeIdNum,
+        mplsNodeCreateXC,
+        mplsNodeCreateTunnel,
+        mplsNodeCreateLsp,
+        mplsNodeCreatePw,
+        mplsNodeCreateIf,
+        mplsNodeLinearProtMode,
+        mplsNodeLinearProtWtrTimer,
+        mplsNodeLPContMsgInterval,
+        mplsNodeLPRapidMsgInterval,
+        mplsNodeCreateMsPw,
+        mplsNodeCreateLsp2,
+        mplsNodeCreateTunnelAdvanced,
+        mplsNodeCreateLspAdvanced,
+        mplsNodeCreatePwGeneric,
+        mplsNodeCreatePwMpls,
+        mplsNodeCreatePwEnet,
+        mplsNodeCreateBfdTemplate,
+        mplsNodeCreateXCAdvanced}
+    STATUS      current
+    DESCRIPTION
+        "The MPLS node objects (R30.1)."
+    ::= { lumMplsGroups 18 }
+
+mplsLspGroupV5 OBJECT-GROUP
+    OBJECTS {
+        mplsLspIndex,
+        mplsLspName,
+        mplsLspInternalReference,
+        mplsLspIdentifier,
+        mplsLspState,
+        mplsLspRole,
+        mplsLspForwardXCId,
+        mplsLspReverseXCId,
+        mplsLspPriority,
+        mplsLspSrcNodeId,
+        mplsLspDestNodeId,
+        mplsLspSrcTunnelId,
+        mplsLspDestTunnelId,
+        mplsLspLspId,
+        mplsLspExtId,
+        mplsLspIntTunnelId,
+        mplsLspRowStatus,
+        mplsLspBFDSession,
+        mplsLspCreateBFD,
+        mplsLspTrafficClass,
+        mplsLspGlobalId,
+        mplsLspDestGlobalId,
+        mplsLspReservedBW,
+        mplsLspDescr,
+        mplsLspCreateBFDAdvanced}
+
+    STATUS      current
+    DESCRIPTION
+        "The MPLS LSP objects (R30.1)."
+    ::= { lumMplsGroups 19 }
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+lumMplsBasicComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R18.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV1,
+            mplsXCGroupV1,
+            mplsTunnelGroupV2,
+            mplsNodeGroupV1,
+            mplsLspGroupV1,
+            mplsTnlXLspV1 }
+    ::= { lumMplsCompl 1 }
+
+lumMplsBasicComplV2 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R19.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV1,
+            mplsXCGroupV1,
+            mplsTunnelGroupV2,
+            mplsNodeGroupV2,
+            mplsLspGroupV2,
+            mplsTnlXLspV1}
+    ::= { lumMplsCompl 2 }
+
+lumMplsBasicComplV3 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R20.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV1,
+            mplsXCGroupV1,
+            mplsTunnelGroupV3,
+            mplsNodeGroupV3,
+            mplsLspGroupV3,
+            mplsTnlXLspV1}
+    ::= { lumMplsCompl 3 }
+
+lumMplsBasicComplV4 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R21.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV1,
+            mplsXCGroupV1,
+            mplsTunnelGroupV3,
+            mplsNodeGroupV3,
+            mplsLspGroupV3,
+            mplsTnlXLspV1}
+    ::= { lumMplsCompl 4 }
+
+lumMplsBasicComplV5 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R21.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV1,
+            mplsXCGroupV1,
+            mplsTunnelGroupV3,
+            mplsNodeGroupV4,
+            mplsLspGroupV3,
+            mplsTnlXLspV1}
+    ::= { lumMplsCompl 5 }
+
+lumMplsBasicComplV6 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R24.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV1,
+            mplsXCGroupV1,
+            mplsTunnelGroupV4,
+            mplsNodeGroupV4,
+            mplsLspGroupV4,
+            mplsTnlXLspV1}
+    ::= { lumMplsCompl 6 }
+
+lumMplsBasicComplV7 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R28.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV2,
+            mplsXCGroupV1,
+            mplsTunnelGroupV4,
+            mplsNodeGroupV4,
+            mplsLspGroupV4,
+            mplsTnlXLspV1}
+    ::= { lumMplsCompl 7 }
+
+lumMplsBasicComplV8 MODULE-COMPLIANCE
+    STATUS     current
+    DESCRIPTION
+        "Basic implementation requirements for the MPLS MIB. (R30.1)"
+    MODULE
+        MANDATORY-GROUPS {
+            mplsGeneralGroupV1,
+            mplsIfGroupV2,
+            mplsXCGroupV1,
+            mplsTunnelGroupV4,
+            mplsNodeGroupV5,
+            mplsLspGroupV5,
+            mplsTnlXLspV1}
+    ::= { lumMplsCompl 8 }
+
+END
+
+

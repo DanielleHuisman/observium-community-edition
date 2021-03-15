@@ -191,9 +191,10 @@ function mysql_deluser($username)
 {
   $user_id = mysql_auth_user_id($username);
 
-  dbDelete('entity_permissions', "`user_id` =  ?", array($user_id));
-  dbDelete('users_prefs',        "`user_id` =  ?", array($user_id));
-  dbDelete('users_ckeys',       "`username` =  ?", array($username));
+  dbDelete('entity_permissions', "`user_id` = ? AND `auth_mechanism` = ?", [ $user_id, $GLOBALS['config']['auth_mechanism'] ]);
+  dbDelete('roles_users',        "`user_id` = ? AND `auth_mechanism` = ?", [ $user_id, $GLOBALS['config']['auth_mechanism'] ]);
+  dbDelete('users_prefs',        "`user_id` = ?", array($user_id));
+  dbDelete('users_ckeys',       "`username` = ?", array($username));
 
   return dbDelete('users', "`username` =  ?", array($username)); // FIXME should return BOOL
 }

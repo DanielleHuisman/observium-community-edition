@@ -15,5 +15,5 @@ ALTER TABLE `ports` ADD `ifInDiscards_rate` INT(11) UNSIGNED NULL DEFAULT NULL;
 ALTER TABLE `ports` ADD `ifOutDiscards` BIGINT(20) UNSIGNED NULL DEFAULT NULL;
 ALTER TABLE `ports` ADD `ifOutDiscards_rate` INT(11) UNSIGNED NULL DEFAULT NULL;
 ALTER TABLE `ports` CHANGE `ifOperStatus` `ifOperStatus` ENUM( 'testing', 'notPresent', 'dormant', 'down', 'lowerLayerDown', 'unknown', 'up', 'monitoring' ) CHARACTER SET utf8 COLLATE utf8_unicode_ci NULL DEFAULT NULL ;
---NOTE update syslog, may be long operation ~15-30min
+-- NOTE update syslog, may be long operation ~15-30min
 ALTER TABLE `syslog` CHANGE `tag` `tag` VARCHAR(32) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL;

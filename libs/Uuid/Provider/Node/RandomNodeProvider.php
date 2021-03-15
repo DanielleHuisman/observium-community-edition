@@ -14,6 +14,7 @@
 
 namespace Ramsey\Uuid\Provider\Node;
 
+use Exception;
 use Ramsey\Uuid\Provider\NodeProviderInterface;
 
 /**
@@ -28,9 +29,29 @@ class RandomNodeProvider implements NodeProviderInterface
      * Returns the system node ID
      *
      * @return string System node ID as a hexadecimal string
+     * @throws Exception if it was not possible to gather sufficient entropy
      */
     public function getNode()
     {
-        return sprintf('%06x%06x', mt_rand(0, 0xffffff), mt_rand(0, 0xffffff));
+        $nodeBytes = random_bytes(6);
+
+        // Split the node bytes for math on 32-bit systems.
+        $nodeMsb = substr($nodeBytes, 0, 3);
+        $nodeLsb = substr($nodeBytes, 3);
+
+        // Set the multicast bit; see RFC 4122, section 4.5.
+        $nodeMsb = hex2bin(
+            str_pad(
+                dechex(hexdec(bin2hex($nodeMsb)) | 0x010000),
+                6,
+                '0',
+                STR_PAD_LEFT
+            )
+        );
+
+        // Recombine the node bytes.
+        $node = $nodeMsb . $nodeLsb;
+
+        return str_pad(bin2hex($node), 12, '0', STR_PAD_LEFT);
     }
 }

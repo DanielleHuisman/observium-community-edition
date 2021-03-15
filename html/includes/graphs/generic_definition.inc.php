@@ -17,6 +17,7 @@ $graph_def = $config['graph_types'][$type][$subtype];
 // common.inc.php needs converted to use $graph_def so we can remove this.
 
 if (isset($graph_def['name']))      { $graph_title = $graph_def['name']; }
+if (isset($graph_def['step']))      { $step = $graph_def['step']; }
 if (isset($graph_def['unit_text'])) { $unit_text = $graph_def['unit_text']; }
 if (isset($graph_def['scale_min'])) { $scale_min = $graph_def['scale_min']; }
 if (isset($graph_def['scale_max'])) { $scale_max = $graph_def['scale_max']; }
@@ -119,6 +120,7 @@ foreach ($graph_def['ds'] as $ds_name => $ds)
   $ds_data = $ds_name;
 
   $ds['file'] = get_rrd_path($device, $ds['file']);
+  $ds['file_escape'] = rrdtool_escape($ds['file']);
 
   if (isset($ds['graph']) && !$ds['graph']) // Some time required skip graphs, only CDEF
   {
@@ -133,16 +135,16 @@ foreach ($graph_def['ds'] as $ds_name => $ds)
     continue;
   }
 
-  $cmd_def .= " DEF:".$ds_name."=".$ds['file'].":".$ds_name.":AVERAGE";
+  $cmd_def .= " DEF:".$ds_name."=".$ds['file_escape'].":".$ds_name.":AVERAGE";
   if ($ds['rra_min'])
   {
-    $cmd_def .= " DEF:".$ds_name."_min=".$ds['file'].":".$ds_name.":MIN";
+    $cmd_def .= " DEF:".$ds_name."_min=".$ds['file_escape'].":".$ds_name.":MIN";
   } else {
     $cmd_def .= " CDEF:".$ds_name."_min=".$ds_name;
   }
   if ($ds['rra_max'])
   {
-    $cmd_def .= " DEF:".$ds_name."_max=".$ds['file'].":".$ds_name.":MAX";
+    $cmd_def .= " DEF:".$ds_name."_max=".$ds['file_escape'].":".$ds_name.":MAX";
   } else {
     $cmd_def .= " CDEF:".$ds_name."_max=".$ds_name;
   }

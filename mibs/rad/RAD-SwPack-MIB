@@ -1,0 +1,608 @@
+RAD-SwPack-MIB DEFINITIONS ::= BEGIN
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       sysName     FROM  SNMPv2-MIB
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       NOTIFICATION-TYPE     FROM  SNMPv2-SMI
+       DateAndTime     FROM  SNMPv2-TC
+       agnFiles, alarmEventLogSourceName, alarmEventLogAlarmOrEventId, 
+       alarmEventLogDescription, alarmEventLogSeverity, alarmEventLogDateAndTime, 
+       alarmEventReason, systemsEvents, fileSystemPath, 
+       fileSystemObjType, fileSystemObjName, fileSystemValidIndication     FROM  RAD-GEN-MIB
+       FileType, SlotType     FROM  RAD-TC; 
+
+
+    swPack MODULE-IDENTITY
+        LAST-UPDATED "201603101810Z"  -- March 10, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "SW Pack MIB."
+    ::= { agnFiles 4 }
+
+
+
+--  RAD General SW Pack Handling Mechanism
+
+
+--**************
+-- SW Pack table
+--**************
+
+swPackTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SwPackEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object defines the SW Packages that the device
+            contains."
+    ::= { swPack 1 }
+
+swPackEntry OBJECT-TYPE
+    SYNTAX      SwPackEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object defines an entry of the swPackTable.
+            The table uses the fileSystemEntry indices. The swPackEntry
+            may exist only if the fileSystemEntry defining the file that
+            contains the SW Pack exists.
+
+            The SW Pack creation and deletion rules are:
+
+            swPackEntry should be created only if SW Pack copy operation
+            succeeded, i.e. fileSystemEntry.fileSystemValidIndication
+            doesn't contain error indication bits.
+
+            swPackEntry deletion includes two steps:
+            1. The fileSystemEntry with the swPackEntry indices should
+                be deleted first.
+            2. Afterwards the swPackEntry and its swPackFileEntry
+                entities should be deleted."
+
+    INDEX { fileSystemPath, fileSystemObjType, fileSystemObjName}
+    ::= { swPackTable 1 }
+
+SwPackEntry ::= SEQUENCE {
+    swPackVersion           SnmpAdminString,
+    swPackActivityState     INTEGER,
+    swPackCreateTime        DateAndTime,
+    swPackNumberOfFiles     Unsigned32 
+ }
+
+swPackVersion   OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object defines the SW Package version.
+            The Package version format is X.YZQR.
+            'X' is the release Major version number.
+            'Y' is the release Minor version number.
+            'Z' is the release build revision, when
+            0 indicates new features and possible bug repairs,
+            >0 indicates only bug repairs.
+            'QR' depicts the release type according to product phase and
+                QA tests:
+            a - 'alpha-version',
+            b - 'beta-version',
+            d - 'development'
+            r - 'customer release candidate'."
+    ::= { swPackEntry 1 }
+
+swPackActivityState OBJECT-TYPE
+    SYNTAX    INTEGER {
+        active          (1),
+        ready           (2),
+        previousActive  (3)
+        }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+            "SW Pack activity states are:
+            active (1) - is set upon SW Pack installation starting
+                process.
+                Only one SW Pack may be 'active' at any given time.
+                When a SW Pack becomes 'active' agent sets 'readOnly'
+                bit of the fileSystemEntry.fileSystemValidIndication
+                object.
+                In addition the agent shall mark the previous active SW
+                Pack to 'previousActive' (see below description of
+                'previousActive (3)').
+            ready (2) - means that the SW Pack was loaded successfully
+                and it is ready to be installed. The 'readOnly' bit of
+                the fileSystemEntry.fileSystemValidIndication object
+                shall be reset.
+            previousActive (3)- This is a transitional status that
+                remains during the installation process. After the
+                completion of the installation the Agent changes it to
+                'ready'. In case of SW Pack installation interruption by
+                the 'undoInstall' command the agent shall change the
+                'previousActive' state to 'active'.
+                Note: Only one previousActive SW Pack may exist at any
+                given time."
+    ::= { swPackEntry 2 }
+
+swPackCreateTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object specifies the SW Pack Creation date and time.
+            Agent updates it according to the File header information."
+    ::= { swPackEntry 3 }
+
+swPackNumberOfFiles OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The object specifies number of files that SW Pack includes.
+            Agent updates it according to the File header information."
+    ::= { swPackEntry 4 }
+
+--*******************
+-- SW Pack File table
+--*******************
+
+swPackFileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SwPackFileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This object defines SW or firmware images that the SW
+            Package contains. These images are loaded to the device
+            cards during SW Pack installation."
+    ::= { swPack 2 }
+
+swPackFileEntry OBJECT-TYPE
+    SYNTAX      SwPackFileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This is an entry of the swPackFileTable.
+            The swPackFileEntry may exist only if the parent
+            fileSystemEntry and swPackEntry exist.
+            Number of the entries should be equal to the
+            swPackEntry.swPackNumberOfFiles"
+    INDEX { fileSystemPath, fileSystemObjType,fileSystemObjName,
+            swPackFileIdx }
+    ::= { swPackFileTable 1 }
+
+SwPackFileEntry ::= SEQUENCE {
+    swPackFileIdx               Unsigned32,
+    swPackFileType              SnmpAdminString,
+    swPackFileName              SnmpAdminString,
+    swPackFileVer               SnmpAdminString,
+    swPackFileHwVer             SnmpAdminString,
+    swPackFileSize              Unsigned32 
+ }
+
+swPackFileIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This index is a running index of the file within the
+            SW Pack."
+    ::= { swPackFileEntry 1 }
+
+swPackFileType OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object defines SW Pack File type. The File Type
+            denotes type of the HW module that uses this file.
+            Agent updates it according to the file header information."
+    ::= { swPackFileEntry 2 }
+
+swPackFileName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object defines SW Pack File name.
+            Agent updates it according to the file header information."
+    ::= { swPackFileEntry 3 }
+
+swPackFileVer OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object defines the File version.
+            The File version format is X.YZQR.
+            'X' is the release Major version number.
+            'Y' is the release Minor version number.
+            'Z' is the release build revision, when
+            0 indicates new features and possible bug repairs,
+            >0 indicates only bug repairs.
+            'QR' depicts the release type according to product phase and
+                QA tests:
+            a - 'alpha-version',
+            b - 'beta-version',
+            d - 'development'
+            r - 'customer release candidate'.
+            Agent updates it according to the file header information."
+    ::= { swPackFileEntry 4 }
+
+swPackFileHwVer OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The object denotes HW version of the module that uses this
+            file as it is known by the agent software.
+            The Package version format is X.Y.
+            'X' is the release Major version number.
+            'Y' is the release Minor version number.
+            Agent updates it according to the File header information."
+    ::= { swPackFileEntry 5 }
+
+swPackFileSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "This object specifies the total SW Pack size in bytes.
+            Agent updates it according to the File header information."
+    ::= { swPackFileEntry 6 }
+
+--*********************
+-- SW Pack Handle table
+--*********************
+
+swPackHandleTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SwPackHandleEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The table defines the SW Package Handling objects used to
+            execute user commands on SW Pack."
+    ::= { swPack 3 }
+
+swPackHandleEntry OBJECT-TYPE
+    SYNTAX      SwPackHandleEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This is an entry of the swPackHandleTable."
+    INDEX       { swPackHandleIdx }
+    ::= { swPackHandleTable 1 }
+
+SwPackHandleEntry ::= SEQUENCE {
+    swPackHandleIdx                 Unsigned32,
+    swPackHandlePath                SnmpAdminString,
+    swPackHandleType                FileType,
+    swPackHandleName                SnmpAdminString,
+    swPackHandleCmd                 INTEGER,
+    swPackHandleStatus              INTEGER,
+    swPackHandleSlotMap             OCTET STRING,
+    swPackHandleConfirmRequestCmd   INTEGER,
+    swPackHandleConfirmCmd          INTEGER,
+    swPackHandleConfirmTimer        Unsigned32,
+    swPackHandleConfirmRemainingTime Unsigned32 
+ }
+
+swPackHandleIdx OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This index is always equal to 1."
+    ::= { swPackHandleEntry 1 }
+
+swPackHandlePath OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This object represents the SW Package file path. It is
+            equal to the fileSystemEntry.fileSystemPath of the file."
+    ::= { swPackHandleEntry 2 }
+
+swPackHandleType OBJECT-TYPE
+    SYNTAX      FileType
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This object represents the SW Pack Type. It is always equal
+            to swPack (24)."
+    ::= { swPackHandleEntry 3 }
+
+swPackHandleName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This object represents the SW Package file name. It is
+            equal to the fileSystemEntry.fileSystemName of the file."
+    ::= { swPackHandleEntry 4 }
+
+swPackHandleCmd OBJECT-TYPE
+     SYNTAX      INTEGER {
+         none                      (1),
+         installIoManualReset      (2),
+         undoInstall               (3),
+         installAndReboot          (4),
+         installAndRebootNoRestore (5)
+         }
+     MAX-ACCESS  read-write
+     STATUS      current
+     DESCRIPTION
+             "Software installation commands:
+             none (1) - Default value, set at initialization and upon command completion.
+             installIoManualReset (2)- Installation for devices that support per slot instalation.
+             undoInstall (3) - Return to the previously installed software.
+             installAndReboot (4) - Install software and save restore point.
+             installAndRebootNoRestore (5) - Install software without saving restore point.
+             "
+     ::= { swPackHandleEntry 5 }
+
+swPackHandleStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+        idle                 (1),
+        endedOk              (2),
+        inProgress           (3),
+        slotFailure          (4),
+        mainCardResetFailure (5),
+        configMigrationError (6), -- VALUE IS DEPRECATED.
+        otherFailure         (7),
+        abortedByUser        (8),
+        swUnconfirmed        (9),
+        swUnconfirmedButUsed (10),
+        awaitingConfirmation (11),
+        awaitingIoCardReset  (12),
+        inProgressReset      (13),
+        swInstalledFromBoot  (14),
+        swHwConflict         (15)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "This object defines a list of the SW Pack states:
+           idle                  (1) - after reboot not following SW installation
+           endedOk               (2) - operation completed successfully.
+           inProgress            (3) - after starting SW installation.
+           slotFailure           (4) - slot SW installation failed.
+           mainCardResetFailure  (5) - reset of the secondary main card failed.
+           configMigrationError  (6) - deprecated
+           otherFailure          (7) - indicates all other errors.
+           abortedByUser         (8) - aborted by user.
+           swUnconfirmed         (9) - SW was not confirmed on time.
+           swUnconfirmedButUsed (10) - SW was not confirmed on time but used due to a lack of valid SW.
+           awaitingConfirmation (11) - waiting for confirmation.
+           awaitingIoCardReset  (12) - waiting for IO card reset.
+           inProgressReset      (13) - resetting to complete the SW installation.
+           swInstalledFromBoot  (14) - SW installed from boot application.
+           swHwConflict         (15) - SW conflicts with HW.
+      "
+   ::= { swPackHandleEntry 6 }
+
+swPackHandleSlotMap OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (4))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines map of the slots that will be
+            impacted by the command.
+            Each bit defines a slot. The command impacts all slots that
+            are signed by 1.
+            The bit position equals to the slot number as defined by
+            the SlotType textual convention.
+            BIT (0) is reserved for future implementations.
+            For command relates to entire device all bits should be
+            equal to 0.
+            By default all bits are equal to 0."
+    ::= { swPackHandleEntry 7 }
+
+swPackHandleConfirmRequestCmd    OBJECT-TYPE
+    SYNTAX    INTEGER
+    {
+        off  (2),
+        on   (3)
+    }
+    MAX-ACCESS   read-write
+    STATUS current
+    DESCRIPTION
+        "Confirmation request command for newly installed software.
+         off - no confirmation is requested by user.
+         On  - user asks that installed SW shall be confirmed.
+        "
+    DEFVAL { off }
+    ::= { swPackHandleEntry 8 }
+
+ swPackHandleConfirmCmd    OBJECT-TYPE
+      SYNTAX  INTEGER {
+        off      (2),   -- Off OK
+        pending  (3),
+        offError (5)    -- Off Error
+        }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+            "This variable is used for confirming the newly installed software.
+            It is applicable only when SwPackHandleConfirmRequestCmd is set to
+            on(3). If reboot is completed and the SW pack is properly
+            loaded the agent sets the value to pending(3) and starts a
+            timer for a period defined at SwPackHandleConfirmTimer.
+
+            Confirmation is gained when the manager sets the value to
+            off(2) within timeout. If after reboot the value of the
+            variable equals pending(3), namely, the device has rebooted
+            without confirmation, the installed SW pack is considered invalid.
+
+            If the manager fails to confirm the newly installed software, the agent
+            will set the value to offError(5). The manager can poll this
+            variable in order to determine if the command was executed
+            successfully (off(2)), or unsuccessfully (pending(3)) or (offError(5)).
+            If unsuccessful (offError(5)), the agent will install the SW according to
+            the Restore Point.
+
+            The values pending (3) and offError(5) may be set only by
+            the agent (not the user)."
+      DEFVAL { off }
+      ::= { swPackHandleEntry 9 }
+
+ swPackHandleConfirmTimer  OBJECT-TYPE
+      SYNTAX         Unsigned32 (300..86400)
+      MAX-ACCESS     read-write
+      STATUS         current
+      DESCRIPTION
+            "The time in seconds the device will await software confirmation after reboot before falling back
+             to its previous software."
+             DEFVAL {300}
+      ::= { swPackHandleEntry 10}
+
+swPackHandleConfirmRemainingTime  OBJECT-TYPE
+      SYNTAX         Unsigned32
+      MAX-ACCESS     read-only
+      STATUS         current
+      DESCRIPTION
+            "Remaining time in seconds before the device will fallback to its previous software."
+      ::= { swPackHandleEntry 11}
+
+
+--***************************
+-- SW Pack Installation table
+--***************************
+
+swPackInstallationTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SwPackInstallationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The table defines HW modules status relates to SW Pack
+            installation."
+    ::= { swPack 4 }
+
+swPackInstallationEntry OBJECT-TYPE
+    SYNTAX      SwPackInstallationEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This is an entry of the swPackInstallationTable."
+    INDEX { swPackInstallationSlotIdx }
+    ::= { swPackInstallationTable 1 }
+
+SwPackInstallationEntry ::= SEQUENCE {
+    swPackInstallationSlotIdx      SlotType,
+    swPackInstallationSlotStatus   INTEGER 
+ }
+
+swPackInstallationSlotIdx OBJECT-TYPE
+    SYNTAX      SlotType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This index defines the Slot number."
+    ::= { swPackInstallationEntry 1 }
+
+swPackInstallationSlotStatus OBJECT-TYPE
+    SYNTAX    INTEGER {
+        ready           (1),
+        empty           (2),
+        inProgress      (3),
+        manualResetWait (4),
+        failure         (5)
+        }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+            "Status of SW Pack installation per slot.
+            ready (1) - card is placed in slot and ready to SW Pack
+                installation.
+            empty (2) - the slot is empty.
+            inProgress (3) - the card reset was performed, the card SW
+                installation is in progress.
+            manualResetWait (4) - SW Pack installation was started,
+                operator didn't perform the card reset yet.
+            failure (5) - SW installation of the card failed"
+    ::= { swPackInstallationEntry 2 }
+
+--***************
+-- NOTIFICATIONS
+--***************
+
+systemSoftwareInstallStart  NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, swPackHandleCmd, swPackVersion } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that SW installation started.
+      "
+      ::= { systemsEvents 42 }
+
+systemSoftwareInstallEnd    NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, fileSystemValidIndication, swPackHandleStatus, 
+     swPackVersion } 
+      STATUS  current
+      DESCRIPTION
+      "This trap indicates that installation of SW version indicated by
+      entPhysicalSoftwareRev  was either
+      aborted by user, OR
+      ended successfully, OR
+      ended with errors, OR
+      failed"
+      ::= { systemsEvents 43 }
+
+
+systemSwPackCorrupted   NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, swPackHandleName } 
+      STATUS  current
+      DESCRIPTION
+      "This Trap is sent during SW installation, when the device detects that the SW pack is corrupted."
+      ::= { systemsEvents 61 }
+
+
+systemActiveSoftwareChanged               NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, swPackVersion } 
+      STATUS  current
+      DESCRIPTION
+      "Active software changed since last reboot."
+      ::= { systemsEvents 83}
+
+systemRunningConfigSaved                 NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName } 
+      STATUS  current
+      DESCRIPTION
+      "Running configuration saved to startup configuration."
+      ::= { systemsEvents 84}
+
+
+END
+

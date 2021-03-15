@@ -15,7 +15,7 @@ register_html_title('Ports');
 
 // Set Defaults here
 
-if (!isset($vars['format']) || !is_file($config['html_dir'].'/pages/ports/'.$vars['format'].'.inc.php'))
+if (!isset($vars['format']) || !is_alpha($vars['format']) || !is_file($config['html_dir'].'/pages/ports/'.$vars['format'].'.inc.php'))
 {
   $vars['format'] = 'list';
 }
@@ -119,20 +119,28 @@ $form['row'][0]['device_id'] = array(
                                 'width'       => '100%', //'180px',
                                 'values'      => $form_items['devices']);
 
-/*
-$form['row'][0]['ifDescr'] = array(
+foreach (get_locations() as $entry)
+{
+  if ($entry === '') { $entry = OBS_VAR_UNSET; }
+  $form_items['location'][$entry] = $entry;
+}
+
+$form['row'][0]['location'] = [
+  'type'        => 'multiselect',
+  'name'        => 'Device Location',
+  'width'       => '100%', //'180px',
+  //'encode'      => TRUE,
+  'value'       => $vars['location'],
+  'values'      => $form_items['location']
+];
+
+$form['row'][0]['mac']   = [
                                 'type'        => 'text',
-                                'name'        => 'Port Name',
-                                'value'       => $vars['ifDescr'],
+                                'name'        => 'Port Mac Address',
+                                'value'       => $vars['mac'],
                                 'width'       => '100%', //'180px',
-                                'placeholder' => TRUE);
-*/
-$form['row'][0]['label'] = array(
-                                'type'        => 'text',
-                                'name'        => 'Port Name',
-                                'value'       => $vars['label'],
-                                'width'       => '100%', //'180px',
-                                'placeholder' => TRUE);
+                                'placeholder' => TRUE
+];
 
 $form['row'][0]['state'] = array(
                                 'type'        => 'multiselect',
@@ -155,21 +163,20 @@ $form['row'][0]['group']    = array(
                                 'value'       => $vars['group'],
                                 'values'      => $form_items['group']);
 
-// Select sort pull-right
-$form['row'][0]['sort']     = array(
-                                'type'        => 'select',
-                                'icon'        => $config['icon']['sort'],
-                                'right'       => TRUE,
-                                'width'       => '100%', //'150px',
-                                'value'       => $vars['sort'],
-                                'values'      => $form_items['sort']);
-
 $form['row'][1]['hostname']  = array(
                                 'type'        => 'text',
-                                'name'        => 'Hostname',
+                                'name'        => 'Device Hostname',
                                 'value'       => $vars['hostname'],
                                 'width'       => '100%', //'180px',
                                 'placeholder' => TRUE);
+
+$form['row'][1]['label'] = [
+  'type'        => 'text',
+  'name'        => 'Port Name',
+  'value'       => $vars['label'],
+  'width'       => '100%', //'180px',
+  'placeholder' => TRUE
+];
 
 $form['row'][1]['ifAlias'] = array(
                                 'type'        => 'text',
@@ -192,26 +199,24 @@ $form['row'][1]['port_descr_type'] = array(
                                 'value'       => $vars['port_descr_type'],
                                 'values'      => $form_items['port_descr_type']);
 
-foreach (get_locations() as $entry)
-{
-  if ($entry === '') { $entry = OBS_VAR_UNSET; }
-  $form_items['location'][$entry] = $entry;
-}
+// Select sort pull-right
+$form['row'][1]['sort']     = [
+  'type'        => 'select',
+  'icon'        => $config['icon']['sort'],
+  'grid'        => 1,
+  //'right'       => TRUE,
+  'width'       => '100%', //'150px',
+  'value'       => $vars['sort'],
+  'values'      => $form_items['sort']
+];
 
-$form['row'][1]['location'] = array(
-                                'type'        => 'multiselect',
-                                'name'        => 'Select Locations',
-                                'width'       => '100%', //'180px',
-                                'encode'      => TRUE,
-                                'value'       => $vars['location'],
-                                'values'      => $form_items['location']);
-
-$form['row'][1]['search']   = array(
-                                'type'        => 'submit',
-                                //'name'        => 'Search',
-                                //'icon'        => 'icon-search',
-                                'right'       => TRUE,
-                                );
+$form['row'][1]['search']   = [
+  'type'        => 'submit',
+  'grid'        => 1,
+  //'name'        => 'Search',
+  //'icon'        => 'icon-search',
+  'right'       => TRUE,
+];
 
 $panel_form = array('type'  => 'rows',
                     'title' => 'Search Ports',
@@ -222,23 +227,28 @@ $panel_form = array('type'  => 'rows',
                     'url'   => generate_url($vars));
 
 $panel_form['row'][0]['device_id'] = $form['row'][0]['device_id'];
-$panel_form['row'][0]['hostname'] = $form['row'][1]['hostname'];
+$panel_form['row'][0]['hostname']  = $form['row'][1]['hostname'];
+//$panel_form['row'][0]['location']  = $form['row'][0]['location'];
 
-//$panel_form['row'][1]['ifDescr'] = $form['row'][0]['ifDescr'];
-$panel_form['row'][1]['label'] = $form['row'][0]['label'];
+$panel_form['row'][1]['label']   = $form['row'][1]['label'];
 $panel_form['row'][1]['ifAlias'] = $form['row'][1]['ifAlias'];
+$panel_form['row'][1]['mac']     = $form['row'][0]['mac'];
 
-$panel_form['row'][2]['state'] = $form['row'][0]['state'];
+$panel_form['row'][2]['state']   = $form['row'][0]['state'];
 $panel_form['row'][2]['ifSpeed'] = $form['row'][1]['ifSpeed'];
 
-$panel_form['row'][3]['ifType'] = $form['row'][0]['ifType'];
+$panel_form['row'][3]['ifType']          = $form['row'][0]['ifType'];
 $panel_form['row'][3]['port_descr_type'] = $form['row'][1]['port_descr_type'];
 
-$panel_form['row'][4]['group'] = $form['row'][0]['group'];
-$panel_form['row'][4]['location'] = $form['row'][1]['location'];
+$panel_form['row'][4]['group']            = $form['row'][0]['group'];
+$panel_form['row'][4]['group']['grid']    = 4;
+$panel_form['row'][4]['location']         = $form['row'][0]['location'];
+$panel_form['row'][4]['location']['grid'] = 4;
 
-$panel_form['row'][5]['sort'] = $form['row'][0]['sort'];
-$panel_form['row'][5]['search'] = $form['row'][1]['search'];
+$panel_form['row'][4]['sort']             = $form['row'][1]['sort'];
+$panel_form['row'][4]['sort']['grid']     = 2;
+$panel_form['row'][4]['search']           = $form['row'][1]['search'];
+$panel_form['row'][4]['search']['grid']   = 2;
 
 // Register custom panel
 register_html_panel(generate_form($panel_form));

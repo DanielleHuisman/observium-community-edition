@@ -1,0 +1,636 @@
+-- *****************************************************************
+-- MY-RIP-MIB.mib:  My RIP MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+MY-RIP-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32,
+        IpAddress
+                FROM SNMPv2-SMI
+        VlanId
+                FROM Q-BRIDGE-MIB
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus,
+        MemberMap,
+        IfIndex
+                FROM MY-TC
+        EnabledStatus 
+                FROM P-BRIDGE-MIB
+        myMgmt
+                FROM MY-SMI;
+
+myRIPMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "This module defines my Rip mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 13}
+
+myRIPMIBObjects OBJECT IDENTIFIER ::= { myRIPMIB 1 }
+
+---
+---RIP GROUP
+---
+myRipEnable OBJECT-TYPE
+    SYNTAX EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+          "Rip management function status"
+    DEFVAL { disabled }
+          ::={ myRIPMIBObjects 1 } 
+
+myRipUpdateTime OBJECT-TYPE
+    SYNTAX Integer32 (0..2147483647)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+                "The rate (time in seconds between updates) at which routing updates are sent."
+    DEFVAL {30}
+        ::={ myRIPMIBObjects 2 } 
+
+myRipInvalidTime OBJECT-TYPE
+    SYNTAX Integer32 (1..2147483647)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+                "The interval of time (in seconds) after which a route is declared invalid."
+    DEFVAL {180}        
+        ::={ myRIPMIBObjects 3 } 
+
+myRipHolddownTime OBJECT-TYPE
+    SYNTAX Integer32 (0..2147483647)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+         "The amount of time (in seconds) that must pass before a route 
+         is removed from the routing table"
+    DEFVAL {120}
+    ::={ myRIPMIBObjects 4 }
+    
+myRipRecommendSetting OBJECT-TYPE
+    SYNTAX INTEGER{ 
+            ripv1(1),
+            ripv2(2),
+            compatible(3)
+        }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+              "User can set this object to 1,2,3.
+               1 means that the system sending and receiving RIP version1 packets,
+               2 means that the system sending and receiving RIP version2 packets,
+               3 means that the system sending RIP version1 packets and receiving both
+                 RIP version1 and RIP version2 packets.
+                 
+               If the system RIP interface configuration has been modified by user,this 
+               object will be 4."
+    DEFVAL {3}
+        ::={myRIPMIBObjects 5}
+ 
+ 
+-- The RIP Interface Status Table.
+
+myRipIfStatTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF MyRipIfStatEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "A list of subnets which require separate
+           status monitoring in RIP."
+       ::= { myRIPMIBObjects 6 }
+
+myRipIfStatEntry OBJECT-TYPE
+       SYNTAX   MyRipIfStatEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "A Single Routing Domain in a single Subnet."
+      INDEX { myRipIfStatIfIndex }
+      ::= { myRipIfStatTable 1 }
+
+MyRipIfStatEntry ::=
+        SEQUENCE {
+        myRipIfStatIfIndex
+                IfIndex,
+        myRipIfStatRcvBadPackets
+                Counter32,
+        myRipIfStatRcvBadRoutes
+                Counter32,
+        myRipIfStatSentUpdates
+                Counter32
+            }
+
+myRipIfStatIfIndex OBJECT-TYPE
+        SYNTAX   IfIndex
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "VID of vlan which each net interface associate."
+       ::= { myRipIfStatEntry 1 }
+
+myRipIfStatRcvBadPackets OBJECT-TYPE
+        SYNTAX   Counter32
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The number of RIP response packets received by
+           the RIP process which were subsequently discarded
+           for any reason (e.g. a version 0 packet, or an
+           unknown command type)."
+       ::= { myRipIfStatEntry 2 }
+
+myRipIfStatRcvBadRoutes OBJECT-TYPE
+        SYNTAX   Counter32
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The number of routes, in valid RIP packets,
+           which were ignored for any reason (e.g. unknown
+           address family, or invalid metric)."
+       ::= { myRipIfStatEntry 3 }
+
+myRipIfStatSentUpdates OBJECT-TYPE
+        SYNTAX   Counter32
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The number of triggered RIP updates actually
+           sent on this interface.  This explicitly does
+           NOT include full updates sent containing new
+           information."
+       ::= { myRipIfStatEntry 4 }
+ 
+-- The RIP Interface Configuration Table.
+
+myRipIfConfTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF MyRipIfConfEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "A list of interfaces which require separate
+           configuration in RIP."
+       ::= { myRIPMIBObjects  7 }
+
+myRipIfConfEntry OBJECT-TYPE
+       SYNTAX   MyRipIfConfEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "A Single Routing Domain in a single interface."
+      INDEX { myRipIfConfIfIndex }
+      ::= { myRipIfConfTable 1 }
+
+    MyRipIfConfEntry ::=
+        SEQUENCE {
+         myRipIfConfIfIndex
+                IfIndex,
+         myRipIfConfAuthType
+                INTEGER,
+         myRipIfConfAuthKeyChain
+                OCTET STRING,
+         myRipIfConfSend
+                INTEGER,
+         myRipIfConfReceive
+                INTEGER,
+         myRipIfPassiveStatus
+                EnabledStatus,
+         myRipIfBroadcastEnable       
+                EnabledStatus,
+         myRipIfAdminStat 
+                EnabledStatus               
+     }
+
+myRipIfConfIfIndex OBJECT-TYPE
+        SYNTAX   IfIndex
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "IfIndex vale of vlan interface."
+       ::= { myRipIfConfEntry 1 }
+
+ 
+myRipIfConfAuthType OBJECT-TYPE
+        SYNTAX  INTEGER {
+                    noAuthentication(1),
+                    simplePassword (2),
+                    md5(3)    
+                 }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "The type of Authentication used on this
+           interface."
+       DEFVAL { noAuthentication }
+       ::= { myRipIfConfEntry 2 }
+
+myRipIfConfAuthKeyChain OBJECT-TYPE
+        SYNTAX   DisplayString(SIZE(1..32))
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "The key chain name which interface associated. It indicate that 
+            this interface doesn't match any key chain which this string is null"
+        REFERENCE
+           "myAuthenKeyChainName in MY-AUTHEN-KEY-MIB."   
+       ::= { myRipIfConfEntry 3 }
+
+myRipIfConfSend OBJECT-TYPE
+        SYNTAX   INTEGER {
+                    ripVersion1 (1),
+                    rip1Compatible (2),
+                    ripVersion2 (3)                     
+                 }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "What the router sends on this interface.
+           ripVersion1 implies sending RIP updates compliant
+           with  RFC  1058.   rip1Compatible implies
+           broadcasting RIP-2 updates using RFC 1058 route
+           subsumption rules.  ripVersion2 implies
+           multicasting RIP-2 updates.  ripV1Demand indicates
+           the use of Demand RIP on a WAN interface under RIP
+           Version 1 rules.  ripV2Demand indicates the use of
+           Demand RIP on a WAN interface under Version 2 rules."
+       DEFVAL { rip1Compatible }
+       ::= { myRipIfConfEntry 4 }
+
+myRipIfConfReceive OBJECT-TYPE
+        SYNTAX   INTEGER {
+                    rip1 (1),
+                    rip2 (2),
+                    rip1OrRip2 (3)
+                 }
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "This indicates which version of RIP updates
+           are to be accepted.  Note that rip2 and
+           rip1OrRip2 implies reception of multicast
+           packets."
+       DEFVAL { rip1OrRip2 }
+       ::= { myRipIfConfEntry 5 }
+
+myRipIfPassiveStatus  OBJECT-TYPE
+       SYNTAX EnabledStatus
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+             " The interface will not send routing updates if this value is 'enabled'"
+       DEFVAL { disabled }
+             ::={ myRipIfConfEntry 6 } 
+
+myRipIfBroadcastEnable OBJECT-TYPE
+       SYNTAX EnabledStatus
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+             "Enable or disable broadcast updats of RIP in this interface"
+       DEFVAL { disabled }
+             ::={ myRipIfConfEntry 7 }
+
+myRipIfAdminStat OBJECT-TYPE
+        SYNTAX   EnabledStatus
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "The RIP  interface's  administrative  status.
+           The  value formed on the interface, and the in-
+           terface will be advertised as an internal route
+           to  some  area.   The  value 'disabled' denotes
+           that the interface is external to RIP."
+       ::= { myRipIfConfEntry 8 }
+
+                   
+myRipOffsetMetric OBJECT-TYPE
+    SYNTAX Integer32 (1..15)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+         "This object means the value of increasing incoming 
+           and outgoing metrics to routes learned via RIP "
+    DEFVAL {1}
+    ::={ myRIPMIBObjects 8 }
+
+myRipAdministrativeDistance OBJECT-TYPE
+    SYNTAX Integer32 (0..255)
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION 
+                "This object specified the priority of route information learned via RIP."
+    ::={ myRIPMIBObjects 9}  
+
+myRipValidateUpdateSrcEnable  OBJECT-TYPE
+    SYNTAX EnabledStatus
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+          "This object allow of enabling or disabling validate the
+           source IP address of incoming RIP routing updates."
+    DEFVAL { enabled }
+          ::={ myRIPMIBObjects 10 } 
+
+myRipPassiveStatus  OBJECT-TYPE
+       SYNTAX EnabledStatus
+       MAX-ACCESS read-write
+       STATUS current
+       DESCRIPTION
+             "The myRipIfPassiveStatus of a interface equal to this object value
+              when this interface is created. If you change this object value to 'enabled'
+              or 'disabled'all interfaces which have exist will also change their 
+              myRipIfPassiveStatus to 'enabled' or 'disabled'."
+       DEFVAL { disabled }
+             ::={ myRIPMIBObjects 11 } 
+
+
+myRipNextDueIn  OBJECT-TYPE
+       SYNTAX TimeTicks
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+             "Waitting time interval before next update packet generatting 
+             in units of second"
+             ::={ myRIPMIBObjects 12 }
+
+-- The RIP Interface Offset Table.
+myRipIfOffsetTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF MyRipIfOffsetEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "The interface configuration about offset.
+            Apply an offset list to routing metrics to increase incoming and 
+            outgoing metrics to routes learned through RIP. You can limit 
+            the offset list with an access list or an interface."
+       ::= { myRIPMIBObjects 13 }
+
+myRipIfOffsetEntry OBJECT-TYPE
+       SYNTAX   MyRipIfOffsetEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "the entry of this table."
+      INDEX { myRipIfOffsetIfIndex,myRipIfOffsetMethod }
+      ::= { myRipIfOffsetTable 1 }
+
+MyRipIfOffsetEntry ::=
+        SEQUENCE {
+        myRipIfOffsetIfIndex
+                Integer32,
+        myRipIfOffsetMethod
+                INTEGER,
+        myRipIfOffsetAclName
+                DisplayString,
+        myRipIfOffsetMetric
+                Unsigned32,                
+        myRipIfOffsetStatus
+                RowStatus
+            }
+
+myRipIfOffsetIfIndex OBJECT-TYPE
+        SYNTAX   Integer32 (0..2147483647)
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "the interface that this offset list apply to.
+               
+                If this value is 0,it indicate that this offset list apply in all 
+                interfaces except the interfaceswhich which have not Offset configure.
+                
+                Other value is equal to TEXTUAL-CONVENTION IfIndex meaning,this offset
+                list will apply in only the designate interface"
+       ::= { myRipIfOffsetEntry 1 }
+
+myRipIfOffsetMethod OBJECT-TYPE
+        SYNTAX   INTEGER{
+                         out(1),
+                         in(2)
+                        }
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+           "the offset list apply to incoming routes or 
+           outgoing routes."
+       ::= { myRipIfOffsetEntry 2 }
+
+myRipIfOffsetAclName OBJECT-TYPE
+        SYNTAX   DisplayString(SIZE(1..32))
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           " the offset list with Access list name ."
+       ::= { myRipIfOffsetEntry 3 }
+       
+myRipIfOffsetMetric OBJECT-TYPE
+        SYNTAX   Unsigned32(0..16)
+        MAX-ACCESS   read-write
+        STATUS   current
+        DESCRIPTION
+           "the offset list with offset value,
+            in condition the value will be added to route metric."
+       ::= { myRipIfOffsetEntry 4 }
+
+myRipIfOffsetStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+           " if this value is setted destroy,
+             the entry will be deleted ."
+       ::= { myRipIfOffsetEntry 5 }                    
+
+
+--network table
+myRipNetworkTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF MyRipNetworkEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "the network for rip routing."
+       ::= { myRIPMIBObjects 14 }
+
+myRipNetworkEntry OBJECT-TYPE
+       SYNTAX   MyRipNetworkEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "the entry of this table."
+      INDEX { myRipNetworkAddr }
+      ::= { myRipNetworkTable 1 }
+
+MyRipNetworkEntry ::=
+        SEQUENCE {
+        myRipNetworkAddr
+                IpAddress,
+        myRipNetworkMask
+                IpAddress,                
+        myRipNetworkStatus
+                RowStatus
+            }
+
+myRipNetworkAddr OBJECT-TYPE
+        SYNTAX   IpAddress
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "define a network for rip routing ."
+       ::= { myRipNetworkEntry 1 }
+
+myRipNetworkMask OBJECT-TYPE
+        SYNTAX   IpAddress
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "define a network's mask for rip routing ."
+       ::= { myRipNetworkEntry 2 }
+              
+myRipNetworkStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+               "if destroy is setted,
+                this entry will be deleted ."
+       ::= { myRipNetworkEntry 3 }
+
+--neighbor table
+myRipNeighborTable OBJECT-TYPE
+        SYNTAX   SEQUENCE OF MyRipNeighborEntry
+        MAX-ACCESS   not-accessible
+        STATUS   current
+        DESCRIPTION
+           "the neighbor for rip routing."
+       ::= { myRIPMIBObjects 15 }
+
+myRipNeighborEntry OBJECT-TYPE
+       SYNTAX   MyRipNeighborEntry
+       MAX-ACCESS   not-accessible
+       STATUS   current
+       DESCRIPTION
+          "the entry of this table."
+      INDEX { myRipNeighborIndex }
+      ::= { myRipNeighborTable 1 }
+
+MyRipNeighborEntry ::=
+        SEQUENCE {
+        myRipNeighborIndex
+                IpAddress,
+        myRipNeighborStatus
+                RowStatus
+            }
+
+myRipNeighborIndex OBJECT-TYPE
+        SYNTAX   IpAddress
+        MAX-ACCESS   read-only
+        STATUS   current
+        DESCRIPTION
+               "define a neighbor for rip  ."
+       ::= { myRipNeighborEntry 1 }
+       
+myRipNeighborStatus OBJECT-TYPE
+        SYNTAX   RowStatus
+        MAX-ACCESS   read-create
+        STATUS   current
+        DESCRIPTION
+               "if destroy is setted,
+                this entry will be deleted."
+       ::= { myRipNeighborEntry 2 }
+             
+myRIPMIBConformance OBJECT IDENTIFIER ::= { myRIPMIB 2 }
+myRIPMIBCompliances OBJECT IDENTIFIER ::= { myRIPMIBConformance 1 }
+myRIPMIBGroups      OBJECT IDENTIFIER ::= { myRIPMIBConformance 2 }
+
+
+-- compliance statements
+
+myRIPMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My Snooping Dhcp MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { myRipMIBGroup,
+                                   myRIPExtendMIBGroup  
+                 }
+        ::= { myRIPMIBCompliances 1 }
+                
+-- units of conformance
+
+myRipMIBGroup OBJECT-GROUP
+        OBJECTS {
+           myRipEnable,
+           myRipUpdateTime,
+           myRipInvalidTime,
+           myRipHolddownTime,
+           myRipRecommendSetting,
+           myRipIfStatIfIndex,
+           myRipIfStatRcvBadPackets,
+           myRipIfStatRcvBadRoutes,
+           myRipIfStatSentUpdates,           
+           myRipIfConfIfIndex,
+           myRipIfConfAuthType,
+           myRipIfConfAuthKeyChain,
+           myRipIfConfSend,
+           myRipIfConfReceive,
+           myRipIfPassiveStatus,
+           myRipIfBroadcastEnable,
+           myRipIfAdminStat,
+           myRipOffsetMetric,
+           myRipAdministrativeDistance,
+           myRipValidateUpdateSrcEnable
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing rip managment."
+        ::= { myRIPMIBGroups 1 }
+
+myRIPExtendMIBGroup OBJECT-GROUP
+        OBJECTS {
+           myRipNextDueIn,
+           
+           myRipIfOffsetIfIndex,
+           myRipIfOffsetMethod,
+           myRipIfOffsetAclName,
+           myRipIfOffsetMetric,                
+           myRipIfOffsetStatus,
+           
+           myRipNetworkAddr,
+           myRipNetworkMask,
+           myRipNetworkStatus,
+           
+           myRipNeighborIndex,
+           myRipNeighborStatus        
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing rip extend managment."
+        ::= { myRIPMIBGroups 2 }
+                
+        
+END

@@ -194,7 +194,7 @@ foreach ($cols as $sort => $col)
         <tr>
           <td width=20></td>
           <td width=200><bold>".format_mac($acc['mac'])."</bold></td>
-          <td width=200>".implode($ips, "<br />")."</td>
+          <td width=200>".implode("<br />", $ips)."</td>
           <td width=500>".$name." ".$arp_name . "</td>
           <td width=100>".formatRates($acc['bytes_input_rate'] / 8)."</td>
           <td width=100>".formatRates($acc['bytes_output_rate'] / 8)."</td>

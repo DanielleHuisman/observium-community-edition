@@ -1,0 +1,15 @@
+DROP TABLE IF EXISTS `roles`;
+CREATE TABLE `roles` (  `role_id` int(11) NOT NULL,  `role_name` varchar(32) NOT NULL,  `role_descr` varchar(128) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+DROP TABLE IF EXISTS `roles_entity_permissions`;
+CREATE TABLE `roles_entity_permissions` (  `perm_id` int(11) NOT NULL,  `role_id` bigint(20) NOT NULL,  `entity_type` varchar(32) COLLATE utf8_unicode_ci NOT NULL,  `entity_id` int(11) NOT NULL,  `access_level` int(11) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+DROP TABLE IF EXISTS `roles_permissions`;
+CREATE TABLE `roles_permissions` (  `role_perm_id` int(11) NOT NULL,  `role_id` int(11) NOT NULL,  `permission` varchar(32) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+DROP TABLE IF EXISTS `roles_users`;
+CREATE TABLE `roles_users` (  `role_id` int(11) NOT NULL,  `user_id` int(11) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+ALTER TABLE `roles`  ADD PRIMARY KEY (`role_id`);
+ALTER TABLE `roles_entity_permissions`  ADD PRIMARY KEY (`perm_id`),  ADD KEY `user_id` (`role_id`);
+ALTER TABLE `roles_permissions`  ADD PRIMARY KEY (`role_perm_id`);
+ALTER TABLE `roles_users`  ADD UNIQUE KEY `group_user` (`role_id`,`user_id`);
+ALTER TABLE `roles`  MODIFY `role_id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `roles_entity_permissions`  MODIFY `perm_id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `roles_permissions`  MODIFY `role_perm_id` int(11) NOT NULL AUTO_INCREMENT;

@@ -36,7 +36,7 @@ foreach ($vlan_ports as $port)
   if ($vars['view'] == "graphs")
   {
     echo '<div class="box box-solid" style="display: block; padding: 2px; margin: 2px; min-width: 139px; max-width:139px; height:85px; height:85px; text-align: center; float: left;">
-    <div style="font-weight: bold;"><h4>'.short_ifname($port['ifDescr'])."</h4></div>
+    <div style="font-weight: bold;"><h4>'.$port['port_label_short']."</h4></div>
     <a href='".generate_url(array('page' => 'device', 'device' => $device['device_id'], 'tab' => 'port', 'port' => $port['port_id']))."' onmouseover=\"return overlib('\
     <div style=\'font-size: 16px; padding:5px; font-weight: bold; color: #e5e5e5;\'>".$device['hostname']." - ".$port['ifDescr']."</div>\
     ".$port['ifAlias']." \
@@ -49,7 +49,7 @@ foreach ($vlan_ports as $port)
   }
   else
   {
-    echo($vlan['port_sep'] . generate_port_link($port, short_ifname($port['port_label'])));
+    echo($vlan['port_sep'] . generate_port_link_short($port));
     $vlan['port_sep'] = ", ";
     if ($port['untagged']) { echo("(U)"); }
 

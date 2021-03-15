@@ -185,7 +185,7 @@ $status = $mail->send($rcpts, $headers, $body);
 
 if (PEAR::isError($status))
 {
-  print_message('%rMailer Error%n: ' . $status->getMessage(), 'color');
+  //print_message('%rMailer Error%n: ' . $status->getMessage(), 'color');
   $notify_status['success'] = FALSE;
   $notify_status['error']   = $status->getMessage();
 } else {

@@ -70,7 +70,7 @@ function print_fdbtable($vars)
     $string .= '    <td>' . $entry['fdb_status'] . '</td>' . PHP_EOL;
     if ($list['port'])
     {
-      $string .= '    <td class="entity">' . generate_port_link($port, $port['port_label_short']) . ' ' . $port_error . '</td>' . PHP_EOL;
+      $string .= '    <td class="entity">' . generate_port_link_short($port) . ' ' . $port_error . '</td>' . PHP_EOL;
     }
     $string .= '    <td><span class="label">' . ($port['ifType'] == 'l2vlan' && empty($port['ifTrunk']) ? $port['human_type'] : $port['ifTrunk']) . '</span></td>' . PHP_EOL;
     $string .= '    <td>' . ($entry['vlan_vlan'] ? 'Vlan' . $entry['vlan_vlan'] : '') . '</td>' . PHP_EOL;
@@ -154,7 +154,7 @@ function get_fdbtable_array($vars)
           $where .= generate_query_values($value, 'V.vlan_name');
           break;
         case 'address':
-          if (str_contains($value, array('*', '?')))
+          if (str_exists($value, array( '*', '?')))
           {
             $like = 'LIKE';
           } else {

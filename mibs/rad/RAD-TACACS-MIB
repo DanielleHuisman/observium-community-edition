@@ -1,0 +1,406 @@
+RAD-TACACS-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+
+       InetAddressType, InetAddress     FROM  INET-ADDRESS-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Counter32, Unsigned32, OBJECT-TYPE, 
+       MODULE-IDENTITY     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, RowStatus     FROM  SNMPv2-TC
+       radSecurity     FROM  RAD-SMI-MIB; 
+
+    radTacacsPlus MODULE-IDENTITY
+        LAST-UPDATED "201609191808Z"  -- September 19, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "TACACS MIB."
+    ::= { radSecurity 1 }
+
+
+-- Definition of a client Terminal Access Controller Access Control System Plus (TACACS+)
+
+
+-- Textual conventions
+RadTacacsKeyString ::= TEXTUAL-CONVENTION
+      STATUS  current
+      DESCRIPTION
+      "A string to keep a TACACS Plus key. Its lenght is limited to 255 characters."
+      SYNTAX      OCTET STRING (SIZE(0..255))
+
+
+-- TACACS Plus Server Required Parameters
+
+
+tacplusAuthServerTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF TacplusAuthServerEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "The (conceptual) table listing the TACACS+ authentication
+      servers with which the client shares a secret key."
+        ::= { radTacacsPlus 1 }
+
+tacplusAuthServerEntry OBJECT-TYPE
+      SYNTAX      TacplusAuthServerEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "An entry (conceptual row) representing a TACACS+
+      authentication server with which the client shares
+      a secret key."
+      INDEX     { tacplusServerAddressType, tacplusServerAddress, tacplusServerPort }
+        ::= { tacplusAuthServerTable 1 }
+
+TacplusAuthServerEntry ::= SEQUENCE {
+    tacplusServerAddressType        InetAddressType,
+    tacplusServerAddress            InetAddress,
+    tacplusServerPort               Unsigned32,
+    tacplusRowStatus                RowStatus,
+    tacplusSecretKey                RadTacacsKeyString,
+    tacplusRetryCount               Unsigned32,
+    tacplusTimeout                  Unsigned32,
+    tacplusAuthentStatus            INTEGER,
+    tacplusAccountingPort           Unsigned32,
+    tacplusServerGroup              Unsigned32,
+    tacplusAuthenticationPort       Unsigned32 
+ }
+
+tacplusServerAddressType OBJECT-TYPE
+      SYNTAX        InetAddressType
+      MAX-ACCESS    not-accessible
+      STATUS        current
+      DESCRIPTION
+      "This variable represents the TACACS+ Server Address Type
+      indicating ipv4(1), ipv6(2). The object identifiers for
+      the InetAddressType object and the InetAddress object MUST
+      have the same length and the last sub-identifier of the
+      InetAddressType object MUST be 1 less than the last
+      sub-identifier of the InetAddress object."
+      ::= { tacplusAuthServerEntry 1 }
+
+tacplusServerAddress OBJECT-TYPE
+      SYNTAX      InetAddress
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "The IP address of the TACACS+ authentication server
+      referred to in this table entry."
+      ::= { tacplusAuthServerEntry 2 }
+
+tacplusServerPort OBJECT-TYPE
+      SYNTAX      Unsigned32 (1..65535)
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "In current implementation this index shall me equal to '1'.
+       The TCP port configuration shall be done via the objects in the table."
+      ::= { tacplusAuthServerEntry 3 }
+
+tacplusRowStatus OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The status of the TACACS server entry.
+       In order for this object to become active, the following
+       row objects must be defined:
+       tacplusSecretKey
+       All other objects can assume default values.
+       In order to set the admin Status of the server to 'down' use the
+       notInService function."
+      ::= { tacplusAuthServerEntry 4 }
+
+
+tacplusSecretKey OBJECT-TYPE
+      SYNTAX      RadTacacsKeyString
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "This is the secret key shared between the Client and Server TACACS+."
+      DEFVAL    { "" }
+      ::= { tacplusAuthServerEntry 6 }
+
+
+tacplusRetryCount OBJECT-TYPE
+      SYNTAX      Unsigned32 (1..10)
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "This object indicates the threshold number of permitted Authentication requests.
+      If the number of authentication requests crosses the threshold number then the device will
+      not attempt to send additional Authentication requests until it will reboot or reset.
+      The default value is 3 authentication attempt requests."
+      DEFVAL { 3 }
+      ::= { tacplusAuthServerEntry 7 }
+
+
+tacplusTimeout OBJECT-TYPE
+      SYNTAX      Unsigned32 (1..255)
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The delay in seconds that a specific TACACS+ server responds to a client request.
+      The default value is 5 seconds."
+      DEFVAL    { 5 }
+      ::= { tacplusAuthServerEntry 8 }
+
+tacplusAuthentStatus OBJECT-TYPE
+      SYNTAX      INTEGER {
+      authenticated           (1),
+      authenticationFailure   (2),
+      unknownFailure          (3),
+      idle                    (4)
+      }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+      "Authentication Status reflects possible results of the authentication process.
+        Authenticated(1) means that the authentication succeeded.
+        AuthenticationFailure(2) means that the authentication process failed due
+        to wrong credential.
+        UnknownFailure(4) means that the authentication process failed due to a server
+        or internal error.
+        Idle(4) is the initial default value."
+      DEFVAL    { idle }
+      ::= { tacplusAuthServerEntry 9 }
+
+-- Entry 10 is free
+
+
+
+tacplusAccountingPort OBJECT-TYPE
+      SYNTAX      Unsigned32 (1..65535)
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The TCP port used for Accounting.
+       This parameter shall be configured only if the Accounting TCP port is
+       different from 49."
+      DEFVAL    { 49 }
+      ::= { tacplusAuthServerEntry 11 }
+
+tacplusServerGroup   OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..65535)
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The associate group (in tacplusServerGroupId).
+      By default the value is 0."
+      ::= { tacplusAuthServerEntry 12 }
+
+tacplusAuthenticationPort OBJECT-TYPE
+      SYNTAX      Unsigned32 (1..65535)
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The TCP port used for Authentication.
+       This parameter shall be configured only if the Authentication TCP port is
+       different from 49."
+      DEFVAL    { 49 }
+      ::= { tacplusAuthServerEntry 13 }
+
+
+ --       TACACS+ Statistics Entry per Server
+
+
+tacplusStatsTable OBJECT-TYPE
+      SYNTAX      SEQUENCE OF TacplusStatsEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "This table contains the statistics per TACACS+ server instance."
+      ::= { radTacacsPlus 2 }
+
+tacplusStatsEntry OBJECT-TYPE
+      SYNTAX      TacplusStatsEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A TACACS+ server instance statistics table entry."
+      AUGMENTS  { tacplusAuthServerEntry }
+      ::= { tacplusStatsTable 1 }
+
+TacplusStatsEntry ::= SEQUENCE {
+    tacplusClearStaticsCmd              INTEGER,
+    tacplusAuthRequests                 Counter32,
+    tacplusAuthenRequestTimeouts        Counter32,
+    tacplusAuthenUnexpectedResponses    Counter32,
+    tacplusAuthenServerErrorResponses   Counter32,
+    tacplusAuthenIncorrectResponses     Counter32,
+    tacplusAuthenTransactionSuccesses   Counter32,
+    tacplusAuthenTransactionFailures    Counter32,
+    tacplusAuthenPendingRequests        Counter32 
+ }
+
+
+ tacplusClearStaticsCmd OBJECT-TYPE
+      SYNTAX      INTEGER {
+      on  (1),
+      off (2)
+      }
+      MAX-ACCESS  read-write
+      STATUS      current
+      DESCRIPTION
+      "This object will allow to initialize the statistic counters of a given
+      TACACS+ server instance.
+       on(1) means that the statistics will be cleared. The Agent will change the value
+       of this MIB object to off(2) automatically, after performing the command.
+       off(2) is the default value. Setting this object to off(2), will do nothing."
+      DEFVAL    { off }
+      ::= { tacplusStatsEntry 1 }
+
+
+tacplusAuthRequests OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "Counter that measures the number of authentications performed toward a specific TACACS+ server."
+     ::= { tacplusStatsEntry 2 }
+
+tacplusAuthenRequestTimeouts OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "Counter that measures the number of transaction timeouts that were occured between the client and server."
+     ::= { tacplusStatsEntry 3 }
+
+tacplusAuthenUnexpectedResponses OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "Counter that is incremented when the tacacs+ client receives a tacacs+ packet which
+     is not expected at that time. This could happen because of delay response to a request
+     which has already timed out."
+     ::= { tacplusStatsEntry 4 }
+
+tacplusAuthenServerErrorResponses OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "Counter that measures the number of errors received from the tacacs+ server."
+     ::= { tacplusStatsEntry 5 }
+
+tacplusAuthenIncorrectResponses OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "This counter is incremented when tacacs+ client fails to decrypt the packets or
+     when the client finds an invalid field in the tacacs+ packet or when the client
+     receives a response which is not valid based on the request."
+     ::= { tacplusStatsEntry 6 }
+
+tacplusAuthenTransactionSuccesses OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "Counter that measures the successfully transactions between the client and server tacacs+."
+     ::= { tacplusStatsEntry 7 }
+
+tacplusAuthenTransactionFailures OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "This counter is increamented when tacacs+ client receives an abort from the server or
+     when the server fails to respond even after maximum resend (RetryCount)."
+     ::= { tacplusStatsEntry 8 }
+
+tacplusAuthenPendingRequests OBJECT-TYPE
+     SYNTAX      Counter32
+     MAX-ACCESS  read-only
+     STATUS      current
+     DESCRIPTION
+     "This counter is incremented when a tacacs+ client sends a request and it is decremented
+     when tacaplus client receives a response or when a timeout occurs."
+     ::= { tacplusStatsEntry 9 }
+
+
+-- ------------------
+-- Server Group Table
+-- ------------------
+
+
+tacplusServerGroupTable      OBJECT-TYPE
+      SYNTAX      SEQUENCE OF TacplusServerGroupEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "This table contains the groups of tacacs servers."
+      ::= { radTacacsPlus 3 }
+
+tacplusServerGroupEntry      OBJECT-TYPE
+      SYNTAX      TacplusServerGroupEntry
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A TACACS+ server group table entry."
+      INDEX     { tacplusServerGroupId }
+      ::= { tacplusServerGroupTable 1 }
+
+TacplusServerGroupEntry ::= SEQUENCE {
+    tacplusServerGroupId                Unsigned32,
+    tacplusServerGroupRowStatus         RowStatus,
+    tacplusServerGroupName              SnmpAdminString,
+    tacplusServerGroupAccountingMode    BITS 
+ }
+
+tacplusServerGroupId     OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "The ID for the group"
+      ::= { tacplusServerGroupEntry 1 }
+
+tacplusServerGroupRowStatus     OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The status of this table entry."
+      ::= { tacplusServerGroupEntry 2 }
+
+tacplusServerGroupName     OBJECT-TYPE
+      SYNTAX      SnmpAdminString
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The name of the group"
+      ::= { tacplusServerGroupEntry 3 }
+
+tacplusServerGroupAccountingMode     OBJECT-TYPE
+      SYNTAX      BITS
+      {
+       shell     (0),
+       system    (1),
+       commands  (2)
+       }
+      MAX-ACCESS  read-create
+      STATUS      current
+      DESCRIPTION
+      "The group type, the group can be configured as:
+      Bit 0 = shell
+      Bit 1 = system
+      Bit 2 = commands
+      By default all bits are inactive (bit # = 0)."
+      ::= { tacplusServerGroupEntry 4 }
+      
+      
+END

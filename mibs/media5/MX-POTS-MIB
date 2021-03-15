@@ -1,0 +1,1964 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-POTS-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32,
+        Integer32
+    FROM SNMPv2-SMI
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+    FROM SNMPv2-CONF
+        MxEnableState,
+        MxActivationState,
+        MxIpHostName,
+        MxIpAddress,
+        MxIpPort,
+        MxAdvancedIpPort,
+        MxIpSubnetMask,
+        MxDigitMap
+    FROM MX-TC
+        MxUInt64,
+        MxFloat32,
+        MxIpHostNamePort,
+        MxIpAddr,
+        MxIpAddrPort,
+        MxIpAddrMask,
+        MxUri,
+        MxUrl
+    FROM MX-TC2
+        mediatrixServices
+    FROM MX-SMI2;
+
+potsMIB MODULE-IDENTITY
+ LAST-UPDATED   "1910210000Z"
+ ORGANIZATION " Mediatrix Telecom, Inc. "
+ CONTACT-INFO " Mediatrix Telecom, Inc.
+                4229, Garlock Street
+                Sherbrooke (Quebec)
+                Canada
+                Phone: (819) 829-8749
+                "
+ DESCRIPTION  " Plain Old Telephony System Line
+
+                The Plain Old Telephony System (POTS) service manages the FXS
+                and FXO analog telephony interfaces.
+                "
+ ::= { mediatrixServices 1800 }
+
+potsMIBObjects OBJECT IDENTIFIER ::= { potsMIB 1 }
+
+-- *****************************************************************************
+
+-- Table:Line Table
+
+-- *****************************************************************************
+
+lineTable OBJECT-TYPE
+ SYNTAX        SEQUENCE OF LineEntry
+ MAX-ACCESS    not-accessible
+ STATUS        current
+ DESCRIPTION " Line Table
+
+               This table shows the current available lines and allows their
+               basic configuration.
+               "
+ ::= { potsMIBObjects 100 }
+ lineEntry OBJECT-TYPE
+  SYNTAX        LineEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " A row in table Line Table. "
+  INDEX         {
+                  lineId
+                }
+
+  ::= { lineTable 1 }
+
+ LineEntry ::= SEQUENCE
+ {
+   lineId          OCTET STRING,
+   lineTypeStatus  INTEGER,
+   lineState       INTEGER
+ }
+
+ -- Index:Line Identifier
+
+ lineId OBJECT-TYPE
+  SYNTAX        OCTET STRING
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Line Identifier
+
+                String that identifies a line in other tables.
+                "
+  ::= { lineEntry 100 }
+
+ -- Columnar:Line Type Status
+
+ lineTypeStatus OBJECT-TYPE
+  SYNTAX        INTEGER { fxs(100) , fxo(200) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Line Type Status
+
+                The status POTS type of the line.
+                "
+  ::= { lineEntry 200 }
+
+ -- Columnar:State
+
+ lineState OBJECT-TYPE
+  SYNTAX        INTEGER { idle(100) , inUse(200) , disabled(300) , bypass(400)
+                , down(500) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " State
+
+                The current call control state for this channel:
+
+                  * Idle: The line is available
+                  * InUse: The line is currently used
+                  * Disabled: The line is disabled
+                  * Bypass: The line is on bypass
+                  * Down: The power of the line is down
+
+                "
+  ::= { lineEntry 300 }
+
+-- End of table:Line Table
+
+-- Scalar:Caller ID Customisation
+
+callerIdCustomization OBJECT-TYPE
+ SYNTAX        INTEGER { country(100) , etsiDtmf(200) , etsiFsk(300) }
+ MAX-ACCESS    read-write
+ STATUS        current
+ DESCRIPTION " Caller ID Customisation
+
+               The caller ID customisation allows to select the detection/
+               generation method of caller ID.
+
+                 * Country: Use the default caller ID of the country defined in
+                   the TelIf.CountrySelection parameter.
+                 * EtsiDtmf: ETSI 300 659-1 (DTMF string sent between first and
+                   second ring)
+                 * EtsiFsk: ETSI 300 659-1 (FSK (V.23) sent between first and
+                   second ring)
+
+               "
+ DEFVAL        { country }
+ ::= { potsMIBObjects 200 }
+
+-- Scalar:DTMF Map Digit Detection
+
+dtmfMapDigitDetection OBJECT-TYPE
+ SYNTAX        INTEGER { whenPressed(100) , whenReleased(200) }
+ MAX-ACCESS    read-write
+ STATUS        current
+ DESCRIPTION " DTMF Map Digit Detection
+
+               Determines when a digit is processed through the DTMF maps.
+
+                 * WhenPressed : Digits are processed as soon as they are
+                   pressed. This can lead to a digit leak in the RTP at the
+                   beginning of a call if the voice stream is established
+                   before the last digit is released.
+                 * WhenReleased : Digits are processed only when released. This
+                   option increases the delay needed to match a dialed string
+                   to a DTMF map. There is also an impact on
+                   EpServ.DtmfMapTimeoutInterDtmf,
+                   EpServ.DtmfMapTimeoutFirstDtmf and
+                   EpServ.DtmfMapTimeoutCompletion since the timers are stopped
+                   at the end of a digit instead of the beginning.
+
+               "
+ DEFVAL        { whenPressed }
+ ::= { potsMIBObjects 300 }
+
+-- Scalar:Enable/Disable Vocal Unit Information
+
+vocalUnitInformation OBJECT-TYPE
+ SYNTAX        INTEGER { none(100) , all(200) }
+ MAX-ACCESS    read-write
+ STATUS        current
+ DESCRIPTION " Enable/Disable Vocal Unit Information
+
+               Determines the type of vocal information that can be obtained by
+               dialing a pre-defined digit map.
+
+                 * None: The vocal information feature is disabled.
+                 * All: Enable all vocal information digit maps.
+
+               The supported vocal information digit maps are:
+
+                 * '*#*0': The list of IP addresses of the device.
+                 * '*#*1': The MAC address of the device.
+                 * '*#*8': The firmware version number of the device.
+
+               "
+ DEFVAL        { all }
+ ::= { potsMIBObjects 400 }
+
+-- Scalar:Caller ID Transmission
+
+callerIdTransmission OBJECT-TYPE
+ SYNTAX        INTEGER { country(100) , firstRing(200) , ringPulse(300) ,
+               lineReversalRingPulse(400) , dtAs(500) , lineReversalDtAs(600) ,
+               noRingPulse(700) }
+ MAX-ACCESS    read-write
+ STATUS        current
+ DESCRIPTION " Caller ID Transmission
+
+               The caller ID transmission allows selecting the transmission
+               type of the caller ID.
+
+                 * Country : Use the default caller ID of the country defined
+                   in the TelIf.CountrySelection parameter.
+                 * FirstRing : Caller ID is sent after the first ring.
+                 * RingPulse : Caller ID is sent between a brief ring pulse and
+                   the first ring.
+                 * LineReversalRingPulse : Caller ID is sent between a brief
+                   ring pulse and the first ring on an inverted polarity line.
+                 * DtAs : Caller ID is sent after the dual tone alerting state
+                   tone.
+                 * LineReversalDtAs : Caller ID is sent after the dual tone
+                   alerting state tone on an inverted polarity line.
+                 * NoRingPulse : Caller ID is sent before the first ring.
+
+               "
+ DEFVAL        { country }
+ ::= { potsMIBObjects 500 }
+
+-- ****************************************************************************
+
+-- Group:FXS
+
+-- ****************************************************************************
+
+fxsGroup OBJECT IDENTIFIER
+ ::= { potsMIBObjects 10000 }
+ -- Scalar:FXS Line Supervision Mode
+
+ fxsLineSupervisionMode OBJECT-TYPE
+  SYNTAX        INTEGER { none(100) , dropOnDisconnect(200) , reversalOnIdle
+                (300) , reversalOnEstablished(400) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXS Line Supervision Mode
+
+                Determines how the power drop and line polarity are used to
+                signal the state of a line.
+
+                  * None: Don't use power drop or polarity reversal to signal
+                    the state of the line.
+                  * DropOnDisconnect: Activates the Power Drop on Disconnect
+                    feature. A short power drop is made at the end of a call
+                    when the call is disconnected by the remote party. The
+                    drop duration can be configured in the
+                    FxsPowerDropOnDisconnectDuration parameter.
+                  * ReversalOnIdle: Activates the Polarity Reversal on Idle
+                    feature. The polarity of the line is initially in reversed
+                    state. The polarity of the line returns to the normal
+                    state when the user seizes the line or when the line rings
+                    for an incoming call. The polarity of the line is reversed
+                    again when the call is disconnected.
+                  * ReversalOnEstablished: Activates the Polarity Reversal on
+                    Established option. The polarity of the line is initially
+                    in the normal state. The polarity of the line is reversed
+                    when the call is established and returns to the normal
+                    state when the call is disconnected.
+
+                Note: Power drop and polarity reversal are also called battery
+                drop and battery reversal.
+
+                "
+  DEFVAL        { dropOnDisconnect }
+  ::= { fxsGroup 100 }
+
+ -- Scalar:FXS Disconnect Delay
+
+ fxsDisconnectDelay OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..300 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXS Disconnect Delay
+
+                Determines whether or not call clearing occurs as soon as the
+                called user is the first to hang up a received call. This
+                parameter has no effect when the user acts as the calling
+                party.
+
+                If the value is set to 0, the call is disconnected as soon as
+                the called user hangs up the call.
+
+                If the value is greater than 0, that value is the amount of
+                time, in seconds, the unit waits after the called user hangs
+                up before signalling the end of the call.
+
+                "
+  DEFVAL        { 0 }
+  ::= { fxsGroup 200 }
+
+ -- Scalar:FXS Inband Ringback
+
+ fxsInbandRingback OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXS Inband Ringback
+
+                Determines whether or not the FXS endpoint needs to generate a
+                ringback for incoming ringing call.
+
+                  * Disable: The FXS endpoint does not play local ringback to
+                    the remote party.
+                  * Enable: The FXS endpoint plays local ringback to the
+                    remote party via the negotiated media stream.
+
+                "
+  DEFVAL        { disable }
+  ::= { fxsGroup 300 }
+
+ -- Scalar:FXS Shutdown Behavior
+
+ fxsShutdownBehavior OBJECT-TYPE
+  SYNTAX        INTEGER { disabledTone(100) , powerDrop(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXS Shutdown Behavior
+
+                Determines the FXS endpoint behavior when it becomes shut
+                down.
+
+                  * DisabledTone: A disabled tone is played when the user
+                    picks up the telephone and the FXS endpoint is shut down.
+                  * PowerDrop: The loop current is interrupted when the FXS
+                    endpoint is shut down and no tone is played when the user
+                    picks up the telephone.
+
+                A FXS endpoint becomes shut down when the operational state of
+                the endpoint becomes 'Disabled' (see the
+                EpAdm.OperationalState parameter) and the
+                EpAdm.EndpointAutomaticShutdownEnable parameter is set to
+                'Enable'.
+
+                This parameter is not used by FXS endpoints related to bypass
+                when the FxsBypass.Activation parameter is set to
+                'EndpointDisabled'.
+
+                "
+  DEFVAL        { disabledTone }
+  ::= { fxsGroup 400 }
+
+ -- Scalar:FXS Power Drop On Disconnect Duration
+
+ fxsPowerDropOnDisconnectDuration OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 100..5000 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXS Power Drop On Disconnect Duration
+
+                Determines the power drop duration that is made at the end of
+                a call when the call is disconnected by the remote party.
+
+                This value is expressed in milliseconds (ms).
+
+                This parameter only has an effect when the
+                FxsLineSupervisionMode parameter is set to 'DropOnDisconnect'.
+
+                "
+  DEFVAL        { 1000 }
+  ::= { fxsGroup 500 }
+
+ -- Scalar:FXS Service Activation
+
+ fxsServiceActivation OBJECT-TYPE
+  SYNTAX        INTEGER { flashHook(100) , flashHookAndDigit(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXS Service Activation
+
+                Selects the method used by the user to activate supplementary
+                services like call hold, second call, call waiting, call
+                transfer and conference call.
+
+                  * FlashHook: Service activation is performed by flash hook
+                    or hanging up.
+                  * FlashHookAndDigit: Service activation is performed by
+                    flash hook, flash hook followed by a digit or hanging up.
+
+                Flash hook and digits commands when a call is waiting or a
+                call is on hold:
+
+                  * [Flash+1] or [hang-up] : End active call and switch to
+                    call on hold/waiting.
+                  * [Flash+2] : Hold the active call and switch to call on
+                    hold/waiting.
+                  * [Flash+3] : Enter in 3-party conference mode.
+                  * [Flash+4] : Transfer call on hold to the active call (not
+                    available on call waiting).
+
+                Flash hook and digits commands when in 3-party conference:
+
+                  * [hang-up] : End all calls.
+                  * [Flash+1] : Exit from 3-party conference mode. 3rd party
+                    is active, 2nd party call is ended.
+                  * [Flash+2] : Exit from 3-party conference mode. 2nd party
+                    is active, 3rd party is on hold.
+
+                "
+  DEFVAL        { flashHook }
+  ::= { fxsGroup 600 }
+
+ -- Scalar:Fxs Caller ID Private Calling Party Name
+
+ fxsCallerIdPrivateCallingPartyName OBJECT-TYPE
+  SYNTAX        OCTET STRING ( SIZE(0..50) )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Fxs Caller ID Private Calling Party Name
+
+                Sets the Calling Party Name of the caller ID (CLIP) when the
+                calling party is tagged as private.
+
+                  * When empty, no Calling Party Name parameter is sent.
+                  * When set to 'P', no Calling Party Name parameter is sent
+                    but a Reason for Absence of Caller Party Name parameter is
+                    sent with the value 0x50 (Private).
+
+                "
+  DEFVAL        { "Anonymous" }
+  ::= { fxsGroup 700 }
+
+ -- Scalar:Fxs Sip Message Alerting Enable
+
+ fxsSipMessageAlertingEnable OBJECT-TYPE
+  SYNTAX        MxEnableState
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Fxs Sip Message Alerting Enable
+
+                Determines whether or not the FXS endpoints should handle a
+                SIP MESSAGE notification.
+
+                  * Disable: The FXS endpoints will ignore all SIP MESSAGE
+                    notifications.
+                  * Enable: A SIP message notification will trigger an alert
+                    on the FXS endpoint by generating a short ring and sending
+                    the message content through the Caller ID.
+
+                The FXS ports needs to be on-hook for the alert to be
+                generated, otherwise the notification is ignored.
+
+                The SIP message notifications are received only if the
+                SipEp.SipMessageSupport parameter is set to 'AcceptPlainText'.
+
+                "
+  DEFVAL        { disable }
+  ::= { fxsGroup 800 }
+
+ -- ***************************************************************************
+ 
+ -- Group:FXS Country Customisation
+
+ -- ***************************************************************************
+ 
+ fxsCountryCustomizationGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 10000 }
+  -- Scalar:FXS Override Country Configuration
+
+  fxsCountryCustomizationOverride OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXS Override Country Configuration
+
+                 Allows to override FXS-related default country settings.
+
+                   * Disable: The line uses the default country FXS settings.
+                   * Enable: The line uses the FXS country configuration set in
+                     the FxsCountryCustomizationLoopCurrent parameter and the
+                     FxsCountryCustomizationFlashHookDetectionRange parameter.
+
+                 "
+   DEFVAL        { disable }
+   ::= { fxsCountryCustomizationGroup 100 }
+
+  -- Scalar:FXS Country Override Loop Current
+
+  fxsCountryCustomizationLoopCurrent OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 20..32 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXS Country Override Loop Current
+
+                 Loop current generated by the FXS port in milliamperes(mA).
+
+                 This configuration is used only if the
+                 FxsCountryCustomizationOverride parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { 30 }
+   ::= { fxsCountryCustomizationGroup 200 }
+
+  -- Scalar:FXS Country Override Flash Hook Detection Range
+
+  fxsCountryCustomizationFlashHookDetectionRange OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(5..9) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXS Country Override Flash Hook Detection Range
+
+                 The range in which the hook switch must remain pressed to
+                 perform a flash hook.
+
+                 The range consists of the minimal delay and maximal delay
+                 expressed in ms separated by a '-'. The minimal value allowed
+                 is 10 ms and the maximum value allowed is 1200 ms. The space
+                 character is not allowed.
+
+                 This configuration is used only if the
+                 FxsCountryCustomizationOverride parameter is set to 'Enable'.
+
+                 "
+   DEFVAL        { "100-1200" }
+   ::= { fxsCountryCustomizationGroup 300 }
+
+ -- End of group:FXS Country Customisation
+
+ -- ***************************************************************************
+ 
+ -- Group:FXS Bypass
+
+ -- ***************************************************************************
+ 
+ fxsBypassGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 10100 }
+  -- ***************************************************************************
+  
+  -- Table:FXS Bypass Table
+
+  -- ***************************************************************************
+  
+  fxsBypassTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FxsBypassEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " FXS Bypass Table
+
+                 This table shows the current available FXS bypass and allows
+                 their basic configuration.
+                 "
+   ::= { fxsBypassGroup 1000 }
+   fxsBypassEntry OBJECT-TYPE
+    SYNTAX        FxsBypassEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table FXS Bypass Table. "
+    INDEX         {
+                    fxsBypassId
+                  }
+
+    ::= { fxsBypassTable 1 }
+
+   FxsBypassEntry ::= SEQUENCE
+   {
+     fxsBypassId                  OCTET STRING,
+     fxsBypassActivation          INTEGER,
+     fxsBypassActivationDtmfMap   MxDigitMap,
+     fxsBypassDeactivationTimeout Unsigned32
+   }
+
+   -- Index:Line Identifier
+
+   fxsBypassId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Line Identifier
+
+                  String that identifies a line in other tables.
+                  "
+    ::= { fxsBypassEntry 100 }
+
+   -- Columnar:FXS Bypass Activation
+
+   fxsBypassActivation OBJECT-TYPE
+    SYNTAX        INTEGER { powerOff(100) , endpointDisabled(200) , onDemand
+                  (300) }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " FXS Bypass Activation
+
+                  Specifies when the bypass needs to be activated.
+
+                    * PowerOff: The bypass is activated only when the unit
+                      power is off or the POTS service is not started.
+                    * EndpointDisabled: The bypass is activated when the
+                      operational state of the endpoint is 'Disable' and the
+                      EpAdm.EndpointAutomaticShutdownEnable parameter is set to
+                      'Enable'. The bypass is also activated for the same
+                      conditions as the ones defined in 'PowerOff'.
+                    * OnDemand: The bypass is activated when the user enters
+                      the DTMF map configured in the
+                      FxsBypass.ActivationDtmfMap parameter. The bypass is
+                      deactivated when the user on hooks the phone for at least
+                      the number of time configured in the
+                      FxsBypass.DeactivationTimeout parameter. The bypass is
+                      also activated for the same conditions as the ones
+                      defined in 'PowerOff'.
+
+                  "
+    DEFVAL        { endpointDisabled }
+    ::= { fxsBypassEntry 200 }
+
+   -- Columnar:FXS Bypass Activation DTMF Map
+
+   fxsBypassActivationDtmfMap OBJECT-TYPE
+    SYNTAX        MxDigitMap
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " FXS Bypass Activation DTMF Map
+
+                  Specifies the DTMF to signal to enable the bypass.
+
+                  This parameter is only used when the FxsBypass.Activation
+                  parameter is set to 'OnDemand'.
+
+                  "
+    DEFVAL        { "" }
+    ::= { fxsBypassEntry 300 }
+
+   -- Columnar:FXS Bypass Deactivation Timeout
+
+   fxsBypassDeactivationTimeout OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 0..3600 )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " FXS Bypass Deactivation Timeout
+
+                  Specifies the delay to wait before deactivating the bypass
+                  after an on hook if the bypass is activated on demand. The
+                  delay is restarted after each on hook. The bypass is not
+                  deactivated if the delay expires while the FXS endpoint is
+                  off hook.
+
+                  This parameter is only used when the FxsBypass.Activation
+                  parameter is set to 'OnDemand' and the bypass is activated
+                  using the DTMFs configured in the FxsBypass.ActivationDtmfMap
+                  parameter.
+
+                  This value is expressed in seconds (s).
+
+                  "
+    DEFVAL        { 32 }
+    ::= { fxsBypassEntry 400 }
+
+  -- End of table:FXS Bypass Table
+
+ -- End of group:FXS Bypass
+
+ -- ***************************************************************************
+ 
+ -- Group:FXS Message Waiting Indicator Group
+
+ -- ***************************************************************************
+ 
+ fxsMessageWaitingIndicatorGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 10200 }
+  -- Scalar:Default FXS Message Waiting Indicator Activation.
+
+  fxsDefaultMessageWaitingIndicatorActivation OBJECT-TYPE
+   SYNTAX        INTEGER { disabled(100) , tone(200) , visual(300) ,
+                 toneAndVisual(400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Default FXS Message Waiting Indicator Activation.
+
+                 Configure the Message Waiting Indicator service available on
+                 FXS lines.
+
+                 When used in conjunction with a voice-messaging system, the
+                 Message Waiting Indicator allows the user to be notified when
+                 new messages are awaiting attention on the messaging server.
+
+                   * Disabled: The user is not alerted of messages awaiting
+                     attention.
+                   * Tone: When messages are awaiting attention, the user is
+                     alerted by a message waiting tone when picking up the
+                     handset.
+                   * Visual: When messages are awaiting attention, the user is
+                     alerted by a Visual Message Waiting Indicator such as a
+                     blinking LED on the phone.
+                   * ToneAndVisual: When messages are awaiting attention, the
+                     user is alerted by a Visual Message Waiting Indicator such
+                     as a blinking LED on the phone, and a message waiting tone
+                     when picking up the handset.
+
+                 If a specific configuration is set in the
+                 FxsSpecificMessageWaitingIndicator.Activation parameter and
+                 the FxsSpecificMessageWaitingIndicator.EnableConfig parameter
+                 is set to 'Enable', then it overrides the current default
+                 configuration.
+
+                 "
+   DEFVAL        { toneAndVisual }
+   ::= { fxsMessageWaitingIndicatorGroup 100 }
+
+  -- Scalar:Default FXS Visual Message Waiting Indicator Type.
+
+  fxsDefaultVisualMessageWaitingIndicatorType OBJECT-TYPE
+   SYNTAX        INTEGER { fsk(100) , fskAndVoltage(200) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Default FXS Visual Message Waiting Indicator Type.
+
+                 Configures how the Visual Message Waiting Indicator is sent on
+                 FXS lines.
+
+                   * Fsk: A FSK signal is sent to activate the VMWI on the
+                     phone.
+                   * FskAndVoltage: Both FSK signal and high voltage signal are
+                     used to activate the VMWI on the phone.
+
+                 Note: FskAndVoltage is not supported on all devices.
+
+                 "
+   DEFVAL        { fsk }
+   ::= { fxsMessageWaitingIndicatorGroup 150 }
+
+  -- ***************************************************************************
+  
+  -- Table:Specific FXS Message Waiting Indicator Configuration
+
+  -- ***************************************************************************
+  
+  fxsSpecificMessageWaitingIndicatorTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FxsSpecificMessageWaitingIndicatorEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " Specific FXS Message Waiting Indicator Configuration
+
+                 This table allows to configure the message waiting indicator
+                 feature for a specific FXS line.
+                 "
+   ::= { fxsMessageWaitingIndicatorGroup 200 }
+   fxsSpecificMessageWaitingIndicatorEntry OBJECT-TYPE
+    SYNTAX        FxsSpecificMessageWaitingIndicatorEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table Specific FXS Message Waiting Indicator
+                  Configuration . "
+    INDEX         {
+                    fxsSpecificMessageWaitingIndicatorId
+                  }
+
+    ::= { fxsSpecificMessageWaitingIndicatorTable 1 }
+
+   FxsSpecificMessageWaitingIndicatorEntry ::= SEQUENCE
+   {
+     fxsSpecificMessageWaitingIndicatorId           OCTET STRING,
+     fxsSpecificMessageWaitingIndicatorEnableConfig MxEnableState,
+     fxsSpecificMessageWaitingIndicatorActivation   INTEGER
+   }
+
+   -- Index:Line Identifier
+
+   fxsSpecificMessageWaitingIndicatorId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Line Identifier
+
+                  String that identifies a line in other tables.
+                  "
+    ::= { fxsSpecificMessageWaitingIndicatorEntry 100 }
+
+   -- Columnar:Enable Configuration
+
+   fxsSpecificMessageWaitingIndicatorEnableConfig OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Enable Configuration
+
+                  Defines the configuration to use for a specific line.
+
+                    * Disable: The line uses the default configuration as
+                      defined in the
+                      FxsDefaultMessageWaitingIndicatorActivation parameter.
+                    * Enable: The line uses the specific configuration as
+                      defined in the
+                      FxsSpecificMessageWaitingIndicator.Activation parameter.
+
+                  "
+    DEFVAL        { disable }
+    ::= { fxsSpecificMessageWaitingIndicatorEntry 200 }
+
+   -- Columnar:Specific FXS Message Waiting Indicator Activation.
+
+   fxsSpecificMessageWaitingIndicatorActivation OBJECT-TYPE
+    SYNTAX        INTEGER { disabled(100) , tone(200) , visual(300) ,
+                  toneAndVisual(400) }
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Specific FXS Message Waiting Indicator Activation.
+
+                  Configure the Message Waiting Indicator for a specific FXS
+                  line.
+
+                  When used in conjunction with a voice-messaging system, the
+                  Message Waiting Indicator allows the user to be notified when
+                  new messages are awaiting attention on the messaging server.
+
+                    * Disabled: The user is not alerted of messages awaiting
+                      attention.
+                    * Tone: When messages are awaiting attention, the user is
+                      alerted by a message waiting tone when picking up the
+                      handset.
+                    * Visual: When messages are awaiting attention, the user is
+                      alerted by a Visual Message Waiting Indicator such as a
+                      blinking LED on the phone.
+                    * ToneAndVisual: When messages are awaiting attention, the
+                      user is alerted by a Visual Message Waiting Indicator
+                      such as a blinking LED on the phone, and a message
+                      waiting tone when picking up the handset.
+
+                  This configuration overrides the default configuration set in
+                  the FxsDefaultMessageWaitingIndicatorActivation parameter if
+                  the FxsSpecificMessageWaitingIndicator.EnableConfig parameter
+                  is set to 'Enable'.
+
+                  "
+    DEFVAL        { toneAndVisual }
+    ::= { fxsSpecificMessageWaitingIndicatorEntry 300 }
+
+  -- End of table:Specific FXS Message Waiting Indicator Configuration
+
+ -- End of group:FXS Message Waiting Indicator Group
+
+ -- ***************************************************************************
+ 
+ -- Group:FXS Call Group
+
+ -- ***************************************************************************
+ 
+ fxsCallGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 10300 }
+  -- Scalar:FXS Default Auto Cancel Timeout
+
+  fxsDefaultAutoCancelTimeout OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 0..600 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXS Default Auto Cancel Timeout
+
+                 Time, in seconds, the endpoint rings before the call is
+                 automatically cancelled.
+
+                 Setting this parameter to 0 disables the timeout. Calls will
+                 not be automatically cancelled.
+
+                 "
+   DEFVAL        { 0 }
+   ::= { fxsCallGroup 100 }
+
+ -- End of group:FXS Call Group
+
+ -- ***************************************************************************
+ 
+ -- Group:Emergency Call Services Group
+
+ -- ***************************************************************************
+ 
+ fxsEmergencyCallGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 10400 }
+  -- Scalar:FXS Emergency Call Override
+
+  fxsEmergencyCallOverride OBJECT-TYPE
+   SYNTAX        INTEGER { noOverride(100) , noServices(200) , noDisconnect
+                 (300) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXS Emergency Call Override
+
+                 Overrides the set of services that are activated during an
+                 emergency call.
+
+                   * NoOverride: The set of services for emergency calls
+                     remains the same as configured.
+                   * NoServices: Ignores any service requiring a flash-hook.
+                     Call waiting and all other related services are
+                     deactivated.
+                   * NoDisconnect: Same as 'NoServices' and, in addition,
+                     automatically re-establish a call that was disconnected by
+                     the originator.
+
+                 Refer to the service 'EpServ' for telephony services
+                 configuration.
+
+                 "
+   DEFVAL        { noOverride }
+   ::= { fxsEmergencyCallGroup 100 }
+
+  -- Scalar:FXS Emergency Ring Timeout
+
+  fxsEmergencyRingTimeout OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 0..180000 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXS Emergency Ring Timeout
+
+                 When the FxsEmergencyCallOverride parameter is set to
+                 'NoDisconnect', this parameter sets the grace period before
+                 ringing the phone in the event where the originator of an
+                 emergency call hangs-up before the emergency call center
+                 disconnects the call.
+
+                 This value is expressed in milliseconds (ms).
+
+                 "
+   DEFVAL        { 2000 }
+   ::= { fxsEmergencyCallGroup 200 }
+
+ -- End of group:Emergency Call Services Group
+
+ -- ***************************************************************************
+ 
+ -- Group:FXS Ring
+
+ -- ***************************************************************************
+ 
+ fxsRingGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 10500 }
+  -- ***************************************************************************
+  
+  -- Table:FXS Distinctive Ring
+
+  -- ***************************************************************************
+  
+  fxsDistinctiveRingTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FxsDistinctiveRingEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " FXS Distinctive Ring
+
+                 This table allows to override the default country ring
+                 configuration. The configuration applies to all interfaces.
+                 "
+   ::= { fxsRingGroup 100 }
+   fxsDistinctiveRingEntry OBJECT-TYPE
+    SYNTAX        FxsDistinctiveRingEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table FXS Distinctive Ring. "
+    INDEX         {
+                    fxsDistinctiveRingIndex
+                  }
+
+    ::= { fxsDistinctiveRingTable 1 }
+
+   FxsDistinctiveRingEntry ::= SEQUENCE
+   {
+     fxsDistinctiveRingIndex   Unsigned32,
+     fxsDistinctiveRingRingId  OCTET STRING,
+     fxsDistinctiveRingPattern OCTET STRING
+   }
+
+   -- Index:Row Index
+
+   fxsDistinctiveRingIndex OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 1..4 )
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Row Index
+
+                  Unique identifier of the row in the table.
+                  "
+    ::= { fxsDistinctiveRingEntry 100 }
+
+   -- Columnar:Ring ID
+
+   fxsDistinctiveRingRingId OBJECT-TYPE
+    SYNTAX        OCTET STRING ( SIZE(0..512) )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Ring ID
+
+                  Identification of the distinctive ring. When the RingId
+                  parameter is defined and the incoming call property
+                  'distinctive-ring' matches with it, the corresponding ring
+                  pattern is used. Otherwise, the country ring pattern is used.
+
+                  Example:
+
+                    * An 'Alert-Info: <http://127.0.0.1/Bellcore-dr2>' matches
+                      with a '//127.0.0.1/Bellcore-dr2' RingId
+
+                  "
+    DEFVAL        { "" }
+    ::= { fxsDistinctiveRingEntry 200 }
+
+   -- Columnar:Pattern
+
+   fxsDistinctiveRingPattern OBJECT-TYPE
+    SYNTAX        OCTET STRING ( SIZE(0..512) )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Pattern
+
+                  Pattern description of the distinctive ring. Used only if the
+                  RingId parameter is not empty.
+
+                  The format for a cadence is 'on, off, on, off, ...' where
+                  'on' and 'off', respectively are numerical values
+                  representing the time in milliseconds. Up to three 'on, off'
+                  pairs can be specified. Allowed range for the 'on' and 'off'
+                  values are 0 to 32767. A cadence starting with a value of
+                  zero (0) is invalid.
+
+                  Examples:
+
+                    * Bellcore-dr2: '800,400,800,4000'
+                    * Bellcore-dr4: '300,200,1000,200,300,4000'
+
+                  "
+    DEFVAL        { "" }
+    ::= { fxsDistinctiveRingEntry 300 }
+
+  -- End of table:FXS Distinctive Ring
+
+ -- End of group:FXS Ring
+
+ -- ***************************************************************************
+ 
+ -- Group:FXS Caller Id Group
+
+ -- ***************************************************************************
+ 
+ fxsCallerIdGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 10600 }
+  -- ***************************************************************************
+  
+  -- Table:FXS Caller Id
+
+  -- ***************************************************************************
+  
+  fxsCallerIdTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FxsCallerIdEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " FXS Caller Id
+
+                 This table allows the caller id basic configuration. The
+                 caller id configuration is endpoint specific.
+                 "
+   ::= { fxsCallerIdGroup 100 }
+   fxsCallerIdEntry OBJECT-TYPE
+    SYNTAX        FxsCallerIdEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table FXS Caller Id. "
+    INDEX         {
+                    fxsCallerIdId
+                  }
+
+    ::= { fxsCallerIdTable 1 }
+
+   FxsCallerIdEntry ::= SEQUENCE
+   {
+     fxsCallerIdId         OCTET STRING,
+     fxsCallerIdActivation MxEnableState
+   }
+
+   -- Index:Line Identifier
+
+   fxsCallerIdId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Line Identifier
+
+                  String that identifies a line in other tables.
+                  "
+    ::= { fxsCallerIdEntry 150 }
+
+   -- Columnar:Caller Id Activation
+
+   fxsCallerIdActivation OBJECT-TYPE
+    SYNTAX        MxEnableState
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " Caller Id Activation
+
+                  Determines whether or not the FXS endpoint present the caller
+                  id on an incoming call.
+
+                    * Disable: The FXS endpoint does not present the caller id.
+                    * Enable: The FXS endpoint presents the caller id.
+
+                  "
+    DEFVAL        { enable }
+    ::= { fxsCallerIdEntry 300 }
+
+  -- End of table:FXS Caller Id
+
+ -- End of group:FXS Caller Id Group
+
+ -- ***************************************************************************
+ 
+ -- Group:FXS Interop Group
+
+ -- ***************************************************************************
+ 
+ fxsInteropGroup OBJECT IDENTIFIER
+  ::= { fxsGroup 50000 }
+  -- Scalar:Play Local Ringback when no media stream.
+
+  fxsInteropPlayLocalRingbackWhenNoMediaStream OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Play Local Ringback when no media stream.
+
+                 Forces local ringback generation when early-media is enabled
+                 but no media stream has been received yet.
+
+                   * Enable: Upon reception of an early-media provisional
+                     response (i.e. SIP 18x with SDP), play a local ringback
+                     tone if no RTP packet is received after 1 second. At any
+                     moment, if an RTP packet is received, the early-media
+                     stream is played right away, thus aborting definitely the
+                     local ringback.
+                   * Disable: Never play local ringback in early-media
+                     use-cases.
+
+                 Applies to outgoing calls only.
+
+                 "
+   DEFVAL        { disable }
+   ::= { fxsInteropGroup 100 }
+
+ -- End of group:FXS Interop Group
+
+-- End of group:FXS
+
+-- ****************************************************************************
+
+-- Group:FXO Group
+
+-- ****************************************************************************
+
+fxoGroup OBJECT IDENTIFIER
+ ::= { potsMIBObjects 20000 }
+ -- Scalar:FXO Pre Dial Delay
+
+ fxoPreDialDelay OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 0..10000 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXO Pre Dial Delay
+
+                The delay between the time the line is successfully seized, or
+                dial tone detected, and the moment the destination phone
+                number is dialed.
+
+                A value of '0' indicates to use a value that is specific to
+                the country specification as set in the TelIf.CountrySelection
+                parameter.
+
+                This value is expressed in milliseconds (ms).
+
+                "
+  DEFVAL        { 0 }
+  ::= { fxoGroup 100 }
+
+ -- Scalar:FXO Dial Tone Detection Configuration
+
+ fxoDialToneDetectionMode OBJECT-TYPE
+  SYNTAX        INTEGER { disable(100) , countryTone(200) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXO Dial Tone Detection Configuration
+
+                When dial tone detection is enabled, the unit waits for a dial
+                tone on the FXO line before initiating the dialling sequence.
+                If no dial tone is detected, the line is considered as busy
+                with an incoming call. This mechanism helps avoid collisions
+                between incoming and outgoing calls.
+
+                  * Disable: Dial tone detection is disabled.
+                  * CountryTone: The unit tries to detect the tone specified
+                    for this purpose in the current country's tone
+                    specification. Some country specifications omit this
+                    information. In that case, the unit behaves as if the
+                    FxoDialToneDetectionMode parameter is 'disable'.
+
+                See the TelIf.CountrySelection parameter.
+
+                "
+  DEFVAL        { countryTone }
+  ::= { fxoGroup 200 }
+
+ -- Scalar:FXO Dial Tone Detection Timeout
+
+ fxoDialToneDetectionTimeout OBJECT-TYPE
+  SYNTAX        Unsigned32 ( 1300..10000 )
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " FXO Dial Tone Detection Timeout
+
+                Indicates how long the unit waits for a dial tone before
+                considering the line is busy with an incoming FXO call.
+
+                This value is expressed in milliseconds (ms).
+
+                "
+  DEFVAL        { 3000 }
+  ::= { fxoGroup 300 }
+
+ -- ***************************************************************************
+ 
+ -- Table:FXO Answering Delay
+
+ -- ***************************************************************************
+ 
+ fxoAnsweringDelayTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF FxoAnsweringDelayEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " FXO Answering Delay
+
+                This table holds the answering delay configuration. Each row
+                in this table configures the answering delay of a line.
+                "
+  ::= { fxoGroup 5000 }
+  fxoAnsweringDelayEntry OBJECT-TYPE
+   SYNTAX        FxoAnsweringDelayEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table FXO Answering Delay. "
+   INDEX         {
+                   fxoAnsweringDelayId
+                 }
+
+   ::= { fxoAnsweringDelayTable 1 }
+
+  FxoAnsweringDelayEntry ::= SEQUENCE
+  {
+    fxoAnsweringDelayId                           OCTET STRING,
+    fxoAnsweringDelayWaitBeforeAnsweringDelay     Unsigned32,
+    fxoAnsweringDelayAnsweringOnCallerIdDetection MxEnableState,
+    fxoAnsweringDelayWaitForCalleeToAnswer        MxEnableState
+  }
+
+  -- Index:Line Identifier
+
+  fxoAnsweringDelayId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Line Identifier
+
+                 String that identifies a FXO line.
+                 "
+   ::= { fxoAnsweringDelayEntry 100 }
+
+  -- Columnar:FXO Wait Before Answering Delay
+
+  fxoAnsweringDelayWaitBeforeAnsweringDelay OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 0..30000 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Wait Before Answering Delay
+
+                 The waiting period before answering an incoming FXO call.
+
+                 If this delay expires before the caller ID signal is decoded,
+                 the call proceeds without caller ID information.
+
+                 If a minimal waiting period is required for the selected
+                 country, the highest of both values is used. See the
+                 TelIf.CountrySelection parameter.
+
+                 This value is expressed in milliseconds (ms).
+
+                 "
+   DEFVAL        { 8000 }
+   ::= { fxoAnsweringDelayEntry 200 }
+
+  -- Columnar:FXO Answering On Caller ID Detection
+
+  fxoAnsweringDelayAnsweringOnCallerIdDetection OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Answering On Caller ID Detection
+
+                 Enables answering upon caller ID detection instead of the
+                 waiting delay configured by WaitBeforeAnsweringDelay.
+
+                 When enabled, an incoming FXO call is answered on the first
+                 occurrence of either
+
+                   * The reception of the caller ID signal.
+                   * The expiration of the delay configured by the
+                     WaitBeforeAnsweringDelay parameter and the country wait
+                     before answering delay. See the TelIf.CountrySelection
+                     parameter.
+
+                 "
+   DEFVAL        { enable }
+   ::= { fxoAnsweringDelayEntry 300 }
+
+  -- Columnar:FXO Wait For Callee To Answer Enable
+
+  fxoAnsweringDelayWaitForCalleeToAnswer OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Wait For Callee To Answer Enable
+
+                 When the endpoint is set up for automatic call (see the
+                 EpServ.DefaultAutoCallEnable parameter), enabling this
+                 parameter makes the endpoint wait until the called party
+                 connection is established before answering the incoming call.
+
+                 "
+   DEFVAL        { disable }
+   ::= { fxoAnsweringDelayEntry 400 }
+
+ -- End of table:FXO Answering Delay
+
+ -- ***************************************************************************
+ 
+ -- Table:FXO Incoming Call Behavior Table
+
+ -- ***************************************************************************
+ 
+ fxoIncomingCallBehaviorTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF FxoIncomingCallBehaviorEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " FXO Incoming Call Behavior Table
+
+                Table that defines how each line behaves when there is an
+                incoming call.
+                "
+  ::= { fxoGroup 5100 }
+  fxoIncomingCallBehaviorEntry OBJECT-TYPE
+   SYNTAX        FxoIncomingCallBehaviorEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table FXO Incoming Call Behavior Table. "
+   INDEX         {
+                   fxoIncomingCallBehaviorId
+                 }
+
+   ::= { fxoIncomingCallBehaviorTable 1 }
+
+  FxoIncomingCallBehaviorEntry ::= SEQUENCE
+  {
+    fxoIncomingCallBehaviorId                 OCTET STRING,
+    fxoIncomingCallBehaviorNotAllowedBehavior INTEGER
+  }
+
+  -- Index:Line Identifier
+
+  fxoIncomingCallBehaviorId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Line Identifier
+
+                 String that identifies a FXO line.
+                 "
+   ::= { fxoIncomingCallBehaviorEntry 100 }
+
+  -- Columnar:Not Allowed Behavior
+
+  fxoIncomingCallBehaviorNotAllowedBehavior OBJECT-TYPE
+   SYNTAX        INTEGER { doNotAnswer(100) , playCongestionTone(200) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Not Allowed Behavior
+
+                 Under certain circumstances (locked port, configuration,
+                 etc...), incoming FXO calls are not allowed. When that is the
+                 case, the FXO endpoint behaves in one of the manners below.
+
+                   * DoNotAnswer: The incoming call is left unanswered.
+                   * PlayCongestionTone: The incoming call is answered, a
+                     congestion tone is played for 10 seconds, and then the
+                     call is terminated.
+
+                 "
+   DEFVAL        { playCongestionTone }
+   ::= { fxoIncomingCallBehaviorEntry 200 }
+
+ -- End of table:FXO Incoming Call Behavior Table
+
+ -- ***************************************************************************
+ 
+ -- Table:FXO Custom Basic Parameters
+
+ -- ***************************************************************************
+ 
+ fxoCustomBasicParametersTable OBJECT-TYPE
+  SYNTAX        SEQUENCE OF FxoCustomBasicParametersEntry
+  MAX-ACCESS    not-accessible
+  STATUS        current
+  DESCRIPTION " FXO Custom Basic Parameters
+
+                This table allows to override the default country basic
+                parameters for the FXO lines. This table is effective only if
+                the OverrideDefaultCountryParameters parameter is enabled. If
+                the OverrideDefaultCountryParameters parameter is disabled,
+                the values set in the current row are not applied.
+
+                This parameters override is not supported on all hardware.
+
+                "
+  ::= { fxoGroup 5200 }
+  fxoCustomBasicParametersEntry OBJECT-TYPE
+   SYNTAX        FxoCustomBasicParametersEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " A row in table FXO Custom Basic Parameters. "
+   INDEX         {
+                   fxoCustomBasicParametersId
+                 }
+
+   ::= { fxoCustomBasicParametersTable 1 }
+
+  FxoCustomBasicParametersEntry ::= SEQUENCE
+  {
+    fxoCustomBasicParametersId                               OCTET STRING,
+    fxoCustomBasicParametersOverrideDefaultCountryParameters MxEnableState,
+    fxoCustomBasicParametersImpedance                        INTEGER,
+    fxoCustomBasicParametersDigitalHybrid                    OCTET STRING,
+    fxoCustomBasicParametersReset                            INTEGER
+  }
+
+  -- Index:Line Identifier
+
+  fxoCustomBasicParametersId OBJECT-TYPE
+   SYNTAX        OCTET STRING
+   MAX-ACCESS    read-only
+   STATUS        current
+   DESCRIPTION " Line Identifier
+
+                 String that identifies a FXO line.
+                 "
+   ::= { fxoCustomBasicParametersEntry 100 }
+
+  -- Row command:Reset
+
+  fxoCustomBasicParametersReset OBJECT-TYPE
+   SYNTAX        INTEGER { noOp(0), reset(10) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Reset
+
+                 Resets the FXO basic parameter values with the default
+                 country values. This command is used to retrieve the default
+                 country values.
+                 "
+   DEFVAL        { noOp }
+   ::= { fxoCustomBasicParametersEntry 10000 }
+
+  -- Columnar:Override Default Country Parameters
+
+  fxoCustomBasicParametersOverrideDefaultCountryParameters OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Override Default Country Parameters
+
+                 Overrides the default country basic parameters for this FXO
+                 line.
+
+                   * Disable: The FXO line uses the default country values.
+                     The values set in the current row are not applied.
+                   * Enable: The FXO line uses the custom values as defined in
+                     the current row. To reset the parameter values to the
+                     default country values, use the Reset row command.
+
+                 This setting is not supported on all hardware.
+
+                 "
+   DEFVAL        { disable }
+   ::= { fxoCustomBasicParametersEntry 200 }
+
+  -- Columnar:Impedance
+
+  fxoCustomBasicParametersImpedance OBJECT-TYPE
+   SYNTAX        INTEGER { i600(100) , i600LongLoop(200) , i900(300) ,
+                 australia(400) , austria(500) , belgium(600) , brazil(700) ,
+                 china(800) , czechRepublic(900) , denmark(1000) , finland
+                 (1100) , france(1200) , germany(1300) , greece(1400) , italy
+                 (1500) , japan(1600) , netherlands(1700) , newZealand(1800) ,
+                 norway(1900) , russia(2000) , slovakia(2100) , spain(2200) ,
+                 sweden(2300) , uK(2400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " Impedance
+
+                 AC Impedance for the FXO line.
+
+                 Not all values are supported on all hardware.
+
+                 Impedance values are:
+
+                   * I600: 600 ohms.
+                   * I600LongLoop: 350 ohms + (1000 ohms || 210 nF).
+                   * I900: 900 ohms.
+                   * Others: Refer to the FXO properties section of the
+                     Country Specifications document.
+
+                 For more details, refer to the Country Specifications
+                 document published on the Media5 documentation portal.
+
+                 "
+   DEFVAL        { i600 }
+   ::= { fxoCustomBasicParametersEntry 300 }
+
+  -- Columnar:FXO digital hybrid coefficients
+
+  fxoCustomBasicParametersDigitalHybrid OBJECT-TYPE
+   SYNTAX        OCTET STRING ( SIZE(0..512) )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO digital hybrid coefficients
+
+                 The digital hybrid filter is applied over the Impedance, and
+                 helps reduce near-end echo.
+
+                 Contact the Media5 Technical Assistance Center for support on
+                 how to use this parameter.
+
+                 "
+   DEFVAL        { "" }
+   ::= { fxoCustomBasicParametersEntry 400 }
+
+ -- End of table:FXO Custom Basic Parameters
+
+ -- ***************************************************************************
+ 
+ -- Group:FXO Link State Verification Group
+
+ -- ***************************************************************************
+ 
+ fxoLinkStateVerificationGroup OBJECT IDENTIFIER
+  ::= { fxoGroup 10100 }
+  -- ***************************************************************************
+  
+  -- Table:FXO Link State
+
+  -- ***************************************************************************
+  
+  fxoLinkStateTable OBJECT-TYPE
+   SYNTAX        SEQUENCE OF FxoLinkStateEntry
+   MAX-ACCESS    not-accessible
+   STATUS        current
+   DESCRIPTION " FXO Link State
+
+                 A table of link state updated by the link state verification
+                 mechanism.
+                 "
+   ::= { fxoLinkStateVerificationGroup 100 }
+   fxoLinkStateEntry OBJECT-TYPE
+    SYNTAX        FxoLinkStateEntry
+    MAX-ACCESS    not-accessible
+    STATUS        current
+    DESCRIPTION " A row in table FXO Link State. "
+    INDEX         {
+                    fxoLinkStateId
+                  }
+
+    ::= { fxoLinkStateTable 1 }
+
+   FxoLinkStateEntry ::= SEQUENCE
+   {
+     fxoLinkStateId        OCTET STRING,
+     fxoLinkStateLinkState INTEGER
+   }
+
+   -- Index:Line Identifier
+
+   fxoLinkStateId OBJECT-TYPE
+    SYNTAX        OCTET STRING
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " Line Identifier
+
+                  String that identifies a FXO line.
+                  "
+    ::= { fxoLinkStateEntry 100 }
+
+   -- Columnar:FXO Line State
+
+   fxoLinkStateLinkState OBJECT-TYPE
+    SYNTAX        INTEGER { unknown(100) , up(200) , down(300) }
+    MAX-ACCESS    read-only
+    STATUS        current
+    DESCRIPTION " FXO Line State
+
+                  Link state as reported by the link state verification
+                  mechanism. The link state verification can be enabled by
+                  using the FxoLinkStateVerification parameter object.
+
+                  The unit does not automatically detect when a previously
+                  connected port has changed to the disconnected status. The
+                  unit only detects the change of status when it attempts to
+                  use the port or after a restart.
+
+                  The unit automatically detects within seconds when a
+                  disconnected port becomes connected.
+
+                    * Unknown: The line fault detection is disabled.
+                    * Up: When last polled, the line was connected.
+                    * Down: When last polled, the line was disconnected.
+
+                  "
+    ::= { fxoLinkStateEntry 200 }
+
+  -- End of table:FXO Link State
+
+  -- Scalar:FXO Link State Verification
+
+  fxoLinkStateVerification OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Link State Verification
+
+                 The link state verification mechanism allows the detection of
+                 defective or down lines based on the absence of current when
+                 closing the loop. The link state is reported in the
+                 LinkStateTable parameter.
+
+                 "
+   DEFVAL        { enable }
+   ::= { fxoLinkStateVerificationGroup 200 }
+
+  -- Scalar:FXO Link State Verification Timeout
+
+  fxoLinkStateVerificationTimeout OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 500..10000 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Link State Verification Timeout
+
+                 Indicates how long the unit waits to successfully take the
+                 line before considering the line is defective or down.
+
+                 This value is expressed in milliseconds (ms).
+
+                 "
+   DEFVAL        { 5000 }
+   ::= { fxoLinkStateVerificationGroup 300 }
+
+ -- End of group:FXO Link State Verification Group
+
+ -- ***************************************************************************
+ 
+ -- Group:FXO Force End Of Call Group
+
+ -- ***************************************************************************
+ 
+ fxoForceEndOfCallGroup OBJECT IDENTIFIER
+  ::= { fxoGroup 10200 }
+  -- Scalar:FXO Forced End Of Call On Call Failure Enable
+
+  fxoFeocOnCallFailureEnable OBJECT-TYPE
+   SYNTAX        MxEnableState
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Forced End Of Call On Call Failure Enable
+
+                 Enables forced-end-of-call on call failure.
+
+                 This feature forcefully terminates a call that stayed in an
+                 error state for some time. When the line falls in an error
+                 state where a SIT, a ROH, a BUSY or any error tone is played
+                 outbound to the FXO line, the unit waits for the timeout
+                 specified by the FxoFeocOnCallFailureTimeout parameter and
+                 then hangs up.
+
+                 "
+   DEFVAL        { enable }
+   ::= { fxoForceEndOfCallGroup 100 }
+
+  -- Scalar:FXO Forced End Of Call On Call Failure Timeout
+
+  fxoFeocOnCallFailureTimeout OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 0..180 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Forced End Of Call On Call Failure Timeout
+
+                 The waiting period before terminating a call in an error
+                 state. See the FxoFeocOnCallFailure parameter.
+
+                 This value is expressed in seconds (sec).
+
+                 "
+   DEFVAL        { 30 }
+   ::= { fxoForceEndOfCallGroup 200 }
+
+  -- Scalar:FXO Forced End Of Call On Silence Detection Mode
+
+  fxoFeocOnSilenceDetectionMode OBJECT-TYPE
+   SYNTAX        INTEGER { disable(100) , inbountAndOutboundSilent(400) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Forced End Of Call On Silence Detection Mode
+
+                 Enables forced-end-of-call on silence detection.
+
+                 This feature forcefully terminates a call that stayed silent
+                 for some time. When silence is detected on the inbound and/or
+                 outbound media for an amount of time specified by
+                 FxoFeocOnSilenceDetectionTimeout, the call is terminated.
+
+                   * Disable: Forced-end-of-call on silence detection is
+                     disabled.
+                   * InbountAndOutboundSilent: The call is terminated if both
+                     inbound and outbound media are silent at the same time.
+
+                 This feature is useful to free resources in the event of a
+                 network failure preventing the end-of-call to be detected or
+                 when the FXO end-of-call tone was not detected.
+
+                 "
+   DEFVAL        { disable }
+   ::= { fxoForceEndOfCallGroup 300 }
+
+  -- Scalar:FXO Forced End Of Call On Silence Detection Timeout
+
+  fxoFeocOnSilenceDetectionTimeout OBJECT-TYPE
+   SYNTAX        Unsigned32 ( 1..300 )
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Forced End Of Call On Silence Detection Timeout
+
+                 Maximum amount of time that a call can remain silent, as
+                 specified by FxoFeocOnSilenceDetectionMode, before it is
+                 terminated and the line is released.
+
+                 This value is expressed in seconds (sec).
+
+                 "
+   DEFVAL        { 300 }
+   ::= { fxoForceEndOfCallGroup 400 }
+
+  -- Scalar:FXO Forced End Of Call On Tone Detection Mode
+
+  fxoFeocOnToneDetectionMode OBJECT-TYPE
+   SYNTAX        INTEGER { disable(100) , countryTone(200) , customTone(300) }
+   MAX-ACCESS    read-write
+   STATUS        current
+   DESCRIPTION " FXO Forced End Of Call On Tone Detection Mode
+
+                 Enables forced-end-of-call upon tone detection.
+
+                 This feature terminates a call on detection of an end-of-call
+                 tone on the inbound from the FXO line.
+
+                   * Disable: Force-end-of-call upon tone detection is
+                     disabled.
+                   * CountryTone: The unit tries to detect the tone specified
+                     for this purpose in the current country's tone
+                     specification. Some country specifications omit this
+                     information. In that case, the unit behaves as if the
+                     FxoFeocOnToneDetectionMode parameter is 'disable'. See the
+                     TelIf.CountrySelection parameter.
+                   * CustomTone: Terminates a call upon detection of a custom
+                     tone. This custom tone is configured with the
+                     FxoFeocToneCustomFrequency, FxoFeocToneCustomCadence, and
+                     FxoFeocToneCustomRepetition parameters.
+
+                 "
+   DEFVAL        { countryTone }
+   ::= { fxoForceEndOfCallGroup 500 }
+
+  -- ***************************************************************************
+  
+  -- Group:FXO Force End Of Call Tone Custom Settings Group
+
+  -- ***************************************************************************
+  
+  fxoForceEndOfCallToneCustomSettingsGroup OBJECT IDENTIFIER
+   ::= { fxoForceEndOfCallGroup 10000 }
+   -- Scalar:FXO Forced End Of Call Tone Custom Frequency
+
+   fxoFeocToneCustomFrequency OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 350..620 )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " FXO Forced End Of Call Tone Custom Frequency
+
+                  Frequency to detect in the custom cadence.
+
+                  A customised tone detection can only detect a single
+                  frequency. To detect tones made of multiple frequencies,
+                  create the cadence for only one of the frequencies found in
+                  the tone.
+
+                  This value is expressed in hertz (Hz).
+
+                  "
+    DEFVAL        { 440 }
+    ::= { fxoForceEndOfCallToneCustomSettingsGroup 100 }
+
+   -- Scalar:FXO Forced End Of Call Tone Custom Cadence
+
+   fxoFeocToneCustomCadence OBJECT-TYPE
+    SYNTAX        OCTET STRING ( SIZE(0..128) )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " FXO Forced End Of Call Tone Custom Cadence
+
+                  A cadence is a series of frequencies that are played for a
+                  specified time, making up a tone. The format for a cadence is
+                  'on, off, on, off, ...' where 'on' and 'off', respectively are
+                  numerical values representing the time in milliseconds that
+                  the frequency can and cannot be detected.
+
+                  Example: '2000, 1000, 2000, 0' is a cadence where the
+                  frequency will play for 2 seconds, stop for 1 second, and play
+                  for two more seconds. This example is also equivalent to
+                  setting the string '2000, 1000, 2000'.
+
+                  Up to four 'on, off' pairs can be specified. Specifying less
+                  than those eight values results in '0' values being added as
+                  necessary. When specifying more than eight, only the eight
+                  first values are used.
+
+                  A cadence starting with a value of zero (0) is invalid. The
+                  first zero (0) found in the string signals the end of the
+                  cadence (i.e. '200, 0, 300' is the same as '200').
+
+                  The allowed range for the 'on' and 'off' values are 0 to
+                  32767. These values are expressed in milliseconds (ms).
+
+                  See the FxoFeocToneCustomFrequency and
+                  FxoFeocToneCustomRepetition parameters.
+
+                  "
+    DEFVAL        { "" }
+    ::= { fxoForceEndOfCallToneCustomSettingsGroup 200 }
+
+   -- Scalar:FXO Forced End Of Call Tone Custom Repetition
+
+   fxoFeocToneCustomRepetition OBJECT-TYPE
+    SYNTAX        Unsigned32 ( 2..10 )
+    MAX-ACCESS    read-write
+    STATUS        current
+    DESCRIPTION " FXO Forced End Of Call Tone Custom Repetition
+
+                  Repetition of the cadence. See the FxoFeocToneCustomCadence
+                  parameter.
+
+                  Number of times the custom cadence must be detected to
+                  consider the custom end-of-call tone has been detected.
+
+                  "
+    DEFVAL        { 3 }
+    ::= { fxoForceEndOfCallToneCustomSettingsGroup 300 }
+
+  -- End of group:FXO Force End Of Call Tone Custom Settings Group
+
+ -- End of group:FXO Force End Of Call Group
+
+-- End of group:FXO Group
+
+-- ****************************************************************************
+
+-- Group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+notificationsGroup OBJECT IDENTIFIER
+ ::= { potsMIBObjects 60010 }
+ -- Scalar:Minimal Severity of Notification
+
+ minSeverity OBJECT-TYPE
+  SYNTAX        INTEGER { disable(0) , debug(100) , info(200) , warning(300) ,
+                error(400) , critical (500) }
+  MAX-ACCESS    read-write
+  STATUS        current
+  DESCRIPTION " Minimal Severity of Notification
+
+                Sets the minimal severity to issue a notification message
+                incoming from this service.
+
+                  * Disable: No notification is issued.
+                  * Debug: All notification messages are issued.
+                  * Info: Notification messages with a 'Informational' and
+                    higher severity are issued.
+                  * Warning: Notification messages with a 'Warning' and higher
+                    severity are issued.
+                  * Error: Notification messages with an 'Error' and higher
+                    severity are issued.
+                  * Critical: Notification messages with a 'Critical' severity
+                    are issued.
+
+                "
+  DEFVAL        { warning }
+  ::= { notificationsGroup 100 }
+
+-- End of group:Notification Messages Configuration
+
+-- ****************************************************************************
+
+-- Group:Configuration Settings
+
+-- ****************************************************************************
+
+configurationGroup OBJECT IDENTIFIER
+ ::= { potsMIBObjects 60020 }
+ -- Scalar:Need Restart
+
+ needRestartInfo OBJECT-TYPE
+  SYNTAX        INTEGER { no(0) , yes(100) }
+  MAX-ACCESS    read-only
+  STATUS        current
+  DESCRIPTION " Need Restart
+
+                Indicates if the service needs to be restarted for the
+                configuration to fully take effect.
+
+                  * Yes: Service needs to be restarted.
+                  * No: Service does not need to be restarted.
+
+                Services can be restarted by using the
+                Scm.ServiceCommands.Restart command.
+
+                "
+  ::= { configurationGroup 100 }
+
+-- End of group:Configuration Settings
+
+END

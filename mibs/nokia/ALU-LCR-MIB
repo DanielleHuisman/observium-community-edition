@@ -1,0 +1,820 @@
+ALU-LCR-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+        Unsigned32, Integer32, Counter32
+                FROM SNMPv2-SMI
+
+        MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+
+        TimeStamp, RowStatus
+                FROM SNMPv2-TC
+
+        aluSARMIBModules, aluSARObjs, aluSARNotifyPrefix, aluSARConfs
+                FROM ALU-SAR-GLOBAL-MIB
+
+        TNamedItem, TItemDescription
+                FROM TIMETRA-TC-MIB
+
+        TmnxHwIndex
+                FROM TIMETRA-CHASSIS-MIB
+
+        InetAddress, InetAddressType
+                FROM INET-ADDRESS-MIB
+    ;
+
+aluLcrMIBModule                  MODULE-IDENTITY
+    LAST-UPDATED    "201809260000Z"
+    ORGANIZATION    "Nokia"
+    CONTACT-INFO
+        "Nokia 7705 Support
+         Web: http://www.nokia.com"
+    DESCRIPTION
+        "This document is the SNMP MIB module for the Nokia 7705
+        implementation of Line Card Redundancy (LCR).
+
+        Copyright 2018 Nokia. All rights reserved.
+        Reproduction of this document is authorized on the condition that
+        the foregoing copyright notice is included.
+
+        This SNMP MIB module (Specification) embodies Nokia's
+        proprietary intellectual property. Nokia retains all
+        title and ownership in the Specification, including any
+        revisions.
+
+        Nokia grants all interested parties a non-exclusive
+        license to use and distribute an unmodified copy of this
+        Specification in connection with management of Nokia products,
+        and without fee, provided this copyright notice and license
+        appear on all copies.
+
+        This Specification is supplied 'as is', and Nokia makes
+        no warranty, either express or implied, as to the use,
+        operation, condition, or performance of the Specification.
+        "
+
+    REVISION        "201809260000Z"
+    DESCRIPTION     "Rev 0.1               26 Sep 2018 00:00
+                     Initial release of the ALU-LCR-MIB."
+        ::= { aluSARMIBModules 21 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+aluLcrObjs                       OBJECT IDENTIFIER ::= { aluSARObjs 23 }
+aluLcrNotifyPrefix               OBJECT IDENTIFIER ::= { aluSARNotifyPrefix 19 }
+aluLcrConformance                OBJECT IDENTIFIER ::= { aluSARConfs 23 }
+
+-- ==========================================================================
+-- SCALARS
+--
+aluLcrScalarObjs                 OBJECT IDENTIFIER ::= { aluLcrObjs 1 }
+
+-- --------------------------------------------------------------------------
+-- Objects indicating last changes to configuration tables
+-- --------------------------------------------------------------------------
+aluLcrScalarLastChangedObjs      OBJECT IDENTIFIER ::= { aluLcrScalarObjs 1 }
+
+aluLcrConfigTableLastChanged     OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluLcrConfigTableLastChanged indicates the
+         sysUpTime at the time of the last modification to aluLcrConfigTable
+         by adding, deleting an entry or change to a writable object in the
+         table.
+
+         If no changes were made to the table since the last re-initialization
+         of the local network management subsystem, then this object contains
+         a zero value."
+    ::= { aluLcrScalarLastChangedObjs 1 }
+
+aluLcrMdaConfigTableLastChanged  OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluLcrMdaConfigTableLastChanged indicates the
+         sysUpTime at the time of the last modification to
+         aluLcrMdaConfigTable by adding, deleting an entry or change to a
+         writable object in the table.
+
+         If no changes were made to the table since the last re-initialization
+         of the local network management subsystem, then this object contains
+         a zero value."
+    ::= { aluLcrScalarLastChangedObjs 2 }
+
+-- ==========================================================================
+-- TABLES
+--
+aluLcrConfigurations             OBJECT IDENTIFIER ::= { aluLcrObjs 2 }
+
+aluLcrConfigTable                OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluLcrConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the LCR groups that have been configured
+         on the system."
+    ::= { aluLcrConfigurations 1 }
+
+aluLcrConfigEntry                OBJECT-TYPE
+    SYNTAX      AluLcrConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the aluLcrConfigTable."
+    INDEX { IMPLIED aluLcrConfigName }
+    ::= { aluLcrConfigTable 1 }
+
+AluLcrConfigEntry ::= SEQUENCE {
+    aluLcrConfigName                 TNamedItem,
+    aluLcrConfigRowStatus            RowStatus,
+    aluLcrConfigDescription          TItemDescription,
+    aluLcrConfigRevert               INTEGER,
+    aluLcrConfigWaitToRestore        Unsigned32,
+    aluLcrConfigMcNeighborAddrType   InetAddressType,
+    aluLcrConfigMcNeighborAddr       InetAddress,
+    aluLcrConfigMcAdvertiseInterval  Unsigned32,
+    aluLcrConfigMcHoldTime           Unsigned32
+}
+
+aluLcrConfigName                 OBJECT-TYPE
+    SYNTAX      TNamedItem
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A textual name for the LCR group."
+    ::= { aluLcrConfigEntry 1 }
+
+aluLcrConfigRowStatus            OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this LCR group entry."
+    ::= { aluLcrConfigEntry 2 }
+
+aluLcrConfigDescription          OBJECT-TYPE
+    SYNTAX      TItemDescription
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "A textual string containing user supplied information about the
+         LCR group."
+    DEFVAL { ''H }
+    ::= { aluLcrConfigEntry 3 }
+
+aluLcrConfigRevert               OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    nonRevertive(1),
+                    revertive (2)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+       "The revertive mode of the LCR group.
+
+        nonRevertive
+
+        Traffic remains on the protection MDA until another switch
+        request is received.
+
+        revertive
+
+        When the condition that caused a switch to the protection
+        MDA has been cleared, activity is switched back to the
+        working MDA."
+    DEFVAL { nonRevertive }
+    ::= { aluLcrConfigEntry 4 }
+
+aluLcrConfigWaitToRestore        OBJECT-TYPE
+    SYNTAX      Unsigned32 (0|60..3600)
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The Wait To Restore period in seconds.
+
+        After clearing of a condition that necessitated an
+        automatic switch, the wait to restore period must elapse
+        before reverting. This is intended to avoid rapid switch
+        oscillations."
+    DEFVAL { 300 }
+    ::= { aluLcrConfigEntry 5 }
+
+aluLcrConfigMcNeighborAddrType   OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of object aluLcrConfigMcNeighborAddrType specifies the
+         address type of the neighbor's ip-address as specified by
+         aluLcrConfigMcNeighborAddr in the case of Multi-Chassis LCR
+         architecture."
+    ::= { aluLcrConfigEntry 6 }
+
+aluLcrConfigMcNeighborAddr       OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE(4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluLcrConfigMcNeighborAddr variable specifies the
+         neighbor's ip-address only on a Multi-Chassis LCR where the working
+         and protect MDAs are configured on different routers. The value of
+         aluLcrConfigMcNeighborAddr set to 0.0.0.0, implies that this LCR
+         group is configured as a Single-Chassis LCR group.
+
+         The route to the neighbor must not traverse the MC-LCR member
+         (working or protect) MDAs. It is recommended that the address
+         configured here is on a shared network between the routers that own
+         the working and protect MDAs. By default no neighbor address
+         is configured and both the working and protect MDAs are to be
+         configured on the same router (i.e. Single-Chassis LCR)."
+    DEFVAL { '00000000000000000000000000000000'H }
+    ::= { aluLcrConfigEntry 7 }
+
+aluLcrConfigMcAdvertiseInterval  OBJECT-TYPE
+    SYNTAX      Unsigned32 (10..650)
+    UNITS       "100s of milliseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluLcrConfigMcAdvertiseInterval specifies the time
+         interval, in 100s of milliseconds, between 'I am operational'
+         messages sent by both protect and working MDAs to their neighbor for
+         Multi-Chassis LCR. The value of aluLcrConfigMcAdvertiseInterval is
+         valid only for a Multi-Chassis LCR as indicated by the value of
+         aluLcrConfigMcNeighborAddr not set to 0.0.0.0."
+    DEFVAL { 10 }
+    ::= { aluLcrConfigEntry 8 }
+
+aluLcrConfigMcHoldTime           OBJECT-TYPE
+    SYNTAX      Unsigned32 (10..650)
+    UNITS       "100s of milliseconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluLcrConfigMcHoldTime specifies how much time can pass,
+         in 100s of milliseconds, without receiving an advertise packet from
+         the neighbor before the Multi-Chassis signaling link is considered
+         not operational. It is usually 3 times the value of
+         aluLcrConfigMcAdvertiseInterval. The value of
+         aluLcrConfigMcAdvertiseInterval is valid only for a Multi-Chassis LCR
+         as indicated by the value of aluLcrConfigMcNeighborAddr not set to
+         0.0.0.0."
+    DEFVAL { 30 }
+    ::= { aluLcrConfigEntry 9 }
+
+-- ==========================================================================
+--
+aluLcrMdaConfigTable             OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluLcrMdaConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table lists the LCR MDA members that have been configured
+         in LCR groups."
+    ::= { aluLcrConfigurations 2 }
+
+aluLcrMdaConfigEntry             OBJECT-TYPE
+    SYNTAX      AluLcrMdaConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the aluLcrMdaConfigTable."
+    INDEX { aluLcrConfigName, aluLcrMdaConfigNumber }
+    ::= { aluLcrMdaConfigTable 1 }
+
+AluLcrMdaConfigEntry             ::= SEQUENCE {
+    aluLcrMdaConfigNumber              Unsigned32,
+    aluLcrMdaConfigRowStatus           RowStatus,
+    aluLcrMdaConfigHwIndex             TmnxHwIndex
+}
+
+aluLcrMdaConfigNumber            OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This field is set to a unique member number within an LCR
+         group. The value 0 indicates the null (or protection) member. The
+         value 1 indicates the working member."
+    ::= { aluLcrMdaConfigEntry 1 }
+
+aluLcrMdaConfigRowStatus         OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The status of this LCR MDA member entry."
+    ::= { aluLcrMdaConfigEntry 2 }
+
+aluLcrMdaConfigHwIndex           OBJECT-TYPE
+    SYNTAX      TmnxHwIndex
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The Hardware Index assigned to an MDA. This is a hardware
+         component with tmnxHwClass mdaModule(11). The value of this object
+         must be unique among all instances of aluLcrMdaConfigHwIndex.
+         In other words, a particular hardware component can only be
+         configured in one LCR group."
+    ::= { aluLcrMdaConfigEntry 3 }
+
+-- ==========================================================================
+--
+aluLcrCommandTable               OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluLcrCommandEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table allows commands to be sent to configured LCR groups."
+    ::= { aluLcrConfigurations 3 }
+
+aluLcrCommandEntry               OBJECT-TYPE
+    SYNTAX      AluLcrCommandEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the aluLcrCommandTable. This row exists only
+         if the associated aluLcrMdaConfigEntry is active."
+    INDEX { aluLcrConfigName, aluLcrMdaConfigNumber }
+    ::= { aluLcrCommandTable 1 }
+
+AluLcrCommandEntry               ::= SEQUENCE {
+    aluLcrCommandSwitch              INTEGER
+}
+
+aluLcrCommandSwitch              OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    noCmd(1),
+                    clear(2),
+                    lockoutOfProtection(3),
+                    forcedSwitchWorkToProtect(4),
+                    forcedSwitchProtectToWork(5)
+                }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Allows the initiation of an LCR switch command on the
+         LCR group and member specified by the index values.
+
+         When read this object returns the last command written.
+         The last command written does not imply that this command is
+         currently in effect. This request may have been preempted by a higher
+         priority request. In order to determine the current state of the LCR
+         group it is necessary to read the object aluLcrStatusRequest.
+
+         noCmd
+
+         This value should be returned by a read request when no switch
+         command has been written to the object in question since
+         initialization. This value may not be used in a write
+         operation. If noCmd is used in a write operation a wrongValue
+         error is returned.
+
+         clear
+
+         Clears all of the switch commands listed below for the
+         specified MDA member.
+
+         lockoutOfProtection
+
+         Prevents the working MDA from switching to the protection MDA. The
+         specified MDA member should be the protection MDA, otherwise an
+         inconsistentValue error is returned.
+
+         forcedSwitchWorkToProtect
+
+         Switches activity from the working MDA to the protection MDA. The
+         specified MDA member should be the working MDA, otherwise an
+         inconsistentValue error is returned.
+
+         forcedSwitchProtectToWork
+
+         Switches activity from the protection MDA to the working MDA. The
+         specified MDA member should be the protection MDA, otherwise an
+         inconsistentValue error is returned."
+    ::= { aluLcrCommandEntry 1 }
+
+-- ==========================================================================
+--
+aluLcrStatus                     OBJECT IDENTIFIER ::= { aluLcrObjs 3 }
+
+aluLcrStatusTable                OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluLcrStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table provides status information about LCR groups
+         that have been configured on the system."
+    ::= { aluLcrStatus 1 }
+
+aluLcrStatusEntry                OBJECT-TYPE
+    SYNTAX      AluLcrStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the aluLcrStatusTable. This row exists only
+         if the associated aluLcrConfigEntry exists."
+    AUGMENTS { aluLcrConfigEntry }
+    ::= { aluLcrStatusTable 1 }
+
+AluLcrStatusEntry                ::= SEQUENCE {
+    aluLcrStatusRequest              OCTET STRING,
+    aluLcrStatusSwitchedMda          Integer32,
+    aluLcrStatusMcCtlLinkState       INTEGER
+}
+
+aluLcrStatusRequest              OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (1))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of the current request and associated member. It is
+         represented as a single octet. Bits are numbered from left to right.
+
+         Bits 1-4 indicate the request.
+
+         1111  Lockout of Protection
+         1110  Forced Switch
+         1101  SF - High Priority
+         1100  SF - Low Priority
+         1011  SD - High Priority
+         1010  SD - Low Priority
+         1001  not used
+         1000  Manual Switch
+         0111  not used
+         0110  Wait-to-Restore
+         0101  not used
+         0100  Exercise
+         0011  not used
+         0010  Reverse Request
+         0001  Do Not Revert
+         0000  No Request
+
+         Bits 5-8 indicate the member associated with the request defined in
+         bits 1-4. The value 0 indicates the null (or protection) member. The
+         value 1 indicates the working member."
+    ::= { aluLcrStatusEntry 1 }
+
+aluLcrStatusSwitchedMda          OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This field is set to the number of the MDA member that is
+         currently switched to protection. The value 0 indicates no
+         MDA is switched to protection. The value 1 indicates
+         that the working MDA is switched to protection."
+    ::= { aluLcrStatusEntry 2 }
+
+aluLcrStatusMcCtlLinkState       OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    up(0),
+                    downSignalingFailure(1),
+                    downIncompatibleNbr(2)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluLcrStatusMcCtlLinkState indicates the current state
+         of the Multi-Chassis (MC) LCR Group Control Link.
+
+         Note that for a Single-Chassis LCR group the state is always up.
+
+         The state 'up' indicates that the MC-LCR controller has received a
+         valid control message from its neighboring router within the last
+         aluLcrConfigMcHoldTime interval, and the MC-LCR control link is
+         considered as operational.
+
+         The state 'downSignalingFailure' indicates that the MC-LCR
+         controller hasn't received any control message from its neighboring
+         router or vice-versa within the last aluLcrConfigMcHoldTime interval.
+         The MC-LCR control link is considered as operationally down.
+
+         The state 'downIncompatibleNbr' indicates that the MC-LCR controller
+         has received a control message from a neighboring router within the
+         last aluLcrConfigMcHoldTime interval, but the member type
+         (i.e. working/protection) of the neighboring router is not compatible
+         with that of the local router. The MC-LCR control link is considered
+         as operationally down."
+    ::= { aluLcrStatusEntry 3 }
+
+-- ==========================================================================
+--
+aluLcrMdaStatusTable             OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluLcrMdaStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains status information for all MDA members that are
+         included in LCR groups."
+    ::= { aluLcrStatus 2 }
+
+aluLcrMdaStatusEntry             OBJECT-TYPE
+    SYNTAX      AluLcrMdaStatusEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "A conceptual row in the aluLcrMdaStatusTable. This row exists only
+         if the associated aluLcrMdaConfigEntry exists."
+    AUGMENTS { aluLcrMdaConfigEntry }
+    ::= { aluLcrMdaStatusTable 1 }
+
+AluLcrMdaStatusEntry             ::= SEQUENCE {
+    aluLcrMdaStatusCurrent           BITS,
+    aluLcrMdaStatusSwitchovers       Counter32,
+    aluLcrMdaStatusLastSwitchover    TimeStamp,
+    aluLcrMdaStatusSwitchoverSeconds Counter32,
+    aluLcrMdaStatusDiscontinuityTime TimeStamp
+}
+
+aluLcrMdaStatusCurrent           OBJECT-TYPE
+    SYNTAX      BITS {
+                    lockedOut(0),
+                    sd(1),
+                    sf(2),
+                    switched(3),
+                    wtr(4)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the current state of the MDA.
+
+         lockedOut
+
+         This bit, when applied to a working member, indicates that
+         the member is prevented from switching to the protection
+         MDA. When applied to the null member, this bit indicates
+         that no working member may switch to the protection MDA.
+
+         sd
+
+         A signal degrade condition is in effect.
+
+         sf
+
+         A signal failure condition is in effect.
+
+         switched
+
+         The switched bit is applied to a working member if that
+         member is currently switched to the protection MDA.
+
+         wtr
+
+         A Wait-to-Restore state is in effect."
+    ::= { aluLcrMdaStatusEntry 1 }
+
+aluLcrMdaStatusSwitchovers       OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "When queried with index value aluLcrMdaConfigNumber other than
+         0, this object will return the number of times this working MDA
+         has switched to the protection MDA.
+
+         When queried with index value aluLcrMdaConfigNumber set to 0,
+         which is the protection MDA, this object will return the
+         number of times that activity has been switched
+         back to the working MDA from this protection MDA.
+
+         Discontinuities in the value of this counter can occur at
+         re-initialization of the management system, and at other
+         times as indicated by the value of
+         aluLcrMdaStatusDiscontinuityTime."
+    ::= { aluLcrMdaStatusEntry 2 }
+
+aluLcrMdaStatusLastSwitchover    OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "When queried with index value aluLcrMdaConfigNumber other than
+         0, this object will return the value of sysUpTime when this
+         working MDA last completed a switch to the protection MDA. If
+         this member has never switched to the protection MDA, the
+         value 0 will be returned.
+
+         When queried with index value aluLcrMdaConfigNumber set to 0,
+         which is the protection MDA, this object will return the
+         value of sysUpTime the last time that activity was
+         switched back to the working MDA from this protection MDA.
+         If activity has never switched back to the working
+         MDA from this protection MDA, the value 0 will be returned."
+    ::= { aluLcrMdaStatusEntry 3 }
+
+aluLcrMdaStatusSwitchoverSeconds OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The cumulative Protection Switching Duration (PSD) time in
+         seconds. For the working MDA, this is the cumulative number
+         of seconds that traffic was carried on the protection MDA.
+         For the protection MDA, this is the cumulative number of
+         seconds that the protection MDA has been used to carry
+         working MDA traffic. This information is only valid if
+         revertive switching is enabled. The value 0 will be returned
+         otherwise.
+
+         Discontinuities in the value of this counter can occur at
+         re-initialization of the management system, and at other
+         times as indicated by the value of
+         aluLcrMdaStatusDiscontinuityTime. For example, if the value
+         of an instance of aluLcrMdaStatusSwitchoverSeconds changes
+         from a non-zero value to zero due to revertive switching
+         being disabled, it is expected that the corresponding
+         value of aluLcrMdaStatusDiscontinuityTime will be updated
+         to reflect the time of the configuration change."
+    ::= { aluLcrMdaStatusEntry 4 }
+
+aluLcrMdaStatusDiscontinuityTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of sysUpTime on the most recent occasion at which
+         any one or more of this member's counters suffered a
+         discontinuity. The relevant counters are the specific
+         instances associated with this member of any Counter32
+         object contained in aluLcrMdaStatusTable. If no such
+         discontinuities have occurred since the last re-initialization
+         of the local management subsystem, then this object contains
+         a zero value."
+    ::= { aluLcrMdaStatusEntry 5 }
+
+-- ==========================================================================
+-- NOTIFICATIONS
+--
+aluLcrNotifications              OBJECT IDENTIFIER ::= { aluLcrNotifyPrefix 0 }
+
+aluLcrStatusMcCtlLinkStateChange NOTIFICATION-TYPE
+    OBJECTS {
+        aluLcrStatusMcCtlLinkState
+    }
+    STATUS      current
+    DESCRIPTION
+        "The aluLcrStatusMcCtlLinkStateChange notification is generated when
+         there is a change in the value of aluLcrStatusMcCtlLinkState."
+    ::= { aluLcrNotifications 1 }
+
+aluLcrEventSwitchover            NOTIFICATION-TYPE
+    OBJECTS {
+        aluLcrMdaStatusSwitchovers,
+        aluLcrMdaStatusCurrent
+    }
+    STATUS      current
+    DESCRIPTION
+        "The aluLcrEventSwitchover notification is generated when the
+         value of an instance of aluLcrMdaStatusSwitchovers increments."
+    ::= { aluLcrNotifications 2 }
+
+aluLcrCommandSwitchSet           NOTIFICATION-TYPE
+    OBJECTS {
+        aluLcrCommandSwitch
+    }
+    STATUS      current
+    DESCRIPTION
+        "The aluLcrCommandSwitchSet notification is generated when any of the
+         following LCR switch commands are set on aluLcrCommandSwitch:
+         'lockoutOfProtection', 'forcedSwitchWorkToProtect',
+         'forcedSwitchProtectToWork'."
+    ::= { aluLcrNotifications 3 }
+
+aluLcrCommandSwitchClear         NOTIFICATION-TYPE
+    OBJECTS {
+        aluLcrCommandSwitch
+    }
+    STATUS      current
+    DESCRIPTION
+        "The aluLcrCommandSwitchClear notification is generated when an LCR
+         switch command gets cleared. Note that a switch command can be
+         cleared either due to set of the 'clear' switch command on
+         aluLcrCommandSwitch, or due to presence of a higher priority
+         condition."
+    ::= { aluLcrNotifications 4 }
+
+-- ==========================================================================
+-- COMPLIANCE STATEMENTS
+--
+aluLcrCompliances                OBJECT IDENTIFIER ::= { aluLcrConformance 1 }
+
+aluLcrCompliance                 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for the management of the LCR feature
+         for Release 9.0 on Nokia 7705 SAR series systems."
+    MODULE -- this module
+        MANDATORY-GROUPS {
+            aluLcrScalarLastChangedGroup,
+            aluLcrConfigGroup,
+            aluLcrMdaConfigGroup,
+            aluLcrCommandSwitchGroup,
+            aluLcrStatusGroup,
+            aluLcrMdaStatusGroup,
+            aluLcrNotificationsGroup
+        }
+    ::= { aluLcrCompliances 1 }
+
+-- ==========================================================================
+-- OBJECT-GROUPS/NOTIFICATION-GROUPS
+--
+aluLcrGroups                     OBJECT IDENTIFIER ::= { aluLcrConformance 2 }
+
+aluLcrV9v0Groups                 OBJECT IDENTIFIER ::= { aluLcrGroups 1 }
+
+aluLcrScalarLastChangedGroup     OBJECT-GROUP
+    OBJECTS {
+        aluLcrConfigTableLastChanged,
+        aluLcrMdaConfigTableLastChanged
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects providing system-level LCR table last changed
+         information in release 9.0 on Nokia 7705 SAR series systems."
+    ::= { aluLcrV9v0Groups 1 }
+
+aluLcrConfigGroup                OBJECT-GROUP
+    OBJECTS {
+        aluLcrConfigRowStatus,
+        aluLcrConfigDescription,
+        aluLcrConfigRevert,
+        aluLcrConfigWaitToRestore,
+        aluLcrConfigMcNeighborAddrType,
+        aluLcrConfigMcNeighborAddr,
+        aluLcrConfigMcAdvertiseInterval,
+        aluLcrConfigMcHoldTime
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of LCR configurations in
+         release 9.0 on Nokia 7705 SAR series systems."
+    ::= { aluLcrV9v0Groups 2 }
+
+aluLcrMdaConfigGroup             OBJECT-GROUP
+    OBJECTS {
+        aluLcrMdaConfigRowStatus,
+        aluLcrMdaConfigHwIndex
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of LCR MDA configurations
+         in release 9.0 on Nokia 7705 SAR series systems."
+    ::= { aluLcrV9v0Groups 3 }
+
+aluLcrCommandSwitchGroup         OBJECT-GROUP
+    OBJECTS {
+        aluLcrCommandSwitch
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of LCR switch commands in
+         release 9.0 on Nokia 7705 SAR series systems."
+    ::= { aluLcrV9v0Groups 4 }
+
+aluLcrStatusGroup                OBJECT-GROUP
+    OBJECTS {
+        aluLcrStatusRequest,
+        aluLcrStatusSwitchedMda,
+        aluLcrStatusMcCtlLinkState
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects providing LCR status information in release 9.0
+         on Nokia 7705 SAR series systems."
+    ::= { aluLcrV9v0Groups 5 }
+
+aluLcrMdaStatusGroup             OBJECT-GROUP
+    OBJECTS {
+        aluLcrMdaStatusCurrent,
+        aluLcrMdaStatusSwitchovers,
+        aluLcrMdaStatusLastSwitchover,
+        aluLcrMdaStatusSwitchoverSeconds,
+        aluLcrMdaStatusDiscontinuityTime
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects providing LCR MDA status information in release
+         9.0 on Nokia 7705 SAR series systems."
+    ::= { aluLcrV9v0Groups 6 }
+
+aluLcrNotificationsGroup         NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        aluLcrStatusMcCtlLinkStateChange,
+        aluLcrEventSwitchover,
+        aluLcrCommandSwitchSet,
+        aluLcrCommandSwitchClear
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of notifications generated by LCR in release 9.0 on Nokia
+         7705 SAR series systems."
+    ::= { aluLcrV9v0Groups 7 }
+
+END
+

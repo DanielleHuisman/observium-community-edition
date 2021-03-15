@@ -1,0 +1,339 @@
+-- *****************************************************************
+-- MY-ACL-MIB.mib:  My Authentication Key MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+DES7200-AUTHEN-KEY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32
+                FROM SNMPv2-SMI
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        MacAddress,
+        DateAndTime
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+                FROM SNMPv2-CONF
+        IfIndex,
+        ConfigStatus
+                FROM DES7200-TC        
+        myMgmt
+                FROM DES7200-SMI;
+
+myAuthenKeyMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "This module defines authentication key managment mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 24}
+
+
+
+myAuthenKeyMIBObjects OBJECT IDENTIFIER ::= { myAuthenKeyMIB 1 }
+
+
+MyKeyTimeMode ::= TEXTUAL-CONVENTION        
+   STATUS current                          
+   DESCRIPTION                             
+            "Time managment mode of key." 
+   SYNTAX INTEGER {                        
+            infinite(1), -- Key will be valid all along when the key start to become effective
+            duration(2), -- Key will be valid for designate duration when the key start to 
+                         -- become effective.  
+            end-time(3)  -- Key will be valid when the key start to become effective till
+                         -- designate end time reach.                           
+  }                        
+  
+--    Key management is a method of controlling authentication keys used by some protocol. Not 
+-- all protocols can use key management. To manage authentication keys, define a  key chain, 
+-- identify the keys that belong to the key chain, and specify how long each key is valid. Each
+-- key has its own key identifier (specified with the key chain and key number),
+-- which is stored locally. 
+--     The combination of the key identifier and the interface associated with the message
+-- uniquely identifies the authentication algorithm and Message Digest 5 (MD5) authentication
+-- key in use.
+--     You can configure multiple keys with life times. Only one authentication packet is sent,
+-- regardless of how many valid keys exist. The software examines the key numbers in order from
+-- lowest to highest, and uses the first valid key it encounters. The lifetimes allow for 
+-- overlap during key changes. Note that the router must know these lifetimes.
+
+myAuthenKeyChainTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyAuthenKeyChainEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of key chain entries."
+        ::= { myAuthenKeyMIBObjects 1 }
+    
+myAuthenKeyChainEntry OBJECT-TYPE
+        SYNTAX MyAuthenKeyChainEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry contains key chain."  
+        INDEX { myAuthenKeyChainName }
+        ::= { myAuthenKeyChainTable 1 }
+        
+MyAuthenKeyChainEntry ::= 
+        SEQUENCE {
+                myAuthenKeyChainName DisplayString,
+                myAuthenKeyChainEntryStatus ConfigStatus
+        } 
+           
+myAuthenKeyChainName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key chain name of this entry.This value is unique for every entry
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { myAuthenKeyChainEntry  1 }
+                
+myAuthenKeyChainEntryStatus OBJECT-TYPE
+        SYNTAX ConfigStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "Status of this entry, set its value to invalid will delete this entry.
+            set its value to valid has no effect."
+        ::= { myAuthenKeyChainEntry 2 }
+
+
+myAuthenKeyTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MyAuthenKeyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+               "A table of authentication key entries."
+        ::= { myAuthenKeyMIBObjects 2 }
+    
+myAuthenKeyEntry OBJECT-TYPE
+        SYNTAX MyAuthenKeyEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+                "Entry contains authentication key parameters.
+                                
+                We must set all specifies valid values for the 
+                non-defaulted configuration objects, certainly, it should
+                also modify  the default values for the other configuration 
+                objects if the defaults are not appropriate.
+                                       
+                Once the appropriate instance of all the configuration
+                objects have been created or set,the row status should be set
+                to active to initiate the request."  
+        INDEX { myKeyChainName,myAuthenKeyNumber }
+        ::= { myAuthenKeyTable 1 }
+        
+MyAuthenKeyEntry ::= 
+        SEQUENCE {
+                myKeyChainName DisplayString,
+                myAuthenKeyNumber Integer32,
+                myKeyString DisplayString,
+                myAuthenKeyReceiveMyTime DateAndTime,
+                myAuthenKeyReceiveTimeMode MyKeyTimeMode,
+                myAuthenKeyReceiveEndTime DateAndTime,
+                myAuthenKeyReceiveDuration Unsigned32,
+                myAuthenKeySendMyTime DateAndTime,
+                myAuthenKeySendTimeMode MyKeyTimeMode,
+                myAuthenKeySendEndTime DateAndTime,
+                myAuthenKeySendDuration Unsigned32,
+                myAuthenReceiveKeyState       INTEGER,
+                myAuthenSendKeyState       INTEGER,
+                myAuthenKeyEntryStauts RowStatus 
+        }
+
+myKeyChainName OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..32))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key chain name of this key belong to which indentified in myAuthenKeyChainEntry.
+            When this string be used as an index,Value of a sub-identifier equal 
+            ASCII value of corresponding character(first sub-identifier corresponds
+            first character of string). The number of sub-identifiers of this string
+            must be 32,If length of string is less than 32 the sub-identifier(0x0) 
+            will be filled in tail."
+        ::= { myAuthenKeyEntry  1 }
+
+myAuthenKeyNumber OBJECT-TYPE
+        SYNTAX Integer32(0..2147483647)
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+               "The number identify a unique key in the key chain."
+        ::= { myAuthenKeyEntry 2 }
+
+myKeyString OBJECT-TYPE
+        SYNTAX DisplayString(SIZE (1..80))
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Key String of the key. The string can contain from 1 to
+             80 uppercase and lowercase alphanumeric characters,
+             but the first character cannot be a number."
+        ::= { myAuthenKeyEntry  3 }
+           
+myAuthenKeyReceiveMyTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The start time which the key can be received."
+        ::= { myAuthenKeyEntry 4 }
+        
+myAuthenKeyReceiveTimeMode OBJECT-TYPE
+        SYNTAX MyKeyTimeMode
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The time mode of key receive."
+        ::= { myAuthenKeyEntry 5 }
+
+myAuthenKeyReceiveEndTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The end time which the key can be received."
+        ::= { myAuthenKeyEntry 6 }
+
+myAuthenKeyReceiveDuration OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The duration time which the key is valid, in units of second."
+        ::= { myAuthenKeyEntry 7 }
+        
+myAuthenKeySendMyTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The start time which the key can be send."
+        ::= { myAuthenKeyEntry 8 }
+        
+myAuthenKeySendTimeMode OBJECT-TYPE
+        SYNTAX MyKeyTimeMode
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The time mode of key send."
+        ::= { myAuthenKeyEntry 9 }
+
+myAuthenKeySendEndTime OBJECT-TYPE
+        SYNTAX DateAndTime
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The end time which the key can be send."
+        ::= { myAuthenKeyEntry 10 }
+
+myAuthenKeySendDuration OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The duration time which the key is valid,in units of second."
+        ::= { myAuthenKeyEntry 11 }        
+
+myAuthenReceiveKeyState OBJECT-TYPE
+        SYNTAX INTEGER{
+                  valid(1),
+                  invalid(2)
+               }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The key is valid or invalid currently for receiving."
+        ::= { myAuthenKeyEntry 12 }        
+        
+myAuthenSendKeyState OBJECT-TYPE
+        SYNTAX INTEGER{
+                  valid(1),
+                  invalid(2)
+               }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "The key is valid or invalid currently for sending."
+        ::= { myAuthenKeyEntry 13 }        
+                  
+myAuthenKeyEntryStauts OBJECT-TYPE
+        SYNTAX RowStatus
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "entry status for this list."
+        ::= { myAuthenKeyEntry 14 }
+ 
+-- conformance information
+
+myAuthenKeyChainMIBConformance OBJECT IDENTIFIER ::= { myAuthenKeyMIB 2 }
+myAuthenKeyChainMIBCompliances OBJECT IDENTIFIER ::= { myAuthenKeyChainMIBConformance 1 }
+myAuthenKeyChainMIBGroups      OBJECT IDENTIFIER ::= { myAuthenKeyChainMIBConformance 2 }
+
+
+-- compliance statements
+
+myAuthenKeyChainMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My Acl MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { myAuthenKeyChainMIBGroup }
+        ::= { myAuthenKeyChainMIBCompliances 1 }
+        
+        
+-- units of conformance
+
+myAuthenKeyChainMIBGroup OBJECT-GROUP
+        OBJECTS {
+                myAuthenKeyChainName,
+                myAuthenKeyChainEntryStatus,        
+                myKeyChainName,
+                myAuthenKeyNumber, 
+                myKeyString, 
+                myAuthenKeyReceiveMyTime ,
+                myAuthenKeyReceiveTimeMode, 
+                myAuthenKeyReceiveEndTime ,
+                myAuthenKeyReceiveDuration, 
+                myAuthenKeySendMyTime ,
+                myAuthenKeySendTimeMode ,
+                myAuthenKeySendEndTime ,
+                myAuthenKeySendDuration, 
+                myAuthenReceiveKeyState,
+                myAuthenSendKeyState,
+                myAuthenKeyEntryStauts 
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing acl (echo) ability to a
+                My agent."
+        ::= { myAuthenKeyChainMIBGroups 1 }        
+        
+END

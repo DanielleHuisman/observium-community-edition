@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -20,7 +19,7 @@ echo('<table cellspacing="0" cellpadding="5" border="0">');
 
 foreach (dbFetchRows("SELECT * FROM juniAtmVp WHERE port_id = ?", array($interface['port_id'])) as $vp)
 {
-  if (is_integer($row/2)) { $row_colour = $list_colour_a; } else { $row_colour = $list_colour_b; }
+  if (is_integer($row/2)) { $row_colour = OBS_COLOUR_LIST_A; } else { $row_colour = OBS_COLOUR_LIST_B; }
   echo('<tr bgcolor="'.$row_colour.'">');
   echo('<td><span class=strong>'.$row.'. VP'.$vp['vp_id'].' '.$vp['vp_descr'].'</span></td>');
   echo('</tr>');

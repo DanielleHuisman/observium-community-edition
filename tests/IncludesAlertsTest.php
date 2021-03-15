@@ -40,6 +40,22 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array( TRUE, 'sweet', '>=',   'sweet');
     $array[] = array( TRUE, 'swoot', '>=',   'sweet');
     $array[] = array(FALSE, 'sweet', '>=',  'sweett');
+    $array[] = array(FALSE,       0, 'ge',        'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline');
+    $array[] = array( TRUE, 'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline', 'ge', 0);
+
+    // version compare
+    //$array[] = array(FALSE, '15.1R4.55', 'version_>=', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R4.55',         '>=', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.55', 'version_>=', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R5.55',         '>=', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.5',  'version_>=', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R5.5',          '>=', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.5',  'version_>=', '15.1X5.5');
+    $array[] = array(FALSE, '15.1R5.5',          '>=', '15.1X5.5');
+    //$array[] = array( TRUE, '15.1X5.5',  'version_>=', '15.1R5.5');
+    $array[] = array( TRUE, '15.1X5.5',          '>=', '15.1R5.5');
+    //$array[] = array(FALSE, '1.2.3x',    'version_>=', '1.2.3z');
+    $array[] = array(FALSE, '1.2.3x',            '>=', '1.2.3z');
 
     // >
     $array[] = array( TRUE,       0, 'gt',        -1);
@@ -59,6 +75,23 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array(FALSE, 'sweet', '>',    'sweet');
     $array[] = array( TRUE, 'swoot', '>',    'sweet');
     $array[] = array(FALSE, 'sweet', '>',   'sweett');
+    $array[] = array(FALSE,       0, 'gt',        'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline');
+    $array[] = array( TRUE, 'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline', 'gt', 0);
+    //$array[] = array(FALSE, 1474559, '>',       NULL);
+
+    // version compare
+    //$array[] = array(FALSE, '15.1R4.55', 'version_>', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R4.55',         '>', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.55', 'version_>', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R5.55',         '>', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.5',  'version_>', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R5.5',          '>', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.5',  'version_>', '15.1X5.5');
+    $array[] = array(FALSE, '15.1R5.5',          '>', '15.1X5.5');
+    //$array[] = array( TRUE, '15.1X5.5',  'version_>', '15.1R5.5');
+    $array[] = array( TRUE, '15.1X5.5',          '>', '15.1R5.5');
+    //$array[] = array(FALSE, '1.2.3x',    'version_>', '1.2.3z');
+    $array[] = array(FALSE, '1.2.3x',            '>', '1.2.3z');
 
     // <=
     $array[] = array( TRUE,      -1, 'le',        -1);
@@ -77,6 +110,22 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array( TRUE, 'sweet', '<=',   'sweet');
     $array[] = array(FALSE, 'swoot', '<=',   'sweet');
     $array[] = array( TRUE, 'sweet', '<=',  'sweett');
+    $array[] = array( TRUE,       0, 'le',        'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline');
+    $array[] = array(FALSE, 'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline', 'le', 0);
+
+    // version compare
+    //$array[] = array( TRUE, '15.1R4.55', 'version_<=', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R4.55',         '<=', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.55', 'version_<=', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R5.55',         '<=', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.5',  'version_<=', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R5.5',          '<=', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.5',  'version_<=', '15.1X5.5');
+    $array[] = array( TRUE, '15.1R5.5',          '<=', '15.1X5.5');
+    //$array[] = array(FALSE, '15.1X5.5',  'version_<=', '15.1R5.5');
+    $array[] = array(FALSE, '15.1X5.5',          '<=', '15.1R5.5');
+    //$array[] = array( TRUE, '1.2.3x',    'version_<=', '1.2.3z');
+    $array[] = array( TRUE, '1.2.3x',            '<=', '1.2.3z');
 
     // <
     $array[] = array( TRUE,      -2, 'lt',        -1);
@@ -96,11 +145,29 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array(FALSE, 'sweet', '<',    'sweet');
     $array[] = array(FALSE, 'swoot', '<',    'sweet');
     $array[] = array( TRUE, 'sweet', '<',   'sweett');
+    $array[] = array( TRUE,       0, 'lt',        'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline');
+    $array[] = array(FALSE, 'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline', 'lt', 0);
+
+    // version compare
+    //$array[] = array( TRUE, '5.11R5.5',  'version_<', '15.1R5.5');
+    $array[] = array( TRUE, '5.11R5.5',          '<', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.55', 'version_<', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R5.55',         '<', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.5',  'version_<', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R5.5',          '<', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.5',  'version_<', '15.1X5.5');
+    $array[] = array( TRUE, '15.1R5.5',          '<', '15.1X5.5');
+    //$array[] = array(FALSE, '15.1X5.5',  'version_<', '15.1R5.5');
+    $array[] = array(FALSE, '15.1X5.5',          '<', '15.1R5.5');
+    //$array[] = array( TRUE, '1.2.3x',    'version_<', '1.2.3z');
+    $array[] = array( TRUE, '1.2.3x',            '<', '1.2.3z');
 
     // !=
     $array[] = array( TRUE,       0, 'notequals', -1);
     $array[] = array( TRUE,       0, 'isnot',     -1);
     $array[] = array( TRUE,       0, 'ne',        -1);
+    $array[] = array( TRUE,       0, 'ne',        'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline');
+    $array[] = array( TRUE, 'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline', 'ne', 0);
 
     $array[] = array( TRUE,       0, '!=',        -1);
     $array[] = array( TRUE,       0, '!=',         1);
@@ -116,6 +183,16 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array(FALSE, 'sweet', '!=',   'sweet');
     $array[] = array( TRUE, 'swoot', '!=',   'sweet');
     $array[] = array( TRUE, 'sweet', '!=',  'sweett');
+
+    // version compare
+    //$array[] = array( TRUE, '15.1R4.55', 'version_!=', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R4.55',         '!=', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.55', 'version_!=', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R5.55',         '!=', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.5',  'version_!=', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R5.5',          '!=', '15.1R5.5');
+    //$array[] = array( TRUE, '1.2.3x',    'version_!=', '1.2.3z');
+    $array[] = array( TRUE, '1.2.3x',            '!=', '1.2.3z');
 
     // ==
     $array[] = array( TRUE,      -1, 'equals',    -1);
@@ -137,6 +214,18 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array( TRUE, 'sweet', '==',   'sweet');
     $array[] = array(FALSE, 'swoot', '==',   'sweet');
     $array[] = array(FALSE, 'sweet', '==',  'sweett');
+    $array[] = array(FALSE,       0, 'eq',        'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline');
+    $array[] = array(FALSE, 'acPowerAndSwitchAreOnPowerSupplyIsOnIsOkAndOnline', 'eq', 0);
+
+    // version compare
+    //$array[] = array(FALSE, '15.1R4.55', 'version_==', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R4.55',         '==', '15.1R5.5');
+    //$array[] = array(FALSE, '15.1R5.55', 'version_==', '15.1R5.5');
+    $array[] = array(FALSE, '15.1R5.55',         '==', '15.1R5.5');
+    //$array[] = array( TRUE, '15.1R5.5',  'version_==', '15.1R5.5');
+    $array[] = array( TRUE, '15.1R5.5',          '==', '15.1R5.5');
+    //$array[] = array(FALSE, '1.2.3x',    'version_==', '1.2.3z');
+    $array[] = array(FALSE, '1.2.3x',            '==', '1.2.3z');
 
     // match
     $array[] = array( TRUE, 'sweet', 'matches',    '.weet');
@@ -223,6 +312,18 @@ class IncludesAlertsTest extends \PHPUnit\Framework\TestCase
     $array[] = array( TRUE, $test2, '!in',          $list2);
     $array[] = array(FALSE, $test3, '!in',          $list1);
     $array[] = array(FALSE, $test3, '!in',          $list2);
+
+    // isnull (second param not used)
+    $array[] = array(TRUE,     NULL, 'isnull',      NULL);
+    $array[] = array(TRUE,     NULL, 'null',        NULL);
+    $array[] = array(FALSE, 1474559, 'isnull',      NULL);
+    $array[] = array(FALSE, 1474559, 'null',        NULL);
+
+    // notnull
+    $array[] = array(FALSE,    NULL, 'notnull',     NULL);
+    $array[] = array(FALSE,    NULL, '!null',       NULL);
+    $array[] = array(TRUE,  1474559, 'notnull',     NULL);
+    $array[] = array(TRUE,  1474559, '!null',       NULL);
 
     return $array;
   }

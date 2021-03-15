@@ -138,6 +138,15 @@ if ($latest['revision'] > OBSERVIUM_REV)
   print_message("%GThere is a newer revision of Observium available!%n", 'color');
   print_message("%GVersion %r" . $latest['version']."%G (" . format_unixtime(datetime_to_unixtime($latest['date']), 'jS F Y').") is %r". ($latest['revision']-OBSERVIUM_REV) ."%G revisions ahead.%n\n", 'color');
 }
+elseif ($options['u'])
+{
+  if ($latest['revision'] != OBSERVIUM_REV)
+  {
+
+  } else {
+    print_message("-- Observium is up to date.");
+  }
+}
 
 unset($latest, $versions, $train, $last_checked, $stats);
 

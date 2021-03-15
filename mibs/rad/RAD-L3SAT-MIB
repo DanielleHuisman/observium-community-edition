@@ -1,0 +1,2114 @@
+RAD-L3SAT-MIB DEFINITIONS ::= BEGIN
+
+-- L3 Service Activation Test and Report
+
+
+
+IMPORTS
+
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       sysName     FROM  SNMPv2-MIB
+       Gauge32, Unsigned32, OBJECT-TYPE, 
+       MODULE-IDENTITY, NOTIFICATION-TYPE, Counter64, 
+       Counter32     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, RowStatus, DateAndTime, 
+       TruthValue     FROM  SNMPv2-TC
+       InetAddressType, InetAddress, InetPortNumber     FROM  INET-ADDRESS-MIB
+       InterfaceIndexOrZero     FROM  IF-MIB
+       radTestPrefRepEvents, radTestPrefRepProfile, radTestPrefRepTest, 
+       radTestPerfRepResults, radTest     FROM  RAD-TEST-MIB
+       RadTestResult     FROM  RAD-TC
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason     FROM  RAD-GEN-MIB; 
+
+
+
+    radL3Sat MODULE-IDENTITY
+        LAST-UPDATED "201608041925Z"  -- August 04, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "L3 SAT MIB."
+    ::= { radTest 7 }
+
+
+
+-- Textual Conventions
+
+RadTestIpSizeIndex   ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TC is used to index a table according to the range of IP size
+     values."
+    SYNTAX      INTEGER
+    {
+    ip64        (1),
+    ip128       (2),
+    ip256       (3),
+    ip512       (4),
+    ip1024      (5),
+    ip1280      (6),
+    ip1500      (7),
+    ipMtu       (8),
+    ipCustom    (9)
+    }
+
+RadTestIpSizeValues   ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "This TC is used for configuring a set of IP size values."
+    SYNTAX      BITS
+    {
+    ip64Val     (0),
+    ip128Val    (1),
+    ip256Val    (2),
+    ip512Val    (3),
+    ip1024Val   (4),
+    ip1280Val   (5),
+    ip1500Val   (6),
+    ipMtuVal    (7),
+    ipCustomVal (8)
+    }
+
+
+
+-- ========================================================
+-- ==                   L3 SAT Tables                    ==
+-- ========================================================
+-- ------------------
+-- Peer Profile Table
+-- ------------------
+
+l3SatPeerProfileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L3SatPeerProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains peer configuration profiles to be used in
+     L3 SATs."
+    ::= { radTestPrefRepProfile 6 }
+
+l3SatPeerProfileEntry OBJECT-TYPE
+    SYNTAX      L3SatPeerProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in peer profile table.
+
+     A row cannot be deleted if the profile is associated to a peer.
+     A row cannot be modified if the profile is associated to a peer
+     that one or more of its test sessions are in progress."
+    INDEX { IMPLIED l3SatPeerProfileName }
+    ::= { l3SatPeerProfileTable 1 }
+
+L3SatPeerProfileEntry ::= SEQUENCE {
+    l3SatPeerProfileName                      SnmpAdminString,
+    l3SatPeerProfileRowStatus                 RowStatus,
+    l3SatPeerProfileL4Port                    Unsigned32,
+    l3SatPeerProfileScope                     BITS,
+    l3SatPeerProfilePolicingTest              INTEGER,
+    l3SatPeerProfileBwSteps                   OCTET STRING,
+    l3SatPeerProfileConfDuration              Unsigned32,
+    l3SatPeerProfilePerfDuration              Unsigned32,
+    l3SatPeerProfileReportType                INTEGER 
+ }
+
+l3SatPeerProfileName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable profile name."
+    ::= { l3SatPeerProfileEntry 1 }
+
+l3SatPeerProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of profiles."
+    ::= { l3SatPeerProfileEntry 2 }
+
+l3SatPeerProfileL4Port     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65504)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The start of the range of UDP ports that are used in the tests.
+     Must be a multiple of 16."
+    DEFVAL      { 'D000'H }
+    ::= { l3SatPeerProfileEntry 3 }
+
+l3SatPeerProfileScope     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    configuration     (0),
+    performance       (1)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The scope of the test: configuration phase, performance phase, or
+     both phases."
+    DEFVAL      { { configuration, performance } }
+    ::= { l3SatPeerProfileEntry 4 }
+
+l3SatPeerProfilePolicingTest     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    enabled     (1),
+    disabled    (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Allows to include or exclude the traffic policing sub-test from the
+     configuration phase."
+    DEFVAL      { enabled }
+    ::= { l3SatPeerProfileEntry 5 }
+
+l3SatPeerProfileBwSteps     OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(4))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The transmission rate in each step of the step load sub-test,
+     configurable as percentage of BW.
+
+     The last transmission rate must be 100% BW therefore only up to 3
+     additional rates are configurable.
+     Unused steps must have a corresponding value of 0%.
+     The default shall be 4 steps of 25%, 50%, 75% and 100% of BW.
+
+     Examples:
+     1 step of 100% - '64000000'H
+     3 steps of 30% ,60%, 100% - '1E3C6400'H"
+    DEFVAL      { '19324B64'H }  -- 25%, 50%, 75%, 100%
+    ::= { l3SatPeerProfileEntry 6 }
+
+l3SatPeerProfileConfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (60..300)
+    UNITS       "seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The duration of the configuration phase.
+     This duration is used for each test session."
+    DEFVAL      { 100 }
+    ::= { l3SatPeerProfileEntry 7 }
+
+l3SatPeerProfilePerfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (5..7200)
+    UNITS       "minutes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The duration of the performance phase."
+    DEFVAL      { 120 }
+    ::= { l3SatPeerProfileEntry 8 }
+
+l3SatPeerProfileReportType     OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    clockSync   (1),
+    noClockSync (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Indicates which metrics are included in the report.
+
+     Based on this configuration, each metric in the l3SatReportTable is
+     either valid or not as stated in the metric description."
+    DEFVAL      { noClockSync }
+    ::= { l3SatPeerProfileEntry 9 }
+
+
+-- ----------------------
+-- Session Profile Table
+-- ----------------------
+
+l3SatSessionProfileTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L3SatSessionProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains test session configuration profiles to be used
+     in L3 SATs."
+    ::= { radTestPrefRepProfile 7 }
+
+l3SatSessionProfileEntry OBJECT-TYPE
+    SYNTAX      L3SatSessionProfileEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in test session profile table.
+
+     A row cannot be deleted if the profile is associated to a test
+     session.
+     A row cannot be modified if the profile is associated to a running
+     test session."
+    INDEX { IMPLIED l3SatSessionProfileName }
+    ::= { l3SatSessionProfileTable 1 }
+
+L3SatSessionProfileEntry ::= SEQUENCE {
+    l3SatSessionProfileName                   SnmpAdminString,
+    l3SatSessionProfileRowStatus              RowStatus,
+    l3SatSessionProfileIpSize                 RadTestIpSizeValues,
+    l3SatSessionProfileIpCustomSize           Unsigned32,
+    l3SatSessionProfilePlrThreshold           Unsigned32,
+    l3SatSessionProfilePtdThreshold           Unsigned32,
+    l3SatSessionProfilePdvThreshold           Unsigned32,
+    l3SatSessionProfileAvailThreshold         Unsigned32 
+ }
+
+l3SatSessionProfileName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable profile name."
+    ::= { l3SatSessionProfileEntry 1 }
+
+l3SatSessionProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of profiles."
+    ::= { l3SatSessionProfileEntry 2 }
+
+l3SatSessionProfileIpSize     OBJECT-TYPE
+    SYNTAX      RadTestIpSizeValues
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The size of test packets.
+
+     Up to 4 different packet sizes shall be selected.
+     This size refers only to the IP part (IP header + UDP header + payload)
+     and does not include the Ethernet encapsulation."
+    DEFVAL      { { ip256Val } }
+    ::= { l3SatSessionProfileEntry 3 }
+
+l3SatSessionProfileIpCustomSize     OBJECT-TYPE
+    SYNTAX      Unsigned32 (52..2094)
+    UNITS       "bytes"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A user configurable packet size to be used in the tests.
+
+     Relevant only when the ipCustomVal(8) bit is set at
+     l3SatSessionProfileIpSize."
+    DEFVAL      { 576 }
+    ::= { l3SatSessionProfileEntry 4 }
+
+l3SatSessionProfilePlrThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "ppm"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for round-trip Packet Loss Ratio."
+    DEFVAL      { 1000 }
+    ::= { l3SatSessionProfileEntry 5 }
+
+l3SatSessionProfilePtdThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for round-trip/one-way
+    Packet Transfer Delay."
+    DEFVAL      { 200000 }
+    ::= { l3SatSessionProfileEntry 6 }
+
+l3SatSessionProfilePdvThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1000000)
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for round-trip/one-way
+    Packet Delay Variation."
+    DEFVAL      { 100000 }
+    ::= { l3SatSessionProfileEntry 7 }
+
+l3SatSessionProfileAvailThreshold     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "hundredth of percent"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The service acceptance criteria for round-trip Availability."
+    DEFVAL      { 9990 }
+    ::= { l3SatSessionProfileEntry 8 }
+
+
+-- ----------------
+-- Generator Table
+-- ----------------
+
+l3SatGeneratorTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L3SatGeneratorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of generator entities used in L3 SATs."
+    ::= { radTestPrefRepTest 11}
+
+l3SatGeneratorEntry OBJECT-TYPE
+    SYNTAX      L3SatGeneratorEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in L3 SAT generator table.
+
+     A row cannot be modified when the RowStatus is active(1).
+
+     A row cannot be deleted while at least one of the test sessions is
+     running (indicated by l3SatGeneratorStatus = inProgress(4)).
+
+     When a row is deleted all the corresponding rows in the
+     l3SatPeerTable, l3SatSessionTable and l3SatReportTable are
+     automatically deleted as well."
+    INDEX { IMPLIED l3SatGeneratorName }
+    ::= { l3SatGeneratorTable 1 }
+
+L3SatGeneratorEntry ::= SEQUENCE {
+    l3SatGeneratorName                        SnmpAdminString,
+    l3SatGeneratorRowStatus                   RowStatus,
+    l3SatGeneratorApplication                 INTEGER,
+    l3SatGeneratorInterface                   InterfaceIndexOrZero,
+    l3SatGeneratorOuterVlan                   Unsigned32,
+    l3SatGeneratorOuterPbit                   Unsigned32,
+    l3SatGeneratorOuterMarkingProfile         Unsigned32,
+    l3SatGeneratorInnerVlan                   Unsigned32,
+    l3SatGeneratorInnerPbit                   Unsigned32,
+    l3SatGeneratorRouterEntity                Unsigned32,
+    l3SatGeneratorLocalAddrType               InetAddressType,
+    l3SatGeneratorLocalAddr                   InetAddress,
+    l3SatGeneratorRouterInterface             InterfaceIndexOrZero,
+    l3SatGeneratorStatus                      INTEGER 
+ }
+
+l3SatGeneratorName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable generator name."
+    ::= { l3SatGeneratorEntry 1 }
+
+l3SatGeneratorRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of L3 SAT generators."
+    ::= { l3SatGeneratorEntry 2 }
+
+l3SatGeneratorApplication    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    pureL3      (1),
+    l3OverL2    (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The role of the generator device in the service path - L3 forwarder
+     or L2 probe."
+    DEFVAL      { pureL3 }
+    ::= { l3SatGeneratorEntry 3 }
+
+l3SatGeneratorInterface    OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The associated physical or logical port.
+
+     This object is relevant only when l3SatGeneratorApplication is
+     set to l3OverL2(2)."
+    DEFVAL      { 0 }
+    ::= { l3SatGeneratorEntry 4 }
+
+l3SatGeneratorOuterVlan    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The outer VLAN tag of outgoing and incoming test and TWAMP packets.
+
+     When there is no outer VLAN the value 4294967295 is used.
+
+     This object is relevant only when l3SatGeneratorApplication is
+     set to l3OverL2(2)."
+    DEFVAL      { 4294967295 }
+    ::= { l3SatGeneratorEntry 5 }
+
+l3SatGeneratorOuterPbit    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7 | 255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The outer VLAN priority (P-bit) assigned to outgoing and incoming
+     test and TWAMP packets.
+
+     A value of 255 means the marking profile of
+     l3SatGeneratorOuterMarkingProfile is used instead of this object.
+
+     This object is relevant only when l3SatGeneratorApplication is
+     set to l3OverL2(2) and l3SatGeneratorOuterVlan is not set to
+     4294967295."
+    DEFVAL      { 0 }
+    ::= { l3SatGeneratorEntry 6 }
+
+l3SatGeneratorOuterMarkingProfile    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile used to mark outer VLAN priority (P-bit) of outgoing
+     and incoming test and TWAMP packets.
+
+     The configured value is the index of the corresponding entry in
+     rad.markingProfileTable.
+
+     A value of zero means a fixed marking per
+     l3SatGeneratorOuterPbit is used instead of this object.
+
+     This object is relevant only when l3SatGeneratorApplication is
+     set to l3OverL2(2) and l3SatGeneratorOuterVlan is not set to
+     4294967295."
+    DEFVAL      { 0 }
+    ::= { l3SatGeneratorEntry 7 }
+
+l3SatGeneratorInnerVlan    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The inner VLAN tag of outgoing and incoming test and TWAMP packets.
+
+     When there is no inner VLAN the value 4294967295 is used.
+
+     This object is relevant only when l3SatGeneratorApplication is
+     set to l3OverL2(2)."
+    DEFVAL      { 4294967295 }
+    ::= { l3SatGeneratorEntry 8 }
+
+l3SatGeneratorInnerPbit    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The inner VLAN priority (P-bit) assigned to outgoing and incoming
+     test and TWAMP packets.
+
+     This object is relevant only when l3SatGeneratorApplication is
+     set to l3OverL2(2) and l3SatGeneratorInnerVlan is not set to
+     4294967295."
+    DEFVAL      { 0 }
+    ::= { l3SatGeneratorEntry 9 }
+
+l3SatGeneratorRouterEntity    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The number of the router under which the L3 SAT is performed."
+    DEFVAL      { 1 }
+    ::= { l3SatGeneratorEntry 10 }
+
+l3SatGeneratorLocalAddrType    OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of IP address of the L3 SAT generator."
+    ::= { l3SatGeneratorEntry 11 }
+
+l3SatGeneratorLocalAddr    OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The IP address of the L3 SAT generator."
+    ::= { l3SatGeneratorEntry 12 }
+
+l3SatGeneratorRouterInterface    OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The ifIndex of the associated router interface."
+    ::= { l3SatGeneratorEntry 13 }
+
+l3SatGeneratorStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    shutdown    (1),
+    idle        (2),
+    ready       (3),
+    inProgress  (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of the generator:
+     Shutdown    - the generator is disabled.
+     Idle        - some of the mandatory attributes were not configured
+                   yet e.g. L2 parameters, router interface creation.
+     Ready       - all the mandatory configurations were done.
+     In progress - at least one test session is running."
+    ::= { l3SatGeneratorEntry 14 }
+
+
+-- ------------
+-- Peer Table
+-- ------------
+
+l3SatPeerTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L3SatPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of peers entities used in L3 SATs."
+    ::= { radTestPrefRepTest 12 }
+
+l3SatPeerEntry OBJECT-TYPE
+    SYNTAX      L3SatPeerEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in L3 SAT peer table.
+
+     A row cannot be modified or deleted while the peer is active
+     (indicated by l3SatPeerCurrentPhase != idle(1)).
+
+     When a row is deleted all the corresponding rows in the
+     l3SatSessionTable and l3SatReportTable are automatically deleted
+     as well."
+    INDEX {  l3SatGeneratorName,
+             l3SatPeerAddrType,
+             l3SatPeerAddr }
+    ::= { l3SatPeerTable 1 }
+
+L3SatPeerEntry ::= SEQUENCE {
+    l3SatPeerAddrType                         InetAddressType,
+    l3SatPeerAddr                             InetAddress,
+    l3SatPeerRowStatus                        RowStatus,
+    l3SatPeerProfile                          SnmpAdminString,
+    l3SatPeerCmd                              INTEGER,
+    l3SatPeerConfChanged                      TruthValue,
+    l3SatPeerTimeRemaining                    Unsigned32,
+    l3SatPeerCurrentPhase                     INTEGER,
+    l3SatPeerTodStatus                        INTEGER,
+    l3SatPeerResponderType                    INTEGER,
+    l3SatPeerMtu                              Unsigned32,
+    l3SatPeerStartTime                        DateAndTime,
+    l3SatPeerEndTime                          DateAndTime,
+    l3SatPeerTimeElapsed                      Unsigned32,
+    l3SatPeerOutOfSyncSeconds                 Counter32,
+    l3SatPeerOverAllResult                    RadTestResult,
+    l3SatPeerConfDuration                     Unsigned32,
+    l3SatPeerPerfDuration                     Unsigned32,
+    l3SatPeerScope                            BITS,
+    l3SatPeerConnectivityResult               INTEGER,
+    l3SatPeerMtuTestResult                    INTEGER 
+ }
+
+l3SatPeerAddrType         OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The type of IP address of the L3 SAT peer."
+    ::= { l3SatPeerEntry 1 }
+
+l3SatPeerAddr         OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The IP address of the L3 SAT peer."
+    ::= { l3SatPeerEntry 2 }
+
+l3SatPeerRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of L3 SAT peers."
+    ::= { l3SatPeerEntry 3 }
+
+l3SatPeerProfile    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile used for the peer parameters."
+    DEFVAL      { "" }
+    ::= { l3SatPeerEntry 4 }
+
+l3SatPeerCmd    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    stop        (1),
+    start       (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A command to activate or de-activate the test at the generator side.
+
+     If sanity checks prevent the test activation then a set to start(1)
+     shall be rejected with an SNMP error.
+
+     Upon successful activation of a test:
+     - Existing corresponding rows in the l3SatReportTable shall be
+       automatically deleted.
+     - Corresponding rows shall be automatically created/re-created in
+       the l3SatReportTable.
+     - The value of the object l3SatPeerConfChanged shall be set
+       to false(2).
+     - For all the underlying test sessions the value of the object
+       l3SatSessionConfChanged shall be set to false(2).
+
+     This object is volatile i.e. it returns to default value after NE reset."
+    DEFVAL      { stop }
+    ::= { l3SatPeerEntry 5 }
+
+l3SatPeerConfChanged    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indication whether the configuration of the peer was changed after
+     the test was completed.
+
+     The configuration of the peer, in this context, includes the
+     following:
+     - The object l3SatPeerProfile.
+     - All the objects in l3SatPeerProfileTable of the associated profile.
+
+     The initial value is false(2). The value is changed to true(1) upon
+     modification of the above objects after a test was completed. The
+     value is changed back to false(2) upon re-activation of the peer."
+    ::= { l3SatPeerEntry 6 }
+
+l3SatPeerTimeRemaining    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The time remaining till the end of the test.
+
+     If the peer is not active a value of zero is returned."
+    ::= { l3SatPeerEntry 7 }
+
+l3SatPeerCurrentPhase    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    idle              (1),
+    configuration     (2),
+    performance       (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current phase of the test.
+
+     If the peer is not active the value idle(1) is returned."
+    ::= { l3SatPeerEntry 8 }
+
+l3SatPeerTodStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    unknown           (1),
+    sync              (2),
+    outOfSync         (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current TOD synchronization state with the responder device.
+
+     The value unknown(1) is returned if the generator device is connected
+     to an NTP server but the peer is not active (means no TWAMP to pass
+     indication from responder device).
+
+     The value sync(2) is returned if the generator device is connected to
+     an NTP server and the responder device is indicating the same (via
+     TWAMP payload).
+
+     The value outOfSync(3) is returned in all other cases."
+    ::= { l3SatPeerEntry 9 }
+
+l3SatPeerResponderType    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    unknown           (1),
+    ipLoop            (2),
+    udpLoop           (3),
+    loopAndTimestamp  (4)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The discovered type of the responder.
+
+     If the peer was never activated the value unknown(1) is returned."
+    ::= { l3SatPeerEntry 10 }
+
+l3SatPeerMtu    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0 | 68..2094)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The discovered IP MTU of the path to the responder.
+
+     If the peer was never activated the value zero is returned."
+    ::= { l3SatPeerEntry 11 }
+
+l3SatPeerStartTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time at the last peer activation.
+
+     If the peer was never activated a null value is returned."
+    ::= { l3SatPeerEntry 12 }
+
+l3SatPeerEndTime    OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The date and time when the last test was ended (regardless of the end
+     result passed/failed/aborted).
+
+     If a test is in progress or the peer was never activated a null value
+     is returned."
+    ::= { l3SatPeerEntry 13 }
+
+l3SatPeerTimeElapsed    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "For an in progress test - the elapsed time of the current test.
+     For a completed test - the duration of the last test.
+
+     If the peer was never activated a zero value is returned."
+    ::= { l3SatPeerEntry 14 }
+
+l3SatPeerOutOfSyncSeconds    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of seconds there was no TOD synchronization with the
+     responder device.
+
+     If the peer was never activated a zero value is returned."
+    ::= { l3SatPeerEntry 15 }
+
+
+l3SatPeerOverAllResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The overall result of the last test.
+
+     The value notApplicable(1) is returned in the following cases:
+     - The test is currently in progress.
+     - The peer was never activated.
+
+     The value passed(2) is returned if and only if the results of all
+     the test sessions (l3SatSessionEndResult), that were actually
+     performed, are passed(2).
+
+     The value userAborted(4) is returned if the test was prematurely
+     stopped by the operator.
+
+     The value systemAborted(5) is returned if the test was autonomously
+     stopped by the system.
+
+     The value failed(3) is returned in all other cases."
+    ::= { l3SatPeerEntry 16 }
+
+l3SatPeerConfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (60..300)
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The duration of the configuration phase.
+     This duration is used for each test session.
+
+     This object is a copy of the corresponding object in the peer profile.
+     The duplication is done to keep the report valid even if the peer
+     profile was modified after the test completion."
+    ::= { l3SatPeerEntry 17 }
+
+l3SatPeerPerfDuration     OBJECT-TYPE
+    SYNTAX      Unsigned32 (4..7200)
+    UNITS       "minutes"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The duration of the performance phase.
+
+     This object is a copy of the corresponding object in the peer profile
+     and is used for availability calculation.
+     The duplication is done to keep the report valid even if the peer
+     profile was modified after the test completion."
+    ::= { l3SatPeerEntry 18 }
+
+l3SatPeerScope     OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    configuration     (0),
+    performance       (1)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The scope of the test: configuration phase, performance phase, or both
+     phases.
+     This object is a copy of the corresponding object in the peer profile.
+     The duplication is done to keep the report valid even if the peer
+     profile was modified after the test completion."
+    ::= { l3SatPeerEntry 19 }
+
+l3SatPeerConnectivityResult    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable     (1),
+    passed            (2),
+    failed            (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the last connectivity sub-test.
+
+     The value notApplicable(1) is returned in the following cases:
+     - The sub-test is currently in progress.
+     - The peer was never activated."
+    ::= { l3SatPeerEntry 20 }
+
+l3SatPeerMtuTestResult    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    notApplicable     (1),
+    passed            (2),
+    failed            (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the last MTU sub-test.
+
+     The value notApplicable(1) is returned in the following cases:
+     - The sub-test is currently in progress.
+     - The peer was never activated."
+    ::= { l3SatPeerEntry 21 }
+
+
+-- --------------
+-- Session Table
+-- --------------
+
+l3SatSessionTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L3SatSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of test sessions used in L3 SATs."
+    ::= { radTestPrefRepTest 13 }
+
+l3SatSessionEntry OBJECT-TYPE
+    SYNTAX      L3SatSessionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in L3 SAT session table.
+
+     A row may be created while the peer is active
+     (indicated by l3SatPeerCurrentPhase != idle(1)).
+
+     A row cannot be modified while the test is running
+     (indicated by l3SatSessionStatus = inProgress(3)).
+
+     A row may be unconditionally deleted even while the test is running.
+
+     When a row is deleted all the corresponding rows in the
+     l3SatReportTable are automatically deleted as well."
+    INDEX {  l3SatGeneratorName,
+             l3SatPeerAddrType,
+             l3SatPeerAddr,
+             IMPLIED l3SatSessionName }
+    ::= { l3SatSessionTable 1 }
+
+L3SatSessionEntry ::= SEQUENCE {
+    l3SatSessionName                          SnmpAdminString,
+    l3SatSessionRowStatus                     RowStatus,
+    l3SatSessionProfile                       SnmpAdminString,
+    l3SatSessionBw                            Unsigned32,
+    l3SatSessionDscp                          Unsigned32,
+    l3SatSessionConfChanged                   TruthValue,
+    l3SatSessionStatus                        INTEGER,
+    l3SatSessionLmSrcPort                     InetPortNumber,
+    l3SatSessionLmDstPort                     InetPortNumber,
+    l3SatSessionDmSrcPort                     InetPortNumber,
+    l3SatSessionDmDstPort                     InetPortNumber,
+    l3SatSessionConfResult                    RadTestResult,
+    l3SatSessionPerfResult                    RadTestResult 
+ }
+
+l3SatSessionName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable test session name."
+    ::= { l3SatSessionEntry 1 }
+
+l3SatSessionRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of L3 SAT test session."
+    ::= { l3SatSessionEntry 2 }
+
+l3SatSessionProfile    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile used for the test session parameters."
+    DEFVAL      { "" }
+    ::= { l3SatSessionEntry 3 }
+
+l3SatSessionBw    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    UNITS       "kbps"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The rate of the test session traffic."
+    ::= { l3SatSessionEntry 4 }
+
+l3SatSessionDscp    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..63)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The priority value for the test session traffic."
+    DEFVAL      { 0 }
+    ::= { l3SatSessionEntry 5 }
+
+l3SatSessionConfChanged    OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indication whether the configuration of the test session was changed
+     after the test was completed.
+
+     If the configuration was changed then threshold values should not be
+     shown in a detailed report (there is no tracking whether the exact
+     change within a profile was of a threshold or not).
+
+     The configuration of the test session, in this context, includes the
+     following:
+     - The object l3SatSessionProfile.
+     - All the objects in l3SatSessionProfileTable of the associated
+       profile.
+
+     The initial value is false(2). The value is changed to true(1) upon
+     modification of the above objects after a test was completed. The
+     value is changed back to false(2) upon re-activation of the peer."
+    ::= { l3SatSessionEntry 6 }
+
+l3SatSessionStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    idle              (1),
+    ready             (2),
+    inProgress        (3),
+    passed            (4),
+    failed            (5),
+    userAborted       (6),
+    systemAborte      (7)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of the test session:
+     Idle        - the generator is in status shutdown(1) or idle(2).
+     Ready       - waiting for activation of the peer.
+     In progress - the test is currently running.
+     Passed      - the test completed successfully.
+     Failed        - the test failed i.e. the results were not within the
+                     SAC limits.
+     userAborted   - the test was stopped by the operator.
+     systemAborted - the test was autonomously stopped by the system
+                     e.g. due to protection switchover.
+
+     The value passed(4) is returned only in the following cases:
+     1. The scope included only the configuration phase and
+        l3SatSessionConfResult=passed(2).
+     2. The scope included the performance phase (w/ or w/o configuration
+        phase) and l3SatSessionPerfResult=passed(2).
+
+     The value userAborted(6) is returned if
+     l3SatSessionConfResult=userAborted(4)or
+     l3SatSessionPerfResult=userAborted(4).
+
+     The value systemAborted(7) is returned if
+     l3SatSessionConfResult=systemAborted(5)or
+     l3SatSessionPerfResult=systemAborted(5).
+
+     The value failed(5) is returned if l3SatSessionConfResult=failed(3)
+     or l3SatSessionPerfResult=failed(3). If one of these result objects
+     is userAborted(4)/systemAborted(5) then the value returned for
+     l3SatSessionStatus is userAborted(4)/systemAborted(5), respectively."
+    ::= { l3SatSessionEntry 7 }
+
+l3SatSessionLmSrcPort    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The L4 source port of the loss measurement stream."
+    ::= { l3SatSessionEntry 8 }
+
+l3SatSessionLmDstPort    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The L4 destination port of the loss measurement stream."
+    ::= { l3SatSessionEntry 9 }
+
+l3SatSessionDmSrcPort    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The L4 source port of delay the measurement stream."
+    ::= { l3SatSessionEntry 10 }
+
+l3SatSessionDmDstPort    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The L4 destination port of the delay measurement stream."
+    ::= { l3SatSessionEntry 11 }
+
+l3SatSessionConfResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the configuration phase.
+
+     The value notApplicable(1) is returned in the following cases:
+     - The configuration phase was not performed in the last test.
+     - The configuration phase is currently in progress.
+     - The test was never activated.
+
+     The value passed(2) is returned if and only if the results of all
+     the configuration sub-tests (l3SatReportResult), that were actually
+     performed, for all the tested IP sizes, are passed(2).
+
+     The value userAborted(4) is returned if the configuration phase was
+     prematurely stopped by the operator.
+
+     The value systemAborted(5) is returned if the configuration phase
+     was autonomously stopped by the system.
+
+     The value failed(3) is returned in all other cases."
+    ::= { l3SatSessionEntry 12 }
+
+l3SatSessionPerfResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the last performance phase.
+
+     The value notApplicable(1) is returned in the following cases:
+     - The performance phase was not performed in the last test.
+     - The performance phase is currently in progress.
+     - The test was never activated.
+
+     The value passed(2) is returned if and only if the performance
+     sub-test was passed(2) (l3SatReportResult) for all the tested IP
+     sizes.
+
+     The value userAborted(4) is returned if the performance phase was
+     prematurely stopped by the operator.
+
+     The value systemAborted(5) is returned if the performance phase was
+     autonomously stopped by the system.
+
+     The value failed(3) is returned in all other cases."
+    ::= { l3SatSessionEntry 13 }
+
+
+-- ----------------
+-- Responder Table
+-- ----------------
+
+l3SatResponderTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L3SatResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of responder entities used in L3 SATs."
+    ::= { radTestPrefRepTest 14 }
+
+l3SatResponderEntry OBJECT-TYPE
+    SYNTAX      L3SatResponderEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in L3 SAT responder table.
+
+     A row cannot be modified when the RowStatus is active(1)."
+    INDEX { IMPLIED l3SatResponderName }
+    ::= { l3SatResponderTable 1 }
+
+L3SatResponderEntry ::= SEQUENCE {
+    l3SatResponderName                        SnmpAdminString,
+    l3SatResponderRowStatus                   RowStatus,
+    l3SatResponderApplication                 INTEGER,
+    l3SatResponderInterface                   InterfaceIndexOrZero,
+    l3SatResponderOuterVlan                   Unsigned32,
+    l3SatResponderOuterPbit                   Unsigned32,
+    l3SatResponderOuterMarkingProfile         Unsigned32,
+    l3SatResponderInnerVlan                   Unsigned32,
+    l3SatResponderInnerPbit                   Unsigned32,
+    l3SatResponderRouterEntity                Unsigned32,
+    l3SatResponderLocalAddrType               InetAddressType,
+    l3SatResponderLocalAddr                   InetAddress,
+    l3SatResponderL4Port                      Unsigned32,
+    l3SatResponderRouterInterface             InterfaceIndexOrZero,
+    l3SatResponderStatus                      INTEGER,
+    l3SatResponderLmRxPackets                 Counter64,
+    l3SatResponderDmRxPackets                 Counter64 
+ }
+
+l3SatResponderName     OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "A meaningful printable responder name."
+    ::= { l3SatResponderEntry 1 }
+
+l3SatResponderRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of L3 SAT responders."
+    ::= { l3SatResponderEntry 2 }
+
+l3SatResponderApplication    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    pureL3      (1),
+    l3OverL2    (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The role of the responder device in the service path - L3 forwarder
+     or L2 probe."
+    DEFVAL      { pureL3 }
+    ::= { l3SatResponderEntry 3 }
+
+l3SatResponderInterface    OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The associated physical or logical port.
+
+     This object is relevant only when l3SatResponderApplication is
+     set to l3OverL2(2)."
+    DEFVAL      { 0 }
+    ::= { l3SatResponderEntry 4 }
+
+l3SatResponderOuterVlan    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The outer VLAN tag of outgoing and incoming test and TWAMP packets.
+
+     When there is no outer VLAN the value 4294967295 is used.
+
+     This object is relevant only when l3SatResponderApplication is
+     set to l3OverL2(2)."
+    DEFVAL      { 4294967295 }
+    ::= { l3SatResponderEntry 5 }
+
+l3SatResponderOuterPbit    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7 | 255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The outer VLAN priority (P-bit) assigned to outgoing and incoming
+     test and TWAMP packets.
+
+     A value of 255 means the marking profile of
+     l3SatResponderOuterMarkingProfile is used instead of this object.
+
+     This object is relevant only when l3SatResponderApplication is
+     set to l3OverL2(2) and l3SatResponderOuterVlan is not set to
+     4294967295."
+    DEFVAL      { 0 }
+    ::= { l3SatResponderEntry 6 }
+
+l3SatResponderOuterMarkingProfile    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile used to mark outer VLAN priority (P-bit) of outgoing
+     and incoming test and TWAMP packets.
+
+     The configured value is the index of the corresponding entry in
+     rad.markingProfileTable.
+
+     A value of zero means a fixed marking per
+     l3SatResponderOuterPbit is used instead of this object.
+
+     This object is relevant only when l3SatResponderApplication is
+     set to l3OverL2(2) and l3SatResponderOuterVlan is not set to
+     4294967295."
+    DEFVAL      { 0 }
+    ::= { l3SatResponderEntry 7 }
+
+l3SatResponderInnerVlan    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4095 | 4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The inner VLAN tag of outgoing and incoming test and TWAMP packets.
+
+     When there is no inner VLAN the value 4294967295 is used.
+
+     This object is relevant only when l3SatResponderApplication is
+     set to l3OverL2(2)."
+    DEFVAL      { 4294967295 }
+    ::= { l3SatResponderEntry 8 }
+
+l3SatResponderInnerPbit    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The inner VLAN priority (P-bit) assigned to outgoing and incoming
+     test and TWAMP packets.
+
+     This object is relevant only when l3SatResponderApplication is
+     set to l3OverL2(2) and l3SatResponderInnerVlan is not set to
+     4294967295."
+    DEFVAL      { 0 }
+    ::= { l3SatResponderEntry 9 }
+
+l3SatResponderRouterEntity    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The number of the router under which the L3 SAT is performed."
+    DEFVAL      { 1 }
+    ::= { l3SatResponderEntry 10 }
+
+l3SatResponderLocalAddrType    OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of IP address of the L3 SAT responder."
+    ::= { l3SatResponderEntry 11 }
+
+l3SatResponderLocalAddr    OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The IP address of the L3 SAT responder."
+    ::= { l3SatResponderEntry 12 }
+
+l3SatResponderL4Port     OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..65504)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The start of the range of UDP ports that are used in the tests.
+     Must be a multiple of 16."
+    DEFVAL      { 'D000'H }
+    ::= { l3SatResponderEntry 13 }
+
+l3SatResponderRouterInterface    OBJECT-TYPE
+    SYNTAX      InterfaceIndexOrZero
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The ifIndex of the associated router interface."
+    ::= { l3SatResponderEntry 14 }
+
+l3SatResponderStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    shutdown    (1),
+    idle        (2),
+    ready       (3)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The current status of the generator:
+     Shutdown    - the responder is disabled.
+     Idle        - some of the mandatory attributes were not configured
+                   yet e.g. L2 parameters, router interface creation.
+     Ready       - all the mandatory configurations were done."
+    ::= { l3SatResponderEntry 15 }
+
+l3SatResponderLmRxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The total number of packets received on all loss measurement
+     streams."
+    ::= { l3SatResponderEntry 16 }
+
+l3SatResponderDmRxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The total number of packets received on all delay measurement
+     streams."
+    ::= { l3SatResponderEntry 17 }
+
+
+-- -------------
+-- Report Table
+-- -------------
+
+l3SatReportTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF L3SatReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table holds the measurements and results for each L3 SAT session
+     that was performed."
+    ::= { radTestPerfRepResults 11 }
+
+l3SatReportEntry OBJECT-TYPE
+    SYNTAX      L3SatReportEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in L3 SAT report table.
+
+     Rows are automatically created when the corresponding peer in the
+     l3SatPeerTable is successfully activated - for details, see
+     below the description of the index objects.
+
+     When a peer in the l3SatPeerTable is successfully re-activated, the
+     corresponding rows in this table are automatically modified (reset
+     measurement values and results) or deleted (e.g. a certain IP size
+     or sub-test is not used in the re-run).
+
+     A row is automatically deleted when the corresponding generator, the
+     corresponding peer or the corresponding test session is deleted."
+    INDEX {  l3SatGeneratorName,
+             l3SatPeerAddrType,
+             l3SatPeerAddr,
+             l3SatSessionName,
+             l3SatReportIpSize,
+             l3SatReportTestType }
+    ::= { l3SatReportTable 1 }
+
+L3SatReportEntry ::= SEQUENCE {
+    l3SatReportIpSize                         RadTestIpSizeIndex,
+    l3SatReportTestType                       INTEGER,
+    l3SatReportResult                         RadTestResult,
+    l3SatReportTxRate                         Gauge32,
+    l3SatReportIrAverage                      Gauge32,
+    l3SatReportTxPackets                      Counter64,
+    l3SatReportLostPackets                    Counter64,
+    l3SatReportUas                            Counter32,
+    l3SatReportAvailability                   Unsigned32,
+    l3SatReportPtdMin                         Gauge32,
+    l3SatReportPtdAverage                     Gauge32,
+    l3SatReportPtdMax                         Gauge32,
+    l3SatReportPtdStd                         Gauge32,
+    l3SatReportPdvAverage                     Gauge32,
+    l3SatReportPdvMax                         Gauge32,
+    l3SatReportIpdvAverageFwd                 Gauge32,
+    l3SatReportIpdvMaxFwd                     Gauge32,
+    l3SatReportIpdvAverageBck                 Gauge32,
+    l3SatReportIpdvMaxBck                     Gauge32,
+    l3SatReportDuplicatedPacketsFwd           Counter32,
+    l3SatReportDuplicatedPacketsBck           Counter32,
+    l3SatReportReorderedPacketsFwd            Counter32,
+    l3SatReportReorderedPacketsBck            Counter32,
+    l3SatReportPtdMinFwd                      Gauge32,
+    l3SatReportPtdAverageFwd                  Gauge32,
+    l3SatReportPtdMaxFwd                      Gauge32,
+    l3SatReportPtdStdFwd                      Gauge32,
+    l3SatReportPtdMinBck                      Gauge32,
+    l3SatReportPtdAverageBck                  Gauge32,
+    l3SatReportPtdMaxBck                      Gauge32,
+    l3SatReportPtdStdBck                      Gauge32,
+    l3SatReportPdvAverageFwd                  Gauge32,
+    l3SatReportPdvMaxFwd                      Gauge32,
+    l3SatReportPdvAverageBck                  Gauge32,
+    l3SatReportPdvMaxBck                      Gauge32,
+    l3SatReportValidRxTwampPacketsFwd         Counter64,
+    l3SatReportValidRxTwampPacketsBck         Counter64 
+ }
+
+l3SatReportIpSize         OBJECT-TYPE
+    SYNTAX      RadTestIpSizeIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The IP size index of the report.
+     Allows holding measurements and result per IP size.
+
+     One entry for each set IP size in the corresponding
+     l3SatSessionProfileIpSize."
+    ::= { l3SatReportEntry 1 }
+
+l3SatReportTestType       OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    stepLoad1   (1),
+    stepLoad2   (2),
+    stepLoad3   (3),
+    stepLoad4   (4),
+    policing    (5),
+    performance (6)
+    }
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The sub-test type index of the report.
+     Allows holding measurements and result per sub-test type.
+
+     Entries are created according to the associated configuration in the
+     profile e.g. number of BW steps, traffic policing enabled/disabled,
+     test scope includes performance or not, etc.
+     There are no entries for sub-tests that are not included in the last
+     test.
+     For example if the configuration phase consists of 2 BW steps then
+     there are no entries for stepLoad3(3) and stepLoad4(4)."
+    ::= { l3SatReportEntry 2 }
+
+l3SatReportResult    OBJECT-TYPE
+    SYNTAX      RadTestResult
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The result of the sub-test.
+
+     The initial value is notApplicable(1).
+     Upon completion of the sub-test the value changes to passed(2) or
+     failed(3).
+     If the test is stopped by the operator before the completion of the
+     sub-test the value is userAborted(4).
+     If the test is autonomously stopped by the system before the completion
+     of the sub-test the value is systemAborted(5)"
+    ::= { l3SatReportEntry 3 }
+
+l3SatReportTxRate    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The transmission rate that the generator was configured to in the
+     sub-test."
+    ::= { l3SatReportEntry 4 }
+
+l3SatReportIrAverage    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "kbps"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated information rate.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 5 }
+
+l3SatReportTxPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of transmitted packets.
+
+     The initial value is one."
+    ::= { l3SatReportEntry 6 }
+
+l3SatReportLostPackets    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of packets lost.
+
+     The PLR is calculated by:
+     (l3SatReportLostPackets / l3SatReportTxPackets)
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 7 }
+
+l3SatReportUas    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of unavailable seconds.
+
+     This object is relevant only for the performance test. For the other
+     test type entries the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 8 }
+
+l3SatReportAvailability    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    UNITS       "hundredth of percent"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The percentage of available time.
+
+     The availability is calculated by:
+(60*l3SatPeerPerfDuration - l3SatReportUas) * 10000 / (60*l3SatPeerPerfDuration)
+
+     This object is relevant only for the performance test. For the other
+     test type entries the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 9 }
+
+l3SatReportPtdMin    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured packet transfer delay.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 10 }
+
+l3SatReportPtdAverage    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated packet transfer delay.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 11 }
+
+l3SatReportPtdMax    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured packet transfer delay.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 12 }
+
+l3SatReportPtdStd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated standard deviation of the packet transfer delay.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 13 }
+
+l3SatReportPdvAverage    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated packet delay variation.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 14 }
+
+l3SatReportPdvMax    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum calculated packet delay variation.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 15 }
+
+l3SatReportIpdvAverageFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated forward inter-packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4). For the other responder types the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 16 }
+
+l3SatReportIpdvMaxFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum calculated forward inter-packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4). For the other responder types the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 17 }
+
+l3SatReportIpdvAverageBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated backward inter-packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4). For the other responder types the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 18 }
+
+l3SatReportIpdvMaxBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum calculated backward inter-packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4). For the other responder types the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 19 }
+
+l3SatReportDuplicatedPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of duplicated packets in the forward direction.
+
+     This object is relevant only for the performance test and only when
+     l3SatPeerResponderType is loopAndTimestamp(4).
+     For the other test type entries and/or responder types the value is
+     zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 20 }
+
+l3SatReportDuplicatedPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of duplicated packets in the backward direction.
+
+     This object is relevant only for the performance test and only when
+     l3SatPeerResponderType is loopAndTimestamp(4).
+     For the other test type entries and/or responder types the value is
+     zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 21 }
+
+l3SatReportReorderedPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of reordered packets in the forward direction.
+
+     This object is relevant only for the performance test and only when
+     l3SatPeerResponderType is loopAndTimestamp(4).
+     For the other test type entries and/or responder types the value is
+     zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 22 }
+
+l3SatReportReorderedPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter32
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of reordered packets in the backward direction.
+
+     This object is relevant only for the performance test and only when
+     l3SatPeerResponderType is loopAndTimestamp(4).
+     For the other test type entries and/or responder types the value is
+     zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 23 }
+
+--
+
+l3SatReportPtdMinFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured forward packet transfer delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 24 }
+
+l3SatReportPtdAverageFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated forward packet transfer delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 25 }
+
+l3SatReportPtdMaxFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured forward packet transfer delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 26 }
+
+l3SatReportPtdStdFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated standard deviation of the forward packet transfer delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 27 }
+
+l3SatReportPtdMinBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The minimum measured backward packet transfer delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 28 }
+
+l3SatReportPtdAverageBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated backward packet transfer delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 29 }
+
+l3SatReportPtdMaxBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum measured backward packet transfer delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 30 }
+
+l3SatReportPtdStdBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The calculated standard deviation of the backward packet transfer
+     delay.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 31 }
+
+l3SatReportPdvAverageFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated forward packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 32 }
+
+l3SatReportPdvMaxFwd    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum calculated forward packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 33 }
+
+l3SatReportPdvAverageBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The average calculated backward packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 34 }
+
+l3SatReportPdvMaxBck    OBJECT-TYPE
+    SYNTAX      Gauge32
+    UNITS       "micro seconds"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The maximum calculated backward packet delay variation.
+
+     This object is relevant only when l3SatPeerResponderType is
+     loopAndTimestamp(4) and l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 35 }
+
+l3SatReportValidRxTwampPacketsFwd    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of valid received TWAMP packets in the forward direction.
+     Timeout (lost) and duplicated packets are not valid.
+
+     The PDR is calculated by:
+     (l3SatReportDuplicatedPacketsFwd / l3SatReportValidRxTwampPacketsFwd)
+
+     The PRR is calculated by:
+     (l3SatReportReorderedPacketsFwd / l3SatReportValidRxTwampPacketsFwd)
+
+     This object is relevant only for the performance test and only when
+     l3SatPeerResponderType is loopAndTimestamp(4) and
+     l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero and the PDR & PRR are not
+     calculated.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 36 }
+
+l3SatReportValidRxTwampPacketsBck    OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "packets"
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of valid received TWAMP packets in the backward direction.
+     Timeout (lost) and duplicated packets are not valid.
+
+     The PDR is calculated by:
+     (l3SatReportDuplicatedPacketsBck / l3SatReportValidRxTwampPacketsBck)
+
+     The PRR is calculated by:
+     (l3SatReportReorderedPacketsBck / l3SatReportValidRxTwampPacketsBck)
+
+     This object is relevant only for the performance test and only when
+     l3SatPeerResponderType is loopAndTimestamp(4) and
+     l3SatPeerProfileReportType is clockSync(1).
+     For the other cases the value is zero and the PDR & PRR are not
+     calculated.
+
+     The initial value is zero."
+    ::= { l3SatReportEntry 37 }
+
+
+-- --------------
+-- Notifications
+-- --------------
+
+systemL3SatTestStart                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, l3SatPeerCmd } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a L3 SAT test was started."
+    ::= { radTestPrefRepEvents 50 }
+
+systemL3SatConfigurationTestEnd                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, l3SatPeerCmd } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a L3 SAT configuration phase has ended."
+    ::= { radTestPrefRepEvents 51 }
+
+systemL3SatPerformanceTestEnd                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, l3SatPeerCmd } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a L3 SAT performance phase has ended."
+    ::= { radTestPrefRepEvents 52 }
+
+systemL3SatResponderActivated                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, l3SatResponderStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a L3 SAT responder was activated."
+    ::= { radTestPrefRepEvents 53 }
+
+systemL3SatResponderDeactivated                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, l3SatResponderStatus } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates that a L3 SAT responder was deactivated (either
+     by the operator or by the device due to external conditions)."
+    ::= { radTestPrefRepEvents 54 }
+
+systemL3SatPreliminaryTestFailed                NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, l3SatPeerConnectivityResult, l3SatPeerMtuTestResult } 
+    STATUS  current
+    DESCRIPTION
+    "This trap indicates a failure in one of the L3 SAT preliminary tests."
+    ::= { radTestPrefRepEvents 55 }
+
+END

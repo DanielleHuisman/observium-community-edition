@@ -13,9 +13,9 @@
 
 include($config['html_dir']."/includes/graphs/common.inc.php");
 
-$rrd_options .= " DEF:pre=$rrd_filename:PrePolicyPkt:AVERAGE";
-$rrd_options .= " DEF:drop=$rrd_filename:DropPkt:AVERAGE";
-$rrd_options .= " DEF:bufdrop=$rrd_filename:NoBufDropPkt:AVERAGE";
+$rrd_options .= " DEF:pre=$rrd_filename_escape:PrePolicyPkt:AVERAGE";
+$rrd_options .= " DEF:drop=$rrd_filename_escape:DropPkt:AVERAGE";
+$rrd_options .= " DEF:bufdrop=$rrd_filename_escape:NoBufDropPkt:AVERAGE";
 
 #$rrd_options .= " CDEF:post_perc=post,pre,/,100,*";
 #$rrd_options .= " CDEF:drop_perc=drop,pre,/,100,*";

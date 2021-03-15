@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage graphs
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -55,13 +55,15 @@ foreach ($vars['id'] as $storage_id)
   if (!$config['graph_colours'][$colours][$iter]) { $iter = 0; }
   $colour=$config['graph_colours'][$colours][$iter];
 
-  $descr = rrdtool_escape(rewrite_hrDevice($storage['storage_descr']), $descr_len);
+  $descr = rrdtool_escape(rewrite_entity_name($storage['storage_descr'], 'storage'), $descr_len);
   if (isset($storage['storage_type'])) { $storage['storage_mib'] = $storage['storage_type']; }
 
   if (is_file($rrd_filename))
   {
-    $rrd_options .= " DEF:".$storage['storage_id']."used=$rrd_filename:used:AVERAGE";
-    $rrd_options .= " DEF:".$storage['storage_id']."free=$rrd_filename:free:AVERAGE";
+    $rrd_filename_escape = rrdtool_escape($rrd_filename);
+
+    $rrd_options .= " DEF:".$storage['storage_id']."used=$rrd_filename_escape:used:AVERAGE";
+    $rrd_options .= " DEF:".$storage['storage_id']."free=$rrd_filename_escape:free:AVERAGE";
     $rrd_options .= " CDEF:".$storage['storage_id']."size=".$storage['storage_id']."used,".$storage['storage_id']."free,+";
     $rrd_options .= " CDEF:".$storage['storage_id']."perc=".$storage['storage_id']."used,".$storage['storage_id']."size,/,100,*";
     $rrd_options .= " AREA:".$storage['storage_id']."perc#" . $colour . "10";

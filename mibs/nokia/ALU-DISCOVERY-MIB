@@ -1,0 +1,462 @@
+ALU-DISCOVERY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE, 
+        NOTIFICATION-TYPE, Counter64, 
+        Unsigned32, Integer32, IpAddress        FROM SNMPv2-SMI
+
+        MODULE-COMPLIANCE, OBJECT-GROUP, 
+        NOTIFICATION-GROUP                      FROM SNMPv2-CONF
+
+        TEXTUAL-CONVENTION, TimeStamp,
+        TruthValue, RowStatus, DisplayString    FROM SNMPv2-TC
+                
+        alcatelCommonMIBModules, alcatelObjects, 
+        alcatelNotifyPrefix, alcatelConformance FROM TIMETRA-GLOBAL-MIB
+        
+		tmnxChassisIndex, tmnxChassisNotifyHwIndex FROM TIMETRA-CHASSIS-MIB		
+        ;
+
+
+aluDiscoveryMIBModule MODULE-IDENTITY
+        LAST-UPDATED    "0901190000Z"
+        ORGANIZATION    "Nokia"
+        CONTACT-INFO    
+            "Nokia 7x50 Support
+             Web: http://www.nokia.com/comps/pages/carrier_support.jhtml"
+        DESCRIPTION
+        "This document is the SNMP MIB module to manage and provision the 
+        microwave components on the Nokia 7xxx device.
+        
+        Copyright 2009-2014 Nokia.  All rights reserved.
+        Reproduction of this document is authorized on the condition that
+        the foregoing copyright notice is included.
+
+        This SNMP MIB module (Specification) embodies Nokia's
+        proprietary intellectual property.  Nokia retains 
+        all title and ownership in the Specification, including any 
+        revisions.
+
+        Nokia grants all interested parties a non-exclusive 
+        license to use and distribute an unmodified copy of this 
+        Specification in connection with management of Nokia 
+        products, and without fee, provided this copyright notice and 
+        license appear on all copies.
+
+        This Specification is supplied 'as is', and Nokia 
+        makes no warranty, either express or implied, as to the use, 
+        operation, condition, or performance of the Specification."
+
+--
+--  Revision History
+--
+        REVISION        "0901180000Z"
+        DESCRIPTION     "Rev 1.0                19 Jan 2009 00:00 
+                         1.0 release of the ALU-DISCOVERY-MIB."
+                         
+        ::= { alcatelCommonMIBModules 4 }
+
+
+aluDiscoveryObjs             OBJECT IDENTIFIER ::= { alcatelObjects 4 }
+
+aluDiscoveryMIBConformance   OBJECT IDENTIFIER ::= { alcatelConformance 4 }
+aluDiscoveryConformance      OBJECT IDENTIFIER ::= { aluDiscoveryMIBConformance 1 }
+
+aluDiscoveryNotificationsPrefix   OBJECT IDENTIFIER ::= { alcatelNotifyPrefix 4 }
+    aluDiscoveryNotifications     OBJECT IDENTIFIER ::= { aluDiscoveryNotificationsPrefix 0 } 
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      ALU-DISCOVERY-MIB textual conventions
+--
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--     AluDiscoveryStatus
+--
+AluDiscoveryStatus ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The value of AluDiscoveryStatus is an enumerated integer
+         that indicates the status of auto-discovery on this system.
+             noAutoDiscovery (0) - indicates that auto-discovery was not
+                                   used during the boot process of this
+                                   system.
+             inProgress (1)      - indicates that auto-discovery is 
+                                   currently in-progress.
+             halted (2)          - indicates that auto-discovery is
+                                   halted due to a failure. 
+             terminated (2)      - indicates that auto-discovery was
+                                   terminated by an operator before 
+                                   completing successfully.
+             successful (3)      - indicates that auto-discovery was
+                                   completed successfully on this system 
+                                   since last system boot."
+    SYNTAX      INTEGER {
+                    noAutoDiscovery  (0),
+                    inProgress       (1),
+                    halted           (2),
+                    terminated       (4),
+                    successful       (5)
+                }
+                
+AluDiscoveryStage ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The value of AluDiscoveryStage is an enumerated integer
+         that indicates the stage of auto-discovery on this system.
+             unknown (0) - this value is returned if auto-discovery
+                           is not currently in-progess.
+             selfDiscovery (1) - indicates that auto-discovery is
+                           currently auditing the installed equipment
+                           in the system.
+             aquiringNetwork (2) - indicates auto-discovery is looking
+                           for a usuable uplink into the network.
+             aquiringConfig (3) - indicates auto-discovery is uploading
+                           configuration provided by the network.
+             testAndCommitConfig (4) - indicates auto-discovery is checking
+                           the uploaded configuration and committing this
+                           config to the system database."
+    SYNTAX      INTEGER {
+                    unknown             (0),
+                    selfDiscovery       (1),
+                    aquiringNetwork     (2),
+                    aquiringConfig      (3),
+                    testAndCommitConfig (4)
+                }
+
+AluDiscoveryCircuitId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The value of AluDiscoveryCircuitId is a string that describes the system name,
+        interface name and port of a given uplink.  The format of this string is as
+        follows:
+             '<system-name>|<interface-name>|<port>'
+        "
+    SYNTAX      DisplayString
+    
+AluDiscoveryFailureFlags ::= TEXTUAL-CONVENTION
+    STATUS          current
+    DESCRIPTION     "This object specifies all the conditions that
+                     affect the successful completion of Auto-Discovery."
+    SYNTAX          BITS {
+                        configConflict       (0),  -- Configuration conflict detected
+                        eqNotReady           (1),  -- No supported equipment is online
+                        noPortsReady         (2),  -- No discovery ports are online
+                        noNetworkFound       (3),  -- No response to discover requests
+                        ipRequestFailed      (4),  -- DHCP IP Request failed
+                        portSelectFailed     (5),  -- No port was selected
+                        configLoadingProblem (6),  -- Issue with loading discovered configuration
+                        configTestingFailed  (7),  -- Tests on configuration failed
+                        configCommitProblem  (8)   -- Issue with configuration commit to database
+                    }
+                                
+--
+-- Auto-Discovery Table (System)
+--
+aluDiscoveryTable   OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluDiscoveryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluDiscoveryTable has one entry for the system."
+    ::= { aluDiscoveryObjs 1 }
+aluDiscoveryEntry   OBJECT-TYPE
+    SYNTAX      AluDiscoveryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table contains the runtime information of auto-discovery
+        of this system.  The information contained in this table is since
+        last system boot."
+    INDEX       { tmnxChassisIndex }
+    ::= { aluDiscoveryTable 1 }
+
+AluDiscoveryEntry ::=
+    SEQUENCE {
+        aluDiscoveryStatus           AluDiscoveryStatus,
+        aluDiscoveryStage            AluDiscoveryStage,
+        aluDiscoveryStartTime        TimeStamp,
+        aluDiscoveryEndTime      	 TimeStamp,
+        aluDiscoverySystemIpAddr     IpAddress,
+        aluDiscoverySystemSubnet     IpAddress,
+        aluDiscoveryLocalCircId      AluDiscoveryCircuitId,
+        aluDiscoveryLocalIpAddr      IpAddress,
+        aluDiscoveryLocalSubnet      IpAddress,
+        aluDiscoveryGatewayCircId    AluDiscoveryCircuitId,
+        aluDiscoveryGatewayRemId     DisplayString,
+        aluDiscoveryGatewayIpAddr    IpAddress,
+		aluDiscoveryServerIpAddr     IpAddress,
+		aluDiscoveryFailureFlags     AluDiscoveryFailureFlags   
+   }
+   
+aluDiscoveryStatus  OBJECT-TYPE
+    SYNTAX      AluDiscoveryStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryStatus specifies the current status of the Auto-Discovery Agent.
+        
+         If aluDiscoveryStatus is 'terminated' or 'halted' the aluDiscoveryFailureFlags
+         object can be used for more detail."
+    ::= { aluDiscoveryEntry 1 }
+
+aluDiscoveryStage  OBJECT-TYPE
+    SYNTAX      AluDiscoveryStage
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryStage specifies the current stage of the Auto-Discovery Agent if
+        it is currently running."
+    ::= { aluDiscoveryEntry 2 }
+
+aluDiscoveryStartTime  OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryStartTime specifies the last time the Auto-Discovery Agent was
+        started since the last system boot."
+    ::= { aluDiscoveryEntry 3 }
+    
+aluDiscoveryEndTime  OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryEndTime specifies the last time the Auto-Discovery Agent ended
+        since the last system boot. The end-time will be updated regardless of if the
+        auto-discovery was successful or not."
+    ::= { aluDiscoveryEntry 4 }
+    
+aluDiscoverySystemIpAddr  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoverySystemIpAddr specifies the discovered system loopback ip-address 
+        of the base router."
+    ::= { aluDiscoveryEntry 5 }
+
+aluDiscoverySystemSubnet  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoverySystemSubnet specifies the discovered system loopback subnet mask 
+        of the base router."
+    ::= { aluDiscoveryEntry 6 }
+    
+aluDiscoveryLocalCircId  OBJECT-TYPE
+    SYNTAX      AluDiscoveryCircuitId
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryLocalCircId describes the local selected network uplink interface
+        used for auto-discovery of this system."
+    ::= { aluDiscoveryEntry 7 }
+
+aluDiscoveryLocalIpAddr  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryLocalIpAddr describes the discovered ip-address of the selected
+        network uplink interface used for auto-discovery of this system."
+    ::= { aluDiscoveryEntry 8 }
+
+aluDiscoveryLocalSubnet  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryLocalSubnet describes the discovered subnet mask of the selected
+        network uplink interface used for auto-discovery of this system."
+    ::= { aluDiscoveryEntry 9 }
+
+aluDiscoveryGatewayCircId  OBJECT-TYPE
+    SYNTAX      AluDiscoveryCircuitId
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryGatewayCircId describes the discovered gateway into the network
+        used for auto-discovery of this system."
+    ::= { aluDiscoveryEntry 10 }
+
+aluDiscoveryGatewayRemId  OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryGatewayRemId describes the remote-id of the gateway into the network
+        used for auto-discovery of this system."
+    ::= { aluDiscoveryEntry 11 }
+
+aluDiscoveryGatewayIpAddr  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryGatewayIpAddr describes the ip-address of the gateway into the network
+        used for auto-discovery of this system."
+    ::= { aluDiscoveryEntry 12 }
+
+aluDiscoveryServerIpAddr  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryServerIpAddr describes the selected DHCP server that provided configuration
+        information during auto-discovery of this system."
+    ::= { aluDiscoveryEntry 13 }
+
+aluDiscoveryFailureFlags  OBJECT-TYPE
+    SYNTAX      AluDiscoveryFailureFlags
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluDiscoveryFailureFlags specifies the failure reasons that auto-discovery can not be 
+        completed successfully."
+    ::= { aluDiscoveryEntry 14 }
+
+--
+-- Auto-Discovery Boot Options 
+--
+aluDiscoveryBofInfo    OBJECT IDENTIFIER ::= { aluDiscoveryObjs 2 }
+
+aluSbiAutoDiscover  OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSbiAutoDiscover specifies whether or not the system
+         will use Auto-Discovery during bootup to generate its configuration. When set to 'true',
+         Auto-Discovery is enabled."
+    DEFVAL { false }
+    ::= { aluDiscoveryBofInfo 1 }
+
+aluSbiAutoDiscoverId  OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..50))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSbiAutoDiscoverId specifies the identifier to be used when
+        sending discovery requests."
+    DEFVAL { ''H }
+    ::= { aluDiscoveryBofInfo 2}
+
+aluSbiAutoDiscoverVlan  OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..4094)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluSbiAutoDiscoverVlan specifies the IEEE 802.1Q VLAN ID all
+        discovery requests should be broadcasted on.
+        
+        The value '0' indicates that no VLAN ID is provisioned and IEEE 802.1Q 
+        encapsulation is not required."
+    DEFVAL { 0 }
+    ::= { aluDiscoveryBofInfo 3}
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ --
+ --     Notification Definition section
+ --
+ --                     Notification Objects
+ --
+
+aluDiscoveryStarted   NOTIFICATION-TYPE
+    STATUS  current
+    DESCRIPTION
+        "The aluDiscoveryStarted notification is generated when auto-discovery
+         is started." 
+    ::= { aluDiscoveryNotifications 1 }
+
+aluDiscoveryTerminated   NOTIFICATION-TYPE
+    OBJECTS {
+        aluDiscoveryFailureFlags
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluDiscoveryTerminated notification is generated when the Auto-Discovery
+         Agent is terminated before auto-discovery is complete." 
+    ::= { aluDiscoveryNotifications 2 }
+
+aluDiscoverySuccessful   NOTIFICATION-TYPE
+    OBJECTS {
+        aluDiscoverySystemIpAddr,
+        aluDiscoveryLocalCircId,
+        aluDiscoveryLocalIpAddr,
+        aluDiscoveryGatewayCircId,
+        aluDiscoveryGatewayIpAddr
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluDiscoverySuccessful notification is generated when the Auto-Discovery
+         Agent completes discovery successfully." 
+    ::= { aluDiscoveryNotifications 3 }
+
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      The compliance specifications.
+--
+
+aluDiscoveryCompliances     OBJECT IDENTIFIER ::= { aluDiscoveryConformance 1 }
+aluDiscoveryGroups          OBJECT IDENTIFIER ::= { aluDiscoveryConformance 2 }
+
+aluDiscoveryComp7705        OBJECT IDENTIFIER ::= { aluDiscoveryCompliances 1 }
+--  aluDiscoveryComp7705V1v0  OBJECT IDENTIFIER ::= { aluDiscoveryComp7705 1}
+
+aluDiscoveryComp7705V1v0  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for revision 1.0 of ALU-DISCOVERY-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluDiscoveryGroup,
+            aluDiscoveryNotificationGroup
+        }
+    ::= { aluDiscoveryComp7705 1 }
+
+
+-- units of conformance
+
+aluDiscoveryGroup     OBJECT-GROUP
+    OBJECTS {   aluDiscoveryStatus,
+                aluDiscoveryStage,
+                aluDiscoveryStartTime,
+                aluDiscoveryEndTime,
+                aluDiscoverySystemIpAddr,
+                aluDiscoverySystemSubnet,
+                aluDiscoveryLocalCircId,
+                aluDiscoveryLocalIpAddr,
+                aluDiscoveryLocalSubnet,
+                aluDiscoveryGatewayCircId,
+                aluDiscoveryGatewayRemId,
+                aluDiscoveryGatewayIpAddr,
+		        aluDiscoveryServerIpAddr,
+		        aluDiscoveryFailureFlags,
+		        aluSbiAutoDiscover,
+		        aluSbiAutoDiscoverId,
+		        aluSbiAutoDiscoverVlan
+            }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of the auto-discovery
+         on Nokia series systems."
+    ::= { aluDiscoveryGroups 1 }
+    
+aluDiscoveryNotificationGroup NOTIFICATION-GROUP
+    NOTIFICATIONS   { 
+                      aluDiscoveryStarted,
+                      aluDiscoveryTerminated,
+                      aluDiscoverySuccessful
+                    }
+    STATUS        current
+    DESCRIPTION
+        "The group of notifications supporting the management of auto-discovery
+        on Nokia series systems."
+    ::= { aluDiscoveryGroups 2 }
+
+END

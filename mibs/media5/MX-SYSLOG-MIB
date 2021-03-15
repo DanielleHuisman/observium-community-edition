@@ -1,0 +1,426 @@
+-- ****************************************************************************
+-- ****************************************************************************
+--
+--             Copyright(c) 2004 Mediatrix Telecom, Inc.
+--
+--  NOTICE:
+--   This document contains information that is confidential and proprietary
+--   to Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves all rights to this document as well as
+--   to the Intellectual Property of the document and the technology and
+--   know-how that it includes and represents.
+--
+--   This publication cannot be reproduced, neither in whole nor in part in
+--   any form whatsoever without written prior approval by
+--   Mediatrix Telecom, Inc.
+--
+--   Mediatrix Telecom, Inc. reserves the right to revise this publication
+--   and make changes at any time and without the obligation to notify any
+--   person and/or entity of such revisions and/or changes.
+--
+-- ****************************************************************************
+-- ****************************************************************************
+
+MX-SYSLOG-MIB
+DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        Unsigned32
+    FROM SNMPv2-SMI
+        OBJECT-GROUP,
+        MODULE-COMPLIANCE
+    FROM SNMPv2-CONF
+        MxIpHostName,
+        MxIpConfigSource,
+        MxIpPort,
+        MxEnableState,
+        MxIpSelectConfigSource,
+        MxIpDhcpSiteSpecificCode
+    FROM MX-TC
+        ipAddressStatus,
+        ipAddressConfig,
+        mediatrixConfig
+    FROM MX-SMI;
+
+syslogMIB MODULE-IDENTITY
+    LAST-UPDATED "200411050000Z"
+    ORGANIZATION "Mediatrix Telecom, Inc."
+    CONTACT-INFO "Mediatrix Telecom, Inc.
+                  4229, Garlock Street
+                  Sherbrooke (Quebec)
+                  Canada
+                  Phone: (819) 829-8749
+                  "
+    DESCRIPTION "This MIB describes the parameters used by the syslog
+                 messaging system."
+    -- ************************************************************************
+    -- Revision history
+    -- ************************************************************************
+    REVISION    "200411050000Z"
+    DESCRIPTION "Added syslogMsgDisplayTimeFormat."
+
+    REVISION    "200404270000Z"
+    DESCRIPTION "Added syslogMsgDisplayMacAddress, syslogMsgDisplayTime and
+                 syslogMsgDisplayLocalHost."
+
+    REVISION    "200402090000Z"
+    DESCRIPTION "Add variable syslogMsgLocalMaxSeverity and syslogMsgLocalMaxNbr.
+                 Add also table syslogLocalMsgTable."
+
+    REVISION    "200208230000Z"
+    DESCRIPTION "DEFVAL of syslogMsgMaxSeverity is set to informational
+                 instead of disabled. This allows to know when the unit
+                 is booted up."
+
+    REVISION    "200108060000Z"
+    DESCRIPTION "Creation."
+
+    ::= { mediatrixConfig 17 }
+
+syslogMIBObjects  OBJECT IDENTIFIER ::= { syslogMIB 1 }
+syslogConformance OBJECT IDENTIFIER ::= { syslogMIB 2 }
+
+-- Add the syslog general parameters
+
+    syslogMsgMaxSeverity OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              disabled(0),
+                              critical(1),
+                              error(2),
+                              warning(3),
+                              informational(4),
+                              debug(5)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "This value indicates which syslog message will be processed.
+                     Any syslog message with a severity value greater than this
+                     value will be ignored by the agent."
+        DEFVAL { informational }
+        ::= { syslogMIBObjects 5 }
+
+    syslogMsgLocalMaxSeverity OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              disabled(0),
+                              critical(1),
+                              error(2),
+                              warning(3),
+                              informational(4),
+                              debug(5)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "This value indicates which syslog message will be processed
+                     by the local agent. Any syslog message with a severity
+                     value greater than this value will be ignored by the agent."
+        DEFVAL { informational }
+        ::= { syslogMIBObjects 50 }
+
+    syslogMsgLocalMaxNbr OBJECT-TYPE
+        SYNTAX      Unsigned32 (0..100)
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "This value indicates the maximum number of syslog messages
+                     handled by the local agent. If the local agent receives a
+                     new syslog message and the maximal number of message is
+                     reached, the oldest one is removed."
+        DEFVAL { 0 }
+        ::= { syslogMIBObjects 100 }
+
+    -- *************************************************************************
+    -- syslogLocalMsgTable
+    -- *************************************************************************
+    syslogLocalMsgTable OBJECT-TYPE
+        SYNTAX      SEQUENCE OF SyslogLocalMsgEntry
+        MAX-ACCESS  not-accessible
+        STATUS      current
+        DESCRIPTION "This table holds the last syslogMsgLocalMaxNbr syslog sent
+                     by the unit."
+        ::= { syslogMIBObjects 150 }
+
+        syslogLocalMsgEntry OBJECT-TYPE
+            SYNTAX      SyslogLocalMsgEntry
+            MAX-ACCESS  not-accessible
+            STATUS      current
+            DESCRIPTION "A row in the syslogMsgLocalMaxNbr table."
+            INDEX       {
+                            ifIndex
+                        }
+            ::= { syslogLocalMsgTable 50 }
+
+            SyslogLocalMsgEntry ::= SEQUENCE
+                {
+                    syslogMsgLocalSeverity  OCTET STRING,
+                    syslogMsgLocalTime      OCTET STRING,
+                    syslogMsgLocalModule    OCTET STRING,
+                    syslogMsgLocalMsg       OCTET STRING
+                }
+
+            syslogMsgLocalSeverity OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..16))
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "Severity level of the syslog."
+                ::= { syslogLocalMsgEntry 50 }
+
+            syslogMsgLocalTime OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..16))
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "Time when the syslog occurred."
+                ::= { syslogLocalMsgEntry 100 }
+
+
+            syslogMsgLocalModule OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..64))
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "Module that sent the syslog."
+                ::= { syslogLocalMsgEntry 150 }
+
+            syslogMsgLocalMsg OBJECT-TYPE
+                SYNTAX  OCTET STRING (SIZE(0..255))
+                MAX-ACCESS  read-only
+                STATUS      current
+                DESCRIPTION "Syslog message."
+                ::= { syslogLocalMsgEntry 200 }
+
+
+    -- *************************************************************************
+    -- syslogMsgCustomization
+    -- *************************************************************************
+syslogMsgCustomization    OBJECT IDENTIFIER ::= { syslogMIBObjects 200 }
+
+    syslogMsgDisplayMacAddress OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables displaying the unit’s MAC address as part of
+                     the prefix for all syslog messages.
+
+                     disable: The MAC address is not displayed in the prefix of the
+                              syslog messages.
+
+                     enable : The MAC address is displayed in the prefix of the syslog
+                              messages.
+
+                     This affect only syslog messages sent on the network and not the
+                     local syslog messages."
+        DEFVAL { disable }
+        ::= { syslogMsgCustomization 50 }
+
+    syslogMsgDisplayTime OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables displaying the unit’s current local time as part
+                     of the prefix for all syslog messages.
+
+                     disable: The time is not displayed in the prefix of the syslog
+                              messages.
+
+                     enable : The time is displayed in the prefix of the syslog
+                              messages.
+
+                     This affect only syslog messages sent on the network and not the
+                     local syslog messages."
+
+
+        DEFVAL { enable }
+        ::= { syslogMsgCustomization 150 }
+
+    syslogMsgDisplayTimeFormat OBJECT-TYPE
+        SYNTAX      INTEGER {
+                              pseudoRfcFormat(0),
+                              trueRfcFormat(1)
+                            }
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Selects the timestamp format of the syslog messages.
+
+                     trueRfcFormat   : The timestamp complies with the RFC 3164
+                                       format.
+
+                     pseudoRfcFormat : The timestamp uses a pseudo-RFC 3164
+                                       format.
+
+                     Timestamp in true RFC 3164 format   : Jan 1 09:05:06
+                     Timestamp in pseudo-RFC 3164 format : Jan 1  9:5:6
+
+                     This applies only to syslog messages sent on the network 
+                     and not the local syslog messages."
+
+        DEFVAL { pseudoRfcFormat }
+        ::= { syslogMsgCustomization 175 }
+
+    syslogMsgDisplayLocalHost OBJECT-TYPE
+        SYNTAX      MxEnableState
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Enables/Disables displaying the unit’s current local host as
+                     part of the prefix for all syslog messages.
+
+                     disable: The local host is not displayed in the prefix of the
+                              syslog messages.
+
+                     enable : The local host is displayed in the prefix of the
+                              syslog messages.
+
+                     This affect only syslog messages sent on the network and not the
+                     local syslog messages."
+
+
+        DEFVAL { enable }
+        ::= { syslogMsgCustomization 200 }
+
+    -- ************************************************************************
+    -- CallAgent IP address: Placed in the mediatrixMgmt.ipAddressStatus and
+    --                       in mediatrixConfig.ipAddressConfig.
+    -- ************************************************************************
+
+-- Add the syslog ip addresses specifics parameters
+
+    ipAddressStatusSyslog OBJECT IDENTIFIER ::= { ipAddressStatus 20 }
+    ipAddressConfigSyslog OBJECT IDENTIFIER ::= { ipAddressConfig 20 }
+
+-- Add the syslog Call Agent status information
+
+    syslogConfigSource OBJECT-TYPE
+        SYNTAX      MxIpConfigSource
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Indicates the source used for the provisioning of
+                     the syslog MIB objects."
+        DEFVAL { dhcp }
+        ::=  {  ipAddressStatusSyslog  1  }
+
+    syslogHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Syslog server IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressStatusSyslog  2  }
+
+    syslogPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-only
+        STATUS      current
+        DESCRIPTION "Syslog server IP port number."
+        DEFVAL { 514 }
+        ::=  {    ipAddressStatusSyslog  3  }
+
+-- Add the syslog Call Agent configuration information
+
+    syslogSelectConfigSource OBJECT-TYPE
+        SYNTAX      MxIpSelectConfigSource
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Indicates the source to be used for the provisioning of
+                     the syslog MIB objects."
+        DEFVAL      { dhcp }
+        ::=  {  ipAddressConfigSyslog  1  }
+
+    ipAddressConfigSyslogStatic OBJECT IDENTIFIER ::= { ipAddressConfigSyslog 10 }
+
+    -- Add the static parameters
+
+    syslogStaticHost OBJECT-TYPE
+        SYNTAX      MxIpHostName
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static Syslog server IP address or domain name."
+        DEFVAL      { "192.168.0.10" }
+        ::=  {    ipAddressConfigSyslogStatic  1  }
+
+    syslogStaticPort OBJECT-TYPE
+        SYNTAX      MxIpPort
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "Static Syslog server IP port number."
+        DEFVAL      { 514 }
+        ::=  {    ipAddressConfigSyslogStatic  2  }
+
+    ipAddressConfigSyslogDhcp OBJECT IDENTIFIER ::= { ipAddressConfigSyslog 30 }
+
+    -- Add the dhcp parameters
+    syslogDhcpSiteSpecificCode OBJECT-TYPE
+        SYNTAX      MxIpDhcpSiteSpecificCode
+        MAX-ACCESS  read-write
+        STATUS      current
+        DESCRIPTION "DHCP Syslog server site specific code.
+        			 If set to 0, use vendor-specific code #110"
+        DEFVAL      { 0 }
+        ::=  {    ipAddressConfigSyslogDhcp  1    }
+
+    -- ************************************************************************
+    -- Conformance information
+    -- ************************************************************************
+    syslogCompliances OBJECT IDENTIFIER ::= { syslogConformance 1 }
+
+    syslogBasicComplVer1 MODULE-COMPLIANCE
+        STATUS      current
+        DESCRIPTION
+            "Minimal parameters definitions to support the syslog messaging system."
+        MODULE -- This Module
+            MANDATORY-GROUPS {
+                                syslogBasicGroupVer1,
+                                syslogServerGroupVer1,
+                                syslogMsgCustomizationGroupVer1
+                             }
+        ::= { syslogCompliances 1 }
+
+    -- ************************************************************************
+    -- MIB variable grouping
+    -- ************************************************************************
+    syslogGroups OBJECT IDENTIFIER ::= { syslogConformance 2 }
+
+    syslogBasicGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                    syslogMsgMaxSeverity,
+                    syslogMsgLocalMaxSeverity,
+                    syslogMsgLocalMaxNbr,
+                    syslogMsgLocalTime,
+                    syslogMsgLocalSeverity,
+                    syslogMsgLocalModule,
+                    syslogMsgLocalMsg
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the minimal set of objects that enables the user to send
+             syslog messages."
+        ::= { syslogGroups 1 }
+
+    syslogServerGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                    syslogConfigSource,
+                    syslogHost,
+                    syslogPort,
+                    syslogSelectConfigSource,
+                    syslogStaticHost,
+                    syslogStaticPort,
+                    syslogDhcpSiteSpecificCode
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the minimal set of objects that define
+             syslog server."
+        ::= { syslogGroups 2 }
+
+    syslogMsgCustomizationGroupVer1 OBJECT-GROUP
+        OBJECTS {
+                  syslogMsgDisplayMacAddress,
+                  syslogMsgDisplayTime,
+                  syslogMsgDisplayTimeFormat,
+                  syslogMsgDisplayLocalHost
+                }
+        STATUS current
+        DESCRIPTION
+            "This group holds the necessary objects that define customization of
+             syslog messages."
+        ::= { syslogGroups 50 }
+
+END

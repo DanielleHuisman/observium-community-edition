@@ -9,6 +9,8 @@ IMPORTS
         FROM SNMPv2-SMI
     MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP 
         FROM SNMPv2-CONF
+    sysName
+        FROM RFC1213-MIB
     eaton, xupsEnvironment
         FROM EATON-OIDS
     -- Need to import these EMP objects to support PowerMIB-style traps for EMP
@@ -19,15 +21,15 @@ IMPORTS
         FROM EATON-EMP-MIB;
 
 xupsMIB MODULE-IDENTITY
-    LAST-UPDATED "201102250000Z"
+    LAST-UPDATED "201909270000Z"
     ORGANIZATION "Eaton Corporation"
     CONTACT-INFO
         "Eaton Power Quality Technical Support (PQTS) group
             www.eaton.com/powerxpert 
             Technical Resource Center phone numbers 
-			United States:  1.800.843.9433 or 919.870.3028
-			Canada:  1.800.461.9166 ext. 260
-			All other countries:  Call your local service representative." 
+            United States:  1.800.843.9433 or 919.870.3028
+            Canada:  1.800.461.9166 ext. 260
+            All other countries:  Call your local service representative." 
     DESCRIPTION
             "Defines Eaton's proprietary PowerMIB for UPS and
              related device data.
@@ -36,9 +38,74 @@ xupsMIB MODULE-IDENTITY
             Copyright (C) Powerware Corporation 1999-2004
             Copyright (C) Eaton Corporation (2005-)."
 
-	REVISION "201102250000Z"
-	DESCRIPTION 
-		"Add new data xupsSwitchable"
+    REVISION "201909270000Z"
+    DESCRIPTION 
+        "xupsOutputSource data can monitor the ESS mode."
+
+    REVISION "201909120000Z"
+    DESCRIPTION 
+        "Provide new data that reflects some battery alarm : xupsBatteryFailure,
+         xupsBatteryNotPresent, xupsBatteryAged, xupsBatteryLowCapacity."
+
+    REVISION "201909100000Z"
+    DESCRIPTION 
+        "Change the data xupsBatteryLastReplacedDate to read-only because the card
+         sets it automatically when the battery replacement is detected."
+
+    REVISION "201904120000Z"
+    DESCRIPTION 
+        "Provide the status of the main AC Input in xupsInputStatus.
+         Provide the status of the AC Output in xupsOutputStatus and a new trap
+         and alarm 'load not protected' in xupsOutputNotProtected." 
+
+    REVISION "201903050000Z"
+    DESCRIPTION 
+        "Provide more UPS identification data as xupsIdentPartNumber and xupsIdentSerialNumber.
+         Provide a collection xupsAgent that contains identification data of the card :
+         xupsAgentManufacturer, xupsAgentModel, xupsAgentSoftwareVersion, xupsAgentPartNumber,
+         xupsAgentSerialNumber"
+
+    REVISION "201902190000Z"
+    DESCRIPTION 
+        "To ensure consistency whith the measures done on the UPS, the data following are renamed :
+         xupsInputAverageCurrent to xupsInputTotalCurrent,
+         xupsOutputAverageCurrent to xupsOutputTotalCurrent,
+         xupsBypassAverageCurrent to xupsBypassTotalCurrent."
+
+    REVISION "201809120000Z"
+    DESCRIPTION 
+        "Add new data xupsInputId, xupsInputName, xupsInputCurrentHighPrecision in the table xupsInputTable.
+         Add new sub collection xupsInputTotal with xupsInputAverageVoltage, xupsInputAverageCurrent,
+         xupsInputTotalWatts, xupsInputTotalVA, xupsInputAveragePowerFactor inside.
+         Add new data xupsOutputId, xupsOutputName, xupsOutputCurrentHighPrecision,
+         xupsOutputPercentLoad, xupsOutputVA in the table xupsOutputTable.
+         Add new sub collection xupsOutputTotal with xupsOutputAverageVoltage, xupsOutputAverageCurrent,
+         xupsOutputTotalWatts, xupsOutputTotalVA, xupsOutputAveragePowerFactor inside.
+         Add new data xupsBypassId, xupsBypassName, xupsBypassCurrentHighPrecision,
+         xupsBypassWatts in the table xupsBypassTable.
+         Add new sub collection xupsBypassTotal with xupsBypassTotalAverageVoltage, xupsBypassAverageCurrent,
+         xupsBypassTotalWatts, xupsBypassTotalVA, xupsBypassTotalAverageFactor inside."
+
+    REVISION "201804230000Z"
+    DESCRIPTION 
+        "Add new data xupsTestTrap, xupstdTestTrap that will allow to initiate a 
+         test trap sent out from the agent to the trap receivers."
+
+    REVISION "201211261513Z"
+    DESCRIPTION 
+        "Add the identifier of measures xupsInputId, xupsOutputId and xupsBypassId,
+         respectively in the table xupsInputTable, xupsOutputTable and xupsBypassTable."
+
+    REVISION "201204030000Z"
+    DESCRIPTION 
+        "Add new data xupsOutputHourlyPowerUsage, xupsOutputCumulativePowerUsage,
+         and xupsOutputCumulativePowerUsageTimer into the collection xupsOutput.
+         Add new data xupsRecepHourlyPowerUsage, xupsRecepCumulativePowerUsage,
+         and xupsRecepCumulativePowerUsageTimer into the collection xupsRecepTable."
+
+    REVISION "201102250000Z"
+    DESCRIPTION 
+        "Add new data xupsSwitchable"
 
     REVISION        "200810020000Z"
     DESCRIPTION
@@ -75,7 +142,11 @@ xupsConfig       OBJECT IDENTIFIER       ::= { xupsMIB 10 }
 xupsTrapControl  OBJECT IDENTIFIER       ::= { xupsMIB 11 }
 xupsRecep        OBJECT IDENTIFIER       ::= { xupsMIB 12 }
 xupsTopology     OBJECT IDENTIFIER       ::= { xupsMIB 13 }
+xupsAgent        OBJECT IDENTIFIER       ::= { xupsMIB 14 }
 
+xupsInputTotal   OBJECT IDENTIFIER       ::= { xupsInput 8 }
+xupsOutputTotal   OBJECT IDENTIFIER       ::= { xupsOutput 9 }
+xupsBypassTotal   OBJECT IDENTIFIER       ::= { xupsBypass 4 }
 
 --
 -- xupsIdent group:
@@ -113,6 +184,21 @@ xupsIdentOemCode OBJECT-TYPE
          0 or 255 indicates Eaton itself."
     ::= {xupsIdent 4}
 
+xupsIdentPartNumber  OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE(1..31))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION 
+        "The catalog part number of the UPS device."
+    ::= { xupsIdent 5 }
+
+xupsIdentSerialNumber  OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE(1..31))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION 
+        "The serial number of the UPS device."
+    ::= { xupsIdent 6 }
 
 
 --
@@ -182,15 +268,58 @@ xupsBatteryAbmStatus OBJECT-TYPE
 
 xupsBatteryLastReplacedDate OBJECT-TYPE
     SYNTAX     DisplayString (SIZE (0..16))
-    MAX-ACCESS read-write
+    MAX-ACCESS read-only
     STATUS     current
     DESCRIPTION
-    "The date when the Batteries in this UPS were last replaced.  Should be
-     the same as xupsConfigInstallDate initially. Free text format, so the  
-     preferred local date format may be used (MM/DD/YYYY, DD-Mon-YYYY, etc)."
+    "The date when the Batteries in this UPS were last replaced. Free text format,
+     so the preferred local date format may be used (MM/DD/YYYY, DD-Mon-YYYY, etc)."
     ::= { xupsBattery 6}
 
-                                   
+xupsBatteryFailure OBJECT-TYPE
+    SYNTAX INTEGER {
+        yes(1),
+        no(2)
+    }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Indicates if a battery fault detected or battery tests failed."
+    ::= { xupsBattery 7}
+
+xupsBatteryNotPresent OBJECT-TYPE
+    SYNTAX INTEGER {
+        yes(1),
+        no(2)
+    }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Indicates if the UPS has no battery either internal or external."
+    ::= { xupsBattery 8}
+
+xupsBatteryAged OBJECT-TYPE
+    SYNTAX INTEGER {
+        yes(1),
+        no(2)
+    }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Indicates if the battery is over aged."
+    ::= { xupsBattery 9}
+
+xupsBatteryLowCapacity OBJECT-TYPE
+    SYNTAX INTEGER {
+        yes(1),
+        no(2)
+    }
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Indicates if the battery capacity is below the threshold set in the UPS."
+    ::= { xupsBattery 10}
+
+
 --
 -- xupsInput group:
 --
@@ -243,7 +372,10 @@ XupsInputEntry ::= SEQUENCE {
     xupsInputPhase   Integer32,
     xupsInputVoltage Integer32,
     xupsInputCurrent Integer32,
-    xupsInputWatts   Integer32
+    xupsInputWatts   Integer32,
+    xupsInputId      INTEGER,
+    xupsInputName    OCTET STRING,
+    xupsInputCurrentHighPrecision Integer32
     }
 
 xupsInputPhase OBJECT-TYPE
@@ -280,6 +412,40 @@ xupsInputWatts OBJECT-TYPE
     DESCRIPTION
         "The measured input real power in watts."
     ::= {xupsInputEntry 4}
+
+xupsInputId  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		phase1toN (1),
+		phase2toN (2),
+		phase3toN (3),
+		phase1to2 (4),
+		phase2to3 (5),
+		phase3to1 (6)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"value indicates what measurement is being stored in this table row :
+		phase1 to neutral, phase2 to neutral, phase3 to neutral,
+		phase1 to phase2, phase2 to phase3, phase3 to phase1."
+	::= { xupsInputEntry 5 }
+
+xupsInputName  OBJECT-TYPE
+	SYNTAX     OCTET STRING (SIZE(1..31))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"A descriptive name for the phase, example : L1/A for the phase 1."
+	::= { xupsInputEntry 6 }
+
+xupsInputCurrentHighPrecision OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "RMS tenth of Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured input current from the UPS meters in tenth of amps."
+    ::= {xupsInputEntry 7}
 
 xupsInputSource OBJECT-TYPE
     SYNTAX     INTEGER {
@@ -354,8 +520,75 @@ xupsSecondaryInputWatch OBJECT-TYPE
         power, i.e., redundant AC feeds or a separate Bypass or Generator source."
     ::= { xupsInput 7 }
 
+--
+-- xupsInputTotal group:
+--
+xupsInputAverageVoltage OBJECT-TYPE
+    SYNTAX     Integer32  (0..2147483647)  
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured input voltage from the UPS meters in volts.
+         Related to the phase 1 if the UPS is single phase,
+         either it is average of all the simple phase voltage."
+    ::= {xupsInputTotal 1}
 
+xupsInputTotalCurrent OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "RMS tenth of Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured input current from the UPS meters in tenth of amps.
+         Related to the phase 1 if the UPS is single phase,
+         either it is average of all the simple phase current."
+    ::= {xupsInputTotal 2}
 
+xupsInputTotalWatts OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured input active power in watts.
+         Sum of all the simple phase watts."
+    ::= {xupsInputTotal 3}
+
+xupsInputTotalVA OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "VA"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured input apparent power in VA.
+         Sum of all the simple phase VA."
+    ::= {xupsInputTotal 4}
+
+xupsInputAveragePowerFactor  OBJECT-TYPE
+    SYNTAX     Integer32  
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION 
+      "Indicates the total power factor of the input in hundredths.
+       0.92 would be returned as 92."
+    ::= { xupsInputTotal 5 }
+
+xupsInputStatus OBJECT-TYPE
+    SYNTAX     INTEGER {
+        inputBad(1),
+        inputGood(2)
+        }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+       "The present status of the primary AC input of the UPS.
+        The enumeration inputGood(2) indicates that the primary source
+        of power is present and within 'normal' ranges for voltage and
+        frequency.
+        inputBad(1) indicates that neither source is present, or, if present,
+        is not within acceptable ranges."
+    ::= { xupsInput 9 }
 
 --
 -- xupsOutput group:
@@ -408,7 +641,12 @@ XupsOutputEntry ::= SEQUENCE {
         xupsOutputPhase    Integer32,
         xupsOutputVoltage  Integer32,
         xupsOutputCurrent  Integer32,
-        xupsOutputWatts    Integer32
+        xupsOutputWatts    Integer32,
+   	    xupsOutputId       INTEGER,
+   	    xupsOutputName     OCTET STRING,
+        xupsOutputCurrentHighPrecision Integer32,
+        xupsOutputPercentLoad Integer32,
+        xupsOutputVA Integer32
         }
 
 xupsOutputPhase OBJECT-TYPE
@@ -416,7 +654,7 @@ xupsOutputPhase OBJECT-TYPE
     MAX-ACCESS read-only
     STATUS     current
     DESCRIPTION
-        "The number {1..3} of the output phase."
+        "The number of the phase.  Serves as index for output table."
     ::= {xupsOutputEntry 1}
 
 xupsOutputVoltage OBJECT-TYPE
@@ -446,6 +684,59 @@ xupsOutputWatts OBJECT-TYPE
         "The measured real output power in watts."
     ::= {xupsOutputEntry 4}
 
+xupsOutputId  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		phase1toN (1),
+		phase2toN (2),
+		phase3toN (3),
+		phase1to2 (4),
+		phase2to3 (5),
+		phase3to1 (6)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"value indicates what measurement is being stored in this table row :
+		phase1 to neutral, phase2 to neutral, phase3 to neutral,
+		phase1 to phase2, phase2 to phase3, phase3 to phase1. "
+	::= { xupsOutputEntry 5 }
+
+xupsOutputName  OBJECT-TYPE
+	SYNTAX     OCTET STRING (SIZE(1..31))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"A descriptive name for the phase."
+	::= { xupsOutputEntry 6 }
+
+xupsOutputCurrentHighPrecision OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "RMS tenth of Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured output current from the UPS meters in tenth of amps."
+    ::= {xupsOutputEntry 7}
+
+xupsOutputPercentLoad OBJECT-TYPE
+    SYNTAX     Integer32  (0..200)
+    UNITS      "percent"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The percentage of the UPS power capacity presently
+         being used on this output line"
+    ::= { xupsOutputEntry 8 }
+
+xupsOutputVA OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    UNITS      "VA"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured apparent output power in VA."
+    ::= {xupsOutputEntry 9}
+
 xupsOutputSource OBJECT-TYPE
     SYNTAX  INTEGER {
         other(1),
@@ -458,7 +749,8 @@ xupsOutputSource OBJECT-TYPE
         parallelCapacity(8),    
         parallelRedundant(9),   
         highEfficiencyMode(10), 
-        maintenanceBypass(11)   
+        maintenanceBypass(11),   
+        essMode(12)   
         }
     MAX-ACCESS  read-only
     STATUS      current
@@ -475,8 +767,109 @@ xupsOutputSource OBJECT-TYPE
 		'highEfficiencyMode' is normal but enhanced by High Efficiency mode.
 		'maintenanceBypass' indicates that the UPS is in Maintenance/Manual 
 		Bypass mode.
+		'essMode' is normal but enhanced by Energy Saver System.
 		'other' covers any other, unusual conditions."
     ::= { xupsOutput  5 }
+
+xupsOutputHourlyPowerUsage  OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    UNITS      "Wh"
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Units are Watt-hours.This is the energy consumed during the last hour."
+	::= { xupsOutput 6 }
+
+xupsOutputCumulativePowerUsage  OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    UNITS      "Wh"
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Units are Watt-hours.This is the energy consumed since the last reset.
+         This object is writable so that it can be reset to 0.
+         When it is written to 0, the xupsOutputCumulativeWhTimer will be reset to 0 as well."
+	::= { xupsOutput 7 }
+
+xupsOutputCumulativePowerUsageTimer  OBJECT-TYPE
+    SYNTAX     Counter32
+    UNITS      "Seconds"
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Time in seconds since the cumulative power usage was last reset."
+	::= { xupsOutput 8 }
+
+--
+-- xupsOutputTotal group:
+--
+xupsOutputAverageVoltage OBJECT-TYPE
+    SYNTAX     Integer32  (0..2147483647)  
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured output voltage from the UPS meters in volts.
+         Related to the phase 1 if the UPS is single phase,
+         either it is average of all the simple phase voltage."
+    ::= {xupsOutputTotal 1}
+
+xupsOutputTotalCurrent OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "RMS tenth of Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured output current from the UPS meters in tenth of amps.
+         Related to the phase 1 if the UPS is single phase,
+         either it is average of all the simple phase current."
+    ::= {xupsOutputTotal 2}
+
+xupsOutputTotalWatts OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured output active power in watts.
+         Sum of all the simple phase watts."
+    ::= {xupsOutputTotal 3}
+
+xupsOutputTotalVA OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "VA"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured output apparent power in VA.
+         Sum of all the simple phase VA."
+    ::= {xupsOutputTotal 4}
+
+xupsOutputAveragePowerFactor  OBJECT-TYPE
+    SYNTAX     Integer32  
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION 
+      "Indicates the total power factor of the output in hundredths.
+       0.92 would be returned as 92."
+    ::= { xupsOutputTotal 5 }
+
+xupsOutputStatus OBJECT-TYPE
+    SYNTAX     INTEGER {
+        outputNotPowered(1),   
+        outputNotProtected(2),   
+        outputProtected(3)   
+        }
+    MAX-ACCESS  read-only
+    STATUS      current           
+    DESCRIPTION
+       "The present status of the AC output of the UPS.  
+        The enumeration outputNotPowered(1) indicates that the output is not powered.
+        outputNotProtected(2) indicates that the output is powered but not protected,
+        due to following reasons : On bypass, battery fault, or UPS internal failure
+        that makes the ups will be inoperant in case of AC input failure.
+        outputProtected(3) indicates that the output is powered and protected."
+    ::= { xupsOutput 10 }
 
 
 --
@@ -519,7 +912,11 @@ xupsBypassEntry OBJECT-TYPE
 
 XupsBypassEntry ::= SEQUENCE {
         xupsBypassPhase    Integer32,
-        xupsBypassVoltage  Integer32
+        xupsBypassVoltage  Integer32,
+      	xupsBypassId       INTEGER,
+      	xupsBypassName     OCTET STRING,
+        xupsBypassCurrentHighPrecision Integer32,
+        xupsBypassWatts Integer32
         }
 
 xupsBypassPhase OBJECT-TYPE
@@ -538,6 +935,103 @@ xupsBypassVoltage OBJECT-TYPE
     DESCRIPTION
         "The measured UPS bypass voltage in volts."
     ::= {xupsBypassEntry 2}
+
+xupsBypassId  OBJECT-TYPE
+	SYNTAX     INTEGER {
+		phase1toN (1),
+		phase2toN (2),
+		phase3toN (3),
+		phase1to2 (4),
+		phase2to3 (5),
+		phase3to1 (6)
+	}
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"value indicates what measurement is being stored in this table row :
+		phase1 to neutral, phase2 to neutral, phase3 to neutral,
+		phase1 to phase2, phase2 to phase3, phase3 to phase1. "
+	::= { xupsBypassEntry 3 }
+
+xupsBypassName  OBJECT-TYPE
+	SYNTAX     OCTET STRING (SIZE(1..31))
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"A descriptive name for the phase."
+	::= { xupsBypassEntry 4 }
+
+xupsBypassCurrentHighPrecision OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "RMS tenth of Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured bypass current from the UPS meters in tenth of amps."
+    ::= {xupsBypassEntry 5}
+
+xupsBypassWatts OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured real bypass power in watts."
+    ::= {xupsBypassEntry 6}
+
+--
+-- xupsBypassTotal group:
+--
+xupsBypassAverageVoltage OBJECT-TYPE
+    SYNTAX     Integer32  (0..2147483647)  
+    UNITS      "RMS Volts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured bypass voltage from the UPS meters in volts.
+         Related to the phase 1 if the UPS is single phase,
+         either it is average of all the simple phase voltage."
+    ::= {xupsBypassTotal 1}
+
+xupsBypassTotalCurrent OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "RMS tenth of Amps"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured bypass current from the UPS meters in tenth of amps.
+         Related to the phase 1 if the UPS is single phase,
+         either it is average of all the simple phase current."
+    ::= {xupsBypassTotal 2}
+
+xupsBypassTotalWatts OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "Watts"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured bypass active power in watts.
+         Sum of all the simple phase watts."
+    ::= {xupsBypassTotal 3}
+
+xupsBypassTotalVA OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)  
+    UNITS      "VA"
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The measured output apparent power in VA.
+         Sum of all the simple phase VA."
+    ::= {xupsBypassTotal 4}
+
+xupsBypassAveragePowerFactor  OBJECT-TYPE
+    SYNTAX     Integer32  
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION 
+      "Indicates the total power factor of the input in hundredths.
+       0.92 would be returned as 92."
+    ::= { xupsBypassTotal 5 }
 
 
 --
@@ -827,6 +1321,9 @@ xupsAlarmAwaitingPower           OBJECT IDENTIFIER ::= {xupsAlarm 43}
 -- Alarm for this important UPS mode
 xupsOnMaintenanceBypass          OBJECT IDENTIFIER ::= {xupsAlarm 44}
 
+-- New alarms now managed by the Network-M2 card
+xupsOutputNotProtected           OBJECT IDENTIFIER ::= {xupsAlarm 51}
+
 
 --
 -- xupsTest group:
@@ -910,6 +1407,16 @@ xupsLastGeneralTestResult OBJECT-TYPE
         "Reading this enumerated value gives the result of the test indicated
          in xupsLastGeneralTest."
     ::= {xupsTest 4}
+
+xupsTestTrap OBJECT-TYPE           
+    SYNTAX INTEGER { startTestTrap (1) }
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+      	"Setting startTestTrap to 1 will initiate a test trap 
+	       to be sent out from the agent.  All other set values are invalid."
+    ::= {xupsTest 5}
+
 
 --
 -- xupsControl group:
@@ -1213,8 +1720,11 @@ XupsRecepEntry ::= SEQUENCE {
         xupsRecepOnDelaySecs         Integer32,
         xupsRecepAutoOffDelay        Integer32,
         xupsRecepAutoOnDelay         Integer32,
-        xupsRecepShedSecsWithRestart Integer32 
-        }
+        xupsRecepShedSecsWithRestart Integer32, 
+        xupsRecepHourlyPowerUsage    Integer32,
+        xupsRecepCumulativePowerUsage Integer32,
+        xupsRecepCumulativePowerUsageTimer Counter32
+		}
     
 xupsRecepIndex OBJECT-TYPE
     SYNTAX     Integer32 (1..64)
@@ -1319,6 +1829,36 @@ xupsRecepShedSecsWithRestart OBJECT-TYPE
         Once set, this command cannot be aborted."
     ::= {xupsRecepEntry 7}
 
+xupsRecepHourlyPowerUsage  OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    UNITS      "Wh"
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Units are Watt-hours.This is the energy consumed during the last hour."
+	::= { xupsRecepEntry 8 }
+
+xupsRecepCumulativePowerUsage  OBJECT-TYPE
+    SYNTAX     Integer32 (0..2147483647)
+    UNITS      "Wh"
+	MAX-ACCESS read-write
+	STATUS     current
+	DESCRIPTION 
+		"Units are Watt-hours.This is the energy consumed since the last reset.
+         This object is writable so that it can be reset to 0.
+         When it is written to 0, the xupsRecepCumulativePowerUsageTimer will be reset to 0 as well."
+	::= { xupsRecepEntry 9 }
+
+xupsRecepCumulativePowerUsageTimer  OBJECT-TYPE
+    SYNTAX     Counter32
+    UNITS      "Seconds"
+	MAX-ACCESS read-only
+	STATUS     current
+	DESCRIPTION 
+		"Time in seconds since the cumulative power usage was last reset."
+	::= { xupsRecepEntry 10 }
+
+
 --
 -- xupsTopology group:
 --
@@ -1379,6 +1919,51 @@ xupsTopoPowerStrategy OBJECT-TYPE
         xupsOutputSource will indicate if the UPS status is actually operating in 
         High Efficiency mode."
     ::= {xupsTopology 4}
+
+
+--
+-- xupsAgent group:
+--
+xupsAgentManufacturer OBJECT-TYPE
+    SYNTAX     DisplayString (SIZE (0..31))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The card agent Manufacturer Name (e.g. Eaton Corporation)."
+    ::= { xupsAgent 1}
+
+xupsAgentModel OBJECT-TYPE
+    SYNTAX     DisplayString (SIZE (0..63))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The card agent model"
+    ::= {xupsAgent 2}
+
+xupsAgentSoftwareVersion OBJECT-TYPE
+    SYNTAX     DisplayString (SIZE (0..63))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+        "The agent firmware version."
+    ::= {xupsAgent 3}
+
+xupsAgentPartNumber  OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE(1..31))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION 
+        "The card agent catalog part number."
+    ::= { xupsAgent 4 }
+
+xupsAgentSerialNumber  OBJECT-TYPE
+    SYNTAX     OCTET STRING (SIZE(1..31))
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION 
+        "The card agent catalog serial number."
+    ::= { xupsAgent 5 }
+
 
 -- *************************************************************************
 -- *************************************************************************
@@ -1867,7 +2452,22 @@ xupstdAgentDown  NOTIFICATION-TYPE
     --#SEVERITY MINOR
     ::= { xupsTrapOidDefined 50 }
 
+-- New traps now managed by the Network-M2 card
+xupstdOutputNotProtected  NOTIFICATION-TYPE
+    OBJECTS    { xupsAlarmID,  xupsAlarmDescr, xupsTrapMessage }
+    STATUS     current
+    DESCRIPTION
+    "The ups output is not protectet for any reason in the UPS."
+    --#SEVERITY CRITICAL 
+    ::= { xupsTrapOidDefined 51 }
 
+xupstdTestTrap  NOTIFICATION-TYPE
+    OBJECTS    { sysName, xupsTrapMessage }
+    STATUS     current
+    DESCRIPTION
+    "This trap is sent to the trap receivers to check proper reception of traps."
+    --#SEVERITY INFORMATIONAL
+    ::= { xupsTrapOidDefined 100 }
 
 --
 -- Conformance-related definitions
@@ -1877,7 +2477,8 @@ xupsConformance OBJECT IDENTIFIER ::= { xupsMIB 100 }
 
 xupsIdentFullGroup  OBJECT-GROUP
     OBJECTS { xupsIdentManufacturer, xupsIdentModel, 
-              xupsIdentSoftwareVersion, xupsIdentOemCode  }
+              xupsIdentSoftwareVersion, xupsIdentOemCode,
+              xupsIdentPartNumber, xupsIdentSerialNumber }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsIdent subgroup objects."
@@ -1885,7 +2486,8 @@ xupsIdentFullGroup  OBJECT-GROUP
 
 xupsBatteryFullGroup  OBJECT-GROUP
     OBJECTS { xupsBatTimeRemaining, xupsBatVoltage, xupsBatCurrent, 
-              xupsBatCapacity, xupsBatteryAbmStatus, xupsBatteryLastReplacedDate  }
+              xupsBatCapacity, xupsBatteryAbmStatus, xupsBatteryLastReplacedDate,
+              xupsBatteryFailure, xupsBatteryNotPresent, xupsBatteryAged, xupsBatteryLowCapacity }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsBattery subgroup objects."
@@ -1893,28 +2495,31 @@ xupsBatteryFullGroup  OBJECT-GROUP
 
 xupsInputFullGroup  OBJECT-GROUP
     OBJECTS { xupsInputFrequency, xupsInputLineBads, xupsInputNumPhases, 
-              xupsInputSource, xupsDualInputStatus, xupsSecondaryInputWatch  }
+              xupsInputSource, xupsDualInputStatus, xupsSecondaryInputWatch, xupsInputStatus }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsInput subgroup objects."
     ::= { xupsConformance 4 }
 
 xupsInputTableFullGroup  OBJECT-GROUP
-    OBJECTS { xupsInputPhase, xupsInputVoltage, xupsInputCurrent, xupsInputWatts }
+    OBJECTS { xupsInputPhase, xupsInputVoltage, xupsInputCurrent, xupsInputWatts,
+              xupsInputId, xupsInputName, xupsInputCurrentHighPrecision }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsInputTable subgroup objects."
     ::= { xupsConformance 5 }
 
 xupsOutputFullGroup  OBJECT-GROUP
-    OBJECTS { xupsOutputLoad, xupsOutputFrequency, xupsOutputNumPhases, xupsOutputSource }
+    OBJECTS { xupsOutputLoad, xupsOutputFrequency, xupsOutputNumPhases, xupsOutputSource,
+              xupsOutputHourlyPowerUsage, xupsOutputCumulativePowerUsage, xupsOutputCumulativePowerUsageTimer, xupsOutputStatus }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsOutput subgroup objects."
     ::= { xupsConformance 6 }
 
 xupsOutputTableFullGroup  OBJECT-GROUP
-    OBJECTS { xupsOutputPhase, xupsOutputVoltage, xupsOutputCurrent, xupsOutputWatts }
+    OBJECTS { xupsOutputPhase, xupsOutputVoltage, xupsOutputCurrent, xupsOutputWatts,
+              xupsOutputId, xupsOutputName, xupsOutputCurrentHighPrecision, xupsOutputPercentLoad, xupsOutputVA }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsOutputTable subgroup objects."
@@ -1950,7 +2555,8 @@ xupsAlarmEventsFullGroup  OBJECT-GROUP
     ::= { xupsConformance 11 }
 
 xupsTestFullGroup  OBJECT-GROUP
-    OBJECTS { xupsTestStart, xupsTestBatteryStatus, xupsLastGeneralTest, xupsLastGeneralTestResult }
+    OBJECTS { xupsTestStart, xupsTestBatteryStatus, xupsLastGeneralTest,
+              xupsLastGeneralTestResult, xupsTestTrap }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsTest subgroup objects."
@@ -1985,7 +2591,8 @@ xupsTrapControlFullGroup  OBJECT-GROUP
 xupsRecepFullGroup  OBJECT-GROUP
     OBJECTS { xupsNumReceptacles, xupsRecepIndex, xupsRecepStatus, 
               xupsRecepOffDelaySecs, xupsRecepOnDelaySecs, 
-              xupsRecepAutoOffDelay, xupsRecepAutoOnDelay, xupsRecepShedSecsWithRestart }
+              xupsRecepAutoOffDelay, xupsRecepAutoOnDelay, xupsRecepShedSecsWithRestart,
+              xupsRecepHourlyPowerUsage, xupsRecepCumulativePowerUsage, xupsRecepCumulativePowerUsageTimer }
     STATUS  current
     DESCRIPTION
         "The Full set of xupsRecep subgroup objects."
@@ -2014,7 +2621,8 @@ xupstdNotifyGroup NOTIFICATION-GROUP
                     xupstdPowerSwitchBad, xupstdModuleFailure, xupstdOnAlternatePowerSource, 
                     xupstdAltPowerNotAvailable, xupstdNoticeCondition, xupstdHeartbeat, 
                     xupstdDiagnosticTestPassed, xupstdOutputBad, xupstdAwaitingPower, 
-                    xupstdOnMaintenanceBypass, xupstdCommEstablished, xupstdAgentDown  }
+                    xupstdOnMaintenanceBypass, xupstdCommEstablished, xupstdAgentDown,
+                    xupstdOutputNotProtected, xupstdTestTrap }
     STATUS  current
     DESCRIPTION
         "The Alarm and Event notifications from the xupsTrapDefined source (xupstd)."
@@ -2039,7 +2647,9 @@ xupsMibFullCompliance MODULE-COMPLIANCE
                            xupsBypassFullGroup, xupsEnvironmentFullGroup, xupsAlarmFullGroup, 
                            xupsAlarmEventsFullGroup, xupsTestFullGroup, xupsControlFullGroup, 
                            xupsConfigFullGroup, xupsTrapControlFullGroup, xupsRecepFullGroup, 
-                           xupsTopologyFullGroup, xupstdNotifyGroup, xupstdEMPNotifyGroup }
+                           xupsTopologyFullGroup, xupstdNotifyGroup, xupstdEMPNotifyGroup,
+                           xupsBypassTableFullGroup, xupsInputTotalFullGroup, xupsOutputTotalFullGroup,
+                           xupsBypassTotalFullGroup }
     ::= { xupsConformance 20 }
 
 xupsDeprecatedGroup  OBJECT-GROUP
@@ -2050,8 +2660,44 @@ xupsDeprecatedGroup  OBJECT-GROUP
         "Contains objects which are now deprecated."
     ::= { xupsConformance 21 }
 
+xupsBypassTableFullGroup  OBJECT-GROUP
+    OBJECTS { xupsBypassId, xupsBypassName, xupsBypassCurrentHighPrecision, xupsBypassWatts }
+    STATUS  current
+    DESCRIPTION
+        "The Full set of xupsBypassTable subgroup objects."
+    ::= { xupsConformance 22 }
 
+xupsInputTotalFullGroup  OBJECT-GROUP
+    OBJECTS { xupsInputAverageVoltage, xupsInputTotalCurrent, xupsInputTotalWatts,
+              xupsInputTotalVA, xupsInputAveragePowerFactor }
+    STATUS  current
+    DESCRIPTION
+        "The Full set of xupsInputTotal subgroup objects."
+    ::= { xupsConformance 23 }
 
+xupsOutputTotalFullGroup  OBJECT-GROUP
+    OBJECTS { xupsOutputAverageVoltage, xupsOutputTotalCurrent, xupsOutputTotalWatts,
+              xupsOutputTotalVA, xupsOutputAveragePowerFactor }
+    STATUS  current
+    DESCRIPTION
+        "The Full set of xupsOutputTotal subgroup objects."
+    ::= { xupsConformance 24 }
+
+xupsBypassTotalFullGroup  OBJECT-GROUP
+    OBJECTS { xupsBypassAverageVoltage, xupsBypassTotalCurrent, xupsBypassTotalWatts,
+              xupsBypassTotalVA, xupsBypassAveragePowerFactor }
+    STATUS  current
+    DESCRIPTION
+        "The Full set of xupsOutputTotal subgroup objects."
+    ::= { xupsConformance 25 }
+
+xupsAgentFullGroup  OBJECT-GROUP
+    OBJECTS { xupsAgentManufacturer, xupsAgentModel, 
+              xupsAgentSoftwareVersion, xupsAgentPartNumber, xupsAgentSerialNumber }
+    STATUS  current
+    DESCRIPTION
+        "The Full set of xupsAgent subgroup objects."
+    ::= { xupsConformance 26 }
 
     END
 

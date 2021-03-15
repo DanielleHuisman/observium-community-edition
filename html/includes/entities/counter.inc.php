@@ -310,7 +310,7 @@ function print_counter_table_header($vars)
   $cols = [];
   $cols[]              = array(NULL, 'class="state-marker"');
   $cols['device']      = array('Device', 'style="width: 250px;"');
-  $cols[]              = array(NULL, 'class="no-width"'); // Measure entity link
+  //$cols[]              = array(NULL, 'class="no-width"'); // Measure entity link
   $cols['descr']       = array('Description');
   $cols['class']       = array('Class', 'style="width: 100px;"');
   $cols['mib']         = array('MIB::Object');
@@ -381,12 +381,12 @@ function generate_counter_row($counter, $vars)
   }
 
   // Measured link & icon
-  $row .= '        <td style="padding-right: 0px;" class="no-width vertical-align">'; // minify column if empty
+  /* Disabled because it breaks the overview table layout
   if ($vars['entity_icon']) // this used for entity popup
   {
     $row .= get_icon($config['counter_types'][$counter['counter_class']]['icon']);
   }
-  else if ($counter['measured_entity'] &&
+  elseif ($counter['measured_entity'] &&
            (!isset($vars['measured_icon']) || $vars['measured_icon'])) // hide measured icon if not required
   {
     //$row .= generate_entity_link($counter['measured_class'], $counter['measured_entity'], get_icon($counter['measured_class']));
@@ -394,6 +394,7 @@ function generate_counter_row($counter, $vars)
   }
   $row .= '</td>';
   $table_cols++;
+  */
 
   $row .= '        <td class="entity">' . generate_entity_link("counter", $counter) . '</td>';
   $table_cols++;
@@ -443,7 +444,7 @@ function generate_counter_row($counter, $vars)
 
   // Set to TRUE if this counter in time based format (ie lifetime)
   $format_time = isset($config['counter_types'][$counter['counter_class']]['format']) &&
-                 str_contains($config['counter_types'][$counter['counter_class']]['format'], 'time');
+                 str_exists($config['counter_types'][$counter['counter_class']]['format'], 'time');
   $rates = [];
   // FIXME. Probably do not show rates for time based counters?.. (it's always around 1s/5m/1h)
   if (!$format_time)

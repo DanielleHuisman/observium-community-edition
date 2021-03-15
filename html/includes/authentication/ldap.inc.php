@@ -41,7 +41,7 @@ if (!is_array($config['auth_ldap_server']))
  * @param string $userdn User Distinguished Name
  * @param int $depth Recursion depth (used in recursion, stops at configured maximum depth)
  *
- * @return array Array of server names to be used for LDAP.
+ * @return boolean
  */
 function ldap_search_user($ldap_group, $userdn, $depth = -1)
 {
@@ -64,22 +64,30 @@ function ldap_search_user($ldap_group, $userdn, $depth = -1)
 
     //$filter = "(&(objectClass=group)(memberOf=". $ldap_group ."))";
     $filter_params                = array();
-    $filter_params[] = ldap_filter_create('objectClass', 'group');
+    $filter_params[] = ldap_filter_create('objectClass', $config['auth_ldap_attr']['group']);
     $filter_params[] = ldap_filter_create($config['auth_ldap_attr']['memberOf'], $ldap_group);
     $filter          = ldap_filter_combine($filter_params);
 
     print_debug("LDAP[UserSearch][$depth][Comparing: " . $ldap_group . "][".$config['auth_ldap_groupmemberattr']."=$userdn][Filter: $filter]");
 
     $ldap_search  = ldap_search($ds, trim($config['auth_ldap_groupbase'], ', '), $filter, array($config['auth_ldap_attr']['dn']));
+    //r($filter);
     $ldap_results = ldap_get_entries($ds, $ldap_search);
 
+    //r($ldap_results);
     array_shift($ldap_results); // Chop off "count" array entry
 
     foreach($ldap_results as $element)
     {
-      print_debug("LDAP[UserSearch][$depth][Comparing: " .$element[$config['auth_ldap_attr']['dn']][0] . "][".$config['auth_ldap_groupmemberattr']."=$userdn]");
+      if (!isset($element[$config['auth_ldap_attr']['dn']])) { continue; }
 
-      $result = ldap_search_user($element[$config['auth_ldap_attr']['dn']][0], $userdn, $depth);
+      // Not sure, seems as different results in LDAP vs AD
+      // See: https://jira.observium.org/browse/OBS-3240 and https://jira.observium.org/browse/OBS-3310
+      $element_dn = is_array($element[$config['auth_ldap_attr']['dn']]) ? $element[$config['auth_ldap_attr']['dn']][0] : $element[$config['auth_ldap_attr']['dn']];
+
+      print_debug("LDAP[UserSearch][$depth][Comparing: " . $element_dn . "][". $config['auth_ldap_groupmemberattr'] . "=$userdn]");
+
+      $result = ldap_search_user($element_dn, $userdn, $depth);
       if ($result === TRUE)
       {
         return TRUE; // Member found, return TRUE
@@ -523,47 +531,7 @@ function ldap_auth_user_list($username = NULL)
 
   print_debug("LDAP[UserList][Filter][$filter][" . trim($config['auth_ldap_suffix'], ', ') . "]");
 
-  if ($config['auth_ldap_version'] >= 3 && function_exists('ldap_control_paged_result'))
-  {
-    // Use pagination for
-    $page_size = 200;
-
-    $entries = array();
-    $cookie = '';
-    do
-    {
-      // WARNING, do not make any ldap queries betwen ldap_control_paged_result() and ldap_control_paged_result_response()!!
-      //          this produce loop and errors in queries
-      $page_test = ldap_control_paged_result($ds, $page_size, TRUE, $cookie);
-      //print_vars($page_test);
-      print_debug(ldap_error($ds));
-
-      $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
-      print_debug(ldap_error($ds));
-      $entries = array_merge($entries, ldap_get_entries($ds, $search));
-      //print_vars($filter);
-      //print_vars($search);
-
-      //ldap_internal_user_entries($entries, $userlist);
-
-      ldap_control_paged_result_response($ds, $search, $cookie);
-
-    } while($page_test && $cookie !== NULL && $cookie != '');
-    // Reset LDAP paged result
-    ldap_control_paged_result($ds, 1000);
-  } else {
-    // Old php < 5.4, trouble with limit 1000 entries, see:
-    // http://stackoverflow.com/questions/24990243/ldap-search-not-returning-more-than-1000-user
-
-    $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
-    print_debug(ldap_error($ds));
-
-    $entries = ldap_get_entries($ds, $search);
-    //print_vars($filter);
-    //print_vars($search);
-
-    //ldap_internal_user_entries($entries, $userlist);
-  }
+  $entries = ldap_internal_paged_entries($filter, $attributes);
   //print_vars($entries);
   ldap_internal_user_entries($entries, $userlist);
   unset($entries);
@@ -648,6 +616,83 @@ function ldap_internal_user_entries($entries, &$userlist)
   }
 }
 
+function ldap_internal_paged_entries($filter, $attributes)
+{
+  global $config, $ds;
+
+  if ($config['auth_ldap_version'] >= 3 && version_compare(PHP_VERSION, '7.3.0', '>='))
+  {
+    // Use pagination for speedup fetch huge lists, there is new style, see:
+    // https://www.php.net/manual/en/ldap.examples-controls.php (Example #5)
+    $page_size = 200;
+    $entries = [];
+    $cookie = '';
+
+    do {
+      $search = ldap_search(
+        $ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes, 0, 0, 0, LDAP_DEREF_NEVER,
+        [['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => $page_size, 'cookie' => $cookie]]]
+      );
+      ldap_parse_result($ds, $search, $errcode , $matcheddn , $errmsg , $referrals, $controls);
+      print_debug(ldap_error($ds));
+      $entries = array_merge($entries, ldap_get_entries($ds, $search));
+
+      if (isset($controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie']))
+      {
+        // You need to pass the cookie from the last call to the next one
+        $cookie = $controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'];
+      } else {
+        $cookie = '';
+      }
+      // Empty cookie means last page
+    } while (!empty($cookie));
+
+  }
+  elseif ($config['auth_ldap_version'] >= 3 && function_exists('ldap_control_paged_result'))
+  {
+    // Use pagination for speedup fetch huge lists, pre 7.3 style
+    $page_size = 200;
+    $entries = [];
+    $cookie = '';
+    do
+    {
+      // WARNING, do not make any ldap queries between ldap_control_paged_result() and ldap_control_paged_result_response()!!
+      //          this produce loop and errors in queries
+      $page_test = ldap_control_paged_result($ds, $page_size, TRUE, $cookie);
+      //print_vars($page_test);
+      print_debug(ldap_error($ds));
+
+      $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
+      print_debug(ldap_error($ds));
+      $entries = array_merge($entries, ldap_get_entries($ds, $search));
+      //print_vars($filter);
+      //print_vars($search);
+
+      //ldap_internal_user_entries($entries, $userlist);
+
+      ldap_control_paged_result_response($ds, $search, $cookie);
+
+    } while($page_test && $cookie !== NULL && $cookie != '');
+    // Reset LDAP paged result
+    ldap_control_paged_result($ds, 1000);
+
+  } else {
+    // Old php < 5.4, trouble with limit 1000 entries, see:
+    // http://stackoverflow.com/questions/24990243/ldap-search-not-returning-more-than-1000-user
+
+    $search = ldap_search($ds, trim($config['auth_ldap_suffix'], ', '), $filter, $attributes);
+    print_debug(ldap_error($ds));
+
+    $entries = ldap_get_entries($ds, $search);
+    //print_vars($filter);
+    //print_vars($search);
+
+    //ldap_internal_user_entries($entries, $userlist);
+  }
+
+  return $entries;
+}
+
 /**
  * Returns the textual SID for Active Directory
  * Private function for this LDAP module only
@@ -686,6 +731,7 @@ function ldap_bin_to_str_sid($binsid)
 */
 function ldap_little_endian($hex)
 {
+  $result = '';
   for ($x = strlen($hex) - 2; $x >= 0; $x = $x - 2)
   {
     $result .= substr($hex, $x, 2);

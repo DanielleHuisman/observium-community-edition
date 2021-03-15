@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -29,7 +27,7 @@ $system_metatypes = array('sysDescr', 'sysLocation', 'sysContact', 'sysName', 's
 foreach ($system_metatypes as $metatype)
 {
 
-  $param = ($metatype == 'sysUpTime') ? 'uptime' : strtolower($metatype); // For sysUptime use simple param name
+  $param = ($metatype === 'sysUpTime') ? 'uptime' : strtolower($metatype); // For sysUptime use simple param name
   foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supported by the device, in order
   {
     if (isset($config['mibs'][$mib][$param]))
@@ -37,35 +35,52 @@ foreach ($system_metatypes as $metatype)
       foreach ($config['mibs'][$mib][$param] as $entry)
       {
         // For ability override metatype by vendor mib definition use 'force' boolean param
-        if (!isset($poll_device[$metatype]) ||                    // Poll if metatype not already set
-            $metatype == 'sysUpTime' || $metatype == 'reboot' ||  // Or uptime/reboot (always polled)
-            (isset($entry['override']) && $entry['override']))    // Or forced override (see ekinops EKINOPS-MGNT2-MIB mib definition
+        if (!isset($poll_device[$metatype]) ||                     // Poll if metatype not already set
+            $metatype === 'sysUpTime' || $metatype === 'reboot' || // Or uptime/reboot (always polled)
+            (isset($entry['force']) && $entry['force']))           // Or forced override (see ekinops EKINOPS-MGNT2-MIB mib definition
         {
+
+          if (discovery_check_requires($device, $entry, $device, 'device'))
+          {
+            // Examples in QNAP NAS-MIB and RFC UPS-MIB
+            print_debug("Definition entry [$metatype] [$mib::".$entry['oid'].$entry['oid_next']."] skipped by test condition");
+            continue;
+          }
+
+          $flags = OBS_SNMP_ALL_UTF8; // Force HEX to UTF8 conversion
           if (isset($entry['oid_num'])) // Use numeric OID if set, otherwise fetch text based string
           {
-            $value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid_num'])));
+            //$value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid_num'])));
+            $value = snmp_get_oid($device, $entry['oid_num'], NULL, $flags);
           }
           elseif (isset($entry['oid_next']))
           {
             // If Oid passed without index part use snmpgetnext (see FCMGMT-MIB definitions)
-            $value = trim(snmp_hexstring(snmp_getnext_oid($device, $entry['oid_next'], $mib)));
+            //$value = trim(snmp_hexstring(snmp_getnext_oid($device, $entry['oid_next'], $mib)));
+            $value = snmp_getnext_oid($device, $entry['oid_next'], $mib, NULL, $flags);
           } else {
-            $value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid'], $mib)));
+            //$value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid'], $mib)));
+            $value = snmp_get_oid($device, $entry['oid'], $mib, NULL, $flags);
           }
 
-          if ($GLOBALS['snmp_status'] && $value != '')
+          if (snmp_status() && $value != '')
           {
             $polled = round($GLOBALS['exec_status']['endtime']);
 
             // Field found (no SNMP error), perform optional transformations.
+            if (isset($entry['transform']))
+            {
+              // Just simplify definition entry (unify with others)
+              $entry['transformations'] = $entry['transform'];
+            }
             $value = string_transform($value, $entry['transformations']);
 
             // Detect uptime with MIB defined oids, see below uptimes 2.
-            if ($metatype == 'sysUpTime' || $metatype == 'reboot')
+            if ($metatype === 'sysUpTime' || $metatype === 'reboot')
             {
               // Previous uptime from standard sysUpTime or other MIB::oid
               $uptime_previous = isset($poll_device['device_uptime']) ? $poll_device['device_uptime'] : $poll_device['sysUpTime'];
-              if ($metatype == 'reboot' && is_numeric($value))
+              if ($metatype === 'reboot' && is_numeric($value))
               {
                 // Last reboot is same uptime, but as diff with current (polled) time (see INFINERA-ENTITY-CHASSIS-MIB)
                 $value = $polled - $value;
@@ -95,7 +110,9 @@ foreach ($system_metatypes as $metatype)
   }
 
 }
-$poll_device['sysName_original'] = $poll_device['sysName']; // Store original sysName for devices who store hardware in this Oid
+
+// Store original sysName for devices who store hardware in this Oid,
+$poll_device['sysName_original'] = $poll_device['sysName'];
 $poll_device['sysName'] = strtolower($poll_device['sysName']);
 print_debug_vars($poll_device);
 
@@ -126,7 +143,7 @@ if (is_numeric($agent_data['uptime']) && $agent_data['uptime'] > 0)
   $uptimes['message'] = 'Using UNIX Agent Uptime';
 }
 // 2. Uptime from os specific OID, see in includes/polling/system MIB specific
-else if (isset($poll_device['device_uptime']) && is_numeric($poll_device['device_uptime']) && $poll_device['device_uptime'] > 0)
+elseif (isset($poll_device['device_uptime']) && is_numeric($poll_device['device_uptime']) && $poll_device['device_uptime'] > 0)
 {
   // Get uptime by some custom way in device os poller, see example in wowza-engine os poller
   $uptimes['device_uptime'] = round($poll_device['device_uptime']);
@@ -137,8 +154,8 @@ else if (isset($poll_device['device_uptime']) && is_numeric($poll_device['device
   // NOTE, about windows uptime,
   // sysUpTime resets when SNMP service restarted, but hrSystemUptime resets at 49.7 days (always),
   // Now we use LanMgr-Mib-II-MIB::comStatStart.0 as reboot time instead
-  if ($device['os'] != 'windows' &&
-      $device['snmp_version'] != 'v1' && is_device_mib($device, 'HOST-RESOURCES-MIB'))
+  if ($device['os'] !== 'windows' &&
+      $device['snmp_version'] !== 'v1' && is_device_mib($device, 'HOST-RESOURCES-MIB'))
   {
     // HOST-RESOURCES-MIB::hrSystemUptime.0 = Wrong Type (should be Timeticks): 1632295600
     // HOST-RESOURCES-MIB::hrSystemUptime.0 = Timeticks: (63050465) 7 days, 7:08:24.65
@@ -153,19 +170,19 @@ else if (isset($poll_device['device_uptime']) && is_numeric($poll_device['device
   }
 
   // 4. Uptime from snmpEngineTime (only in snmp v2c/v3)
-  if ($device['snmp_version'] != 'v1' && is_device_mib($device, 'SNMP-FRAMEWORK-MIB'))
+  if ($device['snmp_version'] !== 'v1' && is_device_mib($device, 'SNMP-FRAMEWORK-MIB'))
   {
     $snmpEngineTime = snmp_get_oid($device, 'snmpEngineTime.0', 'SNMP-FRAMEWORK-MIB');
 
     if (is_numeric($snmpEngineTime) && $snmpEngineTime > 0)
     {
-      if ($device['os'] == 'aos' && strlen($snmpEngineTime) > 8)
+      if ($device['os'] === 'aos' && strlen($snmpEngineTime) > 8)
       {
         // Some Alcatel have bug with snmpEngineTime
         // See: http://jira.observium.org/browse/OBSERVIUM-763
         $snmpEngineTime = 0;
       }
-      else if ($device['os'] == 'ironware')
+      elseif ($device['os'] === 'ironware')
       {
         // Check if version correct like "07.4.00fT7f3"
         $ironware_version = explode('.', $device['version']);
@@ -173,17 +190,17 @@ else if (isset($poll_device['device_uptime']) && is_numeric($poll_device['device
         {
           // IronWare before Release 05.1.00b have bug (firmware returning snmpEngineTime * 10)
           // See: http://jira.observium.org/browse/OBSERVIUM-1199
-          $snmpEngineTime = $snmpEngineTime / 10;
+          $snmpEngineTime /= 10;
         }
       }
       $uptimes['snmpEngineTime'] = intval($snmpEngineTime);
 
-      if ($uptimes['use'] == 'hrSystemUptime')
+      if ($uptimes['use'] === 'hrSystemUptime')
       {
         // Prefer snmpEngineTime only if more than hrSystemUptime
         if ($uptimes['snmpEngineTime'] > $uptimes['hrSystemUptime']) { $uptimes['use'] = 'snmpEngineTime'; }
       }
-      else if ($uptimes['snmpEngineTime'] >= $uptimes['sysUpTime'])
+      elseif ($uptimes['snmpEngineTime'] >= $uptimes['sysUpTime'])
       {
         // in other cases prefer if more than sysUpTime
         $uptimes['use'] = 'snmpEngineTime';
@@ -227,9 +244,9 @@ if (is_numeric($uptime) && $uptime > 0) // it really is very impossible case for
       // greater than 60 sec, than device truly rebooted
       $rebooted = 1;
     }
-    else if ($uptimes['previous'] < 300 && abs($uptimes['diff']) < 280)
+    elseif ($uptimes['previous'] < 300 && abs($uptimes['diff']) < 280)
     {
-      // This is rare, boundary case, when device rebooted multiple times betwen polling runs
+      // This is rare, boundary case, when device rebooted multiple times between polling runs
       $rebooted = 1;
     }
 
@@ -309,15 +326,11 @@ foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supporte
   {
     $la_def  = $config['mibs'][$mib]['la'];
 
-    // FIXME. Filter hack, need more common way!
     // See Cisco CISCO-PROCESS-MIB
-    foreach ($la_def['filter'] as $param => $entries)
-    {
-      if (!in_array($device[$param], (array)$entries)) { continue; }
-    }
+    if (discovery_check_requires($device, $la_def, $device, 'device')) { continue; }
 
     $la_oids = array();
-    if (isset($la_def['type']) && $la_def['type'] == 'table')
+    if (isset($la_def['type']) && $la_def['type'] === 'table')
     {
       // First element from table walk, currently only for Cisco IOS-XE
       $la_oids = ['1min' => $la_def['oid_1min'], '5min' => $la_def['oid_5min'], '15min' => $la_def['oid_15min']];
@@ -333,7 +346,7 @@ foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supporte
         {
           $la_oids[$min] = $la_def['oid_'.$min.'_num'];
         }
-        else if (isset($la_def['oid_'.$min]))
+        elseif (isset($la_def['oid_'.$min]))
         {
           $la_oids[$min] = snmp_translate($la_def['oid_'.$min], $mib);
         }
@@ -347,14 +360,7 @@ foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supporte
     if (snmp_status() && is_numeric($la[$la_oids['5min']]))
     {
       $scale = isset($la_def['scale']) ? $la_def['scale'] : 1;
-      $scale_graph = $scale * 100; // Since want to keep compatability with old UCD-SNMP-MIB LA, graph stored as la * 100
-
-      // CLEANME after r9500, but not before CE 18.6
-      // Rename old UCD-SNMP-MIB rrds
-      if ($mib == 'UCD-SNMP-MIB')
-      {
-        rename_rrd($device, 'ucd_load.rrd', 'la.rrd');
-      }
+      $scale_graph = $scale * 100; // Since want to keep compatibility with old UCD-SNMP-MIB LA, graph stored as la * 100
 
       foreach ($la_oids as $min => $oid)
       {
@@ -362,7 +368,7 @@ foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supporte
         // Now, graph specific scale if not equals 1
         $la[$min] = $la[$oid] * $scale_graph;
       }
-      $device_state['ucd_load'] = $device_state['la']['5min']; // Compatability witn old UCD-SNMP-MIB code
+      $device_state['ucd_load'] = $device_state['la']['5min']; // Compatibility with old UCD-SNMP-MIB code
 
       rrdtool_update_ng($device, 'la', array('1min' => $la['1min'], '5min' => $la['5min'], '15min' => $la['15min']));
       $graphs['la'] = TRUE;
@@ -378,7 +384,7 @@ foreach (get_device_mibs_permitted($device) as $mib) // Check every MIB supporte
 // END LA
 
 // Rewrite sysLocation if there is a mapping array or DB override
-$poll_device['sysLocation'] = snmp_fix_string($poll_device['sysLocation']);
+//$poll_device['sysLocation'] = snmp_fix_string($poll_device['sysLocation']);
 $poll_device['sysLocation'] = rewrite_location($poll_device['sysLocation']);
 
 if ($device['location'] != $poll_device['sysLocation'])
@@ -389,23 +395,26 @@ if ($device['location'] != $poll_device['sysLocation'])
 
 $poll_device['sysContact']  = str_replace(array('\"', '"') , '', $poll_device['sysContact']);
 
-if ($poll_device['sysContact'] == 'not set')
+if (in_array($poll_device['sysContact'], [ 'Uninitialized', 'not set', '<none>', '(none)',
+                                           'SNMPv2', 'Unknown', '?', '<private>' ]))
 {
+  // Common wrong contacts: Uninitialized, not set, <none>, (none), SNMPv2, Unknown, ?, <private>
   $poll_device['sysContact'] = '';
 }
 
 print_debug_vars($poll_device);
 
 // Check if snmpEngineID changed
+$force_discovery = FALSE;
 if (strlen($poll_device['snmpEngineID'] . $device['snmpEngineID']) && $poll_device['snmpEngineID'] != $device['snmpEngineID'])
 {
   $update_array['snmpEngineID'] = $poll_device['snmpEngineID'];
   if ($device['snmpEngineID'])
   {
-    // snmpEngineID changed frome one to other
+    // snmpEngineID changed, force full device rediscovery
     log_event('snmpEngineID changed: '.$device['snmpEngineID'].' -> '.$poll_device['snmpEngineID'].' (probably the device was replaced). The device will be rediscovered.', $device, 'device', $device['device_id'], 4);
-    // Reset device discover time for full re-discovery
-    dbUpdate(array('last_discovered' => array('NULL')), 'devices', '`device_id` = ?', array($device['device_id']));
+    $force_discovery = TRUE;
+    force_discovery($device);
   } else {
     log_event('snmpEngineID -> '.$poll_device['snmpEngineID'], $device, 'device', $device['device_id']);
   }
@@ -422,22 +431,38 @@ foreach ($oids as $oid)
     log_event("$oid -> '".$poll_device[$oid]."'", $device, 'device', $device['device_id']);
 
     // Update $device array for cases when model specific options required
-    if ($oid == 'sysObjectID' && $poll_device['sysObjectID'])
+    if ($oid === 'sysObjectID' && $poll_device['sysObjectID'])
     {
       $device['sysObjectID'] = $poll_device['sysObjectID'];
     }
   }
 }
 
-// Restore original (not lower case) sysName
-$poll_device['sysName'] = $poll_device['sysName_original'];
-unset($poll_device['sysName_original']);
+// Check if both (sysObjectID and sysDescr) changed, force full device rediscovery
+if (!$force_discovery && // Check if not already forced
+    isset($update_array['sysObjectID']) && isset($update_array['sysDescr']) &&
+    strlen($poll_device['sysObjectID']) && strlen($device['sysObjectID']) &&
+    strlen($poll_device['sysDescr']) && strlen($device['sysDescr']))
+{
+  log_event('sysObjectID and sysDescr changed: seems the device was replaced. The device will be rediscovered.', $device, 'device', $device['device_id'], 4);
+  force_discovery($device);
+}
 
 print_cli_data('sysObjectID',  $poll_device['sysObjectID'], 2);
 print_cli_data('snmpEngineID', $poll_device['snmpEngineID'], 2);
 print_cli_data('sysDescr',     $poll_device['sysDescr'], 2);
-print_cli_data('sysName',      $poll_device['sysName'], 2);
+print_cli_data('sysName',      $poll_device['sysName_original'], 2);
 print_cli_data('Location',     $poll_device['sysLocation'], 2);
+
+// Restore original (not lower case) sysName
+if (isset($poll_device['sysName_SNMPv2']))
+{
+  $poll_device['sysName'] = $poll_device['sysName_SNMPv2'];
+  unset($poll_device['sysName_SNMPv2']);
+} else {
+  $poll_device['sysName'] = $poll_device['sysName_original'];
+}
+unset($poll_device['sysName_original']);
 
 // Geolocation detect
 
@@ -454,16 +479,16 @@ if ($config['geocoding']['enable'])
   $geo_updated = $config['time']['now'] - strtotime($geo_db['location_updated']); // Seconds since previous GEO update
   $geo_frequency = 86400;                                                         // Minimum seconds for next GEO api request (default is 1 day)
 
-  // Device coordinates still empty, redetect no more than 1 time per 1 day ($geo_frequency param)
+  // Device coordinates still empty, re-detect no more than 1 time per 1 day ($geo_frequency param)
   if (!(is_numeric($geo_db['location_lat']) && is_numeric($geo_db['location_lon'])))
   {
-    // Redetect geolocation if coordinates still empty, no more frequently than once a day
+    // Re-detect geolocation if coordinates still empty, no more frequently than once a day
     $geo_detect = $geo_detect || ($geo_updated > $geo_frequency);
   }
 
   // sysLocation changed (and not empty!), redetect now
   $geo_detect = $geo_detect || ($poll_device['sysLocation'] && $device['location'] != $poll_device['sysLocation']);
-  // Geo API changed, force redetect
+  // Geo API changed, force re-detect
   $geo_detect = $geo_detect || ($geo_db['location_geoapi'] != strtolower($config['geocoding']['api']));
 
   // This seems to cause endless geolocation every poll. Disabled.
@@ -507,7 +532,7 @@ if ($config['geocoding']['enable'])
       }
 
     }
-    else if (is_numeric($geo_db['location_id']))
+    elseif (is_numeric($geo_db['location_id']))
     {
       $update_geo = array('location_updated' => format_unixtime($config['time']['now'], 'Y-m-d G:i:s')); // Increase updated time
       dbUpdate($update_geo, 'devices_locations', '`location_id` = ?', array($geo_db['location_id']));

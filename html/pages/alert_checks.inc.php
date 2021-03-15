@@ -193,7 +193,7 @@ foreach ($alert_check as $check)
   {
     $text_block[] = escape_html($condition['metric'].' '.$condition['condition'].' '.$condition['value']);
   }
-  echo('<code>'.implode($text_block,'<br />').'</code>');
+  echo('<code>'.implode('<br />', $text_block).'</code>');
   echo('</td>');
 
   echo('<td>');
@@ -222,7 +222,7 @@ foreach ($alert_check as $check)
            {
               $text_block[] = escape_html($attribute['attrib'] . ' ' . $attribute['condition'] . ' ' . $attribute['value']);
            }
-           echo('<code>' . implode($text_block, '<br />') . '</code>');
+           echo('<code>' . implode('<br />', $text_block) . '</code>');
         }
         else
         {
@@ -239,7 +239,7 @@ foreach ($alert_check as $check)
            {
               $text_block[] = escape_html($attribute['attrib'] . ' ' . $attribute['condition'] . ' ' . $attribute['value']);
            }
-           echo('<code>' . implode($text_block, '<br />') . '</code>');
+           echo('<code>' . implode('<br />', $text_block) . '</code>');
         }
         else
         {
@@ -261,7 +261,7 @@ foreach ($alert_check as $check)
   // We assume each row here is going to be two lines, so we just <br /> them.
   echo '<td style="text-align: right;">';
   #echo overlib_link('#', count($entities), $entities_content,  NULL));
-  echo '<span class="label">', $check['num_entities'], '</span>';
+  echo '<span class="label label-primary">', $check['num_entities'], '</span>';
   echo '<br />';
   echo $check['status_numbers'];
   echo '</td>';

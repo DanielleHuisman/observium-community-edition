@@ -13,7 +13,7 @@
 
 // EdgeSwitch-SWITCHING-MIB::agentSwitchCpuProcessTotalUtilization.0 = STRING: "    5 Secs ( 99.9999%)   60 Secs ( 99.6358%)  300 Secs ( 99.2401%)"
 
-$data = snmp_get($device, 'agentSwitchCpuProcessTotalUtilization.0', '-OQUvs', $mib);
+$data = snmp_get_oid($device, 'agentSwitchCpuProcessTotalUtilization.0', $mib);
 
 if (preg_match('/300 Secs \(\s*(?<proc>[\d\.]+)%\)/', $data, $matches))
 {

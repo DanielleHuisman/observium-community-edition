@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,8 +6,7 @@
  *
  * @package    observium
  * @subpackage discovery
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -69,12 +67,13 @@ if ($GLOBALS['snmp_status'])
     'percentRH' => 'humidity',
     'rpm'       => 'fanspeed',
     'celsius'   => 'temperature',
-    'dBm'       => 'dbm'
+    'dBm'       => 'dbm',
+    'truthvalue' => 'state'
   );
 
   foreach ($entity_array as $index => $entry)
   {
-    if ($entitysensor[$entry['entPhySensorType']] &&
+    if (isset($entitysensor[$entry['entPhySensorType']]) &&
         is_numeric($entry['entPhySensorValue']) &&
         is_numeric($index) &&
         $entry['entPhySensorOperStatus'] != 'unavailable' &&
@@ -96,14 +95,14 @@ if ($GLOBALS['snmp_status'])
           $descr = rewrite_entity_name($entry['entPhysicalDescr']) . ' - ' . rewrite_entity_name($entry['entPhysicalName']);
         }
       }
-      else if (!$entry['entPhysicalDescr'] && $entry['entPhysicalName'])
+      elseif (!$entry['entPhysicalDescr'] && $entry['entPhysicalName'])
       {
         $descr = rewrite_entity_name($entry['entPhysicalName']);
       }
-      else if (!$entry['entPhysicalDescr'] && !$entry['entPhysicalName'])
+      elseif (!$entry['entPhysicalDescr'] && !$entry['entPhysicalName'])
       {
         // This is also trick for some retard devices like NetMan Plus
-        $descr = nicecase($type);
+        $descr = nicecase($type) . " $index";
       }
 
       if ($device['os'] == 'asa' && $entry['entPhySensorScale'] == 'yocto' && $entry['entPhySensorPrecision'] == '0')
@@ -111,7 +110,11 @@ if ($GLOBALS['snmp_status'])
         // Hardcoded fix for Cisco ASA 9.1.5 (can be other) bug when all scales equals yocto (OBSERVIUM-1110)
         $scale = 1;
       }
-      else if (isset($entry['entPhySensorScale']))
+      elseif ($device['os'] == 'netman' && $type == 'temperature')
+      {
+        $scale = 0.1;
+      }
+      elseif (isset($entry['entPhySensorScale']))
       {
         $scale = si_to_scale($entry['entPhySensorScale'], $entry['entPhySensorPrecision']);
       } else {
@@ -125,9 +128,11 @@ if ($GLOBALS['snmp_status'])
       {
         if ($value * $scale > 200 || $value == 0) { $ok = FALSE; }
       }
-      if ($value == -127) { $ok = FALSE; }
-
-      if($value == -1000000000) { $ok = FALSE; } // Optic RX/TX watt sensors on Arista
+      if ($value == -127 ||
+          $value == -1000000000)  // Optic RX/TX watt sensors on Arista
+      {
+        $ok = FALSE;
+      }
 
       // Now try to search port bounded with sensor by ENTITY-MIB
       if ($ok && in_array($type, array('temperature', 'voltage', 'current', 'dbm', 'power')))
@@ -140,6 +145,12 @@ if ($GLOBALS['snmp_status'])
           $options['measured_class']   = 'port';
           $options['measured_entity']  = $port['port_id'];
           $options['entPhysicalIndex_measured'] = $port['ifIndex'];
+
+          // Append port label for Extreme XOS, while it not have port information in descr
+          if ($device['os_group'] == 'extremeware' && !str_exists($descr, [ $port['port_label'], $port['port_label_short'] ]))
+          {
+            $descr = $port['port_label'] . ' ' . $descr;
+          }
         }
       }
 
@@ -161,12 +172,34 @@ if ($GLOBALS['snmp_status'])
       }
 
       // Check to make sure we've not already seen this sensor via cisco's entity sensor mib
-      if ($ok && !isset($valid['sensor'][$type]['CISCO-ENTITY-SENSOR-MIB-entSensorValue'][$index]))
+      if ($type == 'state')
+      {
+        //if (isset($valid['status']['CISCO-ENTITY-SENSOR-MIB']['cisco-entity-sensor'][$index]))
+        if (is_device_mib($device, 'CISCO-ENTITY-SENSOR-MIB')) // Complete ignore truthvalue on Cisco devices
+        {
+          $ok = FALSE;
+        }
+      }
+      elseif (isset($valid['sensor'][$type]['CISCO-ENTITY-SENSOR-MIB-entSensorValue'][$index]))
+      {
+        $ok = FALSE;
+      }
+
+      if ($ok)
       {
         $options = array_merge($limits, $options);
-        $options['rename_rrd'] = 'entity-sensor-'.$index;
-        discover_sensor_ng($device, $type, $mib, 'entPhySensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
+        if ($type == 'state')
+        {
+          //truthvalue
+          discover_status_ng($device, $mib, 'entPhySensorValue', $oid, $index, 'entity-truthvalue', $descr, $value, $options);
+        } else {
+          $options['rename_rrd'] = 'entity-sensor-'.$index;
+          discover_sensor_ng($device, $type, $mib, 'entPhySensorValue', $oid, $index, NULL, $descr, $scale, $value, $options);
+        }
       }
+    } else {
+      print_debug("Skipped:");
+      print_debug_vars($entry);
     }
   }
 }

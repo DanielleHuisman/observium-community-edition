@@ -4,11 +4,9 @@
  *
  *   This file is part of Observium.
  *
- *   This file contains functions related to processing and displaying port entity data.
- *
- * @package        observium
- * @subpackage     functions
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @package    observium
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -60,6 +58,11 @@ function build_ports_where_array($vars)
         case 'label':
         case 'port_label':
           $where[] = generate_query_values($value, 'port_label', '%LIKE%');
+          break;
+        case 'mac':
+        case 'ifPhysAddress':
+          $value = str_replace([ '.', '-', ':' ], '', $value);
+          $where[] = generate_query_values($value, 'ifPhysAddress', '%LIKE%');
           break;
         case 'port_descr_type':
           $where[] = generate_query_values($value, $var, 'LIKE');
@@ -148,7 +151,7 @@ function generate_port_popup_header($port)
      <tr class="' . $port['row_class'] . '" style="font-size: 10pt;">
        <td class="state-marker"></td>
        <td style="width: 10px;"></td>
-       <td style="width: 250px;"><a href="#" class="' . $port['html_class'] . '" style="font-size: 15px; font-weight: bold;">' . $port['port_label'] . '</a><br />' . escape_html($port['ifAlias']) . '</td>
+       <td style="width: 250px;"><a href="#" class="' . $port['html_class'] . '" style="font-size: 15px; font-weight: bold;">' . escape_html($port['port_label']) . '</a><br />' . escape_html($port['ifAlias']) . '</td>
        <td style="width: 100px;">' . $port['human_speed'] . '<br />' . $port['ifMtu'] . '</td>
        <td>' . $port['human_type'] . '<br />' . $port['human_mac'] . '</td>
      </tr>
@@ -234,16 +237,12 @@ function generate_port_link($port, $text = NULL, $type = NULL, $escape = FALSE, 
 {
   humanize_port($port);
 
-  //if (!isset($port['html_class'])) { $port['html_class'] = ifclass($port['ifOperStatus'], $port['ifAdminStatus']); }
-  //if (!isset($text)) { $text = escape_html($port['port_label'], !$escape); } // Negative escape flag for exclude double escape
-
   // Fixme -- does this function even need alternative $text? I think not. It's a hangover from before label.
-  if (!isset($text) && !$short)
+  // Sometime in $text included html
+  if (empty($text))
   {
-    $text = $port['port_label'];
-  } elseif (!isset($text) && $short)
-  {
-    $text = $port['port_label_short'];
+    $text = $short ? $port['port_label_short'] : $port['port_label'];
+    $escape = TRUE; // FORCE label escaping
   }
 
   if (port_permitted($port['port_id'], $port['device_id']))
@@ -260,6 +259,12 @@ function generate_port_link($port, $text = NULL, $type = NULL, $escape = FALSE, 
   {
     return escape_html($text);
   }
+}
+
+// Just simplify function call, instead generate_port_link($port, NULL, NULL, TRUE, TRUE)
+function generate_port_link_short($port, $text = NULL, $type = NULL, $escape = FALSE, $short = TRUE)
+{
+  return generate_port_link($port, $text, $type, $escape, $short);
 }
 
 /**
@@ -388,7 +393,7 @@ function generate_port_row($port, $vars = array())
 
   $string = '';
 
-  if ($vars['view'] == "basic" || $vars['view'] == "graphs")  // Print basic view table row
+  if ($vars['view'] === "basic" || $vars['view'] === "graphs")  // Print basic view table row
   {
     $table_cols = '8';
 
@@ -396,7 +401,7 @@ function generate_port_row($port, $vars = array())
             <td class="state-marker"></td>
             <td style="width: 1px;"></td>';
 
-    if ($vars['page'] != "device" && $vars['popup'] != TRUE) // Print device name link if we're not inside the device page hierarchy.
+    if ($vars['page'] !== "device" && $vars['popup'] != TRUE) // Print device name link if we're not inside the device page hierarchy.
     {
       $table_cols++; // Increment table columns by one to make sure graph line draws correctly
 
@@ -405,33 +410,34 @@ function generate_port_row($port, $vars = array())
     }
 
 
-    $string .= '    <td><span class="entity">' . generate_port_link($port, escape_html($port['port_label'])) . '</span> <span class="pull-right">' . $port['tags'] . '</span><br />
-                <span class="em">' . escape_html(truncate($port['ifAlias'], 50, '')) . '</span></td>' .
+    $string .=
+      '    <td><span class="entity">' . generate_port_link($port) . '</span> <span class="pull-right">' . $port['tags'] . '</span><br />' .
+      '        <span class="em">' . escape_html(truncate($port['ifAlias'], 50, '')) . '</span></td>' .
 
-      '<td style="width: 110px;"> <i class="icon-circle-arrow-down" style="' . $port['bps_in_style'] . '"></i>  <span class="small" style="' . $port['bps_in_style'] . '">' . formatRates($port['in_rate']) . '</span><br />' .
-      '<i class="icon-circle-arrow-up" style="' . $port['bps_out_style'] . '"></i> <span class="small" style="' . $port['bps_out_style'] . '">' . formatRates($port['out_rate']) . '</span><br /></td>' .
+      '<td style="width: 110px;">' . get_icon('arrow-down', NULL, [ 'style' => $port['bps_in_style'] ]) . ' <span class="small" style="' . $port['bps_in_style'] . '">' . formatRates($port['in_rate']) . '</span><br />' .
+      get_icon('arrow-up', NULL, [ 'style' => $port['bps_out_style'] ]) . ' <span class="small" style="' . $port['bps_out_style'] . '">' . formatRates($port['out_rate']) . '</span><br /></td>' .
 
-      '<td style="width: 90px;"> <i class="icon-circle-arrow-down" style="' . $port['bps_in_style'] . '"></i>  <span class="small" style="' . $port['bps_in_style'] . '">' . $port['ifInOctets_perc'] . '%</span><br />' .
-      '<i class="icon-circle-arrow-up" style="' . $port['bps_out_style'] . '"></i> <span class="small" style="' . $port['bps_out_style'] . '">' . $port['ifOutOctets_perc'] . '%</span><br /></td>' .
+      '<td style="width: 90px;">' . get_icon('arrow-down', NULL, [ 'style' => $port['bps_in_style'] ]) . ' <span class="small" style="' . $port['bps_in_style'] . '">' . $port['ifInOctets_perc'] . '%</span><br />' .
+      get_icon('arrow-up', NULL, [ 'style' => $port['bps_out_style'] ]) . ' <span class="small" style="' . $port['bps_out_style'] . '">' . $port['ifOutOctets_perc'] . '%</span><br /></td>' .
 
-      '<td style="width: 110px;"><i class="icon-circle-arrow-down" style="' . $port['pps_in_style'] . '"></i>  <span class="small" style="' . $port['pps_in_style'] . '">' . format_bi($port['ifInUcastPkts_rate']) . 'pps</span><br />' .
-      '<i class="icon-circle-arrow-up" style="' . $port['pps_out_style'] . '"></i> <span class="small" style="' . $port['pps_out_style'] . '">' . format_bi($port['ifOutUcastPkts_rate']) . 'pps</span></td>' .
+      '<td style="width: 110px;">' . get_icon('arrow-down', NULL, [ 'style' => $port['pps_in_style'] ]) . ' <span class="small" style="' . $port['pps_in_style'] . '">' . format_bi($port['ifInUcastPkts_rate']) . 'pps</span><br />' .
+      get_icon('arrow-up', NULL, [ 'style' => $port['pps_out_style'] ]) . ' <span class="small" style="' . $port['pps_out_style'] . '">' . format_bi($port['ifOutUcastPkts_rate']) . 'pps</span></td>' .
 
       '<td style="width: 110px;"><small>' . $port['human_speed'] . '<br />' . $port['ifMtu'] . '</small></td>
             <td ><small>' . $port['human_type'] . '<br />' . $port['human_mac'] . '</small></td>
           </tr>';
   }
-  else if ($vars['view'] == "details" || $vars['view'] == "detail") // Print detailed view table row
+  elseif ($vars['view'] === "details" || $vars['view'] === "detail") // Print detailed view table row
   {
     $table_cols = '9';
 
     $string .= '<tr class="' . $port['row_class'] . '"';
-    if ($vars['tab'] != "port") { $string .= ' onclick="openLink(\'' . generate_port_url($port) . '\')" style="cursor: pointer;"'; }
+    if ($vars['tab'] !== "port") { $string .= ' onclick="openLink(\'' . generate_port_url($port) . '\')" style="cursor: pointer;"'; }
     $string .= '>';
     $string .= '         <td class="state-marker"></td>
          <td style="width: 1px;"></td>';
 
-    if ($vars['page'] != "device" && $vars['popup'] != TRUE) // Print device name link if we're not inside the device page hierarchy.
+    if ($vars['page'] !== "device" && $vars['popup'] != TRUE) // Print device name link if we're not inside the device page hierarchy.
     {
       $table_cols++; // Increment table columns by one to make sure graph line draws correctly
 
@@ -450,9 +456,13 @@ function generate_port_row($port, $vars = array())
 
     unset($break);
 
+    $ignore_type = $GLOBALS['config']['ip-address']['ignore_type'];
     if (!isset($cache['ports_option']['ipv4_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv4_addresses']))
     {
-      foreach (dbFetchRows("SELECT * FROM `ipv4_addresses` WHERE `port_id` = ?", array($port['port_id'])) as $ip)
+      $sql = "SELECT * FROM `ipv4_addresses` WHERE `port_id` = ?";
+      // Do not exclude IPv4 link-local
+      $sql .= generate_query_values(array_diff($ignore_type, [ 'link-local' ]), 'ipv4_type', '!='); // Do not show ignored ip types
+      foreach (dbFetchRows($sql, array($port['port_id'])) as $ip)
       {
         $string .= $break . generate_popup_link('ip', $ip['ipv4_address'].'/'.$ip['ipv4_prefixlen'], NULL, 'small');
         $break = "<br />";
@@ -460,7 +470,9 @@ function generate_port_row($port, $vars = array())
     }
     if (!isset($cache['ports_option']['ipv6_addresses']) || in_array($port['port_id'], $cache['ports_option']['ipv6_addresses']))
     {
-      foreach (dbFetchRows("SELECT * FROM `ipv6_addresses` WHERE `port_id` = ?", array($port['port_id'])) as $ip6)
+      $sql = "SELECT * FROM `ipv6_addresses` WHERE `port_id` = ?";
+      $sql .= generate_query_values($ignore_type, 'ipv6_type', '!='); // Do not show ignored ip types
+      foreach (dbFetchRows($sql, array($port['port_id'])) as $ip6)
       {
         $string .= $break . generate_popup_link('ip', $ip6['ipv6_address'].'/'.$ip6['ipv6_prefixlen'], NULL, 'small');
         $break = "<br />";
@@ -498,7 +510,7 @@ function generate_port_row($port, $vars = array())
 
     $string .= '<td style="width: 100px; white-space: nowrap;">';
 
-    if ($port['ifOperStatus'] == "up" || $port['ifOperStatus'] == "monitoring")
+    if ($port['ifOperStatus'] === "up" || $port['ifOperStatus'] === "monitoring")
     {
       // Colours generated by humanize_port
       $string .= '<i class="icon-circle-arrow-down" style="'.$port['bps_in_style']. '"></i> <span class="small" style="'.$port['bps_in_style']. '">' . formatRates($port['in_rate']) . '</span><br />
@@ -511,7 +523,7 @@ function generate_port_row($port, $vars = array())
     if ($port['ifType'] && $port['ifType'] != "") { $string .= '<span class="small">' . $port['human_type'] . '</span>'; } else { $string .= '-'; }
     $string .= '<br />';
     if ($port['ifSpeed']) { $string .= '<span class="small">'.humanspeed($port['ifSpeed']).'</span>'; }
-    if ($port['ifDuplex'] && $port['ifDuplex'] != "unknown") { $string .= '<span class="small"> (' . str_replace("Duplex", "", $port['ifDuplex']) . ')</span>'; }
+    if ($port['ifDuplex'] && $port['ifDuplex'] !== "unknown") { $string .= '<span class="small"> (' . str_replace("Duplex", "", $port['ifDuplex']) . ')</span>'; }
     $string .= '<br />';
     if ($port['ifMtu'] && $port['ifMtu'] != "") { $string .= '<span class="small">MTU ' . $port['ifMtu'] . '</span>'; } else { $string .= '<span class="small">Unknown MTU</span>'; }
     // if ($ifHardType && $ifHardType != "") { $string .= '<span class="small">" . $ifHardType . "</span>"); } else { $string .= '-'; }
@@ -572,7 +584,10 @@ function generate_port_row($port, $vars = array())
               case 'forwarding': $class = 'text-success';  break;
               default:           $class = 'muted';
             }
-            if (empty($vlan['vlan_name'])) { 'VLAN'.str_pad($vlan['vlan'], 4, '0', STR_PAD_LEFT); }
+            if (empty($vlan['vlan_name']))
+            {
+              $vlan['vlan_name'] = 'VLAN'.str_pad($vlan['vlan'], 4, '0', STR_PAD_LEFT);
+            }
             $string .= '<strong class='.$class.'>'.$vlan['vlan'] .' ['.$vlan['vlan_name'].']</strong><br />';
           }
         }
@@ -601,7 +616,7 @@ function generate_port_row($port, $vars = array())
         default:           $class = '';
       }
       $rel = ($native_name) ? 'tooltip' : ''; // Hide tooltip for empty
-      $vlan_name = ($port['ifTrunk'] != 'access') ? nicecase($port['ifTrunk']) . ' ' : '';
+      $vlan_name = ($port['ifTrunk'] !== 'access') ? nicecase($port['ifTrunk']) . ' ' : '';
       $vlan_name .= 'VLAN ' . $port['ifVlan'];
       $string .= '<br /><span data-rel="'.$rel.'" class="label '.$class.'"  data-tooltip="<strong class=\'small\'>'.$port['ifVlan'].' ['.$native_name.']</strong>">' . $vlan_name . '</span>';
     }
@@ -645,7 +660,7 @@ function generate_port_row($port, $vars = array())
       // Populate links array for ports with direct links
       if (!isset($cache['ports_option']['neighbours']) || in_array($port['port_id'], $cache['ports_option']['neighbours']))
       {
-        foreach (dbFetchRows('SELECT * FROM `neighbours` WHERE `port_id` = ?', array($port['port_id'])) as $neighbour)
+        foreach (dbFetchRows('SELECT * FROM `neighbours` WHERE `port_id` = ? AND `active` = ?', [ $port['port_id'], 1 ]) as $neighbour)
         {
           // print_r($neighbour);
           if ($neighbour['remote_port_id'])
@@ -728,7 +743,8 @@ function generate_port_row($port, $vars = array())
           $string .= generate_tooltip_link(NULL, NULL, 'Same subnet', $config['icon']['network']) . ' ';
         }
 
-        $string .= '<b>' . generate_port_link($link_if, $link_if['port_label_short']) . ' on ' . generate_device_link($link_dev, short_hostname($link_dev['hostname'])) . '</b>';
+        // for port_label_short - generate_port_link($link_if, NULL,  NULL, TRUE, TRUE)
+        $string .= '<b>' . generate_port_link_short($link_if) . ' on ' . generate_device_link($link_dev, short_hostname($link_dev['hostname'])) . '</b>';
 
         if (isset($int_links_phys[$int_link]) && !is_numeric($int_links_phys[$int_link]))
         {
@@ -774,7 +790,7 @@ function generate_port_row($port, $vars = array())
         if (is_array($pw_peer_int))
         {
           humanize_port($pw_peer_int);
-          $string .= $br.'<i class="'.$config['icon']['cross-connect'].'"></i> <strong>' . generate_port_link($pw_peer_int, $pw_peer_int['port_label_short']) .' on '. generate_device_link($pw_peer_dev, short_hostname($pw_peer_dev['hostname'])) . '</strong>';
+          $string .= $br.'<i class="'.$config['icon']['cross-connect'].'"></i> <strong>' . generate_port_link_short($pw_peer_int) .' on '. generate_device_link($pw_peer_dev, short_hostname($pw_peer_dev['hostname'])) . '</strong>';
         } else {
           $string .= $br.'<i class="'.$config['icon']['cross-connect'].'"></i> <strong> VC ' . $pseudowire['pwID'] .' on '. $pseudowire['peer_addr'] . '</strong>';
         }

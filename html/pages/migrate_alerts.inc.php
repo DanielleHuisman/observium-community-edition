@@ -113,7 +113,7 @@ foreach($checkers as $alert)
                {
                   $text_block[] = escape_html($attribute['attrib'].' '.$attribute['condition'].' '.$attribute['value']);
                }
-               echo('<code>'.implode($text_block,'<br />').'</code>');
+               echo('<code>'.implode('<br />', $text_block).'</code>');
             } else {
                echo '<code>*</code>';
             }
@@ -128,7 +128,7 @@ foreach($checkers as $alert)
                {
                   $text_block[] = escape_html($attribute['attrib'].' '.$attribute['condition'].' '.$attribute['value']);
                }
-               echo('<code>'.implode($text_block,'<br />').'</code>');
+               echo('<code>'.implode('<br />', $text_block).'</code>');
             } else {
                echo '<code>*</code>';
             }

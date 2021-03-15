@@ -1,0 +1,568 @@
+LUM-SITE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Unsigned32
+        FROM SNMPv2-SMI
+    OBJECT-GROUP, MODULE-COMPLIANCE
+        FROM SNMPv2-CONF
+    DisplayString, DateAndTime
+        FROM SNMPv2-TC
+    lumModules, lumSiteMIB
+        FROM LUM-REG
+    FaultStatus, AdminStatusWithNA, OperStatusWithNA, BoardOrInterfaceOperStatus
+        FROM LUM-TC
+    AlarmPerceivedSeverity
+        FROM LUM-ALARM-MIB;
+
+lumSiteMIBModule MODULE-IDENTITY
+    LAST-UPDATED
+        "201706150000Z" -- June 15th 2017
+    ORGANIZATION
+        "Infinera Corporation"
+    CONTACT-INFO
+        "techsupport@infinera.com"
+    DESCRIPTION
+        "The MIB module for management of customer site properties.
+
+         The tables contained in this MIB are:
+
+         (1) The General group contains some general attributes as timestamps
+            and tables sizes.
+
+         (2) The External Alarm table contains configuration for External Alarm inputs.
+
+"
+    REVISION
+        "201706150000Z" -- June 15th 2017
+    DESCRIPTION
+        "Changes made for release r29.0:
+         - Changed ORGANIZATION and CONTACT-INFO
+         - Added ExtAlarmOut table"
+    REVISION
+        "201612010000Z" -- December 1 2016
+    DESCRIPTION
+        "Added id to ExtAlarm table."
+    REVISION
+        "201112200000Z" -- December 20th 2011
+    DESCRIPTION
+        "The initial revision of this module."
+    ::= { lumModules 42 }
+
+
+-- ----------------------------------------------------
+-- Conformance area, containing groups and complicance
+-- specifications.
+-- ----------------------------------------------------
+
+lumSiteConfs OBJECT IDENTIFIER ::= { lumSiteMIB 1 }
+lumSiteGroups OBJECT IDENTIFIER ::= { lumSiteConfs 1 }
+lumSiteCompl OBJECT IDENTIFIER ::= { lumSiteConfs 2 }
+
+
+-- ----------------------------------------------------
+-- Root for objects in the Site MIB
+-- ----------------------------------------------------
+
+lumSiteMIBObjects OBJECT IDENTIFIER ::= { lumSiteMIB 2 }
+
+
+-- ----------------------------------------------------
+-- This MIB contains the following groups:
+-- ----------------------------------------------------
+
+siteGeneral OBJECT IDENTIFIER ::= { lumSiteMIBObjects 1 }
+siteExtAlarmList OBJECT IDENTIFIER ::= { lumSiteMIBObjects 2 }
+siteExtAlarmOutList OBJECT IDENTIFIER ::= { lumSiteMIBObjects 3 }
+
+-- ----------------------------------------------------
+-- Textual Conventions
+-- ----------------------------------------------------
+
+
+
+-- ----------------------------------------------------
+-- General group
+-- ----------------------------------------------------
+
+siteGeneralLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the configuration of the MIB was
+        last changed.
+"
+    ::= { siteGeneral 1 }
+
+siteGeneralStateLastChangeTime OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The time when the state of the MIB was last
+        changed.
+"
+    ::= { siteGeneral 2 }
+
+siteGeneralExtAlarmTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of entries in External Alarms table
+"
+    ::= { siteGeneral 3 }
+
+siteGeneralExtAlarmOutTableSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Number of entries in External Alarms output table
+"
+    ::= { siteGeneral 4 }
+
+
+-- ----------------------------------------------------
+-- External Alarm table
+-- ----------------------------------------------------
+
+siteExtAlarmTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SiteExtAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table handles configuration and alarm status for all
+        External Alarms in the system. One entry in this table
+        represents a single External Alarm logical input. Entries are
+        automatically created in this table when configuration for
+        hardware with External Alarm input(s) are added to the system and
+        automatically deleted when such hardware is removed from
+        configuration."
+    ::= { siteExtAlarmList 1 }
+
+siteExtAlarmEntry OBJECT-TYPE
+    SYNTAX      SiteExtAlarmEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the External Alarm table.
+         Each entry represents a logical External Alarm input.
+
+"
+    INDEX { siteExtAlarmIndex }
+    ::= { siteExtAlarmTable 1 }
+
+SiteExtAlarmEntry ::=
+    SEQUENCE {
+        siteExtAlarmIndex               Unsigned32,
+        siteExtAlarmName                DisplayString,
+        siteExtAlarmAdminStatus         INTEGER,
+        siteExtAlarmLevel               INTEGER,
+        siteExtAlarmSeverity            AlarmPerceivedSeverity,
+        siteExtAlarmText                DisplayString,
+        siteExtAlarmActive              FaultStatus,
+        siteExtAlarmId                  Unsigned32,
+        siteExtAlarmOperStatus          BoardOrInterfaceOperStatus }
+
+siteExtAlarmIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each External Alarm entry.
+
+"
+    ::= { siteExtAlarmEntry 1 }
+
+siteExtAlarmName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the External Alarm, e.g. 'extalarm:1:1:2'.
+
+        The first number indicates the subrack where the physical
+        External Alarm connector is located.
+
+        The second number indicates the slot where the physical
+        External Alarm connector is located.
+
+        The third number is identifies the logical
+        External Alarm input represented by this entry.
+
+"
+    ::= { siteExtAlarmEntry 2 }
+
+siteExtAlarmAdminStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    down (1),
+                    up (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative state of the External Alarm.
+
+        down - The external alarm is not in use.
+               Suppresses alarm propagation.
+
+        up - The external alarm is in use.
+
+"
+    DEFVAL { up }
+    ::= { siteExtAlarmEntry 3 }
+
+siteExtAlarmLevel OBJECT-TYPE
+    SYNTAX      INTEGER { activeHigh (1),
+                          activeLow (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "'Active' level of this alarm:
+
+        activeHigh      Alarm is activated by a high input signal level.
+
+        activeLow       Alarm is activated by a low input signal level.
+
+"
+    DEFVAL { 1 }
+    ::= { siteExtAlarmEntry 4 }
+
+siteExtAlarmSeverity OBJECT-TYPE
+    SYNTAX      AlarmPerceivedSeverity
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The severity of this alarm.
+
+"
+    DEFVAL { warning }
+    ::= { siteExtAlarmEntry 5 }
+
+
+siteExtAlarmText OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..128))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The alarm text associated with this alarm. The alarm text
+        is displayed in alarm lists and logs.
+
+"
+    DEFVAL { "" }
+    ::= { siteExtAlarmEntry 6 }
+
+
+siteExtAlarmActive OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The external alarm is active according to active high or low
+        setting configured by the 'Level' attribute.
+
+        Activation: Active HW indication.
+
+        De-activation: Inactive HW indication.
+
+"
+    ::= { siteExtAlarmEntry 7 }
+
+siteExtAlarmId OBJECT-TYPE
+    SYNTAX      Unsigned32   (0..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Identifier for the entry
+"
+    ::= { siteExtAlarmEntry 8 }
+
+siteExtAlarmOperStatus OBJECT-TYPE
+    SYNTAX      BoardOrInterfaceOperStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational state of the external alarm.
+         This attribute is required to automatically suppress (or not)
+         alarmActive from admin status attribute.
+
+"
+    ::= { siteExtAlarmEntry 9 }
+
+-- ----------------------------------------------------
+-- External Alarm Output table
+-- ----------------------------------------------------
+
+siteExtAlarmOutTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF SiteExtAlarmOutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "This table handles configuration and alarm status for all
+        Output External Alarms in the system. One entry in this table
+        represents a single External Alarm logical output. Entries are
+        automatically created in this table when configuration for
+        hardware with External Alarm output is added to the system and
+        automatically deleted when such hardware is removed from
+        configuration."
+    ::= { siteExtAlarmOutList 1 }
+
+siteExtAlarmOutEntry OBJECT-TYPE
+    SYNTAX      SiteExtAlarmOutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "An entry in the External Alarm Output table.
+         Each entry represents a logical External Alarm output.
+
+"
+    INDEX { siteExtAlarmOutIndex }
+    ::= { siteExtAlarmOutTable 1 }
+
+SiteExtAlarmOutEntry ::=
+    SEQUENCE {
+        siteExtAlarmOutIndex               Unsigned32,
+        siteExtAlarmOutName                DisplayString,
+        siteExtAlarmOutAdminStatus         AdminStatusWithNA,
+        siteExtAlarmOutOperStatus          OperStatusWithNA,
+        siteExtAlarmOutLevel               INTEGER,
+        siteExtAlarmOutSeverity            AlarmPerceivedSeverity,
+        siteExtAlarmOutText                DisplayString,
+        siteExtAlarmOutActive              FaultStatus,
+        siteExtAlarmOutId                  Unsigned32 }
+
+siteExtAlarmOutIndex OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "An arbitrary index assigned to each External Alarm output entry.
+
+"
+    ::= { siteExtAlarmOutEntry 1 }
+
+siteExtAlarmOutName OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..128))
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The name of the External Alarm Output, e.g. 'extalarmout:1:1:2'.
+
+        The first number indicates the subrack where the physical
+        External Alarm Output connector is located.
+
+        The second number indicates the slot where the physical
+        External Alarm Output connector is located.
+
+        The third number is identifies the logical
+        External Alarm output represented by this entry.
+
+"
+    ::= { siteExtAlarmOutEntry 2 }
+
+siteExtAlarmOutAdminStatus OBJECT-TYPE
+    SYNTAX      AdminStatusWithNA
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative state of the External Alarm Output.
+
+        down - The external alarm output is not in use.
+               Suppresses alarm propagation.
+
+        up - The external alarm is in use.
+
+"
+    DEFVAL { up }
+    ::= { siteExtAlarmOutEntry 3 }
+
+siteExtAlarmOutOperStatus OBJECT-TYPE
+    SYNTAX      OperStatusWithNA
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The operational state of the external alarm output.
+         This attribute is required to automatically suppress (or not)
+         alarmActive from admin status attribute.
+
+"
+    ::= { siteExtAlarmOutEntry 4 }
+
+siteExtAlarmOutLevel OBJECT-TYPE
+    SYNTAX      INTEGER { activeHigh (1),
+                          activeLow (2) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "'Active' level of this alarm:
+
+        activeHigh      Alarm is activated by a high input signal level.
+
+        activeLow       Alarm is activated by a low input signal level.
+
+"
+    DEFVAL { 1 }
+    ::= { siteExtAlarmOutEntry 5 }
+
+siteExtAlarmOutSeverity OBJECT-TYPE
+    SYNTAX      AlarmPerceivedSeverity
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The severity of this alarm.
+
+"
+    DEFVAL { warning }
+    ::= { siteExtAlarmOutEntry 6 }
+
+
+siteExtAlarmOutText OBJECT-TYPE
+    SYNTAX      DisplayString (SIZE (0..128))
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The alarm text associated with this alarm.
+
+"
+    ::= { siteExtAlarmOutEntry 7 }
+
+
+siteExtAlarmOutActive OBJECT-TYPE
+    SYNTAX      FaultStatus
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The external alarm output is active according to active high
+        or low setting configured by the 'Level' attribute.
+
+        Activation: Active HW indication.
+
+        De-activation: Inactive HW indication.
+
+"
+    ::= { siteExtAlarmOutEntry 8 }
+
+siteExtAlarmOutId OBJECT-TYPE
+    SYNTAX      Unsigned32   (0..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Identifier for the entry
+"
+    ::= { siteExtAlarmOutEntry 9 }
+
+
+-- ----------------------------------------------------
+-- Notifications
+-- ----------------------------------------------------
+
+
+-- ----------------------------------------------------
+-- Object and event groups
+-- ----------------------------------------------------
+
+siteGeneralGroupV1 OBJECT-GROUP
+    OBJECTS {
+        siteGeneralLastChangeTime,
+        siteGeneralStateLastChangeTime,
+        siteGeneralExtAlarmTableSize}
+    STATUS      deprecated
+    DESCRIPTION
+        "The general objects."
+    ::= { lumSiteGroups 1 }
+
+siteGeneralGroupV2 OBJECT-GROUP
+    OBJECTS {
+        siteGeneralLastChangeTime,
+        siteGeneralStateLastChangeTime,
+        siteGeneralExtAlarmTableSize,
+	    siteGeneralExtAlarmOutTableSize}
+    STATUS      current
+    DESCRIPTION
+        "The general objects."
+    ::= { lumSiteGroups 2 }
+
+siteExtAlarmGroupV1 OBJECT-GROUP
+    OBJECTS {
+        siteExtAlarmIndex,
+        siteExtAlarmName,
+        siteExtAlarmAdminStatus,
+        siteExtAlarmLevel,
+        siteExtAlarmSeverity,
+        siteExtAlarmText,
+        siteExtAlarmActive }
+    STATUS      deprecated
+    DESCRIPTION
+        "The External Alarm objects. (18.0)"
+    ::= { lumSiteGroups 3 }
+
+siteExtAlarmGroupV2 OBJECT-GROUP
+    OBJECTS {
+        siteExtAlarmIndex,
+        siteExtAlarmName,
+        siteExtAlarmAdminStatus,
+        siteExtAlarmLevel,
+        siteExtAlarmSeverity,
+        siteExtAlarmText,
+        siteExtAlarmActive,
+        siteExtAlarmId,
+        siteExtAlarmOperStatus }
+    STATUS      current
+    DESCRIPTION
+        "The External Alarm objects. (28.1)"
+    ::= { lumSiteGroups 4 }
+
+siteExtAlarmOutGroupV1 OBJECT-GROUP
+    OBJECTS {
+        siteExtAlarmIndex,
+        siteExtAlarmName,
+        siteExtAlarmAdminStatus,
+        siteExtAlarmOperStatus,
+        siteExtAlarmLevel,
+        siteExtAlarmSeverity,
+        siteExtAlarmText,
+        siteExtAlarmActive,
+        siteExtAlarmId}
+    STATUS      current
+    DESCRIPTION
+        "The External Alarm Output objects. (29.0)"
+    ::= { lumSiteGroups 5 }
+
+-- ----------------------------------------------------
+-- Compliance
+-- ----------------------------------------------------
+
+lumSiteBasicComplV1 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the Site MIB. (R18.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            siteGeneralGroupV1,
+            siteExtAlarmGroupV1 }
+    ::= { lumSiteCompl 1 }
+
+lumSiteBasicComplV2 MODULE-COMPLIANCE
+    STATUS      deprecated
+    DESCRIPTION
+        "Basic implementation requirements for the Site MIB. (R28.1)"
+    MODULE
+        MANDATORY-GROUPS {
+            siteGeneralGroupV1,
+            siteExtAlarmGroupV2 }
+    ::= { lumSiteCompl 2 }
+
+lumSiteBasicComplV3 MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "Basic implementation requirements for the Site MIB. (R29.0)"
+    MODULE
+        MANDATORY-GROUPS {
+            siteGeneralGroupV2,
+            siteExtAlarmGroupV2,
+            siteExtAlarmOutGroupV1 }
+    ::= { lumSiteCompl 3 }
+
+END
+
+

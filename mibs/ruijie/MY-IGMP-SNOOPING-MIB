@@ -1,0 +1,622 @@
+-- *****************************************************************
+-- MY-IGMP-SNOOPING-MIB.mib:  My IGMP snooping MIB file
+--
+-- $Copyright$
+-- 
+-- *****************************************************************
+--
+
+MY-IGMP-SNOOPING-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Integer32,
+        Counter32,
+        IpAddress
+                FROM SNMPv2-SMI
+        VlanId
+                FROM Q-BRIDGE-MIB
+        TruthValue,
+        DisplayString,
+        RowStatus,
+        MacAddress
+                FROM SNMPv2-TC
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP,
+        NOTIFICATION-GROUP
+                FROM SNMPv2-CONF
+        ConfigStatus,
+        MemberMap,
+        IfIndex
+                FROM MY-TC
+        EnabledStatus 
+                FROM P-BRIDGE-MIB
+        myMgmt
+                FROM MY-SMI;
+
+myIgmpSnoopingMIB MODULE-IDENTITY
+        LAST-UPDATED "200203200000Z"
+        ORGANIZATION "$Company$"
+        CONTACT-INFO
+                " 
+                Tel: $Telephone$ 
+
+                E-mail: $E-mail$"
+        DESCRIPTION
+                "This module defines my IGMP snooping mibs."
+        REVISION      "200203200000Z"
+        DESCRIPTION
+                "Initial version of this MIB module."
+        ::= { myMgmt 8}
+
+myIgmpSnoopingMIBObjects OBJECT IDENTIFIER ::= { myIgmpSnoopingMIB 1 }
+
+    --
+    -- my Snooping Igmp Group
+    --
+mySNIgmpWorkingMode OBJECT-TYPE
+        SYNTAX INTEGER {
+            disabled(1),
+            svgl(2),    -- shared-vlan-group-learning(2),
+            ivgl(3),    -- independent-vlan-group-learning(3)
+            ivgl-svgl(4)-- svgl-and-ivgl-coexist(4)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "System IGMP snooping working mode:
+             disabled(1):
+                disable the snooping IGMP function, and all IGMP report or leave
+                message will be forward transparent.
+             svgl(2):
+                shared vlan group learning, all group learning in each VLAN will 
+                be awared of by other VLAN.
+             ivgl(3):
+                independent vlan group learning, all group learning by each VLAN
+                cannot be used by other VLAN.
+             ivgl-svgl(4):
+                svgl-and-ivgl-coexist."                
+        DEFVAL { disabled }
+        ::= { myIgmpSnoopingMIBObjects 1 }
+
+mySNIgmpSourcePortCheck OBJECT-TYPE
+        SYNTAX EnabledStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Only video flow of router port can be accept by switch when 
+            this value is enabled"
+        DEFVAL { disabled }
+        ::= { myIgmpSnoopingMIBObjects 2 }
+        
+mySNIgmpSourceIpCheck OBJECT-TYPE
+        SYNTAX EnabledStatus
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            " "
+        DEFVAL { disabled }
+        ::= { myIgmpSnoopingMIBObjects 3 }        
+
+mySNIgmpSourceIpCheckDefIp OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Default multicast server ip address of igmp source ip checking,
+            this value must be setted before mySNIgmpSourceIpCheck be setted
+            to enabled"
+        ::= { myIgmpSnoopingMIBObjects 4 }
+
+mySNIgmpSrcIpCheckTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MySNIgmpSrcIpCheckEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "table of igmp source Ip check."
+        ::= { myIgmpSnoopingMIBObjects 5 }
+    
+mySNIgmpSrcIpCheckEntry OBJECT-TYPE
+        SYNTAX MySNIgmpSrcIpCheckEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "list of igmp source Ip check"
+        INDEX { mySNIgmpSrcIpCheckVID,mySNIgmpSrcIpCheckMultiIpAddr }
+        ::= { mySNIgmpSrcIpCheckTable 1 }
+    
+MySNIgmpSrcIpCheckEntry ::= 
+        SEQUENCE {
+        mySNIgmpSrcIpCheckVID VlanId,
+        mySNIgmpSrcIpCheckMultiIpAddr IpAddress,
+        mySNIgmpSrcIpCheckSrcIpAddr IpAddress,
+        mySNIgmpSrcIpCheckEntryStatus INTEGER
+        }
+
+mySNIgmpSrcIpCheckVID OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "VID of ipmc stream"
+        ::= { mySNIgmpSrcIpCheckEntry 1 }
+        
+mySNIgmpSrcIpCheckMultiIpAddr OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Group Destination Address for a ipmc stream."
+        ::= { mySNIgmpSrcIpCheckEntry 2 }
+
+mySNIgmpSrcIpCheckSrcIpAddr OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-create
+        STATUS current
+        DESCRIPTION
+            "The associate source ip of this ipmc stream. This Stream can be accepted only it's
+            source ip address is mySNIgmpSrcIpCheckSrcIpAddr."
+        ::= { mySNIgmpSrcIpCheckEntry 3 }
+            
+mySNIgmpSrcIpCheckEntryStatus OBJECT-TYPE
+        SYNTAX INTEGER{
+              valid(1),
+              delete(2) 
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "entry status of this entry. Setting this value to 'delete' will delete this
+             entry.Setting this value to value have no any effect"
+        ::= { mySNIgmpSrcIpCheckEntry 4 } 
+    
+mySNIgmpPortTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MySNIgmpPortEntry
+        MAX-ACCESS not-accessible
+        STATUS mandatory
+        DESCRIPTION
+            "Port's configuration concerned with snooping IGMP"
+        ::= { myIgmpSnoopingMIBObjects 6 }
+        
+mySNIgmpPortEntry OBJECT-TYPE
+        SYNTAX MySNIgmpPortEntry
+        MAX-ACCESS not-accessible
+        STATUS mandatory
+        DESCRIPTION 
+            "list of IGMP port configurations."
+        INDEX { mySNIgmpPortRouterVID,mySNIgmpPortIndex }
+        ::= { mySNIgmpPortTable 1 }
+        
+MySNIgmpPortEntry ::= 
+        SEQUENCE {
+        mySNIgmpPortRouterVID VlanId,        
+        mySNIgmpPortIndex IfIndex,
+        mySNIgmpPortRouterState INTEGER,
+        mySNIgmpPortRouterProfile Unsigned32
+        }
+    
+mySNIgmpPortRouterVID OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "the mroute port's vlan id"
+        ::= { mySNIgmpPortEntry 1 }    
+    
+mySNIgmpPortIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS mandatory
+        DESCRIPTION     
+            ""
+        ::= { mySNIgmpPortEntry 2 }
+
+mySNIgmpPortRouterState OBJECT-TYPE
+        SYNTAX INTEGER{
+           mrnone(1),
+           mrstatic(2),
+           mrdynamic(3)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "the mroute port's state,"
+        ::= { mySNIgmpPortEntry 3 }        
+
+mySNIgmpPortRouterProfile OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "the mroute port's profile."
+        ::= { mySNIgmpPortEntry 4 }        
+    
+
+--mySNIgmpPortDefGroupsFilterBehavior OBJECT-TYPE
+--        SYNTAX INTEGER {
+--            forwardAllGroups(1),
+--            forwardUnregisteredGroups (2),
+--            filterUnregisteredGroups (3)
+--        }
+--        MAX-ACCESS read-write
+--        STATUS current
+--        DESCRIPTION
+--         "Forwarding and filtering of group addressed frames may be managed by specifying 
+--         defaults for each outbound Port. The behavior of each of these defaults, as modified
+--         by the control elements of more explicit Filtering Database entries applicable to 
+--         a given frame’s MAC Address, reception Port, and outbound Port, is as follows.
+--              a) Forward All Groups. The frame is forwarded, unless an explicit Static Filtering
+--                 Entry specifies filtering independent of any dynamic filtering information.
+--              b) Forward Unregistered Groups. The frame is forwarded, unless
+--                 1) An explicit Static Filtering Entry specifies filtering independent 
+--                    of any dynamic filtering information; or
+--                 2) An explicit Static Filtering Entry specifies forwarding or filtering
+--                    on the basis of dynamic filtering information, and an applicable explicit
+--                     Group Registration Entry exists specifying filtering;or
+--                 3) An applicable explicit Static Filtering Entry does not exist, but an 
+--                    applicable Group Registration entry specifies filtering.
+--              c) Filter Unregistered Groups. The frame is filtered unless
+--                 1) An explicit Static Filtering Entry specifies forwarding independent of 
+--                    any dynamic filtering information; or
+--                 2) An explicit Static Filtering Entry specifies forwarding or filtering on
+--                   the basis of dynamic filtering information, and an applicable explicit 
+--                   Group Registration Entry exists specifying forwarding;or
+--                 3) An applicable explicit Static Filtering Entry does not exist, but an 
+--                    applicable Group Registration entry specifies forwarding."
+--        ::= { mySNIgmpPortEntry 4 }
+
+mySNIgmpGDANumber OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "max number of Group Destination Address this system supported."
+        ::= { myIgmpSnoopingMIBObjects 7 }
+
+mySNIgmpGDATable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MySNIgmpGDAEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "table of GDA."
+        ::= { myIgmpSnoopingMIBObjects 8}
+    
+mySNIgmpGDAEntry OBJECT-TYPE
+        SYNTAX MySNIgmpGDAEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "list of GDA of ports"
+        INDEX { mySNIgmpGDAVID,mySNIgmpGDAAddr }
+        ::= { mySNIgmpGDATable 1 }
+    
+MySNIgmpGDAEntry ::= 
+        SEQUENCE {
+        mySNIgmpGDAVID VlanId,
+        mySNIgmpGDAAddr IpAddress,
+        mySNIgmpGDAPortMemberAction MemberMap,
+        mySNIgmpGDATrunkMemberAction MemberMap
+--        mySNIgmpGDAStatus RowStatus
+--        mySNIgmpGDAStatus INTEGER
+        }
+
+mySNIgmpGDAVID OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "VID of ipmc stream"
+        ::= { mySNIgmpGDAEntry 1 }
+        
+mySNIgmpGDAAddr OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Group Destination Address for a port."
+        ::= { mySNIgmpGDAEntry 2 }
+    
+mySNIgmpGDAPortMemberAction OBJECT-TYPE
+        SYNTAX MemberMap
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "member physical port of this group, and each port have its action:
+             null(1), static(2), dynamic(3), mroute(4). the port is the logic port
+             by implementation specific."
+        ::= { mySNIgmpGDAEntry 3 }
+        
+mySNIgmpGDATrunkMemberAction OBJECT-TYPE
+        SYNTAX MemberMap
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "member trunk port of this group, and each trunk port have its action:
+             null(1), static(2), dynamic(3), mroute(4). the port is the logic port
+             by implementation specific."
+        ::= { mySNIgmpGDAEntry 4 }        
+    
+--mySNIgmpGDAStatus OBJECT-TYPE
+--        SYNTAX RowStatus
+--        MAX-ACCESS read-create
+--        STATUS current
+--        DESCRIPTION
+--            "the item status"
+--        ::= { mySNIgmpGDAEntry 5 }    
+        
+--mySNIgmpGDAStatus OBJECT-TYPE
+--        SYNTAX INTEGER {
+--            invalid(1),
+--          dynamic(2),
+--          static(3)
+--      }
+--      MAX-ACCESS read-only
+--      STATUS current
+--      DESCRIPTION
+--          "Status of a logic port's Group Destination Address.
+--          dynamic (2):
+--          while logic port's GDA dynamic configuration in 
+--          snoopingIgmpPortTable is enabled some GDA 
+--          will add to table with status dynamic.
+--          static (3):
+--          add by management, you can specify a GDA by
+--          hand for a logic port.
+--          changes can occur between every status, from invalid
+--          to dynamic, static to dynamic, etc. but can't change
+--          from invalid to dynamic or static when 
+--          snoopingIgmpGDAAddr is not a valid GDA."
+--      ::= { mySNIgmpGDAEntry 5 }
+
+mySNIgmpSvglVID OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "the vid of svgl mode"
+        ::= { myIgmpSnoopingMIBObjects 9 }
+        
+mySNIgmpSvglProfile OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "the profile of svgl mode"
+        ::= { myIgmpSnoopingMIBObjects 10 }        
+
+
+mySNIgmpMrLearnTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MySNIgmpMrLearnEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "table of MrLearn."
+        ::= { myIgmpSnoopingMIBObjects 11}
+    
+mySNIgmpMrLearnEntry OBJECT-TYPE
+        SYNTAX MySNIgmpMrLearnEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of MrLearn table"
+        INDEX { mySNIgmpMrLearnVID }         
+        ::= { mySNIgmpMrLearnTable 1}
+    
+MySNIgmpMrLearnEntry ::= 
+        SEQUENCE {
+        mySNIgmpMrLearnVID VlanId,
+        mySNIgmpMrLearnStatus INTEGER
+        }
+
+mySNIgmpMrLearnVID OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "VID of Mr Learn"
+        ::= { mySNIgmpMrLearnEntry 1 } 
+        
+mySNIgmpMrLearnStatus OBJECT-TYPE
+        SYNTAX INTEGER{
+        	disable(1),
+        	pim-dvmrp(2)
+        }
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Status of Mr Learn"
+        ::= { mySNIgmpMrLearnEntry 2 }          
+
+mySNIgmpPortFilteringTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MySNIgmpPortFilteringEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "table of igmp snooping port filtering."
+        ::= { myIgmpSnoopingMIBObjects 12}
+    
+mySNIgmpPortFilteringEntry OBJECT-TYPE
+        SYNTAX MySNIgmpPortFilteringEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "list of igmp filtering table"
+        INDEX { mySNPortIndex }         
+        ::= { mySNIgmpPortFilteringTable 1}
+        
+MySNIgmpPortFilteringEntry ::= 
+        SEQUENCE {
+        mySNPortIndex IfIndex,
+        mySNIgmpFilteringProfile Unsigned32,
+        mySNIgmpFilteringMaxGroups Unsigned32
+        }
+
+mySNPortIndex OBJECT-TYPE
+        SYNTAX IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION     
+            ""
+        ::= { mySNIgmpPortFilteringEntry 1}  
+
+mySNIgmpFilteringProfile OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "profile for igmp snooping port filtering"
+        ::= { mySNIgmpPortFilteringEntry 2 }     
+
+
+mySNIgmpFilteringMaxGroups OBJECT-TYPE
+        SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "The maximum number of IGMP groups that the L2 interface can join,the number can 
+            be from 0-4294967294;4294967295(0xFFFFFFFF) means no limit"
+        ::= { mySNIgmpPortFilteringEntry 3 }             
+
+mySNIgmpGDAConfigTable OBJECT-TYPE
+        SYNTAX SEQUENCE OF MySNIgmpGDAConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION
+            "GDA config table"
+        ::= { myIgmpSnoopingMIBObjects 13}
+    
+mySNIgmpGDAConfigEntry OBJECT-TYPE
+        SYNTAX MySNIgmpGDAConfigEntry
+        MAX-ACCESS not-accessible
+        STATUS current
+        DESCRIPTION 
+            "list of GDA table"
+        INDEX { mySNIgmpGDAConfigVID,mySNIgmpGDAConfigAddr }
+        ::= { mySNIgmpGDAConfigTable 1 }
+    
+MySNIgmpGDAConfigEntry ::= 
+        SEQUENCE {
+        mySNIgmpGDAConfigVID VlanId,
+        mySNIgmpGDAConfigAddr IpAddress,
+        mySNIgmpGDAConfigIfIndex IfIndex,
+        mySNIgmpGDAConfigType INTEGER,
+        mySNIgmpGDAConfigStatus INTEGER
+        }        
+
+mySNIgmpGDAConfigVID OBJECT-TYPE
+        SYNTAX VlanId
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "VID of ipmc stream"
+        ::= { mySNIgmpGDAConfigEntry 1 }
+        
+mySNIgmpGDAConfigAddr OBJECT-TYPE
+        SYNTAX IpAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "Group Destination Address for a port."
+        ::= { mySNIgmpGDAConfigEntry 2 }
+        
+mySNIgmpGDAConfigIfIndex OBJECT-TYPE   
+	SYNTAX   IfIndex
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            "member port of this group"
+        ::= { mySNIgmpGDAConfigEntry 3 }
+        
+mySNIgmpGDAConfigType OBJECT-TYPE   
+	SYNTAX   INTEGER{
+		null(1),
+		static(2),
+		dynamic(3),
+		mrouter(4)
+	}
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            ""
+        ::= { mySNIgmpGDAConfigEntry 4 }        
+        
+mySNIgmpGDAConfigStatus OBJECT-TYPE   
+	SYNTAX   INTEGER{
+		valid(1),
+		invalid(2)
+	}
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+            ""
+        ::= { mySNIgmpGDAConfigEntry 5 }     
+        
+mySNIgmpQueryResponeTime  OBJECT-TYPE   
+	SYNTAX Unsigned32
+        MAX-ACCESS read-write
+        STATUS current
+        DESCRIPTION
+            "Query报文的最长响应时间"
+        ::= { myIgmpSnoopingMIBObjects 14}                 
+            
+	           
+        
+myIgmpSnoopingMIBConformance OBJECT IDENTIFIER ::= { myIgmpSnoopingMIB 2 }
+myIgmpSnoopingMIBCompliances OBJECT IDENTIFIER ::= { myIgmpSnoopingMIBConformance 1 }
+myIgmpSnoopingMIBGroups      OBJECT IDENTIFIER ::= { myIgmpSnoopingMIBConformance 2 }
+
+
+-- compliance statements
+
+myIgmpSnoopingMIBCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for entities which implement
+                the My Snooping Igmp MIB"
+        MODULE  -- this module
+                MANDATORY-GROUPS { myIgmpSnoopingMIBGroup
+                 }
+        ::= { myIgmpSnoopingMIBCompliances 1 }
+                
+-- units of conformance
+
+myIgmpSnoopingMIBGroup OBJECT-GROUP
+        OBJECTS {
+           mySNIgmpWorkingMode,
+           mySNIgmpSourcePortCheck,
+           mySNIgmpSourceIpCheck,
+           mySNIgmpSourceIpCheckDefIp,           
+           mySNIgmpSrcIpCheckVID,
+           mySNIgmpSrcIpCheckMultiIpAddr,
+           mySNIgmpSrcIpCheckSrcIpAddr,
+           mySNIgmpSrcIpCheckEntryStatus,    
+           mySNIgmpPortRouterVID,        
+           mySNIgmpPortIndex,
+           mySNIgmpPortRouterState,
+           mySNIgmpPortRouterProfile,
+           mySNIgmpGDANumber,
+           mySNIgmpGDAVID,
+           mySNIgmpGDAAddr,
+           mySNIgmpGDAPortMemberAction,
+           mySNIgmpGDATrunkMemberAction,   
+	   mySNIgmpSvglVID,   
+	   mySNIgmpSvglProfile,	      
+           mySNIgmpMrLearnVID,
+           mySNIgmpMrLearnStatus,
+           mySNPortIndex,
+           mySNIgmpFilteringProfile,
+           mySNIgmpFilteringMaxGroups,
+           mySNIgmpGDAConfigVID,
+           mySNIgmpGDAConfigAddr,
+           mySNIgmpGDAConfigIfIndex,
+           mySNIgmpGDAConfigType,
+           mySNIgmpGDAConfigStatus,
+	   mySNIgmpQueryResponeTime           
+        }
+        STATUS  current
+        DESCRIPTION
+                "A collection of objects providing snooping Igmp configure ."
+        ::= { myIgmpSnoopingMIBGroups 1 }
+        
+END

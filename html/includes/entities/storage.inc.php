@@ -6,7 +6,7 @@
  *
  * @package    observium
  * @subpackage web
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -15,7 +15,7 @@ function generate_storage_query($vars)
 
     $sql  = "SELECT * FROM `storage`";
 
-    if($vars['sort'] == 'hostname' || $vars['sort'] == 'device' || $vars['sort'] == 'device_id')
+    if (in_array($vars['sort'], [ 'hostname', 'device', 'device_id' ]))
     {
       $sql .= ' LEFT JOIN `devices` USING(`device_id`)';
     }
@@ -139,7 +139,7 @@ function print_storage_table($vars)
 
 function print_storage_table_header($vars)
 {
-  if ($vars['view'] == "graphs" || isset($vars['graph']))
+  if ($vars['view'] === "graphs" || isset($vars['graph']))
   {
     $table_class = OBS_CLASS_TABLE_STRIPED_TWO;
   } else {
@@ -158,7 +158,7 @@ function print_storage_table_header($vars)
     'usage'      => array('Usage %', 'style="width: 200px;"'),
   );
 
-  if ($vars['page'] == "device")
+  if ($vars['page'] === "device")
   {
     unset($cols['device']);
   }
@@ -178,7 +178,7 @@ function generate_storage_row($storage, $vars) {
   global $config;
 
   $table_cols = 8;
-  if ($vars['page'] != "device" && $vars['popup'] != TRUE) { $table_cols++; } // Add a column for device.
+  if ($vars['page'] !== "device" && $vars['popup'] != TRUE) { $table_cols++; } // Add a column for device.
 
   $graph_array           = array();
   $graph_array['to']     = $config['time']['now'];
@@ -215,7 +215,7 @@ function generate_storage_row($storage, $vars) {
   $row = '<tr class="ports ' . $storage['row_class'] . '">
           <td class="state-marker"></td>';
 
-  if ($vars['page'] != "device" && $vars['popup'] != TRUE) { $row .= '<td class="entity">' . generate_device_link($storage) . '</td>'; }
+  if ($vars['page'] !== "device" && $vars['popup'] != TRUE) { $row .= '<td class="entity">' . generate_device_link($storage) . '</td>'; }
 
   $row .= '  <td class="entity">'.generate_entity_link('storage', $storage).'</td>
       <td>'.$total.'</td>
@@ -229,7 +229,7 @@ function generate_storage_row($storage, $vars) {
     </tr>
   ';
 
-  if ($vars['view'] == "graphs") { $vars['graph'] = "usage"; }
+  if ($vars['view'] === "graphs") { $vars['graph'] = "usage"; }
   if ($vars['graph'])
   {
     $row .= '<tr class="' . $storage['row_class'] . '">';

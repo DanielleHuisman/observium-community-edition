@@ -48,7 +48,7 @@ foreach (dbFetchRows($sql, array($device['device_id'])) as $processor)
 
   $proc = snmp_fix_numeric($proc);
 
-  if (!$processor['processor_precision']) { $processor['processor_precision'] = 1; };
+  if (!$processor['processor_precision']) { $processor['processor_precision'] = 1; }
   $proc = round($proc / $processor['processor_precision'], 2);
   if ($processor['processor_returns_idle'] == 1) { $proc = 100 - $proc; } // The OID returns idle value, so we subtract it from 100.
 

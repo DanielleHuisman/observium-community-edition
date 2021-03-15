@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Observium
  *
@@ -7,7 +6,7 @@
  *
  * @package    observium
  * @subpackage poller
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -18,56 +17,9 @@ if (!isset($config['os'][$device['os']]))
   force_discovery($device, 'os');
 }
 
-// Cache hardware/version/serial info from ENTITY-MIB (if possible use inventory module data)
-if (is_device_mib($device, 'ENTITY-MIB') &&
-    (in_array($device['os_group'], array('unix', 'cisco')) ||
-     in_array($device['os'], array('acme', 'nos', 'slx', 'ibmnos', 'acsw', 'fabos', 'wlc', 'h3c', 'hh3c', 'hpuww', 'lenovo-cnos'))))
-{
-  // Get entPhysical tables for some OS and OS groups
-  if ($config['discovery_modules']['inventory'])
-  {
-    $entPhysical = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ? AND `deleted` IS NULL', array($device['device_id'], '0'));
-  } else {
-    switch (TRUE)
-    {
-      case ($device['os_group'] == 'cisco' || in_array($device['os'], array('acme', 'h3c', 'hh3c'))):
-        $oids = 'entPhysicalDescr.1 entPhysicalSerialNum.1 entPhysicalModelName.1 entPhysicalContainedIn.1 entPhysicalName.1 entPhysicalSoftwareRev.1';
-        break;
-      case ($device['os'] == 'qnap'):
-        $oids = 'entPhysicalDescr.1 entPhysicalName.1 entPhysicalSerialNum.1 entPhysicalFirmwareRev.1';
-        break;
-      case (in_array($device['os'], ['ibmnos', 'slx'])):
-        $oids = 'entPhysicalName.1 entPhysicalSerialNum.1 entPhysicalSoftwareRev.1';
-        break;
-      case ($device['os'] == 'wlc'):
-        $oids = 'entPhysicalDescr.1 entPhysicalModelName.1 entPhysicalSoftwareRev.1';
-        break;
-      case ($device['os'] == 'lenovo-cnos'):
-        $oids = 'entPhysicalDescr.1 entPhysicalName.1 entPhysicalSoftwareRev.1 entPhysicalModelName.1';
-        break;
-      default:
-        $oids = 'entPhysicalDescr.1 entPhysicalSerialNum.1';
-    }
-    $data = snmp_get_multi_oid($device, $oids, array(), snmp_mib_entity_vendortype($device, 'ENTITY-MIB'));
-    $entPhysical = $data[1];
-  }
-
-  if (!empty($entPhysical['entPhysicalDescr']))
-  {
-    $entPhysical['entPhysicalDescr'] = rewrite_entity_name($entPhysical['entPhysicalDescr']);
-
-    if (str_contains($entPhysical['entPhysicalSerialNum'], ['..', '***']))
-    {
-      $entPhysical['entPhysicalSerialNum'] = '';
-    }
-  } else {
-    unset($entPhysical);
-  }
-}
-
 // List of variables/params parsed from sysDescr or snmp for each os
-$os_metatypes = array('serial', 'version', 'hardware', 'vendor', 'features', 'asset_tag', 'ra_url_http', 'kernel', 'arch');
-$os_values    = array();
+$os_metatypes = [ 'serial', 'version', 'hardware', 'type', 'vendor', 'features', 'asset_tag', 'ra_url_http', 'kernel', 'arch' ];
+$os_values    = [];
 
 // Find OS-specific SNMP data via OID regex: serial number, version number, hardware description, features, asset tag
 foreach ($config['os'][$device['os']]['sysDescr_regex'] as $pattern)
@@ -79,6 +31,9 @@ foreach ($config['os'][$device['os']]['sysDescr_regex'] as $pattern)
       if (!isset($os_values[$metatype]) &&
           isset($matches[$metatype]) && $matches[$metatype] != '')
       {
+        // Skip unknown type
+        if ($metatype === 'type' && !array_key_exists($matches[$metatype], $config['devicetypes'])) { continue; }
+
         $os_values[$metatype] = $matches[$metatype];
 
         // Additional sub-data (up to 2), ie hardware1, hardware2
@@ -102,6 +57,93 @@ foreach ($config['os'][$device['os']]['sysDescr_regex'] as $pattern)
   }
 }
 
+// Cache hardware/version/serial info from ENTITY-MIB (if possible use inventory module data)
+if (isset($config['os'][$device['os']]['entPhysical']) && is_device_mib($device, 'ENTITY-MIB'))
+{
+  $entPhysical_def    = $config['os'][$device['os']]['entPhysical'];
+
+  // Get entPhysical tables for some OS and OS groups
+  if (is_module_enabled($device, 'inventory', 'discovery'))
+  {
+    $entPhysicalContainedIn = isset($entPhysical_def['containedin']) ? $entPhysical_def['containedin'] : '0';
+    $entPhysical = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalContainedIn` = ? AND `deleted` IS NULL', array($device['device_id'], $entPhysicalContainedIn));
+    if (isset($entPhysical_def['class']) && (empty($entPhysical) || $entPhysical['entPhysicalClass'] === 'stack'))
+    {
+      $entPhysical = dbFetchRow('SELECT * FROM `entPhysical` WHERE `device_id` = ? AND `entPhysicalClass` = ? AND `deleted` IS NULL ORDER BY `entPhysicalIndex` ASC', array($device['device_id'], $entPhysical_def['class']));
+    }
+  } else {
+    $oids = isset($entPhysical_def['oids']) && is_array($entPhysical_def['oids']) ? $entPhysical_def['oids'] : [];
+    foreach ($entPhysical_def as $metatype => $def)
+    {
+      if (isset($def['oid']) && !isset($os_values[$metatype]))
+      {
+        $oids[] = $def['oid'];
+        // Append extra oid(s)
+        if (isset($def['oid_extra']))
+        {
+          $oids[] = $def['oid_extra'];
+        }
+      }
+    }
+    $data = snmp_get_multi_oid($device, $oids, [], snmp_mib_entity_vendortype($device, 'ENTITY-MIB'));
+    $entPhysical = array_shift($data);
+  }
+  print_debug_vars($entPhysical, 1);
+
+  foreach ($os_metatypes as $metatype)
+  {
+    // skip undefined metatype or already found metatype
+    if (!isset($entPhysical_def[$metatype]) || isset($os_values[$metatype])) { continue; }
+    $entry = $entPhysical_def[$metatype];
+
+    list($oid, $index) = explode('.', $entry['oid'], 2);
+
+    // skip empty oids
+    if (!isset($entPhysical[$oid]) || !strlen($entPhysical[$oid])) { continue; }
+
+    $value = $entPhysical[$oid];
+
+    // Append extra value, ie lenovo-cnos
+    if (isset($entry['oid_extra']))
+    {
+      list($oid_extra) = explode('.', $entry['oid_extra'], 2);
+      if (strlen($entPhysical[$oid_extra]) && $entPhysical[$oid_extra] != $value)
+      {
+        $value .= ' (' . $entPhysical[$oid_extra] . ')';
+      }
+    }
+
+    // Field found (no SNMP error), perform optional transformations.
+    if (isset($entry['transform']))
+    {
+      // Just simplify definition entry (unify with others)
+      $entry['transformations'] = $entry['transform'];
+    }
+
+    if (isset($entry['transformations']))
+    {
+      $value = string_transform($value, $entry['transformations']);
+    }
+    elseif ($oid === 'entPhysicalDescr')
+    {
+      $value = rewrite_entity_name($value);
+    }
+    elseif ($oid === 'entPhysicalSerialNum' && !is_valid_serial($value))
+    {
+      $value = '';
+    }
+
+    // finally set os value
+    if (strlen($value))
+    {
+      $os_values[$metatype] = $value;
+
+      $$metatype = $os_values[$metatype]; // Set metatype variable
+      print_debug("Added OS param from ENTITY-MIB: '$metatype' = '".$os_values[$metatype]."'");
+    }
+  }
+}
+
 // Find MIB-specific SNMP data via OID fetch: serial number, version number, hardware description, features, asset tag
 foreach ($os_metatypes as $metatype)
 {
@@ -113,6 +155,14 @@ foreach ($os_metatypes as $metatype)
       {
         foreach ($config['mibs'][$mib][$metatype] as $entry)
         {
+          if (!match_discovery_os_group($device, $entry))
+          {
+            // Definition entry not matched basic os params
+            // Example in QNAP NAS-MIB
+            print_debug("Definition entry [$metatype] [$mib::".$entry['oid'].$entry['oid_next']."] skipped by basic os/group params");
+            continue;
+          }
+
           if (isset($entry['oid_num'])) // Use numeric OID if set, otherwise fetch text based string
           {
             $value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid_num'])));
@@ -125,16 +175,52 @@ foreach ($os_metatypes as $metatype)
             $value = trim(snmp_hexstring(snmp_get_oid($device, $entry['oid'], $mib)));
           }
 
-          if ($GLOBALS['snmp_status'] && $value != '')
+          if (snmp_status() && $value != '')
           {
+            // Additional Oids for current metaparam (see IMM-MIB hardware definition)
+            if (isset($entry['oid_extra']))
+            {
+              $extra = [];
+              foreach ((array)$entry['oid_extra'] as $oid_extra)
+              {
+                $value_extra = trim(snmp_hexstring(snmp_get_oid($device, $oid_extra, $mib)));
+                if (snmp_status() && $value_extra != '')
+                {
+                  $extra[] = $value_extra;
+                }
+              }
+              if (count($extra))
+              {
+                $value .= ' (' . implode(', ', $extra) . ')';
+              }
+              unset($oid_extra, $extra, $value_extra);
+            }
+
             // Field found (no SNMP error), perform optional transformations.
+            if (isset($entry['transform']))
+            {
+              // Just simplify definition entry (unify with others)
+              $entry['transformations'] = $entry['transform'];
+            }
             $os_values[$metatype] = string_transform($value, $entry['transformations']);
+
+            // Skip unknown type
+            if ($metatype === 'type' && !array_key_exists($os_values[$metatype], $config['devicetypes']))
+            {
+              unset($os_values[$metatype]);
+              //echo("TYPE DEBUG");
+              continue;
+            }
 
             $$metatype = $os_values[$metatype]; // Set metatype variable
             print_debug("Added OS param from SNMP definition walk: '$metatype' = '".$os_values[$metatype]."'");
 
-            // Exit both foreach loops and move on to the next field.
-            break 2;
+            // If SNMP retrieval was okay, and field was not empty after transformations,
+            // exit both foreach loops and move on to the next field. Otherwise, continue finding $metatype.
+            if ($$metatype != '')
+            {
+              break 2;
+            }
           }
         }
       }
@@ -245,9 +331,9 @@ foreach ($update_fields as $field)
 // Here additional fields, change only if not set already
 foreach (array('type', 'icon') as $field)
 {
-  if (!isset($$field) || isset($attribs['override_'.$field])) { continue; }
+  if (!isset($$field) || isset($attribs['override_'.$field]) || $$field == $device[$field]) { continue; }
 
-  if ($device[$field] == "unknown" || empty($device[$field]) || ($field == 'type' && $$field != $device[$field]))
+  if ($device[$field] == "unknown" || empty($device[$field]) || $field == 'icon')
   {
     $update_array[$field] = $$field;
     log_event(nicecase($field)." changed: '".$device[$field]."' -> '".$update_array[$field]."'", $device, 'device', $device['device_id']);

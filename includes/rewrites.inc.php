@@ -1,16 +1,12 @@
 <?php
-
 /**
  * Observium
  *
  *   This file is part of Observium.
  *
- *   These functions perform rewrites on strings and numbers.
- *
  * @package    observium
  * @subpackage functions
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -167,28 +163,49 @@ function humanize_alert_check(&$check)
   $check['entity_status'] = array('up' => 0, 'down' => 0, 'unknown' => 0, 'delay' => 0, 'suppress' => 0);
   foreach ($check['entities'] as $alert_table_id => $alert_table_entry)
   {
-    if ($alert_table_entry['alert_status'] == '1')      { ++$check['entity_status']['up'];
-    } elseif($alert_table_entry['alert_status'] == '0') { ++$check['entity_status']['down'];
-    } elseif($alert_table_entry['alert_status'] == '2') { ++$check['entity_status']['delay'];
-    } elseif($alert_table_entry['alert_status'] == '3') { ++$check['entity_status']['suppress'];
-    } else                                              { ++$check['entity_status']['unknown']; }
+    if     ($alert_table_entry['alert_status'] == '1') { ++$check['entity_status']['up']; }
+    elseif ($alert_table_entry['alert_status'] == '0') { ++$check['entity_status']['down']; }
+    elseif ($alert_table_entry['alert_status'] == '2') { ++$check['entity_status']['delay']; }
+    elseif ($alert_table_entry['alert_status'] == '3') { ++$check['entity_status']['suppress']; }
+    else                                               { ++$check['entity_status']['unknown']; }
   }
 
   $check['num_entities'] = count($check['entities']);
 
   if ($check['entity_status']['up'] == $check['num_entities'])
   {
-    $check['class']  = "green"; $check['html_row_class'] = "up";
-  } elseif($check['entity_status']['down'] > '0') {
-    $check['class']  = "red"; $check['html_row_class'] = "error";
-  } elseif($check['entity_status']['delay'] > '0') {
-    $check['class']  = "orange"; $check['html_row_class'] = "warning";
-  } elseif($check['entity_status']['suppress'] > '0') {
-    $check['class']  = "purple"; $check['html_row_class'] = "suppressed";
-  } elseif($check['entity_status']['up'] > '0') {
-    $check['class']  = "green"; $check['html_row_class'] = "success";
+    $check['class']  = "green";
+    $check['html_row_class'] = "up";
+  }
+  elseif ($check['entity_status']['down'] > 0)
+  {
+    if ($check['severity'] === 'warn')
+    {
+      $check['class']          = "olive";
+      $check['html_row_class'] = "warning";
+    } else {
+      $check['class']          = "red";
+      $check['html_row_class'] = "error";
+    }
+  }
+  elseif ($check['entity_status']['delay'] > 0)
+  {
+    $check['class']  = "orange";
+    $check['html_row_class'] = "warning";
+  }
+  elseif ($check['entity_status']['suppress'] > 0)
+  {
+    $check['class']  = "purple";
+    $check['html_row_class'] = "suppressed";
+  }
+  elseif ($check['entity_status']['up'] > 0)
+  {
+    $check['class']  = "green";
+    $check['html_row_class'] = "success";
   } else {
-    $check['entity_status']['class']  = "gray"; $check['table_tab_colour'] = "#555555"; $check['html_row_class'] = "disabled";
+    $check['entity_status']['class']  = "gray";
+    $check['table_tab_colour'] = "#555555";
+    $check['html_row_class'] = "disabled";
   }
 
   $check['status_numbers'] = '<span class="label label-success">'. $check['entity_status']['up']. '</span><span class="label label-suppressed">'. $check['entity_status']['suppress'].
@@ -215,19 +232,43 @@ function humanize_alert_entry(&$entry)
   if ($entry['alert_status'] == '1')
   {
     // 1 means ok. Set blue text and disable row class
-    $entry['class']  = "green"; $entry['html_row_class'] = "up"; $entry['status'] = "OK";
-  } elseif($entry['alert_status'] == '0') {
+    $entry['class']  = "green";
+    $entry['html_row_class'] = "up";
+    $entry['status'] = "OK";
+  }
+  elseif ($entry['alert_status'] == '0')
+  {
     // 0 means down. Set red text and error class
-    $entry['class']  = "red"; $entry['html_row_class'] = "error"; $entry['status'] = "FAILED";
-  } elseif($entry['alert_status'] == '2') {
+    //r($entry);
+    if ($entry['severity'] === 'warn')
+    {
+      $entry['class']  = "olive";
+      $entry['html_row_class'] = "warning";
+      $entry['status'] = "WARNING";
+    } else {
+      $entry['class']  = "red";
+      $entry['html_row_class'] = "error";
+      $entry['status'] = "FAILED";
+    }
+  }
+  elseif ($entry['alert_status'] == '2')
+  {
     // 2 means the checks failed but we're waiting for x repetitions. set colour to orange and class to warning
-    $entry['class']  = "orange"; $entry['html_row_class'] = "warning"; $entry['status'] = "DELAYED";
-  } elseif($entry['alert_status'] == '3') {
+    $entry['class']  = "orange";
+    $entry['html_row_class'] = "warning";
+    $entry['status'] = "DELAYED";
+  }
+  elseif ($entry['alert_status'] == '3')
+  {
     // 3 means the checks failed but the alert is suppressed. set the colour to purple and the row class to suppressed
-    $entry['class']  = "purple"; $entry['html_row_class'] = "suppressed"; $entry['status'] = "SUPPRESSED";
+    $entry['class']  = "purple";
+    $entry['html_row_class'] = "suppressed";
+    $entry['status'] = "SUPPRESSED";
   } else {
     // Anything else set the colour to grey and the class to disabled.
-    $entry['class']  = "gray"; $entry['html_row_class'] = "disabled"; $entry['status'] = "Unknown";
+    $entry['class']  = "gray";
+    $entry['html_row_class'] = "disabled";
+    $entry['status'] = "Unknown";
   }
 
   // Set the checked/changed/alerted entries to formatted date strings if they exist, else set them to never
@@ -418,11 +459,14 @@ function process_port_label(&$this_port, $device)
     }
   }
 
-  if ($this_port['ifDescr'] === '' && $config['os'][$device['os']]['ifType_ifDescr'] && $this_port['ifIndex'])
+  // This happen on some liebert UPS devices or when device have memory leak (ie Eaton Powerware)
+  if (isset($config['os'][$device['os']]['ifType_ifDescr']) && $config['os'][$device['os']]['ifType_ifDescr'] && $this_port['ifIndex'])
   {
-    // This happen on some liebert UPS devices
+    $len = strlen($this_port['ifDescr']);
     $type = rewrite_iftype($this_port['ifType']);
-    if ($type)
+    if ($type && ($len === 0 || $len > 255 ||
+                  isHexString($this_port['ifDescr']) ||
+                  preg_match('/(.)\1{4,}/', $this_port['ifDescr'])))
     {
       $this_port['ifDescr'] = $type . ' ' . $this_port['ifIndex'];
       print_debug("Port 'ifDescr' rewritten: '' -> '" . $this_port['ifDescr'] . "'");
@@ -527,7 +571,7 @@ function process_port_label(&$this_port, $device)
       $label_bracket = $this_port['port_label']; // fallback
       list($this_port['port_label']) = explode($matches[0], $this_port['port_label'], 2);
     }
-    else if (preg_match('!^10*(?:/10*)*\s*[MGT]Bit\s+(.*)!i', $this_port['port_label'], $matches))
+    elseif (preg_match('!^10*(?:/10*)*\s*[MGT]Bit\s+(.*)!i', $this_port['port_label'], $matches))
     {
       // remove 10/100 Mbit part from beginning, this broke detect label_base/label_num (see hirschmann-switch os)
       // 10/100 MBit Ethernet Switch Interface 6
@@ -536,7 +580,7 @@ function process_port_label(&$this_port, $device)
       $label_bracket = $this_port['port_label']; // fallback
       $this_port['port_label'] = $matches[1];
     }
-    else if (preg_match('/^(.+)\s*:\s+(.+)/', $this_port['port_label'], $matches))
+    elseif (preg_match('/^(.+)\s*:\s+(.+)/', $this_port['port_label'], $matches))
     {
       // Another case with colon
       // gigabitEthernet 1/0/24 : copper
@@ -548,7 +592,7 @@ function process_port_label(&$this_port, $device)
 
     // Detect port_label_base and port_label_num
     //if (preg_match('/\d+(?:(?:[\/:](?:[a-z])?[\d\.:]+)+[a-z\d\.\:]*(?:[\-\_][\w\.\:]+)*|\/\w+$)/i', $this_port['port_label'], $matches))
-    if (preg_match('/\d+((?<periodic>(?:[\/:][a-z]*\d+(?:\.\d+)?)+)(?<last>[\-\_\.][\w\.\:]+)*|\/\w+$)/i', $this_port['port_label'], $matches))
+    if (preg_match('/\d+((?<periodic>(?:[\/:]([a-z]*\d+|[a-z]+[a-z0-9\-\_]*)(?:\.\d+)?)+)(?<last>[\-\_\.][\w\.\:]+)*|\/\w+$)/i', $this_port['port_label'], $matches))
     {
       // Multipart numeric
       /*
@@ -581,12 +625,13 @@ function process_port_label(&$this_port, $device)
       1:38
       1/4/x24, mx480-xe-0-0-0
       1/4/x24
+      5/1/lns-net
       */
       $this_port['port_label_num'] = $matches[0];
       list($this_port['port_label_base']) = explode($matches[0], $this_port['port_label'], 2);
       $this_port['port_label'] = $this_port['port_label_base'] . $this_port['port_label_num']; // Remove additional part (after port number)
     }
-    else if (preg_match('/(?<port_label_num>(?:\d+[a-z])?\d[\d\.\:]*(?:[\-\_]\w+)?)(?: [a-z()\[\] ]+)?$/i', $this_port['port_label'], $matches))
+    elseif (preg_match('/(?<port_label_num>(?:\d+[a-z])?\d[\d\.\:]*(?:[\-\_]\w+)?)(?: [a-z()\[\] ]+)?$/i', $this_port['port_label'], $matches))
     {
       // Simple numeric
       /*
@@ -795,149 +840,6 @@ function humanize_port(&$port)
 // Rewrite arrays
 /// FIXME. Clean, rename GLOBAL $rewrite_* variables into $config['rewrite'] definition
 
-// List of real names for cisco entities
-$entPhysicalVendorTypes = array(
-  'cevC7xxxIo1feTxIsl'    => 'C7200-IO-FE-MII',
-  'cevChassis7140Dualfe'  => 'C7140-2FE',
-  'cevChassis7204'        => 'C7204',
-  'cevChassis7204Vxr'     => 'C7204VXR',
-  'cevChassis7206'        => 'C7206',
-  'cevChassis7206Vxr'     => 'C7206VXR',
-  'cevCpu7200Npe200'      => 'NPE-200',
-  'cevCpu7200Npe225'      => 'NPE-225',
-  'cevCpu7200Npe300'      => 'NPE-300',
-  'cevCpu7200Npe400'      => 'NPE-400',
-  'cevCpu7200Npeg1'       => 'NPE-G1',
-  'cevCpu7200Npeg2'       => 'NPE-G2',
-  'cevPa1feTxIsl'         => 'PA-FE-TX-ISL',
-  'cevPa2feTxI82543'      => 'PA-2FE-TX',
-  'cevPa8e'               => 'PA-8E',
-  'cevPaA8tX21'           => 'PA-8T-X21',
-  'cevMGBIC1000BaseLX'    => '1000BaseLX GBIC',
-  'cevPort10GigBaseLR'    => '10GigBaseLR'
-);
-
-$rewrite_junos_hardware = array(
-  '.1.3.6.1.4.1.4874.1.1.1.6.2' => 'E120',
-  '.1.3.6.1.4.1.4874.1.1.1.6.1' => 'E320',
-  '.1.3.6.1.4.1.4874.1.1.1.1.1' => 'ERX1400',
-  '.1.3.6.1.4.1.4874.1.1.1.1.3' => 'ERX1440',
-  '.1.3.6.1.4.1.4874.1.1.1.1.5' => 'ERX310',
-  '.1.3.6.1.4.1.4874.1.1.1.1.2' => 'ERX700',
-  '.1.3.6.1.4.1.4874.1.1.1.1.4' => 'ERX705',
-  '.1.3.6.1.4.1.2636.1.1.1.2.43' => 'EX2200',
-  '.1.3.6.1.4.1.2636.1.1.1.2.30' => 'EX3200',
-  '.1.3.6.1.4.1.2636.1.1.1.2.76' => 'EX3300',
-  '.1.3.6.1.4.1.2636.1.1.1.2.31' => 'EX4200',
-  '.1.3.6.1.4.1.2636.1.1.1.2.44' => 'EX4500',
-  '.1.3.6.1.4.1.2636.1.1.1.2.74' => 'EX6210',
-  '.1.3.6.1.4.1.2636.1.1.1.2.32' => 'EX8208',
-  '.1.3.6.1.4.1.2636.1.1.1.2.33' => 'EX8216',
-  '.1.3.6.1.4.1.2636.1.1.1.2.16' => 'IRM',
-  '.1.3.6.1.4.1.2636.1.1.1.2.13' => 'J2300',
-  '.1.3.6.1.4.1.2636.1.1.1.2.23' => 'J2320',
-  '.1.3.6.1.4.1.2636.1.1.1.2.24' => 'J2350',
-  '.1.3.6.1.4.1.2636.1.1.1.2.14' => 'J4300',
-  '.1.3.6.1.4.1.2636.1.1.1.2.22' => 'J4320',
-  '.1.3.6.1.4.1.2636.1.1.1.2.19' => 'J4350',
-  '.1.3.6.1.4.1.2636.1.1.1.2.15' => 'J6300',
-  '.1.3.6.1.4.1.2636.1.1.1.2.20' => 'J6350',
-  '.1.3.6.1.4.1.2636.1.1.1.2.38' => 'JCS1200',
-  '.1.3.6.1.4.1.2636.10' => 'BX7000',
-  '.1.3.6.1.4.1.12532.252.2.1' => 'SA-2000',
-  '.1.3.6.1.4.1.12532.252.6.1' => 'SA-6000',
-  '.1.3.6.1.4.1.4874.1.1.1.5.1' => 'UMC Sys Mgmt',
-  '.1.3.6.1.4.1.2636.3.41.1.1.5.4' => 'WXC1800',
-  '.1.3.6.1.4.1.2636.3.41.1.1.5.1' => 'WXC250',
-  '.1.3.6.1.4.1.2636.3.41.1.1.5.5' => 'WXC2600',
-  '.1.3.6.1.4.1.2636.3.41.1.1.5.6' => 'WXC3400',
-  '.1.3.6.1.4.1.2636.3.41.1.1.5.2' => 'WXC500',
-  '.1.3.6.1.4.1.2636.3.41.1.1.5.3' => 'WXC590',
-  '.1.3.6.1.4.1.2636.3.41.1.1.5.7' => 'WXC7800',
-  '.1.3.6.1.4.1.2636.1.1.1.2.4' => 'M10',
-  '.1.3.6.1.4.1.2636.1.1.1.2.11' => 'M10i',
-  '.1.3.6.1.4.1.2636.1.1.1.2.18' => 'M120',
-  '.1.3.6.1.4.1.2636.1.1.1.2.3' => 'M160',
-  '.1.3.6.1.4.1.2636.1.1.1.2.2' => 'M20',
-  '.1.3.6.1.4.1.2636.1.1.1.2.9' => 'M320',
-  '.1.3.6.1.4.1.2636.1.1.1.2.1' => 'M40',
-  '.1.3.6.1.4.1.2636.1.1.1.2.8' => 'M40e',
-  '.1.3.6.1.4.1.2636.1.1.1.2.5' => 'M5',
-  '.1.3.6.1.4.1.2636.1.1.1.2.10' => 'M7i',
-  '.1.3.6.1.4.1.2636.1.1.1.2.68' => 'MAG6610',
-  '.1.3.6.1.4.1.2636.1.1.1.2.67' => 'MAG6611',
-  '.1.3.6.1.4.1.2636.1.1.1.2.66' => 'MAG8600',
-  '.1.3.6.1.4.1.2636.1.1.1.2.89' => 'MX10',
-  '.1.3.6.1.4.1.2636.1.1.1.2.29' => 'MX240',
-  '.1.3.6.1.4.1.2636.1.1.1.2.88' => 'MX40',
-  '.1.3.6.1.4.1.2636.1.1.1.2.25' => 'MX480',
-  '.1.3.6.1.4.1.2636.1.1.1.2.90' => 'MX5',
-  '.1.3.6.1.4.1.2636.1.1.1.2.57' => 'MX80',
-  '.1.3.6.1.4.1.2636.1.1.1.2.21' => 'MX960',
-  '.1.3.6.1.4.1.3224.1.1' => 'Netscreen',
-  '.1.3.6.1.4.1.3224.1.3' => 'Netscreen 10',
-  '.1.3.6.1.4.1.3224.1.4' => 'Netscreen 100',
-  '.1.3.6.1.4.1.3224.1.5' => 'Netscreen 1000',
-  '.1.3.6.1.4.1.3224.1.9' => 'Netscreen 204',
-  '.1.3.6.1.4.1.3224.1.10' => 'Netscreen 208',
-  '.1.3.6.1.4.1.3224.1.8' => 'Netscreen 25',
-  '.1.3.6.1.4.1.3224.1.2' => 'Netscreen 5',
-  '.1.3.6.1.4.1.3224.1.7' => 'Netscreen 50',
-  '.1.3.6.1.4.1.3224.1.6' => 'Netscreen 500',
-  '.1.3.6.1.4.1.3224.1.13' => 'Netscreen 5000',
-  '.1.3.6.1.4.1.3224.1.14' => 'Netscreen 5GT',
-  '.1.3.6.1.4.1.3224.1.17' => 'Netscreen 5GT-ADSL-A',
-  '.1.3.6.1.4.1.3224.1.23' => 'Netscreen 5GT-ADSL-A-WLAN',
-  '.1.3.6.1.4.1.3224.1.19' => 'Netscreen 5GT-ADSL-B',
-  '.1.3.6.1.4.1.3224.1.25' => 'Netscreen 5GT-ADSL-B-WLAN',
-  '.1.3.6.1.4.1.3224.1.21' => 'Netscreen 5GT-WLAN',
-  '.1.3.6.1.4.1.3224.1.12' => 'Netscreen 5XP',
-  '.1.3.6.1.4.1.3224.1.11' => 'Netscreen 5XT',
-  '.1.3.6.1.4.1.3224.1.15' => 'Netscreen Client',
-  '.1.3.6.1.4.1.3224.1.28' => 'Netscreen ISG1000',
-  '.1.3.6.1.4.1.3224.1.16' => 'Netscreen ISG2000',
-  '.1.3.6.1.4.1.3224.1.52' => 'Netscreen SSG140',
-  '.1.3.6.1.4.1.3224.1.53' => 'Netscreen SSG140',
-  '.1.3.6.1.4.1.3224.1.35' => 'Netscreen SSG20',
-  '.1.3.6.1.4.1.3224.1.36' => 'Netscreen SSG20-WLAN',
-  '.1.3.6.1.4.1.3224.1.54' => 'Netscreen SSG320',
-  '.1.3.6.1.4.1.3224.1.55' => 'Netscreen SSG350',
-  '.1.3.6.1.4.1.3224.1.29' => 'Netscreen SSG5',
-  '.1.3.6.1.4.1.3224.1.30' => 'Netscreen SSG5-ISDN',
-  '.1.3.6.1.4.1.3224.1.33' => 'Netscreen SSG5-ISDN-WLAN',
-  '.1.3.6.1.4.1.3224.1.31' => 'Netscreen SSG5-v92',
-  '.1.3.6.1.4.1.3224.1.34' => 'Netscreen SSG5-v92-WLAN',
-  '.1.3.6.1.4.1.3224.1.32' => 'Netscreen SSG5-WLAN',
-  '.1.3.6.1.4.1.3224.1.50' => 'Netscreen SSG520',
-  '.1.3.6.1.4.1.3224.1.18' => 'Netscreen SSG550',
-  '.1.3.6.1.4.1.3224.1.51' => 'Netscreen SSG550',
-  '.1.3.6.1.4.1.2636.1.1.1.2.84' => 'QFX3000',
-  '.1.3.6.1.4.1.2636.1.1.1.2.85' => 'QFX5000',
-  '.1.3.6.1.4.1.2636.1.1.1.2.82' => 'QFX Switch',
-  '.1.3.6.1.4.1.2636.1.1.1.2.41' => 'SRX100',
-  '.1.3.6.1.4.1.2636.1.1.1.2.64' => 'SRX110',
-  '.1.3.6.1.4.1.2636.1.1.1.2.49' => 'SRX1400',
-  '.1.3.6.1.4.1.2636.1.1.1.2.36' => 'SRX210',
-  '.1.3.6.1.4.1.2636.1.1.1.2.58' => 'SRX220',
-  '.1.3.6.1.4.1.2636.1.1.1.2.39' => 'SRX240',
-  '.1.3.6.1.4.1.2636.1.1.1.2.35' => 'SRX3400',
-  '.1.3.6.1.4.1.2636.1.1.1.2.34' => 'SRX3600',
-  '.1.3.6.1.4.1.2636.1.1.1.2.86' => 'SRX550',
-  '.1.3.6.1.4.1.2636.1.1.1.2.28' => 'SRX5600',
-  '.1.3.6.1.4.1.2636.1.1.1.2.26' => 'SRX5800',
-  '.1.3.6.1.4.1.2636.1.1.1.2.40' => 'SRX650',
-  '.1.3.6.1.4.1.2636.1.1.1.2.27' => 'T1600',
-  '.1.3.6.1.4.1.2636.1.1.1.2.7' => 'T320',
-  '.1.3.6.1.4.1.2636.1.1.1.2.6' => 'T640',
-  '.1.3.6.1.4.1.2636.1.1.1.2.17' => 'TX',
-  '.1.3.6.1.4.1.2636.1.1.1.2.37' => 'TXPlus',
-);
-
-# FIXME needs a rewrite, preferrably in form above? ie cat3524tXLEn etc
-$rewrite_cisco_hardware = array(
-  '.1.3.6.1.4.1.9.1.275' => 'C2948G-L3',
-);
-
 $rewrite_breeze_type = array(
   'aubs'     => 'AU-BS',    // modular access unit
   'ausa'     => 'AU-SA',    // stand-alone access unit
@@ -975,74 +877,109 @@ $rewrite_breeze_type = array(
 );
 
 $rewrite_cpqida_hardware = array(
-  'other' => 'Other',
-  'ida' => 'IDA',
+  'other'      => 'Other',
+  'ida'        => 'IDA',
   'idaExpansion' => 'IDA Expansion',
-  'ida-2' => 'IDA - 2',
-  'smart' => 'SMART',
-  'smart-2e' => 'SMART - 2/E',
-  'smart-2p' => 'SMART - 2/P',
-  'smart-2sl' => 'SMART - 2SL',
+  'ida-2'      => 'IDA - 2',
+  'smart'      => 'SMART',
+  'smart-2e'   => 'SMART - 2/E',
+  'smart-2p'   => 'SMART - 2/P',
+  'smart-2sl'  => 'SMART - 2SL',
   'smart-3100es' => 'Smart - 3100ES',
   'smart-3200' => 'Smart - 3200',
-  'smart-2dh' => 'SMART - 2DH',
-  'smart-221' => 'Smart - 221',
-  'sa-4250es' => 'Smart Array 4250ES',
-  'sa-4200' => 'Smart Array 4200',
+  'smart-2dh'  => 'SMART - 2DH',
+  'smart-221'  => 'Smart - 221',
+  'sa-4250es'  => 'Smart Array 4250ES',
+  'sa-4200'    => 'Smart Array 4200',
   'sa-integrated' => 'Integrated Smart Array',
-  'sa-431' => 'Smart Array 431',
-  'sa-5300' => 'Smart Array 5300',
-  'raidLc2' => 'RAID LC2 Controller',
-  'sa-5i' => 'Smart Array 5i',
-  'sa-532' => 'Smart Array 532',
-  'sa-5312' => 'Smart Array 5312',
-  'sa-641' => 'Smart Array 641',
-  'sa-642' => 'Smart Array 642',
-  'sa-6400' => 'Smart Array 6400',
-  'sa-6400em' => 'Smart Array 6400 EM',
-  'sa-6i' => 'Smart Array 6i',
+  'sa-431'     => 'Smart Array 431',
+  'sa-5300'    => 'Smart Array 5300',
+  'raidLc2'    => 'RAID LC2 Controller',
+  'sa-5i'      => 'Smart Array 5i',
+  'sa-532'     => 'Smart Array 532',
+  'sa-5312'    => 'Smart Array 5312',
+  'sa-641'     => 'Smart Array 641',
+  'sa-642'     => 'Smart Array 642',
+  'sa-6400'    => 'Smart Array 6400',
+  'sa-6400em'  => 'Smart Array 6400 EM',
+  'sa-6i'      => 'Smart Array 6i',
   'sa-generic' => 'Generic Array',
-  'sa-p600' => 'Smart Array P600',
-  'sa-p400' => 'Smart Array P400',
-  'sa-e200' => 'Smart Array E200',
-  'sa-e200i' => 'Smart Array E200i',
-  'sa-p400i' => 'Smart Array P400i',
-  'sa-p800' => 'Smart Array P800',
-  'sa-e500' => 'Smart Array E500',
-  'sa-p700m' => 'Smart Array P700m',
-  'sa-p212' => 'Smart Array P212',
-  'sa-p410' => 'Smart Array P410',
-  'sa-p410i' => 'Smart Array P410i',
-  'sa-p411' => 'Smart Array P411',
-  'sa-b110i' => 'Smart Array B110i SATA RAID',
-  'sa-p712m' => 'Smart Array P712m',
-  'sa-p711m' => 'Smart Array P711m',
-  'sa-p812' => 'Smart Array P812',
-  'sw-1210m' => 'StorageWorks 1210m',
-  'sa-p220i' => 'Smart Array P220i',
-  'sa-p222' => 'Smart Array P222',
-  'sa-p420' => 'Smart Array P420',
-  'sa-p420i' => 'Smart Array P420i',
-  'sa-p421' => 'Smart Array P421',
-  'sa-b320i' => 'Smart Array B320i',
-  'sa-p822' => 'Smart Array P822',
-  'sa-p721m' => 'Smart Array P721m',
-  'sa-b120i' => 'Smart Array B120i',
-  'hps-1224' => 'HP Storage p1224',
-  'hps-1228' => 'HP Storage p1228',
-  'hps-1228m' => 'HP Storage p1228m',
-  'sa-p822se' => 'Smart Array P822se',
-  'hps-1224e' => 'HP Storage p1224e',
-  'hps-1228e' => 'HP Storage p1228e',
+  'sa-p600'    => 'Smart Array P600',
+  'sa-p400'    => 'Smart Array P400',
+  'sa-e200'    => 'Smart Array E200',
+  'sa-e200i'   => 'Smart Array E200i',
+  'sa-p400i'   => 'Smart Array P400i',
+  'sa-p800'    => 'Smart Array P800',
+  'sa-e500'    => 'Smart Array E500',
+  'sa-p700m'   => 'Smart Array P700m',
+  'sa-p212'    => 'Smart Array P212',
+  'sa-p410'    => 'Smart Array P410',
+  'sa-p410i'   => 'Smart Array P410i',
+  'sa-p411'    => 'Smart Array P411',
+  'sa-b110i'   => 'Smart Array B110i SATA RAID',
+  'sa-p712m'   => 'Smart Array P712m',
+  'sa-p711m'   => 'Smart Array P711m',
+  'sa-p812'    => 'Smart Array P812',
+  'sw-1210m'   => 'StorageWorks 1210m',
+  'sa-p220i'   => 'Smart Array P220i',
+  'sa-p222'    => 'Smart Array P222',
+  'sa-p420'    => 'Smart Array P420',
+  'sa-p420i'   => 'Smart Array P420i',
+  'sa-p421'    => 'Smart Array P421',
+  'sa-b320i'   => 'Smart Array B320i',
+  'sa-p822'    => 'Smart Array P822',
+  'sa-p721m'   => 'Smart Array P721m',
+  'sa-b120i'   => 'Smart Array B120i',
+  'hps-1224'   => 'HP Storage p1224',
+  'hps-1228'   => 'HP Storage p1228',
+  'hps-1228m'  => 'HP Storage p1228m',
+  'sa-p822se'  => 'Smart Array P822se',
+  'hps-1224e'  => 'HP Storage p1224e',
+  'hps-1228e'  => 'HP Storage p1228e',
   'hps-1228em' => 'HP Storage p1228em',
-  'sa-p230i' => 'Smart Array P230i',
-  'sa-p430i' => 'Smart Array P430i',
-  'sa-p430' => 'Smart Array P430',
-  'sa-p431' => 'Smart Array P431',
-  'sa-p731m' => 'Smart Array P731m',
-  'sa-p830i' => 'Smart Array P830i',
-  'sa-p830' => 'Smart Array P830',
-  'sa-p831' => 'Smart Array P831'
+  'sa-p230i'   => 'Smart Array P230i',
+  'sa-p430i'   => 'Smart Array P430i',
+  'sa-p430'    => 'Smart Array P430',
+  'sa-p431'    => 'Smart Array P431',
+  'sa-p731m'   => 'Smart Array P731m',
+  'sa-p830i'   => 'Smart Array P830i',
+  'sa-p830'    => 'Smart Array P830',
+  'sa-p831'    => 'Smart Array P831',
+  'sa-p530'    => 'Smart Array P530',
+  'sa-p531'    => 'Smart Array P531',
+  'sa-p244br'  => 'Smart Array P244br',
+  'sa-p246br'  => 'Smart Array P246br',
+  'sa-p440'    => 'Smart Array P440',
+  'sa-p440ar'  => 'Smart Array P440ar',
+  'sa-p441'    => 'Smart Array P441',
+  'sa-p741m'   => 'Smart Array P741m',
+  'sa-p840'    => 'Smart Array P840',
+  'sa-p841'    => 'Smart Array P841',
+  'sh-h240ar'  => 'Smart HBA H240ar',
+  'sh-h244br'  => 'Smart HBA H244br',
+  'sh-h240'    => 'Smart HBA H240',
+  'sh-h241'    => 'Smart HBA H241',
+  'sa-b140i'   => 'Smart Array B140i',
+  'sh-generic' => 'Smart HBA',
+  'sa-p240nr'  => 'Smart Array P240nr',
+  'sh-h240nr'  => 'Smart HBA H240nr',
+  'sa-p840ar'  => 'Smart Array P840ar',
+  'sa-p542d'   => 'Smart Array P542D',
+  's100i'      => 'Smart Array S100i',
+  'e208i-p'    => 'Smart Array E208i-p',
+  'e208i-a'    => 'Smart Array E208i-a',
+  'e208i-c'    => 'Smart Array E208i-c',
+  'e208e-p'    => 'Smart Array E208e-p',
+  'p204i-b'    => 'Smart Array P204i-b',
+  'p204i-c'    => 'Smart Array P204i-c',
+  'p408i-p'    => 'Smart Array P408i-p',
+  'p408i-a'    => 'Smart Array P408i-a',
+  'p408e-p'    => 'Smart Array P408e-p',
+  'p408i-c'    => 'Smart Array P408i-c',
+  'p408e-m'    => 'Smart Array P408e-m',
+  'p416ie-m'   => 'Smart Array P416ie-m',
+  'p816i-a'    => 'Smart Array P816i-a',
+  'p408i-sb'   => 'Smart Array P408i-sb'
 );
 
 $rewrite_liebert_hardware = array(
@@ -1130,376 +1067,6 @@ $rewrite_liebert_hardware = array(
   'lgpPMPonEXC'                       => array('name' => 'PMP version 4 for EXC',                       'type' => 'power'),
   'lgpPMPonSTS2'                      => array('name' => 'PMP version 4 for STS2',                      'type' => 'power'),
   'lgpPMPonSTS2PDU'                   => array('name' => 'PMP version 4 for STS2/PDU',                  'type' => 'power'),
-);
-
-$rewrite_iftype = array(
-  'other' => 'Other',
-  'regular1822',
-  'hdh1822',
-  'ddnX25',
-  'rfc877x25',
-  'ethernetCsmacd' => 'Ethernet',
-  'iso88023Csmacd' => 'Ethernet',
-  'iso88024TokenBus',
-  'iso88025TokenRing' => 'Token Ring',
-  'iso88026Man',
-  'starLan' => 'StarLAN',
-  'proteon10Mbit',
-  'proteon80Mbit',
-  'hyperchannel',
-  'fddi' => 'FDDI',
-  'lapb',
-  'sdlc',
-  'ds1' => 'DS1',
-  'e1' => 'E1',
-  'basicISDN' => 'Basic Rate ISDN',
-  'primaryISDN' => 'Primary Rate ISDN',
-  'propPointToPointSerial' => 'PtP Serial',
-  'ppp' => 'PPP',
-  'softwareLoopback' => 'Loopback',
-  'eon' => 'CLNP over IP',
-  'ethernet3Mbit' => 'Ethernet',
-  'nsip' => 'XNS over IP',
-  'slip' => 'SLIP',
-  'ultra' => 'ULTRA technologies',
-  'ds3' => 'DS3',
-  'sip' => 'SMDS',
-  'frameRelay' => 'Frame Relay',
-  'rs232' => 'RS232 Serial',
-  'para' => 'Parallel',
-  'arcnet' => 'Arcnet',
-  'arcnetPlus' => 'Arcnet Plus',
-  'atm' => 'ATM Cells',
-  'miox25',
-  'sonet' => 'SONET or SDH',
-  'x25ple',
-  'iso88022llc',
-  'localTalk',
-  'smdsDxi',
-  'frameRelayService' => 'FRNETSERV-MIB',
-  'v35',
-  'hssi',
-  'hippi',
-  'modem' => 'Generic Modem',
-  'aal5' => 'AAL5 over ATM',
-  'sonetPath' => 'SONET Path',
-  'sonetVT' => 'SONET VT',
-  'smdsIcip' => 'SMDS InterCarrier Interface',
-  'propVirtual' => 'Virtual/Internal',
-  'propMultiplexor' => 'proprietary multiplexing',
-  'ieee80212' => '100BaseVG',
-  'fibreChannel' => 'Fibre Channel',
-  'hippiInterface' => 'HIPPI',
-  'frameRelayInterconnect' => 'Frame Relay',
-  'aflane8023' => 'ATM Emulated LAN for 802.3',
-  'aflane8025' => 'ATM Emulated LAN for 802.5',
-  'cctEmul' => 'ATM Emulated circuit ',
-  'fastEther' => 'Ethernet',
-  'isdn' => 'ISDN and X.25',
-  'v11' => 'CCITT V.11/X.21',
-  'v36' => 'CCITT V.36 ',
-  'g703at64k' => 'CCITT G703 at 64Kbps',
-  'g703at2mb' => 'Obsolete see DS1-MIB',
-  'qllc' => 'SNA QLLC',
-  'fastEtherFX' => 'Ethernet',
-  'channel' => 'Channel',
-  'ieee80211' => 'IEEE802.11 Radio',
-  'ibm370parChan' => 'IBM System 360/370 OEMI Channel',
-  'escon' => 'IBM Enterprise Systems Connection',
-  'dlsw' => 'Data Link Switching',
-  'isdns' => 'ISDN S/T',
-  'isdnu' => 'ISDN U',
-  'lapd' => 'Link Access Protocol D',
-  'ipSwitch' => 'IP Switching Objects',
-  'rsrb' => 'Remote Source Route Bridging',
-  'atmLogical' => 'ATM Logical Port',
-  'ds0' => 'Digital Signal Level 0',
-  'ds0Bundle' => 'Group of DS0s on the same DS1',
-  'bsc' => 'Bisynchronous Protocol',
-  'async' => 'Asynchronous Protocol',
-  'cnr' => 'Combat Net Radio',
-  'iso88025Dtr' => 'ISO 802.5r DTR',
-  'eplrs' => 'Ext Pos Loc Report Sys',
-  'arap' => 'Appletalk Remote Access Protocol',
-  'propCnls' => 'Proprietary Connectionless Protocol',
-  'hostPad' => 'CCITT-ITU X.29 PAD Protocol',
-  'termPad' => 'CCITT-ITU X.3 PAD Facility',
-  'frameRelayMPI' => 'Multiproto Interconnect over FR',
-  'x213' => 'CCITT-ITU X213',
-  'adsl' => 'ADSL',
-  'radsl' => 'Rate-Adapt. DSL',
-  'sdsl' => 'SDSL',
-  'vdsl' => 'VDSL',
-  'iso88025CRFPInt' => 'ISO 802.5 CRFP',
-  'myrinet' => 'Myricom Myrinet',
-  'voiceEM' => 'Voice recEive and transMit',
-  'voiceFXO' => 'Voice FXO',
-  'voiceFXS' => 'Voice FXS',
-  'voiceEncap' => 'Voice Encapsulation',
-  'voiceOverIp' => 'Voice over IP',
-  'atmDxi' => 'ATM DXI',
-  'atmFuni' => 'ATM FUNI',
-  'atmIma' => 'ATM IMA',
-  'pppMultilinkBundle' => 'PPP Multilink Bundle',
-  'ipOverCdlc' => 'IBM ipOverCdlc',
-  'ipOverClaw' => 'IBM Common Link Access to Workstn',
-  'stackToStack' => 'IBM stackToStack',
-  'virtualIpAddress' => 'IBM VIPA',
-  'mpc' => 'IBM multi-protocol channel support',
-  'ipOverAtm' => 'IBM ipOverAtm',
-  'iso88025Fiber' => 'ISO 802.5j Fiber Token Ring',
-  'tdlc  ' => 'IBM twinaxial data link control',
-  'gigabitEthernet' => 'Ethernet',
-  'hdlc' => 'HDLC',
-  'lapf' => 'LAP F',
-  'v37' => 'V.37',
-  'x25mlp' => 'Multi-Link Protocol',
-  'x25huntGroup' => 'X25 Hunt Group',
-  'transpHdlc' => 'Transp HDLC',
-  'interleave' => 'Interleave channel',
-  'fast' => 'Fast channel',
-  'ip' => 'IP',
-  'docsCableMaclayer' => 'CATV Mac Layer',
-  'docsCableDownstream' => 'CATV Downstream interface',
-  'docsCableUpstream' => 'CATV Upstream interface',
-  'a12MppSwitch' => 'Avalon Parallel Processor',
-  'tunnel' => 'Tunnel',
-  'coffee' => 'coffee pot',
-  'ces' => 'Circuit Emulation Service',
-  'atmSubInterface' => 'ATM Sub Interface',
-  'l2vlan' => 'L2 VLAN (802.1Q)',
-  'l3ipvlan' => 'L3 VLAN (IP)',
-  'l3ipxvlan' => 'L3 VLAN (IPX)',
-  'digitalPowerline' => 'IP over Power Lines',
-  'mediaMailOverIp' => 'Multimedia Mail over IP',
-  'dtm' => 'Dynamic Syncronous Transfer Mode',
-  'dcn' => 'Data Communications Network',
-  'ipForward' => 'IP Forwarding Interface',
-  'msdsl' => 'Multi-rate Symmetric DSL',
-  'ieee1394' => 'IEEE1394 High Performance Serial Bus',
-  'if-gsn--HIPPI-6400 ',
-  'dvbRccMacLayer' => 'DVB-RCC MAC Layer',
-  'dvbRccDownstream' => 'DVB-RCC Downstream Channel',
-  'dvbRccUpstream' => 'DVB-RCC Upstream Channel',
-  'atmVirtual' => 'ATM Virtual Interface',
-  'mplsTunnel' => 'MPLS Tunnel Virtual Interface',
-  'srp' => 'Spatial Reuse Protocol       ',
-  'voiceOverAtm' => 'Voice Over ATM',
-  'voiceOverFrameRelay' => 'Voice Over FR',
-  'idsl' => 'DSL over ISDN',
-  'compositeLink' => 'Avici Composite Link Interface',
-  'ss7SigLink' => 'SS7 Signaling Link ',
-  'propWirelessP2P' => 'Prop. P2P wireless interface',
-  'frForward' => 'Frame Forward Interface',
-  'rfc1483       ' => 'Multiprotocol over ATM AAL5',
-  'usb' => 'USB Interface',
-  'ieee8023adLag' => '802.3ad LAg',
-  'bgppolicyaccounting' => 'BGP Policy Accounting',
-  'frf16MfrBundle' => 'FRF .16 Multilink Frame Relay ',
-  'h323Gatekeeper' => 'H323 Gatekeeper',
-  'h323Proxy' => 'H323 Proxy',
-  'mpls' => 'MPLS ',
-  'mfSigLink' => 'Multi-frequency signaling link',
-  'hdsl2' => 'High Bit-Rate DSL - 2nd generation',
-  'shdsl' => 'Multirate HDSL2',
-  'ds1FDL' => 'Facility Data Link 4Kbps on a DS1',
-  'pos' => 'Packet over SONET/SDH Interface',
-  'dvbAsiIn' => 'DVB-ASI Input',
-  'dvbAsiOut' => 'DVB-ASI Output ',
-  'plc' => 'Power Line Communtications',
-  'nfas' => 'Non Facility Associated Signaling',
-  'tr008' => 'TR008',
-  'gr303RDT' => 'Remote Digital Terminal',
-  'gr303IDT' => 'Integrated Digital Terminal',
-  'isup' => 'ISUP',
-  'propDocsWirelessMaclayer' => 'Cisco proprietary Maclayer',
-  'propDocsWirelessDownstream' => 'Cisco proprietary Downstream',
-  'propDocsWirelessUpstream' => 'Cisco proprietary Upstream',
-  'hiperlan2' => 'HIPERLAN Type 2 Radio Interface',
-  'propBWAp2Mp' => 'PropBroadbandWirelessAccesspt2multipt',
-  'sonetOverheadChannel' => 'SONET Overhead Channel',
-  'digitalWrapperOverheadChannel' => 'Digital Wrapper',
-  'aal2' => 'ATM adaptation layer 2',
-  'radioMAC' => 'MAC layer over radio links',
-  'atmRadio' => 'ATM over radio links',
-  'imt' => 'Inter Machine Trunks',
-  'mvl' => 'Multiple Virtual Lines DSL',
-  'reachDSL' => 'Long Reach DSL',
-  'frDlciEndPt' => 'Frame Relay DLCI End Point',
-  'atmVciEndPt' => 'ATM VCI End Point',
-  'opticalChannel' => 'Optical Channel',
-  'opticalTransport' => 'Optical Transport',
-  'propAtm' => 'Proprietary ATM',
-  'voiceOverCable' => 'Voice Over Cable',
-  'infiniband' => 'Infiniband',
-  'teLink' => 'TE Link',
-  'q2931' => 'Q.2931',
-  'virtualTg' => 'Virtual Trunk Group',
-  'sipTg' => 'SIP Trunk Group',
-  'sipSig' => 'SIP Signaling',
-  'docsCableUpstreamChannel' => 'CATV Upstream Channel',
-  'econet' => 'Acorn Econet',
-  'pon155' => 'FSAN 155Mb Symetrical PON',
-  'pon622' => 'FSAN 622Mb Symetrical PON',
-  'bridge' => 'Transparent bridge interface',
-  'linegroup' => 'Interface common to multiple lines',
-  'voiceEMFGD' => 'voice E&M Feature Group D',
-  'voiceFGDEANA' => 'voice FGD Exchange Access North American',
-  'voiceDID' => 'voice Direct Inward Dialing',
-  'mpegTransport' => 'MPEG transport interface',
-  'sixToFour' => '6to4 interface',
-  'gtp' => 'GTP (GPRS Tunneling Protocol)',
-  'pdnEtherLoop1' => 'Paradyne EtherLoop 1',
-  'pdnEtherLoop2' => 'Paradyne EtherLoop 2',
-  'opticalChannelGroup' => 'Optical Channel Group',
-  'homepna' => 'HomePNA ITU-T G.989',
-  'gfp' => 'GFP',
-  'ciscoISLvlan' => 'ISL VLAN',
-  'actelisMetaLOOP' => 'MetaLOOP',
-  'fcipLink' => 'FCIP Link ',
-  'rpr' => 'Resilient Packet Ring Interface Type',
-  'qam' => 'RF Qam Interface',
-  'lmp' => 'Link Management Protocol',
-  'cblVectaStar' => 'Cambridge Broadband Networks Limited VectaStar',
-  'docsCableMCmtsDownstream' => 'CATV Modular CMTS Downstream Interface',
-  'adsl2' => 'Asymmetric Digital Subscriber Loop Version 2 ',
-  'macSecControlledIF' => 'MACSecControlled ',
-  'macSecUncontrolledIF' => 'MACSecUncontrolled',
-  'aviciOpticalEther' => 'Avici Optical Ethernet Aggregate',
-  'atmbond' => 'atmbond',
-  'voiceFGDOS' => 'voice FGD Operator Services',
-  'mocaVersion1' => 'MultiMedia over Coax Alliance (MoCA) Interface',
-  'ieee80216WMAN' => 'IEEE 802.16 WMAN interface',
-  'adsl2plus' => 'Asymmetric Digital Subscriber Loop Version 2, ',
-  'dvbRcsMacLayer' => 'DVB-RCS MAC Layer',
-  'dvbTdm' => 'DVB Satellite TDM',
-  'dvbRcsTdma' => 'DVB-RCS TDMA',
-  'x86Laps' => 'LAPS based on ITU-T X.86/Y.1323',
-  'wwanPP' => '3GPP WWAN',
-  'wwanPP2' => '3GPP2 WWAN',
-  'voiceEBS' => 'voice P-phone EBS physical interface',
-  'ifPwType' => 'Pseudowire',
-  'ilan' => 'Internal LAN on a bridge per IEEE 802.1ap',
-  'pip' => 'Provider Instance Port IEEE 802.1ah PBB',
-  'aluELP' => 'A-Lu ELP',
-  'gpon' => 'GPON',
-  'vdsl2' => 'VDSL2)',
-  'capwapDot11Profile' => 'WLAN Profile',
-  'capwapDot11Bss' => 'WLAN BSS',
-  'capwapWtpVirtualRadio' => 'WTP Virtual Radio',
-  'bits' => 'bitsport',
-  'docsCableUpstreamRfPort' => 'DOCSIS CATV Upstream RF',
-  'cableDownstreamRfPort' => 'CATV Downstream RF',
-  'vmwareVirtualNic' => 'VMware Virtual NIC',
-  'ieee802154' => 'IEEE 802.15.4 WPAN',
-  'otnOdu' => 'OTN ODU',
-  'otnOtu' => 'OTN OTU',
-  'ifVfiType' => 'VPLS Forwarding Instance',
-  'g9981' => 'G.998.1 Bonded',
-  'g9982' => 'G.998.2 Bonded',
-  'g9983' => 'G.998.3 Bonded',
-  'aluEpon' => 'EPON',
-  'aluEponOnu' => 'EPON ONU',
-  'aluEponPhysicalUni' => 'EPON Physical UNI',
-  'aluEponLogicalLink' => 'EPON Logical Link',
-  'aluGponOnu' => 'GPON ONU',
-  'aluGponPhysicalUni' => 'GPON Physical UNI',
-  'vmwareNicTeam' => 'VMware NIC Team',
-);
-
-$rewrite_ifname = array(
-  '-802.1q vlan subif' => '',
-  '-802.1q' => '',
-  '-aal5 layer' => ' aal5',
-  'hp procurve switch software loopback interface' => 'Loopback',
-  //'uniping server solution v3/sms' => '', // moved to os definition
-  'control plane interface' => 'Control Plane',
-  '802.1q encapsulation tag' => 'Vlan',
-  'stacking port' => 'Port',
-  '_Physical_Interface' => '',
-
-  // Case changes.
-  // FIXME. I'm not sure that this is correct for label changes (mike)
-  'ether' => 'Ether',
-  'gig' => 'Gig',
-  'fast' => 'Fast',
-  'ten' => 'Ten',
-  'forty' => 'Forty',
-  'hundred' => 'Hundred',
-  'bvi' => 'BVI',
-  'vlan' => 'Vlan',
-  'ether' => 'Ether',
-  'tunnel' => 'Tunnel',
-  'serial' => 'Serial',
-  'null' => 'Null',
-  'atm' => 'Atm',
-  'port-channel' => 'Port-Channel',
-  'dial' => 'Dial',
-  'loopback' => 'Loopback',
-);
-
-$rewrite_ifname_regexp = array(
-  //'/Nortel .* Module - /i' => '', // moved no avaya group
-  '/Baystack .* - /i' => '',
-  '/DEC [a-z\d]+ PCI /i' => '',
-  '/\s?Switch Interface/' => '',
-  '/\ {2,}/' => ' ',
-);
-
-$rewrite_shortif = array(
-  'bundle-ether' => 'BE',         // IOS XR
-  'controlethernet' => 'CE',      // IOS XR
-  'hundredgigabitethernet' => 'Hu',
-  'fortygigabitethernet' => 'Fo',
-  'tengigabitethernet' => 'Te',
-  'tengige' => 'Te',
-  'gigabitethernet' => 'Gi',
-  'gigabit ethernet' => 'Gi',
-  'fastethernet' => 'Fa',
-  'fast ethernet' => 'Fa',
-  'managementethernet' => 'Mgmt', // DNOS
-  'ethernet' => 'Et',
-  'twentyfivegige' => 'Twe',
-  'fortygige' => 'Fo',
-  'hundredgige' => 'Hu',
-  'management' => 'Mgmt',
-  'serial' => 'Se',
-  'pos' => 'Pos',
-  'port-channel' => 'Po',
-  'atm' => 'Atm',
-  'null' => 'Null',
-  'loopback' => 'Lo',
-  'dialer' => 'Di',
-  'vlan' => 'Vlan',
-  'tunnel' => 'Tu',
-  'serviceinstance' => 'SI',
-  'dwdm' => 'DWDM',
-  'link aggregation' => 'Lagg',
-  'backplane' => 'Bpl',
-);
-
-$rewrite_shortif_regexp = array(
-  '/^10\w+ (Port)/i' => '\1',      // 1000BaseTX Port 8/48 -> Port 8/48
-  '/^(?:GigaVUE)\S* (Port)/i' => '\1', // GigaVUE-212 Port 8/48
-  '/.*(Upstream|Downstream)(\s*)[^\d]*(\d.*)/' => '\1\2\3', // Logical Upstream Channel 1/0.0/0, Video Downstream 0/0/38, Downstream RF Port 4/7
-  '/^mgmteth(\d.*)/i' => 'Mgmt\1', // IOS XR
-);
-
-$rewrite_adslLineType = array(
-  'noChannel'          => 'No Channel',
-  'fastOnly'           => 'Fastpath',
-  'interleavedOnly'    => 'Interleaved',
-  'fastOrInterleaved'  => 'Fast/Interleaved',
-  'fastAndInterleaved' => 'Fast+Interleaved'
-);
-
-$rewrite_hrDevice = array (
-  'GenuineIntel:' => '',
-  'AuthenticAMD:' => '',
-  'Intel(R)' => '',
-  'CPU' => '',
-  '(R)' => '',
-  '  ' => ' ',
 );
 
 // Rewrite functions
@@ -1592,26 +1159,6 @@ function rewrite_liebert_hardware($hardware)
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
-function rewrite_junose_hardware($hardware)
-{
-  global $rewrite_junos_hardware;
-
-  $hardware = $rewrite_junos_hardware[$hardware];
-  return ($hardware);
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function rewrite_junos_hardware($hardware)
-{
-  global $rewrite_junos_hardware;
-
-  $hardware = $rewrite_junos_hardware[$hardware];
-  return ($hardware);
-}
-
-// DOCME needs phpdoc block
-// TESTME needs unit testing
 function rewrite_breeze_type($type)
 {
   $type = strtolower($type);
@@ -1665,7 +1212,7 @@ function rewrite_ftos_vlanid($device, $ifindex)
 // TESTME needs unit testing
 function rewrite_iftype($type)
 {
-  $type = array_key_replace($GLOBALS['rewrite_iftype'], $type);
+  $type = array_key_replace($GLOBALS['config']['rewrites']['iftype'], $type);
   return $type;
 }
 
@@ -1673,35 +1220,26 @@ function rewrite_iftype($type)
 // TESTME needs unit testing
 function rewrite_ifname($inf, $escape = TRUE)
 {
-  //$inf = strtolower($inf); // ew. -tom
-  $inf = array_str_replace($GLOBALS['rewrite_ifname'], $inf);
-  $inf = array_preg_replace($GLOBALS['rewrite_ifname_regexp'], $inf);
+  $inf = array_str_replace($GLOBALS['config']['rewrites']['ifname'], $inf);
+  //$inf = array_preg_replace($GLOBALS['rewrite_ifname_regexp'], $inf); // use os definitions instead
+  $inf = preg_replace('/\ {2,}/', ' ', $inf); // Clean multiple spaces
   if ($escape) { $inf = escape_html($inf); } // By default use htmlentities
 
-  return $inf;
+  return trim($inf);
 }
 
 // DOCME needs phpdoc block
 // TESTME needs unit testing
 function rewrite_adslLineType($adslLineType)
 {
-  global $rewrite_adslLineType;
+  $rewrite_adslLineType = $GLOBALS['config']['rewrites']['adslLineType'];
 
-  if (isset($rewrite_adslLineType[$adslLineType])) { $adslLineType = $rewrite_adslLineType[$adslLineType]; }
-  return($adslLineType);
-}
+  if (isset($rewrite_adslLineType[$adslLineType]))
+  {
+    $adslLineType = $rewrite_adslLineType[$adslLineType];
+  }
 
-// DOCME needs phpdoc block
-// TESTME needs unit testing
-function rewrite_hrDevice($dev)
-{
-  global $rewrite_hrDevice;
-
-  $dev = array_str_replace($rewrite_hrDevice, $dev);
-  $dev = preg_replace("/\ +/"," ", $dev);
-  $dev = trim($dev);
-
-  return $dev;
+  return $adslLineType;
 }
 
 // DOCME needs phpdoc block
@@ -1769,41 +1307,82 @@ function short_ifname($if, $len = NULL, $escape = TRUE)
   $len = (is_numeric($len) ? (int)$len : FALSE);
 
   $if = rewrite_ifname($if, $escape);
-  // $if = strtolower($if);
-  $if = array_str_replace($GLOBALS['rewrite_shortif'], $if);
-  $if = array_preg_replace($GLOBALS['rewrite_shortif_regexp'], $if);
+
+  $if = array_str_replace($GLOBALS['config']['rewrites']['shortif'], $if);
+  $if = array_preg_replace($GLOBALS['config']['rewrites']['shortif_regexp'], $if);
   if ($len) { $if = truncate($if, $len, ''); }
 
   return $if;
 }
 
-// DOCME needs phpdoc block
-function rewrite_entity_name($string)
+/**
+ * Rewrite name or description of an entity.
+ * Note, not same as entity_rewrite(), since this function impersonally of entity db entry.
+ *
+ * @param string      $string      Entity name or description
+ * @param null|string $entity_type Entity type, by default use common rewrites
+ * @param bool        $escape      Escape return string
+ *
+ * @return string
+ */
+function rewrite_entity_name($string, $entity_type = NULL, $escape = TRUE)
 {
-  $string = str_replace("Distributed Forwarding Card", "DFC", $string);
-  $string = str_replace("7600 Series SPA Interface Processor-", "7600 SIP-", $string);
-  $string = preg_replace("/Rev\.\ [0-9\.]+\ /", "", $string);
-  $string = str_replace("12000 Series Performance Route Processor", "12000 PRP", $string);
-  $string = preg_replace("/^12000/", "", $string);
-  $string = str_replace("Gigabit Ethernet", "GigE", $string);
-  $string = preg_replace("/^ASR1000\ /", "", $string);
+  $string = array_str_replace($GLOBALS['config']['rewrites']['entity_name'], $string, TRUE); // case-sensitive
+  $string = array_preg_replace($GLOBALS['config']['rewrites']['entity_name_regexp'], $string);
+
+  //CLEANME. Remove if no troubles with definitions
+  // (moved to $config['rewrites']['entity_name'], $config['rewrites']['entity_name_regexp'])
+  //$string = str_replace("Distributed Forwarding Card", "DFC", $string);
+  //$string = str_replace("7600 Series SPA Interface Processor-", "7600 SIP-", $string);
+  //$string = preg_replace("/Rev\.\ [0-9\.]+\ /", "", $string);
+  //$string = str_replace("12000 Series Performance Route Processor", "12000 PRP", $string);
+  //$string = preg_replace("/^12000/", "", $string);
+  //$string = str_replace("Gigabit Ethernet", "GigE", $string);
+  //$string = preg_replace("/^ASR1000\ /", "", $string);
   //$string = str_replace("Routing Processor", "RP", $string);
   //$string = str_replace("Route Processor", "RP", $string);
   //$string = str_replace("Switching Processor", "SP", $string);
-  $string = str_replace("Sub-Module", "Module ", $string);
-  $string = str_replace("DFC Card", "DFC", $string);
-  $string = str_replace("Centralized Forwarding Card", "CFC", $string);
-  $string = str_replace(array('fan-tray'), 'Fan Tray', $string);
-  $string = str_replace(array('Temp: ', 'CPU of ', 'CPU ', '(TM)', '(R)', '(r)'), '', $string);
-  $string = str_replace('GenuineIntel Intel', 'Intel', $string);
-  $string = str_replace(array(' Inc.', ' Computer Corporation', ' Corporation'), '', $string);
-  $string = str_replace('IBM IBM', 'IBM', $string);
-  $string = preg_replace("/(HP \w+) Switch/", "$1", $string);
-  $string = preg_replace("/power[ -]supply( \d+)?(?: (?:module|sensor))?/i", "Power Supply$1", $string);
-  $string = preg_replace("/([Vv]oltage|[Tt]ransceiver|[Pp]ower|[Cc]urrent|[Tt]emperature|[Ff]an|input|fail)\ [Ss]ensor/", "$1", $string);
-  $string = preg_replace("/^(temperature|voltage|current|power)s?\ /", "", $string);
-  $string = preg_replace('/\s{2,}/', ' ', $string);
+  //$string = str_replace("Sub-Module", "Module ", $string);
+  //$string = str_replace('Module for SMF', 'Module', $string);
+  //$string = str_replace("DFC Card", "DFC", $string);
+  //$string = str_replace("Centralized Forwarding Card", "CFC", $string);
+  //$string = str_replace(', Enterprise-Class', '', $string);
+  //$string = str_replace([ 'fan-tray' ], 'Fan Tray', $string);
+  //$string = str_replace([ 'Temp: ', 'CPU of ', 'CPU ', '(TM)', '(R)', '(r)' ], '', $string);
+  //$string = str_replace('GenuineIntel Intel', 'Intel', $string);
+  //$string = str_replace([ ' Inc.', ' Computer Corporation', ' Corporation' ], '', $string);
+  //$string = str_replace('IBM IBM', 'IBM', $string);
+  //$string = preg_replace("/(HP \w+) Switch/", "$1", $string);
+  //$string = preg_replace("/power[ -]supply( \d+)?(?: (?:module|sensor))?/i", "Power Supply$1", $string);
+  //$string = preg_replace("/([Vv]oltage|[Tt]ransceiver|[Pp]ower|[Cc]urrent|[Tt]emperature|[Ff]an|input|fail)\ [Ss]ensor/", "$1", $string);
+  //$string = preg_replace("/^(temperature|voltage|current|power)s?\ /", "", $string);
+  //$string = preg_replace('/;\s*SN\w{2,}/', '', $string); // Schwarz-Tonermodul, PN Genuine Xerox(R) Toner;SNXXXXX00843070000
+
+  $string = preg_replace('/\s{2,}/', ' ', $string); // multiple spaces to single space
   $string = preg_replace('/([a-z])([A-Z]{2,})/', '$1 $2', $string); // turn "fixedAC" into "fixed AC"
+
+  // Entity specific rewrites (additionally to common)
+  switch ($entity_type)
+  {
+    case 'port':
+      return rewrite_ifname($string, $escape);
+      break;
+
+    case 'processor':
+      $string = str_replace("Routing Processor",   "RP", $string);
+      $string = str_replace("Route Processor",     "RP", $string);
+      $string = str_replace("Switching Processor", "SP", $string);
+      break;
+
+    case 'storage':
+      $string = rewrite_storage($string);
+      break;
+  }
+
+  if ($escape)
+  {
+    $string = escape_html($string);
+  }
 
   return trim($string);
 }
@@ -1977,8 +1556,10 @@ function array_key_replace($array, $string)
  * Replace strings matched by key string with appropriate value from array: string -> replace
  * Note, by default CASE INSENSITIVE
  *
- * @param array  $array     Array with string and replace string (string -> replace)
- * @param string $string    String subject where replace
+ * @param array  $array  Array with string and replace string (string -> replace)
+ * @param string $string String subject where replace
+ * @param bool   $case_sensitive Case sensitive (default FALSE)
+ *
  * @return string           Result string with replaced strings
  */
 function array_str_replace($array, $string, $case_sensitive = FALSE)

@@ -1,0 +1,3269 @@
+ALU-PTPV2-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+        MODULE-IDENTITY, OBJECT-TYPE,
+        NOTIFICATION-TYPE,
+        Unsigned32, TimeTicks, Integer32,
+        Counter64, IpAddress                    FROM SNMPv2-SMI
+
+        NOTIFICATION-GROUP,
+        MODULE-COMPLIANCE, OBJECT-GROUP         FROM SNMPv2-CONF
+
+        TEXTUAL-CONVENTION, TruthValue,
+        DisplayString, TimeStamp, RowStatus,
+        RowPointer                              FROM SNMPv2-TC
+        
+        TNamedItemOrEmpty, TmnxAdminState,
+        TItemDescription                        FROM TIMETRA-TC-MIB
+
+        InetAddress, InetAddressType            FROM INET-ADDRESS-MIB
+          
+        aluSARMIBModules,
+        aluSARObjs,aluSARConfs, 
+        aluSARNotifyPrefix                      FROM ALU-SAR-GLOBAL-MIB
+        
+        TmnxPortAdminStatus, tmnxChassisIndex,
+        TmnxChassisIndex, TmnxSETSRefSource,
+        TmnxHwIndexOrZero                       FROM TIMETRA-CHASSIS-MIB
+        
+        InterfaceIndex                          FROM IF-MIB
+        ;
+
+aluPtpV2Module MODULE-IDENTITY
+        LAST-UPDATED    "201803200000Z"
+        ORGANIZATION    "Nokia"
+        CONTACT-INFO    
+            "Nokia 7705 Support
+             Web: http://www.nokia.com/comps/pages/carrier_support.jhtml"
+        DESCRIPTION
+        "This document is the SNMP MIB module to manage and provision the 
+        hardware components of the Nokia 7705 device.
+        
+        Copyright 2010-2018 Nokia.  All rights reserved.
+        Reproduction of this document is authorized on the condition that
+        the foregoing copyright notice is included.
+
+        This SNMP MIB module (Specification) embodies Nokia's
+        proprietary intellectual property.  Nokia retains 
+        all title and ownership in the Specification, including any 
+        revisions.
+
+        Nokia grants all interested parties a non-exclusive 
+        license to use and distribute an unmodified copy of this 
+        Specification in connection with management of Nokia 
+        products, and without fee, provided this copyright notice and 
+        license appear on all copies.
+
+        This Specification is supplied 'as is', and Nokia 
+        makes no warranty, either express or implied, as to the use, 
+        operation, condition, or performance of the Specification."
+
+--
+--  Revision History
+--
+        REVISION        "201803200000Z"
+        DESCRIPTION     "Rev 9.0                20 Mar 2018 00:00 
+                         9.0 release of the ALU-PTPV2-MIB."
+
+        REVISION        "1402200000Z"
+        DESCRIPTION     "Rev 6.1                20 Feb 2014 00:00 
+                         6.1 release of the ALU-PTPV2-MIB."
+
+        REVISION        "1108180000Z"
+        DESCRIPTION     "Rev 5.0                18 Aug 2011 00:00 
+                         5.0 release of the ALU-PTPV2-MIB."
+
+        REVISION        "1008130000Z"
+        DESCRIPTION     "Rev 1.0                13 Aug 2010 00:00 
+                         1.0 release of the ALU-PTPV2-MIB."
+
+        ::= { aluSARMIBModules 12 }
+
+aluPtpObjs                OBJECT IDENTIFIER ::= { aluSARObjs 12 }
+aluPtpClock                 OBJECT IDENTIFIER ::= { aluPtpObjs 1 }
+aluPtpPort                  OBJECT IDENTIFIER ::= { aluPtpObjs 2 }
+aluPtpPeer                  OBJECT IDENTIFIER ::= { aluPtpObjs 3 }
+aluPtpNotificationObjects   OBJECT IDENTIFIER ::= { aluPtpObjs 4 }
+
+aluPtpMIBConformance      OBJECT IDENTIFIER ::= { aluSARConfs 12 }
+aluPtpConformance           OBJECT IDENTIFIER ::= { aluPtpMIBConformance 1 }
+
+aluPtpNotifyPrefix        OBJECT IDENTIFIER ::= { aluSARNotifyPrefix 8 } 
+  aluPtpNotification        OBJECT IDENTIFIER ::= { aluPtpNotifyPrefix 0 } 
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      ALU-PTPV2-MIB textual conventions
+--
+
+Alu1588PtpClockId ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "This 64-bit extended unique identifier (EUI-64) is 
+        a concatenation of the 24-bit OUI and the MAC address
+        of the chassis plus the clock index - 1."
+    SYNTAX  OCTET STRING (SIZE(8))
+
+Alu1588PtpClockIndex ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The clock index of the IEEE 1588 PTP clock. A Alu1588PtpClockIndex
+         value specifies the index for the an entry in the aluPtpClockTable."
+    SYNTAX  INTEGER (1..32)
+
+Alu1588PtpPortIndex ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The PTP port index of the IEEE 1588 PTP port. A Alu1588PtpPortIndex
+         value specifies the index for the an entry in the aluPtpPortTable."
+    SYNTAX  INTEGER (1..50)
+
+Alu1588PtpMasterIndex ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The PTP master index of the IEEE 1588 PTP peer. A Alu1588PtpMasterIndex
+         value specifies the index for the entry in the aluPtpUcMasterTable."
+    SYNTAX  INTEGER (1..50)
+
+
+Alu1588PtpProfile ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The Precision Time Protocol (PTP) profile specifies the standard to
+        which PTP conforms.
+             ituTelecomFreq - aligns with some of the core principles specified 
+                              in the ITU-T G.8265.1 specification
+             ieee1588-2008  - conforms to the default PTP profile specified in
+                              the IEEE 1588-2008 standard.
+             g8275dot1-2014 - conforms to the PTP profile specified in the
+                              ITU-T G.8275.1 specification
+
+             g8275dot2-2016 - conforms to the PTP profile specified in the
+                              ITU-T G.8275.2 specification
+        "
+    REFERENCE   "IEEE Std 1588-2008, ITU-T G.8265.1, ITU-T G.8275.1 and ITU-T
+                 G.8275.2"
+    SYNTAX      INTEGER {
+                    unknown        (0),
+                    ituTelecomFreq (1),
+                    ieee1588-2008  (2),
+                    g8275dot1-2014 (3),
+g8275dot2-2016 (4)
+                }
+
+Alu1588PtpClockStepType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "Alu1588PtpClockStepType specifies the clock step:
+            unknown (0) - It is unknown whether the clock is a one-step or
+                          two-step clock.  No announce messages have been
+                          received from the remote clock.
+            oneStep (1) - The Clock provides time information using a single
+                          event message.
+            twoStep (2) - The Clock provides time information using the
+                          combination of an event message and a subsequent
+                          general message."
+    REFERENCE   "IEEE Std 1588-2008 Sections 3.1.21 and 3.1.47"
+    SYNTAX      INTEGER {
+                    unknown (0),
+                    oneStep (1),
+                    twoStep (2)
+                }
+
+Alu1588PtpClockType ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Alu1588PtpClockType specifies the type of clock of the network element"
+    REFERENCE   "IEEE Std 1588-2008 Section 6.5"
+    SYNTAX      INTEGER {
+                    unknown               (0),
+                    boundary              (1),
+                    ordinary              (2),
+                    endToEndTransparent   (3),
+                    peerToPeerTransparent (4),
+                    managementNode        (5)
+                }
+
+Alu1588PtpLogInterval ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "Alu1588PtpLogInterval specifies an interval between PTP packets, or
+         equivalently, a packet rate.  It is specified as the logarithm to the
+         base 2 of the interval in seconds.
+
+         For example, -7 specifies a packet rate of 128 packets per second, and
+         +4 specifies a packet rate of 1 packet every 16 seconds."
+    SYNTAX      Integer32 (-7..4)
+
+Alu1588PtpClockRecoveryState ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The state of the clock that is recovered from the IEEE 1588
+        PTP clock recovery instance."
+    SYNTAX      INTEGER {
+                    unknown (0),
+                    freeRun (1),
+                    acquiring (2),
+                    phase-tracking (3),
+                    holdover (4),
+                    locked (5)
+                }
+
+Alu1588PtpPortState ::= TEXTUAL-CONVENTION
+    STATUS     current
+    DESCRIPTION
+        "The state of the the IEEE 1588 PTP port."
+    SYNTAX     INTEGER {
+                    unknown (0),
+                    initializing (1),
+                    faulty (2),
+                    disabled (3),
+                    listening (4),
+                    pre-master (5),
+                    master (6),
+                    passive (7),
+                    uncalibrated (8),
+                    slave (9)
+                }
+
+AluPtpTimeSource ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+       "AluPtpTimeSource specifies the time source:
+        'ATOMIC_CLOCK (16)' Any device, or device directly connected to such a
+                           device, that is based on atomic resonance for
+                           frequency and that has been calibrated against
+                           international standards for frequency and, if the PTP
+                           timescale is used, time
+        'GPS (32)'         Any device synchronized to a satellite system that
+                           distribute time and frequency tied to international
+                           standards
+        'TERRESTRIAL_RADIO (48)' Any device synchronized via any of the radio
+                           distribution systems that distribute time and frequency
+                           tied to international standards
+        'PTP (64)'         PTP Any device synchronized to a PTP-based source of
+                           time external to the domain
+        'NTP (80)'         Any device synchronized via NTP or Simple Network
+                           Time Protocol (SNTP) to servers that distribute time
+                           and frequency tied to international standards
+        'HAND_SET (96)'    Used for any device whose time has been set by means
+                           of a human interface based on observation of an
+                           international standards source of time to within the
+                           claimed clock accuracy
+        'OTHER (144)'      Other source of time and/or frequency not covered by
+                           other values
+        'INTERNAL_OSCILLATOR (160)' Any device whose frequency is not based on atomic
+                           resonance nor calibrated against international
+                           standards for frequency, and whose time is based on a
+                           free-running oscillator with epoch determined in an
+                           arbitrary or unknown manner
+        'Reserved (255)'"
+    REFERENCE   "IEEE Std 1588-2008 Section 7.6.2.6"
+    SYNTAX      INTEGER {
+                    atomic-clock      (16),
+                    gps               (32),
+                    terrestrial-radio (48),
+                    ptp               (64),
+                    ntp               (80),
+                    hand-set          (96),
+                    other             (144),
+                    internal-osc      (160),
+                    reserved          (255)
+                }
+
+Alu1588PtpFreqSource ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The preferred source of input frequency timing of the 1588 clock 
+        recovery engine."
+    SYNTAX      INTEGER {
+                    unknown (0),
+                    ptp     (1),
+                    ssu     (2)
+                }
+
+Alu1588PtpSyncCertaintyState ::= TEXTUAL-CONVENTION
+    STATUS     current
+    DESCRIPTION
+        "The Alu1588PtpSyncCertaintyState indicates state of synchronization
+        certainty. A value of 'certain(1)' indicates that synchronization
+        is within the specified uncertainty limits. A value of 'uncertain(2)'
+        indicates that synchronization is not within specified uncertainty
+        limits. A value of 'unknown(0)' indicates that synchronization
+        certainty is not supported or is unknown."
+    SYNTAX     INTEGER {
+                    unknown   (0),
+                    certain   (1),
+                    uncertain (2)
+                }
+
+Alu1588ActivePtpPortIndex ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The Alu1588ActivePtpPortIndex value specifies the index for an 
+        entry in the aluPtpPortTable that is associated with the current
+        1588 master. A '0' value indicates that the Alu1588ActivePtpPortIndex
+        is undefined. This occurs when there is no current master."
+    SYNTAX  INTEGER (0..50)
+
+Alu1588ActivePtpMasterIndex ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+        "The Alu1588ActivePtpMasterIndex value specifies the index for an 
+        entry in the aluPtpUcMasterTable that is associated with the current
+        1588 master. A '0' value indicates that the Alu1588ActivePtpMasterIndex
+        is undefined. This occurs when there is no current master."
+    SYNTAX  INTEGER (0..50)
+
+AluPtpPortNumber            ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "AluPtpPortNumber specifies a number which identifies a logical access
+         point of a clock for PTP communications to the communications network.
+
+         A PTP ordinary clock has exactly one PTP port, with port number 1.
+         A PTP boundary clock has multiple ports, each with unique port
+         numbers."
+    REFERENCE   "IEEE 1588-2008, Section 3.1.35, 7.5.2.3"
+
+    SYNTAX      Unsigned32 (0..65534)
+
+AluPtpPriority                  ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+        "The Precision Time Protocol (PTP) priority used both for the value to
+         advertise in the Announce messages and for the local clock value in
+         data set comparisons.
+
+         It is used by the Best Master Clock Algorithm to determine which clock
+         should provide timing for the network.
+
+         The priority is rated highest (0) to lowest (255)."
+    REFERENCE   "IEEE Std 1588-2008 Section 7.6.2.2 and 7.6.2.3"
+    SYNTAX      Unsigned32 (0..255)
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Clock MIB for 4.0
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpClockMaxNumber OBJECT-TYPE
+    SYNTAX      INTEGER (1..32)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of IEEE 1588 PTP Clock instances supported
+        by the node. This limit excludes any IEEE 1588 PTP clocks
+        instances that are associated with the phase and/or frequency
+        recovery that is performed on the CSM."
+    ::= { aluPtpClock 1 }
+
+aluPtpClockTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpClockEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table provides the IEEE1588 PTP Clock. "
+    ::= { aluPtpClock 2 }
+
+aluPtpClockEntry OBJECT-TYPE
+    SYNTAX       AluPtpClockEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Configuration information concerning IEEE 1588 PTP Clock"
+    INDEX       { aluPtpClockIndex }
+    ::= { aluPtpClockTable 1 }
+
+AluPtpClockEntry ::= SEQUENCE
+{
+    aluPtpClockIndex              Alu1588PtpClockIndex,
+    aluPtpClockRowStatus          RowStatus,
+    aluPtpClockIpInterface        TNamedItemOrEmpty,
+    aluPtpClockHw                 TmnxHwIndexOrZero,
+    aluPtpClockProfile            Alu1588PtpProfile,
+    aluPtpClockAdminState         TmnxAdminState,
+    aluPtpClockDynamicPeers       TruthValue,
+    aluPtpClockForwardWeight      Integer32,
+    aluPtpClockRecoveryState      Alu1588PtpClockRecoveryState,
+    aluPtpClockTimeRefPriority    INTEGER,
+    aluPtpClockAdminFreqSource    Alu1588PtpFreqSource,
+    aluPtpClockOperFreqSource     Alu1588PtpFreqSource,
+    aluPtpClockUseNodeTime        TruthValue,
+    aluPtpClockSyncCertaintyState  Alu1588PtpSyncCertaintyState,
+    aluPtpClockTxWhileUncertain   TruthValue
+}
+
+aluPtpClockIndex    OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The unique value which identifies this IEEE 1588 PTP clock."
+    ::= { aluPtpClockEntry 1 }
+
+aluPtpClockRowStatus OBJECT-TYPE
+    SYNTAX       RowStatus
+    MAX-ACCESS   read-create
+    STATUS       current
+    DESCRIPTION
+        "Row Status of the entry."
+    ::= { aluPtpClockEntry 2 }
+
+aluPtpClockIpInterface OBJECT-TYPE
+    SYNTAX      TNamedItemOrEmpty
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockIpInterface indicates the ip
+        interface of the IEEE 1588 PTP ordinary/boundary clock. This
+        interface is used to determine the source IPv4 and/or IPv6
+        address of the PTP packets. 
+        
+        This object can not be modified if aluPtpClockType is set to
+        'endToEndTransparent (3)'. 
+        
+        The value of aluPtpClockIpInterface cannot be set to a router
+        interface that is configured to be unnumbered.
+        
+        An empty value indicates that there is no source router ip 
+        interface for this clock."
+    DEFVAL { ''H } 
+    ::= { aluPtpClockEntry 3 }
+    
+aluPtpClockHw   OBJECT-TYPE
+    SYNTAX      TmnxHwIndexOrZero
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The unique value which identifies the MDA slot within
+         the system which is perfoming IEEE 1588 PTP event message
+         time or frequency recovery processing.
+         
+         This object is derived when the aluPtpClockIpInterface object
+         is a non-loopback IP interface. The aluPtpClockHw will
+         be set to the MDA number of the physical port or '0'
+         when no physical port is defined.
+
+         This object can not be modified if aluPtpClockType is set to
+        'endToEndTransparent (3)'. 
+         
+         This object must be configured by the user when the 
+         aluPtpClockIpInterface is a loopback IP interface."
+    DEFVAL { 0 } 
+    ::= { aluPtpClockEntry 4 }
+    
+aluPtpClockProfile OBJECT-TYPE
+    SYNTAX      Alu1588PtpProfile
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockProfile specifies the conformance of the PTP
+         system to either the default IEEE 1588-2008 behavior, or one of the
+         ITU-T profiles.
+         
+         When aluPtpClockProfile is modified, several other objects are changed
+         to the corresponding default value for the new profile. The following
+         objects are affected:
+         
+             aluPtpClockDomain
+             aluPtpClockUseNodeTime
+             aluPtpClockAdminFreqSource
+             aluPtpClockPriority1
+             aluPtpPortDSLogAnnoInterval
+             aluPtpPortDSLogSyncInterval
+             
+         The new values for aluPtpClockUseNodeTime and aluPtpClockAdminFreqSource
+         also depend on the values of aluPtpClockType and aluPtpClockSlaveOnly.
+
+         This object can not be modified if aluPtpClockType is set to
+         'endToEndTransparent (3)'. When the aluPtpClockType is set to 
+         'endToEndTransparent (3)' aluPtpClockProfile is 'unknown (0)'.
+
+         This object can only be modified if aluPtpClockAdminState is
+         set to 'outOfService (3)', otherwise an 'inconsistentValue' error is
+         returned."
+    DEFVAL { ieee1588-2008 }
+    ::= { aluPtpClockEntry 5 }
+
+aluPtpClockAdminState OBJECT-TYPE
+    SYNTAX      TmnxAdminState
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockAdminState specifies whether PTP 1588 is
+         enabled on the system."
+    DEFVAL      { outOfService }
+    ::= { aluPtpClockEntry 6 }
+
+aluPtpClockDynamicPeers OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockDynamicPeers specifies whether PTP 1588 allows
+         peers to be dynamically learned.
+        
+         aluPtpClockDynamicPeers can not be modified if aluPtpClockType is 
+         set to 'endToEndTransparent (3)'.
+         
+         This object can only be modified if aluPtpClockAdminState is
+         set to 'outOfService (3)', otherwise an 'inconsistentValue' error is
+         returned."
+    DEFVAL      { false }
+    ::= { aluPtpClockEntry 7 }
+
+aluPtpClockForwardWeight    OBJECT-TYPE
+    SYNTAX      Integer32 (-1|0..100)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockForwardWeight represents the percentage that the 
+         forward direction data path is used in the calculations related to 
+         updates to the clock recovery DCO. A value of '-1' indicates the 
+         aluPtpClockForwardWeight is undefined. When the aluPtpClockRecoveryState
+         is 'unknown' or 'freeRun', aluPtpClockForwardWeight is undefined.
+         
+         This object is undefined when the aluPtpClockType is set to
+         'endToEndTransparent (3)'."
+    DEFVAL { -1 }
+    ::= { aluPtpClockEntry 8 }
+
+aluPtpClockRecoveryState    OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockRecoveryState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockRecoveryState indicates the
+         current clock synchronization state of the clock derived from
+         the IEEE 1588 PTP event messages.
+
+         This object is unknown when the aluPtpClockType is set to
+         'endToEndTransparent (3)'."
+    DEFVAL { unknown }
+    ::= { aluPtpClockEntry 9 }
+
+aluPtpClockTimeRefPriority    OBJECT-TYPE
+    SYNTAX  INTEGER (0..32)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockTimeRefPriority indicates the relative
+         priority order of the clock to be used as a source of system time.
+         The aluPtpClockTimeRefPriority cannot be set to a non-zero value
+         unless that clock is capable of time recovery.
+         
+         A lower numerical value indicates a higher relative priority to
+         be the source of system time except for the value '0'. When the
+         aluPtpClockTimeRefPriority is '0' the clock in not a candidate
+         to be a source of system time.
+ 
+         This object is '0' when the aluPtpClockType is set to
+         'endToEndTransparent (3)'."
+    DEFVAL { 0 }
+    ::= { aluPtpClockEntry 10 }
+
+aluPtpClockAdminFreqSource    OBJECT-TYPE
+    SYNTAX  Alu1588PtpFreqSource
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockAdminFreqSource is the preferred source of
+        frequency timing for PTP ports that are in the master state. 
+ 
+         The default value of aluPtpClockAdminFreqSource is based on the
+         the aluPtpClockProfile. When the profile is aluPtpClockProfile is
+         'g8275dot1-2014 (3)' the default value for aluPtpClockAdminFreqSource
+         is 'ssu(2)'. Otherwise the default is 'ptp(1)'.
+
+
+
+        This object is 'unknown(0)' when the aluPtpClockType is set to
+        'endToEndTransparent (3)'."
+    DEFVAL { ptp }
+    ::= { aluPtpClockEntry 11 }
+
+aluPtpClockOperFreqSource    OBJECT-TYPE
+    SYNTAX  Alu1588PtpFreqSource
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockOperFreqSource is the current source of
+        frequency timing for PTP master ports and for PTP time recovery.
+ 
+        This object is 'unknown(0)' when the aluPtpClockType is set to
+        'endToEndTransparent (3)'."
+    ::= { aluPtpClockEntry 12 }
+
+aluPtpClockUseNodeTime OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockUseNodeTime specifies whether the PTP clock
+         will utilize the node system time as its time source. This time
+         is used by ptp-ports in the master state.
+         
+         If aluPtpClockProfile is 'g8275dot1-2014 (3)' or 
+         'g8275dot2-2016 (4)' and aluPtpClockType is an ordinary master (ie.
+         'ordinary(2)' and aluPtpClockSlaveOnly is 'false(2)') the default
+         value of aluPtpClockUseNodeTime is 'true(1)' and cannot be
+         changed. Otherwise the default value of aluPtpClockUseNodeTime is
+         'false(2)'.
+         "
+    DEFVAL      { false }
+    ::= { aluPtpClockEntry 13 }
+
+aluPtpClockSyncCertaintyState OBJECT-TYPE
+    SYNTAX      Alu1588PtpSyncCertaintyState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockSyncCertaintyState indicates the
+        synchronization certainty state of the clock. When the clock is
+        acting as a Grandmaster (ie. a master only ordinary clock or a
+        boundary clock with a PRTC timing source) the
+        aluPtpClockSyncCertaintyState is encoded as 'certain(1)' if
+        the aluPtpClockFreqTraceable and aluPtpClockTimeTraceable are
+        'true(1)'. If either of these attributes are 'false(2)',
+        the aluPtpClockSyncCertaintyState is 'uncertain(2)'.
+        
+        When the clock is acting as a slave (ie. boundary clock or an
+        ordinary slave clock with a slave ptp-port)the
+        aluPtpClockSyncCertaintyState is 'certain(1)' if all the following
+        are true:
+        
+        1) the aluPtpParentSyncCertaintyState is 'certain(1)'
+        2) the SETS is locked to a frequency reference that equivalent or
+        better than the aluPtpClockClass when converted to TmnxSSMQualityLevel.
+        3) the clock as a ptp-port that has a aluPtpPortDSPortState that is
+        in the 'slave (9)' state.
+        
+        The aluPtpClockSyncCertaintyState values 'certain(1)' and
+        'uncertain(2)' are only supported when the aluPtpClockProfile is
+        'g8275dot1-2014 (3)'. For all other profiles only 'unknown(0)' is
+        supported."
+    DEFVAL { unknown }
+    ::= { aluPtpClockEntry 14 }
+
+aluPtpClockTxWhileUncertain OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The aluPtpClockTxWhileUncertain specifies whether the PTP clock will
+        transmit Announce packets while the aluPtpClockSyncCertaintyState is
+        'uncertain(2)'. A value of 'false(2)' indicates that Announce packets
+        will only be transmitted if the aluPtpClockSyncCertaintyState is
+        'certain(1)'. A aluPtpClockTxWhileUncertain encoded with a value of
+        'true(1)' indicates that Announce packets will be generated while
+        'uncertain(2)'.
+        
+        The aluPtpClockTxWhileUncertain can only be changed from the default
+        when the aluPtpClockProfile is 'g8275dot1-2014 (3)'."
+    DEFVAL { true }
+    ::= { aluPtpClockEntry 15 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Clock Default Data Set (DS) 4.0
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpClockDefaultDSTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpClockDefaultDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table provides IEEE1588 PTP Clock Default Data Set. "
+    ::= { aluPtpClock 3 }
+
+aluPtpClockDefaultDSEntry OBJECT-TYPE
+    SYNTAX       AluPtpClockDefaultDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Configuration information concerning IEEE 1588PTP"
+    AUGMENTS { aluPtpClockEntry }
+    ::= { aluPtpClockDefaultDSTable 1 }
+
+AluPtpClockDefaultDSEntry ::= SEQUENCE
+{
+    aluPtpClockId            Alu1588PtpClockId,
+    aluPtpClockType          Alu1588PtpClockType,
+    aluPtpClockSlaveOnly     TruthValue,
+    aluPtpClockDomain        Unsigned32,
+    aluPtpClockNumberPorts   Unsigned32,
+    aluPtpClockClass         Unsigned32,
+    aluPtpClockAccuracy      Unsigned32,
+    aluPtpClockVariance      Integer32,
+    aluPtpClockPriority1     AluPtpPriority,
+    aluPtpClockPriority2     AluPtpPriority,
+    aluPtpClockTwoStepFlag   Alu1588PtpClockStepType,
+    aluPtpClockLocalPriority AluPtpPriority
+}
+
+aluPtpClockId OBJECT-TYPE
+    SYNTAX  Alu1588PtpClockId   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This 64-bit extended unique identifier (EUI-64) is  a 
+         concatenation of the 24-bit OUI, the MAC address of the chassis
+         and the aluPtpClockIndex."
+    REFERENCE   "IEEE Std 1588-2008 Section 7.5.2.2"
+    ::= { aluPtpClockDefaultDSEntry 1 }
+
+aluPtpClockType OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockType	
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The IEEE P1588 PTP clock type.
+        
+         Modifying this object to 'ordinary (2)' will change the
+         aluPtpClockNumberPorts object to '1'.
+        
+         Modifying this object to 'boundary (1)' will change the 
+         aluPtpClockSlaveOnly object to 'false (2)'. Also the
+         aluPtpClockNumberPorts object will be changed to '50'.
+
+         Modifying this object to 'endToEndTransparent (3)' will result
+         in the aluPtpClockNumberPorts object being changed to '0'.
+         Only a single end to end transparent clock can exist in a chassis.
+        
+         When the aluPtpClockType is changed the aluPtpPortTable
+         associated with this clock will be initialized to default values.
+         
+         This object can only be modified if aluPtpClockAdminState is
+         set to 'outOfService (3)', otherwise an 'inconsistentValue' error
+         is returned."
+    REFERENCE   "IEEE Std 1588-2008 Section 6.5"
+    DEFVAL      { ordinary }
+    ::= { aluPtpClockDefaultDSEntry 2 }
+
+aluPtpClockSlaveOnly OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "This is an indicator of whether IEEE 1588 PTP ordinary clock is 
+         slave-only.
+        
+         This object is only applicable to if the aluPtpClockType is 
+         'ordinary (2)'.
+         
+         This object can not be modified if aluPtpClockType is set to
+         'boundary (1)' or 'endToEndTransparent (3)'. 
+         
+         Modifying this object will result in the aluPtpPortTable associated
+         with this clock to be initialized back to the default values
+         associated with the aluPtpClockType and the aluPtpClockSlaveOnly
+         objects.
+
+         This object can only be modified if aluPtpClockAdminState is
+         set to 'outOfService (3)', otherwise an 'inconsistentValue' error
+         is returned."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.1.4.4"
+    DEFVAL { true }
+    ::= { aluPtpClockDefaultDSEntry 3 }
+
+aluPtpClockDomain OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockDomain specifies the domain in which PTP 1588
+         clock runs on the system.
+
+         The default value of aluPtpClockDomain depends on the value of
+         aluPtpClockProfile.
+         
+         If aluPtpClockProfile is 'ituTelecomFreq (1)' or 'ieee1588-2008 (2)'
+         the default value is 0.
+         
+         If aluPtpClockProfile is 'g8275dot1-2014 (3)' the default value is 24.
+         
+         If aluPtpClockProfile is 'g8275dot2-2016 (4)' the default value is 44.
+
+         This object can not be modified if aluPtpClockType is set to
+         'endToEndTransparent (3)'. 
+        
+         This object can only be modified if aluPtpClockAdminState is
+         set to 'outOfService (3)', otherwise an 'inconsistentValue' error is
+         returned."
+    REFERENCE   "IEEE Std 1588-2008 Section 7.1"
+    DEFVAL      { 0 }
+    ::= { aluPtpClockDefaultDSEntry 4 }
+
+aluPtpClockNumberPorts OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..50)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of IEEE PTP ports. This object is set based on the
+        the following rules:
+        
+        aluPtpClockType 'ordinary (2)' - aluPtpClockNumberPorts '1'
+        aluPtpClockType 'boundary (1)' - aluPtpClockNumberPorts '50'
+        aluPtpClockType 'endToEndTransparent (3)' - aluPtpClockNumberPorts '0'"
+    REFERENCE   "IEEE Std 1588-2008 Section 7.6.2.7"
+    DEFVAL     { 1 }
+    ::= { aluPtpClockDefaultDSEntry 5 }
+
+aluPtpClockClass   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The clock class of the IEEE 1588 PTP ordinary or boundary clock."
+    REFERENCE   "IEEE Std 1588-2008 Section 7.6.2.4"
+    DEFVAL { 255 }
+    ::= { aluPtpClockDefaultDSEntry 6 }
+
+aluPtpClockAccuracy   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The accuracy of a IEEE 1588 PTP ordinary or boundary clock"
+    REFERENCE  "IEEE Std 1588-2008 Section 7.6.2.5"
+    DEFVAL { 254 }
+    ::= { aluPtpClockDefaultDSEntry 7 }
+
+aluPtpClockVariance   OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpClockVariance is a measure of the precision of an ordinary 
+        or boundary clock. The value 65535 indicates that the variance 
+        is either too large to be represented or has not been computed."
+    REFERENCE   "IEEE Std 1588-2008 Section 7.6.3"
+    DEFVAL { 65535 }
+    ::= { aluPtpClockDefaultDSEntry 8 }
+
+aluPtpClockPriority1 OBJECT-TYPE
+    SYNTAX      AluPtpPriority
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+         "The value of aluPtpClockPriority1 specifies the value of the
+         defaultDS.priority1 data set member defined in IEEE Std 1588-2008.
+
+         If aluPtpClockProfile is 'g8275dot1-2014 (3)' or, 'g8275dot2-2016 (3)'
+         aluPtpClockPriority1 is set to a value of 128, and cannot be changed.
+         This object can only be modified if aluPtpClockAdminState is
+         set to 'outOfService (3)', otherwise an 'inconsistentValue' error
+         is returned."
+    REFERENCE   "IEEE Std 1588-2008, Sections 7.6.2.2 and 8.2.1.4.1,
+                 ITU-T G.8275.1, Section 6.3.3. and ITU-T G.8275.2,
+                 Section 6.7.3"
+    DEFVAL { 128 }
+    ::= { aluPtpClockDefaultDSEntry 9 }
+
+aluPtpClockPriority2 OBJECT-TYPE
+    SYNTAX      AluPtpPriority
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The priority2 value of the IEEE 1588 PTP clock.
+        
+
+         The default value of aluPtpClockPriority2 depends on the value of
+         aluPtpClockProfile, aluPtpClockType and aluPtpClockSlaveOnly. If the
+         aluPtpClockProfile is 'g8275dot1-2014 (3)' or
+         'g8275dot2-2016 (4)'  the default values are:
+         
+         aluPtpClockType | aluPtpClockSlaveOnly | default
+                         |                      | aluPtpClockPriority2
+         -----------------------------------------------------------
+         'ordinary (2)'  | 'true (1)'           | 255
+                         | 'false (2)'          | 128
+         'boundary (1)'  | n/a                  | 128
+         
+         The aluPtpClockPriority2 cannot be changed if the aluPtpClockProfile
+         is 'g8275dot1-2014 (3)' or 'g8275dot2-2016 (4)' and the clock is an
+         ordinary slave.
+         This object can only be modified if aluPtpClockAdminState is
+         set to 'outOfService (3)', otherwise an 'inconsistentValue' error
+         is returned."
+    REFERENCE   "IEEE Std 1588-2008, Sections 7.6.2.3 and 8.2.1.4.2,
+                 ITU-T G.8275.1, Section 6.3.4. and
+                 ITU-T G.8275.1, Sections 6.7.4"
+    ::= { aluPtpClockDefaultDSEntry 10 }
+
+aluPtpClockTwoStepFlag OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockStepType
+    MAX-ACCESS  read-only
+    STATUS      deprecated
+    DESCRIPTION
+        "This is an indicator of whether master-slave synchronization 
+        utilizes follow-up messaging.
+        
+        This object is only applicable to ordinary and boundary clocks."
+    REFERENCE   "IEEE Std 1588-2008 Sections 3.1.21 and 3.1.47"
+    ::= { aluPtpClockDefaultDSEntry 11 }
+
+aluPtpClockLocalPriority        OBJECT-TYPE
+    SYNTAX      AluPtpPriority
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockLocalPriority specifies the local priority
+         used in the best master clock algorithm for the PTP clock when
+         aluPtpClockProfile is 'g8275dot1-2014 (3)' or 'g8275dot2-2016 (4)'.
+
+         This value is not applicable when aluPtpClockProfile is configured
+         to some other value, and cannot be configured.
+
+         This object corresponds to the defaultDS.localPriority data set member
+         defined in ITU-T G.8275.1 and ITU-T G.8275.2."
+    REFERENCE   "ITU-T G.8275.1, Section 6.3.1
+                 ITU-T G.8275.2, Section 6.7.2"
+    DEFVAL      { 128 }
+    ::= { aluPtpClockDefaultDSEntry 12 }
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Clock Current Data Set
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpClockCurrentDSTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpClockCurrentDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table provides IEEE 1588 PTP Clock Default Data Set. "
+    ::= { aluPtpClock 4 }
+
+aluPtpClockCurrentDSEntry OBJECT-TYPE
+    SYNTAX       AluPtpClockCurrentDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Operational information concerning IEEE 1588 PTP Clock current
+        values"
+    AUGMENTS { aluPtpClockEntry }
+    ::= { aluPtpClockCurrentDSTable 1 }
+
+AluPtpClockCurrentDSEntry ::= SEQUENCE
+{
+    aluPtpClockStepsRemoved           Unsigned32
+}
+
+aluPtpClockStepsRemoved OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of IEEE 1588 PTP devices between the IEEE 1588 PTP clock 
+        and the master"
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.2.2"
+    ::= { aluPtpClockCurrentDSEntry 2 }
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Clock Parent Data Set
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpClockParentDSTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpClockParentDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table provides IEEE1588 PTP Clock Default Data Set. "
+    ::= { aluPtpClock 5 }
+
+aluPtpClockParentDSEntry OBJECT-TYPE
+    SYNTAX       AluPtpClockParentDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Operational information concerning IEEE 1588PTP Clock current
+        values"
+    AUGMENTS { aluPtpClockEntry }
+    ::= { aluPtpClockParentDSTable 1 }
+
+AluPtpClockParentDSEntry ::= SEQUENCE
+{
+    aluPtpClockParentId       Alu1588PtpClockId,
+    aluPtpClockParentPortNum  AluPtpPortNumber,
+    aluPtpClockParentStats    TruthValue,
+    aluPtpClockParentVariance Integer32,
+    aluPtpClockGMClockId      Alu1588PtpClockId,
+    aluPtpClockGMClass        Unsigned32,
+    aluPtpClockGMAccuracy     Unsigned32,
+    aluPtpClockGMVariance     Unsigned32,
+    aluPtpClockGMPriority1    AluPtpPriority,
+    aluPtpClockGMPriority2    AluPtpPriority,
+    aluPtpLocalPtpPortIndex   Alu1588ActivePtpPortIndex,
+    aluPtpLocalPtpPeerIndex   Alu1588ActivePtpMasterIndex,
+    aluPtpParentSyncCertaintyState Alu1588PtpSyncCertaintyState
+}
+
+aluPtpClockParentId OBJECT-TYPE
+    SYNTAX  Alu1588PtpClockId   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockParentId indicates the clock identity of
+         the Master Clock. The value of this object corresponds 
+         to the parentDS.parentPortIdentity.clockIdentity data set
+         member defined in IEEE Std 1588-2008."
+    REFERENCE   "IEEE 1588-2008, Section 8.2.3.2"
+    ::= { aluPtpClockParentDSEntry 1 }
+
+aluPtpClockParentPortNum OBJECT-TYPE
+    SYNTAX 	    AluPtpPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockParentPortNum indicates the identifying
+         port number used by the remote peer when communicating with the local
+         clock.  The value of this object corresponds to the
+         parentDS.parentPortIdentity.portNumber data set member defined in
+         IEEE Std 1588-2008."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.3.2"
+    ::= { aluPtpClockParentDSEntry 2 }
+
+aluPtpClockParentStats OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "This is an indicator of whether parent master stats are collected."
+    ::= { aluPtpClockParentDSEntry 3 }
+
+aluPtpClockParentVariance   OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The frequency offset scaled log variance of the current master
+        (IEEE P1588 D2.2 sect 7.6.3)."
+    ::= { aluPtpClockParentDSEntry 4 }
+
+aluPtpClockGMClockId OBJECT-TYPE
+    SYNTAX  Alu1588PtpClockId   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The current grand master's clock identifier."
+    ::= { aluPtpClockParentDSEntry 6 }
+       
+aluPtpClockGMClass   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The clock class of the grandmaster clock."
+    ::= { aluPtpClockParentDSEntry 7 }
+
+aluPtpClockGMAccuracy   OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The accuracy of the grandmaster clock"
+    ::= { aluPtpClockParentDSEntry 8 }
+
+aluPtpClockGMVariance OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The offset scaled log variance value of the current 
+        grandmaster clock."
+    ::= { aluPtpClockParentDSEntry 9 }
+
+aluPtpClockGMPriority1 OBJECT-TYPE
+    SYNTAX      AluPtpPriority
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The priority1 value of the current grandmaster clock."
+    ::= { aluPtpClockParentDSEntry 10}
+
+aluPtpClockGMPriority2 OBJECT-TYPE
+    SYNTAX      AluPtpPriority
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The priority2 value of the current grandmaster clock."
+    ::= { aluPtpClockParentDSEntry 11 }
+
+aluPtpLocalPtpPortIndex OBJECT-TYPE
+    SYNTAX      Alu1588ActivePtpPortIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The aluPtpLocalPtpPortIndex value indicates an index for an entry in
+         the aluPtpPortTable that is associated with the current master
+         clock."
+    ::= { aluPtpClockParentDSEntry 12 }
+
+aluPtpLocalPtpPeerIndex OBJECT-TYPE
+    SYNTAX      Alu1588ActivePtpMasterIndex
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The aluPtpLocalPtpPeerIndex value indicates an index for an entry in
+         the aluPtpUcMasterTable that is associated with the current master
+         clock."
+    ::= { aluPtpClockParentDSEntry 13 }
+
+aluPtpParentSyncCertaintyState OBJECT-TYPE
+    SYNTAX      Alu1588PtpSyncCertaintyState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "If aluPtpParentSyncCertaintyState is supported by the PTP
+        profile it is set based on the following rules: 
+        
+         1) a clock acting as a Grandmaster Clock (eg. T-GM) the
+         aluPtpParentSyncCertaintyState will be set based on the value
+         of aluPtpClockSyncCertaintyState.
+         
+         2) a Boundary clock or an Ordinary Slave clock acting as a slave
+         will set aluPtpClockParentSyncCertainty based on aluPtpPeerSyncCertainty
+         that is associated with the aluPtpPortDSPortState that is in
+         the 'slave (9)' state.
+        
+        The aluPtpParentSyncCertaintyState values 'certain(1)' and
+        'uncertain(2)' are only supported when the aluPtpClockProfile is
+        'g8275dot1-2014 (3)'. For all other profiles only 'unknown(0)' is
+        supported."
+    DEFVAL { unknown }
+    ::= { aluPtpClockParentDSEntry 14 }
+    
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB timescale Data Set
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpClockTimePropertyDSTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpClockTimePropertyDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table provides IEEE1588 PTP Clock Time Property Data Set."
+    ::= { aluPtpClock 6 }
+
+aluPtpClockTimePropertyDSEntry OBJECT-TYPE
+    SYNTAX       AluPtpClockTimePropertyDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Operational information concerning IEEE 1588 PTP Clock time
+        property values"
+    AUGMENTS { aluPtpClockEntry }
+    ::= { aluPtpClockTimePropertyDSTable 1 }
+
+AluPtpClockTimePropertyDSEntry ::= SEQUENCE
+{
+    aluPtpClockCurUtcOffset       Integer32,
+    aluPtpClockCurUtcOffsetValid  TruthValue,
+    aluPtpClockLeap59             TruthValue,
+    aluPtpClockLeap61             TruthValue,
+    aluPtpClockTimeTraceable      TruthValue,
+    aluPtpClockFreqTraceable      TruthValue,
+    aluPtpClockPtpTimescale       TruthValue,
+    aluPtpClockTimeSource         AluPtpTimeSource
+}
+
+aluPtpClockCurUtcOffset OBJECT-TYPE
+    SYNTAX  Integer32 (-65536..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockCurUtcOffset indicates the offset
+         between TAI and UTC in seconds."
+    REFERENCE   "IEEE 1588-2008, Section 8.2.4.2"
+    ::= { aluPtpClockTimePropertyDSEntry 1 }
+
+aluPtpClockCurUtcOffsetValid OBJECT-TYPE
+    SYNTAX 	    TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockCurUtcOffsetValid is
+         'true (1)' if the aluPtpClockCurUtcOffset is
+         known to be correct."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.4.3"
+    ::= { aluPtpClockTimePropertyDSEntry 2 }
+
+aluPtpClockLeap59 OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockLeap59 is an indicator of whether 
+        the current UTC minute has 59 seconds."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.4.4"
+    ::= { aluPtpClockTimePropertyDSEntry 3 }
+
+aluPtpClockLeap61   OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockLeap61 is an indicator of whether 
+        the current UTC minute has 61 seconds."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.4.5"
+    ::= { aluPtpClockTimePropertyDSEntry 4 }
+
+aluPtpClockTimeTraceable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockTimeTraceable is an indicator of whether
+         time is traceable to a primary reference."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.4.6"
+    ::= { aluPtpClockTimePropertyDSEntry 6 }
+
+aluPtpClockFreqTraceable OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockFreqTraceable is an indicator of whether
+         frequency is traceable to a primary reference."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.4.7"
+    ::= { aluPtpClockTimePropertyDSEntry 7 }
+
+aluPtpClockPtpTimescale OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpClockPtpTimescale is an indicator of whether
+         timescale is PTP."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.4.9"
+    ::= { aluPtpClockTimePropertyDSEntry 8 }
+      
+aluPtpClockTimeSource OBJECT-TYPE
+    SYNTAX      AluPtpTimeSource   
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The timesource of the clock."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.4.9"
+    ::= { aluPtpClockTimePropertyDSEntry 9 }
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Port Configuration
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpPortTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpPortEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table provides editable configuration for the IEEE 1588 PTP
+        port."
+    ::= { aluPtpPort 1 }
+
+aluPtpPortEntry OBJECT-TYPE
+    SYNTAX       AluPtpPortEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Configuration information concerning IEEE 1588 PTP ports.
+        
+         Rows are created and destroyed based on the aluPtpClockType
+         object. The number of aluPtpPortEntry is based
+         the aluPtpClockNumberPorts defined for the clock referenced
+         by aluPtpClockIndex."
+    INDEX       {aluPtpPortClockIndex,  aluPtpPortIndex}
+    ::= { aluPtpPortTable 1 }
+
+AluPtpPortEntry ::= SEQUENCE
+{
+    aluPtpPortClockIndex          Alu1588PtpClockIndex,
+    aluPtpPortIndex               Alu1588PtpPortIndex,
+    aluPtpPortAdminState          TmnxAdminState,
+    aluPtpPortUcNegotiate         TruthValue,
+    aluPtpPortNumPeers            Unsigned32
+}
+
+aluPtpPortClockIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the clock associated with this ptp port."
+    ::= { aluPtpPortEntry 1 }
+
+aluPtpPortIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpPortIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the port associated with this ptp port."
+    ::= { aluPtpPortEntry 2 }
+
+aluPtpPortAdminState OBJECT-TYPE
+    SYNTAX      TmnxAdminState
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPortAdminState specifies the administrative state
+         of the PTP 1588 port."
+    DEFVAL      { outOfService }
+    ::= { aluPtpPortEntry 3 }
+
+aluPtpPortUcNegotiate OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "An administrative value indicating of whether the 1588 PTP 
+        port will communicate to negotiate unicast messaging."
+    DEFVAL { true }
+    ::= { aluPtpPortEntry 4 }
+
+aluPtpPortNumPeers OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPortNumPeers indicates the number of peers
+         that are associated with this PTP port. The value of this object
+         is derived based on the values of the aluPtpClockType and 
+         aluPtpClockSlaveOnly objects for the aluPtpClockIndex. The values
+         are derived based on the following rules:
+         
+         aluPtpClockType | aluPtpClockSlaveOnly | aluPtpPortNumPeers
+         -----------------------------------------------------------
+         'ordinary (2)'  | 'true (1)'           | 2
+                         | 'false (2)'          | 50
+         'boundary (1)'  | n/a                  | 1
+         "
+    DEFVAL { 2 }
+    ::= { aluPtpPortEntry 5 }
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Port Data Set
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpPortDSTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpPortDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table allows configuration to the IEEE 1588 PTP "
+    ::= { aluPtpPort 2 }
+
+aluPtpPortDSEntry OBJECT-TYPE
+    SYNTAX       AluPtpPortDSEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Configuration information concerning IEEE 1588 PTP"
+    AUGMENTS      { aluPtpPortEntry }
+    ::= { aluPtpPortDSTable 1 }
+
+AluPtpPortDSEntry ::= SEQUENCE
+{
+    aluPtpPortDSPortNum                AluPtpPortNumber,
+    aluPtpPortDSAnnoRxTimeout          Unsigned32,
+    aluPtpPortDSLogAnnoInterval        Integer32,
+    aluPtpPortDSLogSyncInterval        Integer32,
+    aluPtpPortDSPortState              Alu1588PtpPortState,
+    aluPtpPortDSDelayMechanism         INTEGER,
+    aluPtpPortDSVersionNumber          INTEGER,
+    aluPtpPortDSMasterOnly             TruthValue,
+    aluPtpPortDSLocalPriority          AluPtpPriority
+}
+
+aluPtpPortDSPortNum OBJECT-TYPE
+    SYNTAX 	    AluPtpPortNumber
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The IEEE 1588 PTP port number."
+    ::= { aluPtpPortDSEntry 1 }
+
+aluPtpPortDSAnnoRxTimeout OBJECT-TYPE
+    SYNTAX      Unsigned32 (2..10)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The administrative value for the number of timeouts for 
+        the announce message associated with the 1588 PTP reference/port.
+        The total time in seconds to timeout is calculated by the
+        aluPtpPortDSAnnoRxTimeout * 
+        2 ^ aluPtpPortDSLogAnnoInterval"
+    DEFVAL { 3 }
+    ::= { aluPtpPortDSEntry 2 }
+
+aluPtpPortDSLogAnnoInterval OBJECT-TYPE
+    SYNTAX      Integer32 (-3..4)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The aluPtpPortDSLogAnnoInterval represents the mean time interval
+        between successive Announce messages. The interval is specified as
+        the logarithm to the base 2 of the time interval in seconds. For
+        example the default value of 1 corresponds to an Announce interval of
+        2 seconds.
+        
+        The default value of aluPtpPortDSLogAnnoInterval depends on the value
+        of aluPtpClockProfile. The defaults and the allowed ranges are
+        defined in the below table:
+        
+          aluPtpClockProfile | default  | range
+         ---------------------------------------
+         'ituTelecomFreq (1)'| 1        | -3..4
+         'ieee1588-2008 (2)' | 1        | -3..4
+         'g8275dot1-2014 (3)'| -3       | -3..4
+'g8275dot2-2016 (4)'| 1        | -3..4
+        
+        For ordinary slave and boundary clocks utilizing unicast negotiations,
+        this is the rate at which a ptp-port will request Announce messages
+        from the remote PTP clock.
+ 
+        The aluPtpPortDSLogAnnoInterval it also determines how often the Best
+        Master Clock Algorithm (BMCA) is run. For example on an ordinary clocks
+        with the aluPtpPortDSLogAnnoInterval set to 3, the BMCA would be run
+        once every 8 seconds. On boundary clocks the ptp-port with the smallest
+        aluPtpPortDSLogAnnoInterval would be used to determine how often the
+        BMCA is run."
+    REFERENCE   "IEEE Std 1588-2008 Sections 7.7.2.2 and 8.2.5.4.1,
+                 ITU-T G.8275.1 2014, Section 6.2.8,
+                 ITU-T G.8275.2 2016, Section 6.5,"
+    ::= { aluPtpPortDSEntry 3 }
+
+aluPtpPortDSLogSyncInterval OBJECT-TYPE
+    SYNTAX      Integer32 (-7..-4)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPortDSLogSyncInterval indicates the period for
+        the sync messages associated with the 1588 PTP port.  The units are seconds
+        represented as logarithm aluPtpPortDSLogSyncInterval to the base 2. For
+        example, the default value of -6 corresponds to a sync interval of 15.625
+        milliseconds, or equivalently a sync packet rate of 64 packets per second.
+        
+        The aluPtpPortDSLogSyncInterval is requested in REQUEST_UNICAST_TRANSMISSION
+        signaling messages for sync packets when negotiating the sync unicast
+        session with the peer clock.
+        
+        The default value of aluPtpPortDSLogSyncInterval depends on the value
+        of aluPtpClockProfile. The defaults and the allowed ranges are
+        defined in the below table:
+        
+          aluPtpClockProfile | default | range
+         ---------------------------------------
+         'ituTelecomFreq (1)'| -6      | -7..-4
+         'ieee1588-2008 (2)' | -6      | -7..-4
+         'g8275dot1-2014 (3)'| -4      | -7..-4
+'g8275dot2-2016 (4)'| -4        | -7..-4
+        
+        "
+    ::= { aluPtpPortDSEntry 4 }
+    
+aluPtpPortDSPortState  OBJECT-TYPE
+    SYNTAX      Alu1588PtpPortState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The state of the IEEE 1588PTP reference/port."
+    DEFVAL { initializing }
+    ::= { aluPtpPortDSEntry 5 }
+
+aluPtpPortDSDelayMechanism  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    e2e (1),
+                    p2p (2),
+                    disabled (254)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The delay mechanism for the IEEE 1588PTP reference/port."
+    REFERENCE   "IEEE Std 1588-2008 Section 8.2.5.4.4"    
+    DEFVAL { e2e }
+    ::= { aluPtpPortDSEntry 6 }
+
+aluPtpPortDSVersionNumber  OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    -- v1 (1),
+                    v2 (2)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The protocol version of the IEEE 1588PTP reference/port."
+    REFERENCE   "IEEE Std 1588-2008 Section 7.5.5"    
+    ::= { aluPtpPortDSEntry 7 }
+
+aluPtpPortDSMasterOnly OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPortDSMasterOnly restricts the possible values that
+         the aluPtpPortDSPortState can have.
+        
+         If aluPtpPortDSMasterOnly is 'true (1)', the aluPtpPortDSPortState
+         will never go the 'slave (9)' state, and will always go to the 'master
+         (6)' state.
+        
+         If aluPtpPortDSMasterOnly is 'false (2)', the aluPtpPortDSPortState
+         can be placed in the 'slave (9)' state.
+
+         The aluPtpPortDSMasterOnly object is only applicable when
+         aluPtpClockProfile is 'g8275dot1-2014 (3)'. For all other profiles
+         aluPtpPortDSMasterOnly is 'false (2)'.
+         
+         The default value of aluPtpPortDSMasterOnly depends on the value of
+         aluPtpClockType and aluPtpClockSlaveOnly, as follows:
+         
+                                  |                      | default
+                                  |                      | aluPtpPortDSMasterOnly
+         aluPtpClockType          | aluPtpClockSlaveOnly | value
+         -------------------------|----------------------|----------
+         'boundary (1)'           | n/a                  | 'true (1)'
+         'ordinary (2)'           | 'true (1)'           | 'false (2)'
+                                  | 'false (2)'          | 'true (1)'
+         'endToEndTransparent (3)'| 'false (2)'          | n/a
+
+         When the aluPtpClockType is 'ordinary (2)' the aluPtpPortDSMasterOnly
+         value cannot be changed.
+
+         This object corresponds to the portDS.notSlave data set member defined
+         in ITU-T G.8275.1."
+    REFERENCE   "ITU-T G.8275.1, Section 6.3.1"
+    ::= { aluPtpPortDSEntry 8 }
+
+aluPtpPortDSLocalPriority         OBJECT-TYPE
+    SYNTAX      AluPtpPriority
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPortLocalPriority specifies the local priority used
+         in the best master clock algorithm for the PTP port when
+         aluPtpClockProfile is 'g8275dot1-2014 (3)' or 'g8275dot2-2016 (4)'.
+
+         This value is not applicable when aluPtpClockProfile is configured
+         to some other value, and cannot be configured.
+
+         This object corresponds to the portDS.localPriority data set member
+         defined in ITU-T G.8275.1 and ITU-T G.8275.2"
+    REFERENCE   "ITU-T G.8275.1, Section 6.3.1,
+                 ITU-T G.8275.2, Section 6.7.2"
+    DEFVAL      { 128 }
+    ::= { aluPtpPortDSEntry 9 }
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Unicast Master Table 
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpUcMasterTable      OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluPtpUcMasterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluPtpUcMasterTable consists of peer configuration information."
+    ::= { aluPtpPeer 1 }
+
+aluPtpUcMasterEntry     OBJECT-TYPE
+    SYNTAX      AluPtpUcMasterEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The aluPtpUcMasterEntry contains the information pertaining
+         to the Unicast Master Table as described in the IEEE Std 1588-2008
+         Section 17.5. Entries within this table represent potential
+         masters (for boundary clocks and slave-only ordinary clocks)
+         or slaves (for ordinary clocks that are not slave-only).
+         
+         Genererically entries in this table are referred to as peers.
+         
+         Rows are created and destroyed based on the aluPtpClockType and 
+         aluPtpClockSlaveOnly values. The number of master/peer entries
+         is based the aluPtpPortTable::aluPtpPortNumPeers defined for 
+         the PTP port indexed by aluPtpPeerClockIndex and 
+         aluPtpPeerPortIndex."
+    INDEX {aluPtpPeerClockIndex, aluPtpPeerPortIndex, aluPtpPeerIndex}
+    ::= { aluPtpUcMasterTable 1 }
+
+AluPtpUcMasterEntry      ::= SEQUENCE {
+    aluPtpPeerClockIndex    Alu1588PtpClockIndex,
+    aluPtpPeerPortIndex     Alu1588PtpPortIndex,
+    aluPtpPeerIndex         Alu1588PtpMasterIndex,
+    aluPtpPeerIpAddrType    InetAddressType,
+    aluPtpPeerIpAddr        InetAddress,
+    aluPtpPeerLastChanged   TimeStamp,
+    aluPtpPeerDescription   TItemDescription,
+    aluPtpPeerDiscovered    TruthValue,
+    aluPtpPeerSyncCertainty Alu1588PtpSyncCertaintyState
+}
+
+aluPtpPeerClockIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the clock associated with this ptp master/peer."
+    ::= { aluPtpUcMasterEntry 1 }
+
+aluPtpPeerPortIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpPortIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the port associated with this ptp master/peer."
+    ::= { aluPtpUcMasterEntry 2 }
+
+aluPtpPeerIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpMasterIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the master/peer associated with this ptp port."
+    ::= { aluPtpUcMasterEntry 3 }
+    
+aluPtpPeerIpAddrType  OBJECT-TYPE
+    SYNTAX      InetAddressType { 
+                    unknown(0),
+                    ipv4(1),
+                    ipv6(2)
+                }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of the object aluPtpPeerIpAddrType indicates the type of
+        aluPtpPeerIpAddr.
+         
+         When setting the value of this object, the value of
+         aluPtpPeerIpAddr must be set as well in the same SNMP SET PDU."
+    DEFVAL { unknown }
+    ::= { aluPtpUcMasterEntry 4 }
+
+aluPtpPeerIpAddr  OBJECT-TYPE
+    SYNTAX      InetAddress (SIZE(0|4|16))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPeerIpAddr specifies the remote IP address of
+         the 1588 PTP peer.
+                 
+         When setting the value of this object, the value of
+         aluPtpPeerIpAddrType must be set as well in the same SNMP SET PDU."
+    DEFVAL { ''H }
+    ::= { aluPtpUcMasterEntry 5 }
+
+aluPtpPeerLastChanged           OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPeerLastChanged indicates the time, since system
+         startup, that the PTP 1588 peer was created or modified."
+    ::= { aluPtpUcMasterEntry 6 }
+
+aluPtpPeerDescription           OBJECT-TYPE
+    SYNTAX      TItemDescription
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPeerDescription specifies a user provided description
+         string for this SAA test.  It can consist of any printable, 
+         seven-bit ASCII characters up to 80 characters in length."
+    DEFVAL { ''H }  -- empty string
+    ::= { aluPtpUcMasterEntry 7 }
+
+aluPtpPeerDiscovered           OBJECT-TYPE
+    SYNTAX      TruthValue
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPeerDiscovered is false unless the aluPtpPeerIpAddr
+        is learned as a result of getting unicast requests from a remote peer."
+    DEFVAL { false }
+    ::= { aluPtpUcMasterEntry 8 }
+
+aluPtpPeerSyncCertainty OBJECT-TYPE
+    SYNTAX      Alu1588PtpSyncCertaintyState
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpPeerSyncCertainty indicates the value of the 
+        synchronizationUncertain flag of the Announce message header recieved
+        or transmitted by the peer. A value of 'certain(1) indicates that 
+        the synchronizationUncertain bit in the Announce message is '0'
+        and a value of 'uncertain(2)' indicates that a '1' was encoded
+        in the synchronizationUncertain bit in the Announce message header.
+        
+        The aluPtpPeerSyncCertainty values 'certain(1)' and 'uncertain(2)'
+        are only supported when the aluPtpClockProfile is 'g8275dot1-2014 (3)'
+        or 'g8275dot2-2016 (4)'.
+        
+        For all other profiles only 'unknown(0)' is supported."
+    ::= { aluPtpUcMasterEntry 9 }
+
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Master Packet Statistics
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpPeerPacketStatsTable OBJECT-TYPE
+    SYNTAX       SEQUENCE OF AluPtpPeerPacketStatsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "This table allows configuration to the IEEE 1588 PTP "
+    ::= { aluPtpPeer 2 }
+
+aluPtpPeerPacketStatsEntry OBJECT-TYPE
+    SYNTAX       AluPtpPeerPacketStatsEntry
+    MAX-ACCESS   not-accessible
+    STATUS       current
+    DESCRIPTION
+        "Configuration information concerning IEEE 1588 PTP"
+    AUGMENTS { aluPtpUcMasterEntry }
+    ::= { aluPtpPeerPacketStatsTable 1 }
+
+AluPtpPeerPacketStatsEntry ::= 
+    SEQUENCE {
+        aluPtpPeerPacketLastUpdateTime           TimeStamp,
+        aluPtpPeerBadVersionDisc                 Counter64,
+        aluPtpPeerBadDomainDisc                  Counter64,
+        aluPtpPeerAlternateMasterDisc            Counter64,
+        aluPtpPeerStepRemovedGreaterThan255Disc  Counter64,
+        aluPtpPeerAnnounceMsgTx                  Counter64,
+        aluPtpPeerAnnounceMsgRx                  Counter64,
+        aluPtpPeerSyncMsgTx                      Counter64,
+        aluPtpPeerSyncMsgRx                      Counter64,
+        aluPtpPeerSignalingMsgTx                 Counter64,
+        aluPtpPeerSignalingMsgRx                 Counter64,       
+        aluPtpPeerTotalUdpGeneralMsgTx           Counter64,
+        aluPtpPeerTotalUdpGeneralMsgRx           Counter64,
+        aluPtpPeerTotalUdpEventMsgTx             Counter64,
+        aluPtpPeerTotalUdpEventMsgRx             Counter64,
+        aluPtpPeerUcReqAnnoTx                    Counter64,
+        aluPtpPeerUcReqAnnoRx                    Counter64,
+        aluPtpPeerUcGrantAnnoTx                  Counter64,
+        aluPtpPeerUcGrantAnnoRx                  Counter64,
+        aluPtpPeerUcReqSyncTx                    Counter64,
+        aluPtpPeerUcReqSyncRx                    Counter64,
+        aluPtpPeerUcGrantSyncTx                  Counter64,
+        aluPtpPeerUcGrantSyncRx                  Counter64,
+        aluPtpPeerUcCancelAnnoTx                 Counter64,
+        aluPtpPeerUcCancelAnnoRx                 Counter64,
+        aluPtpPeerUcCancelSyncTx                 Counter64,
+        aluPtpPeerUcCancelSyncRx                 Counter64,
+        aluPtpPeerUcCancelAckAnnoTx              Counter64,
+        aluPtpPeerUcCancelAckAnnoRx              Counter64,
+        aluPtpPeerUcCancelAckSyncTx              Counter64,
+        aluPtpPeerUcCancelAckSyncRx              Counter64,
+        aluPtpPeerUcNegRejectsAnno               Counter64,
+        aluPtpPeerUcNegRejectsSync               Counter64,
+        aluPtpPeerOutOfOrderSyncPktRx            Counter64,
+        aluPtpPeerDuplicateMsgDisc               Counter64,
+        aluPtpPeerUcReqAnnoTxTimeout             Counter64,
+        aluPtpPeerUcReqSyncTxTimeout             Counter64,
+        aluPtpPeerUcGrantAnnoRejected            Counter64,
+        aluPtpPeerUcGrantSyncRejected            Counter64,
+        aluPtpPeerDelayRespMsgTx                 Counter64,
+        aluPtpPeerDelayRespMsgRx                 Counter64,
+        aluPtpPeerUcReqDelayRespTx               Counter64,
+        aluPtpPeerUcReqDelayRespRx               Counter64,
+        aluPtpPeerUcGrantDelayRespTx             Counter64,
+        aluPtpPeerUcGrantDelayRespRx             Counter64,
+        aluPtpPeerUcCancelDelayRespTx            Counter64,
+        aluPtpPeerUcCancelDelayRespRx            Counter64,
+        aluPtpPeerUcCancelAckDelayRespTx         Counter64,
+        aluPtpPeerUcCancelAckDelayRespRx         Counter64,
+        aluPtpPeerUcReqDelayRespTxTimeout        Counter64,
+        aluPtpPeerUcNegRejectsDelayResp          Counter64,
+        aluPtpPeerUcGrantDelayRespRejected       Counter64,
+        aluPtpPeerDelayReqMsgTx                  Counter64,
+        aluPtpPeerDelayReqMsgRx                  Counter64,
+        aluPtpPeerUcGrantDenyAnnoTx              Counter64,
+        aluPtpPeerUcGrantDenySyncTx              Counter64,
+        aluPtpPeerUcGrantDenyDelayRespTx         Counter64,
+        aluPtpPeerUcReqAnnoRxTimeout             Counter64,
+        aluPtpPeerUcReqSyncRxTimeout             Counter64,
+        aluPtpPeerUcReqDelayRespRxTimeout        Counter64,
+        aluPtpPeerFollowUpMsgTx                  Counter64,
+        aluPtpPeerFollowUpMsgRx                  Counter64
+}
+
+aluPtpPeerPacketLastUpdateTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The last time the PTP peer packets statistics were updated"
+    ::= { aluPtpPeerPacketStatsEntry 1 }
+
+aluPtpPeerBadVersionDisc OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerBadVersionDisc indicates the number of packets discarded 
+        on ingress as a result of the IEEE P1588 D2.2 section 7.5.5 version number
+        checking."
+    ::= { aluPtpPeerPacketStatsEntry 2 }
+
+aluPtpPeerBadDomainDisc OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerBadDomainDisc indicates the number of packets discarded 
+        on ingress as a result of the processing as described in IEEE P1588 D2.2
+        section 9.5.1."
+    ::= { aluPtpPeerPacketStatsEntry 3 }
+
+aluPtpPeerAlternateMasterDisc OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerAlternateMasterDisc indicates the number of packets discarded 
+        on ingress as a result of the processing as described in IEEE P1588 D2.2
+        section 9.1."
+    ::= { aluPtpPeerPacketStatsEntry 4 }
+
+aluPtpPeerStepRemovedGreaterThan255Disc OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerStepRemovedGreaterThan255Disc indicates the number of 
+        packets discarded on ingress as a result of processing as described
+        in IEEE P1588 D2.2 section 9.3.2.5."
+    ::= { aluPtpPeerPacketStatsEntry 5 }
+    
+aluPtpPeerAnnounceMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerAnnounceMsgTx indicates the number of Announce packets 
+        transmitted to the master."
+    ::= { aluPtpPeerPacketStatsEntry 6 }
+
+aluPtpPeerAnnounceMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Announce packets received from the master."
+    ::= { aluPtpPeerPacketStatsEntry 7 }
+
+aluPtpPeerSyncMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Sync packets transmitted to the master."
+    ::= { aluPtpPeerPacketStatsEntry 8 }
+
+aluPtpPeerSyncMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Sync packets received from the master."
+    ::= { aluPtpPeerPacketStatsEntry 9 }
+
+aluPtpPeerSignalingMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Signaling packets transmitted to the master."
+    ::= { aluPtpPeerPacketStatsEntry 10 }
+
+aluPtpPeerSignalingMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Signaling packets received from the master."
+    ::= { aluPtpPeerPacketStatsEntry 11 }
+
+aluPtpPeerTotalUdpGeneralMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of packets transmitted on UDP port 320."
+    ::= { aluPtpPeerPacketStatsEntry 12 }
+
+aluPtpPeerTotalUdpGeneralMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of packets received on UDP port 320."
+    ::= { aluPtpPeerPacketStatsEntry 13 }
+
+aluPtpPeerTotalUdpEventMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of packets transmitted on UDP port 319."
+    ::= { aluPtpPeerPacketStatsEntry 14 }
+
+aluPtpPeerTotalUdpEventMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of packets received on UDP port 319."
+    ::= { aluPtpPeerPacketStatsEntry 15 }
+
+aluPtpPeerUcReqAnnoTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce request packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 16 }
+
+aluPtpPeerUcReqAnnoRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce request packets received."
+    ::= { aluPtpPeerPacketStatsEntry 17 }
+
+aluPtpPeerUcGrantAnnoTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce grant packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 18 }
+
+aluPtpPeerUcGrantAnnoRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce grant packets received."
+    ::= { aluPtpPeerPacketStatsEntry 19 }
+
+aluPtpPeerUcReqSyncTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync request packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 20 }
+
+aluPtpPeerUcReqSyncRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync request packets received."
+    ::= { aluPtpPeerPacketStatsEntry 21 }
+
+aluPtpPeerUcGrantSyncTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync grant packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 22 }
+
+aluPtpPeerUcGrantSyncRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync grant packets received."
+    ::= { aluPtpPeerPacketStatsEntry 23 }
+
+aluPtpPeerUcCancelAnnoTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce cancel request packets 
+        transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 24 }
+
+aluPtpPeerUcCancelAnnoRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce cancel request packets 
+        received."
+    ::= { aluPtpPeerPacketStatsEntry 25 }
+
+aluPtpPeerUcCancelSyncTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync cancel packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 26 }
+
+aluPtpPeerUcCancelSyncRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync cancel packets received."
+    ::= { aluPtpPeerPacketStatsEntry 27 }
+
+aluPtpPeerUcCancelAckAnnoTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce cancel acknowledgement
+        packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 28 }
+
+aluPtpPeerUcCancelAckAnnoRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast announce cancel acknowledgement
+         packets received."
+    ::= { aluPtpPeerPacketStatsEntry 29 }
+
+aluPtpPeerUcCancelAckSyncTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync cancel acknowledgement
+        packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 30 }
+
+aluPtpPeerUcCancelAckSyncRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast sync cancel acknowledgement
+         packets received."
+    ::= { aluPtpPeerPacketStatsEntry 31 }
+
+aluPtpPeerUcNegRejectsAnno OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the unicast negotiations for
+        the announce message were rejected."
+    ::= { aluPtpPeerPacketStatsEntry 32 }
+
+aluPtpPeerUcNegRejectsSync OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the unicast negotiations for
+        the sync message were rejected."
+    ::= { aluPtpPeerPacketStatsEntry 33 }
+
+aluPtpPeerOutOfOrderSyncPktRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerOutOfOrderSyncPktRx indicates the number of sync 
+        packets discarded on ingress as a sequence number processing"
+    ::= { aluPtpPeerPacketStatsEntry 34 }
+
+aluPtpPeerDuplicateMsgDisc OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerDuplicateMsgDisc indicates the number of packets discarded 
+        on ingress as a result of processing described in IEEE P1588 D2.2 
+        section 7.3.7."
+    ::= { aluPtpPeerPacketStatsEntry 35}
+
+aluPtpPeerUcReqAnnoTxTimeout OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the unicast negotiations for
+        the Announce message failed due to a timeout."
+    ::= { aluPtpPeerPacketStatsEntry 36 }
+
+aluPtpPeerUcReqSyncTxTimeout OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the unicast negotiations for
+        the Sync message failed due to a timeout."
+    ::= { aluPtpPeerPacketStatsEntry 37 }
+
+aluPtpPeerUcGrantAnnoRejected OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the a Grant indication,
+        for an Announce unicast negotiation, was rejected."
+    ::= { aluPtpPeerPacketStatsEntry 38 }
+
+aluPtpPeerUcGrantSyncRejected OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the a Grant indication,
+        for Sync unicast negotiations, was rejected."
+    ::= { aluPtpPeerPacketStatsEntry 39 }
+
+aluPtpPeerDelayRespMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Delay Response packets transmitted to the master."
+    ::= { aluPtpPeerPacketStatsEntry 40 }
+
+aluPtpPeerDelayRespMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Delay Response packets received from the master."
+    ::= { aluPtpPeerPacketStatsEntry 41 }
+
+aluPtpPeerUcReqDelayRespTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response request packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 42 }
+
+aluPtpPeerUcReqDelayRespRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response request packets received."
+    ::= { aluPtpPeerPacketStatsEntry 43 }
+
+aluPtpPeerUcGrantDelayRespTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response grant packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 44 }
+
+aluPtpPeerUcGrantDelayRespRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response grant packets received."
+    ::= { aluPtpPeerPacketStatsEntry 45 }
+
+aluPtpPeerUcCancelDelayRespTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response cancel packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 46 }
+
+aluPtpPeerUcCancelDelayRespRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response cancel packets received."
+    ::= { aluPtpPeerPacketStatsEntry 47 }
+
+aluPtpPeerUcCancelAckDelayRespTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response cancel acknowledgement
+        packets transmitted."
+    ::= { aluPtpPeerPacketStatsEntry 48 }
+
+aluPtpPeerUcCancelAckDelayRespRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of unicast Delay Response cancel acknowledgement
+         packets received."
+    ::= { aluPtpPeerPacketStatsEntry 49 }
+
+aluPtpPeerUcReqDelayRespTxTimeout OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the unicast negotiations for
+        the Delay Response message failed due to a timeout."
+    ::= { aluPtpPeerPacketStatsEntry 50 }
+
+aluPtpPeerUcNegRejectsDelayResp OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the unicast negotiations for
+        the Delay Response message were rejected."
+    ::= { aluPtpPeerPacketStatsEntry 51 }
+
+aluPtpPeerUcGrantDelayRespRejected OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the a Grant indication,
+        for Delay Response unicast negotiations, was rejected."
+    ::= { aluPtpPeerPacketStatsEntry 52 }
+
+aluPtpPeerDelayReqMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Delay Request packets transmitted to the master."
+    ::= { aluPtpPeerPacketStatsEntry 53 }
+
+aluPtpPeerDelayReqMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Delay Request packets received from the master."
+    ::= { aluPtpPeerPacketStatsEntry 54 }
+
+aluPtpPeerUcGrantDenyAnnoTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times a unicast request for Announce messages
+        was received but not granted because the requested rate was not supported."
+    ::= { aluPtpPeerPacketStatsEntry 55 }
+
+aluPtpPeerUcGrantDenySyncTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times a unicast request for Sync messages
+        was received but not granted because the requested rate was not supported."
+    ::= { aluPtpPeerPacketStatsEntry 56 }
+
+aluPtpPeerUcGrantDenyDelayRespTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times a unicast request for Delay Response messages
+        was received but not granted because the requested rate was not supported."
+    ::= { aluPtpPeerPacketStatsEntry 58 }
+
+aluPtpPeerUcReqAnnoRxTimeout OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the grant for unicast negotiations for
+        the Announce message expired."
+    ::= { aluPtpPeerPacketStatsEntry 59 }
+
+aluPtpPeerUcReqSyncRxTimeout OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the grant for unicast negotiations for
+        the Sync message expired."
+    ::= { aluPtpPeerPacketStatsEntry 60 }
+
+aluPtpPeerUcReqDelayRespRxTimeout OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of times the grant for unicast negotiations for
+        the Delay Response message expired."
+    ::= { aluPtpPeerPacketStatsEntry 61 }
+
+aluPtpPeerFollowUpMsgTx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerAnnounceMsgTx indicates the number of Follow-Up packets 
+        transmitted by the peer."
+    ::= { aluPtpPeerPacketStatsEntry 62 }
+
+aluPtpPeerFollowUpMsgRx OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Indicates the number of Follow-Up packets received by the peer."
+    ::= { aluPtpPeerPacketStatsEntry 63 }
+
+
+--
+--  IEEE PTP Port Recovered Clock Stats Table
+--
+aluPtpPeerRecClkStatsTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluPtpPeerRecClkStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Defines the Nokia 7705 IEEE 1588 PTP clock recovery
+         statistics table for retrieving statistical information relating
+         to clock that is derived from the PTP."
+    ::= { aluPtpPeer 3 }
+
+aluPtpPeerRecClkStatsEntry    OBJECT-TYPE
+    SYNTAX      AluPtpPeerRecClkStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Defines an entry in aluPtpPeerRecClkStatsTable. Entries are 
+         created and deleted by the system depending port 
+         configuration."
+    AUGMENTS { aluPtpUcMasterEntry }
+    ::= { aluPtpPeerRecClkStatsTable 1 }
+
+AluPtpPeerRecClkStatsEntry ::=
+    SEQUENCE {
+        aluPtpPeerRecLastUpdateTime                TimeStamp,
+        aluPtpPeerTotalMinutesIn24Hour             Unsigned32,
+        aluPtpPeerCurrent24HourFreqOffsetMeanPpb   Integer32,
+        aluPtpPeerCurrent24HourFreqOffsetStdDevPpb Unsigned32,
+        aluPtpPeerMaxShortIntvlMinutes             Unsigned32,
+        aluPtpPeerTotalShortIntvlMinutes           Unsigned32,
+        aluPtpPeerCurrent1MinValidData             TruthValue,
+        aluPtpPeerCurrent1MinPhaseErrorMeanPpb      Integer32,
+        aluPtpPeerCurrent1MinPhaseErrorStdDevNs     Unsigned32,
+        aluPtpPeerCurrent1MinPhaseErrorMeanNs       Integer32,
+        aluPtpPeerCurrent1MinFreqOffsetMeanPpb      Integer32,
+        aluPtpPeerCurrent1MinFreqOffsetStdDevPpb    Unsigned32
+    }
+
+aluPtpPeerRecLastUpdateTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The last time the PTP peer clock recovery statistics were updated"
+    ::= { aluPtpPeerRecClkStatsEntry 1 }
+
+aluPtpPeerTotalMinutesIn24Hour OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of minutes in aluPtpPeerCurrent24HourFreqOffsetMeanPpb
+        and aluPtpPeerCurrent24HourFreqOffsetStdDevPpb"
+    ::= { aluPtpPeerRecClkStatsEntry 2 }
+
+aluPtpPeerCurrent24HourFreqOffsetMeanPpb OBJECT-TYPE
+    SYNTAX      Integer32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerCurrent24HourFreqOffsetMeanPpb indicates the mean frequency offset
+         from the local oscillator clock in parts per billion for up to the
+         last 24 hour."
+    ::= { aluPtpPeerRecClkStatsEntry 3 }
+
+aluPtpPeerCurrent24HourFreqOffsetStdDevPpb OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerCurrent24HourFreqOffsetStdDevPpb indicates the standard deviation of the 
+         frequency offset from the local oscillator clock in parts per billion
+         for up to the last 24 hour."
+    ::= { aluPtpPeerRecClkStatsEntry 4 }
+
+aluPtpPeerMaxShortIntvlMinutes OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerMaxShortIntvlMinutes the maximum number of aluPtpPeerIntvlNumber."
+    ::= { aluPtpPeerRecClkStatsEntry 5 }
+
+aluPtpPeerTotalShortIntvlMinutes OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "aluPtpPeerTotalShortIntvlMinutes is the number of aluPtpPeerIntvlNumber
+        that have valid statistics"
+    ::= { aluPtpPeerRecClkStatsEntry 6 }
+
+aluPtpPeerCurrent1MinValidData OBJECT-TYPE
+     SYNTAX TruthValue
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+            "This variable indicates if the data for the first
+            interval is valid."
+     ::= { aluPtpPeerRecClkStatsEntry 7 }
+
+aluPtpPeerCurrent1MinPhaseErrorMeanPpb OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The mean phase error from the local oscillator clock 
+            in parts per billion during the first interval."
+     ::= { aluPtpPeerRecClkStatsEntry 8 }
+
+aluPtpPeerCurrent1MinPhaseErrorStdDevNs OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The standard deviation of the phase error from the local
+            oscillator clock in nano seconds during the first interval."
+     ::= { aluPtpPeerRecClkStatsEntry 9 }
+
+aluPtpPeerCurrent1MinPhaseErrorMeanNs OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The mean of the phase error from the local 
+            oscillator clock in nano seconds during the first interval."
+     ::= { aluPtpPeerRecClkStatsEntry 10 }
+
+aluPtpPeerCurrent1MinFreqOffsetMeanPpb OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The mean frequency offset from the local oscillator clock
+            in parts per billion during the first interval."
+     ::= { aluPtpPeerRecClkStatsEntry 11 }
+
+aluPtpPeerCurrent1MinFreqOffsetStdDevPpb OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The standard deviation of the frequency offset from the
+            local oscillator clock in nano seconds during the first interval."
+     ::= { aluPtpPeerRecClkStatsEntry 12 }
+
+--
+--  PTP Port Recovered Clock Stats Short Interval Table
+--
+aluPtpPeerRecClkStatsShortIntvlTable OBJECT-TYPE
+     SYNTAX     SEQUENCE OF AluPtpPeerRecClkStatsShortIntvlEntry
+     MAX-ACCESS not-accessible
+     STATUS     current
+     DESCRIPTION
+            "The PTP Port Recovered Clock Interval Table contains various
+            statistics collected by 1588 PTP clock recovery instance
+            over the previous 15 minutes. The past 15 minutes are
+            broken into 15 1 minute intervals.  Each 
+            row in this table represents one such interval 
+            (identified by AluPtpPeerRecClkStatsShortIntvlEntry)."
+     ::= { aluPtpPeer 4 }
+
+aluPtpPeerRecClkStatsShortIntvlEntry OBJECT-TYPE
+     SYNTAX      AluPtpPeerRecClkStatsShortIntvlEntry
+     MAX-ACCESS  not-accessible
+     STATUS      current
+     DESCRIPTION
+            "An entry in the IEEE PTP 1588 peer clock recovery interval 
+             table."
+    INDEX       { aluPtpPeerIntvlClockIndex, aluPtpPeerIntvlPortIndex, aluPtpPeerIntvlIndex, aluPtpPeerIntvlNumber}
+     ::= { aluPtpPeerRecClkStatsShortIntvlTable 1 }
+
+AluPtpPeerRecClkStatsShortIntvlEntry ::=
+     SEQUENCE {
+        aluPtpPeerIntvlClockIndex          Alu1588PtpClockIndex,
+        aluPtpPeerIntvlPortIndex           Alu1588PtpPortIndex,
+        aluPtpPeerIntvlIndex               Alu1588PtpMasterIndex,
+        aluPtpPeerIntvlNumber              INTEGER,
+        aluPtpPeerIntvlValidData           TruthValue,
+        aluPtpPeerIntvlUpdateTime          TimeStamp,
+        aluPtpPeerIntvlPhaseErrorMeanPpb   Integer32,
+        aluPtpPeerIntvlPhaseErrorStdDevNs  Unsigned32,
+        aluPtpPeerIntvlPhaseErrorMeanNs    Integer32
+     }
+
+aluPtpPeerIntvlClockIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the clock associated with this ptp master/peer."
+    ::= { aluPtpPeerRecClkStatsShortIntvlEntry 1 }
+
+aluPtpPeerIntvlPortIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpPortIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the port associated with this ptp master/peer."
+    ::= { aluPtpPeerRecClkStatsShortIntvlEntry 2 }
+
+aluPtpPeerIntvlIndex OBJECT-TYPE
+    SYNTAX      Alu1588PtpMasterIndex
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "The index of the master/peer associated with this ptp port."
+    ::= { aluPtpPeerRecClkStatsShortIntvlEntry 3 }
+ 
+aluPtpPeerIntvlNumber OBJECT-TYPE
+     SYNTAX  INTEGER (1..15)
+     MAX-ACCESS  not-accessible
+     STATUS  current
+     DESCRIPTION
+            "A number between 1 and 15, where 1 is the most
+            recently completed 1 minute interval and 15 is
+            the 1 minutes interval completed 14 minutes prior 
+            to interval 1."
+     ::= { aluPtpPeerRecClkStatsShortIntvlEntry 4 }
+
+aluPtpPeerIntvlValidData OBJECT-TYPE
+     SYNTAX TruthValue
+     MAX-ACCESS read-only
+     STATUS current
+     DESCRIPTION
+            "This variable indicates if the data for this
+            interval is valid."
+     ::= { aluPtpPeerRecClkStatsShortIntvlEntry 5 }
+
+aluPtpPeerIntvlUpdateTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The update time of the ACR interval statistics"
+    ::= { aluPtpPeerRecClkStatsShortIntvlEntry 6 }
+
+aluPtpPeerIntvlPhaseErrorMeanPpb OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The mean phase error from the local oscillator clock 
+            in parts per billion during the interval."
+     ::= { aluPtpPeerRecClkStatsShortIntvlEntry 7 }
+
+aluPtpPeerIntvlPhaseErrorStdDevNs OBJECT-TYPE
+     SYNTAX  Unsigned32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The standard deviation of the phase error from the local
+            oscillator clock in nano seconds during the interval."
+     ::= { aluPtpPeerRecClkStatsShortIntvlEntry 8 }
+
+aluPtpPeerIntvlPhaseErrorMeanNs OBJECT-TYPE
+     SYNTAX  Integer32
+     MAX-ACCESS  read-only
+     STATUS  current
+     DESCRIPTION
+            "The mean of the phase error from the local 
+            oscillator clock in nano seconds during the interval."
+     ::= { aluPtpPeerRecClkStatsShortIntvlEntry 9 }
+
+--
+--  IEEE PTP Peer Clock Recovery Algorithm Table
+--
+aluPtpPeerClkRecAlgTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF AluPtpPeerClkRecAlgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Defines the Nokia 7705 IEEE 1588 PTP recovery statistics
+         table for retrieving statistical information relating to the frequency
+         and time recovery algorithm that is derived from PTP."
+    ::= { aluPtpPeer 5 }
+
+aluPtpPeerClkRecAlgEntry    OBJECT-TYPE
+    SYNTAX      AluPtpPeerClkRecAlgEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Defines an entry in aluPtpPeerClkRecAlgTable. Entries are 
+         created and deleted by the system depending on the PTP clock 
+         configuration."
+    AUGMENTS { aluPtpUcMasterEntry }
+    ::= { aluPtpPeerClkRecAlgTable 1 }
+
+AluPtpPeerClkRecAlgEntry ::=
+    SEQUENCE {
+        aluPtpFreqRecFreeRunCount     Unsigned32,
+        aluPtpFreqRecAcquiringCount   Unsigned32,
+        aluPtpFreqRecPhaseTrackCount  Unsigned32,
+        aluPtpFreqRecHoldOverCount    Unsigned32,
+        aluPtpFreqRecLockedCount      Unsigned32,
+        aluPtpFreqRecExcessFreqErrCnt Unsigned32,
+        aluPtpFreqRecPacketLossCnt    Unsigned32,
+        aluPtpFreqRecLossResetCnt     Unsigned32,
+        aluPtpFreqRecTripCnt          Unsigned32,
+        aluPtpFreqRecVarTooHighCnt    Unsigned32,
+        aluPtpFreqRecPdvStepCnt       Unsigned32,
+        aluPtpFreqRecGapResetCnt      Unsigned32
+    }
+
+aluPtpFreqRecFreeRunCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of seconds the frequency recovery algorithm was in Free Run
+        state."
+    ::= { aluPtpPeerClkRecAlgEntry 1 }
+
+aluPtpFreqRecAcquiringCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of seconds the frequency recovery algorithm was in Aquiring
+        state."
+    ::= { aluPtpPeerClkRecAlgEntry 2 }
+
+aluPtpFreqRecPhaseTrackCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of seconds the frequency recovery algorithm was in 
+        Phase Tracking state."
+    ::= { aluPtpPeerClkRecAlgEntry 3 }
+
+aluPtpFreqRecHoldOverCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of seconds the frequency recovery algorithm was in 
+        Holdover state."
+    ::= { aluPtpPeerClkRecAlgEntry 4 }
+
+aluPtpFreqRecLockedCount OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of seconds the frequency recovery algorithm was in 
+        Locked state."
+    ::= { aluPtpPeerClkRecAlgEntry 5 }
+
+aluPtpFreqRecExcessFreqErrCnt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of Excessive Frequency Error events that have been detected
+        by the frequency recovery algorithm."
+    ::= { aluPtpPeerClkRecAlgEntry 6 }
+
+aluPtpFreqRecPacketLossCnt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of Packet Loss events that have been detected by the
+        frequency recovery algorithm."
+    ::= { aluPtpPeerClkRecAlgEntry 7 }
+
+aluPtpFreqRecLossResetCnt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of Packet Loss Reset events that have been detected
+        by the frequency recovery algorithm."
+    ::= { aluPtpPeerClkRecAlgEntry 8 }
+
+aluPtpFreqRecTripCnt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of Trip events that have been detected by the frequency 
+        recovery algorithm."
+    ::= { aluPtpPeerClkRecAlgEntry 9 }
+
+aluPtpFreqRecVarTooHighCnt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of Variance Too High events that have been detected by the
+        frequency recovery algorithm."
+    ::= { aluPtpPeerClkRecAlgEntry 10 }
+
+aluPtpFreqRecPdvStepCnt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of PDV Step events that have been detected by the
+        frequency recovery algorithm."
+    ::= { aluPtpPeerClkRecAlgEntry 11 }
+
+aluPtpFreqRecGapResetCnt OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "The number of Gap Rest events that have been detected by the
+        frequency recovery algorithm."
+    ::= { aluPtpPeerClkRecAlgEntry 12 }
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-- ALU-PTPV2-MIB Notifications for 4.0
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+aluPtpClockNotifyIndex  OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockIndex
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "Used by PTP Notifications, indicates the aluPtpClockTable
+         associated with the alarm."
+    ::= { aluPtpNotification 1 }
+
+aluPtpPortNotifyIndex  OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockIndex
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "Used by PTP Notifications, indicates the aluPtpPortTable
+         associated with the alarm."
+    ::= { aluPtpNotification 2 }
+
+aluPtpPeerNotifyIndex  OBJECT-TYPE
+    SYNTAX      Alu1588PtpClockIndex
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "Used by PTP Notifications tp indicate the aluPtpUcMasterTable
+         associated with the alarm."
+    ::= { aluPtpNotification 3 }
+
+aluPtpMasterChange NOTIFICATION-TYPE
+    OBJECTS {
+        aluPtpPeerIpAddrType,
+        aluPtpPeerIpAddr,
+        aluPtpClockNotifyIndex,
+        aluPtpPortNotifyIndex,
+        aluPtpPeerNotifyIndex      
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluPtpMasterChange notification is generated when 
+         a PTP clock has changed its source of synchonization. 
+         The aluPtpPeerIpAddr is the IP address of the new 
+         timing master. This IP address will be associated with
+         an aluPtpUcMasterTable entry.
+         This notification will also be associated with changes
+         in the parentDS of the containing clock. The 
+         aluPtpClockNotifyIndex identifies the row the entry in the
+         aluPtpClockTable."
+    ::= { aluPtpNotification 4 }
+
+aluPtpClockNoMaster NOTIFICATION-TYPE
+    OBJECTS {
+        aluPtpClockNotifyIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluPtpClockNoMaster notification is generated when 
+         a PTP clock has does not have PTP timing master.
+         The aluPtpClockNotifyIndex identifies the entry in the
+         aluPtpClockTable. "
+    ::= { aluPtpNotification 5 }
+
+aluPtpPortStateChange NOTIFICATION-TYPE
+    OBJECTS {
+        aluPtpPortDSPortState,
+        aluPtpClockNotifyIndex,
+        aluPtpPortNotifyIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when the aluPtpPortDSPortState changes for an 
+         IEEE 1588 PTP port."
+    ::= { aluPtpNotification 6 }
+
+aluPtpClockRecovClkChange NOTIFICATION-TYPE
+    OBJECTS {
+        aluPtpClockRecoveryState,
+        aluPtpClockNotifyIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when the aluPtpClockRecoveryState changes for an 
+         IEEE 1588 PTP Clock."
+    ::= { aluPtpNotification 7 }
+
+aluPtpPeerDiscoveryChange NOTIFICATION-TYPE
+    OBJECTS {
+        aluPtpPeerDiscovered,
+        aluPtpClockNotifyIndex,
+        aluPtpPortNotifyIndex,
+        aluPtpPeerNotifyIndex
+    }
+    STATUS  current
+    DESCRIPTION
+        "Generated when a 1588 PTP clock dynamic peer is created or deleted."
+    ::= { aluPtpNotification 8 }
+
+aluPtpNotifyRowPointer OBJECT-TYPE
+    SYNTAX      RowPointer
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpNotifyRowPointer indicates a row in a table that
+         has triggered a notification."
+    ::= { aluPtpNotification 9 }
+
+aluPtpNotifyRowDescription OBJECT-TYPE
+    SYNTAX      TItemDescription
+    MAX-ACCESS  accessible-for-notify
+    STATUS      current
+    DESCRIPTION
+        "The value of aluPtpNotifyRowDescription indicates the description
+         explaining the cause of the notification."
+    ::= { aluPtpNotification 10 }
+
+aluPtpClockDynamicChange NOTIFICATION-TYPE
+    OBJECTS {
+        aluPtpNotifyRowPointer,
+        aluPtpNotifyRowDescription
+    }
+    STATUS      current
+    DESCRIPTION
+        "The aluPtpClockDynamicChange notification is generated when an object
+        dynamically (i.e. not by configuration) changes state. This notification
+        identifies the affected row."
+    ::= { aluPtpNotification 11 }
+
+aluPtpClockSyncCertaintyChange NOTIFICATION-TYPE
+    OBJECTS {
+        aluPtpClockNotifyIndex,
+        aluPtpClockSyncCertaintyState
+    }
+    STATUS  current
+    DESCRIPTION
+        "The aluPtpClockSyncCertaintyChange notification is generated
+        when the aluPtpClockSyncCertaintyState changes."
+    ::= { aluPtpNotification 12 }
+
+
+--%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+--
+--      The compliance specifications.
+--
+
+aluPtpCompliances    OBJECT IDENTIFIER ::= { aluPtpConformance 1 }
+aluPtpGroups         OBJECT IDENTIFIER ::= { aluPtpConformance 2 }
+
+aluPtpComp7705       OBJECT IDENTIFIER ::= { aluPtpCompliances 1 }
+   
+aluPtpComp7705V4v0  MODULE-COMPLIANCE
+    STATUS  obsolete
+    DESCRIPTION
+            "The compliance statement for revision 1.0 of ALU-PTPV2-MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluPtpClockV4v0Group,
+            aluPtpPortV4v0Group,
+            aluPtpPeerV4v0Group,
+            aluPtpNotificationV4v0Group
+        }
+    ::= { aluPtpComp7705 1 }
+
+aluPtpComp7705V6v1  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+         "The compliance statement for the management of the Precision Timing
+         Protocol (with IP encapsulation) for Release 6.1 on the 7705 series
+         systems."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluPtpClockV4v0Group,
+            aluPtpPortV4v0Group,
+            aluPtpPeerV4v0Group,
+            aluPtpNotificationV4v0Group,
+            aluPtpClockV5v0Group,
+            aluPtpClockRecoveryV6v0Group,
+            aluPtpClockV6v1Group
+        }
+    ::= { aluPtpComp7705 3 }
+    
+aluPtpComp7705V7v0  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+         "The compliance statement for the management of the Precision Timing
+         Protocol (with IP encapsulation) for Release 7.0 on the 7705 series
+         systems. The corresponding base module compliance statement is
+         aluPtpComp7705V6v1."
+    MODULE  -- this module
+        MANDATORY-GROUPS {
+            aluPtpClockV7v0Group
+        }
+    ::= { aluPtpComp7705 4 }
+
+aluPtpComp7705V8v0  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+        "The compliance statement for the management of the Precision Timing
+         Protocol (with IP encapsulation) for Release 8.0 on the 7705 series
+         systems. The corresponding base module compliance statement is
+         aluPtpComp7705V7v0."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluPtpSyncCertaintyGroup,
+            aluPtpSyncCertNotifObjsGroup
+        }
+    ::= { aluPtpComp7705 5 }
+
+aluPtpComp7705V9v0  MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+        "The compliance statement for the management of the Precision Timing
+         Protocol (with IP encapsulation) for Release 9.0 on the 7705 series
+         systems. The corresponding base module compliance statement is
+         aluPtpComp7705V8v0."
+    MODULE  -- this module
+        MANDATORY-GROUPS { 
+            aluPtpLocalPriorityGroup,
+            aluPtpPeerStatsV9v0Group
+        }
+    ::= { aluPtpComp7705 6 }
+
+-- units of conformance
+
+aluPtpClockV4v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpClockMaxNumber,
+        aluPtpClockRowStatus,
+        aluPtpClockIpInterface,
+        aluPtpClockHw,
+        aluPtpClockProfile,
+        aluPtpClockAdminState,
+        aluPtpClockDynamicPeers,
+        aluPtpClockId,
+        aluPtpClockDomain,
+        aluPtpClockType,
+        aluPtpClockNumberPorts,
+        aluPtpClockClass,
+        aluPtpClockAccuracy,
+        aluPtpClockVariance,
+        aluPtpClockPriority1,
+        aluPtpClockPriority2,
+        aluPtpClockSlaveOnly,
+        aluPtpClockStepsRemoved,
+        aluPtpClockParentId,
+        aluPtpClockParentPortNum,
+        aluPtpClockParentStats,
+        aluPtpClockParentVariance,
+        aluPtpClockGMClockId,
+        aluPtpClockGMClass,
+        aluPtpClockGMAccuracy,
+        aluPtpClockGMVariance,
+        aluPtpClockGMPriority1,
+        aluPtpClockGMPriority2,
+        aluPtpClockForwardWeight,
+        aluPtpClockRecoveryState
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting IEEE 1588 PTP configuration
+        associated with the chassis on the Nokia 7705."
+    ::= { aluPtpGroups 1 }
+
+aluPtpPortV4v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpPortAdminState,
+        aluPtpPortUcNegotiate,
+        aluPtpPortNumPeers,
+        aluPtpPortDSPortNum,
+        aluPtpPortDSAnnoRxTimeout,
+        aluPtpPortDSLogAnnoInterval,
+        aluPtpPortDSLogSyncInterval,
+        aluPtpPortDSPortState,
+        aluPtpPortDSDelayMechanism,
+        aluPtpPortDSVersionNumber
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of IEEE 1588 PTP 
+        port on the Nokia 7705 4.0."
+    ::= { aluPtpGroups 2 }
+
+aluPtpPeerV4v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpPeerIpAddrType,
+        aluPtpPeerIpAddr,
+        aluPtpPeerLastChanged,
+        aluPtpPeerDescription,
+        aluPtpPeerDiscovered
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting management of IEEE 1588 PTP 
+        master/peers on the Nokia 7705 4.0."
+    ::= { aluPtpGroups 3 }
+
+aluPtpPeerStatsV4v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpPeerBadVersionDisc,
+        aluPtpPeerBadDomainDisc,
+        aluPtpPeerAlternateMasterDisc,
+        aluPtpPeerDuplicateMsgDisc,
+        aluPtpPeerStepRemovedGreaterThan255Disc,
+        aluPtpPeerAnnounceMsgTx,
+        aluPtpPeerAnnounceMsgRx,
+        aluPtpPeerSyncMsgTx,
+        aluPtpPeerSyncMsgRx,
+        aluPtpPeerSignalingMsgTx,
+        aluPtpPeerSignalingMsgRx,       
+        aluPtpPeerTotalUdpGeneralMsgTx,
+        aluPtpPeerTotalUdpGeneralMsgRx,
+        aluPtpPeerTotalUdpEventMsgTx,
+        aluPtpPeerTotalUdpEventMsgRx,
+        aluPtpPeerUcReqAnnoTx,
+        aluPtpPeerUcReqAnnoRx,
+        aluPtpPeerUcGrantAnnoTx,
+        aluPtpPeerUcGrantAnnoRx,
+        aluPtpPeerUcReqSyncTx,
+        aluPtpPeerUcReqSyncRx,
+        aluPtpPeerUcGrantSyncTx,
+        aluPtpPeerUcGrantSyncRx,
+        aluPtpPeerUcCancelAnnoTx,
+        aluPtpPeerUcCancelAnnoRx,
+        aluPtpPeerUcCancelSyncTx,
+        aluPtpPeerUcCancelSyncRx,
+        aluPtpPeerUcCancelAckAnnoTx,
+        aluPtpPeerUcCancelAckAnnoRx,
+        aluPtpPeerUcCancelAckSyncTx,
+        aluPtpPeerUcCancelAckSyncRx,
+        aluPtpPeerUcNegRejectsAnno,
+        aluPtpPeerUcNegRejectsSync,
+        aluPtpPeerOutOfOrderSyncPktRx,
+        aluPtpPeerRecLastUpdateTime,
+        aluPtpPeerTotalMinutesIn24Hour,
+        aluPtpPeerCurrent24HourFreqOffsetMeanPpb,
+        aluPtpPeerCurrent24HourFreqOffsetStdDevPpb,
+        aluPtpPeerMaxShortIntvlMinutes,
+        aluPtpPeerTotalShortIntvlMinutes,
+        aluPtpPeerCurrent1MinValidData,
+        aluPtpPeerCurrent1MinPhaseErrorMeanPpb,
+        aluPtpPeerCurrent1MinPhaseErrorStdDevNs,
+        aluPtpPeerCurrent1MinPhaseErrorMeanNs,
+        aluPtpPeerCurrent1MinFreqOffsetMeanPpb,
+        aluPtpPeerCurrent1MinFreqOffsetStdDevPpb,
+        aluPtpPeerIntvlValidData,
+        aluPtpPeerIntvlUpdateTime,
+        aluPtpPeerIntvlPhaseErrorMeanPpb,
+        aluPtpPeerIntvlPhaseErrorStdDevNs,
+        aluPtpPeerIntvlPhaseErrorMeanNs,
+        aluPtpPeerUcReqAnnoTxTimeout,
+        aluPtpPeerUcReqSyncTxTimeout,
+        aluPtpPeerUcGrantAnnoRejected,
+        aluPtpPeerUcGrantSyncRejected,
+        aluPtpPeerDelayRespMsgTx,
+        aluPtpPeerDelayRespMsgRx,
+        aluPtpPeerUcReqDelayRespTx,
+        aluPtpPeerUcReqDelayRespRx,
+        aluPtpPeerUcGrantDelayRespTx,
+        aluPtpPeerUcGrantDelayRespRx,
+        aluPtpPeerUcCancelDelayRespTx,
+        aluPtpPeerUcCancelDelayRespRx,
+        aluPtpPeerUcCancelAckDelayRespTx,
+        aluPtpPeerUcCancelAckDelayRespRx,
+        aluPtpPeerUcReqDelayRespTxTimeout,
+        aluPtpPeerUcNegRejectsDelayResp,
+        aluPtpPeerUcGrantDelayRespRejected,
+        aluPtpPeerDelayReqMsgTx,
+        aluPtpPeerDelayReqMsgRx,
+        aluPtpPeerPacketLastUpdateTime,
+        aluPtpPeerUcGrantDenyAnnoTx,
+        aluPtpPeerUcGrantDenySyncTx,
+        aluPtpPeerUcGrantDenyDelayRespTx,
+        aluPtpPeerUcReqAnnoRxTimeout,
+        aluPtpPeerUcReqSyncRxTimeout,
+        aluPtpPeerUcReqDelayRespRxTimeout
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting statistics IEEE 1588 PTP 
+        masters/peers on the Nokia 7705 4.0."
+    ::= { aluPtpGroups 4 }
+
+aluPtpNotifyObjsV4v0Group   OBJECT-GROUP
+    OBJECTS { aluPtpClockNotifyIndex,
+              aluPtpPortNotifyIndex,
+              aluPtpPeerNotifyIndex
+            }
+    STATUS        current
+    DESCRIPTION
+        "The group of objects supporting IEEE PTP notifications 
+         on Nokia 7705 series systems."
+    ::= { aluPtpGroups 5 }
+    
+aluPtpNotificationV4v0Group NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        aluPtpMasterChange,
+        aluPtpClockNoMaster,
+        aluPtpPortStateChange,
+        aluPtpClockRecovClkChange,
+        aluPtpPeerDiscoveryChange
+    }
+    STATUS    current
+    DESCRIPTION
+        "The group of notifications supporting management of the 
+         IEEE 1588 PTP operations on Nokia 7705."
+    ::= { aluPtpGroups 6 }
+
+aluPtpClockV5v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpClockTimeRefPriority,
+        aluPtpClockCurUtcOffset,
+        aluPtpClockCurUtcOffsetValid,
+        aluPtpClockLeap59,
+        aluPtpClockLeap61,
+        aluPtpClockTimeTraceable,
+        aluPtpClockFreqTraceable,
+        aluPtpClockPtpTimescale,
+        aluPtpClockTimeSource,
+        aluPtpClockAdminFreqSource,
+        aluPtpClockOperFreqSource,
+        aluPtpLocalPtpPortIndex,
+        aluPtpLocalPtpPeerIndex
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting IEEE 1588 PTP configuration
+        associated with the chassis in Release 5.0 on the Nokia 
+        7705."
+    ::= { aluPtpGroups 7 }
+    
+aluPtpClockRecoveryV6v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpFreqRecFreeRunCount,
+        aluPtpFreqRecAcquiringCount,
+        aluPtpFreqRecPhaseTrackCount,
+        aluPtpFreqRecHoldOverCount,
+        aluPtpFreqRecLockedCount,
+        aluPtpFreqRecExcessFreqErrCnt,
+        aluPtpFreqRecPacketLossCnt,
+        aluPtpFreqRecLossResetCnt,
+        aluPtpFreqRecTripCnt,
+        aluPtpFreqRecVarTooHighCnt,
+        aluPtpFreqRecPdvStepCnt,
+        aluPtpFreqRecGapResetCnt
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting IEEE 1588 PTP Clock Recovery statistics
+        associated with the chassis in Release 6.0 on the Nokia 
+        7705."
+    ::= { aluPtpGroups 8 }
+ 
+ aluPtpClockV6v1Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpClockUseNodeTime
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of new objects supporting IEEE 1588 PTP clock configuration
+        in 6.1 on the Nokia 7705."
+    ::= { aluPtpGroups 9 }
+
+ aluPtpClockV7v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpPortDSMasterOnly
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting IEEE 1588 PTP port configuration in
+        7.0 on the Nokia 7705."
+    ::= { aluPtpGroups 10 }
+
+aluPtpV8v0Groups OBJECT IDENTIFIER ::= { aluPtpGroups 11 }
+aluPtpSyncCertaintyGroup  OBJECT-GROUP
+    OBJECTS {
+        aluPtpClockSyncCertaintyState,
+        aluPtpClockTxWhileUncertain,
+        aluPtpParentSyncCertaintyState,
+        aluPtpPeerSyncCertainty
+    }
+    STATUS      current
+    DESCRIPTION
+        "This group was introduced in Release 8.0 to support the configuration
+        and monitoring of the Synchronization Certainty feature for Precision
+        Timing Protocol (with IP encapsulation) on the 7705 series systems."
+    ::= { aluPtpV8v0Groups 1 }
+
+aluPtpSyncCertNotifObjsGroup NOTIFICATION-GROUP
+    NOTIFICATIONS {
+        aluPtpClockDynamicChange,
+        aluPtpClockSyncCertaintyChange
+    }
+    STATUS    current
+    DESCRIPTION
+        "This group was introduced in Release 8.0 to support the notifications
+        for Precision Timing Protocol (with IP encapsulation) on the 7705 series
+        systems."
+    ::= { aluPtpV8v0Groups 2 }
+    
+aluPtpV9v0Groups OBJECT IDENTIFIER ::= { aluPtpGroups 12 }
+aluPtpLocalPriorityGroup  OBJECT-GROUP
+    OBJECTS {
+        aluPtpClockLocalPriority,
+        aluPtpPortDSLocalPriority
+    }
+    STATUS      current
+    DESCRIPTION
+        "This group was introduced in Release 9.0 to support the configuration
+        of local priorities used in the best master clock algorithm for Precision
+        Timing Protocol (with IP encapsulation) on the 7705 series systems."
+    ::= { aluPtpV9v0Groups 1 }
+
+aluPtpPeerStatsV9v0Group  OBJECT-GROUP
+    OBJECTS {
+        aluPtpPeerFollowUpMsgTx,
+        aluPtpPeerFollowUpMsgRx
+    }
+    STATUS      current
+    DESCRIPTION
+        "The group of objects supporting statistics IEEE 1588 PTP peers on
+        the Nokia 7705 release 9.0."
+    ::= { aluPtpV9v0Groups 3 }
+
+END

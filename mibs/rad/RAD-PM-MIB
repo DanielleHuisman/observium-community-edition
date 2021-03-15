@@ -1,0 +1,664 @@
+RAD-PM-MIB DEFINITIONS ::= BEGIN
+
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       ifIndex     FROM  IF-MIB
+       Counter32, Unsigned32, OBJECT-TYPE, 
+       MODULE-IDENTITY, NOTIFICATION-TYPE, Counter64     FROM  SNMPv2-SMI
+       RowStatus, DateAndTime     FROM  SNMPv2-TC
+       sysName     FROM  SNMPv2-MIB
+       alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+       alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+       AlarmEventSourceType     FROM  RAD-GEN-MIB
+       agnt     FROM  RAD-SMI-MIB; 
+
+
+    agnPerformanceManagement MODULE-IDENTITY
+        LAST-UPDATED "201607071624Z"  -- July 07, 2016
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "PM MIB."
+    ::= { agnt 74 }
+
+
+pmEvents  OBJECT IDENTIFIER ::= {agnPerformanceManagement 0 }
+
+-- RAD Performance Management
+
+pmNumberOfIntervals OBJECT-TYPE
+   SYNTAX           Counter32
+   MAX-ACCESS       read-only
+   STATUS           current
+   DESCRIPTION
+   "This counter holds the number of error-measurement periods (Intervals)
+    since the network management portion of the system was last re-initialized."
+   ::= { agnPerformanceManagement 1 }
+
+
+--*****************************************
+-- PM Enabling per entity that has ifIdex.
+--*****************************************
+
+pmEntitiesEnableTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PmEntityEnableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "This table define enabling of PM of all entitites that have
+            ifIndex format definition. The table contains also logical
+            entites that have ifIndex definition, but are not included
+            in the ifTable e.g. flow, ETP or PW."
+    ::= { agnPerformanceManagement 2 }
+
+pmEntityEnableEntry OBJECT-TYPE
+    SYNTAX      PmEntityEnableEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Each entry defines one entity code."
+    INDEX       { ifIndex }
+--  INDEX       { pmEntityEnableIndex }
+    ::= { pmEntitiesEnableTable 1}
+
+PmEntityEnableEntry ::= SEQUENCE {
+    pmEntityActivity    INTEGER 
+ }
+
+    pmEntityActivity OBJECT-TYPE
+    SYNTAX  INTEGER {
+        notApplicable (1),
+        disable       (2),
+        enable        (3)
+        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "The entity PM activity state."
+    ::= { pmEntityEnableEntry 1 }
+
+--  pmEntityEnableIndex OBJECT-TYPE
+--  SYNTAX  Unsigned32 (1..4294967295)
+--  MAX-ACCESS  not-accessible
+--  STATUS      current
+--  DESCRIPTION
+--            "Unique value identification of entity or interface."
+--  ::= { pmEntityEnableEntry 2 }
+
+
+pmIntervalTimeDuration OBJECT-TYPE
+    SYNTAX  Unsigned32 ( 300 | 600 | 900 )
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "System level definition of duration of all non-TDM
+    performance monitoring Intervals  (in seconds).
+    Note - even objects marked in MIB as PerfIntervalCount
+    SYNTAX will be affected."
+    DEFVAL {900}
+    ::= { agnPerformanceManagement 3 }
+
+
+systemPmStatusCmdTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SystemPmStatusCmdEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Table that holds a set of Scalar as columns."
+    ::= { agnPerformanceManagement 4 }
+
+systemPmStatusCmdEntry OBJECT-TYPE
+    SYNTAX  SystemPmStatusCmdEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  { systemPmStatusCmdIndex }
+    ::= { systemPmStatusCmdTable 1 }
+
+SystemPmStatusCmdEntry ::= SEQUENCE {
+    systemPmStatusCmdIndex             Unsigned32,
+    systemPmStatusCmdActivation        INTEGER,
+    systemPmStatusCmdStopReason        INTEGER,
+    systemPmStatusCmdFreeSpace         Unsigned32 
+ }
+
+systemPmStatusCmdIndex      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object used as index value = 1"
+    ::= { systemPmStatusCmdEntry 1 }
+
+systemPmStatusCmdActivation     OBJECT-TYPE
+      SYNTAX   INTEGER
+          {
+            off(2),
+            on (3)
+          }
+      MAX-ACCESS  read-write
+      STATUS  current
+      DESCRIPTION
+       "This command is related to systemPmIntervalConfigTable
+        and it defines the collection activation at the device level.
+         on  - a command to activate the Performance Interval data
+               collection process.
+         off - agent will inactivate  the Performance Interval data
+               collection process.
+         "
+    ::= { systemPmStatusCmdEntry 2 }
+
+
+
+systemPmStatusCmdStopReason    OBJECT-TYPE
+      SYNTAX      INTEGER
+              {
+               notApplicable(1),
+               spaceOverflow(2),
+               timeDeltaOverfow(3)
+              }
+      MAX-ACCESS  read-only
+      STATUS      current
+      DESCRIPTION
+       "This object defines the reason failure of collection process.
+        This object is sent as a varbind trap.
+         spaceOverflow(2)- space overflow, the agent cannot store the PM file.
+         timeDeltaOverfow(3)- PM file not retrieved for too long time."
+        ::= { systemPmStatusCmdEntry 3}
+
+systemPmStatusCmdFreeSpace    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The PM file free space in bytes"
+    ::= { systemPmStatusCmdEntry 4 }
+
+
+-- system Pm Interval Config Table
+
+systemPmIntervalConfigTable    OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SystemPmIntervalConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Entity level PM interval configuration Table."
+    ::= { agnPerformanceManagement 5 }
+
+systemPmIntervalConfigEntry OBJECT-TYPE
+    SYNTAX  SystemPmIntervalConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the table."
+     INDEX  { systemPmIntervalConfigIfIndexType , systemPmIntervalConfigIfIndex }
+    ::= { systemPmIntervalConfigTable 1 }
+
+SystemPmIntervalConfigEntry ::= SEQUENCE {
+    systemPmIntervalConfigIfIndexType       AlarmEventSourceType,
+    systemPmIntervalConfigIfIndex           Unsigned32,
+    systemPmIntervalConfigRowStatus         RowStatus,
+    systemPmIntervalConfigInterval          Unsigned32 
+ }
+
+systemPmIntervalConfigIfIndexType   OBJECT-TYPE
+    SYNTAX      AlarmEventSourceType
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The type of the entity of which PM statistics are collected.
+     The current supported types are:
+     abm               (20600)
+     eth               (50000)
+     flow              (210000)
+     oamCfmDestNe      (270400)
+     oamCfmService     (270300)
+     system            (20000)
+     twamp             (300900)"
+    ::= { systemPmIntervalConfigEntry 1 }
+
+systemPmIntervalConfigIfIndex   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The entity of which PM statistics are collected.
+     Typically, the indices are the same ones used as alarm/event source ID.
+     -- For ABM the index is the same as the corresponding abmConfigSessionIndex.
+     -- If the device (e.g. MiNID) supports PM collection from all entities,
+        the special value of 0xffffffff is used, along with 
+        systemPmIntervalConfigIfIndexType of system."
+     ::= { systemPmIntervalConfigEntry 2 }
+
+systemPmIntervalConfigRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables user to
+     create/delete entries in this table."
+    ::= { systemPmIntervalConfigEntry 3 }
+
+systemPmIntervalConfigInterval      OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The duration of the interval - hundredths of seconds.
+     The range is from 1 to 900 seconds"
+    ::= { systemPmIntervalConfigEntry 4 }
+     
+
+
+-----------------------------------
+-- Rate Measurements
+-----------------------------------
+
+pmPortRateStatsTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF PmPortRateStatsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "This table is used for measuring the rates of ports and LAGs.
+     A row can be deleted unconditionally."
+   ::= { agnPerformanceManagement 7 }
+
+pmPortRateStatsEntry OBJECT-TYPE
+    SYNTAX  PmPortRateStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION  "Entry in Port Rate statistics table."
+    INDEX {ifIndex}
+    ::= { pmPortRateStatsTable 1 }
+
+PmPortRateStatsEntry ::= SEQUENCE {
+    pmPortRateStatsRowStatus   RowStatus,
+    pmPortRateStatsMeasureCmd  INTEGER,
+    pmPortRateStatsDuration    Unsigned32,
+    pmPortRateStatsStartTime   DateAndTime,
+    pmPortRateStatsStatus      INTEGER,
+    pmPortRateStatsRxBytes     Counter64,
+    pmPortRateStatsTxBytes     Counter64 
+ }
+
+pmPortRateStatsRowStatus   OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object enables user to create/delete entries in this table.
+      "
+      ::=  { pmPortRateStatsEntry 1}
+
+pmPortRateStatsMeasureCmd  OBJECT-TYPE
+    SYNTAX       INTEGER
+    {
+     off(2),
+     on (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Issue a command for beginning the measurement of the Port/LAG Rate.
+     Upon setting the command, the value shall be 'on (3)'.
+     After pmPortRateStatsDuration time elapses, the agent shall set this MIB object to 'off (2)'.
+
+     Upon invocation, all counters should be reset.
+
+     It is not possible to update this object while pmPortRateStatsStatus is inProgress(3).
+     "
+   ::= { pmPortRateStatsEntry 2}
+
+pmPortRateStatsDuration    OBJECT-TYPE
+    SYNTAX      Unsigned32 (10..300)
+    UNITS       "Seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Sampling window duration in seconds.
+
+     It is not possible to update this object while pmPortRateStatsStatus is  inProgress(3).
+    "
+    DEFVAL {10}
+   ::= { pmPortRateStatsEntry 3}
+
+pmPortRateStatsStartTime      OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The time of setting pmPortRateStatsMeasureCmd to on(3).
+    "
+   ::= { pmPortRateStatsEntry 4}
+
+pmPortRateStatsStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     notApplicable (1),
+     idle          (2),
+     inProgress    (3),
+     failed        (4),
+     passed        (5)
+    }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Status of the measurement:
+     idle       - Measurement is not running at present.
+                  For example, after row is created and before running the measurement.
+     inProgress - Rate is currently being measured.
+     failed     - Measurement has failed. Examples for failure causes:
+                  Measurement aborted due to Clear Statistics invocation or shutdown of entity
+                  during measurement.
+     passed     - Rate measurement has succeeded.
+    "
+   ::= { pmPortRateStatsEntry 5}
+
+ pmPortRateStatsRxBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of bytes received over the interface during the sampling window.
+    "
+   ::= { pmPortRateStatsEntry 6}
+
+pmPortRateStatsTxBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of bytes transmitted over the interface during the sampling window.
+    "
+    ::= { pmPortRateStatsEntry 7}
+
+
+
+pmFlowRateConfigTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF PmFlowRateConfigEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "This table is used for invocation of flow rate measurements.
+     A row can be deleted unconditionally."
+   ::= { agnPerformanceManagement 8 }
+
+pmFlowRateConfigEntry OBJECT-TYPE
+    SYNTAX  PmFlowRateConfigEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "Entry in Flow Rate configuration table.
+
+     When a row is added, corresponding rows are automatically added
+     to the pmFlowRateStatsTable.
+
+     When a row is deleted, all the corresponding rows in the pmFlowRateStatsTable
+     are automatically deleted as well.
+    "
+    INDEX {pmFlowRateConfigflowIdx1, pmFlowRateConfigflowIdx2}
+    ::= { pmFlowRateConfigTable 1 }
+
+PmFlowRateConfigEntry ::= SEQUENCE {
+    pmFlowRateConfigflowIdx1    Unsigned32,
+    pmFlowRateConfigflowIdx2    Unsigned32,
+    pmFlowRateConfigRowStatus   RowStatus,
+    pmFlowRateConfigMeasureCmd  INTEGER,
+    pmFlowRateConfigDuration    Unsigned32,
+    pmFlowRateConfigStartTime   DateAndTime,
+    pmFlowRateConfigStatus      INTEGER 
+ }
+
+pmFlowRateConfigflowIdx1 OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "A unique first index of the Flow to be measured.
+      "
+      ::=  { pmFlowRateConfigEntry 1}
+
+pmFlowRateConfigflowIdx2 OBJECT-TYPE
+      SYNTAX      Unsigned32
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      " A unique second index of the Flow to be measured.
+      "
+      ::=  { pmFlowRateConfigEntry 2}
+
+pmFlowRateConfigRowStatus   OBJECT-TYPE
+      SYNTAX      RowStatus
+      MAX-ACCESS  read-create
+      STATUS  current
+      DESCRIPTION
+      "This object enables user to create/delete entries in this table."
+      ::=  { pmFlowRateConfigEntry 3}
+
+pmFlowRateConfigMeasureCmd  OBJECT-TYPE
+    SYNTAX       INTEGER
+    {
+     off(2),
+     on (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Issue a command for beginning the measurement of the Flow Rate.
+     Upon setting the command, the value shall be 'on (3)'.
+     After pmPortRateConfigDuration time elapses, the agent shall set this MIB object to 'off (2)'.
+
+     Upon invocation, all counters should be reset.
+
+     It is not possible to update this object while pmFlowRateConfigStatus is inProgress(3).
+    "
+   ::= { pmFlowRateConfigEntry 4}
+
+pmFlowRateConfigDuration    OBJECT-TYPE
+    SYNTAX      Unsigned32 (10..300)
+    UNITS       "Seconds"
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Sampling window duration in seconds.
+
+     It is not possible to update this object while pmFlowRateConfigStatus is inProgress(3).
+    "
+    DEFVAL {10}
+   ::= { pmFlowRateConfigEntry 5}
+
+pmFlowRateConfigStartTime      OBJECT-TYPE
+    SYNTAX      DateAndTime
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The time of setting pmFlowRateConfigMeasureCmd to on(3).
+    "
+   ::= { pmFlowRateConfigEntry 6}
+
+pmFlowRateConfigStatus    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+     notApplicable (1),
+     idle          (2),
+     inProgress    (3),
+     failed        (4),
+     passed        (5)
+    }
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "Status of the measurement:
+     idle       - Measurement is not running at present.
+                  For example, after row is created and before running the measurement.
+     inProgress - Rate is currently being measured.
+     failed     - Measurement has failed. Examples for failure causes:
+                  Measurement aborted due to Clear Statistics invocation or shutdown of entity
+                  during measurement.
+     passed     - Rate measurement has succeeded.
+    "
+   ::= { pmFlowRateConfigEntry 7}
+
+
+pmFlowRateStatsTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF PmFlowRateStatsEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "This table is used for displaying the flow rate statistics.
+     Flow rate statistics can be measured by invocation of pmFlowRateConfigMeasureCmd."
+   ::= { agnPerformanceManagement 9 }
+
+pmFlowRateStatsEntry OBJECT-TYPE
+    SYNTAX  PmFlowRateStatsEntry
+    MAX-ACCESS  not-accessible
+    STATUS current
+    DESCRIPTION
+    "Entry in Flow Rate statistics table.
+
+     Rows in this table are created automatically when a row is added to the pmFlowRateStatsTable.
+     Rows in this table are removed automatically when a row is removed from the pmFlowRateStatsTable.
+    "
+    INDEX {pmFlowRateConfigflowIdx1, pmFlowRateConfigflowIdx2, pmFlowRateStatsCosIndex}
+    ::= { pmFlowRateStatsTable 1 }
+
+PmFlowRateStatsEntry ::= SEQUENCE {
+    pmFlowRateStatsCosIndex         Unsigned32,
+    pmFlowRateStatsRxBytes          Counter64,
+    pmFlowRateStatsTxBytes          Counter64,
+    pmFlowRateStatsGreenDropBytes   Counter64,
+    pmFlowRateStatsYellowDropBytes  Counter64,
+    pmFlowRateStatsRedDropBytes     Counter64,
+    pmFlowRateStatsTotalDropBytes   Counter64 
+ }
+
+pmFlowRateStatsCosIndex OBJECT-TYPE
+      SYNTAX      Unsigned32 (0..7 | 255)
+      MAX-ACCESS  not-accessible
+      STATUS      current
+      DESCRIPTION
+      "For Multi CoS flows, this object specifies the CoS to which the statistics in this table applies.
+       CoS values shall be: 0..7
+       For Single CoS flows, the value of this Index shall be 255.
+      "
+      ::=  { pmFlowRateStatsEntry 1}
+
+
+pmFlowRateStatsRxBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of bytes received over the flow during the sampling window.
+     For Multi CoS flow, MEF 10.3, this object is per CoS.
+    "
+   ::= { pmFlowRateStatsEntry 2}
+
+pmFlowRateStatsTxBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of bytes transmitted over the flow during the sampling window.
+     For Multi CoS flow, MEF 10.3, this object is per CoS.
+    "
+   ::= { pmFlowRateStatsEntry 3}
+
+pmFlowRateStatsGreenDropBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of bytes in Green marked frames discarded from the flow during the sampling window.
+     For Multi CoS flow, MEF 10.3, this object is per CoS.
+     "
+   ::= { pmFlowRateStatsEntry 4}
+
+pmFlowRateStatsYellowDropBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of bytes in Yellow marked frames discarded from the flow during the sampling window.
+     For Multi CoS flow, MEF 10.3, this object is per CoS.
+     "
+   ::= { pmFlowRateStatsEntry 5}
+
+pmFlowRateStatsRedDropBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The number of bytes in Red marked frames discarded from the flow during the sampling window.
+     For Multi CoS flow, MEF 10.3, this object is per CoS.
+     "
+   ::= { pmFlowRateStatsEntry 6}
+
+pmFlowRateStatsTotalDropBytes   OBJECT-TYPE
+    SYNTAX      Counter64
+    UNITS       "bytes"
+    MAX-ACCESS  read-only
+    STATUS  current
+    DESCRIPTION
+    "The Total number of bytes discarded from the flow during the sampling window.
+     For Multi CoS flow, MEF 10.3, this object is per CoS.
+    "
+   ::= { pmFlowRateStatsEntry 7}
+
+
+
+
+-----------------------------------
+-- PM Common Trap Definitions
+-----------------------------------
+systemPmProcessDisabled     NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, systemPmStatusCmdStopReason } 
+    STATUS      current
+    DESCRIPTION
+    "PM collection failure trap."
+     ::= { pmEvents 1 }
+
+systemPmSpaceOverflow   NOTIFICATION-TYPE
+	OBJECTS { alarmEventLogSourceName, alarmEventLogAlarmOrEventId, alarmEventLogDescription, 
+     alarmEventLogSeverity, alarmEventLogDateAndTime, alarmEventReason, 
+     sysName, systemPmStatusCmdFreeSpace } 
+    STATUS      current
+    DESCRIPTION
+    "PM collection space over flow trap."
+     ::= { pmEvents 2 }
+
+
+END

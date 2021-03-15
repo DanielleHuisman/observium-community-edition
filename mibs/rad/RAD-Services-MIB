@@ -1,0 +1,3503 @@
+RAD-Services-MIB DEFINITIONS ::= BEGIN
+
+-- Copyright 2000 RAD Data Communications, Ltd.
+-- All Rights Reserved.
+
+-- It is RAD's intent to encourage the widespread use of
+-- this Specification in connection with the management of
+-- RAD products. RAD grants vendors, end-users,
+-- and other interested parties a non-exclusive license to
+-- use this Specification in connection with the management
+-- of RAD products.
+
+-- This Specification is supplied "as is," and RAD makes
+-- no warranty, either express or implied, as to the use,
+-- operation, condition, or performance of the Specification.
+
+
+IMPORTS
+
+       ifIndex     FROM  IF-MIB
+       VlanIdOrNone, VlanIdOrAnyOrNone     FROM  Q-BRIDGE-MIB
+       SnmpAdminString     FROM  SNMP-FRAMEWORK-MIB
+       Integer32, Counter32, IpAddress, 
+       Unsigned32, OBJECT-TYPE, MODULE-IDENTITY, 
+       Counter64     FROM  SNMPv2-SMI
+       TEXTUAL-CONVENTION, RowStatus, MacAddress     FROM  SNMPv2-TC
+       InetAddressType, InetAddress, InetPortNumber, 
+       InetAddressPrefixLength     FROM  INET-ADDRESS-MIB
+       radGen     FROM  RAD-SMI-MIB; 
+
+
+    services MODULE-IDENTITY
+        LAST-UPDATED "201502191809Z"  -- February 19, 2015
+        ORGANIZATION "RAD Data Communications Ltd."
+        CONTACT-INFO
+        "System Department
+
+         Email:  mibs@rad.com
+         Postal: RAD Data Communications Ltd.
+                 24 Raoul Wallenberg St.
+                 Tel-Aviv 6971920
+                 Israel
+
+         Phone:  +972-3-645-5421
+         Fax:    +972-3-760-7844"
+         DESCRIPTION
+            "Services MIB."
+    ::= { radGen 3 }
+
+--Weighted Fair Queueing (WFQ) Table
+
+wfq OBJECT IDENTIFIER ::= { services 1}
+
+wfqTable OBJECT-TYPE
+    SYNTAX  SEQUENCE OF WfqEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This table allows user to define several
+     WFQ tables per output port.
+     
+     WFQ supports flows with different bandwidth requirements 
+     by giving each queue a weight that assigns it 
+     a different percentage of output port bandwidth.
+
+     When Weighted Fair Queuing is used, 
+     it is possible to precisely attribute bandwidth 
+     partitioning among the queues. 
+     When there is congestion, each class (queue) 
+     is not allowed to use more bandwidth than the amount 
+     allocated to it."
+    ::= { wfq 1 }
+
+wfqEntry OBJECT-TYPE
+    SYNTAX  WfqEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the Weighted Fair Queueing table."
+    INDEX {wfqCnfgIdx, wfqPrtIdx,wfqTblIdx, wfqQueueIdx }
+    ::= { wfqTable 1 }
+
+WfqEntry ::=
+    SEQUENCE {
+              wfqCnfgIdx     Integer32,
+              wfqPrtIdx      Integer32,
+              wfqTblIdx      Integer32,
+              wfqQueueIdx    Integer32,
+              wfqRowStatus   RowStatus,
+              wfqWeightValue Integer32,
+              wfqSchedulingMode	  	INTEGER,
+              wfqMinRateAbsolute  	Unsigned32,
+			  wfqMaxPacketSize		Unsigned32
+              }
+
+wfqCnfgIdx OBJECT-TYPE
+    SYNTAX  Integer32 (1..255)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Idx of the Agent Cnfg the following 
+     objects refer.
+     255=Temporary Cnfg (when relevant, 
+     Set is done only to this configuration).
+     For Agents that support only one configuration, 
+     this object will be  constant=1. "
+    ::= { wfqEntry 1 }
+
+wfqPrtIdx OBJECT-TYPE
+    SYNTAX  Integer32 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates a unique port or interface number,
+     for which Weighted Fair Queueing table is applicable .
+	 For numbering, see product's spec.
+     For some products, the numbering can equal ifIndex.
+     Value of 255 (not applicable) refer to system level queue"    
+    ::= { wfqEntry 2 }
+
+wfqTblIdx OBJECT-TYPE
+    SYNTAX  Integer32 
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates which  Weighted Fair Queueing (WFQ)
+     Table is being used. There can be several tables.
+     For FCD-155 User will select which one will be used 
+     for a virtual concatenation group.Valid values are 1,2"    
+    ::= { wfqEntry 3 }
+
+wfqQueueIdx OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates a queue index.
+     For FCD-155, valid queues are 1..3.
+     The 4th queue is not in MIB. 
+     Its weight will be RO, Calculated according to 
+     the sum of the 3 first queues."
+    ::= { wfqEntry 4 }
+
+wfqRowStatus OBJECT-TYPE
+    SYNTAX  RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object enables Creation/Deletion of 
+    rows in the WFQ table.
+    For FCD-155, rows are not created nor destroyed by user."
+    ::= { wfqEntry 5 }
+
+wfqWeightValue OBJECT-TYPE
+    SYNTAX  Integer32  (0..100)
+	UNITS      "%"
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object indicates a relative weight value.
+     User should make sure that the sum of 
+     values for all queues will not exceed 100%
+     (sum should  be BELOW 100% in order 
+     to leave some BW percentage for last queue)  
+     Note that when this attribute is being used, the wfqMinRateAbsolute attribute is NA."
+    ::= { wfqEntry 6 }
+
+wfqSchedulingMode OBJECT-TYPE
+      SYNTAX  INTEGER {
+		 disable (2), -- Priority Queue
+		 enable  (3)  -- WFQ
+					}
+	MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "This object controls which scheduling mode is used:
+     Weighted Fair Queuing (WFQ) scheme or priority Queue (Strict Priority)."
+    ::= { wfqEntry 7 }
+
+wfqMinRateAbsolute OBJECT-TYPE
+    SYNTAX  Unsigned32  
+	UNITS      "Kbps"
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "The minimum absolute rate, in kbps, 
+    that should be allocated to this queue. 
+    If the value is	zero, then there is effectively 
+    no minimum rate guarantee. 
+    If the value is non-zero, then the servicing of
+    this queue in at least this rate is assured.
+
+    Note that when this attribute is being used, the wfqWeightValue attribute is NA."
+    ::= { wfqEntry 8 }
+
+wfqMaxPacketSize OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The size of the largest packet which can be received
+    on this queue, specified in octets.
+    Packets larger than this size will be discarded."  
+    ::= { wfqEntry 9}
+
+-- Differential Services Code Point Mapping
+
+
+Dscp ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
+    STATUS   current
+    DESCRIPTION
+     "A Differentiated Services Code-Point that may be used for
+       marking a traffic stream."
+    REFERENCE
+        "RFC 2474, RFC 2780"
+    SYNTAX   Integer32 (0..63)
+
+ProfileMethod ::= TEXTUAL-CONVENTION
+    STATUS      current
+    DESCRIPTION
+            "This textual convention defines list of classification
+            methods that may be used for priority handling mapping
+            profiles."
+    SYNTAX      INTEGER {
+        ieee802dot1p    (2), -- p-bit
+        tos             (3),
+        dscp            (4),
+        ipPrecedence    (5),
+        userPorts       (6),
+        internalCos     (7),
+        dei             (8)  -- Drop Eligible Indicator (bit)
+        }
+
+dscpMapping      OBJECT IDENTIFIER ::= {services 2}
+
+dscpMappingTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF DscpMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Mapping of DSCP value to a regenerated priority level."
+    ::= { dscpMapping 1 }
+
+dscpMappingEntry  OBJECT-TYPE
+    SYNTAX      DscpMappingEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in dscpMappingTable."
+    INDEX   { dscpMappingCnfgIdx,dscpMappingDscpIdx }
+    ::= { dscpMappingTable 1 }
+
+DscpMappingEntry ::=
+    SEQUENCE {
+        dscpMappingCnfgIdx       Integer32,
+        dscpMappingDscpIdx            Dscp,
+        dscpMappingRegenPriority      Integer32
+    }
+
+dscpMappingCnfgIdx OBJECT-TYPE
+    SYNTAX  Integer32 (1..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Idx of the Agent Cnfg the following 
+     objects refer to.
+     255=Temporary Cnfg (when relevant, Set is done only 
+     to this configuration).
+     For Agents that support only one configuration, 
+     this object will be  constant=1. 
+     This object can be used to carry additional indexing 
+     (e.g port index) when needed."
+    ::= { dscpMappingEntry 1 }
+
+dscpMappingDscpIdx OBJECT-TYPE
+    SYNTAX      Dscp
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    " DSCP value of the incoming IP packet"
+    ::= { dscpMappingEntry 2 }
+
+dscpMappingRegenPriority OBJECT-TYPE
+    SYNTAX      Integer32 
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "The Regenerated Priority level the
+     incoming DSCP value is mapped to.
+     For FCD-155, valid values are 0,1,2,3"
+    ::= { dscpMappingEntry 3 }
+
+
+-- IfTeQos - Traffic Engineering Quality of Service Interface
+
+ifTeQos		 OBJECT IDENTIFIER ::= { services 3 }
+
+ifTeQosTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF IfTeQosEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The TE QOS Interface Table."
+    ::= {  ifTeQos 1 }
+
+ifTeQosEntry  OBJECT-TYPE
+    SYNTAX      IfTeQosEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the TE QOS Interface table."
+    INDEX   { ifTeQosIdx1, ifTeQosIdx2, ifTeQosIdx3 }
+    ::= { ifTeQosTable 1 }
+
+IfTeQosEntry ::=
+	SEQUENCE { 
+        ifTeQosIdx1			Integer32,
+		ifTeQosIdx2			Integer32,
+		ifTeQosIdx3			Integer32,
+		ifTeQosParam		OCTET STRING,
+		ifTeQosParam2		OCTET STRING,
+		ifTeQosStatus       INTEGER
+    	}
+
+ifTeQosIdx1 OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the 1st Index of the table."
+    ::= { ifTeQosEntry 1 }
+
+ifTeQosIdx2 OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the 2nd Index of the table."
+    ::= { ifTeQosEntry 2 }
+
+ifTeQosIdx3 OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the 3rd Index of the table."
+    ::= { ifTeQosEntry 3 }
+
+ifTeQosParam OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object is used for QOS attributes 
+     of the entry's entities."
+    ::= { ifTeQosEntry 4 }
+
+ifTeQosParam2 OBJECT-TYPE
+    SYNTAX  OCTET STRING
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object is used for 2nd group QOS attributes 
+     of the entry's entities."
+    ::= { ifTeQosEntry 5 }
+
+ifTeQosStatus OBJECT-TYPE
+    SYNTAX  INTEGER
+	       {  active (1),
+		      createAndGo (4),
+		      destroy (6) }     
+	MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "This object is used to create, activate and 
+     destroy entries of this table."
+    ::= { ifTeQosEntry 6 }
+
+
+portQos		 OBJECT IDENTIFIER ::= { services 4 }
+
+prtPriorityTable OBJECT-TYPE
+	SYNTAX  SEQUENCE OF PrtPriorityEntry
+	MAX-ACCESS  not-accessible
+	STATUS current
+	DESCRIPTION  
+	"A table - Parameters per port per Priority ."
+	::= {portQos 1}
+
+prtPriorityEntry OBJECT-TYPE
+    SYNTAX PrtPriorityEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+	DESCRIPTION  "An entry in table."
+	INDEX {prtPriorityIdx1, prtPriorityPrtIdx, prtPriorityIdx}
+    ::= { prtPriorityTable 1}
+
+PrtPriorityEntry ::=
+    SEQUENCE {
+    prtPriorityIdx1   Integer32,
+    prtPriorityPrtIdx	 Integer32,
+    prtPriorityIdx       Integer32,
+    prtPriorityIngressRateLimit   Integer32
+	}
+
+prtPriorityIdx1 OBJECT-TYPE
+    SYNTAX Integer32 (1..255)
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+    "This attribute indicates the Idx of the Cnfg(1..255) being 
+     accessed ; Idx of 255 relates to the TmpCnfg. or any other Index."
+    ::= { prtPriorityEntry 1}
+
+prtPriorityPrtIdx OBJECT-TYPE
+    SYNTAX  Integer32  (0..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates a unique Port Index.
+     Refer to device specification for port Index."
+    ::= { prtPriorityEntry 2}
+
+prtPriorityIdx OBJECT-TYPE
+    SYNTAX  Integer32  (0..7)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This object indicates the Traffic Priority Index."
+    ::= { prtPriorityEntry 3}
+
+prtPriorityIngressRateLimit OBJECT-TYPE
+    SYNTAX  Integer32
+    MAX-ACCESS  read-write
+    STATUS  current
+    DESCRIPTION
+    "The maximum rate permitted at Ingress of 
+     this port with this Traffic Priority, in Kbps."      
+    ::= { prtPriorityEntry 4}
+
+
+prtQosTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF PrtQosEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION  
+	"Port QoS (Quality of Service) table."
+	::= { portQos 2 }
+
+prtQosEntry OBJECT-TYPE
+    SYNTAX		PrtQosEntry
+    MAX-ACCESS	not-accessible
+    STATUS		current
+	DESCRIPTION  "An entry in table."
+	INDEX { prtQosIdx, prtQosPrtIdx, prtQosDirection }
+    ::= { prtQosTable 1 }
+
+PrtQosEntry ::=
+    SEQUENCE {
+		prtQosIdx					Unsigned32,
+		prtQosPrtIdx				Unsigned32,
+		prtQosDirection				INTEGER,
+		prtQosRateLimitPacketType	INTEGER,
+		prtQosRateLimitCIR			Unsigned32,
+		prtQosRateLimitCBS			Unsigned32,
+		prtQosRateLimitEIR			Unsigned32,
+		prtQosRateLimitEBS			Unsigned32
+	}
+
+prtQosIdx OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	not-accessible
+    STATUS		current
+    DESCRIPTION
+    "The first index of the table.
+     This attribute might indicate the Idx of the Cnfg (1..255) being 
+     accessed ; Idx of 255 relates to the TmpCnfg or any other Index."
+    ::= { prtQosEntry 1 }
+
+prtQosPrtIdx OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	not-accessible
+    STATUS		current
+    DESCRIPTION
+    "This object indicates a unique Port Index.
+     Refer to device specification for port Index."
+    ::= { prtQosEntry 2 }
+
+prtQosDirection OBJECT-TYPE
+    SYNTAX		INTEGER {
+		all			(1),
+		ingress		(2),
+		egress		(3)
+	}
+    MAX-ACCESS	not-accessible
+    STATUS		current
+    DESCRIPTION
+    "This object indicates the port's QoS Direction."
+    ::= { prtQosEntry 3 }
+
+prtQosRateLimitPacketType OBJECT-TYPE
+    SYNTAX		INTEGER {
+		all								(1),
+		bcastAndMcastAndFloodedUcast	(2), -- BroadCast + Multicast + Flooded Unicast
+		bcastAndMcast					(3), -- BroadCast + Multicast
+		bcast							(4)  -- BroadCast
+	}
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION
+    "This object indicates the Type of Packets on which Rate Limitation is applied."
+    ::= { prtQosEntry 4 }
+
+prtQosRateLimitCIR OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION
+    "This object indicates the port's CIR (Committed Information Rate) in Kbps.
+     Value=0 represents best effort."      
+    ::= { prtQosEntry 5 }
+
+prtQosRateLimitCBS OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION
+    "This object indicates the port's CBS (Committed Burst Size) in KB.
+     Value=0 represents best effort."            
+    ::= { prtQosEntry 6 }
+
+prtQosRateLimitEIR OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION
+    "This object indicates the port's EIR (Excess Information Rate) in Kbps."            
+    ::= { prtQosEntry 7 }
+
+prtQosRateLimitEBS OBJECT-TYPE
+    SYNTAX		Unsigned32
+    MAX-ACCESS	read-write
+    STATUS		current
+    DESCRIPTION
+    "This object indicates the port's EBS (Excess  Burst Size) in KB."            
+    ::= { prtQosEntry 8 }
+
+prtTrafficClass		 OBJECT IDENTIFIER ::= { services 5 }
+
+portTrafficClassTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PortTrafficClassEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "Mapping of port to Traffic Class level."
+    ::= { prtTrafficClass 1 }
+
+portTrafficClassEntry  OBJECT-TYPE
+    SYNTAX      PortTrafficClassEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in portTrafficClassTable."
+    INDEX   { portTrafficClassIdx1, portTrafficClassPortIdx }
+    ::= { portTrafficClassTable 1 }
+
+PortTrafficClassEntry ::=
+    SEQUENCE {
+        portTrafficClassIdx1       		Integer32,
+        portTrafficClassPortIdx         Integer32,
+        portTrafficClass    			Integer32
+    }
+
+portTrafficClassIdx1 OBJECT-TYPE
+    SYNTAX  Integer32 (1..255)
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "This attribute indicates the 1st index of the table.
+    This may be the Idx of the Cnfg(1..255) being accessed; 
+    Idx of 255 relates to the TmpCnfg, or any other Index."
+    ::= { portTrafficClassEntry 1 }
+
+portTrafficClassPortIdx OBJECT-TYPE
+    SYNTAX      Integer32  (0..2147483647)
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This object indicates a unique Port Index.
+     Refer to device specification for port Index."
+    ::= { portTrafficClassEntry 2 }
+
+portTrafficClass OBJECT-TYPE
+    SYNTAX      Integer32  (0..7)
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+    "This object indicates the Traffic Class level of this port."
+    ::= { portTrafficClassEntry 3 }
+
+--------------------------
+--  Services Definitions
+--------------------------
+serviceTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF ServiceEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Table of services."
+   ::= { services 6 }
+
+serviceEntry OBJECT-TYPE
+    SYNTAX     ServiceEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "An entry in the Service Table."
+    INDEX { ifIndex, flowIndex, serviceIndex  }
+    ::= { serviceTable 1 }
+
+ServiceEntry ::= SEQUENCE {
+    flowIndex                 Unsigned32,
+    serviceIndex              Unsigned32,
+    serviceRowStatus          RowStatus,
+    serviceName               SnmpAdminString,
+    serviceBwProfileId        Unsigned32 
+ }
+
+flowIndex     OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the Flow ID the service is associated to."
+    ::= { serviceEntry 1 }
+
+serviceIndex  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the Service ID - according to the CoS."
+    ::= { serviceEntry 2 }
+
+serviceRowStatus    OBJECT-TYPE
+    SYNTAX        RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing
+       row in the table."
+    ::= {  serviceEntry 3 }
+
+serviceName      OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute defines the service name."
+    ::= {  serviceEntry 4 }
+
+serviceBwProfileId   OBJECT-TYPE
+    SYNTAX       Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This variable holds the index of the Ingress BW profile assigned
+      to that service."
+    ::= {  serviceEntry 5 }
+
+--EVC CoS Table 
+
+evcCosTable OBJECT-TYPE
+ 	SYNTAX  SEQUENCE OF EvcCosEntry
+ 	MAX-ACCESS  not-accessible
+ 	STATUS current
+ 	DESCRIPTION  
+ 	"This table defines  mapping of Ethernet Virtual Connection 
+ 	 (EVC) ID to Class of Service (CoS) ID "
+ 	::= {services 7}
+ 
+evcCosEntry OBJECT-TYPE
+     SYNTAX EvcCosEntry
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION  "An entry in table."
+     INDEX {evcCosCnfgIdx,evcCosEvcIdx}
+     ::= { evcCosTable 1}
+ 
+EvcCosEntry ::=
+     SEQUENCE {	
+     evcCosCnfgIdx              Unsigned32,
+     evcCosEvcIdx 	            Unsigned32,
+     evcCosRowStatus            RowStatus,
+--     evcCosServiceProfileIdx  Unsigned32,
+	 evcCosEvcName				SnmpAdminString,
+	 evcCosSpVlanId				Unsigned32
+  	}
+ 
+evcCosCnfgIdx OBJECT-TYPE
+     SYNTAX Unsigned32 (1..255)
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     "This attribute indicates the Idx of the Cnfg(1..255) being 
+      accessed ; Idx of 255 relates to the TmpCnfg."
+     ::= {evcCosEntry 1}
+
+evcCosEvcIdx OBJECT-TYPE
+     SYNTAX Unsigned32 (1..4095)
+     MAX-ACCESS not-accessible
+     STATUS current
+     DESCRIPTION
+     "This attribute indicates EVC Id."
+     ::= {evcCosEntry 2}
+
+evcCosRowStatus	 OBJECT-TYPE
+      SYNTAX     RowStatus 
+      MAX-ACCESS read-create
+      STATUS     current
+      DESCRIPTION
+      "This attribute allows to create/delete a row in this table."
+      ::= {evcCosEntry 3}
+
+--    ::= {evcCosEntry 4} (reserved)
+
+evcCosEvcName   OBJECT-TYPE
+     SYNTAX  	SnmpAdminString 
+     MAX-ACCESS read-create
+     STATUS current
+     DESCRIPTION
+     "A string that identifies the EVC. It should be unique 
+     in the Maintenance Domain (i.e., in the managed network)
+     Used as MEG ID field in OAM messages."
+     ::= {evcCosEntry 5}
+
+evcCosSpVlanId   OBJECT-TYPE
+     SYNTAX     Unsigned32 
+     MAX-ACCESS read-create
+     STATUS current
+     DESCRIPTION
+     "This object indicates the SP (Service Provider) VLAN used when sending 
+     an OAM message for the specified EVC."
+     ::= {evcCosEntry 6}
+
+
+-----------------------------------
+--  Service Statistics Definitions
+-----------------------------------
+
+serviceStatTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF ServiceStatEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Service statistics table."
+   ::= { services 8 }
+
+serviceStatEntry OBJECT-TYPE
+    SYNTAX     ServiceStatEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "An entry in the Service Statistics Table. "
+    INDEX { ifIndex, flowIndex, serviceIndex, serviceStatDirection  }
+    ::= { serviceStatTable 1 }
+
+ServiceStatEntry ::= SEQUENCE {
+    serviceStatDirection                INTEGER,
+    srvForwardGreenPackets              Counter32,
+    srvForwardGreenPacketsOverflow      Counter32,
+    srvForwardYellowPackets             Counter32,
+    srvForwardYellowPacketsOverflow     Counter32,
+    srvDiscardGreenPackets              Counter32,
+    srvDiscardGreenPacketsOverflow      Counter32,
+    srvDiscardYellowRedPackets          Counter32,
+    srvDiscardYellowRedPacketsOverflow  Counter32,
+    srvForwardGreenBytes                Counter32,
+    srvForwardGreenBytesOverflow        Counter32,
+    srvForwardYellowBytes               Counter32,
+    srvForwardYellowBytesOverflow       Counter32,
+    srvDiscardGreenBytes                Counter32,
+    srvDiscardGreenBytesOverflow        Counter32,
+    srvDiscardYellowRedBytes            Counter32,
+    srvDiscardYellowRedBytesOverflow    Counter32,
+    srvResetStatsCmd                    INTEGER,
+    srvDiscardYellowPackets             Counter32,
+    srvDiscardYellowPacketsOverflow     Counter32,
+    srvDiscardYellowBytes               Counter32,
+    srvDiscardYellowBytesOverflow       Counter32,
+    srvDiscardRedPackets                Counter32,
+    srvDiscardRedPacketsOverflow        Counter32,
+    srvDiscardRedBytes                  Counter32,
+    srvDiscardRedBytesOverflow          Counter32 
+ }
+
+serviceStatDirection  OBJECT-TYPE
+    SYNTAX     INTEGER
+    {
+         upstream   (1),
+         downstream (2),
+         notApplicable(255)
+    }
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "The direction in which the measurement is taken."
+    ::= {  serviceStatEntry 1 }
+
+
+srvForwardGreenPackets     OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded packets
+      that where marked Green."
+    ::= {  serviceStatEntry 2 }
+
+srvForwardGreenPacketsOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardGreenPackets counter has overflowed."
+    ::= {  serviceStatEntry 3 }
+
+srvForwardYellowPackets  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded packets
+      that where marked Yellow."
+    ::= {  serviceStatEntry 4 }
+
+srvForwardYellowPacketsOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardYellowPackets counter has overflowed."
+    ::= {  serviceStatEntry 5 }
+
+srvDiscardGreenPackets OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded packets
+      that where marked Green."
+    ::= {  serviceStatEntry 6 }
+
+srvDiscardGreenPacketsOverflow  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         discardGreenPacket counter has overflowed."
+    ::= {  serviceStatEntry 7 }
+
+srvDiscardYellowRedPackets OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded packets
+      that where marked Yellow or Red."
+    ::= {  serviceStatEntry 8 }
+
+srvDiscardYellowRedPacketsOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         discardYellowRedPackets counter has overflowed."
+    ::= {  serviceStatEntry 9 }
+
+srvForwardGreenBytes        OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded bytes
+      that where marked Green."
+    ::= {  serviceStatEntry 10 }
+
+srvForwardGreenBytesOverflow    OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardGreenBytes counter has overflowed."
+    ::= {  serviceStatEntry 11 }
+
+srvForwardYellowBytes   OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of forwarded bytes
+      that where marked Yellow."
+    ::= {  serviceStatEntry 12 }
+
+srvForwardYellowBytesOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         forwardYellowBytes counter has overflowed."
+    ::= {  serviceStatEntry 13 }
+
+srvDiscardGreenBytes  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded bytes
+      that where marked Green."
+    ::= {  serviceStatEntry 14 }
+
+srvDiscardGreenBytesOverflow  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         discardGreenBytes counter has overflowed."
+    ::= {  serviceStatEntry 15}
+
+srvDiscardYellowRedBytes OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded bytes
+      that where marked Yellow or Red."
+    ::= {  serviceStatEntry 16 }
+
+srvDiscardYellowRedBytesOverflow OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+         discardYellowRedBytes counter has overflowed."
+    ::= {  serviceStatEntry 17 }
+
+
+srvResetStatsCmd   OBJECT-TYPE
+    SYNTAX       INTEGER
+    {
+       off(2),
+       on (3)
+    }
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+    "Reset statistic counters of the service."
+   ::= { serviceStatEntry 18 }
+
+srvDiscardYellowPackets  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the counted number of discarded packets
+      that where marked Yellow."
+    ::= {  serviceStatEntry 19 }
+
+
+srvDiscardYellowPacketsOverflow  OBJECT-TYPE
+    SYNTAX    Counter32
+    MAX-ACCESS read-only
+    STATUS     current
+    DESCRIPTION
+      "This attribute displays the number of times that the
+       discardYellowPackets counter has overflowed."
+    ::= {  serviceStatEntry 20 }
+
+
+srvDiscardYellowBytes               OBJECT-TYPE
+   SYNTAX    Counter32
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "This attribute displays the counted number of discarded bytes
+      that where marked Yellow."
+    ::= {  serviceStatEntry 21 }
+
+srvDiscardYellowBytesOverflow       OBJECT-TYPE
+   SYNTAX    Counter32
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "This attribute displays the number of times that the
+       discardYellowBytes counter has overflowed."
+    ::= {  serviceStatEntry 22 }
+
+srvDiscardRedPackets                OBJECT-TYPE
+   SYNTAX    Counter32
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "This attribute displays the counted number of discarded packets
+      that where marked Red."
+    ::= {  serviceStatEntry 23 }
+
+srvDiscardRedPacketsOverflow        OBJECT-TYPE
+   SYNTAX    Counter32
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+       "This attribute displays the number of times that the
+        discardRedPackets counter has overflowed."
+    ::= {  serviceStatEntry 24 }
+
+srvDiscardRedBytes                  OBJECT-TYPE
+   SYNTAX    Counter32
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "This attribute displays the counted number of discarded bytes
+       that where marked Red."
+    ::= {  serviceStatEntry 25 }
+
+srvDiscardRedBytesOverflow          OBJECT-TYPE
+   SYNTAX    Counter32
+   MAX-ACCESS read-only
+   STATUS     current
+   DESCRIPTION
+      "This attribute displays the number of times that the
+       discardRedBytes counter has overflowed."
+    ::= {  serviceStatEntry 26 }
+
+
+ -- QoS Flow Mapping Definition
+mappingProfileObjects OBJECT IDENTIFIER ::= {  services 9 }
+
+ -- QoS Flow Mapping Profile table
+flowMappingProfileTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF FlowMappingProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "This table holds flow mapping profiles."
+    ::= { mappingProfileObjects 1 }
+
+flowMappingProfileEntry OBJECT-TYPE
+    SYNTAX  FlowMappingProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Each entry in this table describes one Flow mapping profile with
+         one of its Flow Mapping supported, according to the Priority order.
+         The information includes a reference to a Flow Mapping index.
+        "
+    INDEX { flowMappingProfileIndex, flowMappingProfilePriority }
+    ::= { flowMappingProfileTable 1 }
+
+FlowMappingProfileEntry ::= SEQUENCE {
+    flowMappingProfileIndex        Unsigned32,
+    flowMappingProfilePriority     INTEGER,
+    flowMappingProfileRowStatus    RowStatus,
+    flowMappingProfileNumOfMaps    Unsigned32,
+    flowMappingProfileMapIndex     Unsigned32,
+    flowMappingProfileName         SnmpAdminString,
+    flowMappingProfileCondition    INTEGER 
+ }
+
+flowMappingProfileIndex OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "A running index for the Flow Mapping Profile table."
+    ::= { flowMappingProfileEntry 1 }
+
+flowMappingProfilePriority OBJECT-TYPE
+    SYNTAX  INTEGER
+    MAX-ACCESS not-accessible
+    STATUS  current
+    DESCRIPTION
+        "The priority of the selected Mapping."
+    ::= { flowMappingProfileEntry 2 }
+
+flowMappingProfileRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "This attribute is used to create a new row or to delete an
+        existing row in the table."
+    ::= { flowMappingProfileEntry 3 }
+
+flowMappingProfileNumOfMaps OBJECT-TYPE
+    SYNTAX  Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the number of the mappings
+        associated to the Flow Mapping Profile."
+    ::= { flowMappingProfileEntry 4 }
+
+flowMappingProfileMapIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      deprecated
+    DESCRIPTION
+            "This attribute holds a reference to the mapping index.
+            It specifies the mapping selected for the Mapping Profile
+            for the selected Priority.
+            When flowMappingProfileNumOfMaps=0, this attribute is not
+            relevant."
+    ::= { flowMappingProfileEntry 5 }
+
+flowMappingProfileName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the name assigned to flowMappingIndex profile."
+    ::= { flowMappingProfileEntry 6 }
+
+flowMappingProfileCondition OBJECT-TYPE
+    SYNTAX     INTEGER {
+                        or (2),
+                        and(3)
+                        }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute defines the condition between the mappings/rules
+     associated to this Flow Mapping Profile."
+    ::= { flowMappingProfileEntry 7 }
+
+-- QoS: Flow Mapping table
+
+qosFlowMappingTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF QosFlowMappingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "A table of Flow Mapping."
+    ::= { mappingProfileObjects 2 }
+
+qosFlowMappingEntry OBJECT-TYPE
+    SYNTAX QosFlowMappingEntry
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "Each entry in this table describes one Flow Mapping.
+         The information includes combination (AND function) of all the
+         classifications, as defined in the qosFlowMappingCriteria field.
+         Classifiers are: TOS, DSCP, VLAN ID, MAC and IP source and
+         destination addresses, IP protocol, IP Precedence, TCP and UDP
+         source and destination ports."
+    INDEX { qosFlowMappingIdx1, qosFlowMappingIdx2, qosFlowMappingIdx3 }
+    ::= { qosFlowMappingTable 1 }
+
+QosFlowMappingEntry ::= SEQUENCE {
+    qosFlowMappingIdx1                Unsigned32,
+    qosFlowMappingIdx2                Unsigned32,
+    qosFlowMappingIdx3                Unsigned32,
+    qosFlowMappingRowStatus           RowStatus,
+    qosFlowMappingCriteria            BITS,
+    qosFlowMappingIeee802dot1p        Unsigned32,
+    qosFlowMappingTos                 Unsigned32,
+    qosFlowMappingFromDscp            Unsigned32,
+    qosFlowMappingToDscp              Unsigned32,
+    qosFlowMappingFromVlanId          Unsigned32,
+    qosFlowMappingToVlanId            Unsigned32,
+    qosFlowMappingFromSrcMacAddr      MacAddress,
+    qosFlowMappingToSrcMacAddr        MacAddress,
+    qosFlowMappingFromDestMacAddr     MacAddress,
+    qosFlowMappingToDestMacAddr       MacAddress,
+    qosFlowMappingFromSrcIpAddr       IpAddress,
+    qosFlowMappingToSrcIpAddr         IpAddress,
+    qosFlowMappingFromDestIpAddr      IpAddress,
+    qosFlowMappingToDestIpAddr        IpAddress,
+    qosFlowMappingFromTcpSrcPort      Unsigned32,
+    qosFlowMappingToTcpSrcPort        Unsigned32,
+    qosFlowMappingFromTcpDestPort     Unsigned32,
+    qosFlowMappingToTcpDestPort       Unsigned32,
+    qosFlowMappingFromUdpSrcPort      Unsigned32,
+    qosFlowMappingToUdpSrcPort        Unsigned32,
+    qosFlowMappingFromUdpDestPort     Unsigned32,
+    qosFlowMappingToUdpDestPort       Unsigned32,
+    qosFlowMappingFromIpPrecedence    Unsigned32,
+    qosFlowMappingToIpPrecedence      Unsigned32,
+    qosFlowMappingInnerIeee802dot1p   Unsigned32,
+    qosFlowMappingFromInnerVlanId     Unsigned32,
+    qosFlowMappingToInnerVlanId       Unsigned32,
+    qosFlowMappingEtherType           Unsigned32 
+ }
+
+qosFlowMappingIdx1 OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "
+        - In case the table is accessed via flowMappingProfileTable
+        this is a running index for the QoS Flow Mapping table.
+        - In case the table is not accessed via flowMappingProfileTable,
+        this will be the ifIndex of the XNI (bridge port) to which the
+        QoS mapping applies.
+        "
+    ::= { qosFlowMappingEntry 1 }
+
+qosFlowMappingIdx2 OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An index for the QoS Flow Mapping table.
+        - In case the table is accessed via flowMappingProfileTable
+        the index will be fixed = 1.
+        - In case the table is not accessed via flowMappingProfileTable,
+        this will be the index of the Flow (EVC) to which the QoS mapping
+        applies."
+    ::= { qosFlowMappingEntry 2 }
+
+qosFlowMappingIdx3 OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+        "An index for the QoS Flow Mapping table.
+        - In case the table is accessed via flowMappingProfileTable
+        the index will be fixed = 1.
+        - In case the table is not accessed via flowMappingProfileTable,
+        this will be the Priority to which the QoS mapping applies.
+        "
+    ::= { qosFlowMappingEntry 3 }
+
+qosFlowMappingRowStatus OBJECT-TYPE
+    SYNTAX RowStatus
+    MAX-ACCESS  read-create
+    STATUS  current
+    DESCRIPTION
+       "This attribute is used to create a new row or to delete an existing
+        row in the table."
+    ::= { qosFlowMappingEntry 4 }
+
+qosFlowMappingCriteria OBJECT-TYPE
+    SYNTAX BITS {
+         ieee802dot1p (0),
+         tos          (1),
+         dscp         (2),
+         vlanId       (3),
+         macSrcAddr   (4),
+         macDestAddr  (5),
+         ipSrcAddr    (6),
+         ipDestAddr   (7),
+         tcpSrcPort   (8),
+         tcpDestPort  (9),
+         udpSrcPort   (10),
+         udpDestPort  (11),
+         ipPrecedence (12),
+         innerIeee802dot1p (13),
+         innerVlanId (14),
+         untagged     (15),
+         nonIP        (16),
+         etherType    (17),
+         myMac        (18),
+         myIp         (19)
+
+    }
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines upon which criterion the flow
+        will be mapped."
+    ::= { qosFlowMappingEntry 5 }
+
+qosFlowMappingIeee802dot1p OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines which TOS values are applicable for that
+         flow.
+        Each bit (0..7) represents a different 802.1 P-bit value.
+        Setting '1' to the bit means that the corresponding 802.1 P-bit value
+        is applicable.
+        It is relevant only in case the ieee802dot1p bit(0) in
+        qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 6 }
+
+qosFlowMappingTos   OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines which TOS values are applicable for that
+         flow.
+        Each bit (0..7) represents a different TOS value.
+        Setting '1' to the bit means that the corresponding TOS value is
+        applicable.
+        It is relevant only in case the tos bit (1) in qosFlowMappingCriteria
+        equals 1."
+    ::= { qosFlowMappingEntry 7 }
+
+qosFlowMappingFromDscp      OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first DSCP value to compare with
+         in a range.
+         It is relevant only in case the dscp bit (2) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 8 }
+
+qosFlowMappingToDscp OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first DSCP value to compare with in
+         a range.
+         It is relevant only in case the dscp bit (2) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 9 }
+
+qosFlowMappingFromVlanId    OBJECT-TYPE
+    SYNTAX    Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first VLAN ID value to compare with
+         in a range.
+         It is relevant only in case the vlanId bit (3) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 10 }
+
+qosFlowMappingToVlanId    OBJECT-TYPE
+    SYNTAX    Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last VLAN ID value to compare with
+         in a range.
+         It is relevant only in case the vlanId bit (3) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 11 }
+
+qosFlowMappingFromSrcMacAddr OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first source MAC address to compare
+         with in a range.
+         It is relevant only in case the macSrcAddr bit (4) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 12 }
+
+qosFlowMappingToSrcMacAddr    OBJECT-TYPE
+    SYNTAX    MacAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last source MAC address to compare
+         with in a range.
+         It is relevant only in case the macSrcAddr bit (4) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 13 }
+
+qosFlowMappingFromDestMacAddr OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first destination MAC address to
+         compare with in a range.
+         It is relevant only in case the macDestAddr (5) bit in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 14 }
+
+qosFlowMappingToDestMacAddr OBJECT-TYPE
+    SYNTAX MacAddress
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last destination MAC address to
+         compare with in a range.
+         It is relevant only in case the macDestAddr (5) bit in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 15 }
+
+qosFlowMappingFromSrcIpAddr      OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-create
+    STATUS deprecated
+    DESCRIPTION
+        "This attribute determines the first source IP address to compare
+         with in a range.
+         It is relevant only in case the ipSrcAddr (6) bit in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 16 }
+
+qosFlowMappingToSrcIpAddr  OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-create
+    STATUS deprecated
+    DESCRIPTION
+        "This attribute determines the last source IP address to compare
+         with in a range.
+         It is relevant only in case the ipSrcAddr (6) bit in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 17 }
+
+qosFlowMappingFromDestIpAddr   OBJECT-TYPE
+    SYNTAX       IpAddress
+    MAX-ACCESS   read-create
+    STATUS deprecated
+    DESCRIPTION
+        "This attribute determines the first destination IP address to
+         compare with in a range.
+         It is relevant only in case the ipDestAddr (7) bit in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 18 }
+
+qosFlowMappingToDestIpAddr    OBJECT-TYPE
+    SYNTAX       IpAddress
+    MAX-ACCESS   read-create
+    STATUS deprecated
+    DESCRIPTION
+        "This attribute determines the last destination IP address to
+         compare with in a range.
+         It is relevant only in case the ipDestAddr (7) bit in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 19 }
+
+qosFlowMappingFromTcpSrcPort   OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first TCP source port to compare with in a range.
+         It is relevant only in case the tcpSrcPort bit (8) in qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 20 }
+
+qosFlowMappingToTcpSrcPort OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last TCP source port to compare with in a range.
+         It is relevant only in case the tcpSrcPort bit (8) in qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 21 }
+
+qosFlowMappingFromTcpDestPort OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first TCP destination port to compare with in a range.
+         It is relevant only in case the tcpDestPort bit (9) in qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 22 }
+
+qosFlowMappingToTcpDestPort    OBJECT-TYPE
+    SYNTAX    Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last TCP destination port to compare with in a range.
+         It is relevant only in case the tcpDestPort bit (9) in qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 23 }
+
+qosFlowMappingFromUdpSrcPort OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first UDP source port to compare with in a range.
+         It is relevant only in case the udpSrcPort bit (10) in qosFlowMappingCriteria equals 1."
+   ::= { qosFlowMappingEntry 24 }
+
+qosFlowMappingToUdpSrcPort OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last UDP source port to compare with in a range.
+         It is relevant only in case the udpSrcPort bit (10) in qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 25 }
+
+qosFlowMappingFromUdpDestPort OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first UDP destination port to compare with in a range.
+         It is relevant only in case the udpDestPort bit (11) in qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 26 }
+
+qosFlowMappingToUdpDestPort OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last UDP destination port to compare with in a range.
+         It is relevant only in case the udpDestPort bit (11) in qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 27 }
+
+qosFlowMappingFromIpPrecedence OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first IpPrecedence value to compare
+         with in a range.
+         It is relevant only in case the IpPrecedence bit (12) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 28 }
+
+qosFlowMappingToIpPrecedence OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last IpPrecedence value to compare
+         with in a range.
+         It is relevant only in case the IpPrecedence bit (12) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 29 }
+
+qosFlowMappingInnerIeee802dot1p OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines which TOS values are applicable for that
+         flow.
+         Each bit (0..7) represents a different inner 802.1 P-bit value.
+         Setting '1' to the bit means that the corresponding inner 802.1
+         P-bit value is applicable.
+         It is relevant only in case the innerIeee802dot1p bit (13) in
+         qosFlowMappingCriteria equals 1."
+     ::= { qosFlowMappingEntry 30 }
+
+qosFlowMappingFromInnerVlanId    OBJECT-TYPE
+    SYNTAX    Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the first inner VLAN ID value to compare
+         with in a range.
+         It is relevant only in case the innerVlanId bit(14) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 31 }
+
+qosFlowMappingToInnerVlanId    OBJECT-TYPE
+    SYNTAX    Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+        "This attribute determines the last inner VLAN ID value to compare
+         with in a range.
+         It is relevant only in case the innerVlanId bit(14) in
+         qosFlowMappingCriteria equals 1."
+    ::= { qosFlowMappingEntry 32 }
+
+qosFlowMappingEtherType    OBJECT-TYPE
+    SYNTAX    Unsigned32
+    MAX-ACCESS read-create
+    STATUS current
+    DESCRIPTION
+     "Determines the Tag Protocol Identifier (in Hex).
+      For example:
+      0x8100 (C-TAG)
+      0x88A8 (S-TAG)
+      It is relevant only in case the etherType bit (17) in
+      qosFlowMappingCriteria equals 1."
+         ::= { qosFlowMappingEntry 33 }
+
+-- CoS Profile Definition
+cosProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF CosProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Class of Service Profile table.
+      Each profile holds a priority method, and a mapping function
+      that maps the priority values (range according to the method)
+      into CoS values."
+   ::= { services 10 }
+
+cosProfileEntry OBJECT-TYPE
+    SYNTAX     CosProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "A conceptual row where each row contains one CoS attributes."
+    INDEX { cosProfileIndex }
+    ::= { cosProfileTable 1 }
+
+CosProfileEntry ::= SEQUENCE {
+    cosProfileIndex                 Unsigned32,
+    cosProfileRowStatus             RowStatus,
+    cosProfileCosMethod             ProfileMethod,
+    cosProfileName                  SnmpAdminString,
+    cosProfileCosMapping            OCTET STRING 
+ }
+
+cosProfileIndex   OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the CoS Profile ID."
+    ::= { cosProfileEntry 1 }
+
+cosProfileRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing row
+       in the table."
+    ::= {  cosProfileEntry 2 }
+
+cosProfileCosMethod   OBJECT-TYPE
+    SYNTAX      ProfileMethod
+    MAX-ACCESS  read-create
+    STATUS     current
+    DESCRIPTION
+      "Defines the priority method upon CoS mapping is done."
+    ::= { cosProfileEntry 3 }
+
+cosProfileName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the name assigned to CoS profile."
+    ::= { cosProfileEntry 4 }
+
+cosProfileCosMapping  OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..64))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the value of the CoS that is assigned
+      for each priority. The number of the valid octets depends upon
+      the priority method selected:
+      Octet 0 corresponds to priority = 0
+      Octet 1 corresponds to priority = 1
+      ...
+      Octet 63 corresponds to priority = 63.
+      "
+    ::= { cosProfileEntry 5 }
+
+
+-- Queue Profile Attributes
+queueProfileObjects OBJECT IDENTIFIER ::= {  services 11 }
+
+qProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF QProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This table defines the profiles for a cluster of queues.
+      "
+   ::= { queueProfileObjects 1 }
+
+qProfileEntry OBJECT-TYPE
+    SYNTAX     QProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "A conceptual row where each row contains one Queue Cluster attribute."
+    INDEX { qProfileIndex  }
+    ::= { qProfileTable 1 }
+
+QProfileEntry ::= SEQUENCE {
+    qProfileIndex                   Unsigned32,
+    qProfileRowStatus               RowStatus,
+    qProfileName                    SnmpAdminString,
+    qProfileNumberOfInternalQ       Unsigned32,
+    qProfileInternalQProfile        OCTET STRING 
+ }
+
+qProfileIndex  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the Queue Cluster Profile ID."
+    ::= { qProfileEntry 1 }
+
+qProfileRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing
+       row in the table."
+    ::= { qProfileEntry 2 }
+
+qProfileName    OBJECT-TYPE
+    SYNTAX       SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute holds the name of the Queue cluster profile."
+    ::= { qProfileEntry 3 }
+
+qProfileNumberOfInternalQ   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute holds the number of the internal queue profiles
+      that are pointed by qProfileInternalQProfile."
+    ::= { qProfileEntry 4 }
+
+qProfileInternalQProfile  OBJECT-TYPE
+    SYNTAX      OCTET STRING
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+            "This attribute is a vector that holds the indices to the
+            queue profiles in the qInternalProfileTable. The index
+            length depends on specific product realization and may equal
+            two or four octets."
+    ::= { qProfileEntry 5 }
+
+
+qInternalProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF QInternalProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This table holds queue profiles."
+   ::= { queueProfileObjects 2 }
+
+qInternalProfileEntry OBJECT-TYPE
+    SYNTAX     QInternalProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "A conceptual row where each row contains one Queue attribute. "
+    INDEX { qInternalProfileIndex  }
+    ::= { qInternalProfileTable 1 }
+
+QInternalProfileEntry ::= SEQUENCE {
+    qInternalProfileIndex                Unsigned32,
+    qInternalProfileRowStatus            RowStatus,
+    qInternalProfileScheduling           INTEGER,
+    qInternalProfileWFQWeight            Unsigned32,
+    qInternalProfileQueueLength          Unsigned32,
+    qInternalProfileWredStartDropThresh  Unsigned32,
+    qInternalProfileWredDropAllThresh    Unsigned32,
+    qInternalProfileWredDropProbability  Unsigned32,
+    qInternalProfileRateLimit            Unsigned32,
+    qInternalProfileShaperProfile        Unsigned32,
+    qInternalProfileWredProfile          Unsigned32,
+    qInternalProfileFrameBuffers         Unsigned32 
+ }
+
+qInternalProfileIndex  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the Queue Profile ID."
+    ::= { qInternalProfileEntry 1 }
+
+qInternalProfileRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing
+       row in the table."
+    ::= { qInternalProfileEntry 2 }
+
+
+qInternalProfileScheduling    OBJECT-TYPE
+    SYNTAX       INTEGER
+    {
+       wfq         (1),
+       strict      (2),
+       bestEffort  (3)
+    }
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute determines the queue scheduling method."
+    ::= { qInternalProfileEntry 3 }
+
+qInternalProfileWFQWeight    OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute determines the weight that each WFQ
+       (Weighted Fair Queue) participant gets.
+       It is applicable only when scheduling is configured to WFQ."
+    ::= { qInternalProfileEntry 4 }
+
+qInternalProfileQueueLength   OBJECT-TYPE
+    SYNTAX        Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute determines the length of the queue."
+    ::= { qInternalProfileEntry 5 }
+
+qInternalProfileWredStartDropThresh OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      deprecated
+    DESCRIPTION
+      "This attribute determines the length that the queue (Start Value)
+      must reach before the packets colored yellow will start being dropped
+      by the WRED (Weighted Random Early Detection/Discard) mechanism.
+      WRED is one the most commonly used method for congestion avoidance."
+    ::= { qInternalProfileEntry 6 }
+
+qInternalProfileWredDropAllThresh  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      deprecated
+    DESCRIPTION
+      "This attribute determines the length that the queue (Stop Value)
+      must reach before the WRED (Weighted Random Early Detection)
+      shaper mechanism stops dropping randomly,
+      and just drops all further packets marked as yellow."
+    ::= { qInternalProfileEntry 7 }
+
+qInternalProfileWredDropProbability  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      deprecated
+    DESCRIPTION
+      "This attribute determines the percentage of packets that are being
+       dropped at the point when the length of the queue reaches the Stop
+       value.
+       So, effectively, this defines how quickly the rate of dropping packet
+       must increase as the queue length grows from the Start Value to the
+       Stop Value."
+    ::= { qInternalProfileEntry 8 }
+
+qInternalProfileRateLimit   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute determines the Rate Limit of the queue in Kbps.
+     Value=0 represents best effort."
+    ::= { qInternalProfileEntry 9 }
+
+qInternalProfileShaperProfile   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the Shaper Profile
+     (bwProfileIndex from bwProfileTable) assigned to this qInternalProfile.
+     Valid range of bwProfileIndex for Shaper
+     Profiles index starts from 0x8000001.
+     If set to '0', no  profile is assigned to this qInternalProfile."
+    ::= { qInternalProfileEntry 10 }
+
+qInternalProfileWredProfile   OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the WRED Profile
+     (wredProfileIndex from wredProfileTable) assigned to this
+     qInternalProfile.
+     If set to '0', no  profile is assigned to this qInternalProfile."
+    ::= { qInternalProfileEntry 11 }
+
+qInternalProfileFrameBuffers    OBJECT-TYPE
+    SYNTAX        Unsigned32 (0..16384)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute determines the number of frame buffers assigned
+      to a queue."
+      DEFVAL { 511 }
+    ::= { qInternalProfileEntry 13 }
+
+
+queueGroupTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF QueueGroupEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This table defines the queue groups/blocks,their level and connections
+       between them."
+   ::= { queueProfileObjects 3 }
+
+queueGroupEntry OBJECT-TYPE
+    SYNTAX     QueueGroupEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "A conceptual row where each row contains one Queue group. "
+    INDEX {queueGroupName, queueGroupQBlockLevel,queueGroupQBlockIdx}
+    ::= { queueGroupTable 1 }
+
+QueueGroupEntry ::= SEQUENCE {
+    queueGroupName                 SnmpAdminString,
+    queueGroupQBlockLevel          Unsigned32,
+    queueGroupQBlockIdx            Unsigned32,
+    queueGroupRowStatus            RowStatus,
+    queueGroupQBlockProfile        Unsigned32,
+    queueGroupQBlockShaperProfile  Unsigned32,
+    queueGroupPointToQBlock        SnmpAdminString,
+    queueGroupPointToInternalQueue Unsigned32,
+    queueGroupQBlockName           SnmpAdminString 
+ }
+
+queueGroupName  OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the Queue Group unique name."
+    ::= { queueGroupEntry 1 }
+
+queueGroupQBlockLevel   OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This attribute holds the Level of the Queue Block. First level is 1.
+       NA=2^32-1."
+    ::= { queueGroupEntry 2 }
+
+queueGroupQBlockIdx    OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "This attribute holds the ID of the Queue Block.
+       NA=2^32-1."
+       ::= { queueGroupEntry 3 }
+
+queueGroupRowStatus  OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing
+       row in the table."
+    ::= { queueGroupEntry 4 }
+
+queueGroupQBlockProfile  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the Queue profile assigned to this Queue Block.
+       This object points to qProfileIndex in qProfileTable. "
+    ::= { queueGroupEntry 5 }
+
+queueGroupQBlockShaperProfile  OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the Shaper profile assigned to this Queue
+       Block."
+    ::= { queueGroupEntry 6 }
+
+queueGroupPointToQBlock  OBJECT-TYPE
+    SYNTAX      SnmpAdminString(SIZE (1..32))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the Queue Block name of the next Queue Block
+       level that is pointed by this Queue Block."
+    ::= { queueGroupEntry 7 }
+
+queueGroupPointToInternalQueue  OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the internal queue within
+       queueGroupPointToQBlock that is pointed by this Queue Block."
+    ::= { queueGroupEntry 8 }
+
+queueGroupQBlockName    OBJECT-TYPE
+    SYNTAX     SnmpAdminString (SIZE (1..32))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute holds the name of the Queue Block."
+    ::= { queueGroupEntry 9 }
+
+
+-- Marking Profile Attributes
+
+
+markingProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF MarkingProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "Marking profile table. Each profile holds a marking function
+     which converts CoS values to Service Provider priority values."
+   ::= { services 12 }
+
+
+markingProfileEntry OBJECT-TYPE
+    SYNTAX     MarkingProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "A conceptual row where each row contains one Marking attribute."
+    INDEX { markingProfileIndex }
+    ::= { markingProfileTable 1 }
+
+MarkingProfileEntry ::= SEQUENCE {
+    markingProfileIndex        Unsigned32,
+    markingProfileRowStatus    RowStatus,
+    markingProfileName         SnmpAdminString,
+    markingSpVlanPBit          OCTET STRING,
+    markingProfileMethod       ProfileMethod,
+    markingProfileColorAware   BITS,
+    markingProfileDeiAware     INTEGER,
+    markingProfileDeiColor     OCTET STRING,
+    markingProfileDscpColor    OCTET STRING,
+    markingProfileMarkedField  ProfileMethod 
+ }
+
+markingProfileIndex   OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+    "Defines the Marking Profile ID."
+    ::= { markingProfileEntry 1 }
+
+
+markingProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute is used to create a new row or to delete an existing
+     row in the table."
+    ::= {  markingProfileEntry 2 }
+
+
+markingProfileName OBJECT-TYPE
+    SYNTAX     SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute defines the unique name assigned to the marking profile."
+    ::= { markingProfileEntry 3 }
+
+markingSpVlanPBit    OBJECT-TYPE
+    SYNTAX     OCTET STRING  (SIZE (192))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute defines the value of the SP VLAN P-bit that is assigned
+     for each frame according to the value of markingProfileMethod parameter :
+
+     Octet 0 corresponds to value 0 of  P-bit/DSCP/TOS/IP Precedence.
+     Octet 1 corresponds to value 1 of  P-bit/DSCP/TOS/IP Precedence.
+     ...
+     Octet 7 corresponds to value 7 of  P-bit/DSCP/TOS/IP Precedence.
+     Octets 8-63 correspond to DSCP values 8-63.
+
+     For products that support priority marking according to the policer
+     color (e.g ETX 202A from V1.67):
+
+     The first 64 octets will be supported for frames that their policer
+     color is green (according to markingProfileColorAware) as defined above.
+
+     Additional 64 octets will be supported for frames that their policer
+     color is Yellow (according to markingProfileColorAware) as follows:
+     Octet 64 corresponds to value 0 of P-bit/DSCP/TOS/IP Precedence.
+     Octet 65 corresponds to value 1 of P-bit/DSCP/TOS/IP Precedence.
+     ...
+     Octet 71 corresponds to value 7 of P-bit-yellow/DSCP/TOS/IP Precedence.
+     Octets 72-127 correspond to DSCP values 8-63.
+
+     Additional 64 octets will be supported for frames that their policer
+     color is Red:
+     Octet 128 corresponds to value 0 of P-bit/DSCP/TOS/IP Precedence.
+     Octet 129 corresponds to value 1 of P-bit/DSCP/TOS/IP Precedence.
+     ...
+     Octet 135 corresponds to value 7 of P-bit-yellow/DSCP/TOS/IP Precedence.
+     Octets 136-191 correspond to DSCP values 8-63.
+
+     Parameter length will be according to markingProfileColorAware
+     parameter.
+     If no color is supported for the specific profile ,the length will be
+     64 octets.
+     If the Green and Yellow colors are supported then the length is 128.
+     If Red color is supported ,the length will be 192 octets.
+     Therefore markingProfileColorAware should be configured before this
+     parameter, and cannot be changed per profile."
+    ::= { markingProfileEntry 4 }
+
+markingProfileMethod OBJECT-TYPE
+    SYNTAX      ProfileMethod
+    MAX-ACCESS  read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute defines the method that marking is done with."
+    ::= { markingProfileEntry 5 }
+
+markingProfileColorAware OBJECT-TYPE
+    SYNTAX   BITS
+    {
+    green      (0),
+    yellow     (1),
+    red        (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS     current
+    DESCRIPTION
+    "This parameter will be supported only for products that support priority
+     marking according to the policer color (e.g ETX-202A FROM R1.67):
+     This attribute defines the  supported colors for devices that support
+     priority marking according to the policer color.
+     If all bits equal zero , no color aware support is defined for the
+     specific profile.
+     This parameter should be configured before markingSpVlanPBit, and cannot
+     be changed per profile."
+    ::= { markingProfileEntry 6 }
+
+markingProfileDeiAware OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    aware        (1),
+    notAware     (2),
+    alwaysGreen  (3),
+    alwaysYellow (4),
+    byPolicer    (5)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the DEI usage.
+     aware  - Profile include DEI mapping - setting the DEI according to its
+              color, map each priority to specific DEI
+     notAware  - Profile doesn't include DEI mapping.
+     alwaysGreen - DEI set to 0
+     alwaysYellow - DEI set to 1
+     byPolicer - Profile include DEI mapping according to the policer."
+    ::= {markingProfileEntry 7 }
+
+markingProfileDeiColor OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (192))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This attribute defines the DEI bit value that is assigned
+     for each frame according to the markingProfileMethod value:
+
+     Octet 0 corresponds to value 0 of P-bit/DSCP/TOS/IP Precedence.
+     Octet 1 corresponds to value 1 of P-bit/DSCP/TOS/IP Precedence.
+     ...
+     Octet 7 corresponds to value 7 of  P-bit/DSCP/TOS/IP Precedence.
+     Octets 8-63 correspond to DSCP values 8-63.
+
+     For products that support priority marking according to the policer
+     color:
+
+     The first 64 octets will be supported for frames that their policer
+     color is Green (according to markingProfileColorAware) as defined above.
+
+     Additional 64 octets will be supported for frames that their policer
+     color is Yellow (according to markingProfileColorAware) as follows:
+     Octet 64 corresponds to value 0 of P-bit/DSCP/TOS/IP Precedence.
+     Octet 65 corresponds to value 1 of P-bit/DSCP/TOS/IP Precedence.
+     ...
+     Octet 71 corresponds to value 7 of P-bit-yellow/DSCP/TOS/IP Precedence.
+     Octets 72-127 correspond to DSCP values 8-63.
+
+     Additional 64 octets will be supported for frames that their policer
+     color is Red:
+     Octet 128 corresponds to value 0 of P-bit/DSCP/TOS/IP Precedence.
+     Octet 129 corresponds to value 1 of P-bit/DSCP/TOS/IP Precedence.
+     ...
+     Octet 135 corresponds to value 7 of P-bit-yellow/DSCP/TOS/IP Precedence.
+     Octets 136-191 correspond to DSCP values 8-63.
+
+     Parameter length is according to markingProfileColorAware.
+     If no color is supported for the specific profile the length will be
+     64 octets.
+     If the Green and Yellow colors are supported then the length is 128.
+     If Red color is supported ,the length will be 192 octets.
+     Therefore markingProfileColorAware should be configured before this
+     parameter, and cannot be changed per profile."
+    ::= { markingProfileEntry 8 }
+
+markingProfileDscpColor     OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE (128))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The input DSCP value marked according to the policer color.
+
+     The first 64 octets are for frames that their policer color is Green
+     (octets 0-63 correspond to input DSCP values 0-63).
+     The next 64 octets are for frames that their policer color is Yellow
+     (octets 64-127 correspond to input DSCP values 0-63)."
+    ::= { markingProfileEntry 9 }
+
+markingProfileMarkedField OBJECT-TYPE
+    SYNTAX      ProfileMethod
+    MAX-ACCESS  read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute indicates which field in the outgoing frame is modified
+     by this profile.
+
+     The values userPorts(6) and internalCos(7) are not applicable for this
+     object."
+    DEFVAL { ieee802dot1p }
+    ::= { markingProfileEntry 10 }
+
+-- WRED Profile Attributes
+
+wredProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF WredProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+     "This table holds WRED(Weighted Random Early Detection/Discard)
+      profiles."
+   ::= { services 13 }
+
+wredProfileEntry OBJECT-TYPE
+    SYNTAX     WredProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "An entry in the WRED profile Table. "
+    INDEX {wredProfileIndex, wredProfileColor }
+    ::= { wredProfileTable 1 }
+
+WredProfileEntry ::= SEQUENCE {
+    wredProfileIndex             Unsigned32,
+    wredProfileColor             INTEGER,
+    wredProfileRowStatus         RowStatus,
+    wredProfileName              SnmpAdminString,
+    wredProfileMinThreshold      Unsigned32,
+    wredProfileMaxThreshold      Unsigned32,
+    wredProfileMaxProbability    Unsigned32 
+ }
+
+wredProfileIndex    OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+     "Defines the WRED Profile ID."
+    ::= { wredProfileEntry 1 }
+
+wredProfileColor OBJECT-TYPE
+      SYNTAX      INTEGER
+                    {
+                    green (2),
+                    yellow(3),
+                    red   (4)
+                    }
+      MAX-ACCESS  not-accessible
+      STATUS  current
+      DESCRIPTION
+      "Defines the color of the packets that their WRED thresholds are
+       defined in this profile."
+      ::= {wredProfileEntry 2 }
+
+wredProfileRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+     "This attribute is used to create a new row or to delete an existing
+      row in the table."
+    ::= {  wredProfileEntry 3 }
+
+wredProfileName OBJECT-TYPE
+    SYNTAX     SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the unique name assigned to the WRED profile."
+    ::= { wredProfileEntry 4 }
+
+wredProfileMinThreshold OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute determines the queue usage minimum threshold in
+       percent.
+       Above it the packets colored yellow will start being dropped
+       by the WRED (Weighted Random Early Detection/Discard) mechanism."
+    ::= { wredProfileEntry 5 }
+
+wredProfileMaxThreshold OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute determines the queue usage maximum threshold in
+       percent.
+       Above it shaper mechanism stops dropping randomly,
+       and just drops all further packets marked as yellow."
+    ::= { wredProfileEntry 6 }
+
+wredProfileMaxProbability OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute determines the percentage of packets to be dropped
+       at the point when the queue usage reaches wredProfileMaxThreshold.
+       The behavior is linear, so that up to wredProfileMinThreshold no
+       packets are dropped (0%). After minimum value, they are start being
+       dropped, so that when it reaches wredProfileMaxThreshold the % of
+       dropped packets is the one indicated by this object.
+       After wredProfileMaxThreshold, the % of dropped packets is 100%."
+    ::= { wredProfileEntry 7 }
+
+-- Service Virtual Interface (SVI) Configuration Table
+
+sviTable  OBJECT-TYPE
+    SYNTAX  SEQUENCE OF SviEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "Service Virtual Interface (SVI) Table.
+
+     This table holds SVI specific parameters and is augmenting the
+     generic attributes of the IF-MIB."
+    ::= { services 14 }
+
+sviEntry  OBJECT-TYPE
+    SYNTAX  SviEntry
+    MAX-ACCESS  not-accessible
+    STATUS  current
+    DESCRIPTION
+    "An entry in the SVI Table.
+
+     An entry is automatically created by the agent when a new SVI is
+     defined in the ifCreateTable."
+    INDEX { sviIndex }
+    ::= { sviTable 1 }
+
+SviEntry ::= SEQUENCE {
+    sviIndex               Integer32,
+    sviBoundToType         INTEGER 
+ }
+
+sviIndex OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS not-accessible
+    STATUS current
+    DESCRIPTION
+    "This object indicates the SVI index. Its value is equal to the
+     ifIndex of the associated entry in the ifTable."
+    ::= { sviEntry 1 }
+
+sviBoundToType    OBJECT-TYPE
+    SYNTAX    INTEGER {
+        none    (1),
+        bridge  (2),
+        pw      (3),
+        router  (4),
+        twamp   (5)
+        }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+            "Holds the type of the SVI according to the service it is
+            bounded to."
+    ::= { sviEntry 5 }
+
+----------------------------------
+-- Internal CoS Profile Definition
+----------------------------------
+
+cosInternalProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF CosInternalProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Internal Class of Service Profile table.
+      Each profile holds a priority method, and a mapping function
+      that maps the priority values (range according to the method)
+      into internal CoS values."
+    ::= { services 15 }
+
+cosInternalProfileEntry OBJECT-TYPE
+    SYNTAX     CosInternalProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "A conceptual row where each row contains one Internal CoS attributes."
+    INDEX { cosInternalProfileIndex }
+    ::= { cosInternalProfileTable 1 }
+
+CosInternalProfileEntry ::= SEQUENCE {
+    cosInternalProfileIndex                 Unsigned32,
+    cosInternalProfileRowStatus             RowStatus,
+    cosInternalProfileCosMethod             ProfileMethod,
+    cosInternalProfileName                  SnmpAdminString,
+    cosInternalProfileCosMapping            OCTET STRING,
+    cosInternalProfileUntaggedMapping       Unsigned32,
+    cosInternalProfileNonIpMapping          Unsigned32 
+ }
+
+cosInternalProfileIndex   OBJECT-TYPE
+    SYNTAX     Unsigned32
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+      "Defines the internal CoS Profile ID."
+    ::= { cosInternalProfileEntry 1 }
+
+cosInternalProfileRowStatus   OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+      "This attribute is used to create a new row or to delete an existing
+       row in the table."
+    ::= {  cosInternalProfileEntry 2 }
+
+cosInternalProfileCosMethod   OBJECT-TYPE
+    SYNTAX      ProfileMethod
+    MAX-ACCESS  read-create
+    STATUS     current
+    DESCRIPTION
+      "Defines the priority method upon Internal CoS mapping is done."
+    ::= { cosInternalProfileEntry 3 }
+
+cosInternalProfileName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the name assigned to Internal CoS profile."
+    ::= { cosInternalProfileEntry 4 }
+
+cosInternalProfileCosMapping  OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..64))
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+      "This attribute defines the value of the Internal CoS that is assigned
+      for each priority. The number of the valid octets depends upon
+      the priority method selected:
+      Octet 0 corresponds to priority = 0
+      Octet 1 corresponds to priority = 1
+      ...
+      Octet 63 corresponds to priority = 63."
+    ::= { cosInternalProfileEntry 5 }
+
+cosInternalProfileUntaggedMapping  OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute defines the CoS mapping of untagged frames.
+
+     This object is relevant only when cosInternalProfileCosMethod
+     is set to ieee802dot1p(2)."
+    DEFVAL      { 7 }
+    ::= { cosInternalProfileEntry 6 }
+
+cosInternalProfileNonIpMapping  OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS read-create
+    STATUS     current
+    DESCRIPTION
+    "This attribute defines the CoS mapping of non-IP packets.
+
+     This object is relevant only when cosInternalProfileCosMethod
+     is set to dscp(4)."
+    DEFVAL      { 7 }
+    ::= { cosInternalProfileEntry 7 }
+
+
+------------------------------------
+-- Color Mapping Profile Definition
+------------------------------------
+
+colorMappingProfileTable OBJECT-TYPE
+    SYNTAX     SEQUENCE OF ColorMappingProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "Color Mapping Profile table.
+            Each profile holds a priority method and a mapping function
+            that maps the priority values (range according to the method)
+            into color code values."
+    ::= { services 16 }
+
+colorMappingProfileEntry OBJECT-TYPE
+    SYNTAX     ColorMappingProfileEntry
+    MAX-ACCESS not-accessible
+    STATUS     current
+    DESCRIPTION
+            "The table entry."
+    INDEX { colorMappingProfileIndex }
+    ::= { colorMappingProfileTable 1 }
+
+ColorMappingProfileEntry ::= SEQUENCE {
+    colorMappingProfileIndex          Unsigned32,
+    colorMappingProfileRowStatus      RowStatus,
+    colorMappingProfileMethod         ProfileMethod,
+    colorMappingProfileName           SnmpAdminString,
+    colorMappingProfileMapping        OCTET STRING 
+ }
+
+colorMappingProfileIndex OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Defines the Color Mapping Profile ID."
+    ::= { colorMappingProfileEntry 1 }
+
+colorMappingProfileRowStatus OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "Table row status. It is based on the standard RowStatus
+            definition of RFC2579."
+    ::= {  colorMappingProfileEntry 2 }
+
+colorMappingProfileMethod OBJECT-TYPE
+    SYNTAX      ProfileMethod
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "Defines the priority method upon Color Mapping is done."
+    ::= { colorMappingProfileEntry 3 }
+
+colorMappingProfileName OBJECT-TYPE
+    SYNTAX      SnmpAdminString
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines the name assigned to Color Mapping
+            profile."
+    ::= { colorMappingProfileEntry 4 }
+
+colorMappingProfileMapping OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(0..64))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+            "This attribute defines the value of the color that is
+            assigned for each priority:
+            - green  (0)
+            - yellow (1)
+            The number of the valid octets depends on the priority
+            method selected:
+            Octet 0 corresponds to priority = 0
+            Octet 1 corresponds to priority = 1
+               ...
+            Octet 63 corresponds to priority = 63."
+    ::= { colorMappingProfileEntry 5 }
+
+
+-- ========================================================
+-- ==            Port Classifier Tables                  ==
+-- ========================================================
+
+portClassifierObjects OBJECT IDENTIFIER ::= {  services 17 }
+
+portClassifierScalarObjects OBJECT IDENTIFIER ::= {  portClassifierObjects 1 }
+
+portClassifierRemainingActions    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of remaining entries in the device H/W resources that may be
+     used for additional port classifier actions."
+   ::= { portClassifierScalarObjects 1 }
+
+
+-- ----------------------
+-- Port Classifier Table
+-- ----------------------
+
+portClassifierTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PortClassifierEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of classifiers used at the port level.
+
+     The port classifiers are also called Advanced ACLs (A2CL)."
+    ::= { portClassifierObjects 2 }
+
+portClassifierEntry OBJECT-TYPE
+    SYNTAX      PortClassifierEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in port classifier table.
+
+     A row can be deleted unconditionally.
+
+     When a row is deleted all the corresponding rows in the
+     portClassifierActionTable, portClassifierCommentTable and
+     portClassifierInvTable are automatically deleted as well."
+    INDEX {  ifIndex }
+    ::= { portClassifierTable 1 }
+
+PortClassifierEntry ::= SEQUENCE {
+    portClassifierRowStatus                   RowStatus,
+    portClassifierNumberOfActions             Unsigned32,
+    portClassifierHighSequenceNumber          Unsigned32,
+    portClassifierResequenceCmd               Unsigned32 
+ }
+
+portClassifierRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of port classifiers."
+    ::= { portClassifierEntry 1 }
+
+portClassifierNumberOfActions    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of actions (entries) for this interface in the
+     portClassifierActionTable.
+
+     The initial value is zero."
+    ::= { portClassifierEntry 2 }
+
+portClassifierHighSequenceNumber    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The highest used sequence number for this interface in the
+     portClassifierActionTable and portClassifierCommentTable.
+
+     This number is updated upon row activation/deletion at the
+     portClassifierActionTable and at the portClassifierCommentTable.
+
+     The initial value is zero."
+    ::= { portClassifierEntry 3 }
+
+portClassifierResequenceCmd    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..10000)
+    MAX-ACCESS read-create
+    STATUS      current
+    DESCRIPTION
+    "Resequence command, specifying step between sequence numbers.
+     For example, when resequence command with value of 100 is given,
+     new sequence numbers shall be  100 200 300 400 etc.
+     Possible Set values - 1..10000.
+
+     Upon resequence action completion, agent resets this object value
+     to 0 to indicate the resequence action is finished, and to allow
+     another set request.
+     The value 0 can only be set by agent or upon row creation."
+    DEFVAL { 0 }
+    ::= { portClassifierEntry 4 }
+
+
+-- -----------------------------
+-- Port Classifier Action Table
+-- -----------------------------
+
+portClassifierActionTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PortClassifierActionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of port classifier rules (ACL rules).
+     A rule has a match or drop action."
+    ::= { portClassifierObjects 3 }
+
+portClassifierActionEntry OBJECT-TYPE
+    SYNTAX      PortClassifierActionEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the port classifier rules table.
+
+     When a row is created/deleted , a corresponding row (where
+   portClassifierInvSequenceNumber equals portClassifierActionSequenceNumber)
+     is automatically created/deleted in the portClassifierInvTable.
+
+     When a row in this table is in active(1) state, no objects in that row
+     can be modified except for portClassifierActionSequenceNumber.
+
+     A row can be deleted unconditionally.
+
+     When a row is deleted at the portClassifierTable all the corresponding
+     rows in this table are automatically deleted as well."
+    INDEX {  ifIndex,
+             portClassifierActionIndex }
+    ::= { portClassifierActionTable 1 }
+
+PortClassifierActionEntry ::= SEQUENCE {
+    portClassifierActionIndex                       Unsigned32,
+    portClassifierActionRowStatus                   RowStatus,
+    portClassifierActionSequenceNumber              Unsigned32,
+    portClassifierActionType                        INTEGER,
+    portClassifierActionFlowName                    SnmpAdminString,
+    portClassifierActionFlowIndex1                  Unsigned32,
+    portClassifierActionFlowIndex2                  Unsigned32,
+    portClassifierActionCos                         Unsigned32,
+    portClassifierActionCosMapProfile               Unsigned32,
+    portClassifierActionHits                        Counter64,
+    portClassifierActionCriteria                    BITS,
+    portClassifierActionDstMacAddressLow            MacAddress,
+    portClassifierActionDstMacAddressHigh           MacAddress,
+    portClassifierActionSrcMacAddressLow            MacAddress,
+    portClassifierActionSrcMacAddressHigh           MacAddress,
+    portClassifierActionOuterEtherType              OCTET STRING,
+    portClassifierActionOuterVlanIdLow              VlanIdOrAnyOrNone,
+    portClassifierActionOuterVlanIdHigh             VlanIdOrAnyOrNone,
+    portClassifierActionOuterPbitLow                Unsigned32,
+    portClassifierActionOuterPbitHigh               Unsigned32,
+    portClassifierActionOuterDei                    Unsigned32,
+    portClassifierActionInnerEtherType              OCTET STRING,
+    portClassifierActionInnerVlanIdLow              VlanIdOrAnyOrNone,
+    portClassifierActionInnerVlanIdHigh             VlanIdOrAnyOrNone,
+    portClassifierActionInnerPbitLow                Unsigned32,
+    portClassifierActionInnerPbitHigh               Unsigned32,
+    portClassifierActionTosLow                      Unsigned32,
+    portClassifierActionTosHigh                     Unsigned32,
+    portClassifierActionProtocol                    Unsigned32,
+    portClassifierActionSrcIPAddressType            InetAddressType,
+    portClassifierActionSrcIPAddress                InetAddress,
+    portClassifierActionSrcIPAddressPrefixLength    InetAddressPrefixLength,
+    portClassifierActionDstIPAddressType            InetAddressType,
+    portClassifierActionDstIPAddress                InetAddress,
+    portClassifierActionDstIPAddressPrefixLength    InetAddressPrefixLength,
+    portClassifierActionTcpSrcPortLow               InetPortNumber,
+    portClassifierActionTcpSrcPortHigh              InetPortNumber,
+    portClassifierActionTcpDstPortLow               InetPortNumber,
+    portClassifierActionTcpDstPortHigh              InetPortNumber,
+    portClassifierActionUdpSrcPortLow               InetPortNumber,
+    portClassifierActionUdpSrcPortHigh              InetPortNumber,
+    portClassifierActionUdpDstPortLow               InetPortNumber,
+    portClassifierActionUdpDstPortHigh              InetPortNumber 
+ }
+
+portClassifierActionIndex     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A running number for the port classifier rules."
+    ::= { portClassifierActionEntry 1 }
+
+portClassifierActionRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of port classifiers rules."
+    ::= { portClassifierActionEntry 2 }
+
+portClassifierActionSequenceNumber    OBJECT-TYPE
+    SYNTAX      Unsigned32 (1..4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The sequence number (priority) of the rule.
+
+     It must be unique across all rows of this table and of
+     portClassifierCommentTable.
+
+     The default value is portClassifierHighSequenceNumber plus 10."
+    ::= { portClassifierActionEntry 3 }
+
+portClassifierActionType    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    match       (1),
+    drop        (2)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of the action."
+    DEFVAL { match }
+    ::= { portClassifierActionEntry 4 }
+
+portClassifierActionFlowName    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (0..252))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The name of the associated flow.
+
+     When the portClassifierActionType is match(1), the name cannot be a
+     null string.
+     When the portClassifierActionType is drop(2), the name can only be a
+     null string."
+    ::= { portClassifierActionEntry 5 }
+
+portClassifierActionFlowIndex1    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The value of rad.flowIdx1 of the associated flow.
+
+     If the associated flow does not exist, zero is returned."
+    ::= { portClassifierActionEntry 6 }
+
+portClassifierActionFlowIndex2    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The value of rad.flowIdx2 of the associated flow.
+
+     If the associated flow does not exist, zero is returned."
+    ::= { portClassifierActionEntry 7 }
+
+portClassifierActionCos    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7 | 255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The CoS assigned to the rule.
+
+     A value of 255 means the CoS mapping profile of
+     portClassifierActionCosMapProfile is used instead of this object.
+
+     No CoS is assigned to the rule when {portClassifierActionCos=255} and
+     {portClassifierActionCosMapProfile=0}.
+
+     This object is relevant only when portClassifierActionType is match(1)."
+    DEFVAL { 0 }
+    ::= { portClassifierActionEntry 8 }
+
+portClassifierActionCosMapProfile    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The profile used to map frames that match the rule to CoS value.
+
+     The configured value is the index of the corresponding entry in
+     cosInternalProfileTable.
+
+     A value of zero means a fixed CoS per
+     portClassifierActionCos is used instead of this object.
+
+     This object is relevant only when portClassifierActionType is match(1)."
+    DEFVAL { 0 }
+    ::= { portClassifierActionEntry 9 }
+
+portClassifierActionHits    OBJECT-TYPE
+    SYNTAX      Counter64
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The number of incoming frames that matched the rule.
+
+     This counter counts forwarded or dropped frames i.e. regardless of the
+     value of portClassifierActionType."
+    ::= { portClassifierActionEntry 10 }
+
+portClassifierActionCriteria    OBJECT-TYPE
+    SYNTAX      BITS
+    {
+    dstMacAddress     (0),
+    srcMacAddress     (1),
+    outerEtherType    (2),
+    outerVlanId       (3),
+    outerPbit         (4),
+    outerDei          (5),
+    innerEtherType    (6),
+    innerVlanId       (7),
+    innerPbit         (8),
+    tos               (9),
+    dscp              (10),
+    ipPrecedence      (11),
+    protocol          (12),
+    srcIPAddress      (13),
+    dstIPAddress      (14),
+    tcpSrcPort        (15),
+    tcpDstPort        (16),
+    udpSrcPort        (17),
+    udpDstPort        (18),
+    untagged          (19)
+    }
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The criteria for matching incoming frames.
+
+     Several fields may be selected at once. However, no more than one of
+     the fields tos(9), dscp(10) and ipPrecedence(11) can be selected at a
+     time (mutual exclusion between these fields).
+
+     For each selected field the value or range to match is set in the
+     relevant following object/s.
+
+     When no bit is set any incoming frame is matched i.e. any==0."
+    ::= { portClassifierActionEntry 11 }
+
+portClassifierActionDstMacAddressLow    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest destination MAC address to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionDstMacAddressHigh.
+
+     This object is relevant only when the dstMacAddress(0) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 12 }
+
+portClassifierActionDstMacAddressHigh    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest destination MAC address to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionDstMacAddressLow.
+
+     This object is relevant only when the dstMacAddress(0) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 13 }
+
+portClassifierActionSrcMacAddressLow    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest source MAC address to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionSrcMacAddressHigh.
+
+     This object is relevant only when the srcMacAddress(1) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 14 }
+
+portClassifierActionSrcMacAddressHigh    OBJECT-TYPE
+    SYNTAX      MacAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest source MAC address to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionSrcMacAddressLow.
+
+     This object is relevant only when the srcMacAddress(1) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 15 }
+
+portClassifierActionOuterEtherType    OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(2))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The value of the EtherType of the outer VLAN to compare with.
+
+     This object is relevant only when the outerEtherType(2) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 16 }
+
+portClassifierActionOuterVlanIdLow    OBJECT-TYPE
+    SYNTAX      VlanIdOrAnyOrNone
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest outer VLAN ID to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionOuterVlanIdHigh.
+
+     This object is relevant only when the outerVlanId(3) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 17 }
+
+portClassifierActionOuterVlanIdHigh    OBJECT-TYPE
+    SYNTAX      VlanIdOrAnyOrNone
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest outer VLAN ID to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionOuterVlanIdLow.
+
+     This object is relevant only when the outerVlanId(3) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 18 }
+
+portClassifierActionOuterPbitLow    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest outer P-bit value to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionOuterPbitHigh.
+
+     This object is relevant only when the outerPbit(4) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 19 }
+
+portClassifierActionOuterPbitHigh    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest outer P-bit value to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionOuterPbitLow.
+
+     This object is relevant only when the outerPbit(4) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 20 }
+
+portClassifierActionOuterDei    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..1)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The value of the DEI of the outer VLAN to compare with.
+
+     This object is relevant only when the outerDei(5) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 21 }
+
+portClassifierActionInnerEtherType    OBJECT-TYPE
+    SYNTAX      OCTET STRING (SIZE(2))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The value of the EtherType of the inner VLAN to compare with.
+
+     This object is relevant only when the innerEtherType(6) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 22 }
+
+portClassifierActionInnerVlanIdLow    OBJECT-TYPE
+    SYNTAX      VlanIdOrAnyOrNone
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest inner VLAN ID to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionInnerVlanIdHigh.
+
+     This object is relevant only when the innerVlanId(7) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 23 }
+
+portClassifierActionInnerVlanIdHigh    OBJECT-TYPE
+    SYNTAX      VlanIdOrAnyOrNone
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest inner VLAN ID to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionInnerVlanIdLow.
+
+     This object is relevant only when the innerVlanId(7) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 24 }
+
+portClassifierActionInnerPbitLow    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest inner P-bit value to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionInnerPbitHigh.
+
+     This object is relevant only when the innerPbit(8) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 25 }
+
+portClassifierActionInnerPbitHigh    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..7)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest inner P-bit value to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionInnerPbitLow.
+
+     This object is relevant only when the innerPbit(8) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 26 }
+
+portClassifierActionTosLow    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest IP TOS/DSCP/Precedence value to compare with in a range.
+
+     The value should be lower than or equal to portClassifierActionTosHigh.
+
+     This object is relevant only when the tos(9) bit, dscp(10) bit or
+     ipPrecedence(11) bit in portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 27 }
+
+portClassifierActionTosHigh    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest IP TOS/DSCP/Precedence value to compare with in a range.
+
+     The value should be higher than or equal to portClassifierActionTosLow.
+
+     This object is relevant only when the tos(9) bit, dscp(10) bit or
+     ipPrecedence(11) bit in portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 28 }
+
+portClassifierActionProtocol    OBJECT-TYPE
+    SYNTAX      Unsigned32 (0..255)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The value of the Protocol field of the IPv4 header or the Next Header
+     field of IPv6 header to compare with.
+
+     This object is relevant only when the protocol(12) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 29 }
+
+portClassifierActionSrcIPAddressType    OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of the source IP address of portClassifierActionSrcIPAddress.
+
+     This object is relevant only when the srcIPAddress(13) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 30 }
+
+portClassifierActionSrcIPAddress    OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The IP address to match against the packet's source IP address.
+     The type of this address is determined by the value of
+     portClassifierActionSrcIPAddressType.
+
+     This object is relevant only when the srcIPAddress(13) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 31 }
+
+portClassifierActionSrcIPAddressPrefixLength    OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The length of the CIDR Prefix carried in
+     portClassifierActionSrcIPAddress.
+
+     This object is relevant only when the srcIPAddress(13) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 32 }
+
+portClassifierActionDstIPAddressType    OBJECT-TYPE
+    SYNTAX      InetAddressType
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The type of the destination IP address of
+     portClassifierActionDstIPAddress.
+
+     This object is relevant only when the dstIPAddress(14) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 33 }
+
+portClassifierActionDstIPAddress    OBJECT-TYPE
+    SYNTAX      InetAddress
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The IP address to match against the packet's destination IP address.
+     The type of this address is determined by the value of
+     portClassifierActionDstIPAddressType.
+
+     This object is relevant only when the dstIPAddress(14) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 34 }
+
+portClassifierActionDstIPAddressPrefixLength    OBJECT-TYPE
+    SYNTAX      InetAddressPrefixLength
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The length of the CIDR Prefix carried in
+     portClassifierActionDstIPAddress.
+
+     This object is relevant only when the dstIPAddress(14) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 35 }
+
+portClassifierActionTcpSrcPortLow    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest TCP source port number to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionTcpSrcPortHigh.
+
+     This object is relevant only when the tcpSrcPort(15) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 36 }
+
+portClassifierActionTcpSrcPortHigh    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest TCP source port number to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionTcpSrcPortLow.
+
+     This object is relevant only when the tcpSrcPort(15) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 37 }
+
+portClassifierActionTcpDstPortLow    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest TCP destination port number to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionTcpDstPortHigh.
+
+     This object is relevant only when the tcpDstPort(16) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 38 }
+
+portClassifierActionTcpDstPortHigh    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest TCP destination port number to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionTcpDstPortLow.
+
+     This object is relevant only when the tcpDstPort(16) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 39 }
+
+portClassifierActionUdpSrcPortLow    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest UDP source port number to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionUdpSrcPortHigh.
+
+     This object is relevant only when the udpSrcPort(17) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 40 }
+
+portClassifierActionUdpSrcPortHigh    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest UDP source port number to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionUdpSrcPortLow.
+
+     This object is relevant only when the udpSrcPort(17) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 41 }
+
+portClassifierActionUdpDstPortLow    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The lowest UDP destination port number to compare with in a range.
+
+     The value should be lower than or equal to
+     portClassifierActionUdpDstPortHigh.
+
+     This object is relevant only when the udpDstPort(18) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 42 }
+
+portClassifierActionUdpDstPortHigh    OBJECT-TYPE
+    SYNTAX      InetPortNumber
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The highest UDP destination port number to compare with in a range.
+
+     The value should be higher than or equal to
+     portClassifierActionUdpDstPortLow.
+
+     This object is relevant only when the udpDstPort(18) bit in
+     portClassifierActionCriteria is set."
+    ::= { portClassifierActionEntry 43 }
+
+
+-- ------------------------------
+-- Port Classifier Comment Table
+-- ------------------------------
+
+portClassifierCommentTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PortClassifierCommentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This table contains a list of port classifier comments (ACL coments)."
+    ::= { portClassifierObjects 4 }
+
+portClassifierCommentEntry OBJECT-TYPE
+    SYNTAX      PortClassifierCommentEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in the port classifier comments table.
+
+     When a row is created/deleted , a corresponding row (where
+  portClassifierInvSequenceNumber equals portClassifierCommentSequenceNumber)
+     is automatically created/deleted at the portClassifierInvTable.
+
+     When a row in this table is in active(1) state, any object in that row
+     may be modified.
+
+     A row can be deleted unconditionally.
+
+     When a row is deleted at the portClassifierTable all the corresponding
+     rows in this table are automatically deleted as well."
+    INDEX {  ifIndex,
+             portClassifierCommentIndex }
+    ::= { portClassifierCommentTable 1 }
+
+PortClassifierCommentEntry ::= SEQUENCE {
+    portClassifierCommentIndex                       Unsigned32,
+    portClassifierCommentRowStatus                   RowStatus,
+    portClassifierCommentSequenceNumber              Unsigned32,
+    portClassifierCommentDescr                       SnmpAdminString 
+ }
+
+portClassifierCommentIndex     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "A running number for the port classifier comments."
+    ::= { portClassifierCommentEntry 1 }
+
+portClassifierCommentRowStatus    OBJECT-TYPE
+    SYNTAX      RowStatus
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "This object enables creation and deletion of port classifiers comments."
+    ::= { portClassifierCommentEntry 2 }
+
+portClassifierCommentSequenceNumber    OBJECT-TYPE
+    SYNTAX      Unsigned32  (1..4294967295)
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "The sequence number (priority) of the comment.
+
+     It must be unique across all rows of this table and of
+     portClassifierActionTable.
+
+     The default value is portClassifierHighSequenceNumber plus 10."
+    ::= { portClassifierCommentEntry 3 }
+
+portClassifierCommentDescr    OBJECT-TYPE
+    SYNTAX      SnmpAdminString (SIZE (1..252))
+    MAX-ACCESS  read-create
+    STATUS      current
+    DESCRIPTION
+    "Free text describing the following rules."
+    ::= { portClassifierCommentEntry 4 }
+
+
+-- ------------------------------
+-- Port Classifier Inverse Table
+-- ------------------------------
+
+portClassifierInvTable  OBJECT-TYPE
+    SYNTAX      SEQUENCE OF PortClassifierInvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "This read-only table contains a list of port classifier actions and
+     comments. The list is sorted by sequence number."
+    ::= { portClassifierObjects 5 }
+
+portClassifierInvEntry OBJECT-TYPE
+    SYNTAX      PortClassifierInvEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "An entry in port classifier inverse table.
+
+     A row is autonatically created/deleted when a row is activated/deleted
+     at the portClassifierActionTable or at the portClassifierCommentTable.
+
+     When a row is deleted at the portClassifierTable all the corresponding
+     rows in this table are automatically deleted as well."
+    INDEX {  ifIndex,
+             portClassifierInvSequenceNumber }
+    ::= { portClassifierInvTable 1 }
+
+PortClassifierInvEntry ::= SEQUENCE {
+    portClassifierInvSequenceNumber              Unsigned32,
+    portClassifierInvType                        INTEGER,
+    portClassifierInvPointer                     Unsigned32 
+ }
+
+portClassifierInvSequenceNumber     OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+    "The sequence number (priority) of the rule or comment."
+    ::= { portClassifierInvEntry 1 }
+
+portClassifierInvType    OBJECT-TYPE
+    SYNTAX      INTEGER
+    {
+    action      (1),
+    comment     (2)
+    }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "Indicates the origin table of the entry:
+     action(1)  - portClassifierActionTable
+     comment(2) - portClassifierCommentTable ."
+    ::= { portClassifierInvEntry 2 }
+
+portClassifierInvPointer    OBJECT-TYPE
+    SYNTAX      Unsigned32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+    "The running index at the origin table per portClassifierInvType."
+    ::= { portClassifierInvEntry 3 }
+
+
+
+END
+

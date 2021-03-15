@@ -26,7 +26,7 @@ if ($port_stats_count)
 
   $process_port_functions[$port_module] = $GLOBALS['snmp_status']; // Additionally process port with function
 }
-else if ($has_ifEntry_error_code == 1000)
+elseif ($has_ifEntry_error_code == 1000)
 {
   // if not exist ifEntry on device, collect and translate netapp specific tables
   print_cli($mib.'::NetIfEntry ');
@@ -34,10 +34,10 @@ else if ($has_ifEntry_error_code == 1000)
   if (count($netif_stat))
   {
     $has_ifXEntry = $GLOBALS['snmp_status']; // Needed for additional check HC counters
-    if (OBS_DEBUG > 1) { print_vars($netif_stat); }
+    print_debug_vars($netif_stat);
 
-    $mib_config = &$config['mibs'][$mib]['ports']['oids']; // Attach MIB options/translations
-    //print_vars($mib_config);
+    $mib_def = &$config['mibs'][$mib]['ports']['oids']; // Attach MIB options/translations
+    //print_vars($mib_def);
 
     /*
     $data_oids_ifEntry = array(
@@ -49,36 +49,42 @@ else if ($has_ifEntry_error_code == 1000)
       'ifName', 'ifAlias', 'ifHighSpeed', 'ifPromiscuousMode', 'ifConnectorPresent',
     );
     */
-    $data_oids_netport = array('ifType', 'ifMtu', 'ifAdminStatus', 'ifOperStatus',
-                               'ifHighSpeed', 'ifDuplex', 'ifVlan');
+    $data_oids_netport = [ 'ifType', 'ifMtu', 'ifAdminStatus', 'ifOperStatus',
+                           'ifHighSpeed', 'ifDuplex', 'ifVlan' ];
     $flags = OBS_SNMP_ALL ^ OBS_QUOTES_STRIP;
     $netport_stat = array();
     foreach ($data_oids_netport as $oid)
     {
-      $netport_oid = $mib_config[$oid]['oid'];
+      $netport_oid = $mib_def[$oid]['oid'];
       print_cli($mib.'::'.$netport_oid.' ');
       $netport_stat = snmpwalk_cache_twopart_oid($device, $netport_oid, $netport_stat, $mib, NULL, $flags);
     }
     // disable hex to string conversion for ifPhysAddress
     $flags = $flags | OBS_SNMP_HEX;
-    $netport_oid = $mib_config['ifPhysAddress']['oid'];
+    $netport_oid = $mib_def['ifPhysAddress']['oid'];
     print_cli($mib.'::'.$netport_oid.' ');
     $netport_stat = snmpwalk_cache_twopart_oid($device, $netport_oid, $netport_stat, $mib, NULL, $flags);
 
-    if (OBS_DEBUG > 1 && count($netport_stat)) { print_vars($netport_stat); }
+    print_debug_vars($netport_stat);
   }
 
   // Now rewrite to standard IF-MIB array
   foreach ($netif_stat as $ifIndex => $port)
   {
-    list($port['netportNode'], $port['netportPort']) = explode(':', $port['netifDescr'], 2);
+    if (str_exists($port['netifDescr'], ':'))
+    {
+      list($port['netportNode'], $port['netportPort']) = explode(':', $port['netifDescr'], 2);
+    } else {
+      $port['netportNode'] = '';
+      $port['netportPort'] = $port['netifDescr'];
+    }
     $port['netportPort'] = str_ireplace('MGMT_PORT_ONLY ', '', $port['netportPort']);
 
     if (isset($netport_stat[$port['netportNode']][$port['netportPort']]))
     {
       // ifDescr
       $oid = 'ifDescr';
-      $port[$oid] = $port[$mib_config[$oid]['oid']];
+      $port[$oid] = $port[$mib_def[$oid]['oid']];
       $port_stats[$ifIndex][$oid] = $port[$oid];
 
       // ifName, ifAlias
@@ -89,19 +95,24 @@ else if ($has_ifEntry_error_code == 1000)
 
       // ifPhysAddress
       $oid = 'ifPhysAddress';
-      $port[$oid] = strtolower($netport[$mib_config[$oid]['oid']]);
+      $port[$oid] = strtolower($netport[$mib_def[$oid]['oid']]);
       $port[$oid] = str_replace(' ', '', $port[$oid]);
       $port_stats[$ifIndex][$oid] = $port[$oid];
 
       // All other data fields
       foreach ($data_oids_netport as $oid)
       {
-        $port[$oid] = $netport[$mib_config[$oid]['oid']];
-        if (isset($mib_config[$oid]['rewrite'][$port[$oid]]))
+        $port[$oid] = $netport[$mib_def[$oid]['oid']];
+        if (isset($mib_def[$oid]['transform']))
+        {
+          $mib_def[$oid]['transformations'] = $mib_def[$oid]['transform'];
+        }
+        if (isset($mib_def[$oid]['transformations']))
         {
           // Translate to standard IF-MIB values
-          $port[$oid] = $mib_config[$oid]['rewrite'][$port[$oid]];
+          $port[$oid] = string_transform($port[$oid], $mib_def[$oid]['transformations']);
         }
+
         if ($oid == 'ifVlan' && $port[$oid] < 0)
         {
           $port[$oid] = '';

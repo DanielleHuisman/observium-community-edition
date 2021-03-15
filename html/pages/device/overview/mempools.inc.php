@@ -1,13 +1,12 @@
 <?php
-
 /**
- * Observium Network Management and Monitoring System
- * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
+ * Observium
+ *
+ *   This file is part of Observium.
  *
  * @package    observium
- * @subpackage webui
- * @author     Adam Armstrong <adama@observium.org>
- * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
+ * @subpackage web
+ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2020 Observium Limited
  *
  */
 
@@ -33,7 +32,7 @@ if (count($mempools))
   foreach ($mempools as $mempool)
   {
     $percent= round($mempool['mempool_perc'], 0);
-    $text_descr = rewrite_entity_name($mempool['mempool_descr']);
+    $text_descr = rewrite_entity_name($mempool['mempool_descr'], 'mempool');
     if ($mempool['mempool_total'] != '100')
     {
       $total = formatStorage($mempool['mempool_total']);
